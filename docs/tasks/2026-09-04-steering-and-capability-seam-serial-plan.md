@@ -46,7 +46,7 @@ This is a coordination and recovery ledger. I207 claim/activation is effective v
 
 | Work | State | Disposition |
 |---|---|---|
-| I207 / TUI-049 | Active / Claimed | First child; claim/activation effective via PR #482 merge `8ff4c6f1`. |
+| I207 / TUI-049 | Review / Claimed | First child; local implementation candidate converged, awaiting implementation PR CI/review. |
 | I208 / TUI-050 | Planned / Unclaimed | Second child; depends on I207 contract/terminal disposition. |
 | I246 / CAP-001-P0 | Planned / Unclaimed | Third child; depends on CAP-001 decision or explicit narrowing and follows steering work. |
 | I164 | Paused / superseded | Preserve; do not resume. |

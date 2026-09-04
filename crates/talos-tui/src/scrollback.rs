@@ -530,6 +530,7 @@ pub(crate) struct QueuePlan {
     pub(crate) hidden_count: usize,
     pub(crate) show_summary: bool,
     pub(crate) show_followup: bool,
+    pub(crate) entry_rows: Vec<Vec<String>>,
 }
 
 /// Compressed layout budget for constrained terminal heights.
@@ -570,7 +571,7 @@ pub(crate) fn compress_layout(
 }
 
 impl QueuePreviewComponent<'_> {
-    pub(crate) fn plan(&self) -> QueuePlan {
+    pub(crate) fn plan_with_width(&self, width: usize) -> QueuePlan {
         let steering_total = self.snapshot.map(|s| s.total_count).unwrap_or(0);
         let total = steering_total + self.followup_count;
         if total == 0 || self.max_rows == 0 {
@@ -580,12 +581,23 @@ impl QueuePreviewComponent<'_> {
                 hidden_count: 0,
                 show_summary: false,
                 show_followup: false,
+                entry_rows: Vec::new(),
             };
         }
 
         let max_rows = self.max_rows.min(6);
         let content_budget = ((max_rows - 1) as usize).min(5);
         let available = self.snapshot.map(|s| s.entries.len()).unwrap_or(0);
+        let entry_rows_all = self
+            .snapshot
+            .map(|snapshot| {
+                snapshot
+                    .entries
+                    .iter()
+                    .map(|entry| queue_entry_rows(entry, width.saturating_sub(4).max(1)))
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
 
         let entries_if_full = available.min(content_budget);
         let would_hide = steering_total.saturating_sub(entries_if_full);
@@ -596,17 +608,34 @@ impl QueuePreviewComponent<'_> {
             content_budget
         };
 
-        let entries_to_show = available.min(entry_budget);
+        let mut entries_to_show = 0usize;
+        let mut used_rows = 0usize;
+        let mut visible_entry_rows = Vec::new();
+        for rows in entry_rows_all.iter().take(entry_budget) {
+            let row_count = rows
+                .len()
+                .max(1)
+                .min(entry_budget.saturating_sub(used_rows));
+            if row_count == 0 {
+                break;
+            }
+            entries_to_show += 1;
+            used_rows += row_count;
+            visible_entry_rows.push(rows.iter().take(row_count).cloned().collect::<Vec<_>>());
+            if used_rows >= entry_budget {
+                break;
+            }
+        }
         let hidden_count = steering_total.saturating_sub(entries_to_show);
         let show_summary = hidden_count > 0;
 
         let remaining = content_budget
-            .saturating_sub(entries_to_show)
+            .saturating_sub(used_rows)
             .saturating_sub(if show_summary { 1 } else { 0 });
         let show_followup = self.followup_count > 0 && remaining > 0;
 
         let total_rows = 1
-            + entries_to_show as u16
+            + used_rows as u16
             + if show_summary { 1 } else { 0 }
             + if show_followup { 1 } else { 0 };
 
@@ -616,17 +645,20 @@ impl QueuePreviewComponent<'_> {
             hidden_count,
             show_summary,
             show_followup,
+            entry_rows: visible_entry_rows,
         }
     }
 }
 
 impl ViewportComponent for QueuePreviewComponent<'_> {
-    fn height_hint(&self, _w: u16) -> u16 {
-        self.plan().total_rows
+    fn height_hint(&self, width: u16) -> u16 {
+        self.plan_with_width(width as usize).total_rows
     }
 
     fn render(&self, frame: &mut InlineFrame, area: Rect) {
-        let plan = self.plan();
+        let max_width = (area.width as usize).saturating_sub(4).max(1);
+        let plan = self.plan_with_width(area.width as usize);
+        debug_assert_eq!(plan.entries_to_show, plan.entry_rows.len());
         if plan.total_rows == 0 {
             return;
         }
@@ -649,19 +681,24 @@ impl ViewportComponent for QueuePreviewComponent<'_> {
             Span::styled(" (will send after current turn)", dim),
         ]));
 
-        let max_width = (area.width as usize).saturating_sub(4).max(1);
-
-        if let Some(snap) = &self.snapshot {
-            for entry in snap.entries.iter().take(plan.entries_to_show) {
-                let normalized = normalize_single_line(&entry.text);
-                let suffix = if entry.truncated { " ⚠" } else { "" };
-                let suffix_width = if entry.truncated { 2 } else { 0 }; // " ⚠" = 2 display cols
-                let text_budget = max_width.saturating_sub(suffix_width);
-                let display = truncate_to_display_width(&normalized, text_budget);
+        for (entry_index, rows) in plan.entry_rows.iter().enumerate() {
+            let truncated = self
+                .snapshot
+                .and_then(|snap| snap.entries.get(entry_index))
+                .is_some_and(|entry| entry.truncated);
+            for (row_index, display) in rows.iter().enumerate() {
+                let suffix = if truncated && row_index + 1 == rows.len() {
+                    " ⚠"
+                } else {
+                    ""
+                };
                 lines.push(Line::from(vec![
                     Span::styled("  ", dim),
-                    Span::styled("↳ ", dim.add_modifier(Modifier::DIM)),
-                    Span::styled(display, dim),
+                    Span::styled(
+                        if row_index == 0 { "↳ " } else { "  " },
+                        dim.add_modifier(Modifier::DIM),
+                    ),
+                    Span::styled(display.clone(), dim),
                     Span::styled(suffix, dim),
                 ]));
             }
@@ -694,6 +731,20 @@ impl ViewportComponent for QueuePreviewComponent<'_> {
             "render line count must match height_hint"
         );
         frame.render_widget(Paragraph::new(lines), area);
+    }
+}
+
+fn queue_entry_rows(
+    entry: &talos_conversation::SteeringQueueEntry,
+    max_width: usize,
+) -> Vec<String> {
+    let suffix_width = if entry.truncated { 2 } else { 0 };
+    let text_width = max_width.saturating_sub(suffix_width).max(1);
+    let rows = wrap_to_display_width(&normalize_single_line(&entry.text), text_width);
+    if rows.is_empty() {
+        vec![String::new()]
+    } else {
+        rows
     }
 }
 
