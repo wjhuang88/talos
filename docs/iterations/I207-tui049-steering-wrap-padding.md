@@ -15,7 +15,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed (proposed; effective only after claim merge) |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline session |
 | Work Slice | I207 / TUI-049 only: steering wrapped-row padding and its focused/terminal validation. |
