@@ -21,7 +21,7 @@
 | Work Slice | I207 / TUI-049 only: steering wrapped-row padding and its focused/terminal validation. |
 | Claimed At | 2026-09-04 |
 | Source Issue | #267 |
-| Governance Claim PR | Pending draft PR number |
+| Governance Claim PR | #482 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer requested serial execution on 2026-09-04; implementation remains gated on this claim merge. |
 | Implementation PR | Not started |

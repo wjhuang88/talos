@@ -20,7 +20,7 @@
 | Work Slice | I207 / TUI-049 only: preserve shared left/right display padding for wrapped steering rows, including narrow and Unicode-width cases, with focused tests and terminal evidence. Excludes steering timing/custody, history wrapping, theme, selection, release and CAP-001 text seam work. |
 | Claimed At | 2026-09-04 |
 | Source Issue | #267 |
-| Governance Claim PR | Pending draft PR number |
+| Governance Claim PR | #482 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer requested serial execution of I207, I208 and I246 on 2026-09-04; independent review remains required for the implementation candidate. |
 | Implementation PR | Not started |
