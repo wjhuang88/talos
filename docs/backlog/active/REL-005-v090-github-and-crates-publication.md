@@ -1,6 +1,6 @@
 # REL-005: v0.9.0 GitHub And Crates.io Publication
 
-**Status**: Review / Claimed
+**Status**: Complete / Closed (2026-09-04)
 **Type**: Release / Distribution Story
 **Parent Epic**: ARCH-031
 
@@ -8,7 +8,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | `Codex / GPT-5 mainline release session` |
 | Work Slice | `REL-005 / I245` only: prepare and review the v0.9.0 candidate, publish the immutable GitHub tag and Release first, then publish the metadata-derived Cargo closure and verify external CLI/runtime consumption. |
@@ -18,8 +18,8 @@
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer explicitly requested a complete GitHub and crates.io release on 2026-09-03. Independent exact-head release review remains mandatory before the immutable tag or any Cargo publish. |
 | Implementation PR | #480 |
-| Last Updated | 2026-09-03 |
-| Handoff / Release Condition | Candidate publication remains blocked until exact-head CI, independent release review, merge-time CAS and merged-main versioned preflight pass. |
+| Last Updated | 2026-09-04 |
+| Handoff / Release Condition | Closed after GitHub-first v0.9.0 publication, Cargo closure and external CLI/runtime acceptance. |
 
 ## Identity / Goal / Value
 
@@ -56,17 +56,17 @@ Cargo package closure so users can install the `talos` binary and embed `talos-r
 
 ## Acceptance
 
-- [ ] `./scripts/release_preflight.sh v0.9.0` passes on the exact release commit.
-- [ ] Exact-head CI and independent release review approve the candidate.
-- [ ] Annotated `v0.9.0` points at the reviewed main commit and the GitHub Release contains five
+- [x] `./scripts/release_preflight.sh v0.9.0` passes on the exact release commit.
+- [x] Exact-head CI and independent release review approve the candidate.
+- [x] Annotated `v0.9.0` points at the reviewed main commit and the GitHub Release contains five
       platform archives plus `checksum.sha256`.
-- [ ] No Cargo package is published before the GitHub Release succeeds.
-- [ ] Every registry-enabled Talos package is visible at `0.9.0`; `talos-models` is absent.
-- [ ] External Cargo installation returns `talos 0.9.0`.
-- [ ] A registry-only runtime fixture passes in default and `coding` modes.
-- [ ] The explicit model refresh preserves all local variants and compatibility aliases and fails
+- [x] No Cargo package is published before the GitHub Release succeeds.
+- [x] Every registry-enabled Talos package is visible at `0.9.0`; `talos-models` is absent.
+- [x] External Cargo installation returns `talos 0.9.0`.
+- [x] A registry-only runtime fixture passes in default and `coding` modes.
+- [x] The explicit model refresh preserves all local variants and compatibility aliases and fails
       without overwriting the committed catalog if its prior catalog cannot be parsed.
-- [ ] Owner-first closeout records immutable commit, tag, workflow, package and external evidence.
+- [x] Owner-first closeout records immutable commit, tag, workflow, package and external evidence.
 
 ## Residual Destination
 
@@ -94,3 +94,19 @@ sandboxed run identified that `talos-skill` intentionally writes a dedicated sha
 under `~/.agents/skills`; its `Operation not permitted` was a host sandbox restriction, and the
 same test passed in the standard release environment. No tag, Release or crate publication has
 occurred.
+
+## 2026-09-04 Closeout Checkpoint
+
+Implementation PR #480 was merged as `fad6e24e4b716b90b776b358d92ff69015688adf` after exact-head
+CI `33774242560` and independent release review `5534058458` approved head
+`9f6a22a2af91e718f03009686202caa754c533ad`. The immutable annotated tag `v0.9.0` points to
+`fad6e24e`; GitHub Release workflow `33825995467` succeeded and published the five platform
+archives plus `checksum.sha256`.
+
+After GitHub Release completion, all 20 registry-enabled Talos packages became visible at
+`0.9.0` in dependency order; `talos-models` remains unpublished (`publish = false`). Isolated
+acceptance confirmed `cargo install talos-cli --version 0.9.0 --bin talos --locked` returns
+`talos 0.9.0`, and a registry-only `talos-runtime` fixture passes in default and `coding`
+modes. The versioned release preflight passed on the release commit.
+
+Completion Commit: `fad6e24e4b716b90b776b358d92ff69015688adf`.

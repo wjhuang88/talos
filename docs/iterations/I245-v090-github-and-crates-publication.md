@@ -1,6 +1,6 @@
 # Iteration I245: v0.9.0 GitHub And Crates.io Publication
 
-> Document status: Review / Claimed
+> Document status: Complete / Closed (2026-09-04)
 > Published plan date: 2026-09-03
 > Planned objective: publish one validated v0.9.0 GitHub Release before publishing the Cargo
 > package closure, then prove external CLI installation and runtime SDK consumption.
@@ -12,7 +12,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | `Codex / GPT-5 mainline release session` |
 | Work Slice | REL-005 only: v0.9.0 version/release surfaces, reviewed candidate, GitHub-first tag/Release, dependency-ordered Cargo publication, external CLI/runtime verification and owner-first closeout. |
@@ -22,8 +22,8 @@
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer explicitly requested the complete GitHub and crates.io release. Protected release execution still requires independent exact-head review before irreversible actions. |
 | Implementation PR | #480 |
-| Last Updated | 2026-09-03 |
-| Handoff / Release Condition | Immutable publication remains blocked until exact-head CI, independent release review, merge-time CAS and merged-main versioned preflight pass. |
+| Last Updated | 2026-09-04 |
+| Handoff / Release Condition | Closed after GitHub-first v0.9.0 publication, Cargo closure and external acceptance. |
 
 ## Published Baseline
 
@@ -96,9 +96,18 @@
 
 ## Completion Evidence
 
-- Completion Commit: Pending.
+- Completion Commit: `fad6e24e4b716b90b776b358d92ff69015688adf`.
 - Status-only documentation commits cannot self-certify completion.
 
 ## Variance And Residuals
 
 - None at selection. RUNTIME-006 and REL-002 remain separate owners.
+
+## 2026-09-04 Closeout Checkpoint
+
+PR #480 merged at `fad6e24e4b716b90b776b358d92ff69015688adf` after exact-head CI
+`33774242560` and independent release review `5534058458` approved
+`9f6a22a2af91e718f03009686202caa754c533ad`. Tag `v0.9.0` and GitHub Release workflow
+`33825995467` completed with five platform archives and `checksum.sha256`. The 20
+registry-enabled packages are visible on crates.io; `talos-models` remains unpublished.
+Isolated CLI installation and registry-only runtime default/`coding` tests passed.
