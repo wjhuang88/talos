@@ -14,7 +14,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed (proposed; effective only after claim merge) |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline session |
 | Work Slice | I207 / TUI-049 only: preserve shared left/right display padding for wrapped steering rows, including narrow and Unicode-width cases, with focused tests and terminal evidence. Excludes steering timing/custody, history wrapping, theme, selection, release and CAP-001 text seam work. |
