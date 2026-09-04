@@ -627,12 +627,15 @@ impl QueuePreviewComponent<'_> {
             let clipped = row_count < rows.len();
             let mut visible_rows = rows.iter().take(row_count).cloned().collect::<Vec<_>>();
             if clipped && let Some(last) = visible_rows.last_mut() {
-                let storage_marker_width = self
+                let storage_marker_width = if self
                     .snapshot
                     .and_then(|snapshot| snapshot.entries.get(entry_index))
                     .is_some_and(|entry| entry.truncated)
-                    .then_some(2)
-                    .unwrap_or(0);
+                {
+                    2
+                } else {
+                    0
+                };
                 *last = mark_queue_row_clipped(
                     last,
                     width
