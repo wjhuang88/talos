@@ -5,10 +5,10 @@
 | Story ID | CAP-001-P0 |
 | Type | Architecture Preparation / Compatibility Story |
 | Priority | P1 |
-| Status | Refinement / Unclaimed |
+| Status | Planned / Unclaimed |
 | Parent Epic | CAP-001 |
 | Source | [GitHub Issue #467](https://github.com/wjhuang88/talos/issues/467) |
-| Selected Iteration | None |
+| Selected Iteration | I246 |
 | Depends On | CAP-001 architecture decision; current code-truth characterization; active Desktop/shared-file overlap inventory |
 
 ## Collaboration Claim
@@ -25,8 +25,8 @@
 | Authorization Mode | Not applicable |
 | Authorization Evidence | Not applicable |
 | Implementation PR | Not started |
-| Last Updated | 2026-09-02 |
-| Handoff / Release Condition | Decide crate placement and compatibility seams from code truth, inventory active overlap, then establish a bounded runnable iteration and effective claim before code or Cargo changes. |
+| Last Updated | 2026-09-04 |
+| Handoff / Release Condition | I246 is planned but unactivated. Accept or explicitly narrow CAP-001's architecture decision, then establish an effective claim before code or Cargo changes. |
 
 ## Identity / Goal / Value
 
