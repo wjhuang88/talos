@@ -1,11 +1,13 @@
 # TUI-050: Steering Inserts At Model And Tool Boundaries
 
+**Status**: Active / Claimed (proposed; ineffective until claim merge)
+
 | Field | Value |
 |---|---|
 | Story ID | TUI-050 |
 | Type | TUI / Runtime Scheduling Story |
 | Priority | P1 |
-| Status | Planned / Unclaimed |
+| Status | Active / Claimed (proposed; ineffective until claim merge) |
 | Source | [GitHub Issue #267](https://github.com/wjhuang88/talos/issues/267) |
 | Selected Iteration | I208 |
 | Depends On | TUI-044 / I169 accepted queue custody and Turn lifecycle |
@@ -14,18 +16,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 mainline session |
+| Work Slice | I208 / TUI-050 only: insert accepted steering at explicit model-response or tool-call boundaries, preserving FIFO, Session/generation identity, exactly-once custody and existing transcript semantics. Excludes layout/padding, arbitrary token preemption, parallel model execution, global event bus, persistent cross-Session queues, permission, release and CAP-001 text seam work. |
+| Claimed At | 2026-09-04 |
 | Source Issue | #267 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #486 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | I207/TUI-049 is Complete / Closed on main at `2edb914f`; maintainer directed serial execution of I207, I208 and I246. |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-17 |
-| Handoff / Release Condition | Establish an effective claim and define the provider/tool event boundary before implementation. |
+| Last Updated | 2026-09-04 |
+| Handoff / Release Condition | Claim and activation are ineffective until this governance record merges. Implementation starts from its merge or a later `main`; independent exact-head review remains required. |
 
 ## Identity / Goal / Value
 
