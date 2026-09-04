@@ -1,6 +1,6 @@
 # Iteration I207: Steering Wrap Padding Contract
 
-> Document status: Planned / Unclaimed
+> Document status: Active / Claimed (proposed; effective only after claim merge)
 > Planned date: 2026-08-17
 > Objective: implement TUI-049 so steering continuation lines use the shared horizontal padding
 > contract at every supported terminal width.
@@ -10,6 +10,23 @@
 - `TUI-049` — `docs/backlog/active/TUI-049-steering-wrap-padding.md`
 
 ## Activation Gate
+
+## Collaboration Claim
+
+| Field | Value |
+|---|---|
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 mainline session |
+| Work Slice | I207 / TUI-049 only: steering wrapped-row padding and its focused/terminal validation. |
+| Claimed At | 2026-09-04 |
+| Source Issue | #267 |
+| Governance Claim PR | #482 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Maintainer requested serial execution on 2026-09-04; implementation remains gated on this claim merge. |
+| Implementation PR | Not started |
+| Last Updated | 2026-09-04 |
+| Handoff / Release Condition | Both claim and Active state are ineffective until the finalized governance PR merges to main. |
 
 - Current-main inventory and effective Collaboration Claim are recorded before activation.
 - The implementation branch starts from the effective claim merge point.
@@ -32,4 +49,4 @@ No steering lifecycle/timing change, theme redesign, selection change or release
 
 ## Status
 
-Planned / Unclaimed. No implementation branch or code authorization exists.
+Active / Claimed (proposed; effective only after the finalized governance PR merges). No implementation code exists yet.

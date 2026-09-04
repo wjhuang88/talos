@@ -5,7 +5,7 @@
 | Story ID | TUI-049 |
 | Type | TUI / Layout Correctness Story |
 | Priority | P1 |
-| Status | Planned / Unclaimed |
+| Status | Active / Claimed (proposed; effective only after claim merge) |
 | Source | [GitHub Issue #267](https://github.com/wjhuang88/talos/issues/267) |
 | Selected Iteration | I207 |
 | Depends On | Shared scrollback/composer width and padding conventions |
@@ -14,18 +14,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 mainline session |
+| Work Slice | I207 / TUI-049 only: preserve shared left/right display padding for wrapped steering rows, including narrow and Unicode-width cases, with focused tests and terminal evidence. Excludes steering timing/custody, history wrapping, theme, selection, release and CAP-001 text seam work. |
+| Claimed At | 2026-09-04 |
 | Source Issue | #267 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #482 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Maintainer requested serial execution of I207, I208 and I246 on 2026-09-04; independent review remains required for the implementation candidate. |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-17 |
-| Handoff / Release Condition | Establish an effective claim and bind the width contract to the shared production allocator. |
+| Last Updated | 2026-09-04 |
+| Handoff / Release Condition | Claim/activation become effective only after the finalized governance PR reaches main; implementation starts from that merge. |
 
 ## Identity / Goal / Value
 
