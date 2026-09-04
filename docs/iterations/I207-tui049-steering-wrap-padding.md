@@ -73,3 +73,11 @@ behavior is unchanged. Focused TUI tests and the full `talos-tui` library suite 
 - `cargo test -p talos-tui --lib`: 568 passed, 0 failed.
 - `cargo fmt --all`: passed.
 - Workspace locked checks remain in progress before the stable candidate is pushed.
+
+## Review Correction Checkpoint (2026-09-04)
+
+Independent review comment `5538822655` on PR #483 identified silent viewport loss when one
+wrapped entry exceeded the five-row queue budget. The implementation now marks the final visible
+row with a display-width-safe `…`, while retaining the separate storage-truncation `⚠` marker;
+tests cover both a single over-budget entry and a later entry that only partially fits. The next
+stable candidate must use fresh exact-head CI and review evidence.

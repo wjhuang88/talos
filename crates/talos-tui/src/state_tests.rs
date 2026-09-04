@@ -1027,6 +1027,48 @@ fn queue_preview_wraps_long_steering_with_shared_padding_budget() {
 }
 
 #[test]
+fn queue_preview_marks_single_entry_clipped_by_viewport_budget() {
+    let long = "x".repeat(100);
+    let s = snap(&[&long], 1);
+    let c = crate::scrollback::QueuePreviewComponent {
+        snapshot: Some(&s),
+        followup_count: 0,
+        max_rows: 5,
+    };
+    let plan = c.plan_with_width(14);
+    assert_eq!(plan.entry_clipped, vec![true]);
+    assert!(
+        plan.entry_rows[0]
+            .last()
+            .is_some_and(|row| row.ends_with('…'))
+    );
+    assert_eq!(
+        plan.hidden_count, 0,
+        "the visible entry is not a hidden entry"
+    );
+}
+
+#[test]
+fn queue_preview_marks_later_entry_when_only_partially_visible() {
+    let first = "a".repeat(18);
+    let second = "b".repeat(40);
+    let s = snap(&[&first, &second], 2);
+    let c = crate::scrollback::QueuePreviewComponent {
+        snapshot: Some(&s),
+        followup_count: 0,
+        max_rows: 6,
+    };
+    let plan = c.plan_with_width(14);
+    assert_eq!(plan.entry_clipped, vec![false, true]);
+    assert!(
+        plan.entry_rows[1]
+            .last()
+            .is_some_and(|row| row.ends_with('…'))
+    );
+    assert_eq!(plan.total_rows, 6);
+}
+
+#[test]
 fn normalize_single_line_replaces_newlines() {
     assert_eq!(
         crate::scrollback::normalize_single_line("hello\nworld"),

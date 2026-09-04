@@ -58,7 +58,7 @@ This is a coordination and recovery ledger. I207 claim/activation is effective v
 | ID | Task | Expected Output | Depends On | Completion Gate | Fallback | Status |
 |---|---|---|---|---|---|---|
 | S0 | Establish current-main inventory and claim for I207 | Effective I207 claim and active owner | Clean current main; no overlapping steering implementation | Governance PR merged, exact-head CI/review/CAS pass | Keep I207 Planned/Unclaimed | Complete (`8ff4c6f1`) |
-| S1 | Implement I207 / TUI-049 | Padding-correct steering wrapping with focused and terminal evidence | S0 | Owner acceptance, local locked checks, exact-head review/CI, merge and closeout | Preserve existing layout and record residual | In progress |
+| S1 | Implement I207 / TUI-049 | Padding-correct steering wrapping with focused and terminal evidence | S0 | Owner acceptance, local locked checks, exact-head review/CI, merge and closeout | Preserve existing layout and record residual | In progress; review correction batched locally after #483 feedback |
 | S2 | Establish I208 claim after I207 disposition | Effective I208 claim and active owner | S1 terminal; current-main refresh | Governance PR merged and CAS pass | Keep I208 Planned/Unclaimed | Planned |
 | S3 | Implement I208 / TUI-050 | Deterministic boundary insertion and ordering evidence | S2 | Event-sequence tests, cancellation/error/restart evidence, exact-head review/CI, merge and closeout | Keep accepted queue custody and defer timing change | Planned |
 | S4 | Establish I246 claim after steering sequence | Effective I246 claim and active owner | S3 terminal; CAP-001 decision/narrowing; overlap inventory | Governance PR merged and CAS pass | Keep CAP-001-P0 Refinement/Unclaimed | Planned |

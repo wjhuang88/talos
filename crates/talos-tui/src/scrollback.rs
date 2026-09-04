@@ -531,6 +531,7 @@ pub(crate) struct QueuePlan {
     pub(crate) show_summary: bool,
     pub(crate) show_followup: bool,
     pub(crate) entry_rows: Vec<Vec<String>>,
+    pub(crate) entry_clipped: Vec<bool>,
 }
 
 /// Compressed layout budget for constrained terminal heights.
@@ -582,6 +583,7 @@ impl QueuePreviewComponent<'_> {
                 show_summary: false,
                 show_followup: false,
                 entry_rows: Vec::new(),
+                entry_clipped: Vec::new(),
             };
         }
 
@@ -611,7 +613,8 @@ impl QueuePreviewComponent<'_> {
         let mut entries_to_show = 0usize;
         let mut used_rows = 0usize;
         let mut visible_entry_rows = Vec::new();
-        for rows in entry_rows_all.iter().take(entry_budget) {
+        let mut visible_entry_clipped = Vec::new();
+        for (entry_index, rows) in entry_rows_all.iter().take(entry_budget).enumerate() {
             let row_count = rows
                 .len()
                 .max(1)
@@ -621,7 +624,25 @@ impl QueuePreviewComponent<'_> {
             }
             entries_to_show += 1;
             used_rows += row_count;
-            visible_entry_rows.push(rows.iter().take(row_count).cloned().collect::<Vec<_>>());
+            let clipped = row_count < rows.len();
+            let mut visible_rows = rows.iter().take(row_count).cloned().collect::<Vec<_>>();
+            if clipped && let Some(last) = visible_rows.last_mut() {
+                let storage_marker_width = self
+                    .snapshot
+                    .and_then(|snapshot| snapshot.entries.get(entry_index))
+                    .is_some_and(|entry| entry.truncated)
+                    .then_some(2)
+                    .unwrap_or(0);
+                *last = mark_queue_row_clipped(
+                    last,
+                    width
+                        .saturating_sub(4)
+                        .saturating_sub(storage_marker_width)
+                        .max(1),
+                );
+            }
+            visible_entry_rows.push(visible_rows);
+            visible_entry_clipped.push(clipped);
             if used_rows >= entry_budget {
                 break;
             }
@@ -646,6 +667,7 @@ impl QueuePreviewComponent<'_> {
             show_summary,
             show_followup,
             entry_rows: visible_entry_rows,
+            entry_clipped: visible_entry_clipped,
         }
     }
 }
@@ -659,6 +681,7 @@ impl ViewportComponent for QueuePreviewComponent<'_> {
         let max_width = (area.width as usize).saturating_sub(4).max(1);
         let plan = self.plan_with_width(area.width as usize);
         debug_assert_eq!(plan.entries_to_show, plan.entry_rows.len());
+        debug_assert_eq!(plan.entry_rows.len(), plan.entry_clipped.len());
         if plan.total_rows == 0 {
             return;
         }
@@ -746,6 +769,29 @@ fn queue_entry_rows(
     } else {
         rows
     }
+}
+
+fn mark_queue_row_clipped(row: &str, max_width: usize) -> String {
+    use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
+
+    if max_width == 0 {
+        return String::new();
+    }
+    let marker_width = UnicodeWidthChar::width('…').unwrap_or(1);
+    let content_budget = max_width.saturating_sub(marker_width);
+    let mut clipped = String::new();
+    let mut width = 0usize;
+    for ch in row.chars() {
+        let ch_width = UnicodeWidthChar::width(ch).unwrap_or(0);
+        if width + ch_width > content_budget {
+            break;
+        }
+        clipped.push(ch);
+        width += ch_width;
+    }
+    clipped.push('…');
+    debug_assert!(clipped.width() <= max_width);
+    clipped
 }
 
 pub(crate) fn normalize_single_line(text: &str) -> String {
