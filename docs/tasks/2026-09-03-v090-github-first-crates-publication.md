@@ -1,6 +1,6 @@
 # v0.9.0 GitHub-First Crates Publication Task
 
-> Status: Review / Claimed
+**Status**: Complete / Closed (2026-09-04)
 > Created: 2026-09-03
 > Candidate release: v0.9.0
 > Current base: claim merge `main@c6e453a49dff12397d80335242e8291bff239938`
@@ -9,7 +9,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | `Codex / GPT-5 mainline release session` |
 | Work Slice | Coordinate only REL-005/I245 from release candidate through GitHub-first publication, Cargo publication, external verification and owner-first closeout. |
@@ -19,8 +19,8 @@
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer explicitly requested a complete GitHub and crates.io release on 2026-09-03; independent exact-head release review is retained for irreversible execution. |
 | Implementation PR | #480 |
-| Last Updated | 2026-09-03 |
-| Handoff / Release Condition | Candidate publication requires exact-head CI, independent release review, merge-time CAS and merged-main versioned preflight; completion additionally requires GitHub Release, Cargo closure and external acceptance. |
+| Last Updated | 2026-09-04 |
+| Handoff / Release Condition | Closed after GitHub-first v0.9.0 publication, Cargo closure and external acceptance. |
 
 ## Closure Ledger
 
@@ -44,10 +44,10 @@ their existing outcomes.
 |---|---|---|---|
 | V090-00 | Establish claim and activation | Finalized claim PR, validators, exact-head CI and CAS | Done — #479 merge `c6e453a4` |
 | V090-10 | Prepare stable candidate locally | Version/release surfaces aligned; versioned preflight passes | Done — local preflight passed |
-| V090-20 | Review and merge candidate | Exact-head CI, independent release review and CAS | In progress |
-| V090-30 | Publish GitHub Release | Immutable tag; five archives plus checksum | Blocked on V090-20 |
-| V090-40 | Publish Cargo closure | GitHub Release complete; all registry-enabled packages visible | Blocked on V090-30 |
-| V090-50 | External acceptance and closeout | CLI install, runtime fixture and owner-first evidence pass | Blocked on V090-40 |
+| V090-20 | Review and merge candidate | Exact-head CI, independent release review and CAS | Done - PR #480 merge `fad6e24e` |
+| V090-30 | Publish GitHub Release | Immutable tag; five archives plus checksum | Done - tag `v0.9.0`, workflow `33825995467` |
+| V090-40 | Publish Cargo closure | GitHub Release complete; all registry-enabled packages visible | Done - 20 packages at `0.9.0` |
+| V090-50 | External acceptance and closeout | CLI install, runtime fixture and owner-first evidence pass | Done - CLI/runtime acceptance passed |
 
 ## Irreversible Action Rules
 
@@ -76,3 +76,18 @@ the restricted agent sandbox correctly denied the shared-skill fixture's dedicat
 `talos-models` remains excluded. The model catalog contains 6,474 entries, five variants and the
 `k2p7` compatibility alias. The candidate is ready for one stable PR; exact-head CI and independent
 release review remain pending, and no immutable publication action has occurred.
+
+## 2026-09-04 Closeout Checkpoint
+
+PR #480 merged as `fad6e24e4b716b90b776b358d92ff69015688adf` after CI `33774242560` and
+independent release review `5534058458` approved exact head `9f6a22a2`. Tag `v0.9.0`
+points to the implementation commit; GitHub workflow `33825995467` published all five archives
+and checksum. Cargo publication then completed for all 20 registry-enabled packages, with
+`talos-models` excluded. External CLI installation returned `talos 0.9.0`; registry-only
+runtime default and `coding` fixtures passed. Completion Commit:
+`fad6e24e4b716b90b776b358d92ff69015688adf`.
+
+## Completion Evidence
+
+- Completion Commit: `fad6e24e4b716b90b776b358d92ff69015688adf`.
+- The closeout documentation commit does not self-certify completion.

@@ -146,7 +146,7 @@ I170's accepted residuals remain explicit:
 | I241 | Complete / Closed | PERM-007-E bounded model-first triage merged via PR #460 (`b7735ef8`); exact-head CI `33475638936` and independent review `5489739524` passed. |
 | I243 | Complete / Closed | PERM-007-F0 decision-only shell classifier context/precedence contract; ADR-070 Accepted. Completion Commit `cc4f22e5`; I244 remains separately blocked/unclaimed. |
 | I244 | Complete / Closed | PERM-007-F generic shell auto-classifier completion commits `4342caa6`, `63358c8a`, and `6bcc8eca`; PR #473 merged as `11c6dc28` after CI `33744161881`, independent approval `5525279657`, real-TUI acceptance, and CAS. |
-| I245 | v0.9.0 GitHub And Crates.io Publication | Review / Claimed | Stable candidate passed local versioned preflight; exact-head CI and independent release review are pending. GitHub Release must complete before Cargo publication. |
+| I245 | v0.9.0 GitHub And Crates.io Publication | Complete / Closed | Completion Commit `fad6e24e`; GitHub workflow `33825995467`, 20 crates.io packages and external CLI/runtime acceptance completed. |
 | I168 | Complete (2026-07-30) | Provider terminal outcome integrity; completion commit `86262d02`. |
 | I167 | Complete (2026-07-29) | Approval option contrast; implementation `3356aac`. |
 | I166 | Complete (2026-07-28) | Interrupt shortcut reliability; automated and maintainer Alacritty acceptance passed. |
