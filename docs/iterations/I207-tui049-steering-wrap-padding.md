@@ -1,6 +1,6 @@
 # Iteration I207: Steering Wrap Padding Contract
 
-> Document status: Review / Claimed (implementation merged; closeout pending)
+> Document status: Complete / Closed
 > Planned date: 2026-08-17
 > Objective: implement TUI-049 so steering continuation lines use the shared horizontal padding
 > contract at every supported terminal width.
@@ -15,7 +15,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline session |
 | Work Slice | I207 / TUI-049 only: steering wrapped-row padding and its focused/terminal validation. |
@@ -26,7 +26,7 @@
 | Authorization Evidence | Maintainer requested serial execution on 2026-09-04; claim became effective through PR #482 before implementation. |
 | Implementation PR | #483 |
 | Last Updated | 2026-09-04 |
-| Handoff / Release Condition | Implementation started from main at or after claim merge `8ff4c6f186e299d1ca179baeeedc19971eeaa75f`; implementation PR #483 is merged, while closeout still requires the recorded real-terminal acceptance trace. |
+| Handoff / Release Condition | None; I207 is complete. I208 remains separately governed and unclaimed. |
 
 - Current-main inventory and effective Collaboration Claim are recorded before activation.
 - The implementation branch starts from the effective claim merge point.
@@ -52,15 +52,16 @@ No steering lifecycle/timing change, theme redesign, selection change or release
 
 - [x] Wrapped steering lines honor both shared left and right padding boundaries.
 - [x] Narrow, exact-boundary and Unicode-width cases pass without overflow or edge contact.
-- [ ] Locked validation and real-terminal evidence pass at exact head.
-- [ ] User-facing layout documentation or residual ownership is recorded.
+- [x] Locked validation and real-terminal evidence pass at exact head.
+- [x] User-facing layout documentation or residual ownership is recorded.
 
 ## Status
 
-Review / Claimed. Claim and activation became effective with governance PR #482 merge
+Complete / Closed. Claim and activation became effective with governance PR #482 merge
 `8ff4c6f186e299d1ca179baeeedc19971eeaa75f`. Implementation PR #483 was independently reviewed,
-validated and merged as `ca3b2fa7ffb1ca14b82d1acf6af6be147368e6fe`; closeout remains pending the
-real-terminal narrow-width trace and its independent closeout review.
+validated and merged as `ca3b2fa7ffb1ca14b82d1acf6af6be147368e6fe`. The native-terminal trace below
+completed the remaining acceptance gate. This proposed closeout becomes target-branch truth only
+after its closeout PR merges.
 
 ## Implementation Checkpoint (2026-09-04)
 
@@ -79,8 +80,13 @@ behavior is unchanged. Focused TUI tests and the full `talos-tui` library suite 
 - Exact-head CI `33861265618`: 5/5 successful for implementation head
   `0998b10581867dca92c2b37919825f8d72134766`.
 - Independent implementation review APPROVE: comment `5539172892`, bound to the same exact head.
-- Remaining gate: run and record a real-terminal narrow-width trace through the actual `talos` binary;
-  this evidence is not inferred from unit tests or CI.
+- Native-terminal evidence: the rebuilt `target/debug/talos --tui --no-init --no-context` was run
+  in a narrowed terminal. While a turn and permission prompt were active, a long mixed Chinese/ASCII
+  steering entry wrapped across the queued preview. The captured screen showed the `↳` first row and
+  continuation row retaining left padding, right-edge clearance and bounded display width without
+  overflow. Maintainer accepted the trace on 2026-09-04 and exited cleanly.
+- Documentation disposition: this correction changes no command, configuration or documented user
+  workflow; the owner and long-task ledger carry the layout contract and terminal evidence.
 
 ## Review Correction Checkpoint (2026-09-04)
 
@@ -89,3 +95,10 @@ wrapped entry exceeded the five-row queue budget. The implementation now marks t
 row with a display-width-safe `…`, while retaining the separate storage-truncation `⚠` marker;
 tests cover both a single over-budget entry and a later entry that only partially fits. The next
 stable candidate must use fresh exact-head CI and review evidence.
+
+## Completion Evidence
+
+- Completion Commit: `ca3b2fa7ffb1ca14b82d1acf6af6be147368e6fe` (implementation merge for PR #483;
+  source implementation head `0998b10581867dca92c2b37919825f8d72134766`).
+- Exact-head CI `33861265618` and independent APPROVE comment `5539172892` bind to that source head.
+- The closeout status commit does not certify its own implementation.
