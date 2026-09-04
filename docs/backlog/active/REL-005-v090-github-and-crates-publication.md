@@ -1,6 +1,6 @@
 # REL-005: v0.9.0 GitHub And Crates.io Publication
 
-**Status**: Active / Claimed (proposed; ineffective until claim PR merge)
+**Status**: Review / Claimed
 **Type**: Release / Distribution Story
 **Parent Epic**: ARCH-031
 
@@ -17,9 +17,9 @@
 | Governance Claim PR | #479 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer explicitly requested a complete GitHub and crates.io release on 2026-09-03. Independent exact-head release review remains mandatory before the immutable tag or any Cargo publish. |
-| Implementation PR | Not started |
+| Implementation PR | #480 |
 | Last Updated | 2026-09-03 |
-| Handoff / Release Condition | Claim and activation become effective only when the finalized governance PR reaches `main`; implementation then starts from that merge or later. |
+| Handoff / Release Condition | Candidate publication remains blocked until exact-head CI, independent release review, merge-time CAS and merged-main versioned preflight pass. |
 
 ## Identity / Goal / Value
 
@@ -30,6 +30,7 @@ Cargo package closure so users can install the `talos` binary and embed `talos-r
 ## Scope
 
 - synchronize the workspace and all Talos path-dependency versions to `0.9.0`;
+- refresh the packaged offline model catalog through the explicit `BUILD_MODELS=1` release path;
 - update paired English/Chinese README and site release surfaces plus `docs/releases/v0.9.0.md`;
 - run the exact versioned release preflight and obtain exact-head CI and independent release review;
 - merge the reviewed candidate and create one immutable annotated `v0.9.0` tag on that main commit;
@@ -63,6 +64,8 @@ Cargo package closure so users can install the `talos` binary and embed `talos-r
 - [ ] Every registry-enabled Talos package is visible at `0.9.0`; `talos-models` is absent.
 - [ ] External Cargo installation returns `talos 0.9.0`.
 - [ ] A registry-only runtime fixture passes in default and `coding` modes.
+- [ ] The explicit model refresh preserves all local variants and compatibility aliases and fails
+      without overwriting the committed catalog if its prior catalog cannot be parsed.
 - [ ] Owner-first closeout records immutable commit, tag, workflow, package and external evidence.
 
 ## Residual Destination
@@ -70,3 +73,24 @@ Cargo package closure so users can install the `talos` binary and embed `talos-r
 RUNTIME-006 retains the stronger single-direct-dependency facade outcome; REL-002 retains v1
 self-bootstrap qualification. Any source-changing release failure receives a new patch-release
 owner rather than mutation of published artifacts.
+
+## 2026-09-03 Activation Checkpoint
+
+Claim PR #479 exact head `967c220a3af8c8f0df5bae443e996f4031b61e48` passed CI
+`33766270164`, both governance validators and single-maintainer merge-time CAS, then merged as
+`c6e453a49dff12397d80335242e8291bff239938`. The REL-005/I245 claim is effective on `main` and the
+release candidate branch starts from that merge. No tag, GitHub Release or Cargo publication has
+occurred. The pre-release catalog refresh is the previously requested explicit build-time refresh;
+normal builds retain their no-network behavior.
+
+## 2026-09-03 Stable Candidate Checkpoint
+
+The locally converged candidate synchronizes all 21 Talos workspace packages and internal path
+dependencies to `0.9.0`, keeps `talos-models` as the only non-published package, refreshes the
+offline catalog to 6,474 entries while retaining five local variants and the `k2p7` compatibility
+alias, and updates the paired release surfaces. `CARGO_INCREMENTAL=0
+./scripts/release_preflight.sh v0.9.0` passed in the real user filesystem environment. The first
+sandboxed run identified that `talos-skill` intentionally writes a dedicated shared-skill fixture
+under `~/.agents/skills`; its `Operation not permitted` was a host sandbox restriction, and the
+same test passed in the standard release environment. No tag, Release or crate publication has
+occurred.

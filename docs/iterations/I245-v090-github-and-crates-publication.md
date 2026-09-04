@@ -1,6 +1,6 @@
 # Iteration I245: v0.9.0 GitHub And Crates.io Publication
 
-> Document status: Active / Claimed (proposed; ineffective until claim PR merge)
+> Document status: Review / Claimed
 > Published plan date: 2026-09-03
 > Planned objective: publish one validated v0.9.0 GitHub Release before publishing the Cargo
 > package closure, then prove external CLI installation and runtime SDK consumption.
@@ -21,9 +21,9 @@
 | Governance Claim PR | #479 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer explicitly requested the complete GitHub and crates.io release. Protected release execution still requires independent exact-head review before irreversible actions. |
-| Implementation PR | Not started |
+| Implementation PR | #480 |
 | Last Updated | 2026-09-03 |
-| Handoff / Release Condition | Claim and activation are ineffective until the finalized governance PR merges to `main`; immutable publication additionally requires the I245 release gates. |
+| Handoff / Release Condition | Immutable publication remains blocked until exact-head CI, independent release review, merge-time CAS and merged-main versioned preflight pass. |
 
 ## Published Baseline
 
@@ -85,10 +85,14 @@
 | Date | Type | Record |
 |---|---|---|
 | 2026-09-03 | Atomic claim+activation proposal | Based on `main@336c65e08c49c0e95334a8d967bb8a1648aa3a8f`; no Active/Review iteration or overlapping PR exists. This record has no effect until its finalized PR reaches `main`. |
+| 2026-09-03 | Activation | Claim PR #479 exact head `967c220a` passed CI `33766270164`, both validators and single-maintainer CAS, then merged as `c6e453a4`. Implementation starts from that merge; no immutable publication action has occurred. |
+| 2026-09-03 | Stable candidate | All package versions, internal dependency requirements, model catalog and paired release surfaces converged locally. The versioned release preflight passed outside the restricted agent filesystem sandbox; no tag or registry mutation has occurred. |
 
 ## Verification Evidence
 
-- Pending claim-stage validators and exact-head CI.
+- Local `CARGO_INCREMENTAL=0 ./scripts/release_preflight.sh v0.9.0`: passed, including both
+  governance validators, workspace check, Clippy, tests and doctests.
+- Exact-head CI and independent release review: pending stable-candidate PR.
 
 ## Completion Evidence
 
