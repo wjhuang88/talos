@@ -1,6 +1,6 @@
 # Iteration I208: Steering Boundary Insertion
 
-> Document status: Active / Claimed (proposed; ineffective until claim merge)
+> Document status: Active / Claimed
 > Planned date: 2026-08-17
 > Objective: implement TUI-050 so steering is inserted at an explicit model-response or tool-call
 > boundary rather than only after the outer turn completes.
@@ -25,12 +25,20 @@
 | Work Slice | I208 / TUI-050 only: insert accepted steering at explicit model-response or tool-call boundaries, preserving FIFO, Session/generation identity, exactly-once custody and existing transcript semantics. Excludes layout/padding, arbitrary token preemption, parallel model execution, global event bus, persistent cross-Session queues, permission, release and CAP-001 text seam work. |
 | Claimed At | 2026-09-04 |
 | Source Issue | #267 |
-| Governance Claim PR | #486 |
+| Governance Claim PR | #487 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | I207/TUI-049 is Complete / Closed on main at `2edb914f`; maintainer directed serial execution of I207, I208 and I246. |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-04 |
-| Handoff / Release Condition | Claim and activation are ineffective until this governance record merges. Implementation must start from its merge or a later `main`; independent exact-head review remains required. |
+| Handoff / Release Condition | Claim and activation became effective when governance PR #487 merged as `75ca8057`; implementation starts from that merge or a later `main`; independent exact-head review remains required. |
+
+## Activation Checkpoint — 2026-09-05
+
+I208 claim and activation are effective on `main` after governance PR #487 merged as
+`75ca80571a42f2d026f507fdf84624f5a103b873`. The claim candidate was reviewed at exact head
+`d3b1d94e` with CI `33894155189`; this checkpoint records activation only and is not implementation
+evidence. The implementation branch starts at the merge commit above. Published Baseline remains
+unchanged.
 
 ## Runnable Deliverable
 
@@ -50,5 +58,17 @@ No arbitrary token preemption, parallel model execution, global event bus, or re
 
 ## Status
 
-Active / Claimed (proposed; ineffective until claim merge). No implementation branch or code
-authorization exists before the claim merge.
+Active / Claimed. Implementation authorization is now limited to the Work Slice above; no release,
+permission-policy, CAP-001, Dashboard or Desktop work is authorized.
+
+## Local Convergence Checkpoint — 2026-09-05
+
+- Implemented the first boundary slice locally: a `ToolUse` model-response boundary transfers one
+  prepared FIFO batch into the Session command route while the current structured turn remains the
+  execution authority; durable receipt custody is tracked separately and adopted at completion.
+- Added a focused boundary transfer test and preserved existing queue/continuation tests.
+- `cargo test -p talos-cli --locked` passed (360 tests); `cargo clippy -p talos-cli --locked -- -D warnings`
+  passed; `cargo test --workspace --locked` passed, including doctests.
+- Governance validators and `git diff --check` passed with zero warnings/errors.
+- This is a local checkpoint only. Implementation PR, exact-head CI, independent review, terminal
+  evidence and completion evidence remain pending.

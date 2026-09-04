@@ -1,13 +1,14 @@
 # Steering And Capability Seam Serial Development Plan
 
-**Status**: Active coordination / I207 Complete / I208 Active / Claimed (proposed; ineffective until #486 merge)
+**Status**: Active coordination / I207 Complete / Closed / I208 Active / Claimed
 **Published plan date**: 2026-09-04
 **Outcome**: Deliver the remaining steering follow-ups and then prepare the progressive capability compatibility seam in a controlled serial sequence.
 **Work mode**: Standard
 **Deferred validation tracker**: None; human/device evidence remains a per-child gate and is not deferred by this plan.
 
-This is a coordination and recovery ledger. I207 claim/activation is effective via governance PR
-#482 merge `8ff4c6f1`; I208 and I246 remain unclaimed and unauthorized until their own claims merge.
+This is a coordination and recovery ledger. I207 is Complete / Closed via closeout merge
+`2edb914f`; I208 claim/activation is effective via governance PR #487 merge `75ca8057`; I246
+remains unclaimed and unauthorized until its own claim merges.
 
 ## Collaboration Claim
 
@@ -46,8 +47,8 @@ This is a coordination and recovery ledger. I207 claim/activation is effective v
 
 | Work | State | Disposition |
 |---|---|---|
-| I207 / TUI-049 | Complete / Closed | Implementation PR #483 merged as `ca3b2fa7`; native-terminal acceptance passed and closeout is being synchronized. |
-| I208 / TUI-050 | Active / Claimed (proposed) | Governance claim PR #486 is open; remains ineffective until merge, then implementation starts from its merge or later main. |
+| I207 / TUI-049 | Complete / Closed | Implementation PR #483 merged as `ca3b2fa7`; native-terminal acceptance passed; closeout merged as `2edb914f`. |
+| I208 / TUI-050 | Active / Claimed | Governance claim PR #487 merged as `75ca8057`; implementation starts from that merge and is locally converging. |
 | I246 / CAP-001-P0 | Planned / Unclaimed | Third child; depends on CAP-001 decision or explicit narrowing and follows steering work. |
 | I164 | Paused / superseded | Preserve; do not resume. |
 | CAP-001 parent | Refinement / Unclaimed | Preserve; parent is not an implementation unit. |
@@ -59,8 +60,8 @@ This is a coordination and recovery ledger. I207 claim/activation is effective v
 |---|---|---|---|---|---|---|
 | S0 | Establish current-main inventory and claim for I207 | Effective I207 claim and active owner | Clean current main; no overlapping steering implementation | Governance PR merged, exact-head CI/review/CAS pass | Keep I207 Planned/Unclaimed | Complete (`8ff4c6f1`) |
 | S1 | Implement I207 / TUI-049 | Padding-correct steering wrapping with focused and terminal evidence | S0 | Owner acceptance, local locked checks, exact-head review/CI, merge and closeout | Preserve existing layout and record residual | Complete (`ca3b2fa7`) |
-| S2 | Establish I208 claim after I207 disposition | Effective I208 claim and active owner | S1 terminal; current-main refresh | Governance PR #486 merged and CAS pass | Keep I208 Planned/Unclaimed | Governance PR #486 open; claim pending merge |
-| S3 | Implement I208 / TUI-050 | Deterministic boundary insertion and ordering evidence | S2 | Event-sequence tests, cancellation/error/restart evidence, exact-head review/CI, merge and closeout | Keep accepted queue custody and defer timing change | Planned |
+| S2 | Establish I208 claim after I207 disposition | Effective I208 claim and active owner | S1 terminal; current-main refresh | Governance PR #487 merged and CAS pass | Keep I208 Planned/Unclaimed | Complete (`75ca8057`) |
+| S3 | Implement I208 / TUI-050 | Deterministic boundary insertion and ordering evidence | S2 | Event-sequence tests, cancellation/error/restart evidence, exact-head review/CI, merge and closeout | Keep accepted queue custody and defer timing change | Active / local convergence |
 | S4 | Establish I246 claim after steering sequence | Effective I246 claim and active owner | S3 terminal; CAP-001 decision/narrowing; overlap inventory | Governance PR merged and CAS pass | Keep CAP-001-P0 Refinement/Unclaimed | Planned |
 | S5 | Implement I246 / CAP-001-P0 | Characterization, compatibility seam and Desktop handoff | S4 | Focused behavior/dependency evidence, docs, exact-head review/CI, merge and closeout | Preserve current paths and route unresolved decisions to child ADRs | Planned |
 | S6 | Final ledger closeout | All three child owners and derived views synchronized | S1, S3, S5 | Existing completion evidence, residuals recorded, claim closed | Leave task Partial with explicit residual owner | Planned |
@@ -90,6 +91,6 @@ expanding I207 or I208.
 ## Completion Evidence
 
 - I207 Completion Commit: `ca3b2fa7ffb1ca14b82d1acf6af6be147368e6fe` (implementation merge for
-  PR #483; the I207 closeout transition remains ineffective until its closeout PR reaches main).
+  PR #483; closeout merged as `2edb914f139a6b3954f790d3fc2889eac16d4599`).
 - I208 and I246 Completion Commit: Pending.
 - This coordination record cannot self-certify child implementation completion.

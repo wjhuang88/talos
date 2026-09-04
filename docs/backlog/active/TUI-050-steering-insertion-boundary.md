@@ -1,13 +1,13 @@
 # TUI-050: Steering Inserts At Model And Tool Boundaries
 
-**Status**: Active / Claimed (proposed; ineffective until claim merge)
+**Status**: Active / Claimed
 
 | Field | Value |
 |---|---|
 | Story ID | TUI-050 |
 | Type | TUI / Runtime Scheduling Story |
 | Priority | P1 |
-| Status | Active / Claimed (proposed; ineffective until claim merge) |
+| Status | Active / Claimed |
 | Source | [GitHub Issue #267](https://github.com/wjhuang88/talos/issues/267) |
 | Selected Iteration | I208 |
 | Depends On | TUI-044 / I169 accepted queue custody and Turn lifecycle |
@@ -22,12 +22,18 @@
 | Work Slice | I208 / TUI-050 only: insert accepted steering at explicit model-response or tool-call boundaries, preserving FIFO, Session/generation identity, exactly-once custody and existing transcript semantics. Excludes layout/padding, arbitrary token preemption, parallel model execution, global event bus, persistent cross-Session queues, permission, release and CAP-001 text seam work. |
 | Claimed At | 2026-09-04 |
 | Source Issue | #267 |
-| Governance Claim PR | #486 |
+| Governance Claim PR | #487 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | I207/TUI-049 is Complete / Closed on main at `2edb914f`; maintainer directed serial execution of I207, I208 and I246. |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-04 |
-| Handoff / Release Condition | Claim and activation are ineffective until this governance record merges. Implementation starts from its merge or a later `main`; independent exact-head review remains required. |
+| Handoff / Release Condition | Claim and activation became effective when governance PR #487 merged as `75ca8057`; implementation starts from that merge or a later `main`; independent exact-head review remains required. |
+
+## Activation Checkpoint — 2026-09-05
+
+Governance PR #487 merged to `main` as `75ca80571a42f2d026f507fdf84624f5a103b873` after exact-head
+review at `d3b1d94e` and CI `33894155189`. This records the effective claim and activation; it is
+not implementation evidence. The Published Baseline is preserved unchanged.
 
 ## Identity / Goal / Value
 
