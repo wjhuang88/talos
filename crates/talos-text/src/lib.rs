@@ -61,6 +61,30 @@ pub struct TextRequest {
     pub source: String,
 }
 
+/// Renderer-neutral source location used by outline and symbol consumers.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SourceLocation {
+    /// Workspace-relative file path.
+    pub file: String,
+    /// One-based line number.
+    pub line: usize,
+    /// Zero-based column number.
+    pub column: usize,
+}
+
+/// A renderer-neutral symbol description.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SymbolInfo {
+    /// Symbol name.
+    pub name: String,
+    /// Stable semantic kind.
+    pub kind: String,
+    /// Workspace-relative file path.
+    pub file: String,
+    /// One-based line number.
+    pub line: usize,
+}
+
 #[cfg(test)]
 mod tests {
     use super::{HighlightResult, HighlightSpan, LanguageId};

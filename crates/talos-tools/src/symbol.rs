@@ -181,20 +181,8 @@ struct SymbolResult {
     references: Vec<SourceLocation>,
 }
 
-#[derive(Debug, Serialize, Clone)]
-struct SourceLocation {
-    file: String,
-    line: usize,
-    column: usize,
-}
-
-#[derive(Debug, Serialize, Clone)]
-struct SymbolInfo {
-    name: String,
-    kind: String,
-    file: String,
-    line: usize,
-}
+type SourceLocation = talos_text::SourceLocation;
+type SymbolInfo = talos_text::SymbolInfo;
 
 #[derive(Debug, Serialize, Clone)]
 struct ImportInfo {
