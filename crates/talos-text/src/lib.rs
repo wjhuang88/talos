@@ -2,6 +2,47 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Built-in, renderer-independent highlighting adapter.
+#[cfg(feature = "code-intelligence")]
+pub struct BuiltinHighlighter(arborium::Highlighter);
+
+#[cfg(feature = "code-intelligence")]
+impl Default for BuiltinHighlighter {
+    fn default() -> Self {
+        Self(arborium::Highlighter::new())
+    }
+}
+
+#[cfg(feature = "code-intelligence")]
+impl BuiltinHighlighter {
+    /// Highlight a source using the existing built-in grammars, falling back on failure.
+    pub fn highlight(&mut self, language: &LanguageId, source: &str) -> HighlightResult {
+        let start = std::time::Instant::now();
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            self.0.highlight_spans(language.as_str(), source)
+        }));
+        match result {
+            Ok(Ok(spans)) if start.elapsed().as_millis() <= 500 => HighlightResult::Spans(
+                spans
+                    .into_iter()
+                    .map(|s| HighlightSpan {
+                        start: s.start as usize,
+                        end: s.end as usize,
+                        capture: s.capture,
+                    })
+                    .collect(),
+            ),
+            _ => HighlightResult::PlainText,
+        }
+    }
+
+    /// Whether the built-in grammar bundle contains this language.
+    pub fn supports(&self, language: &LanguageId) -> bool {
+        std::panic::catch_unwind(|| arborium::get_language(language.as_str()).is_some())
+            .unwrap_or(false)
+    }
+}
+
 /// Canonical language identifier used by text consumers.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LanguageId(String);

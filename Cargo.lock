@@ -6055,6 +6055,7 @@ dependencies = [
 name = "talos-text"
 version = "0.9.0"
 dependencies = [
+ "arborium",
  "serde",
  "serde_json",
 ]
@@ -6100,7 +6101,6 @@ dependencies = [
 name = "talos-tui"
 version = "0.9.0"
 dependencies = [
- "arborium",
  "crossterm",
  "futures",
  "gix",

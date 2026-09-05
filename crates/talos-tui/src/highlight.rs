@@ -1,7 +1,5 @@
 //! Syntax highlighting engine using arborium (tree-sitter grammar bundle).
 
-use std::time::Instant;
-
 use crossterm::style::Color as CColor;
 
 use crate::theme::to_crossterm_color;
@@ -9,7 +7,7 @@ use crate::theme::to_crossterm_color;
 type LineSegments = Vec<(String, Option<CColor>)>;
 
 pub(crate) struct HighlightEngine {
-    highlighter: arborium::Highlighter,
+    highlighter: talos_text::BuiltinHighlighter,
 }
 
 impl Default for HighlightEngine {
@@ -21,7 +19,7 @@ impl Default for HighlightEngine {
 impl HighlightEngine {
     pub(crate) fn new() -> Self {
         Self {
-            highlighter: arborium::Highlighter::new(),
+            highlighter: talos_text::BuiltinHighlighter::default(),
         }
     }
 
@@ -31,38 +29,16 @@ impl HighlightEngine {
     /// where color is `None` for the default text color.
     /// Returns `None` if parsing fails or exceeds 500ms.
     pub(crate) fn highlight(&mut self, language: &str, code: &str) -> Option<Vec<LineSegments>> {
-        let start = Instant::now();
         let language = talos_text::LanguageId::parse(language)?;
-
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            self.highlighter.highlight_spans(language.as_str(), code)
-        }));
-
-        let spans = match result {
-            Ok(Ok(spans)) => spans,
-            _ => return None,
-        };
-
-        if start.elapsed().as_millis() > 500 {
-            return None;
-        }
-
-        let neutral = talos_text::HighlightResult::Spans(
-            spans
-                .iter()
-                .map(|span| talos_text::HighlightSpan {
-                    start: span.start as usize,
-                    end: span.end as usize,
-                    capture: span.capture.clone(),
-                })
-                .collect(),
-        );
-        Some(segments_from_result(code, &neutral))
+        Some(segments_from_result(
+            code,
+            &self.highlighter.highlight(&language, code),
+        ))
     }
 
     pub(crate) fn supports(&self, language: &str) -> bool {
         talos_text::LanguageId::parse(language)
-            .is_some_and(|language| arborium::get_language(language.as_str()).is_some())
+            .is_some_and(|language| self.highlighter.supports(&language))
     }
 }
 

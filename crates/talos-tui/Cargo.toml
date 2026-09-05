@@ -13,7 +13,6 @@ gix = { version = "0.85", default-features = false, features = ["basic", "status
 talos-core = { version = "0.9.0", path = "../talos-core" }
 talos-permission = { version = "0.9.0", path = "../talos-permission" }
 talos-conversation = { version = "0.9.0", path = "../talos-conversation" }
-talos-text = { version = "0.9.0", path = "../talos-text" }
 ratatui = { version = "0.30", features = ["scrolling-regions"] }
 unicode-width = "0.2"
 crossterm = { version = "0.29", features = ["event-stream"] }
@@ -22,13 +21,7 @@ futures = "0.3"
 serde_json = "1"
 tui-markdown = "0.3"
 mermaid-text = "0.56"
-arborium = { version = "2.18", default-features = false, features = [
-    "lang-rust", "lang-python", "lang-typescript", "lang-javascript",
-    "lang-go", "lang-java", "lang-c", "lang-cpp", "lang-c-sharp",
-    "lang-bash", "lang-sql", "lang-powershell", "lang-lua", "lang-dart",
-    "lang-html", "lang-css", "lang-json", "lang-toml", "lang-markdown",
-    "lang-ruby", "lang-php", "lang-kotlin", "lang-swift"
-] }
+talos-text = { version = "0.9.0", path = "../talos-text", features = ["code-intelligence"] }
 
 [dev-dependencies]
 tempfile = "3"
