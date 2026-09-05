@@ -6056,6 +6056,7 @@ name = "talos-text"
 version = "0.9.0"
 dependencies = [
  "serde",
+ "serde_json",
 ]
 
 [[package]]
