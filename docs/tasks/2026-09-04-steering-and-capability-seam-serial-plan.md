@@ -8,7 +8,7 @@
 
 This is a coordination and recovery ledger. I207 is Complete / Closed via closeout merge
 `2edb914f`; I208 claim/activation is effective via governance PR #487 merge `75ca8057`; I246
-claim #491 is effective at `f913d28b`; its bounded implementation is now active.
+claim #491 is effective at `f913d28b`; its bounded implementation is in Review through PR #492.
 
 ## Collaboration Claim
 
@@ -63,7 +63,7 @@ claim #491 is effective at `f913d28b`; its bounded implementation is now active.
 | S2 | Establish I208 claim after I207 disposition | Effective I208 claim and active owner | S1 terminal; current-main refresh | Governance PR #487 merged and CAS pass | Keep I208 Planned/Unclaimed | Complete (`75ca8057`) |
 | S3 | Implement I208 / TUI-050 | Deterministic boundary insertion and ordering evidence | S2 | Event-sequence tests, cancellation/error/restart evidence, exact-head review/CI, merge and closeout | Keep accepted queue custody and defer timing change | Complete (`442d143b`) |
 | S4 | Establish I246 claim after steering sequence | Effective I246 claim and active owner | S3 terminal; CAP-001 decision/narrowing; overlap inventory | Governance PR merged and CAS pass | Keep CAP-001-P0 Refinement/Unclaimed | Complete (`f913d28b`) |
-| S5 | Implement I246 / CAP-001-P0 | Characterization, compatibility seam and Desktop handoff | S4 | Focused behavior/dependency evidence, docs, exact-head review/CI, merge and closeout | Preserve current paths and route unresolved decisions to child ADRs | Active |
+| S5 | Implement I246 / CAP-001-P0 | Characterization, compatibility seam and Desktop handoff | S4 | Focused behavior/dependency evidence, docs, exact-head review/CI, merge and closeout | Preserve current paths and route unresolved decisions to child ADRs | Review |
 | S6 | Final ledger closeout | All three child owners and derived views synchronized | S1, S3, S5 | Existing completion evidence, residuals recorded, claim closed | Leave task Partial with explicit residual owner | Planned |
 
 ## Shared Validation And Ownership Rules

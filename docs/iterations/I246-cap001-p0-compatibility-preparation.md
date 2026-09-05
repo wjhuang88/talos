@@ -1,6 +1,6 @@
 # Iteration I246: CAP-001-P0 Compatibility Preparation
 
-> Document status: Active / Claimed
+> Document status: Review / Claimed
 > Planned date: 2026-09-04
 > Planned objective: prepare the current codebase for progressive capability work through a characterized, UI-neutral text/language and Plugin compatibility boundary without changing shipped behavior.
 > Baseline rule: preserve this target; changed targets use a new iteration ID.
@@ -106,7 +106,7 @@ This iteration is intentionally scheduled after I207 and I208 in the long task. 
 
 ## Completion Evidence
 
-- Completion Commit: {already-existing implementation SHA}
+- Completion Commit: Pending
 - Status-only documentation commits must not cite themselves.
 
 ## Local Convergence Checkpoint — 2026-09-05
@@ -134,6 +134,30 @@ remove persisted `plugin` fields. Bundle identity/source/digest may be additive 
 not imply permission. Package selection/install and executable runtime remain separate operations.
 Evidence: existing `talos-plugin` manifest/WASM tests and CLI explicit-plugin tests pass in the
 workspace run; no plugin behavior was changed by I246.
+
+## Implementation Candidate Checkpoint — 2026-09-05
+
+PR #492 contains the bounded implementation; I246 is Review / Claimed, not Complete. Its source
+starts after effective claim merge `f913d28b`. This current checkpoint supersedes early local
+descriptions of consumer-owned Arborium adapters: the direct dependency and parser operations
+are now centralized in `talos-text`; TUI owns only rendering and tools retain file access.
+
+The compatibility fix `31fb34f4` preserves canonical-only TUI grammar support. Regression cases
+cover `rs`, `py`, `TSX`, `tsx`, `.rs`, `RUST`, whitespace, and canonical Rust/Python/TypeScript.
+Focused highlighter tests: 4 passed. Full preflight passed at `78622fe8` before this fix; that
+earlier result is not claimed as full validation of the updated candidate.
+
+Default-feature release build `cargo build --release -p talos-cli --locked` at `31fb34f4`
+passed with pinned Rust 1.97.0 on aarch64-apple-darwin. The stripped release binary is
+76,050,640 bytes; hash and profile are recorded in the compatibility reference. This is a
+post-alignment baseline, not a before/after reduction claim.
+
+Changed-file authority: root Cargo manifest/lock; `crates/talos-text/**`; the Cargo manifests
+and symbol/highlight consumer files in talos-tools/talos-tui; the text-boundary validator and
+preflight integration; CAP-001-P0/I246 owners, compatibility reference and their derived
+Board/backlog/iteration/serial-plan views. No Dashboard, Desktop, permission, Session or release
+version/tag/publication behavior is changed. Final exact-head CI, independent review, CAS and
+owner-first completion remain pending.
 
 ## Variance And Residuals
 
