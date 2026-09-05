@@ -61,11 +61,22 @@ pub struct TextRequest {
 
 #[cfg(test)]
 mod tests {
-    use super::LanguageId;
+    use super::{HighlightResult, HighlightSpan, LanguageId};
 
     #[test]
     fn aliases_normalize_to_one_identifier() {
         assert_eq!(LanguageId::parse("TSX").unwrap().as_str(), "typescript");
         assert_eq!(LanguageId::parse(".rs").unwrap().as_str(), "rust");
+    }
+
+    #[test]
+    fn highlight_result_is_renderer_neutral_and_serializable() {
+        let result = HighlightResult::Spans(vec![HighlightSpan {
+            start: 0,
+            end: 3,
+            capture: "keyword".into(),
+        }]);
+        let encoded = serde_json::to_string(&result).unwrap();
+        assert!(encoded.contains("keyword"));
     }
 }
