@@ -94,6 +94,14 @@ This inventory is a governance checkpoint, not implementation authorization beyo
 - The two consumers therefore have duplicate parser authorities and expose renderer/parser coupling that the bounded seam must remove while preserving these fallback and alias behaviors.
 - `talos-conversation` currently provides UI-independent conversation projection, not language parsing; seam placement must avoid duplicating that responsibility.
 
+### Local Seam Contract Draft — 2026-09-05
+
+The bounded seam will expose normalized language identifiers, immutable source text, highlight
+spans, and provider-unavailable/plain-text outcomes. Consumer-facing types will contain no
+Arborium, Tree-sitter, Ratatui, Crossterm, or GPUI values. Existing TUI colors remain a renderer
+mapping; symbol consumers retain their current location and error semantics. This draft is an
+implementation constraint, not a new CAP-001 architecture decision.
+
 This iteration is intentionally scheduled after I207 and I208 in the long task. It must not start until the steering slices have reached terminal dispositions and its own architecture/overlap gates are satisfied.
 
 ## Completion Evidence
