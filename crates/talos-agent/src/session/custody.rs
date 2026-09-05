@@ -16,6 +16,23 @@ use super::{
 };
 
 impl AppServerSession {
+    pub(super) fn finish_unacknowledged_boundary(&self, active: &ActiveStructuredTurn) -> bool {
+        let completion = TurnCompletionStatus::Error {
+            message: "boundary submission was not acknowledged as model-visible".into(),
+        };
+        if !self.finish_injected_structured_turn(active, &completion) {
+            return false;
+        }
+        let _ = self.eq_tx.send(SessionEvent::SubmissionResolved {
+            session_id: self.session_id.clone(),
+            session_generation: active.session_generation,
+            submission_id: active.submission_id.clone(),
+            receipt_id: active.receipt_id.clone(),
+            state: PendingSubmissionState::TerminalError,
+        });
+        true
+    }
+
     pub(super) fn reconcile_running_submissions(&self) {
         let records = match self.pending_store.recover_running() {
             Ok(records) => records,
@@ -129,6 +146,23 @@ impl AppServerSession {
         active: &ActiveStructuredTurn,
         completion: &TurnCompletionStatus,
     ) -> bool {
+        self.finish_structured_turn_with_event(active, completion, true)
+    }
+
+    pub(super) fn finish_injected_structured_turn(
+        &self,
+        active: &ActiveStructuredTurn,
+        completion: &TurnCompletionStatus,
+    ) -> bool {
+        self.finish_structured_turn_with_event(active, completion, false)
+    }
+
+    fn finish_structured_turn_with_event(
+        &self,
+        active: &ActiveStructuredTurn,
+        completion: &TurnCompletionStatus,
+        emit_turn_event: bool,
+    ) -> bool {
         let transition = match completion {
             TurnCompletionStatus::Success { .. } => self
                 .pending_store
@@ -154,18 +188,20 @@ impl AppServerSession {
             self.emit_custody_error("failed to pause unstarted work after terminal turn", &error);
             return false;
         }
-        let _ = self.eq_tx.send(SessionEvent::StructuredTurnEvent {
-            session_id: self.session_id.clone(),
-            session_generation: active.session_generation,
-            source: active.source,
-            submission_id: active.submission_id.clone(),
-            receipt_id: active.receipt_id.clone(),
-            turn_id: active.turn_id.clone(),
-            sequence: 1,
-            payload: TurnEventPayload::Completed {
-                status: completion.clone(),
-            },
-        });
+        if emit_turn_event {
+            let _ = self.eq_tx.send(SessionEvent::StructuredTurnEvent {
+                session_id: self.session_id.clone(),
+                session_generation: active.session_generation,
+                source: active.source,
+                submission_id: active.submission_id.clone(),
+                receipt_id: active.receipt_id.clone(),
+                turn_id: active.turn_id.clone(),
+                sequence: 1,
+                payload: TurnEventPayload::Completed {
+                    status: completion.clone(),
+                },
+            });
+        }
         true
     }
 

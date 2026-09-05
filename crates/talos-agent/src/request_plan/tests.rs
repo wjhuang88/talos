@@ -142,7 +142,7 @@ async fn initial_provider_dispatch_consumes_the_exact_sealed_plan_once() {
 
     let (event_tx, _event_rx) = mpsc::unbounded_channel();
     let (result, _messages) = agent
-        .run_prepared_session_turn(prepared, event_tx, None)
+        .run_prepared_session_turn(prepared, event_tx, None, None, None)
         .await;
     assert_eq!(result.expect("run prepared request"), "done");
     assert_eq!(hook_calls.load(Ordering::SeqCst), 1);

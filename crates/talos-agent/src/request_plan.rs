@@ -32,7 +32,7 @@ pub(crate) struct PreparedSessionTurn {
 }
 
 impl Agent {
-    fn structured_session_inputs(items: &[SubmissionItem]) -> (String, Vec<Message>) {
+    pub(super) fn structured_session_inputs(items: &[SubmissionItem]) -> (String, Vec<Message>) {
         let memory_query = items
             .iter()
             .map(|item| item.text.as_str())
@@ -83,9 +83,17 @@ impl Agent {
         prepared: PreparedSessionTurn,
         event_tx: mpsc::UnboundedSender<AgentEvent>,
         snapshot_tx: Option<mpsc::UnboundedSender<Vec<Message>>>,
+        boundary_tx: Option<mpsc::UnboundedSender<crate::SteeringBoundaryRequest>>,
+        boundary_ack_tx: Option<mpsc::UnboundedSender<crate::SteeringBoundaryAcknowledgement>>,
     ) -> (AgentResult<String>, Vec<Message>) {
-        self.run_prepared_inner(prepared, Some(event_tx), snapshot_tx)
-            .await
+        self.run_prepared_inner(
+            prepared,
+            Some(event_tx),
+            snapshot_tx,
+            boundary_tx,
+            boundary_ack_tx,
+        )
+        .await
     }
 
     pub(super) async fn prepare_turn_start(

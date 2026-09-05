@@ -194,11 +194,12 @@ async fn transcript_commit_survives_journal_finalization_failure_without_provide
     );
     assert_eq!(calls.load(Ordering::SeqCst), 1);
 
-    sq_tx
-        .send(SessionOp::Shutdown)
+    // Finalization failure fences this Actor instead of accepting work with
+    // released in-memory accounting for a still-Running durable identity.
+    tokio::time::timeout(Duration::from_secs(5), actor_task)
         .await
-        .expect("operation should succeed");
-    actor_task.await.expect("operation should succeed");
+        .expect("faulted Actor must stop without requiring another command")
+        .expect("Actor joins");
 
     let reopened = manager
         .create_or_open_session(external_id)

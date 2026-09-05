@@ -116,6 +116,16 @@ pub enum SessionEvent {
         receipt_id: String,
         turn_id: String,
     },
+    /// A durably accepted steering submission was committed to the continuation
+    /// context of a running structured Turn at a complete tool-call boundary.
+    /// Cancellation can still prevent the subsequent Provider request.
+    StructuredSubmissionInjected {
+        session_id: String,
+        session_generation: u64,
+        submission: StructuredSubmission,
+        receipt_id: String,
+        turn_id: String,
+    },
     SubmissionRejected {
         session_id: String,
         submission_id: String,
@@ -129,8 +139,8 @@ pub enum SessionEvent {
         receipt_id: String,
         reason: SubmissionRejectionReason,
     },
-    /// A pre-start durable submission was explicitly resolved without
-    /// Provider execution.
+    /// A durable submission was resolved without Provider execution: a
+    /// pre-start cancellation, or an unacknowledged boundary handoff failure.
     SubmissionResolved {
         session_id: String,
         session_generation: u64,

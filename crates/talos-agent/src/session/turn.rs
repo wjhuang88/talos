@@ -11,7 +11,7 @@ use talos_core::message::{AgentEvent, Message};
 use talos_core::session::{SessionEvent, TurnCompletionStatus, TurnEventPayload};
 use talos_session::{TurnTranscriptOutcome, TurnTranscriptOutcomeRecord};
 
-use crate::{Agent, PreparedSessionTurn};
+use crate::{Agent, PreparedSessionTurn, SteeringBoundaryAcknowledgement, SteeringBoundaryRequest};
 
 #[derive(Clone)]
 pub(super) struct TurnPersistence {
@@ -51,6 +51,10 @@ pub(super) struct TurnForwarding {
     pub(super) persistence: Option<TurnPersistence>,
     pub(super) durable_persistence: Option<DurableTurnPersistence>,
     pub(super) result_tx: tokio::sync::oneshot::Sender<TurnRecord>,
+    pub(super) boundary_tx: mpsc::UnboundedSender<SteeringBoundaryRequest>,
+    pub(super) boundary_ack_tx: mpsc::UnboundedSender<SteeringBoundaryAcknowledgement>,
+    #[cfg(test)]
+    pub(super) boundary_ack_cancel_gate: Option<Arc<tokio::sync::Notify>>,
 }
 
 pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
@@ -67,6 +71,10 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
         persistence,
         durable_persistence,
         result_tx,
+        boundary_tx,
+        boundary_ack_tx,
+        #[cfg(test)]
+        boundary_ack_cancel_gate,
     } = turn;
 
     let eq_tx_clone = eq_tx.clone();
@@ -81,12 +89,28 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
     let progress_diagnostic_failures = diagnostic_failures.clone();
     let diagnostic_turn_id = turn_id.clone();
     let (snapshot_tx, mut snapshot_rx) = mpsc::unbounded_channel::<Vec<Message>>();
+    let (agent_ack_tx, mut agent_ack_rx) =
+        mpsc::unbounded_channel::<SteeringBoundaryAcknowledgement>();
 
     let forwarder = tokio::spawn(async move {
         let mut response_ordinal = 0_u32;
         loop {
             tokio::select! {
-                _ = cancel_clone.cancelled() => break,
+                biased;
+                _ = cancel_clone.cancelled() => {
+                    // The Agent publishes its boundary snapshot and
+                    // acknowledgement synchronously before awaiting the
+                    // Actor confirmation.  On cancellation, drain any
+                    // already-published acknowledgement so the Actor can
+                    // resolve the delivered durable identity instead of
+                    // leaving the bridge in AcceptedByActor forever.
+                    // The parent aborts and joins the Agent; wait for sender
+                    // closure rather than racing its final synchronous poll.
+                    while let Some(acknowledgement) = agent_ack_rx.recv().await {
+                        let _ = boundary_ack_tx.send(acknowledgement);
+                    }
+                    break;
+                }
                 event = event_rx.recv() => {
                     match event {
                         Some(event) => {
@@ -132,13 +156,30 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                         None => break,
                     }
                 }
+                Some(acknowledgement) = agent_ack_rx.recv() => {
+                    #[cfg(test)]
+                    if let Some(reached) = &boundary_ack_cancel_gate {
+                        reached.notify_one();
+                        cancel_clone.cancelled().await;
+                    }
+                    // The Agent waits for this acknowledgement. Drain its
+                    // earlier progress first so the Actor's injection event
+                    // cannot overtake the preceding tool results in EQ.
+                    let _ = boundary_ack_tx.send(acknowledgement);
+                }
             }
         }
     });
 
     let mut agent_task = tokio::spawn(async move {
         agent
-            .run_prepared_session_turn(prepared, event_tx, Some(snapshot_tx))
+            .run_prepared_session_turn(
+                prepared,
+                event_tx,
+                Some(snapshot_tx),
+                Some(boundary_tx),
+                Some(agent_ack_tx),
+            )
             .await
     });
 
@@ -146,6 +187,9 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
         result = &mut agent_task => result,
         _ = cancel_token.cancelled() => {
             agent_task.abort();
+            // Join before draining snapshots: a concurrently running Agent
+            // may still publish its last closed boundary until abort completes.
+            let _ = agent_task.await;
             let _ = forwarder.await;
             let mut stable_prefix = Vec::new();
             while let Ok(snapshot) = snapshot_rx.try_recv() {

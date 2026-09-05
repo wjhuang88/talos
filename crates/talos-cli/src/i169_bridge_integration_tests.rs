@@ -663,10 +663,21 @@ async fn esc_cancel_activates_queued_turn_before_provider_switch_is_allowed() {
     );
 
     user_tx.send(UserInput::Cancel).expect("Esc cancellation");
-    let interrupt = tokio::time::timeout(Duration::from_secs(2), command_rx.recv())
+    let mut interrupt = tokio::time::timeout(Duration::from_secs(2), command_rx.recv())
         .await
         .expect("interrupt timeout")
         .expect("command channel open");
+    // I208 may transfer queued input into durable custody before Esc. Its
+    // execution must still wait for the original Turn's terminal event.
+    let early_second = if let SessionOp::SubmitStructured { submission } = interrupt {
+        interrupt = tokio::time::timeout(Duration::from_secs(2), command_rx.recv())
+            .await
+            .expect("targeted interrupt timeout")
+            .expect("command channel open");
+        Some(submission)
+    } else {
+        None
+    };
     assert!(matches!(
         interrupt,
         SessionOp::InterruptTurn {
@@ -689,12 +700,17 @@ async fn esc_cancel_activates_queued_turn_before_provider_switch_is_allowed() {
         })
         .expect("cancelled completion");
 
-    let second = tokio::time::timeout(Duration::from_secs(2), command_rx.recv())
-        .await
-        .expect("queued continuation dispatch timeout")
-        .expect("command channel open");
-    let SessionOp::SubmitStructured { submission: second } = second else {
-        panic!("expected queued structured submission");
+    let second = if let Some(submission) = early_second {
+        submission
+    } else {
+        let second = tokio::time::timeout(Duration::from_secs(2), command_rx.recv())
+            .await
+            .expect("queued continuation dispatch timeout")
+            .expect("command channel open");
+        let SessionOp::SubmitStructured { submission } = second else {
+            panic!("expected queued structured submission");
+        };
+        submission
     };
     assert_eq!(second.sender_generation, 7);
     assert_eq!(second.items.len(), 1);

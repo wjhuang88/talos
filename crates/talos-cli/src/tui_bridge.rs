@@ -50,6 +50,15 @@ struct DeferredAcceptedSubmission {
 }
 
 impl DeferredAcceptedSubmission {
+    fn into_paused_state(self) -> BridgeTurnState {
+        BridgeTurnState::PreStartPaused {
+            session_id: self.session_id,
+            session_generation: self.session_generation,
+            submission_id: self.submission_id,
+            receipt_id: self.receipt_id,
+        }
+    }
+
     fn into_turn_state(self) -> BridgeTurnState {
         BridgeTurnState::AcceptedByActor {
             session_id: self.session_id,
@@ -71,6 +80,7 @@ struct BoundarySubmission {
     cancel_requested: bool,
     last_reconcile: Instant,
     reconcile_attempts: u32,
+    continuation_allowed: Option<bool>,
 }
 
 #[derive(Debug)]
@@ -474,6 +484,17 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                                     QueuedDispatch::CurrentRoute,
                                 )
                                 .await;
+                            } else if accepted
+                                && matches!(turn_state, BridgeTurnState::StructuredRunning { .. })
+                            {
+                                prepare_boundary_submission(
+                                    &mut engine,
+                                    &mut boundary_submission,
+                                    &mut deferred_accepted,
+                                    &sq_tx_watch,
+                                    sender_generation,
+                                    &ui_tx,
+                                );
                             }
                         }
                     }
@@ -636,6 +657,53 @@ async fn handle_session_event(
                 receipt_id,
                 turn_id,
             );
+        }
+        SessionEvent::StructuredSubmissionInjected {
+            session_id,
+            session_generation,
+            submission,
+            receipt_id,
+            turn_id,
+        } => {
+            let matches_active_turn = matches!(
+                turn_state,
+                BridgeTurnState::StructuredRunning {
+                    session_id: active_session,
+                    session_generation: active_generation,
+                    turn_id: active_turn,
+                    ..
+                } | BridgeTurnState::StructuredCancelling {
+                    session_id: active_session,
+                    session_generation: active_generation,
+                    turn_id: active_turn,
+                    ..
+                } if active_session == &session_id
+                    && *active_generation == session_generation
+                    && active_turn == &turn_id
+            );
+            let matches_deferred = deferred_accepted.as_ref().is_some_and(|accepted| {
+                accepted.session_id == session_id
+                    && accepted.session_generation == session_generation
+                    && accepted.submission_id == submission.id
+                    && accepted.receipt_id == receipt_id
+                    && accepted.submission == submission
+            });
+            if matches_active_turn && matches_deferred {
+                emit_submission_projection(engine, ui_tx, &submission);
+                deferred_accepted.take();
+                if matches!(turn_state, BridgeTurnState::StructuredRunning { .. }) {
+                    prepare_boundary_submission(
+                        engine,
+                        boundary_submission,
+                        deferred_accepted,
+                        sq_tx_watch,
+                        *sender_generation,
+                        ui_tx,
+                    );
+                }
+            } else {
+                emit_bridge_error(ui_tx, "ignored uncorrelated boundary steering injection");
+            }
         }
         SessionEvent::StructuredTurnEvent {
             session_id,
@@ -872,6 +940,44 @@ async fn handle_session_event(
                 .await;
             }
         }
+        SessionEvent::SubmissionResolved {
+            session_id,
+            session_generation,
+            submission_id,
+            receipt_id,
+            state: PendingSubmissionState::TerminalError,
+        } => {
+            let matches_active = matches!(turn_state,
+                BridgeTurnState::AcceptedByActor {
+                    session_id: expected_session, session_generation: expected_generation,
+                    submission_id: expected_submission, receipt_id: expected_receipt, ..
+                } | BridgeTurnState::PreStartPaused {
+                    session_id: expected_session, session_generation: expected_generation,
+                    submission_id: expected_submission, receipt_id: expected_receipt,
+                } if expected_session == &session_id && *expected_generation == session_generation
+                    && expected_submission == &submission_id && expected_receipt == &receipt_id
+            );
+            let matches_deferred = deferred_accepted.as_ref().is_some_and(|accepted| {
+                accepted.session_id == session_id
+                    && accepted.session_generation == session_generation
+                    && accepted.submission_id == submission_id
+                    && accepted.receipt_id == receipt_id
+            });
+            if matches_active || matches_deferred {
+                if matches_active {
+                    *turn_state = BridgeTurnState::PausedAfterFailure;
+                }
+                if matches_deferred {
+                    deferred_accepted.take();
+                }
+                emit_bridge_error(
+                    ui_tx,
+                    "steering handoff failed before model visibility; the input was not executed or automatically retried; submit it again explicitly",
+                );
+            } else {
+                emit_bridge_error(ui_tx, "ignored stale boundary-submission resolution");
+            }
+        }
         SessionEvent::SubmissionResolved { .. } => {
             emit_bridge_error(
                 ui_tx,
@@ -940,7 +1046,7 @@ fn handle_submission_receipt(
                     engine.steering_queue_snapshot(),
                 ));
                 let _ = ui_tx.send(UiOutput::Status(engine.status_snapshot()));
-                *deferred_accepted = Some(DeferredAcceptedSubmission {
+                let accepted = DeferredAcceptedSubmission {
                     session_id,
                     session_generation,
                     submission_id,
@@ -948,7 +1054,18 @@ fn handle_submission_receipt(
                     submission: boundary.submission,
                     projected: false,
                     cancel_requested: boundary.cancel_requested,
-                });
+                };
+                match boundary.continuation_allowed {
+                    Some(true) => *turn_state = accepted.into_turn_state(),
+                    Some(false) => {
+                        *turn_state = accepted.into_paused_state();
+                        emit_bridge_error(
+                            ui_tx,
+                            "accepted steering is paused before execution; press Esc to cancel this retained input",
+                        );
+                    }
+                    None => *deferred_accepted = Some(accepted),
+                }
             }
             SubmissionReceiptDisposition::NotAccepted
             | SubmissionReceiptDisposition::Rejected { .. } => {
@@ -1491,14 +1608,22 @@ fn handle_structured_turn_event(
             }
             let continuation_allowed =
                 completion_allows_queued_continuation(&status, cancellation_requested);
+            if let Some(boundary) = boundary_submission.as_mut() {
+                boundary.continuation_allowed = Some(continuation_allowed);
+            }
             *turn_state = if continuation_allowed {
                 deferred_accepted.take().map_or(
                     BridgeTurnState::Idle,
                     DeferredAcceptedSubmission::into_turn_state,
                 )
             } else {
-                deferred_accepted.take();
-                BridgeTurnState::PausedAfterFailure
+                deferred_accepted.take().map_or(
+                    if continuation_allowed { BridgeTurnState::Idle } else { BridgeTurnState::PausedAfterFailure },
+                    |accepted| {
+                        emit_bridge_error(ui_tx, "accepted steering is paused before execution; press Esc to cancel this retained input");
+                        accepted.into_paused_state()
+                    },
+                )
             };
             let _ = ui_tx.send(UiOutput::SteeringQueueSnapshot(
                 engine.steering_queue_snapshot(),
@@ -1583,6 +1708,233 @@ mod completion_continuation_tests {
 #[cfg(test)]
 mod boundary_submission_tests {
     use super::*;
+
+    #[tokio::test]
+    async fn unacknowledged_boundary_resolution_releases_waiting_identity() {
+        for receipt_matches in [false, true] {
+            let (mut sender, mut commands) = tokio::sync::mpsc::channel(8);
+            let (_watch_tx, watch_rx) = tokio::sync::watch::channel(sender.clone());
+            let (ui_tx, _ui_rx) = tokio::sync::mpsc::unbounded_channel();
+            let mut engine = ConversationEngine::new("model".into(), "provider".into());
+            let mut state = BridgeTurnState::PreStartPaused {
+                session_id: "session".into(),
+                session_generation: 7,
+                submission_id: "steering".into(),
+                receipt_id: "receipt".into(),
+            };
+            let mut deferred = None;
+            let mut boundary = None;
+            let mut generation = 7;
+            handle_session_event(
+                SessionEvent::SubmissionResolved {
+                    session_id: "session".into(),
+                    session_generation: 7,
+                    submission_id: "steering".into(),
+                    receipt_id: if receipt_matches { "receipt" } else { "stale" }.into(),
+                    state: PendingSubmissionState::TerminalError,
+                },
+                &mut engine,
+                &mut state,
+                &mut deferred,
+                &mut boundary,
+                &watch_rx,
+                &mut sender,
+                &mut generation,
+                &ui_tx,
+            )
+            .await;
+            if receipt_matches {
+                assert!(matches!(state, BridgeTurnState::PausedAfterFailure));
+            } else {
+                assert!(matches!(state, BridgeTurnState::PreStartPaused { .. }));
+            }
+            assert!(
+                commands.try_recv().is_err(),
+                "must not retry ambiguous handoff"
+            );
+        }
+    }
+
+    #[test]
+    fn accepted_uninjected_input_remains_cancellable_before_or_after_terminal_receipt() {
+        for receipt_first in [false, true] {
+            for cancelled in [false, true] {
+                let (sender, mut commands) = tokio::sync::mpsc::channel(8);
+                crate::session_transition::register_generation_bound_sender(&sender, 7);
+                let (_watch_tx, watch_rx) = tokio::sync::watch::channel(sender);
+                let (ui_tx, _ui_rx) = tokio::sync::mpsc::unbounded_channel();
+                let mut engine = ConversationEngine::new("model".into(), "provider".into());
+                engine.enqueue_steering("retained".into());
+                let mut boundary = None;
+                let mut deferred = None;
+                prepare_boundary_submission(
+                    &mut engine,
+                    &mut boundary,
+                    &mut deferred,
+                    &watch_rx,
+                    7,
+                    &ui_tx,
+                );
+                let SessionOp::SubmitStructured { submission } =
+                    commands.try_recv().expect("submit")
+                else {
+                    panic!("structured submit");
+                };
+                let mut state = BridgeTurnState::StructuredRunning {
+                    session_id: "session".into(),
+                    session_generation: 7,
+                    submission_id: "original".into(),
+                    receipt_id: "original-receipt".into(),
+                    turn_id: "turn".into(),
+                    next_structured_sequence: 1,
+                    next_legacy_sequence: 1,
+                    progress_mode: ProgressMode::Unknown,
+                };
+                if cancelled {
+                    request_cancel(&mut state, &watch_rx, &ui_tx);
+                    assert!(matches!(
+                        commands.try_recv(),
+                        Ok(SessionOp::InterruptTurn { .. })
+                    ));
+                }
+                let receive =
+                    |engine: &mut ConversationEngine,
+                     state: &mut BridgeTurnState,
+                     boundary: &mut Option<BoundarySubmission>,
+                     deferred: &mut Option<DeferredAcceptedSubmission>| {
+                        handle_submission_receipt(
+                            engine,
+                            state,
+                            boundary,
+                            deferred,
+                            &watch_rx,
+                            &ui_tx,
+                            "session".into(),
+                            7,
+                            submission.id.clone(),
+                            format!("reservation:{}", submission.id),
+                            "receipt".into(),
+                            SubmissionSource::User,
+                            submission.items.len(),
+                            submission.total_text_bytes(),
+                            SubmissionReceiptDisposition::AcceptedPending,
+                        );
+                    };
+                if receipt_first {
+                    receive(&mut engine, &mut state, &mut boundary, &mut deferred);
+                }
+                let mut dispatch = QueuedDispatch::None;
+                handle_structured_turn_event(
+                    &mut engine,
+                    &mut state,
+                    &mut deferred,
+                    &watch_rx,
+                    &ui_tx,
+                    "session".into(),
+                    7,
+                    SubmissionSource::User,
+                    "original".into(),
+                    "original-receipt".into(),
+                    "turn".into(),
+                    1,
+                    TurnEventPayload::Completed {
+                        status: if cancelled {
+                            TurnCompletionStatus::Cancelled
+                        } else {
+                            TurnCompletionStatus::Error {
+                                message: "fixture failure".into(),
+                            }
+                        },
+                    },
+                    &mut dispatch,
+                    &mut boundary,
+                    7,
+                );
+                if !receipt_first {
+                    receive(&mut engine, &mut state, &mut boundary, &mut deferred);
+                }
+                if cancelled {
+                    assert!(
+                        matches!(&state, BridgeTurnState::AcceptedByActor { submission_id, .. } if submission_id == &submission.id)
+                    );
+                    continue;
+                }
+                assert!(
+                    matches!(&state, BridgeTurnState::PreStartPaused { submission_id, .. } if submission_id == &submission.id)
+                );
+                request_cancel(&mut state, &watch_rx, &ui_tx);
+                assert!(
+                    matches!(commands.try_recv(), Ok(SessionOp::CancelPausedSubmission { submission_id, session_generation: 7 }) if submission_id == submission.id)
+                );
+                assert!(matches!(state, BridgeTurnState::PreStartCancelling { .. }));
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn injection_acknowledgement_submits_later_queued_input_without_ending_turn() {
+        let (mut sender, mut commands) = tokio::sync::mpsc::channel(8);
+        crate::session_transition::register_generation_bound_sender(&sender, 7);
+        let (_watch_tx, watch_rx) = tokio::sync::watch::channel(sender.clone());
+        let (ui_tx, _ui_rx) = tokio::sync::mpsc::unbounded_channel();
+        let mut engine = ConversationEngine::new("model".into(), "provider".into());
+        engine.enqueue_steering("first".into());
+        let mut submission = engine.prepare_steering_submission().expect("first batch");
+        submission.sender_generation = 7;
+        assert!(engine.commit_prepared_steering(&submission.id));
+        engine.enqueue_steering("later".into());
+        let mut deferred = Some(DeferredAcceptedSubmission {
+            session_id: "session".into(),
+            session_generation: 7,
+            submission_id: submission.id.clone(),
+            receipt_id: "receipt".into(),
+            submission: submission.clone(),
+            projected: false,
+            cancel_requested: false,
+        });
+        let mut state = BridgeTurnState::StructuredRunning {
+            session_id: "session".into(),
+            session_generation: 7,
+            submission_id: "original".into(),
+            receipt_id: "original-receipt".into(),
+            turn_id: "turn".into(),
+            next_structured_sequence: 1,
+            next_legacy_sequence: 1,
+            progress_mode: ProgressMode::Unknown,
+        };
+        let mut boundary = None;
+        let mut generation = 7;
+        handle_session_event(
+            SessionEvent::StructuredSubmissionInjected {
+                session_id: "session".into(),
+                session_generation: 7,
+                submission,
+                receipt_id: "receipt".into(),
+                turn_id: "turn".into(),
+            },
+            &mut engine,
+            &mut state,
+            &mut deferred,
+            &mut boundary,
+            &watch_rx,
+            &mut sender,
+            &mut generation,
+            &ui_tx,
+        )
+        .await;
+        assert!(
+            matches!(state, BridgeTurnState::StructuredRunning { turn_id, .. } if turn_id == "turn")
+        );
+        assert!(deferred.is_none());
+        assert!(boundary.is_some());
+        let SessionOp::SubmitStructured { submission } =
+            commands.try_recv().expect("later submission")
+        else {
+            panic!("expected queued steering transfer");
+        };
+        assert_eq!(submission.items[0].text, "later");
+        assert_eq!(submission.sender_generation, 7);
+    }
 
     #[test]
     fn model_tool_boundary_transfers_one_fifo_batch_without_replacing_active_turn() {
@@ -1891,9 +2243,9 @@ async fn dispatch_prepared_submission(
     }
 }
 
-/// Transfers one queued steering batch at the provider's model-response
-/// boundary. The actor keeps the current turn running and queues the accepted
-/// batch durably; execution still begins only at the actor's next turn.
+/// Transfers one queued steering batch into durable Actor custody. The Actor
+/// may inject it after a complete tool batch in the current Turn, or retain it
+/// for the next eligible Turn when no tool boundary remains.
 fn prepare_boundary_submission(
     engine: &mut ConversationEngine,
     boundary_submission: &mut Option<BoundarySubmission>,
@@ -1930,6 +2282,7 @@ fn prepare_boundary_submission(
                 cancel_requested: false,
                 last_reconcile: Instant::now(),
                 reconcile_attempts: 0,
+                continuation_allowed: None,
             });
         }
         Err(_) => {

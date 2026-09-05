@@ -33,7 +33,10 @@ use talos_session::PendingSubmissionStore;
 pub use crate::background_jobs::BackgroundJobFinalizerHandle;
 use crate::compaction::Compactor;
 use crate::token::TokenEstimator;
-use crate::{ActivatedSkillContext, Agent};
+use crate::{
+    ActivatedSkillContext, Agent, SteeringBoundaryAcknowledgement, SteeringBoundaryBatch,
+    SteeringBoundaryRequest,
+};
 
 mod custody;
 mod lifecycle;
@@ -67,10 +70,18 @@ struct ActiveStructuredTurn {
     turn_id: String,
 }
 
+#[derive(Debug)]
+struct BoundaryStructuredTurn {
+    active: ActiveStructuredTurn,
+    submission: StructuredSubmission,
+}
+
 struct StartedTurn {
     handle: JoinHandle<Option<TurnRecord>>,
     token: CancellationToken,
     structured: Option<ActiveStructuredTurn>,
+    boundary_rx: mpsc::UnboundedReceiver<SteeringBoundaryRequest>,
+    boundary_ack_rx: mpsc::UnboundedReceiver<SteeringBoundaryAcknowledgement>,
 }
 
 fn immediate_started_turn(
@@ -81,6 +92,8 @@ fn immediate_started_turn(
     structured: Option<ActiveStructuredTurn>,
     completion: TurnCompletionStatus,
 ) -> StartedTurn {
+    let (_boundary_tx, boundary_rx) = mpsc::unbounded_channel();
+    let (_boundary_ack_tx, boundary_ack_rx) = mpsc::unbounded_channel();
     let status = match &completion {
         TurnCompletionStatus::Success { .. } => TurnRecordStatus::Success,
         TurnCompletionStatus::Cancelled => TurnRecordStatus::Cancelled,
@@ -105,6 +118,8 @@ fn immediate_started_turn(
         handle,
         token,
         structured,
+        boundary_rx,
+        boundary_ack_rx,
     }
 }
 
@@ -131,6 +146,8 @@ pub struct AppServerSession {
     runtime_admission: Option<RuntimeAdmissionControl>,
     #[cfg(test)]
     start_commit_gate: Option<(Arc<tokio::sync::Notify>, Arc<tokio::sync::Notify>)>,
+    #[cfg(test)]
+    boundary_ack_cancel_gate: Option<Arc<tokio::sync::Notify>>,
 }
 
 impl AppServerSession {
@@ -180,6 +197,8 @@ impl AppServerSession {
             runtime_admission: None,
             #[cfg(test)]
             start_commit_gate: None,
+            #[cfg(test)]
+            boundary_ack_cancel_gate: None,
         };
 
         (handle, actor)
@@ -256,6 +275,68 @@ impl AppServerSession {
     /// Runs the session actor until shutdown or SQ disconnect.
     pub async fn run(&mut self) {
         self.reconcile_running_submissions();
+        let recovery_fenced = match self.pending_store.recover_running() {
+            Ok(records) if records.is_empty() => false,
+            Ok(_) => {
+                self.emit_custody_error(
+                    "session stopped because Running custody has no terminal transcript proof",
+                    &"reconcile the original Turn before resuming",
+                );
+                true
+            }
+            Err(error) => {
+                self.emit_custody_error(
+                    "session stopped because Running custody could not be inspected",
+                    &error,
+                );
+                true
+            }
+        };
+        if recovery_fenced {
+            // Preserve observational reconciliation while refusing execution
+            // whose quota cannot be accounted for from orphan Running rows.
+            while let Some(op) = self.sq_rx.recv().await {
+                match op {
+                    SessionOp::SubmitStructured { submission } => {
+                        self.emit_admission_rejection(
+                            &submission,
+                            SubmissionRejectionReason::SessionClosed,
+                            None,
+                        );
+                    }
+                    SessionOp::SubmitStructuredTracked {
+                        submission,
+                        receipt_tx,
+                    } => {
+                        self.emit_admission_rejection(
+                            &submission,
+                            SubmissionRejectionReason::SessionClosed,
+                            receipt_tx.as_ref(),
+                        );
+                    }
+                    SessionOp::ReconcileStructured { submission }
+                    | SessionOp::SubmitStructuredReconcile { submission } => {
+                        self.reconcile_submission(&submission, None);
+                    }
+                    SessionOp::ReconcileStructuredTracked {
+                        submission,
+                        receipt_tx,
+                    }
+                    | SessionOp::SubmitStructuredReconcileTracked {
+                        submission,
+                        receipt_tx,
+                    } => {
+                        self.reconcile_submission(&submission, receipt_tx.as_ref());
+                    }
+                    SessionOp::Shutdown => break,
+                    _ => self.emit_custody_error(
+                        "execution is fenced by unresolved Running custody",
+                        &"reconcile the original Turn before resuming",
+                    ),
+                }
+            }
+            return;
+        }
 
         let mut turn_counter: u64 = 0;
         let mut submission_counter: u64 = 0;
@@ -269,7 +350,15 @@ impl AppServerSession {
         let mut current_turn: Option<JoinHandle<Option<TurnRecord>>> = None;
         let mut current_submission_size: Option<(usize, usize, usize, u64)> = None;
         let mut current_structured: Option<ActiveStructuredTurn> = None;
+        let mut injected_structured = Vec::<BoundaryStructuredTurn>::new();
+        let mut delivered_boundary: Option<BoundaryStructuredTurn> = None;
+        let mut current_boundary_rx: Option<mpsc::UnboundedReceiver<SteeringBoundaryRequest>> =
+            None;
+        let mut current_boundary_ack_rx: Option<
+            mpsc::UnboundedReceiver<SteeringBoundaryAcknowledgement>,
+        > = None;
         let mut cancel_token: Option<CancellationToken> = None;
+        let mut resume_user_after_cancel = false;
         let mut paused = self.restore_pending_submissions(
             &mut pending,
             &mut pending_items,
@@ -317,6 +406,8 @@ impl AppServerSession {
                         current_turn = Some(started.handle);
                         current_submission_size = Some(submission_size);
                         current_structured = started.structured;
+                        current_boundary_rx = Some(started.boundary_rx);
+                        current_boundary_ack_rx = Some(started.boundary_ack_rx);
                         cancel_token = Some(started.token);
                     }
                     None => {
@@ -342,6 +433,17 @@ impl AppServerSession {
                 }, if current_turn.is_some() => {
                     current_turn = None;
                     cancel_token = None;
+                    current_boundary_rx = None;
+                    if let Some(rx) = current_boundary_ack_rx.as_mut() {
+                        while let Ok(submission_id) = rx.try_recv() {
+                            self.acknowledge_boundary_submission(
+                                submission_id,
+                                &mut delivered_boundary,
+                                &mut injected_structured,
+                            );
+                        }
+                    }
+                    current_boundary_ack_rx = None;
                     if let Some((items, bytes, images, image_bytes)) = current_submission_size.take() {
                         pending_items = pending_items.saturating_sub(items);
                         pending_bytes = pending_bytes.saturating_sub(bytes);
@@ -354,27 +456,95 @@ impl AppServerSession {
                             let status = record.status;
                             let completion = record.completion.clone();
                             self.commit_turn_record(record);
-                            let custody_ok = structured.as_ref().is_none_or(|active| {
-                                self.finish_structured_turn(active, &completion)
-                            });
+                            let mut custody_ok = true;
+                            if let Some(active) = structured.as_ref() {
+                                custody_ok &= self.finish_structured_turn(active, &completion);
+                            }
+                            for injected in injected_structured.drain(..) {
+                                subtract_submission_totals(
+                                    &injected.submission,
+                                    &mut pending_items,
+                                    &mut pending_bytes,
+                                    &mut pending_images,
+                                    &mut pending_image_bytes,
+                                );
+                                custody_ok &= self.finish_injected_structured_turn(
+                                    &injected.active,
+                                    &completion,
+                                );
+                            }
+                            if let Some(unacknowledged) = delivered_boundary.take() {
+                                subtract_submission_totals(
+                                    &unacknowledged.submission,
+                                    &mut pending_items,
+                                    &mut pending_bytes,
+                                    &mut pending_images,
+                                    &mut pending_image_bytes,
+                                );
+                                custody_ok = false;
+                                custody_ok &= self.finish_unacknowledged_boundary(&unacknowledged.active);
+                            }
                             if let Some(admission) = &self.runtime_admission {
                                 admission.finish_active(Some(&completion));
                             }
-                            paused = status != TurnRecordStatus::Success || !custody_ok;
+                            let resume_queued_user = resume_user_after_cancel
+                                && status == TurnRecordStatus::Cancelled
+                                && pending.iter().any(|submission| submission.source == SubmissionSource::User);
+                            paused = (status != TurnRecordStatus::Success && !resume_queued_user)
+                                || !custody_ok;
+                            if !custody_ok {
+                                // Do not accept new work after releasing in-memory
+                                // accounting for a still-Running journal identity.
+                                // Reconstruction reconciles the terminal transcript.
+                                shutting_down = true;
+                                self.release_in_memory_pending_on_shutdown(&mut pending);
+                                if let Err(error) = self.pending_store.pause_unstarted() {
+                                    self.emit_custody_error("failed to pause pending work after custody failure", &error);
+                                }
+                            }
                         }
                         None => {
+                            let completion = TurnCompletionStatus::Error {
+                                message: "turn task ended without a completion record".into(),
+                            };
                             if let Some(active) = structured.as_ref() {
-                                let completion = TurnCompletionStatus::Error {
-                                    message: "turn task ended without a completion record".into(),
-                                };
                                 let _ = self.finish_structured_turn(active, &completion);
+                            }
+                            for injected in injected_structured.drain(..) {
+                                subtract_submission_totals(
+                                    &injected.submission,
+                                    &mut pending_items,
+                                    &mut pending_bytes,
+                                    &mut pending_images,
+                                    &mut pending_image_bytes,
+                                );
+                                let _ = self.finish_injected_structured_turn(
+                                    &injected.active,
+                                    &completion,
+                                );
+                            }
+                            if let Some(unacknowledged) = delivered_boundary.take() {
+                                subtract_submission_totals(
+                                    &unacknowledged.submission,
+                                    &mut pending_items,
+                                    &mut pending_bytes,
+                                    &mut pending_images,
+                                    &mut pending_image_bytes,
+                                );
+                                let _ = self.finish_unacknowledged_boundary(&unacknowledged.active);
                             }
                             if let Some(admission) = &self.runtime_admission {
                                 admission.finish_active(None);
                             }
                             paused = true;
+                            shutting_down = true;
+                            self.release_in_memory_pending_on_shutdown(&mut pending);
+                            if let Err(error) = self.pending_store.pause_unstarted() {
+                                self.emit_custody_error("failed to pause pending work after missing completion record", &error);
+                            }
                         }
                     }
+                    resume_user_after_cancel = false;
                 }
                 op = self.sq_rx.recv(), if !shutting_down => {
                     let Some(op) = op else {
@@ -540,6 +710,7 @@ impl AppServerSession {
                                     .as_ref()
                                     .is_some_and(|active| active.turn_id == turn_id);
                             if matches && let Some(token) = &cancel_token {
+                                resume_user_after_cancel = true;
                                 token.cancel();
                             }
                         }
@@ -617,6 +788,58 @@ impl AppServerSession {
                         }
                     }
                 }
+                request = async {
+                    match current_boundary_rx.as_mut() {
+                        Some(rx) => rx.recv().await,
+                        None => None,
+                    }
+                }, if current_boundary_rx.is_some() => {
+                    if let Some(request) = request {
+                        // The previous acknowledgement precedes this request in
+                        // Agent execution, but the two channels can be selected
+                        // in either order by the Actor.
+                        if let Some(rx) = current_boundary_ack_rx.as_mut() {
+                            while let Ok(submission_id) = rx.try_recv() {
+                                self.acknowledge_boundary_submission(
+                                    submission_id,
+                                    &mut delivered_boundary,
+                                    &mut injected_structured,
+                                );
+                            }
+                        }
+                        let injected = if shutting_down
+                            || request.response.is_closed()
+                            || cancel_token.as_ref().is_none_or(CancellationToken::is_cancelled)
+                        {
+                            None
+                        } else {
+                            self.take_boundary_submission(
+                                &mut pending,
+                                current_structured.as_ref(),
+                                &mut delivered_boundary,
+                            )
+                        };
+                        let _ = request.response.send(injected);
+                    } else {
+                        current_boundary_rx = None;
+                    }
+                }
+                acknowledgement = async {
+                    match current_boundary_ack_rx.as_mut() {
+                        Some(rx) => rx.recv().await,
+                        None => None,
+                    }
+                }, if current_boundary_ack_rx.is_some() => {
+                    if let Some(submission_id) = acknowledgement {
+                        self.acknowledge_boundary_submission(
+                            submission_id,
+                            &mut delivered_boundary,
+                            &mut injected_structured,
+                        );
+                    } else {
+                        current_boundary_ack_rx = None;
+                    }
+                }
             }
         }
 
@@ -627,6 +850,99 @@ impl AppServerSession {
                 message: format!("background cleanup incomplete: {error}"),
             });
         }
+    }
+
+    fn take_boundary_submission(
+        &self,
+        pending: &mut VecDeque<StructuredSubmission>,
+        current: Option<&ActiveStructuredTurn>,
+        delivered: &mut Option<BoundaryStructuredTurn>,
+    ) -> Option<SteeringBoundaryBatch> {
+        if delivered.is_some() {
+            return None;
+        }
+        let current = current?;
+        let index = pending
+            .iter()
+            .position(|submission| submission.source == SubmissionSource::User)?;
+        let submission = pending.remove(index)?;
+        if submission.common_kind() != Some(SubmissionKind::UserTurn) {
+            pending.insert(index, submission);
+            return None;
+        }
+        let record = match self.pending_store.get(&submission.id) {
+            Ok(Some(record)) => record,
+            Ok(None) => {
+                self.emit_custody_error(
+                    "boundary submission is missing from the durable journal",
+                    &submission.id,
+                );
+                pending.insert(index, submission);
+                return None;
+            }
+            Err(error) => {
+                self.emit_custody_error("failed to load boundary submission", &error);
+                pending.insert(index, submission);
+                return None;
+            }
+        };
+        if let Err(error) = self
+            .pending_store
+            .mark_running(&submission.id, &current.turn_id)
+        {
+            self.emit_custody_error("failed to bind boundary submission to active Turn", &error);
+            pending.insert(index, submission);
+            return None;
+        }
+        let active = ActiveStructuredTurn {
+            submission_id: submission.id.clone(),
+            receipt_id: record.receipt_id.clone(),
+            session_generation: self.session_generation,
+            source: submission.source,
+            turn_id: current.turn_id.clone(),
+        };
+        let batch = SteeringBoundaryBatch {
+            submission_id: submission.id.clone(),
+            items: submission.items.clone(),
+        };
+        *delivered = Some(BoundaryStructuredTurn { active, submission });
+        Some(batch)
+    }
+
+    fn acknowledge_boundary_submission(
+        &self,
+        acknowledgement: SteeringBoundaryAcknowledgement,
+        delivered: &mut Option<BoundaryStructuredTurn>,
+        injected: &mut Vec<BoundaryStructuredTurn>,
+    ) {
+        let SteeringBoundaryAcknowledgement {
+            submission_id,
+            projected,
+        } = acknowledgement;
+        let Some(boundary) = delivered.take() else {
+            self.emit_custody_error(
+                "ignored boundary acknowledgement without a delivered submission",
+                &submission_id,
+            );
+            return;
+        };
+        if boundary.active.submission_id != submission_id {
+            self.emit_custody_error(
+                "ignored mismatched boundary acknowledgement",
+                &submission_id,
+            );
+            *delivered = Some(boundary);
+            return;
+        }
+        let _ = self.eq_tx.send(SessionEvent::StructuredSubmissionInjected {
+            session_id: self.session_id.clone(),
+            session_generation: self.session_generation,
+            submission: boundary.submission.clone(),
+            receipt_id: boundary.active.receipt_id.clone(),
+            turn_id: boundary.active.turn_id.clone(),
+        });
+        injected.push(boundary);
+        let _ = projected.send(());
     }
 
     fn commit_turn_record(&mut self, record: TurnRecord) {
@@ -942,6 +1258,14 @@ impl AppServerSession {
                 handle,
                 token,
                 structured,
+                boundary_rx: {
+                    let (_tx, rx) = mpsc::unbounded_channel();
+                    rx
+                },
+                boundary_ack_rx: {
+                    let (_tx, rx) = mpsc::unbounded_channel();
+                    rx
+                },
             });
         }
 
@@ -957,6 +1281,10 @@ impl AppServerSession {
         let persistence = self.persistence.clone();
         let durable_persistence = self.durable_persistence.clone();
         let session_id = self.session_id.clone();
+        let (boundary_tx, boundary_rx) = mpsc::unbounded_channel();
+        let (boundary_ack_tx, boundary_ack_rx) = mpsc::unbounded_channel();
+        #[cfg(test)]
+        let boundary_ack_cancel_gate = self.boundary_ack_cancel_gate.clone();
         let handle = tokio::spawn(async move {
             let (event_tx, event_rx) = mpsc::unbounded_channel::<AgentEvent>();
             let (result_tx, result_rx) = tokio::sync::oneshot::channel::<TurnRecord>();
@@ -973,6 +1301,10 @@ impl AppServerSession {
                 persistence,
                 durable_persistence,
                 result_tx,
+                boundary_tx,
+                boundary_ack_tx,
+                #[cfg(test)]
+                boundary_ack_cancel_gate,
             }))
             .catch_unwind()
             .await;
@@ -982,6 +1314,8 @@ impl AppServerSession {
             handle,
             token,
             structured,
+            boundary_rx,
+            boundary_ack_rx,
         })
     }
 
@@ -1107,4 +1441,18 @@ fn queue_totals_after(
         && next_images <= MAX_STEERING_QUEUE_IMAGES
         && next_image_bytes <= MAX_STEERING_QUEUE_IMAGE_BYTES)
         .then_some((next_items, next_bytes, next_images, next_image_bytes))
+}
+
+fn subtract_submission_totals(
+    submission: &StructuredSubmission,
+    pending_items: &mut usize,
+    pending_bytes: &mut usize,
+    pending_images: &mut usize,
+    pending_image_bytes: &mut u64,
+) {
+    let (images, image_bytes) = submission.image_totals();
+    *pending_items = pending_items.saturating_sub(submission.items.len());
+    *pending_bytes = pending_bytes.saturating_sub(submission.total_text_bytes());
+    *pending_images = pending_images.saturating_sub(images);
+    *pending_image_bytes = pending_image_bytes.saturating_sub(image_bytes);
 }

@@ -88,6 +88,20 @@ pub use compression::{CompressionMetrics, RetrievalMetrics};
 pub use prompt::{ActivatedSkillContext, ContextFile, SystemPromptBuilder, ToolDescription};
 pub(crate) use request_plan::PreparedSessionTurn;
 
+pub(crate) struct SteeringBoundaryRequest {
+    pub(crate) response: tokio::sync::oneshot::Sender<Option<SteeringBoundaryBatch>>,
+}
+
+pub(crate) struct SteeringBoundaryBatch {
+    pub(crate) submission_id: String,
+    pub(crate) items: Vec<talos_core::session::SubmissionItem>,
+}
+
+pub(crate) struct SteeringBoundaryAcknowledgement {
+    pub(crate) submission_id: String,
+    pub(crate) projected: tokio::sync::oneshot::Sender<()>,
+}
+
 /// Maximum number of tool calls allowed per turn before budget exhaustion.
 const MAX_TOOL_CALLS_PER_TURN: usize = 50;
 
@@ -683,7 +697,8 @@ impl Agent {
             Ok(prepared) => prepared,
             Err(error) => return (Err(error), Vec::new()),
         };
-        self.run_prepared_inner(prepared, event_tx, None).await
+        self.run_prepared_inner(prepared, event_tx, None, None, None)
+            .await
     }
 
     async fn run_prepared_inner(
@@ -691,6 +706,8 @@ impl Agent {
         prepared: PreparedSessionTurn,
         event_tx: Option<mpsc::UnboundedSender<AgentEvent>>,
         snapshot_tx: Option<mpsc::UnboundedSender<Vec<Message>>>,
+        boundary_tx: Option<mpsc::UnboundedSender<SteeringBoundaryRequest>>,
+        boundary_ack_tx: Option<mpsc::UnboundedSender<SteeringBoundaryAcknowledgement>>,
     ) -> (AgentResult<String>, Vec<Message>) {
         let PreparedSessionTurn {
             hook_ctx,
@@ -1215,6 +1232,33 @@ impl Agent {
                 // This is the first safe boundary after a complete tool batch:
                 // the projection excludes private fields and incomplete calls.
                 let _ = snapshot_tx.send(self.persistence_projection(&messages[persist_start..]));
+            }
+            if let Some(boundary_tx) = &boundary_tx {
+                let (response, injected) = tokio::sync::oneshot::channel();
+                if boundary_tx
+                    .send(SteeringBoundaryRequest { response })
+                    .is_ok()
+                    && let Ok(Some(batch)) = injected.await
+                {
+                    let (_, injected_messages) = Self::structured_session_inputs(&batch.items);
+                    messages.extend(injected_messages);
+                    if let Some(snapshot_tx) = &snapshot_tx {
+                        let _ = snapshot_tx
+                            .send(self.persistence_projection(&messages[persist_start..]));
+                    }
+                    if let Some(boundary_ack_tx) = &boundary_ack_tx {
+                        let (projected, confirmation) = tokio::sync::oneshot::channel();
+                        if boundary_ack_tx
+                            .send(SteeringBoundaryAcknowledgement {
+                                submission_id: batch.submission_id,
+                                projected,
+                            })
+                            .is_ok()
+                        {
+                            let _ = confirmation.await;
+                        }
+                    }
+                }
             }
         };
 

@@ -343,6 +343,16 @@ clears on content, failure, cancellation, or completion; providers that do not i
 progress retain the compatible static `Connecting...` display. A fast retry still leaves the
 initial `Connecting...` phase visible for one activity frame before the truthful reconnect state.
 
+You can enter steering while a TUI turn is running. After a complete tool batch, the Session
+can insert one durably accepted user batch before the next model request in that same turn.
+Insertion confirms that the input entered the continuation context; cancellation can still
+prevent that next model request from being sent.
+Inputs retain their FIFO order; an input accepted after that boundary waits for a later eligible
+boundary. Streaming text and running tools are not interrupted. If no tool boundary remains,
+pending input follows the existing next-turn behavior. Model errors and cancellation preserve
+already injected input in the completed transcript prefix and do not replay that input as a new
+turn; unstarted durable input follows the existing pause/resume rules.
+
 Attach one or more local images to a print-mode prompt (requires a vision-capable model):
 
 ```bash
