@@ -120,7 +120,20 @@ This iteration is intentionally scheduled after I207 and I208 in the long task. 
   `cargo test -p talos-tools --locked --features code-intelligence --lib` (51 passed),
   `cargo check --workspace --locked` and `cargo clippy --workspace --locked -- -D warnings` pass.
 - Local implementation commits: `54db04be`, `0ff1642f`, `035c6c8b`, `1664e4b4`, `543ec076`,
-  `ec38d73b`, `2b711e55`, `c36e24f7`, `7cfa1602`, `04035105`, `8eee6355`, `9d46a4d1`.
+  `ec38d73b`, `2b711e55`, `c36e24f7`, `7cfa1602`, `04035105`, `8eee6355`, `9d46a4d1`,
+  `ce4c017d`, `26a25f2a`, `6e5e3f67`, `844a2859`, `73f41527`.
+
+### Plugin compatibility inventory — 2026-09-05
+
+`talos-plugin` currently persists `talos-plugin.toml` with a top-level `plugin` metadata object,
+plus `skills`, `tools`, and `hooks`. The WASM carrier, confined handler paths, fuel/epoch timeout,
+bounded output, no-host-import boundary, explicit local package selection, and default registry
+exclusion are existing compatibility invariants. Manifest parsing does not grant permissions.
+Future Bundle work must add an envelope around this legacy payload; it must not silently rename or
+remove persisted `plugin` fields. Bundle identity/source/digest may be additive provenance and must
+not imply permission. Package selection/install and executable runtime remain separate operations.
+Evidence: existing `talos-plugin` manifest/WASM tests and CLI explicit-plugin tests pass in the
+workspace run; no plugin behavior was changed by I246.
 
 ## Variance And Residuals
 
