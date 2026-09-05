@@ -1,6 +1,6 @@
 # Iteration I246: CAP-001-P0 Compatibility Preparation
 
-> Document status: Review / Claimed (proposed; ineffective until governance merge)
+> Document status: Active / Claimed
 > Planned date: 2026-09-04
 > Planned objective: prepare the current codebase for progressive capability work through a characterized, UI-neutral text/language and Plugin compatibility boundary without changing shipped behavior.
 > Baseline rule: preserve this target; changed targets use a new iteration ID.
@@ -21,7 +21,7 @@
 | Authorization Evidence | Maintainer explicitly authorized the narrowed scope on 2026-09-05. |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-05 |
-| Handoff / Release Condition | This claim remains ineffective until its governance PR merges; implementation may change bounded shared code and Cargo edges only within the published CAP-001-P0 scope, preserving behavior and exclusions. |
+| Handoff / Release Condition | Claim effective on merge commit `f913d28b`; implementation may change bounded shared code and Cargo edges only within the published CAP-001-P0 scope, preserving behavior and exclusions. |
 
 ## Published Baseline
 
@@ -68,6 +68,10 @@
 
 - Risk: seam placement duplicates talos-conversation or changes fallback behavior.
 - Rollback: preserve existing consumer paths, record incompatibility, and route a new decision/child owner before changing public or persisted contracts.
+
+## Activation Checkpoint — 2026-09-05
+
+Claim PR #491 merged as `f913d28b027530bf43a70db21e1ef2c8eb89f5bc` after exact-head CI `33958282011` and independent review approval. Implementation must start from this merge or later main.
 
 ## Current Nonterminal Inventory And Disposition — 2026-09-05
 

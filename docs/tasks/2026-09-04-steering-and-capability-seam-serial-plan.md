@@ -49,7 +49,7 @@ remains unclaimed and unauthorized until its own claim merges.
 |---|---|---|
 | I207 / TUI-049 | Complete / Closed | Implementation PR #483 merged as `ca3b2fa7`; native-terminal acceptance passed; closeout merged as `2edb914f`. |
 | I208 / TUI-050 | Complete / Closed | PR #489 merged as `442d143b`; exact-head CI `33944840881`, independent review `5550116820`, human acceptance complete. |
-| I246 / CAP-001-P0 | Planned / Unclaimed | Third child; depends on CAP-001 decision or explicit narrowing and follows steering work. |
+| I246 / CAP-001-P0 | Active / Claimed | Bounded code-alignment claim #491 merged as `f913d28b`; starts from this main, excludes full CAP-001 architecture. |
 | I164 | Paused / superseded | Preserve; do not resume. |
 | CAP-001 parent | Refinement / Unclaimed | Preserve; parent is not an implementation unit. |
 | DESKTOP-001 | Deferred / Unclaimed | Preserve; mock/real Desktop work remains separately governed. |

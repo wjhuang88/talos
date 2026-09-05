@@ -5,7 +5,7 @@
 | Story ID | CAP-001-P0 |
 | Type | Architecture Preparation / Compatibility Story |
 | Priority | P1 |
-| Status | Active / Claimed (proposed; ineffective until governance merge) |
+| Status | Active / Claimed |
 | Parent Epic | CAP-001 |
 | Source | [GitHub Issue #467](https://github.com/wjhuang88/talos/issues/467) |
 | Selected Iteration | I246 |
@@ -26,7 +26,7 @@
 | Authorization Evidence | Maintainer explicitly authorized narrowed scope on 2026-09-05. |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-05 |
-| Handoff / Release Condition | This bounded claim is proposed and ineffective until governance merge; code/Cargo changes are limited to behavior-preserving CAP-001-P0 alignment and its tests. |
+| Handoff / Release Condition | Claim effective after governance PR #491 merged as `f913d28b`; code/Cargo changes are limited to behavior-preserving CAP-001-P0 alignment and its tests. |
 
 ## Identity / Goal / Value
 
