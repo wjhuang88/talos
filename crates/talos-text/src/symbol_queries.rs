@@ -366,4 +366,16 @@ mod tests {
             Err("parse failed".into())
         );
     }
+
+    #[test]
+    fn deeply_nested_source_is_rejected_before_recursive_visitors() {
+        let source = format!("fn f() {{ {} 0; {} }}", "{".repeat(150), "}".repeat(150));
+        assert_eq!(
+            list_imports("rust", &source, Path::new("fixture.rs")).expect_err("depth budget"),
+            "parse budget exceeded"
+        );
+        assert!(
+            find_symbol("rust", &source, Path::new(""), Path::new("fixture.rs"), "f").is_none()
+        );
+    }
 }

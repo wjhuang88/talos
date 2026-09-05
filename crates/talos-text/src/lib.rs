@@ -26,13 +26,38 @@ fn parse_builtin(language: &str, source: &str) -> Result<arborium::tree_sitter::
             ControlFlow::Continue(())
         }
     };
-    parser
+    let tree = parser
         .parse_with_options(
             &mut |offset, _| &source.as_bytes()[offset..],
             None,
             Some(ParseOptions::new().progress_callback(&mut progress)),
         )
-        .ok_or_else(|| "parse failed".to_owned())
+        .ok_or_else(|| "parse failed".to_owned())?;
+    // Validate before recursive compatibility visitors run. TreeCursor traversal itself
+    // uses no Rust recursion, so an adversarial tree cannot exhaust the visitor stack.
+    let mut cursor = tree.walk();
+    let mut depth = 0usize;
+    let mut nodes = 0usize;
+    loop {
+        nodes += 1;
+        if depth > 128 || nodes > 1_000_000 || start.elapsed().as_millis() > 500 {
+            return Err("parse budget exceeded".to_owned());
+        }
+        if cursor.goto_first_child() {
+            depth += 1;
+            continue;
+        }
+        loop {
+            if cursor.goto_next_sibling() {
+                break;
+            }
+            if !cursor.goto_parent() {
+                drop(cursor);
+                return Ok(tree);
+            }
+            depth -= 1;
+        }
+    }
 }
 
 #[cfg(feature = "code-intelligence")]
