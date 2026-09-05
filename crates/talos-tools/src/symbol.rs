@@ -169,6 +169,7 @@ fn detect_language(path: &Path) -> Option<&'static str> {
     };
     // Validate through the shared UI-neutral language contract before exposing
     // the canonical Arborium name to the symbol implementation.
+    let language = language?;
     talos_text::LanguageId::parse(language).map(|_| language)
 }
 
