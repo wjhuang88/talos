@@ -1,16 +1,18 @@
 # TUI-050: Steering Inserts At Model And Tool Boundaries
 
-**Status**: Review / Claimed
+**Status**: Complete / Closed
 
 | Field | Value |
 |---|---|
 | Story ID | TUI-050 |
 | Type | TUI / Runtime Scheduling Story |
 | Priority | P1 |
-| Status | Review / Claimed |
+| Status | Complete / Closed |
 | Source | [GitHub Issue #267](https://github.com/wjhuang88/talos/issues/267) |
 | Selected Iteration | I208 |
 | Depends On | TUI-044 / I169 accepted queue custody and Turn lifecycle |
+
+Completion Commit: `442d143ba9c1ba6b820ecdddac89bae365cef978`
 
 ## Collaboration Claim
 

@@ -1,6 +1,6 @@
 # Iteration I208: Steering Boundary Insertion
 
-> Document status: Review / Claimed
+> Document status: Complete / Closed
 > Planned date: 2026-08-17
 > Objective: implement TUI-050 so steering is inserted at an explicit model-response or tool-call
 > boundary rather than only after the outer turn completes.
@@ -245,6 +245,13 @@ disk without disabling debug assertions or tests. A preceding restricted run fai
 the existing skill fixture writes `~/.agents/skills/dedup-test`; it was a filesystem permission
 failure, not evidence of flaky I208 behavior. No skill implementation or test was changed.
 
-Remaining gates: local staged-diff review and immutable candidate; real-terminal timing and
-cancel acceptance; fresh exact-head independent review/CI and merge-time CAS; owner-first
-closeout. Completion Commit remains Pending. I246 is not activated.
+Remaining gates: owner-first closeout. Completion Commit remains Pending until the closeout
+record lands on main. I246 is not activated.
+
+## Closeout Checkpoint — 2026-09-05
+
+- Completion Commit: `442d143ba9c1ba6b820ecdddac89bae365cef978` (implementation merge PR #489).
+- Exact implementation head `8a502c262856e5ccb1bcec46d09ffac445642caa`; base `5abc6eb837b03367fd2c47a5824cfd3fd428dc23`.
+- Exact-head CI `33944840881` passed; independent review APPROVE comment `5550116820`.
+- Human terminal acceptance, including cancellation behavior, completed successfully.
+- This record is not self-certifying; the Completion Commit names the existing implementation merge.

@@ -1,6 +1,6 @@
 # Steering And Capability Seam Serial Development Plan
 
-**Status**: Active coordination / I207 Complete / Closed / I208 Review / Claimed
+**Status**: Active coordination / I207 Complete / Closed / I208 Complete / Closed
 **Published plan date**: 2026-09-04
 **Outcome**: Deliver the remaining steering follow-ups and then prepare the progressive capability compatibility seam in a controlled serial sequence.
 **Work mode**: Standard
@@ -48,7 +48,7 @@ remains unclaimed and unauthorized until its own claim merges.
 | Work | State | Disposition |
 |---|---|---|
 | I207 / TUI-049 | Complete / Closed | Implementation PR #483 merged as `ca3b2fa7`; native-terminal acceptance passed; closeout merged as `2edb914f`. |
-| I208 / TUI-050 | Review / Claimed | Claim #487 is effective; #488 is intermediate custody evidence; same-Turn injection follow-up is locally converging. |
+| I208 / TUI-050 | Complete / Closed | PR #489 merged as `442d143b`; exact-head CI `33944840881`, independent review `5550116820`, human acceptance complete. |
 | I246 / CAP-001-P0 | Planned / Unclaimed | Third child; depends on CAP-001 decision or explicit narrowing and follows steering work. |
 | I164 | Paused / superseded | Preserve; do not resume. |
 | CAP-001 parent | Refinement / Unclaimed | Preserve; parent is not an implementation unit. |
@@ -61,7 +61,7 @@ remains unclaimed and unauthorized until its own claim merges.
 | S0 | Establish current-main inventory and claim for I207 | Effective I207 claim and active owner | Clean current main; no overlapping steering implementation | Governance PR merged, exact-head CI/review/CAS pass | Keep I207 Planned/Unclaimed | Complete (`8ff4c6f1`) |
 | S1 | Implement I207 / TUI-049 | Padding-correct steering wrapping with focused and terminal evidence | S0 | Owner acceptance, local locked checks, exact-head review/CI, merge and closeout | Preserve existing layout and record residual | Complete (`ca3b2fa7`) |
 | S2 | Establish I208 claim after I207 disposition | Effective I208 claim and active owner | S1 terminal; current-main refresh | Governance PR #487 merged and CAS pass | Keep I208 Planned/Unclaimed | Complete (`75ca8057`) |
-| S3 | Implement I208 / TUI-050 | Deterministic boundary insertion and ordering evidence | S2 | Event-sequence tests, cancellation/error/restart evidence, exact-head review/CI, merge and closeout | Keep accepted queue custody and defer timing change | Review / PR #488 |
+| S3 | Implement I208 / TUI-050 | Deterministic boundary insertion and ordering evidence | S2 | Event-sequence tests, cancellation/error/restart evidence, exact-head review/CI, merge and closeout | Keep accepted queue custody and defer timing change | Complete (`442d143b`) |
 | S4 | Establish I246 claim after steering sequence | Effective I246 claim and active owner | S3 terminal; CAP-001 decision/narrowing; overlap inventory | Governance PR merged and CAS pass | Keep CAP-001-P0 Refinement/Unclaimed | Planned |
 | S5 | Implement I246 / CAP-001-P0 | Characterization, compatibility seam and Desktop handoff | S4 | Focused behavior/dependency evidence, docs, exact-head review/CI, merge and closeout | Preserve current paths and route unresolved decisions to child ADRs | Planned |
 | S6 | Final ledger closeout | All three child owners and derived views synchronized | S1, S3, S5 | Existing completion evidence, residuals recorded, claim closed | Leave task Partial with explicit residual owner | Planned |
