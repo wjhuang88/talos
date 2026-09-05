@@ -1,6 +1,6 @@
 # Steering And Capability Seam Serial Development Plan
 
-**Status**: Active coordination / I207 Complete / Closed / I208 Active / Claimed
+**Status**: Active coordination / I207 Complete / Closed / I208 Review / Claimed
 **Published plan date**: 2026-09-04
 **Outcome**: Deliver the remaining steering follow-ups and then prepare the progressive capability compatibility seam in a controlled serial sequence.
 **Work mode**: Standard
@@ -48,7 +48,7 @@ remains unclaimed and unauthorized until its own claim merges.
 | Work | State | Disposition |
 |---|---|---|
 | I207 / TUI-049 | Complete / Closed | Implementation PR #483 merged as `ca3b2fa7`; native-terminal acceptance passed; closeout merged as `2edb914f`. |
-| I208 / TUI-050 | Active / Claimed | Governance claim PR #487 merged as `75ca8057`; implementation starts from that merge and is locally converging. |
+| I208 / TUI-050 | Review / Claimed | Claim #487 is effective; #488 is intermediate custody evidence; same-Turn injection follow-up is locally converging. |
 | I246 / CAP-001-P0 | Planned / Unclaimed | Third child; depends on CAP-001 decision or explicit narrowing and follows steering work. |
 | I164 | Paused / superseded | Preserve; do not resume. |
 | CAP-001 parent | Refinement / Unclaimed | Preserve; parent is not an implementation unit. |
@@ -94,3 +94,22 @@ expanding I207 or I208.
   PR #483; closeout merged as `2edb914f139a6b3954f790d3fc2889eac16d4599`).
 - I208 and I246 Completion Commit: Pending.
 - This coordination record cannot self-certify child implementation completion.
+
+## Same-Turn Injection Follow-up Checkpoint — 2026-09-05
+
+I208 remains Review / Claimed. PR #488 merged as `5abc6eb8`, but its early durable transfer
+alone does not fulfill insertion into the current Agent continuation. Resume the uncommitted
+follow-up on `fix/i208-steering-runtime-boundary` and consult I208's appended audit checkpoint.
+The local Agent suite passes 343 tests, including two-boundary FIFO, cancellation and error
+transcript/custody checks; Agent/CLI Clippy passes. CLI projection verification and remaining
+race, recovery, quota, full-workspace and real-terminal evidence remain pending. No follow-up
+candidate has been pushed. I246 stays Planned / Unclaimed until I208's real closeout.
+
+## Local Validation Recovery Checkpoint — 2026-09-05
+
+I208's same-Turn follow-up now passes the complete pinned-toolchain preflight, including
+workspace tests/doctests (Agent 347, CLI 363) and both governance validators. See the iteration's
+Complete Local Validation Checkpoint for the exact command, cancellation gate, disk recovery
+and restricted-filesystem fixture failure. This supersedes earlier pending machine-check rows,
+not their historical results. Real-terminal acceptance, stable candidate review/CI, merge and
+owner-first closeout remain pending. I246 remains Planned / Unclaimed and unauthorized.

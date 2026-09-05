@@ -1794,6 +1794,641 @@ async fn canonical_turn_events_are_contiguous_and_actor_persistence_replays_mess
 
 struct EchoTool;
 
+struct BoundaryBlockingTool {
+    entered: Arc<tokio::sync::Notify>,
+    release: Arc<tokio::sync::Notify>,
+}
+
+#[tokio::test]
+async fn boundary_injection_ambiguous_running_recovery_fences_new_execution() {
+    let temp = tempfile::tempdir().expect("temporary directory");
+    let manager = talos_session::SessionManager::with_dir(temp.path().to_path_buf());
+    let session = manager
+        .create_session("ambiguous-boundary", "")
+        .expect("session");
+    let calls = Arc::new(AtomicUsize::new(0));
+    let (handle, mut actor) = AppServerSession::new(
+        make_agent(CountingModel {
+            calls: calls.clone(),
+        }),
+        SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: temp.path().to_path_buf(),
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        },
+    );
+    actor.set_persistence(session, talos_session::SessionMetadata::default());
+    set_authoritative_generation(&mut actor, 1);
+    let store = actor.pending_store.clone();
+    for id in ["original", "injected"] {
+        store
+            .accept(&structured_submission(
+                id,
+                &format!("{id}-item"),
+                1,
+                "ambiguous",
+                SubmissionSource::User,
+            ))
+            .expect("accept");
+        store
+            .mark_running(id, "interrupted-before-transcript")
+            .expect("running");
+    }
+    handle
+        .sq_tx
+        .send(SessionOp::SubmitStructured {
+            submission: structured_submission(
+                "new",
+                "new-item",
+                1,
+                "must not start",
+                SubmissionSource::User,
+            ),
+        })
+        .await
+        .expect("queued before recovery");
+    let task = tokio::spawn(async move { actor.run().await });
+    let (receipt_tx, mut receipt_rx) = tokio::sync::mpsc::unbounded_channel();
+    handle
+        .sq_tx
+        .send(SessionOp::SubmitStructuredTracked {
+            submission: structured_submission(
+                "tracked-new",
+                "tracked-new-item",
+                1,
+                "must reject",
+                SubmissionSource::User,
+            ),
+            receipt_tx: Some(receipt_tx),
+        })
+        .await
+        .expect("tracked submit");
+    handle
+        .sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("shutdown");
+    tokio::time::timeout(Duration::from_secs(5), task)
+        .await
+        .expect("recovery terminates")
+        .expect("actor joins");
+    let receipt = receipt_rx.try_recv().expect("explicit tracked rejection");
+    assert!(matches!(
+        receipt.disposition,
+        SubmissionReceiptDisposition::Rejected {
+            reason: SubmissionRejectionReason::SessionClosed
+        }
+    ));
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    assert!(store.get("new").expect("lookup").is_none());
+    assert_eq!(store.recover_running().expect("frozen identities").len(), 2);
+}
+
+#[tokio::test]
+async fn boundary_handoff_without_ack_publishes_correlated_terminal_resolution() {
+    use talos_core::session::PendingSubmissionState;
+    let temp = tempfile::tempdir().expect("temporary directory");
+    let (handle, actor) = AppServerSession::new(
+        make_agent(CountingModel {
+            calls: Arc::new(AtomicUsize::new(0)),
+        }),
+        SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: temp.path().to_path_buf(),
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        },
+    );
+    let submission = structured_submission(
+        "unack",
+        "unack-item",
+        0,
+        "not delivered",
+        SubmissionSource::User,
+    );
+    let (receipt, _) = actor.pending_store.accept(&submission).expect("accept");
+    actor
+        .pending_store
+        .mark_running(&submission.id, "outer")
+        .expect("running");
+    let active = ActiveStructuredTurn {
+        submission_id: submission.id.clone(),
+        receipt_id: receipt.clone(),
+        session_generation: 0,
+        source: SubmissionSource::User,
+        turn_id: "outer".into(),
+    };
+    assert!(actor.finish_unacknowledged_boundary(&active));
+    let record = actor
+        .pending_store
+        .get(&submission.id)
+        .expect("lookup")
+        .expect("record");
+    assert_eq!(record.state, PendingSubmissionState::TerminalError);
+    let mut events = handle.eq_rx;
+    assert!(
+        matches!(events.try_recv(), Ok(SessionEvent::SubmissionResolved {
+        submission_id, receipt_id, state: PendingSubmissionState::TerminalError, ..
+    }) if submission_id == submission.id && receipt_id == receipt)
+    );
+    assert!(
+        events.try_recv().is_err(),
+        "no fabricated injection or outer Turn event"
+    );
+}
+
+#[async_trait]
+impl talos_core::tool::AgentTool for BoundaryBlockingTool {
+    fn name(&self) -> &str {
+        "boundary_probe"
+    }
+    fn description(&self) -> &str {
+        "Wait for a deterministic test boundary"
+    }
+    fn parameters(&self) -> serde_json::Value {
+        serde_json::json!({"type": "object", "properties": {}})
+    }
+    async fn execute(&self, _: serde_json::Value) -> talos_core::tool::ToolResult {
+        self.entered.notify_one();
+        self.release.notified().await;
+        talos_core::tool::ToolResult::success("boundary complete")
+    }
+}
+
+#[tokio::test]
+async fn boundary_injection_reaches_next_provider_request_in_same_turn() {
+    exercise_boundary_injection(false, false, false).await;
+}
+
+#[tokio::test]
+async fn boundary_injection_cancel_preserves_injected_input_once() {
+    exercise_boundary_injection(true, false, false).await;
+}
+
+#[tokio::test]
+async fn boundary_injection_provider_error_preserves_both_fifo_inputs() {
+    exercise_boundary_injection(false, true, false).await;
+}
+
+#[tokio::test]
+async fn boundary_injection_targeted_cancel_resumes_uninjected_user_once() {
+    exercise_boundary_injection(false, false, true).await;
+}
+
+async fn exercise_boundary_injection(cancel: bool, provider_error: bool, cancel_before: bool) {
+    exercise_boundary_injection_with_gate(cancel, provider_error, cancel_before, false).await;
+}
+
+#[tokio::test]
+async fn boundary_cancel_after_agent_ack_before_actor_projection_preserves_once() {
+    exercise_boundary_injection_with_gate(true, false, false, true).await;
+}
+
+async fn exercise_boundary_injection_with_gate(
+    cancel: bool,
+    provider_error: bool,
+    cancel_before: bool,
+    handoff_cancel: bool,
+) {
+    use talos_core::session::PendingSubmissionState;
+    use talos_session::{SessionManager, SessionMetadata};
+
+    let temp = tempfile::tempdir().expect("temp directory");
+    let manager = SessionManager::with_dir(temp.path().to_path_buf());
+    let session = manager.create_session("boundary", "").expect("session");
+    let ack_reached = Arc::new(tokio::sync::Notify::new());
+    let captured = Arc::new(Mutex::new(Vec::new()));
+    let entered = Arc::new(tokio::sync::Notify::new());
+    let release = Arc::new(tokio::sync::Notify::new());
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(BoundaryBlockingTool {
+        entered: entered.clone(),
+        release: release.clone(),
+    }));
+    let tool_response = |id: &str| {
+        vec![
+            AgentEvent::ToolCall {
+                call: talos_core::message::ToolCall {
+                    id: id.into(),
+                    name: "boundary_probe".into(),
+                    input: serde_json::json!({}),
+                },
+                provenance: talos_core::tool::ToolProvenance::Native,
+                summary_fields: vec![],
+            },
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::ToolUse,
+                usage: Default::default(),
+            },
+        ]
+    };
+    let responses = vec![
+        tool_response("probe-1"),
+        if cancel_before {
+            success_events("queued turn resumed")
+        } else {
+            tool_response("probe-2")
+        },
+        if provider_error {
+            vec![AgentEvent::Error {
+                message: "boundary fixture failure".into(),
+            }]
+        } else {
+            success_events("steering received")
+        },
+    ];
+    #[allow(deprecated)]
+    let agent = Agent::new(
+        Arc::new(CapturingSequenceModel {
+            captured: captured.clone(),
+            responses: Arc::new(Mutex::new(responses.into())),
+        }),
+        registry,
+    );
+    let (handle, mut actor) = AppServerSession::new(
+        agent,
+        SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: temp.path().to_path_buf(),
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        },
+    );
+    actor.set_persistence(session.clone(), SessionMetadata::default());
+    if handoff_cancel {
+        actor.boundary_ack_cancel_gate = Some(ack_reached.clone());
+    }
+    set_authoritative_generation(&mut actor, 1);
+    let store = actor.pending_store.clone();
+    let task = tokio::spawn(async move { actor.run().await });
+    let mut events = Vec::new();
+    let mut eq_rx = handle.eq_rx;
+    handle
+        .sq_tx
+        .send(SessionOp::SubmitStructured {
+            submission: structured_submission(
+                "initial",
+                "initial-item",
+                1,
+                "original task",
+                SubmissionSource::User,
+            ),
+        })
+        .await
+        .expect("initial submit");
+    tokio::time::timeout(Duration::from_secs(5), entered.notified())
+        .await
+        .expect("tool entered");
+    handle
+        .sq_tx
+        .send(SessionOp::SubmitStructured {
+            submission: structured_submission(
+                "steering",
+                "steering-item",
+                1,
+                "change the next step",
+                SubmissionSource::User,
+            ),
+        })
+        .await
+        .expect("steering submit");
+    tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            let event = eq_rx.recv().await.expect("event");
+            let accepted = matches!(&event, SessionEvent::SubmissionReceipt { submission_id, disposition: SubmissionReceiptDisposition::AcceptedPending, .. } if submission_id == "steering");
+            events.push(event);
+            if accepted { break; }
+        }
+    }).await.expect("durable receipt");
+    if cancel_before {
+        let turn_id = events
+            .iter()
+            .find_map(|event| match event {
+                SessionEvent::StructuredSubmissionStarted { turn_id, .. } => Some(turn_id.clone()),
+                _ => None,
+            })
+            .expect("original turn identity");
+        handle
+            .sq_tx
+            .send(SessionOp::InterruptTurn {
+                session_generation: 1,
+                turn_id,
+            })
+            .await
+            .expect("targeted Esc");
+        events.extend(collect_until_completions(&mut eq_rx, 2).await);
+        handle
+            .sq_tx
+            .send(SessionOp::Shutdown)
+            .await
+            .expect("shutdown");
+        tokio::time::timeout(Duration::from_secs(5), task)
+            .await
+            .expect("actor stopped")
+            .expect("actor joined");
+        while let Ok(event) = eq_rx.try_recv() {
+            events.push(event);
+        }
+        let original = store.get("initial").expect("lookup").expect("original");
+        let steering = store.get("steering").expect("lookup").expect("steering");
+        assert_eq!(original.state, PendingSubmissionState::TerminalCancelled);
+        assert_eq!(steering.state, PendingSubmissionState::Committed);
+        assert_ne!(original.turn_id, steering.turn_id);
+        assert_eq!(
+            events
+                .iter()
+                .filter(|event| matches!(event, SessionEvent::StructuredSubmissionStarted { .. }))
+                .count(),
+            2
+        );
+        assert!(
+            !events
+                .iter()
+                .any(|event| matches!(event, SessionEvent::StructuredSubmissionInjected { .. }))
+        );
+        let requests = captured.lock().expect("requests");
+        assert_eq!(requests.len(), 2);
+        assert!(requests[1].iter().any(|message| matches!(message, Message::User { content } if content == "change the next step")));
+        return;
+    }
+    release.notify_one();
+    if handoff_cancel {
+        tokio::time::timeout(Duration::from_secs(5), ack_reached.notified())
+            .await
+            .expect("Agent ack held before Actor projection");
+    } else {
+        tokio::time::timeout(Duration::from_secs(5), entered.notified())
+            .await
+            .expect("second tool entered");
+    }
+    if cancel {
+        // Both the original and the injected item must still consume quota.
+        // Fill the rest while the second tool is held at an explicit gate.
+        let mut remaining = MAX_STEERING_QUEUE_ITEMS - 2;
+        let mut batch = 0;
+        while remaining > 0 {
+            let count = remaining.min(MAX_SUBMISSION_BATCH_ITEMS);
+            handle
+                .sq_tx
+                .send(SessionOp::SubmitStructured {
+                    submission: StructuredSubmission {
+                        id: format!("quota-{batch}"),
+                        source: SubmissionSource::Scheduler,
+                        sender_generation: 1,
+                        items: (0..count)
+                            .map(|item| SubmissionItem {
+                                id: format!("quota-{batch}-{item}"),
+                                enqueue_sequence: item as u64,
+                                kind: SubmissionKind::UserTurn,
+                                text: "queued".into(),
+                                attachments: vec![],
+                            })
+                            .collect(),
+                    },
+                })
+                .await
+                .expect("fill remaining quota");
+            remaining -= count;
+            batch += 1;
+        }
+        handle
+            .sq_tx
+            .send(SessionOp::SubmitStructured {
+                submission: structured_submission(
+                    "overflow",
+                    "overflow-item",
+                    1,
+                    "must reject",
+                    SubmissionSource::User,
+                ),
+            })
+            .await
+            .expect("overflow probe");
+        tokio::time::timeout(Duration::from_secs(5), async {
+            loop {
+                let event = eq_rx.recv().await.expect("quota event");
+                let rejected = matches!(&event, SessionEvent::SubmissionRejected {
+                    submission_id, reason: SubmissionRejectionReason::LimitExceeded, ..
+                } if submission_id == "overflow");
+                assert!(
+                    !matches!(&event, SessionEvent::SubmissionReceipt {
+                    submission_id, disposition: SubmissionReceiptDisposition::AcceptedPending, ..
+                } if submission_id == "overflow"),
+                    "injected Running item lost its quota"
+                );
+                events.push(event);
+                if rejected {
+                    break;
+                }
+            }
+        })
+        .await
+        .expect("injected quota rejection");
+        let interrupt = if handoff_cancel {
+            SessionOp::InterruptTurn {
+                session_generation: 1,
+                turn_id: store
+                    .get("initial")
+                    .expect("lookup")
+                    .expect("record")
+                    .turn_id
+                    .expect("outer Turn"),
+            }
+        } else {
+            SessionOp::Interrupt
+        };
+        handle.sq_tx.send(interrupt).await.expect("interrupt");
+    } else {
+        handle
+            .sq_tx
+            .send(SessionOp::SubmitStructured {
+                submission: structured_submission(
+                    "later",
+                    "later-item",
+                    1,
+                    "second steering",
+                    SubmissionSource::User,
+                ),
+            })
+            .await
+            .expect("second steering submit");
+        tokio::time::timeout(Duration::from_secs(5), async {
+            loop {
+                let event = eq_rx.recv().await.expect("event");
+                let accepted = matches!(&event, SessionEvent::SubmissionReceipt { submission_id, disposition: SubmissionReceiptDisposition::AcceptedPending, .. } if submission_id == "later");
+                events.push(event);
+                if accepted { break; }
+            }
+        }).await.expect("second receipt");
+        release.notify_one();
+    }
+    events.extend(collect_until_completions(&mut eq_rx, 1).await);
+    handle
+        .sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("shutdown");
+    tokio::time::timeout(Duration::from_secs(5), task)
+        .await
+        .expect("actor stopped")
+        .expect("actor joined");
+    while let Ok(event) = eq_rx.try_recv() {
+        events.push(event);
+    }
+
+    let requests = captured.lock().expect("captured requests");
+    let injected_position = events.iter().position(|event| matches!(event,
+        SessionEvent::StructuredSubmissionInjected { submission, .. } if submission.id == "steering"
+    )).expect("first injection event");
+    let tool_result_position = events
+        .iter()
+        .position(|event| {
+            matches!(progress_event(event),
+                Some(AgentEvent::ToolResult { result }) if result.tool_use_id == "probe-1"
+            )
+        })
+        .expect("first tool result event");
+    assert!(
+        tool_result_position < injected_position,
+        "injection must follow the preceding tool result in UI order"
+    );
+    if let Some(next_call_position) = events.iter().position(|event| {
+        matches!(progress_event(event),
+            Some(AgentEvent::ToolCall { call, .. }) if call.id == "probe-2"
+        )
+    }) {
+        assert!(
+            injected_position < next_call_position,
+            "injection must precede the next response in UI order"
+        );
+    }
+    assert_eq!(
+        requests.len(),
+        if handoff_cancel {
+            1
+        } else if cancel {
+            2
+        } else {
+            3
+        },
+        "steering must not start a second outer Turn"
+    );
+    if !handoff_cancel {
+        let next = &requests[1];
+        let tool_index = next.iter().position(|message| matches!(message, Message::Tool { result } if result.tool_use_id == "probe-1")).expect("tool result");
+        assert!(
+            matches!(&next[tool_index + 1], Message::User { content } if content == "change the next step")
+        );
+    }
+    assert!(
+        !events.iter().any(|event| matches!(event,
+            SessionEvent::SubmissionResolved { submission_id, .. } if submission_id == "steering"
+        )),
+        "acknowledged input must not also resolve as an unacknowledged failure"
+    );
+    assert_eq!(
+        events
+            .iter()
+            .filter(|event| matches!(event, SessionEvent::StructuredSubmissionInjected { .. }))
+            .count(),
+        if cancel { 1 } else { 2 }
+    );
+    assert_eq!(
+        events
+            .iter()
+            .filter(|event| matches!(event, SessionEvent::StructuredSubmissionStarted { .. }))
+            .count(),
+        1
+    );
+    let first = store
+        .get("initial")
+        .expect("lookup")
+        .expect("initial record");
+    let second = store
+        .get("steering")
+        .expect("lookup")
+        .expect("steering record");
+    let expected = if cancel {
+        PendingSubmissionState::TerminalCancelled
+    } else if provider_error {
+        PendingSubmissionState::TerminalError
+    } else {
+        PendingSubmissionState::Committed
+    };
+    assert_eq!(first.state, expected);
+    assert_eq!(second.state, expected);
+    assert_eq!(first.turn_id, second.turn_id);
+    if !cancel {
+        let third = store.get("later").expect("lookup").expect("later record");
+        assert_eq!(third.state, expected);
+        assert_eq!(third.turn_id, first.turn_id);
+        let users: Vec<_> = requests[2]
+            .iter()
+            .filter_map(|message| match message {
+                Message::User { content } => Some(content.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert!(users.ends_with(&["change the next step", "second steering"]));
+    }
+    assert_eq!(session.read_messages().expect("transcript").iter().filter(|message| matches!(message, Message::User { content } if content == "change the next step")).count(), 1);
+    drop(requests);
+
+    // Reconstruct the real Session actor and retry the exact accepted identity.
+    // Its terminal receipt must survive reconstruction without another model call.
+    let replay_calls = Arc::new(AtomicUsize::new(0));
+    let (reopened, mut recovered_actor) = AppServerSession::new(
+        make_agent(CountingModel {
+            calls: replay_calls.clone(),
+        }),
+        SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: temp.path().to_path_buf(),
+            initial_history: session.read_messages().expect("recovered transcript"),
+            model_context_limit: 128_000,
+        },
+    );
+    recovered_actor.set_persistence(session, SessionMetadata::default());
+    set_authoritative_generation(&mut recovered_actor, 1);
+    let recovered_task = tokio::spawn(async move { recovered_actor.run().await });
+    reopened
+        .sq_tx
+        .send(SessionOp::SubmitStructured {
+            submission: second.submission,
+        })
+        .await
+        .expect("retry accepted identity");
+    let mut recovered_events = reopened.eq_rx;
+    let recovered_state = tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            if let Some(SessionEvent::SubmissionReceipt {
+                submission_id,
+                disposition: SubmissionReceiptDisposition::AlreadyAccepted { state, .. },
+                ..
+            }) = recovered_events.recv().await
+            {
+                if submission_id == "steering" {
+                    break state;
+                }
+            }
+        }
+    })
+    .await
+    .expect("recovered terminal receipt");
+    assert_eq!(recovered_state, expected);
+    reopened
+        .sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("recovered shutdown");
+    tokio::time::timeout(Duration::from_secs(5), recovered_task)
+        .await
+        .expect("recovered actor stopped")
+        .expect("recovered actor joined");
+    assert_eq!(replay_calls.load(Ordering::SeqCst), 0);
+}
+
 #[async_trait::async_trait]
 impl talos_core::tool::AgentTool for EchoTool {
     fn name(&self) -> &str {
@@ -2114,14 +2749,40 @@ async fn fixture_persistence_failure_is_observable_in_error() {
         .parent()
         .expect("session file has parent")
         .to_path_buf();
-    std::fs::remove_file(&session.file_path).expect("remove initial session log");
-    std::fs::remove_dir_all(&session_parent).expect("remove session parent");
-    std::fs::write(&session_parent, "not a directory").expect("block session parent");
-
+    let entered = Arc::new(tokio::sync::Notify::new());
+    let release = Arc::new(tokio::sync::Notify::new());
     let mut registry = ToolRegistry::new();
-    registry.register(std::sync::Arc::new(EchoTool));
+    registry.register(Arc::new(BoundaryBlockingTool {
+        entered: entered.clone(),
+        release: release.clone(),
+    }));
     #[allow(deprecated)]
-    let agent = Agent::new(std::sync::Arc::new(ToolCallThenErrorModel::new()), registry);
+    let agent = Agent::new(
+        Arc::new(CapturingSequenceModel {
+            captured: Arc::new(Mutex::new(Vec::new())),
+            responses: Arc::new(Mutex::new(VecDeque::from(vec![
+                vec![
+                    AgentEvent::ToolCall {
+                        call: talos_core::message::ToolCall {
+                            id: "persist-probe".into(),
+                            name: "boundary_probe".into(),
+                            input: serde_json::json!({}),
+                        },
+                        provenance: talos_core::tool::ToolProvenance::Native,
+                        summary_fields: vec![],
+                    },
+                    AgentEvent::TurnEnd {
+                        stop_reason: StopReason::ToolUse,
+                        usage: Default::default(),
+                    },
+                ],
+                vec![AgentEvent::Error {
+                    message: "provider server error".into(),
+                }],
+            ]))),
+        }),
+        registry,
+    );
 
     let config = SessionConfig {
         runtime_policy: RuntimePolicy::interactive(),
@@ -2150,6 +2811,14 @@ async fn fixture_persistence_failure_is_observable_in_error() {
         .await
         .expect("operation should succeed");
 
+    tokio::time::timeout(Duration::from_secs(5), entered.notified())
+        .await
+        .expect("persistence fixture tool entered");
+    // Fail finalization after admission, not startup custody inspection.
+    std::fs::remove_file(&session.file_path).expect("remove initial session log");
+    std::fs::remove_dir_all(&session_parent).expect("remove session parent");
+    std::fs::write(&session_parent, "not a directory").expect("block session parent");
+    release.notify_one();
     let events = collect_events(eq_rx, Duration::from_secs(5)).await;
 
     let error_message = events.iter().find_map(|e| match completed_status(e) {
