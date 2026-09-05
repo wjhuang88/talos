@@ -146,6 +146,10 @@ owner-first closeout, final validators and merge CAS remain pending in this bran
 
 ## Final Ledger Checkpoint — 2026-09-05
 
+The [earlier steering ledger](2026-08-17-steering-follow-up-sequence.md) is superseded for
+recovery by this plan; its terminal checkpoint preserves historical #486 references and corrects
+the effective claim to #487. Its Board row now mirrors the completed I208 owner.
+
 This checkpoint supersedes earlier execution/recovery instructions, not the published plan.
 I246 closeout #493 merged as `2289fb80` after exact-head `bac98203` CI `33970169212`
 (four successes and route-correct Windows Rust skip) and independent Agent-role approval

@@ -29,3 +29,16 @@ claim PR #486 open, which is ineffective until merge, and no implementation auth
 I206 and I207 retain their completed implementation evidence. I208 implementation starts only after
 claim PR #486 merges and the first two contracts are accepted or their interaction is explicitly
 resolved.
+
+## Terminal / Supersession Checkpoint — 2026-09-06
+
+Status: Complete / Closed.
+Completion Commit: `9d7c87cb`, `ca3b2fa7ffb1ca14b82d1acf6af6be147368e6fe`,
+`442d143ba9c1ba6b820ecdddac89bae365cef978`.
+
+I206, I207 and I208 are complete in their owners. I208 claim #486 was superseded by #487
+(merge `75ca8057`); implementation #489 merged as `442d143b`. The historical descriptions
+and Resume section above are superseded and must not be executed.
+
+Use the [final serial plan](2026-09-04-steering-and-capability-seam-serial-plan.md) for current
+coordination and completion evidence. Do not reactivate these iterations or wait for #486.
