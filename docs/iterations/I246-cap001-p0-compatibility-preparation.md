@@ -1,6 +1,6 @@
 # Iteration I246: CAP-001-P0 Compatibility Preparation
 
-> Document status: Planned / Unclaimed
+> Document status: Active / Claimed (proposed; ineffective until governance merge)
 > Planned date: 2026-09-04
 > Planned objective: prepare the current codebase for progressive capability work through a characterized, UI-neutral text/language and Plugin compatibility boundary without changing shipped behavior.
 > Baseline rule: preserve this target; changed targets use a new iteration ID.
@@ -10,18 +10,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 mainline session |
+| Work Slice | I246 / CAP-001-P0 narrowed characterization only: current-code inventory, compatibility matrix, dependency boundary and downstream handoff. No code, Cargo, dependency, persistence or runtime behavior changes. |
+| Claimed At | 2026-09-05 |
 | Source Issue | #467 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | Pending |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Maintainer explicitly authorized the narrowed scope on 2026-09-05. |
 | Implementation PR | Not started |
-| Last Updated | 2026-09-04 |
-| Handoff / Release Condition | CAP-001 architecture decision, overlap inventory and effective claim must precede code/Cargo changes. |
+| Last Updated | 2026-09-05 |
+| Handoff / Release Condition | This narrowed claim remains ineffective until its governance PR merges; implementation is limited to documentation/characterization artifacts and must not change code/Cargo/behavior. |
 
 ## Published Baseline
 
