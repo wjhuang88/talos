@@ -30,10 +30,11 @@ impl HighlightEngine {
     /// Returns `None` if parsing fails or exceeds 500ms.
     pub(crate) fn highlight(&mut self, language: &str, code: &str) -> Option<Vec<LineSegments>> {
         let language = talos_text::LanguageId::parse(language)?;
-        Some(segments_from_result(
-            code,
-            &self.highlighter.highlight(&language, code),
-        ))
+        let result = self.highlighter.highlight(&language, code);
+        match result {
+            talos_text::HighlightResult::PlainText => None,
+            _ => Some(segments_from_result(code, &result)),
+        }
     }
 
     pub(crate) fn supports(&self, language: &str) -> bool {
@@ -147,6 +148,18 @@ fn capture_color(capture: &str) -> Option<CColor> {
 mod tests {
     use super::*;
     use talos_text::{HighlightResult, HighlightSpan};
+
+    #[test]
+    fn unavailable_grammar_keeps_existing_markdown_fallback() {
+        let mut engine = HighlightEngine::new();
+        assert!(!engine.supports("not-a-supported-language"));
+        assert!(
+            engine
+                .highlight("not-a-supported-language", "一\nsecond\n")
+                .is_none()
+        );
+        assert!(engine.highlight("rust", "fn main() {}\n").is_some());
+    }
 
     #[test]
     fn plain_fallback_preserves_line_structure() {
