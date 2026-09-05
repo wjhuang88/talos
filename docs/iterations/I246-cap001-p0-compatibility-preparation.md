@@ -87,6 +87,13 @@ This inventory is a governance checkpoint, not implementation authorization beyo
 
 ## Execution Order
 
+### Local Code-Truth Inventory — 2026-09-05
+
+- `talos-tui/src/highlight.rs` owns `arborium::Highlighter` and converts Arborium spans directly to Crossterm-colored line segments; parse failures and the 500ms budget fall back to plain rendering.
+- `talos-tools/src/symbol.rs` owns a separate Arborium parser path, including extension-to-language aliases and AST symbol/outline traversal.
+- The two consumers therefore have duplicate parser authorities and expose renderer/parser coupling that the bounded seam must remove while preserving these fallback and alias behaviors.
+- `talos-conversation` currently provides UI-independent conversation projection, not language parsing; seam placement must avoid duplicating that responsibility.
+
 This iteration is intentionally scheduled after I207 and I208 in the long task. It must not start until the steering slices have reached terminal dispositions and its own architecture/overlap gates are satisfied.
 
 ## Completion Evidence
