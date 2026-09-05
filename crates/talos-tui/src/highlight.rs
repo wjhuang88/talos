@@ -29,6 +29,12 @@ impl HighlightEngine {
     /// where color is `None` for the default text color.
     /// Returns `None` if parsing fails or exceeds 500ms.
     pub(crate) fn highlight(&mut self, language: &str, code: &str) -> Option<Vec<LineSegments>> {
+        // Preserve the previous Arborium boundary: only canonical grammar keys are
+        // highlighted. Alias normalization remains available to neutral consumers and tools,
+        // but must not silently change TUI fallback behavior.
+        if !self.supports(language) {
+            return None;
+        }
         let language = talos_text::LanguageId::parse(language)?;
         let result = self.highlighter.highlight(&language, code);
         match result {
@@ -39,7 +45,7 @@ impl HighlightEngine {
 
     pub(crate) fn supports(&self, language: &str) -> bool {
         talos_text::LanguageId::parse(language)
-            .is_some_and(|language| self.highlighter.supports(&language))
+            .is_some_and(|id| id.as_str() == language && self.highlighter.supports(&id))
     }
 }
 
@@ -159,6 +165,18 @@ mod tests {
                 .is_none()
         );
         assert!(engine.highlight("rust", "fn main() {}\n").is_some());
+    }
+
+    #[test]
+    fn aliases_keep_the_previous_plain_fallback_boundary() {
+        let mut engine = HighlightEngine::new();
+        for language in ["rs", "py", "TSX", "tsx", ".rs", "RUST", " rust "] {
+            assert!(!engine.supports(language), "{language}");
+            assert!(engine.highlight(language, "fn main() {}\n").is_none());
+        }
+        for language in ["rust", "python", "typescript"] {
+            assert!(engine.supports(language), "{language}");
+        }
     }
 
     #[test]
