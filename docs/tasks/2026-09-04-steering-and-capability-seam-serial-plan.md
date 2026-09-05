@@ -7,8 +7,8 @@
 **Deferred validation tracker**: None; human/device evidence remains a per-child gate and is not deferred by this plan.
 
 This is a coordination and recovery ledger. I207 is Complete / Closed via closeout merge
-`2edb914f`; I208 claim/activation is effective via governance PR #487 merge `75ca8057`; I246
-claim #491 is effective at `f913d28b`; its bounded implementation is in Review through PR #492.
+`2edb914f`; I208 is Complete / Closed with implementation merge `442d143b`.
+I246 implementation #492 merged at `9a3c1d86`; its owner now records Complete / Closed.
 
 ## Collaboration Claim
 
@@ -92,7 +92,8 @@ expanding I207 or I208.
 
 - I207 Completion Commit: `ca3b2fa7ffb1ca14b82d1acf6af6be147368e6fe` (implementation merge for
   PR #483; closeout merged as `2edb914f139a6b3954f790d3fc2889eac16d4599`).
-- I208 and I246 Completion Commit: Pending.
+- I208 Completion Commit: `442d143ba9c1ba6b820ecdddac89bae365cef978`; I246 Completion Commit:
+  `9a3c1d860408c1438ec1a7ad4b57860167d0cb01`.
 - This coordination record cannot self-certify child implementation completion.
 
 ## Same-Turn Injection Follow-up Checkpoint — 2026-09-05
