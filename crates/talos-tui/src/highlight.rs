@@ -47,7 +47,17 @@ impl HighlightEngine {
             return None;
         }
 
-        Some(segments_from_spans(code, &spans))
+        let neutral = talos_text::HighlightResult::Spans(
+            spans
+                .iter()
+                .map(|span| talos_text::HighlightSpan {
+                    start: span.start as usize,
+                    end: span.end as usize,
+                    capture: span.capture.clone(),
+                })
+                .collect(),
+        );
+        Some(segments_from_result(code, &neutral))
     }
 
     pub(crate) fn supports(&self, language: &str) -> bool {
@@ -57,7 +67,11 @@ impl HighlightEngine {
 }
 
 /// Convert raw tree-sitter spans into per-line colored text segments.
-fn segments_from_spans(code: &str, spans: &[arborium::advanced::Span]) -> Vec<LineSegments> {
+fn segments_from_result(code: &str, result: &talos_text::HighlightResult) -> Vec<LineSegments> {
+    let spans = match result {
+        talos_text::HighlightResult::Spans(spans) => spans,
+        talos_text::HighlightResult::PlainText => return vec![vec![(code.to_string(), None)]],
+    };
     let line_offsets: Vec<usize> = code
         .match_indices('\n')
         .map(|(i, _)| i + 1)
@@ -69,8 +83,8 @@ fn segments_from_spans(code: &str, spans: &[arborium::advanced::Span]) -> Vec<Li
     let mut cursor: usize = 0;
 
     for span in spans {
-        let s = span.start.min(code.len() as u32) as usize;
-        let e = span.end.min(code.len() as u32) as usize;
+        let s = span.start.min(code.len());
+        let e = span.end.min(code.len());
 
         if s < cursor || e < s {
             continue;
