@@ -63,8 +63,8 @@ claim #491 is effective at `f913d28b`; its bounded implementation is in Review t
 | S2 | Establish I208 claim after I207 disposition | Effective I208 claim and active owner | S1 terminal; current-main refresh | Governance PR #487 merged and CAS pass | Keep I208 Planned/Unclaimed | Complete (`75ca8057`) |
 | S3 | Implement I208 / TUI-050 | Deterministic boundary insertion and ordering evidence | S2 | Event-sequence tests, cancellation/error/restart evidence, exact-head review/CI, merge and closeout | Keep accepted queue custody and defer timing change | Complete (`442d143b`) |
 | S4 | Establish I246 claim after steering sequence | Effective I246 claim and active owner | S3 terminal; CAP-001 decision/narrowing; overlap inventory | Governance PR merged and CAS pass | Keep CAP-001-P0 Refinement/Unclaimed | Complete (`f913d28b`) |
-| S5 | Implement I246 / CAP-001-P0 | Characterization, compatibility seam and Desktop handoff | S4 | Focused behavior/dependency evidence, docs, exact-head review/CI, merge and closeout | Preserve current paths and route unresolved decisions to child ADRs | Review |
-| S6 | Final ledger closeout | All three child owners and derived views synchronized | S1, S3, S5 | Existing completion evidence, residuals recorded, claim closed | Leave task Partial with explicit residual owner | Planned |
+| S5 | Implement I246 / CAP-001-P0 | Characterization, compatibility seam and Desktop handoff | S4 | Focused behavior/dependency evidence, docs, exact-head review/CI, merge and closeout | Preserve current paths and route unresolved decisions to child ADRs | Complete (`9a3c1d86`) |
+| S6 | Final ledger closeout | All three child owners and derived views synchronized | S1, S3, S5 | Existing completion evidence, residuals recorded, claim closed | Leave task Partial with explicit residual owner | Review |
 
 ## Shared Validation And Ownership Rules
 
@@ -130,3 +130,12 @@ and read-only Browser Provider outcomes. These require separately governed child
 dependencies resolved from the parent owner rather than inferred from this serial plan. I246
 must still satisfy its own code migration, compatibility evidence and handoff requirements;
 those may not be silently deferred to #466 merely to close this task.
+
+## I246 Implementation Merge Checkpoint — 2026-09-05
+
+PR #492 merged as `9a3c1d860408c1438ec1a7ad4b57860167d0cb01` from reviewed head `59d27ac6` onto
+`f913d28b`. Exact-head CI run `33965865507` completed 5/5 SUCCESS; independent Agent-role
+review comment `5551902186` APPROVED. I246 owner and derived views now record Complete / Closed
+with this implementation commit. CAP-001/#466 remains a separate open parent; its provider,
+resolver, Bundle, Language, Distribution and Browser child work is not claimed here. S6
+owner-first closeout, final validators and merge CAS remain pending in this branch.

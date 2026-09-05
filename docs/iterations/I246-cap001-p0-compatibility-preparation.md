@@ -1,6 +1,6 @@
 # Iteration I246: CAP-001-P0 Compatibility Preparation
 
-> Document status: Review / Claimed
+> Document status: Complete / Closed
 > Planned date: 2026-09-04
 > Planned objective: prepare the current codebase for progressive capability work through a characterized, UI-neutral text/language and Plugin compatibility boundary without changing shipped behavior.
 > Baseline rule: preserve this target; changed targets use a new iteration ID.
@@ -106,7 +106,7 @@ This iteration is intentionally scheduled after I207 and I208 in the long task. 
 
 ## Completion Evidence
 
-- Completion Commit: Pending
+- Completion Commit: `9a3c1d860408c1438ec1a7ad4b57860167d0cb01`
 - Status-only documentation commits must not cite themselves.
 
 ## Local Convergence Checkpoint — 2026-09-05
@@ -158,6 +158,19 @@ preflight integration; CAP-001-P0/I246 owners, compatibility reference and their
 Board/backlog/iteration/serial-plan views. No Dashboard, Desktop, permission, Session or release
 version/tag/publication behavior is changed. Final exact-head CI, independent review, CAS and
 owner-first completion remain pending.
+
+## Implementation Closeout — 2026-09-05
+
+Implementation PR #492 merged into main as `9a3c1d860408c1438ec1a7ad4b57860167d0cb01`.
+Reviewed head `59d27ac649ff1da98d2869d92e1e724f80e513e6`, base `f913d28b`, CI run
+`33965865507` (5/5 SUCCESS), and independent Agent-role review comment `5551902186` belong to
+that implementation candidate. Review confirmed canonical TUI fallback, source-only symbol
+operations, single Arborium ownership, neutral API, Plugin matrix and Desktop handoff. Shared
+GitHub identity does not establish natural-person separation. The merge retained the reviewed
+head and unchanged base; the implementation merge is the completion evidence, not this status
+change. The 76,050,640-byte default release build supplies the size baseline without claiming
+parser trimming or dynamic loading. CAP-001/#466 remains open; its architecture is not delivered
+by this bounded compatibility preparation.
 
 ## Variance And Residuals
 

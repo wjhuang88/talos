@@ -5,7 +5,7 @@
 | Story ID | CAP-001-P0 |
 | Type | Architecture Preparation / Compatibility Story |
 | Priority | P1 |
-| Status | Review / Claimed |
+| Status | Complete / Closed |
 | Parent Epic | CAP-001 |
 | Source | [GitHub Issue #467](https://github.com/wjhuang88/talos/issues/467) |
 | Selected Iteration | I246 |
@@ -122,7 +122,14 @@ or symbol capability descriptions. This intake makes no user-visible behavior cl
 - `docs/sop/AGENT-COLLABORATION.md`
 
 ## Residual Destination
-
 The accepted CAP-001 ADR and separately owned CAP/BUNDLE/TEXT/LANG/DIST/BROWSER children own target
 architecture implementation. Desktop hosts, renderers, i18n and production binding remain under
 Desktop owners. None of those residuals are authorized here.
+
+## Completion Evidence — 2026-09-05
+
+Completion Commit: `9a3c1d860408c1438ec1a7ad4b57860167d0cb01` (implementation PR #492).
+Exact-head CI `33965865507` passed all five jobs; independent Agent-role review is comment
+`5551902186`. I246 records the source lineage and verification; the compatibility reference
+records grammar/API inventory, Plugin migration matrix, Desktop fixture, dependency guards and
+default-release size/hash. No completion of CAP-001/#466 or Desktop production binding is implied.
