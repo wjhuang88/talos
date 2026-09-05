@@ -139,3 +139,6 @@ workspace run; no plugin behavior was changed by I246.
 
 - CAP-001-A/B/C and BUNDLE/TEXT/LANG/DIST/BROWSER children remain separately governed.
 - Real Desktop capability binding remains under Desktop owners after this preparation.
+- Continuity guard: #467/I246 is a prerequisite seam for CAP-001/#466, not a substitute for the
+  parent architecture. The parent and all later provider, bundle, language, distribution and
+  browser outcomes remain open for separately governed child iterations.
