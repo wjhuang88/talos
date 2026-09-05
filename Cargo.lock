@@ -6052,6 +6052,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "talos-text"
+version = "0.9.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "talos-tools"
 version = "0.9.0"
 dependencies = [

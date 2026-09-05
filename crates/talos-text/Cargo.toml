@@ -1,0 +1,15 @@
+[package]
+name = "talos-text"
+description = "UI-neutral text and language contracts for Talos"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+
+[lints]
+workspace = true
