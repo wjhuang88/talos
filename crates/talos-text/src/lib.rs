@@ -79,4 +79,10 @@ mod tests {
         let encoded = serde_json::to_string(&result).unwrap();
         assert!(encoded.contains("keyword"));
     }
+
+    #[test]
+    fn language_ids_trim_extensions_and_reject_empty_values() {
+        assert_eq!(LanguageId::parse(" .PY ").unwrap().as_str(), "python");
+        assert!(LanguageId::parse("   ").is_none());
+    }
 }
