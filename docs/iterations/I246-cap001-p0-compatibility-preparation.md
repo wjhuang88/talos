@@ -19,7 +19,7 @@
 | Governance Claim PR | #491 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer explicitly authorized the narrowed scope on 2026-09-05. |
-| Implementation PR | Not started |
+| Implementation PR | #492 (stable candidate; exact head evolves only through batched local convergence) |
 | Last Updated | 2026-09-05 |
 | Handoff / Release Condition | Claim effective on merge commit `f913d28b`; implementation may change bounded shared code and Cargo edges only within the published CAP-001-P0 scope, preserving behavior and exclusions. |
 
