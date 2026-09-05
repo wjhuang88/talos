@@ -733,123 +733,14 @@ fn collect_file_symbols(
     code: &str,
     results: &mut Vec<SymbolInfo>,
 ) -> Result<(), String> {
-    let mut parser = arborium::tree_sitter::Parser::new();
-    let lang_ref =
-        arborium::get_language(language).ok_or_else(|| "language not loaded".to_string())?;
-    parser.set_language(&lang_ref).map_err(|e| e.to_string())?;
-    let tree = parser
-        .parse(code, None)
-        .ok_or_else(|| "parse failed".to_string())?;
-
-    let root_node = tree.root_node();
-    let source = code.as_bytes();
-    let mut cursor = root_node.walk();
-
-    let symbol_kinds: &[&str] = &[
-        "function_item",
-        "function_definition",
-        "method_definition",
-        "function_declaration",
-        "struct_item",
-        "class_definition",
-        "enum_item",
-        "trait_item",
-        "impl_item",
-        "type_alias",
-        "variable_declaration",
-        "module",
-    ];
-
-    collect_symbols(
-        &root_node,
-        source,
-        symbol_kinds,
+    let file = path.strip_prefix(root).unwrap_or(path).to_string_lossy();
+    results.extend(talos_text::symbol::list_symbols(
+        language,
+        code,
+        &file,
         kind_filter,
-        root,
-        path,
-        &mut cursor,
-        results,
-    );
+    )?);
     Ok(())
-}
-
-#[allow(warnings)]
-fn collect_symbols(
-    node: &tree_sitter::Node,
-    source: &[u8],
-    symbol_kinds: &[&str],
-    kind_filter: Option<&str>,
-    root: &Path,
-    path: &Path,
-    cursor: &mut tree_sitter::TreeCursor,
-    results: &mut Vec<SymbolInfo>,
-) {
-    let kind = node.kind();
-
-    if symbol_kinds.contains(&kind) || kind.contains("definition") || kind.contains("declaration") {
-        if let Some(filter) = kind_filter {
-            let kind_lower = kind.to_lowercase();
-            let filter_lower = filter.to_lowercase();
-            let matches_filter = kind_lower.contains(&filter_lower)
-                || (filter_lower == "function" && kind_lower.contains("function"))
-                || (filter_lower == "struct" && kind_lower.contains("struct"))
-                || (filter_lower == "class" && kind_lower.contains("class"))
-                || (filter_lower == "enum" && kind_lower.contains("enum"))
-                || (filter_lower == "trait" && kind_lower.contains("trait"))
-                || (filter_lower == "interface" && kind_lower.contains("interface"));
-
-            if !matches_filter {
-                if node.child_count() > 0 {
-                    for i in 0..node.child_count() {
-                        if let Some(child) = node.child(i as u32) {
-                            collect_symbols(
-                                &child,
-                                source,
-                                symbol_kinds,
-                                kind_filter,
-                                root,
-                                path,
-                                cursor,
-                                results,
-                            );
-                        }
-                    }
-                }
-                return;
-            }
-        }
-
-        if let Some(ident) = find_identifier(node, source) {
-            let rel_path = path
-                .strip_prefix(root)
-                .unwrap_or(path)
-                .to_string_lossy()
-                .to_string();
-            results.push(SymbolInfo {
-                name: ident,
-                kind: kind.to_string(),
-                file: rel_path,
-                line: node.start_position().row + 1,
-            });
-        }
-    }
-
-    if node.child_count() > 0 {
-        for i in 0..node.child_count() {
-            if let Some(child) = node.child(i as u32) {
-                collect_symbols(
-                    &child,
-                    source,
-                    symbol_kinds,
-                    kind_filter,
-                    root,
-                    path,
-                    cursor,
-                    results,
-                );
-            }
-        }
-    }
 }
 
 fn list_imports_in_file(path: &Path) -> Result<Vec<ImportInfo>, String> {

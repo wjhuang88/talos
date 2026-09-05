@@ -2,6 +2,10 @@
 
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "code-intelligence")]
+/// Built-in source-only symbol operations; no filesystem access is performed.
+pub mod symbol;
+
 /// Built-in, renderer-independent highlighting adapter.
 #[cfg(feature = "code-intelligence")]
 pub struct BuiltinHighlighter(arborium::Highlighter);

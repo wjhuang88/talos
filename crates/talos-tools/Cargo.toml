@@ -44,7 +44,7 @@ network = [
     "tokio/time",
 ]
 image = ["file-read", "dep:image"]
-code-intelligence = ["dep:arborium"]
+code-intelligence = ["dep:arborium", "talos-text/code-intelligence"]
 coding = [
     "file-read",
     "file-write",
