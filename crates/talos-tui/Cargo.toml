@@ -13,6 +13,7 @@ gix = { version = "0.85", default-features = false, features = ["basic", "status
 talos-core = { version = "0.9.0", path = "../talos-core" }
 talos-permission = { version = "0.9.0", path = "../talos-permission" }
 talos-conversation = { version = "0.9.0", path = "../talos-conversation" }
+talos-text = { version = "0.9.0", path = "../talos-text" }
 ratatui = { version = "0.30", features = ["scrolling-regions"] }
 unicode-width = "0.2"
 crossterm = { version = "0.29", features = ["event-stream"] }

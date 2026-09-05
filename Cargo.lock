@@ -6108,6 +6108,7 @@ dependencies = [
  "talos-conversation",
  "talos-core",
  "talos-permission",
+ "talos-text",
  "tempfile",
  "tokio",
  "tui-markdown",

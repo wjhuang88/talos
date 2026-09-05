@@ -32,9 +32,10 @@ impl HighlightEngine {
     /// Returns `None` if parsing fails or exceeds 500ms.
     pub(crate) fn highlight(&mut self, language: &str, code: &str) -> Option<Vec<LineSegments>> {
         let start = Instant::now();
+        let language = talos_text::LanguageId::parse(language)?;
 
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            self.highlighter.highlight_spans(language, code)
+            self.highlighter.highlight_spans(language.as_str(), code)
         }));
 
         let spans = match result {
@@ -50,7 +51,8 @@ impl HighlightEngine {
     }
 
     pub(crate) fn supports(&self, language: &str) -> bool {
-        arborium::get_language(language).is_some()
+        talos_text::LanguageId::parse(language)
+            .is_some_and(|language| arborium::get_language(language.as_str()).is_some())
     }
 }
 
