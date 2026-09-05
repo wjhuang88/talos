@@ -16,7 +16,7 @@
 | Work Slice | I246 / CAP-001-P0 bounded code-alignment: characterize current behavior, introduce the smallest UI-neutral text/language seam, migrate existing TUI/symbol consumers, isolate Plugin package/runtime compatibility, and add dependency guards. Excludes full CAP-001 providers/resolver, Desktop production binding, persisted/public renames and release/publication. |
 | Claimed At | 2026-09-05 |
 | Source Issue | #467 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #491 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer explicitly authorized the narrowed scope on 2026-09-05. |
 | Implementation PR | Not started |

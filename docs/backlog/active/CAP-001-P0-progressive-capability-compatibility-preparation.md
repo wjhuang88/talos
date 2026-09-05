@@ -21,7 +21,7 @@
 | Work Slice | Bounded code-alignment: characterization, minimal UI-neutral text/language seam, existing-consumer migration, Plugin package/runtime isolation and dependency guards; no full CAP-001 providers/resolver, Desktop production binding, persisted/public rename or release/publication. |
 | Claimed At | 2026-09-05 |
 | Source Issue | #467 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #491 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer explicitly authorized narrowed scope on 2026-09-05. |
 | Implementation PR | Not started |
