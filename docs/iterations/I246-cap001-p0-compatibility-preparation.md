@@ -79,7 +79,7 @@ Claim PR #491 merged as `f913d28b027530bf43a70db21e1ef2c8eb89f5bc` after exact-h
 |---|---|---|
 | I207 / TUI-049 | Complete / Closed | Predecessor complete; no overlap. |
 | I208 / TUI-050 | Complete / Closed | Predecessor complete; no overlap. |
-| I246 / CAP-001-P0 | Active / Claimed (proposed) | This bounded slice; ineffective until claim PR #491 merges. |
+| I246 / CAP-001-P0 | Active / Claimed | Claim #491 is effective at `f913d28b`; implementation proceeds from that merge. |
 | #466 / CAP-001 | Refinement / Unclaimed | Parent architecture remains separate; no full provider/resolver implementation here. |
 | Future CAP/TEXT/LANG/BUNDLE/BROWSER children | Planned or unselected | Remain separately governed and unactivated. |
 
