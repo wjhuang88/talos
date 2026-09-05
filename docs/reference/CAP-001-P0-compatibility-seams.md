@@ -89,7 +89,11 @@ lane changes them. This handoff does not activate a Desktop claim.
 
 ## Remaining closure evidence
 
-- Current default-release binary-size measurement and its exact build identity are still pending.
-  TOOL-008's historical 64 MB baseline is not evidence of this candidate's size. No size reduction
-  or dynamic language loading is claimed by this preparation.
+- Current default-release binary-size evidence (2026-09-05): `cargo build --release -p talos-cli
+  --locked`, workspace version `0.9.0`, default features, profile `release` (`lto=fat`,
+  `codegen-units=1`, `strip=true`), pinned `rustc 1.97.0` (`2d8144b78`), candidate source
+  `31fb34f4`, produced `target/release/talos` at `76,050,640` bytes (SHA-256
+  `b5171bd8917da899bd54ec3f2a760baf8ccbd59e3461d28266f1d21e0a02ca26`). TOOL-008's historical
+  64 MB figure remains a separate baseline; no size reduction or dynamic language loading is
+  claimed by this preparation.
 - Remote exact-head CI/review, implementation merge and owner-first completion remain pending.
