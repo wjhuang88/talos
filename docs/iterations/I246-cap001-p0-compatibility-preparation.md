@@ -1,6 +1,6 @@
 # Iteration I246: CAP-001-P0 Compatibility Preparation
 
-> Document status: Review / Claimed
+> Document status: Complete / Closed
 > Planned date: 2026-09-04
 > Planned objective: prepare the current codebase for progressive capability work through a characterized, UI-neutral text/language and Plugin compatibility boundary without changing shipped behavior.
 > Baseline rule: preserve this target; changed targets use a new iteration ID.
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline session |
 | Work Slice | I246 / CAP-001-P0 bounded code-alignment: characterize current behavior, introduce the smallest UI-neutral text/language seam, migrate existing TUI/symbol consumers, isolate Plugin package/runtime compatibility, and add dependency guards. Excludes full CAP-001 providers/resolver, Desktop production binding, persisted/public renames and release/publication. |
@@ -19,9 +19,9 @@
 | Governance Claim PR | #491 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer explicitly authorized the narrowed scope on 2026-09-05. |
-| Implementation PR | #492 (stable candidate; exact head evolves only through batched local convergence) |
+| Implementation PR | #492 — merged as `9a3c1d860408c1438ec1a7ad4b57860167d0cb01` |
 | Last Updated | 2026-09-05 |
-| Handoff / Release Condition | Claim effective on merge commit `f913d28b`; implementation may change bounded shared code and Cargo edges only within the published CAP-001-P0 scope, preserving behavior and exclusions. |
+| Handoff / Release Condition | Implementation #492 merged at `9a3c1d86`; this claim is closed. Further capability or Desktop work requires its own effective claim; no ongoing implementation authority remains here. |
 
 ## Published Baseline
 
@@ -106,7 +106,7 @@ This iteration is intentionally scheduled after I207 and I208 in the long task. 
 
 ## Completion Evidence
 
-- Completion Commit: Pending
+- Completion Commit: `9a3c1d860408c1438ec1a7ad4b57860167d0cb01`
 - Status-only documentation commits must not cite themselves.
 
 ## Local Convergence Checkpoint — 2026-09-05
@@ -158,6 +158,19 @@ preflight integration; CAP-001-P0/I246 owners, compatibility reference and their
 Board/backlog/iteration/serial-plan views. No Dashboard, Desktop, permission, Session or release
 version/tag/publication behavior is changed. Final exact-head CI, independent review, CAS and
 owner-first completion remain pending.
+
+## Implementation Closeout — 2026-09-05
+
+Implementation PR #492 merged into main as `9a3c1d860408c1438ec1a7ad4b57860167d0cb01`.
+Reviewed head `59d27ac649ff1da98d2869d92e1e724f80e513e6`, base `f913d28b`, CI run
+`33965865507` (5/5 SUCCESS), and independent Agent-role review comment `5551902186` belong to
+that implementation candidate. Review confirmed canonical TUI fallback, source-only symbol
+operations, single Arborium ownership, neutral API, Plugin matrix and Desktop handoff. Shared
+GitHub identity does not establish natural-person separation. The merge retained the reviewed
+head and unchanged base; the implementation merge is the completion evidence, not this status
+change. The 76,050,640-byte default release build supplies the size baseline without claiming
+parser trimming or dynamic loading. CAP-001/#466 remains open; its architecture is not delivered
+by this bounded compatibility preparation.
 
 ## Variance And Residuals
 

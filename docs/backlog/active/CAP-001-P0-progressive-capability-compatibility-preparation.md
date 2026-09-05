@@ -1,11 +1,13 @@
 # CAP-001-P0: Progressive Capability Compatibility Preparation
 
+> Document status: Complete / Closed
+
 | Field | Value |
 |---|---|
 | Story ID | CAP-001-P0 |
 | Type | Architecture Preparation / Compatibility Story |
 | Priority | P1 |
-| Status | Review / Claimed |
+| Status | Complete / Closed |
 | Parent Epic | CAP-001 |
 | Source | [GitHub Issue #467](https://github.com/wjhuang88/talos/issues/467) |
 | Selected Iteration | I246 |
@@ -15,7 +17,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline session |
 | Work Slice | Bounded code-alignment: characterization, minimal UI-neutral text/language seam, existing-consumer migration, Plugin package/runtime isolation and dependency guards; no full CAP-001 providers/resolver, Desktop production binding, persisted/public rename or release/publication. |
@@ -24,9 +26,9 @@
 | Governance Claim PR | #491 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer explicitly authorized narrowed scope on 2026-09-05. |
-| Implementation PR | #492 |
+| Implementation PR | #492 — merged as `9a3c1d860408c1438ec1a7ad4b57860167d0cb01` |
 | Last Updated | 2026-09-05 |
-| Handoff / Release Condition | Claim effective after governance PR #491 merged as `f913d28b`; code/Cargo changes are limited to behavior-preserving CAP-001-P0 alignment and its tests. |
+| Handoff / Release Condition | Implementation #492 merged at `9a3c1d86`; this claim is closed. Further capability or Desktop work requires its own effective claim; no ongoing implementation authority remains here. |
 
 ## Identity / Goal / Value
 
@@ -36,8 +38,8 @@ package-versus-runtime Plugin terminology behind reviewed compatibility seams so
 BUNDLE, TEXT, LANG and Desktop work does not require one uncontrolled cross-workspace rewrite.
 
 The original intake below is retained as the published scope. Claim #491 became effective at
-`f913d28b`; I246 now has implementation candidate #492 in Review / Claimed. Parent CAP-001/#466
-remains separately governed; neither the claim nor this candidate authorizes its full architecture.
+`f913d28b`; implementation #492 merged as `9a3c1d86` and I246 is Complete / Closed. Parent
+CAP-001/#466 remains separately governed; no full parent architecture is claimed here.
 
 ## Proposed Scope Requiring Refinement
 
@@ -122,7 +124,14 @@ or symbol capability descriptions. This intake makes no user-visible behavior cl
 - `docs/sop/AGENT-COLLABORATION.md`
 
 ## Residual Destination
-
 The accepted CAP-001 ADR and separately owned CAP/BUNDLE/TEXT/LANG/DIST/BROWSER children own target
 architecture implementation. Desktop hosts, renderers, i18n and production binding remain under
 Desktop owners. None of those residuals are authorized here.
+
+## Completion Evidence — 2026-09-05
+
+Completion Commit: `9a3c1d860408c1438ec1a7ad4b57860167d0cb01` (implementation PR #492).
+Exact-head CI `33965865507` passed all five jobs; independent Agent-role review is comment
+`5551902186`. I246 records the source lineage and verification; the compatibility reference
+records grammar/API inventory, Plugin migration matrix, Desktop fixture, dependency guards and
+default-release size/hash. No completion of CAP-001/#466 or Desktop production binding is implied.
