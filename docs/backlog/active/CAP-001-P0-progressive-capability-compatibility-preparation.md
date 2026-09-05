@@ -5,7 +5,7 @@
 | Story ID | CAP-001-P0 |
 | Type | Architecture Preparation / Compatibility Story |
 | Priority | P1 |
-| Status | Active / Claimed (proposed; ineffective until governance merge) |
+| Status | Review / Claimed |
 | Parent Epic | CAP-001 |
 | Source | [GitHub Issue #467](https://github.com/wjhuang88/talos/issues/467) |
 | Selected Iteration | I246 |
@@ -24,9 +24,9 @@
 | Governance Claim PR | #491 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer explicitly authorized narrowed scope on 2026-09-05. |
-| Implementation PR | Not started |
+| Implementation PR | #492 |
 | Last Updated | 2026-09-05 |
-| Handoff / Release Condition | This bounded claim is proposed and ineffective until governance merge; code/Cargo changes are limited to behavior-preserving CAP-001-P0 alignment and its tests. |
+| Handoff / Release Condition | Claim effective after governance PR #491 merged as `f913d28b`; code/Cargo changes are limited to behavior-preserving CAP-001-P0 alignment and its tests. |
 
 ## Identity / Goal / Value
 
@@ -35,8 +35,9 @@ The eventual deliverable will place existing Arborium-backed language/text behav
 package-versus-runtime Plugin terminology behind reviewed compatibility seams so later CAP,
 BUNDLE, TEXT, LANG and Desktop work does not require one uncontrolled cross-workspace rewrite.
 
-This intake records the proposed executable Story boundary only. It is not Ready, selected or
-authorized for implementation.
+The original intake below is retained as the published scope. Claim #491 became effective at
+`f913d28b`; I246 now has implementation candidate #492 in Review / Claimed. Parent CAP-001/#466
+remains separately governed; neither the claim nor this candidate authorizes its full architecture.
 
 ## Proposed Scope Requiring Refinement
 

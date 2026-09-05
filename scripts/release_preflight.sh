@@ -30,6 +30,7 @@ echo "release preflight: Talos version ${workspace_version}"
 # Validate both the existing owner-document model and the collaboration claim extension.
 ./scripts/validate_project_governance.sh .
 bash ./scripts/validate_collaboration_claims.sh .
+python3 ./scripts/validate_text_boundary.py .
 python3 ./scripts/test_ci_change_classifier.py
 cargo fmt --all -- --check
 cargo check --locked --workspace

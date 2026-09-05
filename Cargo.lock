@@ -6052,10 +6052,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "talos-tools"
+name = "talos-text"
 version = "0.9.0"
 dependencies = [
  "arborium",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "talos-tools"
+version = "0.9.0"
+dependencies = [
  "async-trait",
  "cap-std",
  "gix",
@@ -6078,6 +6086,7 @@ dependencies = [
  "talos-core",
  "talos-permission",
  "talos-sandbox",
+ "talos-text",
  "tempfile",
  "thiserror 2.0.18",
  "tokio",
@@ -6091,7 +6100,6 @@ dependencies = [
 name = "talos-tui"
 version = "0.9.0"
 dependencies = [
- "arborium",
  "crossterm",
  "futures",
  "gix",
@@ -6101,6 +6109,7 @@ dependencies = [
  "talos-conversation",
  "talos-core",
  "talos-permission",
+ "talos-text",
  "tempfile",
  "tokio",
  "tui-markdown",

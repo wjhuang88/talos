@@ -14,7 +14,7 @@ use serde_json::Value;
 use talos_core::tool::{AgentTool, ToolFamily, ToolResult};
 use talos_core::tool_parameters;
 
-use arborium::tree_sitter; // arborium re-exports tree-sitter
+use talos_text::symbol_queries::{ImportInfo, SymbolResult};
 
 const MAX_DEPTH: usize = 64;
 const MAX_FILES: usize = 10_000;
@@ -138,68 +138,12 @@ fn admit_file(path: &Path, state: &mut TraversalState) -> Result<FileAdmission, 
     Ok(FileAdmission::Admitted { language, code })
 }
 
-/// Maps file extensions to arborium language names.
 fn detect_language(path: &Path) -> Option<&'static str> {
-    match path.extension().and_then(|e| e.to_str()) {
-        Some("rs") => Some("rust"),
-        Some("py") => Some("python"),
-        Some("ts") | Some("tsx") => Some("typescript"),
-        Some("js") | Some("jsx") | Some("mjs") => Some("javascript"),
-        Some("go") => Some("go"),
-        Some("java") => Some("java"),
-        Some("c") | Some("h") => Some("c"),
-        Some("cpp") | Some("cc") | Some("cxx") | Some("hpp") => Some("cpp"),
-        Some("cs") => Some("c-sharp"),
-        Some("sh") | Some("bash") | Some("zsh") => Some("bash"),
-        Some("sql") => Some("sql"),
-        Some("ps1") => Some("powershell"),
-        Some("lua") => Some("lua"),
-        Some("dart") => Some("dart"),
-        Some("html") => Some("html"),
-        Some("css") => Some("css"),
-        Some("json") => Some("json"),
-        Some("yaml") | Some("yml") => Some("yaml"),
-        Some("toml") => Some("toml"),
-        Some("md") => Some("markdown"),
-        Some("rb") => Some("ruby"),
-        Some("php") => Some("php"),
-        Some("kt") | Some("kts") => Some("kotlin"),
-        Some("swift") => Some("swift"),
-        _ => None,
-    }
+    talos_text::language_for_extension(path.extension()?.to_str()?)
 }
 
-/// Result from a find_symbol query.
-#[derive(Debug, Serialize, Clone)]
-struct SymbolResult {
-    name: String,
-    kind: String,
-    definition: Option<SourceLocation>,
-    references: Vec<SourceLocation>,
-}
-
-#[derive(Debug, Serialize, Clone)]
-struct SourceLocation {
-    file: String,
-    line: usize,
-    column: usize,
-}
-
-#[derive(Debug, Serialize, Clone)]
-struct SymbolInfo {
-    name: String,
-    kind: String,
-    file: String,
-    line: usize,
-}
-
-#[derive(Debug, Serialize, Clone)]
-struct ImportInfo {
-    module: String,
-    symbols: Vec<String>,
-    file: String,
-    line: usize,
-}
+type SourceLocation = talos_text::SourceLocation;
+type SymbolInfo = talos_text::SymbolInfo;
 
 /// Input for find_symbol tool.
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -460,191 +404,13 @@ fn find_symbol_in_file(
     let FileAdmission::Admitted { language, code } = admit_file(path, state).ok()? else {
         return None;
     };
-    let mut parser = arborium::tree_sitter::Parser::new();
-    parser
-        .set_language(&arborium::get_language(language)?)
-        .ok()?;
-    let tree = parser.parse(&code, None)?;
-
-    let root_node = tree.root_node();
-    let source = code.as_bytes();
-
-    let kinds: &[&str] = &[
-        "function_item",
-        "function_definition",
-        "struct_item",
-        "class_definition",
-        "enum_item",
-        "trait_item",
-        "impl_item",
-        "type_alias",
-        "variable_declaration",
-        "method_definition",
-        "function_declaration",
-        "interface_declaration",
-    ];
-
-    let cursor = &mut root_node.walk();
-    let mut found_def = None;
-    let mut refs = Vec::new();
-
-    for node in root_node.children(&mut cursor.clone()) {
-        check_node(
-            &node,
-            source,
-            name,
-            kinds,
-            root,
-            path,
-            &mut found_def,
-            &mut refs,
-        );
-    }
-
-    found_def.map(|def| SymbolResult {
-        name: name.to_string(),
-        kind: def.kind,
-        definition: Some(SourceLocation {
-            file: def.rel_path,
-            line: def.line,
-            column: 0,
-        }),
-        references: refs,
-    })
-}
-
-struct DefInfo {
-    kind: String,
-    rel_path: String,
-    line: usize,
-}
-
-#[allow(warnings)]
-fn check_node(
-    node: &tree_sitter::Node,
-    source: &[u8],
-    name: &str,
-    kinds: &[&str],
-    root: &Path,
-    path: &Path,
-    found_def: &mut Option<DefInfo>,
-    refs: &mut Vec<SourceLocation>,
-) {
-    let kind = node.kind();
-    let is_candidate =
-        kinds.contains(&kind) || kind.contains("definition") || kind.contains("declaration");
-
-    if is_candidate
-        && let Some(ident) = find_identifier(node, source)
-        && ident == name
-    {
-        let line = node.start_position().row + 1;
-        let rel_path = path
-            .strip_prefix(root)
-            .unwrap_or(path)
-            .to_string_lossy()
-            .to_string();
-        let location = SourceLocation {
-            file: rel_path.clone(),
-            line,
-            column: 0,
-        };
-
-        if found_def.is_none() {
-            *found_def = Some(DefInfo {
-                kind: kind.to_string(),
-                rel_path,
-                line,
-            });
-        } else {
-            refs.push(location);
-        }
-    }
-
-    if node.child_count() > 0 && !is_terminal_node(kind) {
-        let mut cursor = node.walk();
-        for child in node.named_children(&mut cursor) {
-            check_node(&child, source, name, kinds, root, path, found_def, refs);
-        }
-    }
-}
-
-fn find_identifier(node: &tree_sitter::Node, source: &[u8]) -> Option<String> {
-    let mut cursor = node.walk();
-    for child in node.named_children(&mut cursor) {
-        if child.kind() == "identifier" || child.kind() == "name" {
-            return child.utf8_text(source).ok().map(|s| s.to_string());
-        }
-    }
-    None
-}
-
-fn is_terminal_node(kind: &str) -> bool {
-    matches!(
-        kind,
-        "identifier" | "string" | "comment" | "number" | "boolean" | "null"
-    )
+    talos_text::symbol_queries::find_symbol(language, &code, root, path, name)
 }
 
 fn find_refs_in_file(path: &Path, name: &str) -> Result<Vec<SourceLocation>, String> {
     let lang = detect_language(path).ok_or_else(|| "unsupported file type".to_string())?;
     let code = fs::read_to_string(path).map_err(|e| e.to_string())?;
-    let mut parser = arborium::tree_sitter::Parser::new();
-    parser
-        .set_language(
-            &arborium::get_language(lang).ok_or_else(|| "language not loaded".to_string())?,
-        )
-        .map_err(|e| e.to_string())?;
-    let tree = parser
-        .parse(&code, None)
-        .ok_or_else(|| "parse failed".to_string())?;
-
-    let root_node = tree.root_node();
-    let source = code.as_bytes();
-    let mut cursor = root_node.walk();
-
-    let mut locations = Vec::new();
-    let mut visited = false;
-    find_all_identifiers(
-        &root_node,
-        source,
-        name,
-        &mut cursor,
-        &mut locations,
-        &mut visited,
-        path,
-    );
-    Ok(locations)
-}
-
-#[allow(warnings)]
-fn find_all_identifiers(
-    node: &tree_sitter::Node,
-    source: &[u8],
-    name: &str,
-    cursor: &mut tree_sitter::TreeCursor,
-    locations: &mut Vec<SourceLocation>,
-    visited: &mut bool,
-    path: &Path,
-) {
-    if (node.kind() == "identifier" || node.kind() == "name")
-        && let Ok(text) = node.utf8_text(source)
-        && text == name
-    {
-        locations.push(SourceLocation {
-            file: path.to_string_lossy().to_string(),
-            line: node.start_position().row + 1,
-            column: node.start_position().column + 1,
-        });
-    }
-
-    if node.child_count() > 0 {
-        for i in 0..node.child_count() {
-            if let Some(child) = node.child(i as u32) {
-                find_all_identifiers(&child, source, name, cursor, locations, visited, path);
-            }
-        }
-    }
+    talos_text::symbol_queries::find_references(lang, &code, path, name)
 }
 
 fn list_symbols_in_path(
@@ -741,201 +507,20 @@ fn collect_file_symbols(
     code: &str,
     results: &mut Vec<SymbolInfo>,
 ) -> Result<(), String> {
-    let mut parser = arborium::tree_sitter::Parser::new();
-    let lang_ref =
-        arborium::get_language(language).ok_or_else(|| "language not loaded".to_string())?;
-    parser.set_language(&lang_ref).map_err(|e| e.to_string())?;
-    let tree = parser
-        .parse(code, None)
-        .ok_or_else(|| "parse failed".to_string())?;
-
-    let root_node = tree.root_node();
-    let source = code.as_bytes();
-    let mut cursor = root_node.walk();
-
-    let symbol_kinds: &[&str] = &[
-        "function_item",
-        "function_definition",
-        "method_definition",
-        "function_declaration",
-        "struct_item",
-        "class_definition",
-        "enum_item",
-        "trait_item",
-        "impl_item",
-        "type_alias",
-        "variable_declaration",
-        "module",
-    ];
-
-    collect_symbols(
-        &root_node,
-        source,
-        symbol_kinds,
+    let file = path.strip_prefix(root).unwrap_or(path).to_string_lossy();
+    results.extend(talos_text::symbol::list_symbols(
+        language,
+        code,
+        &file,
         kind_filter,
-        root,
-        path,
-        &mut cursor,
-        results,
-    );
+    )?);
     Ok(())
-}
-
-#[allow(warnings)]
-fn collect_symbols(
-    node: &tree_sitter::Node,
-    source: &[u8],
-    symbol_kinds: &[&str],
-    kind_filter: Option<&str>,
-    root: &Path,
-    path: &Path,
-    cursor: &mut tree_sitter::TreeCursor,
-    results: &mut Vec<SymbolInfo>,
-) {
-    let kind = node.kind();
-
-    if symbol_kinds.contains(&kind) || kind.contains("definition") || kind.contains("declaration") {
-        if let Some(filter) = kind_filter {
-            let kind_lower = kind.to_lowercase();
-            let filter_lower = filter.to_lowercase();
-            let matches_filter = kind_lower.contains(&filter_lower)
-                || (filter_lower == "function" && kind_lower.contains("function"))
-                || (filter_lower == "struct" && kind_lower.contains("struct"))
-                || (filter_lower == "class" && kind_lower.contains("class"))
-                || (filter_lower == "enum" && kind_lower.contains("enum"))
-                || (filter_lower == "trait" && kind_lower.contains("trait"))
-                || (filter_lower == "interface" && kind_lower.contains("interface"));
-
-            if !matches_filter {
-                if node.child_count() > 0 {
-                    for i in 0..node.child_count() {
-                        if let Some(child) = node.child(i as u32) {
-                            collect_symbols(
-                                &child,
-                                source,
-                                symbol_kinds,
-                                kind_filter,
-                                root,
-                                path,
-                                cursor,
-                                results,
-                            );
-                        }
-                    }
-                }
-                return;
-            }
-        }
-
-        if let Some(ident) = find_identifier(node, source) {
-            let rel_path = path
-                .strip_prefix(root)
-                .unwrap_or(path)
-                .to_string_lossy()
-                .to_string();
-            results.push(SymbolInfo {
-                name: ident,
-                kind: kind.to_string(),
-                file: rel_path,
-                line: node.start_position().row + 1,
-            });
-        }
-    }
-
-    if node.child_count() > 0 {
-        for i in 0..node.child_count() {
-            if let Some(child) = node.child(i as u32) {
-                collect_symbols(
-                    &child,
-                    source,
-                    symbol_kinds,
-                    kind_filter,
-                    root,
-                    path,
-                    cursor,
-                    results,
-                );
-            }
-        }
-    }
 }
 
 fn list_imports_in_file(path: &Path) -> Result<Vec<ImportInfo>, String> {
     let lang = detect_language(path).ok_or_else(|| "unsupported file type".to_string())?;
     let code = fs::read_to_string(path).map_err(|e| e.to_string())?;
-    let mut parser = arborium::tree_sitter::Parser::new();
-    parser
-        .set_language(
-            &arborium::get_language(lang).ok_or_else(|| "language not loaded".to_string())?,
-        )
-        .map_err(|e| e.to_string())?;
-    let tree = parser
-        .parse(&code, None)
-        .ok_or_else(|| "parse failed".to_string())?;
-
-    let root_node = tree.root_node();
-    let source = code.as_bytes();
-
-    let mut results = Vec::new();
-    collect_imports(&root_node, source, path, &mut results);
-    Ok(results)
-}
-
-fn collect_imports(
-    node: &tree_sitter::Node,
-    source: &[u8],
-    path: &Path,
-    results: &mut Vec<ImportInfo>,
-) {
-    let kind = node.kind();
-
-    let is_import = kind.contains("use_declaration")
-        || kind.contains("import")
-        || kind == "import_statement"
-        || kind == "import_from_statement"
-        || kind == "require_call"
-        || kind == "lexical_declaration";
-
-    if is_import {
-        let import_text = node.utf8_text(source).unwrap_or("").to_string();
-        let symbols: Vec<String> = import_text
-            .lines()
-            .flat_map(|line| {
-                line.trim()
-                    .trim_start_matches("use ")
-                    .trim_start_matches("import ")
-                    .trim_start_matches("from ")
-                    .trim_start_matches("require(")
-                    .trim_start_matches("const ")
-                    .trim_start_matches("let ")
-                    .trim_start_matches("var ")
-                    .split([',', ';', '{', '}'])
-                    .map(|s| s.trim().trim_matches('"').trim_matches('\'').to_string())
-                    .filter(|s| !s.is_empty() && s != "from" && s != "import" && s != "require")
-                    .collect::<Vec<_>>()
-            })
-            .collect();
-
-        if !symbols.is_empty() {
-            let module = import_text
-                .split_whitespace()
-                .nth(1)
-                .unwrap_or("")
-                .to_string();
-            results.push(ImportInfo {
-                module,
-                symbols,
-                file: path.to_string_lossy().to_string(),
-                line: node.start_position().row + 1,
-            });
-        }
-    }
-
-    for i in 0..node.child_count() {
-        if let Some(child) = node.child(i as u32) {
-            collect_imports(&child, source, path, results);
-        }
-    }
+    talos_text::symbol_queries::list_imports(lang, &code, path)
 }
 
 #[cfg(test)]

@@ -8,7 +8,7 @@
 
 This is a coordination and recovery ledger. I207 is Complete / Closed via closeout merge
 `2edb914f`; I208 claim/activation is effective via governance PR #487 merge `75ca8057`; I246
-remains unclaimed and unauthorized until its own claim merges.
+claim #491 is effective at `f913d28b`; its bounded implementation is in Review through PR #492.
 
 ## Collaboration Claim
 
@@ -49,7 +49,7 @@ remains unclaimed and unauthorized until its own claim merges.
 |---|---|---|
 | I207 / TUI-049 | Complete / Closed | Implementation PR #483 merged as `ca3b2fa7`; native-terminal acceptance passed; closeout merged as `2edb914f`. |
 | I208 / TUI-050 | Complete / Closed | PR #489 merged as `442d143b`; exact-head CI `33944840881`, independent review `5550116820`, human acceptance complete. |
-| I246 / CAP-001-P0 | Planned / Unclaimed | Third child; depends on CAP-001 decision or explicit narrowing and follows steering work. |
+| I246 / CAP-001-P0 | Active / Claimed | Bounded code-alignment claim #491 merged as `f913d28b`; starts from this main, excludes full CAP-001 architecture. |
 | I164 | Paused / superseded | Preserve; do not resume. |
 | CAP-001 parent | Refinement / Unclaimed | Preserve; parent is not an implementation unit. |
 | DESKTOP-001 | Deferred / Unclaimed | Preserve; mock/real Desktop work remains separately governed. |
@@ -62,8 +62,8 @@ remains unclaimed and unauthorized until its own claim merges.
 | S1 | Implement I207 / TUI-049 | Padding-correct steering wrapping with focused and terminal evidence | S0 | Owner acceptance, local locked checks, exact-head review/CI, merge and closeout | Preserve existing layout and record residual | Complete (`ca3b2fa7`) |
 | S2 | Establish I208 claim after I207 disposition | Effective I208 claim and active owner | S1 terminal; current-main refresh | Governance PR #487 merged and CAS pass | Keep I208 Planned/Unclaimed | Complete (`75ca8057`) |
 | S3 | Implement I208 / TUI-050 | Deterministic boundary insertion and ordering evidence | S2 | Event-sequence tests, cancellation/error/restart evidence, exact-head review/CI, merge and closeout | Keep accepted queue custody and defer timing change | Complete (`442d143b`) |
-| S4 | Establish I246 claim after steering sequence | Effective I246 claim and active owner | S3 terminal; CAP-001 decision/narrowing; overlap inventory | Governance PR merged and CAS pass | Keep CAP-001-P0 Refinement/Unclaimed | Planned |
-| S5 | Implement I246 / CAP-001-P0 | Characterization, compatibility seam and Desktop handoff | S4 | Focused behavior/dependency evidence, docs, exact-head review/CI, merge and closeout | Preserve current paths and route unresolved decisions to child ADRs | Planned |
+| S4 | Establish I246 claim after steering sequence | Effective I246 claim and active owner | S3 terminal; CAP-001 decision/narrowing; overlap inventory | Governance PR merged and CAS pass | Keep CAP-001-P0 Refinement/Unclaimed | Complete (`f913d28b`) |
+| S5 | Implement I246 / CAP-001-P0 | Characterization, compatibility seam and Desktop handoff | S4 | Focused behavior/dependency evidence, docs, exact-head review/CI, merge and closeout | Preserve current paths and route unresolved decisions to child ADRs | Review |
 | S6 | Final ledger closeout | All three child owners and derived views synchronized | S1, S3, S5 | Existing completion evidence, residuals recorded, claim closed | Leave task Partial with explicit residual owner | Planned |
 
 ## Shared Validation And Ownership Rules
@@ -113,3 +113,20 @@ Complete Local Validation Checkpoint for the exact command, cancellation gate, d
 and restricted-filesystem fixture failure. This supersedes earlier pending machine-check rows,
 not their historical results. Real-terminal acceptance, stable candidate review/CI, merge and
 owner-first closeout remain pending. I246 remains Planned / Unclaimed and unauthorized.
+
+## Capability Continuity And Local Validation Checkpoint — 2026-09-05
+
+I207 and I208 are Complete / Closed; I246 is Active / Claimed through #491 merge `f913d28b`.
+The historical checkpoints above are retained and do not describe the current execution state.
+On local I246 implementation head `fbad20ee`, `./scripts/release_preflight.sh` passed, including
+workspace tests/doctests, Clippy, dependency fitness and both governance validators. No remote
+candidate or completion is asserted by this checkpoint.
+
+#467 is the bounded code-alignment prerequisite of #466, not its replacement. Centralized
+built-in parsing in `talos-text` is preparation only: #466 retains the architecture decision,
+Capability/Provider contracts, registry/resolver, Plugin contributions, Bundle migration,
+verified installation, first Rust dynamic Language Provider, remaining language distribution,
+and read-only Browser Provider outcomes. These require separately governed children, with their
+dependencies resolved from the parent owner rather than inferred from this serial plan. I246
+must still satisfy its own code migration, compatibility evidence and handoff requirements;
+those may not be silently deferred to #466 merely to close this task.

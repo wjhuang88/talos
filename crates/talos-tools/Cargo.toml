@@ -44,7 +44,7 @@ network = [
     "tokio/time",
 ]
 image = ["file-read", "dep:image"]
-code-intelligence = ["dep:arborium"]
+code-intelligence = ["talos-text/code-intelligence"]
 coding = [
     "file-read",
     "file-write",
@@ -59,6 +59,7 @@ coding = [
 
 [dependencies]
 talos-core = { version = "0.9.0", path = "../talos-core" }
+talos-text = { version = "0.9.0", path = "../talos-text" }
 talos-sandbox = { version = "0.9.0", path = "../talos-sandbox", optional = true }
 async-trait = "0.1"
 serde = { version = "1", features = ["derive"] }
@@ -76,13 +77,6 @@ ignore = { version = "0.4", optional = true }
 similar = { version = "3", optional = true }
 gix = { version = "0.85", default-features = false, optional = true, features = [
     "basic", "status", "revision", "blob-diff", "index", "sha1"
-] }
-arborium = { version = "2.18", default-features = false, optional = true, features = [
-    "lang-rust", "lang-python", "lang-typescript", "lang-javascript",
-    "lang-go", "lang-java", "lang-c", "lang-cpp", "lang-c-sharp",
-    "lang-bash", "lang-sql", "lang-powershell", "lang-lua", "lang-dart",
-    "lang-html", "lang-css", "lang-json", "lang-toml", "lang-markdown",
-    "lang-ruby", "lang-php", "lang-kotlin", "lang-swift"
 ] }
 reqwest = { version = "0.13.4", default-features = false, optional = true, features = ["rustls", "json"] }
 rust-websearch = { version = "0.1", optional = true }

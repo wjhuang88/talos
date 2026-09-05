@@ -1,7 +1,5 @@
 //! Syntax highlighting engine using arborium (tree-sitter grammar bundle).
 
-use std::time::Instant;
-
 use crossterm::style::Color as CColor;
 
 use crate::theme::to_crossterm_color;
@@ -9,7 +7,7 @@ use crate::theme::to_crossterm_color;
 type LineSegments = Vec<(String, Option<CColor>)>;
 
 pub(crate) struct HighlightEngine {
-    highlighter: arborium::Highlighter,
+    highlighter: talos_text::BuiltinHighlighter,
 }
 
 impl Default for HighlightEngine {
@@ -21,7 +19,7 @@ impl Default for HighlightEngine {
 impl HighlightEngine {
     pub(crate) fn new() -> Self {
         Self {
-            highlighter: arborium::Highlighter::new(),
+            highlighter: talos_text::BuiltinHighlighter::default(),
         }
     }
 
@@ -31,31 +29,32 @@ impl HighlightEngine {
     /// where color is `None` for the default text color.
     /// Returns `None` if parsing fails or exceeds 500ms.
     pub(crate) fn highlight(&mut self, language: &str, code: &str) -> Option<Vec<LineSegments>> {
-        let start = Instant::now();
-
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            self.highlighter.highlight_spans(language, code)
-        }));
-
-        let spans = match result {
-            Ok(Ok(spans)) => spans,
-            _ => return None,
-        };
-
-        if start.elapsed().as_millis() > 500 {
+        // Preserve the previous Arborium boundary: only canonical grammar keys are
+        // highlighted. Alias normalization remains available to neutral consumers and tools,
+        // but must not silently change TUI fallback behavior.
+        if !self.supports(language) {
             return None;
         }
-
-        Some(segments_from_spans(code, &spans))
+        let language = talos_text::LanguageId::parse(language)?;
+        let result = self.highlighter.highlight(&language, code);
+        match result {
+            talos_text::HighlightResult::PlainText => None,
+            _ => Some(segments_from_result(code, &result)),
+        }
     }
 
     pub(crate) fn supports(&self, language: &str) -> bool {
-        arborium::get_language(language).is_some()
+        talos_text::LanguageId::parse(language)
+            .is_some_and(|id| id.as_str() == language && self.highlighter.supports(&id))
     }
 }
 
 /// Convert raw tree-sitter spans into per-line colored text segments.
-fn segments_from_spans(code: &str, spans: &[arborium::advanced::Span]) -> Vec<LineSegments> {
+fn segments_from_result(code: &str, result: &talos_text::HighlightResult) -> Vec<LineSegments> {
+    let spans: &[talos_text::HighlightSpan] = match result {
+        talos_text::HighlightResult::Spans(spans) => spans,
+        talos_text::HighlightResult::PlainText => &[],
+    };
     let line_offsets: Vec<usize> = code
         .match_indices('\n')
         .map(|(i, _)| i + 1)
@@ -67,10 +66,10 @@ fn segments_from_spans(code: &str, spans: &[arborium::advanced::Span]) -> Vec<Li
     let mut cursor: usize = 0;
 
     for span in spans {
-        let s = span.start.min(code.len() as u32) as usize;
-        let e = span.end.min(code.len() as u32) as usize;
+        let s = span.start.min(code.len());
+        let e = span.end.min(code.len());
 
-        if s < cursor || e < s {
+        if s < cursor || e < s || !code.is_char_boundary(s) || !code.is_char_boundary(e) {
             continue;
         }
 
@@ -149,4 +148,59 @@ fn capture_color(capture: &str) -> Option<CColor> {
         _ => return None,
     };
     to_crossterm_color(nord_color)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use talos_text::{HighlightResult, HighlightSpan};
+
+    #[test]
+    fn unavailable_grammar_keeps_existing_markdown_fallback() {
+        let mut engine = HighlightEngine::new();
+        assert!(!engine.supports("not-a-supported-language"));
+        assert!(
+            engine
+                .highlight("not-a-supported-language", "一\nsecond\n")
+                .is_none()
+        );
+        assert!(engine.highlight("rust", "fn main() {}\n").is_some());
+    }
+
+    #[test]
+    fn aliases_keep_the_previous_plain_fallback_boundary() {
+        let mut engine = HighlightEngine::new();
+        for language in ["rs", "py", "TSX", "tsx", ".rs", "RUST", " rust "] {
+            assert!(!engine.supports(language), "{language}");
+            assert!(engine.highlight(language, "fn main() {}\n").is_none());
+        }
+        for language in ["rust", "python", "typescript"] {
+            assert!(engine.supports(language), "{language}");
+        }
+    }
+
+    #[test]
+    fn plain_fallback_preserves_line_structure() {
+        assert_eq!(
+            segments_from_result("一\nsecond\n", &HighlightResult::PlainText),
+            vec![
+                vec![("一".into(), None)],
+                vec![("second".into(), None)],
+                vec![]
+            ]
+        );
+    }
+
+    #[test]
+    fn malformed_neutral_span_cannot_split_utf8() {
+        let result = HighlightResult::Spans(vec![HighlightSpan {
+            start: 1,
+            end: 2,
+            capture: "keyword".into(),
+        }]);
+        assert_eq!(
+            segments_from_result("一", &result),
+            vec![vec![("一".into(), None)]]
+        );
+    }
 }
