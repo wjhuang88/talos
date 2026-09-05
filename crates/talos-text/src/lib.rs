@@ -64,11 +64,11 @@ pub struct TextRequest {
 /// Renderer-neutral source location used by outline and symbol consumers.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SourceLocation {
-    /// Workspace-relative file path.
+    /// File path supplied by the symbol consumer (relative or absolute).
     pub file: String,
     /// One-based line number.
     pub line: usize,
-    /// Zero-based column number.
+    /// One-based column number, or zero when only the line is known.
     pub column: usize,
 }
 

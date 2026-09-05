@@ -68,9 +68,9 @@ impl HighlightEngine {
 
 /// Convert raw tree-sitter spans into per-line colored text segments.
 fn segments_from_result(code: &str, result: &talos_text::HighlightResult) -> Vec<LineSegments> {
-    let spans = match result {
+    let spans: &[talos_text::HighlightSpan] = match result {
         talos_text::HighlightResult::Spans(spans) => spans,
-        talos_text::HighlightResult::PlainText => return vec![vec![(code.to_string(), None)]],
+        talos_text::HighlightResult::PlainText => &[],
     };
     let line_offsets: Vec<usize> = code
         .match_indices('\n')
@@ -86,7 +86,7 @@ fn segments_from_result(code: &str, result: &talos_text::HighlightResult) -> Vec
         let s = span.start.min(code.len());
         let e = span.end.min(code.len());
 
-        if s < cursor || e < s {
+        if s < cursor || e < s || !code.is_char_boundary(s) || !code.is_char_boundary(e) {
             continue;
         }
 
@@ -165,4 +165,35 @@ fn capture_color(capture: &str) -> Option<CColor> {
         _ => return None,
     };
     to_crossterm_color(nord_color)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use talos_text::{HighlightResult, HighlightSpan};
+
+    #[test]
+    fn plain_fallback_preserves_line_structure() {
+        assert_eq!(
+            segments_from_result("一\nsecond\n", &HighlightResult::PlainText),
+            vec![
+                vec![("一".into(), None)],
+                vec![("second".into(), None)],
+                vec![]
+            ]
+        );
+    }
+
+    #[test]
+    fn malformed_neutral_span_cannot_split_utf8() {
+        let result = HighlightResult::Spans(vec![HighlightSpan {
+            start: 1,
+            end: 2,
+            capture: "keyword".into(),
+        }]);
+        assert_eq!(
+            segments_from_result("一", &result),
+            vec![vec![("一".into(), None)]]
+        );
+    }
 }
