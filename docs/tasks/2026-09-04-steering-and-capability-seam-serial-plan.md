@@ -113,3 +113,20 @@ Complete Local Validation Checkpoint for the exact command, cancellation gate, d
 and restricted-filesystem fixture failure. This supersedes earlier pending machine-check rows,
 not their historical results. Real-terminal acceptance, stable candidate review/CI, merge and
 owner-first closeout remain pending. I246 remains Planned / Unclaimed and unauthorized.
+
+## Capability Continuity And Local Validation Checkpoint — 2026-09-05
+
+I207 and I208 are Complete / Closed; I246 is Active / Claimed through #491 merge `f913d28b`.
+The historical checkpoints above are retained and do not describe the current execution state.
+On local I246 implementation head `fbad20ee`, `./scripts/release_preflight.sh` passed, including
+workspace tests/doctests, Clippy, dependency fitness and both governance validators. No remote
+candidate or completion is asserted by this checkpoint.
+
+#467 is the bounded code-alignment prerequisite of #466, not its replacement. Centralized
+built-in parsing in `talos-text` is preparation only: #466 retains the architecture decision,
+Capability/Provider contracts, registry/resolver, Plugin contributions, Bundle migration,
+verified installation, first Rust dynamic Language Provider, remaining language distribution,
+and read-only Browser Provider outcomes. These require separately governed children, with their
+dependencies resolved from the parent owner rather than inferred from this serial plan. I246
+must still satisfy its own code migration, compatibility evidence and handoff requirements;
+those may not be silently deferred to #466 merely to close this task.
