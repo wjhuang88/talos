@@ -140,7 +140,7 @@ fn admit_file(path: &Path, state: &mut TraversalState) -> Result<FileAdmission, 
 
 /// Maps file extensions to arborium language names.
 fn detect_language(path: &Path) -> Option<&'static str> {
-    match path.extension().and_then(|e| e.to_str()) {
+    let language = match path.extension().and_then(|e| e.to_str()) {
         Some("rs") => Some("rust"),
         Some("py") => Some("python"),
         Some("ts") | Some("tsx") => Some("typescript"),
@@ -165,8 +165,11 @@ fn detect_language(path: &Path) -> Option<&'static str> {
         Some("php") => Some("php"),
         Some("kt") | Some("kts") => Some("kotlin"),
         Some("swift") => Some("swift"),
-        _ => None,
-    }
+        _ => return None,
+    };
+    // Validate through the shared UI-neutral language contract before exposing
+    // the canonical Arborium name to the symbol implementation.
+    talos_text::LanguageId::parse(language).map(|_| language)
 }
 
 /// Result from a find_symbol query.

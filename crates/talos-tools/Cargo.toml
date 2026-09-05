@@ -59,6 +59,7 @@ coding = [
 
 [dependencies]
 talos-core = { version = "0.9.0", path = "../talos-core" }
+talos-text = { version = "0.9.0", path = "../talos-text" }
 talos-sandbox = { version = "0.9.0", path = "../talos-sandbox", optional = true }
 async-trait = "0.1"
 serde = { version = "1", features = ["derive"] }
