@@ -1,6 +1,6 @@
 # Iteration I246: CAP-001-P0 Compatibility Preparation
 
-> Document status: Active / Claimed (proposed; ineffective until governance merge)
+> Document status: Review / Claimed (proposed; ineffective until governance merge)
 > Planned date: 2026-09-04
 > Planned objective: prepare the current codebase for progressive capability work through a characterized, UI-neutral text/language and Plugin compatibility boundary without changing shipped behavior.
 > Baseline rule: preserve this target; changed targets use a new iteration ID.
