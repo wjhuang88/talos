@@ -27,7 +27,9 @@ impl LanguageId {
     }
 
     /// Return the canonical identifier string.
-    pub fn as_str(&self) -> &str { &self.0 }
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
 }
 
 /// A source range with a semantic highlight capture.
