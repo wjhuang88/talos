@@ -69,6 +69,18 @@
 - Risk: seam placement duplicates talos-conversation or changes fallback behavior.
 - Rollback: preserve existing consumer paths, record incompatibility, and route a new decision/child owner before changing public or persisted contracts.
 
+## Current Nonterminal Inventory And Disposition — 2026-09-05
+
+| Item | Current state | Disposition |
+|---|---|---|
+| I207 / TUI-049 | Complete / Closed | Predecessor complete; no overlap. |
+| I208 / TUI-050 | Complete / Closed | Predecessor complete; no overlap. |
+| I246 / CAP-001-P0 | Active / Claimed (proposed) | This bounded slice; ineffective until claim PR #491 merges. |
+| #466 / CAP-001 | Refinement / Unclaimed | Parent architecture remains separate; no full provider/resolver implementation here. |
+| Future CAP/TEXT/LANG/BUNDLE/BROWSER children | Planned or unselected | Remain separately governed and unactivated. |
+
+This inventory is a governance checkpoint, not implementation authorization beyond the bounded Work Slice.
+
 ## Execution Order
 
 This iteration is intentionally scheduled after I207 and I208 in the long task. It must not start until the steering slices have reached terminal dispositions and its own architecture/overlap gates are satisfied.
