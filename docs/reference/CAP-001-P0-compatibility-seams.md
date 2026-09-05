@@ -30,6 +30,22 @@ by #467, not the final dynamic-provider or binary-size outcome required by #466.
 
 ## Guards
 
+### Built-in dependency and call-site inventory
+
+The direct grammar feature set in `talos-text/Cargo.toml` preserves the previous consumers'
+23 explicit languages: Rust, Python, TypeScript, JavaScript, Go, Java, C, C++, C#, Bash, SQL,
+PowerShell, Lua, Dart, HTML, CSS, JSON, TOML, Markdown, Ruby, PHP, Kotlin and Swift. Transitive
+grammar dependencies are not counted as extra explicit features. This is not parser trimming.
+
+Native API ownership now consists of `lib.rs` (`parse_builtin`, `BuiltinHighlighter` construction,
+span highlighting and grammar availability); `symbol.rs` (private Node visitors); and
+`symbol_queries.rs` (private Node/TreeCursor definition, reference and import visitors).
+Previously these responsibilities lived in TUI `highlight.rs` and tools `symbol.rs` respectively.
+`language_for_extension` retains the symbol-tool extension policy; TUI canonical-only `supports`
+preserves its former fallback decision, even when `LanguageId` can normalize an alias.
+
+### Enforced boundaries
+
 - `talos-text` has no UI dependency; its optional `code-intelligence` feature owns Arborium.
 - Highlighting uses a 500ms post-operation soft budget, not a hard interruption guarantee.
   Symbol parsing has progress-callback and AST depth/work guards; neither is a process-isolation
