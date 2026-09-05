@@ -13,7 +13,7 @@
 | Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline session |
-| Work Slice | I246 / CAP-001-P0 narrowed characterization only: current-code inventory, compatibility matrix, dependency boundary and downstream handoff. No code, Cargo, dependency, persistence or runtime behavior changes. |
+| Work Slice | I246 / CAP-001-P0 bounded code-alignment: characterize current behavior, introduce the smallest UI-neutral text/language seam, migrate existing TUI/symbol consumers, isolate Plugin package/runtime compatibility, and add dependency guards. Excludes full CAP-001 providers/resolver, Desktop production binding, persisted/public renames and release/publication. |
 | Claimed At | 2026-09-05 |
 | Source Issue | #467 |
 | Governance Claim PR | Pending |
@@ -21,7 +21,7 @@
 | Authorization Evidence | Maintainer explicitly authorized the narrowed scope on 2026-09-05. |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-05 |
-| Handoff / Release Condition | This narrowed claim remains ineffective until its governance PR merges; implementation is limited to documentation/characterization artifacts and must not change code/Cargo/behavior. |
+| Handoff / Release Condition | This claim remains ineffective until its governance PR merges; implementation may change bounded shared code and Cargo edges only within the published CAP-001-P0 scope, preserving behavior and exclusions. |
 
 ## Published Baseline
 

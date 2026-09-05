@@ -18,7 +18,7 @@
 | Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline session |
-| Work Slice | Narrowed characterization only: inventory and compatibility handoff; no code/Cargo/dependency/behavior changes. |
+| Work Slice | Bounded code-alignment: characterization, minimal UI-neutral text/language seam, existing-consumer migration, Plugin package/runtime isolation and dependency guards; no full CAP-001 providers/resolver, Desktop production binding, persisted/public rename or release/publication. |
 | Claimed At | 2026-09-05 |
 | Source Issue | #467 |
 | Governance Claim PR | Pending |
@@ -26,7 +26,7 @@
 | Authorization Evidence | Maintainer explicitly authorized narrowed scope on 2026-09-05. |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-05 |
-| Handoff / Release Condition | I246 is planned but unactivated. Accept or explicitly narrow CAP-001's architecture decision, then establish an effective claim before code or Cargo changes. |
+| Handoff / Release Condition | This bounded claim is proposed and ineffective until governance merge; code/Cargo changes are limited to behavior-preserving CAP-001-P0 alignment and its tests. |
 
 ## Identity / Goal / Value
 
