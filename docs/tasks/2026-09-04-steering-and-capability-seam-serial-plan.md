@@ -1,6 +1,6 @@
 # Steering And Capability Seam Serial Development Plan
 
-**Status**: Active coordination / I207 Complete / Closed / I208 Complete / Closed
+**Status**: Complete / Closed — I207, I208 and I246 delivered
 **Published plan date**: 2026-09-04
 **Outcome**: Deliver the remaining steering follow-ups and then prepare the progressive capability compatibility seam in a controlled serial sequence.
 **Work mode**: Standard
@@ -64,7 +64,7 @@ I246 implementation #492 merged at `9a3c1d86`; its owner now records Complete / 
 | S3 | Implement I208 / TUI-050 | Deterministic boundary insertion and ordering evidence | S2 | Event-sequence tests, cancellation/error/restart evidence, exact-head review/CI, merge and closeout | Keep accepted queue custody and defer timing change | Complete (`442d143b`) |
 | S4 | Establish I246 claim after steering sequence | Effective I246 claim and active owner | S3 terminal; CAP-001 decision/narrowing; overlap inventory | Governance PR merged and CAS pass | Keep CAP-001-P0 Refinement/Unclaimed | Complete (`f913d28b`) |
 | S5 | Implement I246 / CAP-001-P0 | Characterization, compatibility seam and Desktop handoff | S4 | Focused behavior/dependency evidence, docs, exact-head review/CI, merge and closeout | Preserve current paths and route unresolved decisions to child ADRs | Complete (`9a3c1d86`) |
-| S6 | Final ledger closeout | All three child owners and derived views synchronized | S1, S3, S5 | Existing completion evidence, residuals recorded, claim closed | Leave task Partial with explicit residual owner | Review |
+| S6 | Final ledger closeout | All three child owners and derived views synchronized | S1, S3, S5 | Existing completion evidence, residuals recorded, claim closed | Leave task Partial with explicit residual owner | Complete (`2289fb80`) |
 
 ## Shared Validation And Ownership Rules
 
@@ -89,6 +89,9 @@ remain separate owners. Any unresolved steering behavior receives a new bounded 
 expanding I207 or I208.
 
 ## Completion Evidence
+
+Completion Commit: `ca3b2fa7ffb1ca14b82d1acf6af6be147368e6fe`,
+`442d143ba9c1ba6b820ecdddac89bae365cef978`, `9a3c1d860408c1438ec1a7ad4b57860167d0cb01`.
 
 - I207 Completion Commit: `ca3b2fa7ffb1ca14b82d1acf6af6be147368e6fe` (implementation merge for
   PR #483; closeout merged as `2edb914f139a6b3954f790d3fc2889eac16d4599`).
@@ -140,3 +143,20 @@ review comment `5551902186` APPROVED. I246 owner and derived views now record Co
 with this implementation commit. CAP-001/#466 remains a separate open parent; its provider,
 resolver, Bundle, Language, Distribution and Browser child work is not claimed here. S6
 owner-first closeout, final validators and merge CAS remain pending in this branch.
+
+## Final Ledger Checkpoint — 2026-09-05
+
+The [earlier steering ledger](2026-08-17-steering-follow-up-sequence.md) is superseded for
+recovery by this plan; its terminal checkpoint preserves historical #486 references and corrects
+the effective claim to #487. Its Board row now mirrors the completed I208 owner.
+
+This checkpoint supersedes earlier execution/recovery instructions, not the published plan.
+I246 closeout #493 merged as `2289fb80` after exact-head `bac98203` CI `33970169212`
+(four successes and route-correct Windows Rust skip) and independent Agent-role approval
+`5552337342`. I246 and CAP-001-P0 claims are Closed; I207/I208/I246 owner delivery states and
+Board/backlog/iteration index are terminal. S6 records this existing closeout, not its own
+status commit as implementation evidence. Resume with the separately governed CAP-001/#466
+parent and child dependency plan; do not reactivate any of these completed iterations.
+
+The local-only main commit `9416ef95` is an older activation record retained locally, not a
+new implementation or a branch to replay over the completed owners. Remote main is authoritative.
