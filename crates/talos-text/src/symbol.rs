@@ -7,11 +7,16 @@ pub fn list_symbols(
     file: &str,
     kind_filter: Option<&str>,
 ) -> Result<Vec<SymbolInfo>, String> {
-    let language = super::LanguageId::parse(language).ok_or("unsupported language")?;
-    let mut parser = arborium::tree_sitter::Parser::new();
-    let grammar = arborium::get_language(language.as_str()).ok_or("language not loaded")?;
-    parser.set_language(&grammar).map_err(|e| e.to_string())?;
-    let tree = parser.parse(source, None).ok_or("parse failed")?;
+    crate::guarded(|| list_symbols_inner(language, source, file, kind_filter))
+}
+
+fn list_symbols_inner(
+    language: &str,
+    source: &str,
+    file: &str,
+    kind_filter: Option<&str>,
+) -> Result<Vec<SymbolInfo>, String> {
+    let tree = crate::parse_builtin(language, source)?;
     let mut output = Vec::new();
     let kinds = [
         "function_item",
@@ -63,7 +68,7 @@ fn visit(
         });
     }
     let mut cursor = node.walk();
-    for child in node.named_children(&mut cursor) {
+    for child in node.children(&mut cursor) {
         visit(child, source, file, filter, kinds, output);
     }
 }

@@ -6064,7 +6064,6 @@ dependencies = [
 name = "talos-tools"
 version = "0.9.0"
 dependencies = [
- "arborium",
  "async-trait",
  "cap-std",
  "gix",

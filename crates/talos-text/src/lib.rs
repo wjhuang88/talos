@@ -6,6 +6,41 @@ use serde::{Deserialize, Serialize};
 /// Built-in source-only symbol operations; no filesystem access is performed.
 pub mod symbol;
 
+/// Source-only built-in definition, reference, and import operations.
+#[cfg(feature = "code-intelligence")]
+pub mod symbol_queries;
+
+#[cfg(feature = "code-intelligence")]
+fn parse_builtin(language: &str, source: &str) -> Result<arborium::tree_sitter::Tree, String> {
+    use arborium::tree_sitter::{ParseOptions, ParseState, Parser};
+    use std::ops::ControlFlow;
+    let start = std::time::Instant::now();
+    let language = LanguageId::parse(language).ok_or("language not loaded")?;
+    let mut parser = Parser::new();
+    let grammar = arborium::get_language(language.as_str()).ok_or("language not loaded")?;
+    parser.set_language(&grammar).map_err(|e| e.to_string())?;
+    let mut progress = |_: &ParseState| {
+        if start.elapsed().as_millis() > 500 {
+            ControlFlow::Break(())
+        } else {
+            ControlFlow::Continue(())
+        }
+    };
+    parser
+        .parse_with_options(
+            &mut |offset, _| &source.as_bytes()[offset..],
+            None,
+            Some(ParseOptions::new().progress_callback(&mut progress)),
+        )
+        .ok_or_else(|| "parse failed".to_owned())
+}
+
+#[cfg(feature = "code-intelligence")]
+fn guarded<T>(operation: impl FnOnce() -> Result<T, String>) -> Result<T, String> {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(operation))
+        .unwrap_or_else(|_| Err("parse failed".to_owned()))
+}
+
 /// Built-in, renderer-independent highlighting adapter.
 #[cfg(feature = "code-intelligence")]
 pub struct BuiltinHighlighter(arborium::Highlighter);
@@ -44,6 +79,38 @@ impl BuiltinHighlighter {
     pub fn supports(&self, language: &LanguageId) -> bool {
         std::panic::catch_unwind(|| arborium::get_language(language.as_str()).is_some())
             .unwrap_or(false)
+    }
+}
+
+/// Resolve the existing symbol-tool extension policy, including case sensitivity.
+/// Unknown extensions remain unsupported even when a similarly named grammar exists.
+pub fn language_for_extension(extension: &str) -> Option<&'static str> {
+    match Some(extension) {
+        Some("rs") => Some("rust"),
+        Some("py") => Some("python"),
+        Some("ts") | Some("tsx") => Some("typescript"),
+        Some("js") | Some("jsx") | Some("mjs") => Some("javascript"),
+        Some("go") => Some("go"),
+        Some("java") => Some("java"),
+        Some("c") | Some("h") => Some("c"),
+        Some("cpp") | Some("cc") | Some("cxx") | Some("hpp") => Some("cpp"),
+        Some("cs") => Some("c-sharp"),
+        Some("sh") | Some("bash") | Some("zsh") => Some("bash"),
+        Some("sql") => Some("sql"),
+        Some("ps1") => Some("powershell"),
+        Some("lua") => Some("lua"),
+        Some("dart") => Some("dart"),
+        Some("html") => Some("html"),
+        Some("css") => Some("css"),
+        Some("json") => Some("json"),
+        Some("yaml") | Some("yml") => Some("yaml"),
+        Some("toml") => Some("toml"),
+        Some("md") => Some("markdown"),
+        Some("rb") => Some("ruby"),
+        Some("php") => Some("php"),
+        Some("kt") | Some("kts") => Some("kotlin"),
+        Some("swift") => Some("swift"),
+        _ => None,
     }
 }
 
