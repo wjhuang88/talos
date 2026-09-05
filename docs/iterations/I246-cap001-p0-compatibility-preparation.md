@@ -109,6 +109,19 @@ This iteration is intentionally scheduled after I207 and I208 in the long task. 
 - Completion Commit: {already-existing implementation SHA}
 - Status-only documentation commits must not cite themselves.
 
+## Local Convergence Checkpoint — 2026-09-05
+
+- Implemented neutral language, highlight, location, and symbol contracts in `talos-text`.
+- TUI and symbol consumers convert/consume neutral values while retaining Arborium at their
+  existing built-in adapter boundaries; Plugin package/runtime responsibilities are documented in
+  `docs/reference/CAP-001-P0-compatibility-seams.md`.
+- Evidence: `cargo test -p talos-text --locked` (3 passed),
+  `cargo test -p talos-tui --locked --lib` (570 passed),
+  `cargo test -p talos-tools --locked --features code-intelligence --lib` (51 passed),
+  `cargo check --workspace --locked` and `cargo clippy --workspace --locked -- -D warnings` pass.
+- Local implementation commits: `54db04be`, `0ff1642f`, `035c6c8b`, `1664e4b4`, `543ec076`,
+  `ec38d73b`, `2b711e55`, `c36e24f7`, `7cfa1602`, `04035105`, `8eee6355`, `9d46a4d1`.
+
 ## Variance And Residuals
 
 - CAP-001-A/B/C and BUNDLE/TEXT/LANG/DIST/BROWSER children remain separately governed.
