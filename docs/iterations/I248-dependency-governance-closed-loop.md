@@ -86,6 +86,14 @@
 - This is not completion evidence: baseline entries, fixture mutation/parity, live latest comparison,
   and generated candidate handoff remain open.
 
+### 2026-09-06 Change-Control Decision
+
+The request to include one actual dependency upgrade is a scope addition, not an in-scope correction:
+the published I248 baseline and Issue #474 explicitly exclude dependency changes. It is assigned to
+new planned I249, which depends on I248's live report and owns one candidate only. I248 remains
+complete only when its mechanism works without performing an upgrade; I249 cannot activate before
+the candidate is selected with fresh evidence.
+
 ### 2026-09-06 Inventory And Evidence Correction
 
 Inventory base: `main@e336e438208eebca95576db9fbf245783651d0c1`; candidate before this

@@ -52,6 +52,9 @@ and recovery sequence are recorded in
 
 I248 is the effective iteration for the full #474 outcome. Implementation starts from
 `main@7c3f6421` and remains within its Work Slice.
+
+The requested first real upgrade is tracked separately by planned I249. It must consume a fresh
+I248 live report and may select exactly one candidate; it does not widen I248 or authorize a batch.
 See [I248](../../iterations/I248-dependency-governance-closed-loop.md).
 
 ## Required Reads And Acceptance Owner
