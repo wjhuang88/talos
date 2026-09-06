@@ -73,6 +73,51 @@
 
 ## Verification Evidence
 
+### 2026-09-06 Inventory And Evidence Correction
+
+Inventory base: `main@e336e438208eebca95576db9fbf245783651d0c1`; candidate before this
+checkpoint: `94910d545dbc3dc3ae8615c39e2f0fe4ed22fd32`. Reviewed header variants include
+`> Document status`, `**Status**` and plain `Status`, not substring matches against historical
+timeline text. The I001-I024 legacy files have no current status header and are not activated by
+this proposal; preserve them without inferring a new execution authority.
+
+| Set | Observed disposition | Action |
+|---|---|---|
+| Active / In Progress / Review / Planned / Blocked on target main | No current explicit iteration header declares these states | No competing iteration is activated or closed by #496 |
+| I164 | Paused, explicitly superseded by I165 | Keep paused; do not resume |
+| I028, I081-I083, I086-I089 | Superseded before implementation/activation | Preserve terminal disposition |
+| Other explicit current headers through I246 | Terminal (some retain dated review wording or old Claimed fields) | Do not reopen; stale metadata is not implementation authority |
+| Local I247 | Unpublished invalid activation/scope extension on retained branch | No claim transfer; preserve diagnostic branch; do not merge/replay implementation |
+| I248 | Atomic Active / Claimed proposal in #496 only | Not effective before merge; only selected implementation candidate |
+
+PR inventory at the checkpoint: #496 is the only open PR, governance-only; no overlapping
+implementation PR. Recheck this and the main SHA during merge-time CAS. This inventory does not
+claim a repository-wide closeout-evidence audit of every historical Complete document.
+
+CI run `34016411779` at `94910d54` succeeded. Despite its job name, the Unix job ran
+**Reduced documentation validation** and skipped Rust toolchain/preflight steps. It is not Rust
+compilation or implementation acceptance evidence and will not transfer to a substantive new head.
+
+### Required Readiness And Behavioral Tests
+
+- Before converting #496 from Draft, resolve the recovery ledger's parser/platform readiness
+  question with disposable uncommitted experiments; record actual commands and outcomes here.
+  No experiment is accepted implementation or authorization.
+- Test actual frontends against Cargo/registry inputs, not grep strings in their expected output.
+  Golden output must change when input requirements, users, resolutions or registry data mutate.
+- Cover aliases, optional/target/build/dev dependencies, registry identity, every direct resolution,
+  malformed/truncated/escaped JSON and unsupported sources with explicit failure/unknown evidence.
+- Distinguish baseline and upstream drift; preserve prerelease/build metadata and 0.x compatibility
+  semantics; unknown advisory/deprecation coverage must not be reported as no risk.
+- Baseline includes generated accepted entries, timestamp, source SHA and prior validation evidence.
+  Audit commands cannot bless a candidate automatically. Initial baseline bootstrap must cite
+  existing target-main validation; later advancements cite an already-merged upgrade owner.
+- Publish schema and exit-code contract; retain deterministic offline tests and explicit partial
+  live results. Bash/PowerShell parity needs executable evidence from both paths.
+- Before first implementation push, run `./scripts/release_preflight.sh`, focused audit tests,
+  explicit-base governance validators and staged-diff review. Live upstream availability is never
+  a requirement of ordinary compile/test validation. No change to Cargo run/build default scope.
+
 - Pending claim and implementation.
 
 ## Completion Evidence
