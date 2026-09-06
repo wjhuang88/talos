@@ -83,6 +83,8 @@
   with explicit `registry-unavailable`/partial status.
 - `pwsh -NoProfile -File scripts/dependency_audit.ps1 -Format json`: passed against locked offline
   all-feature metadata, preserving manifest requirements, users and unique resolved versions.
+- `scripts/test_dependency_audit_parity.sh`: added; compares schema, status and sorted dependency
+  identities from both frontends without registry access. It must pass before stable candidate push.
 - This is not completion evidence: baseline entries, fixture mutation/parity, live latest comparison,
   and generated candidate handoff remain open.
 
