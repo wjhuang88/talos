@@ -32,8 +32,8 @@
 Deliver the accepted dependency baseline, Bash/PowerShell audit and generic upgrade procedure
 specified in #474 through I248. The proposed scope includes deterministic and live evidence,
 candidate handoff and documentation. It excludes dependency upgrades, manifests, lockfiles,
-versions, public APIs, new helper runtimes and release execution. Claim and activation remain
-ineffective until #496 merges into main.
+versions, public APIs, new helper runtimes and release execution. Claim and activation became
+effective when #496 merged into main as `7c3f6421`.
 
 ## Residual Destination
 
@@ -43,17 +43,15 @@ required or authorized merely to close this mechanism Story.
 
 ## 2026-09-06 Recovery Checkpoint
 
-Remote `main@e336e438208eebca95576db9fbf245783651d0c1` still has no effective claim for #474.
-Local I247 Direct commit / Active assertions and placeholder implementation are not authorization
-or acceptance evidence. Keep this owner Intake / Unclaimed and unselected until a reviewed atomic
-claim reaches the target branch. The full requirement, rejected evidence, technical-readiness
-checks and recovery sequence are recorded in
+The pre-merge recovery note above is historical. After #496 merged as `7c3f6421`, I248 is the
+effective claimed iteration. The full requirement, rejected evidence, technical-readiness checks
+and recovery sequence are recorded in
 [the recovery ledger](../../tasks/2026-09-06-dependency-governance-recovery.md).
 
 ## I248 Selection Proposal
 
-I248 is the replacement candidate for the full #474 outcome. #496 proposes Active / Claimed;
-the target-branch owner remains Intake / Unclaimed until that atomic record merges into `main`.
+I248 is the effective iteration for the full #474 outcome. Implementation starts from
+`main@7c3f6421` and remains within its Work Slice.
 See [I248](../../iterations/I248-dependency-governance-closed-loop.md).
 
 ## Required Reads And Acceptance Owner

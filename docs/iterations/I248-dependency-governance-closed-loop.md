@@ -1,6 +1,6 @@
 # Iteration I248: Dependency Governance Closed Loop
 
-> Document status: Active (proposed; ineffective until #496 merges)
+> Document status: Active
 > Published plan date: 2026-09-06
 > Planned objective: Deliver the complete #474 dependency baseline, audit, SOP, and live handoff loop.
 > Baseline rule: preserve this scope; a different outcome requires a new iteration.
@@ -21,7 +21,7 @@
 | Authorization Evidence | Draft PR #496 proposes atomic claim+activation; ineffective until target-main merge; independent review pending |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-06 |
-| Handoff / Release Condition | Merge #496, then local convergence and one stable candidate |
+| Handoff / Release Condition | #496 merged as `7c3f6421`; local convergence and one stable candidate |
 
 ## Published Baseline
 
@@ -70,6 +70,7 @@
 | Date | Type | Record |
 |---|---|---|
 | 2026-09-06 | Planning | I248 replaces the invalidly widened local I247 attempt; claim remains ineffective until target-main merge. |
+| 2026-09-06 | Activation | #496 merged as `7c3f6421`; claim and Active state are effective on target main. |
 
 ## Verification Evidence
 
