@@ -74,6 +74,18 @@
 
 ## Verification Evidence
 
+### 2026-09-06 Implementation Checkpoint
+
+- Implementation commit `0806f5f1` adds the Bash and PowerShell frontends from effective
+  `main@7c3f6421`; no Cargo or dependency files changed.
+- `bash -n scripts/dependency_audit.sh`: passed.
+- `scripts/dependency_audit.sh --format json`: passed and emits non-empty resolved package entries
+  with explicit `registry-unavailable`/partial status.
+- `pwsh -NoProfile -File scripts/dependency_audit.ps1 -Format json`: passed against locked offline
+  all-feature metadata, preserving manifest requirements, users and unique resolved versions.
+- This is not completion evidence: baseline entries, fixture mutation/parity, live latest comparison,
+  and generated candidate handoff remain open.
+
 ### 2026-09-06 Inventory And Evidence Correction
 
 Inventory base: `main@e336e438208eebca95576db9fbf245783651d0c1`; candidate before this
