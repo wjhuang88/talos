@@ -27,9 +27,9 @@ Completion Commit: `442d143ba9c1ba6b820ecdddac89bae365cef978`
 | Governance Claim PR | #487 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | I207/TUI-049 is Complete / Closed on main at `2edb914f`; maintainer directed serial execution of I207, I208 and I246. |
-| Implementation PR | #488 |
+| Implementation PR | #489 (merged as `442d143b`) |
 | Last Updated | 2026-09-04 |
-| Handoff / Release Condition | Claim and activation became effective when governance PR #487 merged as `75ca8057`; implementation starts from that merge or a later `main`; independent exact-head review remains required. |
+| Handoff / Release Condition | Implementation #489 merged; independent review and acceptance are complete. New steering work requires a new iteration and claim. |
 
 ## Activation Checkpoint — 2026-09-05
 
