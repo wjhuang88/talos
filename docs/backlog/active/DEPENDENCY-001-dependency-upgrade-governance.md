@@ -5,27 +5,27 @@
 | Story ID | DEPENDENCY-001 |
 | Type | Governance / Architecture Intake |
 | Priority | P1 |
-| Status | Intake / Unclaimed |
+| Status | In Progress / Claimed |
 | Source | [GitHub Issue #474](https://github.com/wjhuang88/talos/issues/474) |
-| Selected Iteration | None |
+| Selected Iteration | I248 |
 | Depends On | Existing release, testing, and collaboration SOPs |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Requirement intake only; no dependency or Cargo changes |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 mainline governance session |
+| Work Slice | Full #474 baseline, cross-platform audit, SOP and live handoff; no dependency upgrades |
+| Claimed At | 2026-09-06 |
 | Source Issue | #474 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #496 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Draft governance PR #496; claim and activation proposed, ineffective until merge; independent review pending |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-02 |
-| Handoff / Release Condition | Define and accept a bounded audit/baseline/SOP slice before implementation. |
+| Handoff / Release Condition | Merge #496, then local convergence before one stable implementation candidate. |
 
 ## Scope
 

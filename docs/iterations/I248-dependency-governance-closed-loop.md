@@ -1,6 +1,6 @@
 # Iteration I248: Dependency Governance Closed Loop
 
-> Document status: Planned
+> Document status: Active (proposed; ineffective until #496 merges)
 > Published plan date: 2026-09-06
 > Planned objective: Deliver the complete #474 dependency baseline, audit, SOP, and live handoff loop.
 > Baseline rule: preserve this scope; a different outcome requires a new iteration.
@@ -10,18 +10,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 mainline governance session |
 | Work Slice | Full #474 governance mechanism: baseline, cross-platform audit, SOP, live handoff; no dependency upgrade |
-| Claimed At | Not applicable |
+| Claimed At | 2026-09-06 |
 | Source Issue | #474 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #496 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Draft PR #496 proposes atomic claim+activation; ineffective until target-main merge; independent review pending |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-06 |
-| Handoff / Release Condition | Atomic claim+activation on target main; then local convergence and one stable candidate |
+| Handoff / Release Condition | Merge #496, then local convergence and one stable candidate |
 
 ## Published Baseline
 
