@@ -120,6 +120,34 @@ compilation or implementation acceptance evidence and will not transfer to a sub
 
 - Pending claim and implementation.
 
+### 2026-09-06 Read-Only Cargo Metadata Probe
+
+Probe tree: `41209ca7fd2803abcbaeb704bb8b7eeb52782669`, with Cargo files identical to
+`main@e336e438208eebca95576db9fbf245783651d0c1`. On the local Unix development host,
+PowerShell is available at `/opt/homebrew/bin/pwsh`, awk at `/usr/bin/awk`, curl at `/usr/bin/curl`;
+Cargo reports 1.97.0. No new dependency or audit helper was installed.
+
+`cargo metadata --locked --offline --all-features --format-version 1`, parsed with PowerShell
+`ConvertFrom-Json`, exited 0. Filtering packages by `workspace_members` produced 22 members and
+22 member resolve nodes, with 238 registry dependency declarations. This supersedes the Issue's
+historical 21-member snapshot for implementation sizing only, not its historical record.
+
+Following only those member nodes' `deps[].pkg` IDs into `packages[]`, then filtering registry
+sources, produced 56 distinct external package IDs and 56 names, with no repeated direct-resolved
+names on this tree. This does not remove the multi-resolution acceptance requirement: fixtures
+must introduce duplicate versions and prove neither is dropped. The member declarations include
+23 optional entries, 5 target-conditioned entries and 1 renamed entry (counts across all sources).
+
+Reproduce the mapping by retaining two independent collections: member `packages[].dependencies`
+for requirements/kind/target/optional/rename, and member `resolve.nodes[].deps` for exact package
+IDs and dependency kinds. A flat lockfile package-name join is not equivalent. `--no-deps` cannot
+prove resolved versions. No Cargo manifest or Cargo.lock changes resulted from the probe.
+
+Readiness still outstanding: bounded Unix JSON parsing (escapes/nesting/malformed input), alias and
+kind/target joining, and cross-platform fixture semantics. Availability of PowerShell and a passing
+metadata command alone do not establish these. #496 stays Draft until those assumptions are resolved;
+this section records a disposable investigation, not implementation or an effective claim.
+
 ## Completion Evidence
 
 - Completion Commit: pending
