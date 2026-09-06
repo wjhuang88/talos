@@ -61,7 +61,11 @@ foreach ($r in $rows.Values) {
 }
 # Sort explicit objects, not OrderedDictionary adapters, whose property lookup
 # otherwise leaves the hashtable enumeration order visible in serialized JSON.
-$out = [ordered]@{schema='talos.dependency-audit/v1'; status='local-only'; registry=($(if($Live){'queried'}else{'not-queried'})); dependencies=@($rows.Keys | Sort-Object | ForEach-Object { [pscustomobject]$rows[$_] })}
+# Use ordinal byte-like ordering so empty kind/target fields sort identically to
+# the Bash frontend (culture-aware Sort-Object reverses `dev` and empty kinds).
+$sortedRows=[System.Collections.Generic.SortedDictionary[string,object]]::new([System.StringComparer]::Ordinal)
+foreach($key in $rows.Keys) { $sortedRows[$key]=[pscustomobject]$rows[$key] }
+$out = [ordered]@{schema='talos.dependency-audit/v1'; status='local-only'; registry=($(if($Live){'queried'}else{'not-queried'})); dependencies=@($sortedRows.Values)}
 if($Snapshot) {
   if($SourceCommit -cnotmatch '^[0-9a-f]{40}$' -or $AcceptedAt -cnotmatch '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$' -or [string]::IsNullOrWhiteSpace($ValidationEvidence)) { throw 'snapshot requires source SHA, UTC timestamp and validation evidence' }
   # This is generation, not validation or authorization to advance the baseline.

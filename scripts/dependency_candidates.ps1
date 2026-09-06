@@ -3,7 +3,7 @@ $ErrorActionPreference='Stop'
 $observation=Get-Content -Raw -LiteralPath $ObservationPath|ConvertFrom-Json
 if($observation.schema -cne 'talos.dependency-observation/v1' -or $observation.source_commit -cnotmatch '^[0-9a-f]{40}$' -or $observation.report.schema -cne 'talos.dependency-audit/v1') { throw 'invalid audit observation' }
 $candidates=@()
-foreach($group in ($observation.report.dependencies|Group-Object name|Sort-Object Name)) {
+foreach($group in ($observation.report.dependencies|Group-Object { "$($_.name)|$($_.source)" }|Sort-Object Name)) {
     $rows=@($group.Group)
     $classes=@($rows.classification|Sort-Object -Unique)
     if($classes.Count -eq 1 -and $classes[0] -eq 'current') { continue }
@@ -14,7 +14,7 @@ foreach($group in ($observation.report.dependencies|Group-Object name|Sort-Objec
     $unknown=($classes -contains 'unknown' -or $classes -contains 'registry-unavailable' -or $targets.Count -ne 1 -or $sources.Count -ne 1)
     $isolated=($unknown -or @($classes|Where-Object {$_ -in @('major','pre-1.0-breaking-minor','pre-1.0-breaking-patch','prerelease','ahead-of-stable','yanked','baseline-drift')}).Count -gt 0)
     $candidates+=[pscustomobject][ordered]@{
-        name=$group.Name;source=$sources;current_versions=$versions;target_versions=$targets
+        name=$rows[0].name;source=$sources;current_versions=$versions;target_versions=$targets
         classifications=$classes;direct_consumers=$consumers
         disposition=$(if($unknown){'investigate'}elseif($isolated){'isolated-proposal'}else{'domain-review-required'})
         authorization='none'

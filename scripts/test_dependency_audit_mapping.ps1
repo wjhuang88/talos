@@ -84,6 +84,11 @@ try {
     if($LASTEXITCODE -ne 0 -or ($powershell|ConvertTo-Json -Depth 20 -Compress) -cne ($unix|ConvertTo-Json -Depth 20 -Compress)) { throw 'external Git dependency parity failed' }
     $gitRow=@($unix.dependencies|Where-Object source -eq $gitSource)
     if($gitRow.Count -ne 1 -or $gitRow[0].classification -notcontains 'unknown' -or $unix.status -ne 'partial') { throw 'unsupported registry source was silently dropped or blessed' }
+    foreach($format in @('table','markdown')) {
+      $psText=(& $audit -MetadataPath $fixture -RegistryPath $registry -Format $format) -join "`n"
+      $unixText=(& bash (Join-Path $PSScriptRoot 'dependency_audit.sh') --metadata $fixture --registry $registry --format $format) -join "`n"
+      if($LASTEXITCODE -ne 0 -or $psText -cne $unixText) { throw "external source rendering parity failed: $format" }
+    }
     'dependency declaration mapping: PASS (aliases, kind/target, resolutions, mutation, registry parity, six malformed graphs, Git external source)'
 } finally {
     Remove-Item -LiteralPath $fixture
