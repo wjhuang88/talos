@@ -9,7 +9,9 @@ if ((live)); then
   failed=0
   while read -r name version; do
     [[ -n "$name" ]] || continue
-    curl --fail --silent --show-error --max-time 10 "https://crates.io/api/v1/crates/$name" >/dev/null || failed=1
+    response=$(curl --fail --silent --show-error --max-time 10 "https://crates.io/api/v1/crates/$name" 2>/dev/null) || { failed=1; continue; }
+    latest=$(printf '%s' "$response" | sed -n 's/.*"newest_version":"\([0-9][^"]*\)".*/\1/p')
+    [[ -n "$latest" ]] || failed=1
   done < <(printf '%s\n' "$tree" | awk 'BEGIN{inroot=0} /^[A-Za-z0-9_-]+ v[0-9].*\/crates\//{inroot=1;next} inroot && /^[A-Za-z0-9_-]+ v[0-9]/{print $1, $2}')
   ((failed == 0)) || { echo 'registry-unavailable' >&2; exit 3; }
 fi
