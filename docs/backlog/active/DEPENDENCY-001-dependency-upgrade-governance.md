@@ -45,3 +45,9 @@ or acceptance evidence. Keep this owner Intake / Unclaimed and unselected until 
 claim reaches the target branch. The full requirement, rejected evidence, technical-readiness
 checks and recovery sequence are recorded in
 [the recovery ledger](../../tasks/2026-09-06-dependency-governance-recovery.md).
+
+## I248 Selection Proposal
+
+I248 is the replacement candidate for the full #474 outcome. It remains `Planned / Unclaimed` until
+the non-terminal inventory is recorded and an atomic claim+activation record reaches target `main`.
+See [I248](../../iterations/I248-dependency-governance-closed-loop.md).
