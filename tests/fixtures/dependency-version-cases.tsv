@@ -1,0 +1,16 @@
+1.2.3	1.2.3+build.9	current
+1.2.3	1.2.4	patch
+1.9.0	1.10.0	minor
+1.2.3	2.0.0	major
+0.22.1	0.23.0	pre-1.0-breaking-minor
+0.0.1	0.0.2	pre-1.0-breaking-patch
+2.0.0	1.9.0	ahead-of-stable
+1.0.0-alpha.2	1.0.0	prerelease
+01.0.0	2.0.0	unknown
+1.0.0-alpha.01	2.0.0	unknown
+1.2	2.0.0	unknown
+999999999999999999999.0.0	1000000000000000000000.0.0	major
+1.0.0+	1.0.0	unknown
+1.0.0-	1.0.0	unknown
+1.0.0+foo..bar	1.0.0	unknown
+1.0.0+01	1.0.0+02	current

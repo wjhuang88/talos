@@ -177,6 +177,7 @@ All agents follow this sequence for compile, merge, and release work:
 | "A requirement changed mid-iteration" | `docs/sop/CHANGE-CONTROL.md` |
 | "How do I set up local dev?" | `docs/sop/LOCAL-DEV.md` |
 | "What's the testing strategy?" | `docs/sop/TESTING.md` |
+| "Audit or upgrade external dependencies" | `docs/sop/DEPENDENCY-UPGRADE.md` |
 | "How do I commit my work?" | `docs/sop/GIT-WORKFLOW.md` |
 | "How do I compile or publish a release?" | `docs/sop/RELEASE.md` → `docs/sop/RELEASE-WORKFLOW.md` |
 | "Run an unattended / overnight / long-running task" | `docs/sop/LONG-RUNNING-TASK.md` |

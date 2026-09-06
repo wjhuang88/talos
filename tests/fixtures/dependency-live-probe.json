@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "workspace_members": ["probe"],
+  "packages": [
+    {
+      "id": "probe", "name": "probe", "source": null,
+      "dependencies": [{
+        "name": "serde_json", "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "req": "^1", "rename": null, "kind": null, "target": null
+      }]
+    },
+    {
+      "id": "serde-json-probe", "name": "serde_json", "version": "1.0.150",
+      "source": "registry+https://github.com/rust-lang/crates.io-index"
+    }
+  ],
+  "resolve": {"nodes": [{
+    "id": "probe",
+    "deps": [{"name": "serde_json", "pkg": "serde-json-probe", "dep_kinds": [{"kind": null, "target": null}]}]
+  }]}
+}

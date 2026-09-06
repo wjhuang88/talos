@@ -1,6 +1,6 @@
 # Iteration I248: Dependency Governance Closed Loop
 
-> Document status: Active (proposed; ineffective until #496 merges)
+> Document status: Active
 > Published plan date: 2026-09-06
 > Planned objective: Deliver the complete #474 dependency baseline, audit, SOP, and live handoff loop.
 > Baseline rule: preserve this scope; a different outcome requires a new iteration.
@@ -18,10 +18,10 @@
 | Source Issue | #474 |
 | Governance Claim PR | #496 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Draft PR #496 proposes atomic claim+activation; ineffective until target-main merge; independent review pending |
+| Authorization Evidence | Claim PR #496 merged as `7c3f6421a073aad62e6a4aaf8f6e1c7df9a674bd`; claim effective. This records the actual merge, not missing historical CAS/review evidence. Implementation requires its own stable-candidate gates. |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-06 |
-| Handoff / Release Condition | Merge #496, then local convergence and one stable candidate |
+| Handoff / Release Condition | #496 merged as `7c3f6421`; local convergence and one stable candidate |
 
 ## Published Baseline
 
@@ -70,8 +70,31 @@
 | Date | Type | Record |
 |---|---|---|
 | 2026-09-06 | Planning | I248 replaces the invalidly widened local I247 attempt; claim remains ineffective until target-main merge. |
+| 2026-09-06 | Activation | #496 merged as `7c3f6421`; claim and Active state are effective on target main. |
 
 ## Verification Evidence
+
+### 2026-09-06 Implementation Checkpoint
+
+- Implementation commit `0806f5f1` adds the Bash and PowerShell frontends from effective
+  `main@7c3f6421`; no Cargo or dependency files changed.
+- `bash -n scripts/dependency_audit.sh`: passed.
+- `scripts/dependency_audit.sh --format json`: passed and emits non-empty resolved package entries
+  with explicit `registry-unavailable`/partial status.
+- `pwsh -NoProfile -File scripts/dependency_audit.ps1 -Format json`: passed against locked offline
+  all-feature metadata, preserving manifest requirements, users and unique resolved versions.
+- `scripts/test_dependency_audit_parity.sh`: added; compares schema, status and sorted dependency
+  identities from both frontends without registry access. It must pass before stable candidate push.
+- This is not completion evidence: baseline entries, fixture mutation/parity, live latest comparison,
+  and generated candidate handoff remain open.
+
+### 2026-09-06 Change-Control Decision
+
+The request to include one actual dependency upgrade is a scope addition, not an in-scope correction:
+the published I248 baseline and Issue #474 explicitly exclude dependency changes. It is assigned to
+new planned I249, which depends on I248's live report and owns one candidate only. I248 remains
+complete only when its mechanism works without performing an upgrade; I249 cannot activate before
+the candidate is selected with fresh evidence.
 
 ### 2026-09-06 Inventory And Evidence Correction
 
@@ -149,6 +172,30 @@ metadata command alone do not establish these. #496 stays Draft until those assu
 this section records a disposable investigation, not implementation or an effective claim.
 
 ## Completion Evidence
+
+### 2026-09-06 Local Convergence And Scope Correction
+
+Current implementation remains local on `impl/i248-dependency-governance`; no implementation PR
+has been submitted. The dated pre-merge readiness text above is historical, not the current claim
+state. Local fixture tests now exercise actual Bash/PowerShell entrypoints for collection,
+SemVer, registry failures, baseline comparison, snapshot generation and JSON/table/Markdown parity.
+`bash scripts/test_dependency_audit.sh` passed on the local Unix host with PowerShell 7.6.2;
+this is not Windows execution evidence or a release-preflight result. Both governance validators
+passed with zero warnings, including explicit `COLLABORATION_VALIDATION_BASE=origin/main`, and
+`git diff --check` passed after adding the generic dependency SOP and routes.
+
+The user's request is a full dependency upgrade across the long task, not one pilot package.
+The earlier change-control interpretation assigning exactly one upgrade to I249 was too narrow.
+Preserve that published plan as history; do not count its single-package outcome as satisfaction
+of the full request. I248 still owns the mechanism, without Cargo mutations. After its fresh
+full audit, allocate the full-upgrade owner/slices under CHANGE-CONTROL with every direct dependency
+and relevant transitive update disposed as current, upgraded or explicitly blocked/excepted.
+Latest stable includes majors; preserve existing default features and run/build scope.
+
+Outstanding I248 acceptance includes actual accepted-baseline bootstrap with verified provenance,
+full live audit and generated candidate handoff, supported-platform evidence, schema/exit contract,
+final local preflight and stable-candidate review/CI/merge/closeout. Security/deprecation signals
+currently remain explicitly unknown; registry version lookup is not an advisory audit.
 
 - Completion Commit: pending
 

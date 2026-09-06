@@ -22,18 +22,18 @@
 | Source Issue | #474 |
 | Governance Claim PR | #496 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Draft governance PR #496; claim and activation proposed, ineffective until merge; independent review pending |
+| Authorization Evidence | #496 merged as `7c3f6421a073aad62e6a4aaf8f6e1c7df9a674bd`; claim effective. Actual merge is not a substitute for missing historical CAS/review evidence or new implementation gates. |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-06 |
-| Handoff / Release Condition | Merge #496, then local convergence before one stable implementation candidate. |
+| Handoff / Release Condition | #496 merged; complete local convergence before one stable implementation candidate. |
 
 ## Scope
 
 Deliver the accepted dependency baseline, Bash/PowerShell audit and generic upgrade procedure
 specified in #474 through I248. The proposed scope includes deterministic and live evidence,
 candidate handoff and documentation. It excludes dependency upgrades, manifests, lockfiles,
-versions, public APIs, new helper runtimes and release execution. Claim and activation remain
-ineffective until #496 merges into main.
+versions, public APIs, new helper runtimes and release execution. Claim and activation became
+effective when #496 merged into main as `7c3f6421`.
 
 ## Residual Destination
 
@@ -43,20 +43,27 @@ required or authorized merely to close this mechanism Story.
 
 ## 2026-09-06 Recovery Checkpoint
 
-Remote `main@e336e438208eebca95576db9fbf245783651d0c1` still has no effective claim for #474.
-Local I247 Direct commit / Active assertions and placeholder implementation are not authorization
-or acceptance evidence. Keep this owner Intake / Unclaimed and unselected until a reviewed atomic
-claim reaches the target branch. The full requirement, rejected evidence, technical-readiness
-checks and recovery sequence are recorded in
+The pre-merge recovery note above is historical. After #496 merged as `7c3f6421`, I248 is the
+effective claimed iteration. The full requirement, rejected evidence, technical-readiness checks
+and recovery sequence are recorded in
 [the recovery ledger](../../tasks/2026-09-06-dependency-governance-recovery.md).
 
 ## I248 Selection Proposal
 
-I248 is the replacement candidate for the full #474 outcome. #496 proposes Active / Claimed;
-the target-branch owner remains Intake / Unclaimed until that atomic record merges into `main`.
+I248 is the effective iteration for the full #474 outcome. Implementation starts from
+`main@7c3f6421` and remains within its Work Slice.
+
+The requested first real upgrade is tracked separately by planned I249. It must consume a fresh
+I248 live report and may select exactly one candidate; it does not widen I248 or authorize a batch.
 See [I248](../../iterations/I248-dependency-governance-closed-loop.md).
 
 ## Required Reads And Acceptance Owner
+
+Current scope clarification (2026-09-06): the user's full-upgrade request is a long-task outcome
+beyond the mechanism, not satisfied by I249's one-package pilot. Preserve I249's published baseline;
+the fresh full audit must feed a full-upgrade owner and appropriately isolated slices before Cargo
+changes. I248 remains Active/Claimed and incomplete. See its appended local convergence checkpoint
+for verification and residuals; no implementation PR or dependency upgrade is claimed here.
 
 Read #474 in full, I248, the recovery ledger, root and member Cargo manifests, Cargo.lock,
 rust-toolchain.toml and REQUIREMENT-INTAKE, START-ITERATION, ITERATION-WORKFLOW,
