@@ -22,10 +22,10 @@
 | Source Issue | #474 |
 | Governance Claim PR | #496 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Draft governance PR #496; claim and activation proposed, ineffective until merge; independent review pending |
+| Authorization Evidence | #496 merged as `7c3f6421a073aad62e6a4aaf8f6e1c7df9a674bd`; claim effective. Actual merge is not a substitute for missing historical CAS/review evidence or new implementation gates. |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-06 |
-| Handoff / Release Condition | Merge #496, then local convergence before one stable implementation candidate. |
+| Handoff / Release Condition | #496 merged; complete local convergence before one stable implementation candidate. |
 
 ## Scope
 
@@ -58,6 +58,12 @@ I248 live report and may select exactly one candidate; it does not widen I248 or
 See [I248](../../iterations/I248-dependency-governance-closed-loop.md).
 
 ## Required Reads And Acceptance Owner
+
+Current scope clarification (2026-09-06): the user's full-upgrade request is a long-task outcome
+beyond the mechanism, not satisfied by I249's one-package pilot. Preserve I249's published baseline;
+the fresh full audit must feed a full-upgrade owner and appropriately isolated slices before Cargo
+changes. I248 remains Active/Claimed and incomplete. See its appended local convergence checkpoint
+for verification and residuals; no implementation PR or dependency upgrade is claimed here.
 
 Read #474 in full, I248, the recovery ledger, root and member Cargo manifests, Cargo.lock,
 rust-toolchain.toml and REQUIREMENT-INTAKE, START-ITERATION, ITERATION-WORKFLOW,

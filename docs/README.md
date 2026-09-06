@@ -30,6 +30,7 @@
 | `LOCAL-DEV.md` | Setting up local development environment |
 | `NEW-FEATURE.md` | Implementing a new feature during an iteration |
 | `TESTING.md` | Writing and running tests |
+| `DEPENDENCY-UPGRADE.md` | Audit dependency drift, plan latest-stable upgrades, validate and advance the accepted baseline |
 | `GIT-WORKFLOW.md` | Committing, branching, and PR workflow |
 | `LONG-RUNNING-TASK.md` | Planning and executing unattended or multi-phase work with one confirmation and durable checkpoints |
 | `DOC-CHECK.md` | Keeping documentation synchronized with code reality |
