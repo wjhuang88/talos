@@ -1,13 +1,13 @@
 # DEPENDENCY-002: Full Workspace Dependency Upgrade
 
-> Document status: Review
+> Document status: Complete / Closed
 
 | Field | Value |
 |---|---|
 | Story ID | DEPENDENCY-002 |
 | Type | Dependency Upgrade Story |
 | Priority | P0 |
-| Status | Review / Claimed |
+| Status | Complete / Closed |
 | Source | [GitHub Issue #474](https://github.com/wjhuang88/talos/issues/474) |
 | Selected Iteration | I250 |
 | Depends On | I248 complete; fresh dependency audit and candidate handoff |
@@ -27,7 +27,7 @@
 | Authorization Evidence | #500 merged as `ea9a4c37c129c2eb77825191b9e86baced4c91d4`; claim and activation effective |
 | Implementation PR | #501 |
 | Last Updated | 2026-09-07 |
-| Handoff / Release Condition | #501 awaits final independent review and merge-time CAS, then accepted-baseline advancement and owner-first closeout |
+| Handoff / Release Condition | Closed after #501 merge, accepted-baseline advancement, and owner-first closeout |
 
 ## Scope And Definition Of Done
 
@@ -47,3 +47,10 @@ The work is complete only when manifests and lockfile are validated, default fea
 ## Residual Destination
 
 Candidate-specific blockers belong in I250's final disposition table or a separately selected child iteration. Do not hide them in the baseline or close #474 while any row lacks a disposition.
+
+## Completion Evidence
+
+- Completion Commit: `76f0a41b89dfbe20effe3e4a1c8909a3148a4ad9`
+- Implementation PR: #501; exact-head CI `34125593411`; independent review `5571420442`.
+- Accepted baseline: `docs/reference/dependency-baseline.json`, generated from merge commit with 71
+  identity rows. Two explicit residual dispositions remain with DEPENDENCY-003 / Issue #502.

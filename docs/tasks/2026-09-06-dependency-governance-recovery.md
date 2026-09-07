@@ -1,6 +1,6 @@
 # #474 Dependency Governance Recovery And Delivery
 
-Status: I248 Complete / Closed; I250 Review / Claimed after #500 merge `ea9a4c37`. Recovery ledger; claims live in the iteration owners.
+Status: I248 and I250 Complete / Closed after #501 merge `76f0a41b`. Recovery ledger; claims live in the iteration owners. Residual dependency evidence remains under DEPENDENCY-003 / #502.
 Requirement owner: [DEPENDENCY-001](../backlog/active/DEPENDENCY-001-dependency-upgrade-governance.md).
 
 ## Verified Checkpoint — 2026-09-06
