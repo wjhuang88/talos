@@ -18,10 +18,13 @@
 | Responsible Actor | Not assigned |
 | Executing Agent | Not assigned |
 | Work Slice | Full workspace dependency-version upgrade; every I248 identity row must be upgraded or explicitly dispositioned |
+| Claimed At | Not applicable |
 | Source Issue | #474 |
 | Governance Claim PR | Not applicable |
+| Authorization Mode | Not applicable |
 | Authorization Evidence | No Cargo manifest/lock mutation is authorized before an effective I250 claim |
 | Implementation PR | Not started |
+| Last Updated | 2026-09-07 |
 | Handoff / Release Condition | Select and activate I250 after fresh inventory and candidate review |
 
 ## Scope And Definition Of Done
