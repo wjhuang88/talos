@@ -61,27 +61,27 @@ coding = [
 talos-core = { version = "0.9.0", path = "../talos-core" }
 talos-text = { version = "0.9.0", path = "../talos-text" }
 talos-sandbox = { version = "0.9.0", path = "../talos-sandbox", optional = true }
-async-trait = "0.1"
+async-trait = "0.1.92"
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-schemars = "1.2.1"
-thiserror = "2"
-tokio = { version = "1", default-features = false }
-regex = { version = "1", optional = true }
+serde_json = "1.0.151"
+schemars = "1.2.2"
+thiserror = "2.0.20"
+tokio = { version = "1.53.1", default-features = false }
+regex = { version = "1.13.1", optional = true }
 walkdir = { version = "2", optional = true }
-glob = { version = "0.3", optional = true }
-grep-searcher = { version = "0.1", optional = true }
+glob = { version = "0.3.4", optional = true }
+grep-searcher = { version = "0.1.17", optional = true }
 grep-regex = { version = "0.1", optional = true }
-grep-matcher = { version = "0.1", optional = true }
-ignore = { version = "0.4", optional = true }
-similar = { version = "3", optional = true }
-gix = { version = "0.85", default-features = false, optional = true, features = [
+grep-matcher = { version = "0.1.9", optional = true }
+ignore = { version = "0.4.33", optional = true }
+similar = { version = "3.2.0", optional = true }
+gix = { version = "0.87.1", default-features = false, optional = true, features = [
     "basic", "status", "revision", "blob-diff", "index", "sha1"
 ] }
 reqwest = { version = "0.13.4", default-features = false, optional = true, features = ["rustls", "json"] }
 rust-websearch = { version = "0.1", optional = true }
 scraper = { version = "0.27", optional = true }
-uuid = { version = "1", optional = true, features = ["v4"] }
+uuid = { version = "1.26.0", optional = true, features = ["v4"] }
 sha2 = { version = "0.11", optional = true }
 image = { version = "0.25", default-features = false, optional = true, features = ["png", "jpeg", "gif", "webp"] }
 cap-std = { version = "4.0.3", default-features = false, optional = true }
@@ -103,7 +103,7 @@ windows-sys = { version = "0.61.2", optional = true, features = [
 [dev-dependencies]
 talos-permission = { version = "0.9.0", path = "../talos-permission" }
 tempfile = "3"
-tokio = { version = "1", features = ["fs", "macros", "rt", "rt-multi-thread"] }
+tokio = { version = "1.53.1", features = ["fs", "macros", "rt", "rt-multi-thread"] }
 
 [[test]]
 name = "document_boundaries"
@@ -124,4 +124,4 @@ required-features = ["shell"]
 workspace = true
 
 [build-dependencies]
-toml = "1.1.2"
+toml = "1.1.5"

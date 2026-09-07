@@ -1,0 +1,944 @@
+{
+  "schema": "talos.dependency-candidates/v1",
+  "source_commit": "9de1290a0cf933c0caec9e67d4741dc5dd596086",
+  "observed_date_utc": "2026-09-07T09:57:18Z",
+  "policy": "Latest stable, including majors. Compatible version distance is not a risk clearance. No candidate is implementation authority.",
+  "candidates": [
+    {
+      "name": "anyhow",
+      "source": [
+        "registry+https://github.com/rust-lang/crates.io-index"
+      ],
+      "current_versions": [
+        "1.0.104"
+      ],
+      "target_versions": [
+        "1.0.104"
+      ],
+      "classifications": [
+        "baseline-drift",
+        "current"
+      ],
+      "direct_consumers": [
+        "talos-cli",
+        "talos-mcp",
+        "talos-rpc"
+      ],
+      "disposition": "isolated-proposal",
+      "authorization": "none",
+      "required_next_step": "Inspect actual consumer/API/native/security/MSRV impact; assign existing Story/iteration/claim before Cargo changes.",
+      "validation": "Locked preflight plus consumer-domain and feature-matrix tests; exact-head authorization-specific review.",
+      "rollback": "Revert complete candidate manifests, lock and migrations; assess data compatibility before implementation."
+    },
+    {
+      "name": "arborium",
+      "source": [
+        "registry+https://github.com/rust-lang/crates.io-index"
+      ],
+      "current_versions": [
+        "2.18.2"
+      ],
+      "target_versions": [
+        "2.18.2"
+      ],
+      "classifications": [
+        "baseline-drift",
+        "current"
+      ],
+      "direct_consumers": [
+        "talos-text"
+      ],
+      "disposition": "isolated-proposal",
+      "authorization": "none",
+      "required_next_step": "Inspect actual consumer/API/native/security/MSRV impact; assign existing Story/iteration/claim before Cargo changes.",
+      "validation": "Locked preflight plus consumer-domain and feature-matrix tests; exact-head authorization-specific review.",
+      "rollback": "Revert complete candidate manifests, lock and migrations; assess data compatibility before implementation."
+    },
+    {
+      "name": "async-trait",
+      "source": [
+        "registry+https://github.com/rust-lang/crates.io-index"
+      ],
+      "current_versions": [
+        "0.1.92"
+      ],
+      "target_versions": [
+        "0.1.92"
+      ],
+      "classifications": [
+        "baseline-drift",
+        "current"
+      ],
+      "direct_consumers": [
+        "talos-agent",
+        "talos-cli",
+        "talos-core",
+        "talos-evolution",
+        "talos-mcp",
+        "talos-plugin",
+        "talos-provider",
+        "talos-rpc",
+        "talos-runtime",
+        "talos-sandbox",
+        "talos-session",
+        "talos-tools"
+      ],
+      "disposition": "isolated-proposal",
+      "authorization": "none",
+      "required_next_step": "Inspect actual consumer/API/native/security/MSRV impact; assign existing Story/iteration/claim before Cargo changes.",
+      "validation": "Locked preflight plus consumer-domain and feature-matrix tests; exact-head authorization-specific review.",
+      "rollback": "Revert complete candidate manifests, lock and migrations; assess data compatibility before implementation."
+    },
+    {
+      "name": "base64",
+      "source": [
+        "registry+https://github.com/rust-lang/crates.io-index"
+      ],
+      "current_versions": [
+        "0.23.1"
+      ],
+      "target_versions": [
+        "0.23.1"
+      ],
+      "classifications": [
+        "baseline-drift",
+        "current"
+      ],
+      "direct_consumers": [
+        "talos-provider"
+      ],
+      "disposition": "isolated-proposal",
+      "authorization": "none",
+      "required_next_step": "Inspect actual consumer/API/native/security/MSRV impact; assign existing Story/iteration/claim before Cargo changes.",
+      "validation": "Locked preflight plus consumer-domain and feature-matrix tests; exact-head authorization-specific review.",
+      "rollback": "Revert complete candidate manifests, lock and migrations; assess data compatibility before implementation."
+    },
+    {
+      "name": "clap",
+      "source": [
+        "registry+https://github.com/rust-lang/crates.io-index"
+      ],
+      "current_versions": [
+        "4.6.6"
+      ],
+      "target_versions": [
+        "4.6.6"
+      ],
+      "classifications": [
+        "baseline-drift",
+        "current"
+      ],
+      "direct_consumers": [
+        "talos-cli"
+      ],
+      "disposition": "isolated-proposal",
+      "authorization": "none",
+      "required_next_step": "Inspect actual consumer/API/native/security/MSRV impact; assign existing Story/iteration/claim before Cargo changes.",
+      "validation": "Locked preflight plus consumer-domain and feature-matrix tests; exact-head authorization-specific review.",
+      "rollback": "Revert complete candidate manifests, lock and migrations; assess data compatibility before implementation."
+    },
+    {
+      "name": "dirs",
+      "source": [
+        "registry+https://github.com/rust-lang/crates.io-index"
+      ],
+      "current_versions": [
+        "7.0.0"
+      ],
+      "target_versions": [
+        "7.0.0"
+      ],
+      "classifications": [
+        "baseline-drift",
+        "current"
+      ],
+      "direct_consumers": [
+        "talos-cli",
+        "talos-evolution"
+      ],
+      "disposition": "isolated-proposal",
+      "authorization": "none",
+      "required_next_step": "Inspect actual consumer/API/native/security/MSRV impact; assign existing Story/iteration/claim before Cargo changes.",
+      "validation": "Locked preflight plus consumer-domain and feature-matrix tests; exact-head authorization-specific review.",
+      "rollback": "Revert complete candidate manifests, lock and migrations; assess data compatibility before implementation."
+    },
+    {
+      "name": "futures-core",
+      "source": [
+        "registry+https://github.com/rust-lang/crates.io-index"
+      ],
+      "current_versions": [
+        "0.3.34"
+      ],
+      "target_versions": [
+        "0.3.34"
+      ],
+      "classifications": [
+        "baseline-drift",
+        "current"
+      ],
+      "direct_consumers": [
+        "talos-dashboard"
+      ],
+      "disposition": "isolated-proposal",
+      "authorization": "none",
+      "required_next_step": "Inspect actual consumer/API/native/security/MSRV impact; assign existing Story/iteration/claim before Cargo changes.",
+      "validation": "Locked preflight plus consumer-domain and feature-matrix tests; exact-head authorization-specific review.",
+      "rollback": "Revert complete candidate manifests, lock and migrations; assess data compatibility before implementation."
+    },
+    {
+      "name": "futures-util",
+      "source": [
+        "registry+https://github.com/rust-lang/crates.io-index"
+      ],
+      "current_versions": [
+        "0.3.34"
+      ],
+      "target_versions": [
+        "0.3.34"
+      ],
+      "classifications": [
+        "baseline-drift",
+        "current"
+      ],
+      "direct_consumers": [
+        "talos-agent",
+        "talos-mcp",
+        "talos-plugin",
+        "talos-provider"
+      ],
+      "disposition": "isolated-proposal",
+      "authorization": "none",
+      "required_next_step": "Inspect actual consumer/API/native/security/MSRV impact; assign existing Story/iteration/claim before Cargo changes.",
+      "validation": "Locked preflight plus consumer-domain and feature-matrix tests; exact-head authorization-specific review.",
+      "rollback": "Revert complete candidate manifests, lock and migrations; assess data compatibility before implementation."
+    },
+    {
+      "name": "futures",
+      "source": [
+        "registry+https://github.com/rust-lang/crates.io-index"
+      ],
+      "current_versions": [
+        "0.3.34"
+      ],
+      "target_versions": [
+        "0.3.34"
+      ],
+      "classifications": [
+        "baseline-drift",
+        "current"
+      ],
+      "direct_consumers": [
+        "talos-cli",
+        "talos-conversation",
+        "talos-rpc",
+        "talos-tui"
+      ],
+      "disposition": "isolated-proposal",
+      "authorization": "none",
+      "required_next_step": "Inspect actual consumer/API/native/security/MSRV impact; assign existing Story/iteration/claim before Cargo changes.",
+      "validation": "Locked preflight plus consumer-domain and feature-matrix tests; exact-head authorization-specific review.",
+      "rollback": "Revert complete candidate manifests, lock and migrations; assess data compatibility before implementation."
+    },
+    {
+      "name": "gix",
+      "source": [
+        "registry+https://github.com/rust-lang/crates.io-index"
+      ],
+      "current_versions": [
+        "0.87.1"
+      ],
+      "target_versions": [
+        "0.87.1"
+      ],
+      "classifications": [
+        "baseline-drift",
+        "current"
+      ],
+      "direct_consumers": [
+        "talos-tools",
+        "talos-tui"
+      ],
+      "disposition": "isolated-proposal",
+      "authorization": "none",
+      "required_next_step": "Inspect actual consumer/API/native/security/MSRV impact; assign existing Story/iteration/claim before Cargo changes.",
+      "validation": "Locked preflight plus consumer-domain and feature-matrix tests; exact-head authorization-specific review.",
+      "rollback": "Revert complete candidate manifests, lock and migrations; assess data compatibility before implementation."
+    },
+    {
+      "name": "glob",
+      "source": [
+        "registry+https://github.com/rust-lang/crates.io-index"
+      ],
+      "current_versions": [
+        "0.3.4"
+      ],
+      "target_versions": [
+        "0.3.4"
+      ],
+      "classifications": [
+        "baseline-drift",
+        "current"
+      ],
+      "direct_consumers": [
+        "talos-permission",
+        "talos-tools"
+      ],
+      "disposition": "isolated-proposal",
+      "authorization": "none",
+      "required_next_step": "Inspect actual consumer/API/native/security/MSRV impact; assign existing Story/iteration/claim before Cargo changes.",
+      "validation": "Locked preflight plus consumer-domain and feature-matrix tests; exact-head authorization-specific review.",
+      "rollback": "Revert complete candidate manifests, lock and migrations; assess data compatibility before implementation."
+    },
+    {
+      "name": "grep-matcher",
+      "source": [
+        "registry+https://github.com/rust-lang/crates.io-index"
+      ],
+      "current_versions": [
+        "0.1.9"
+      ],
+      "target_versions": [
+        "0.1.9"
+      ],
+      "classifications": [
+        "baseline-drift",
+        "current"
+      ],
+      "direct_consumers": [
+        "talos-tools"
+      ],
+      "disposition": "isolated-proposal",
+      "authorization": "none",
+      "required_next_step": "Inspect actual consumer/API/native/security/MSRV impact; assign existing Story/iteration/claim before Cargo changes.",
+      "validation": "Locked preflight plus consumer-domain and feature-matrix tests; exact-head authorization-specific review.",
+      "rollback": "Revert complete candidate manifests, lock and migrations; assess data compatibility before implementation."
+    },
+    {
+      "name": "grep-searcher",
+      "source": [
+        "registry+https://github.com/rust-lang/crates.io-index"
+      ],
+      "current_versions": [
+        "0.1.17"
+      ],
+      "target_versions": [
+        "0.1.17"
+      ],
+      "classifications": [
+        "baseline-drift",
+        "current"
+      ],
+      "direct_consumers": [
+        "talos-tools"
+      ],
+      "disposition": "isolated-proposal",
+      "authorization": "none",
+      "required_next_step": "Inspect actual consumer/API/native/security/MSRV impact; assign existing Story/iteration/claim before Cargo changes.",
+      "validation": "Locked preflight plus consumer-domain and feature-matrix tests; exact-head authorization-specific review.",
+      "rollback": "Revert complete candidate manifests, lock and migrations; assess data compatibility before implementation."
+    },
+    {
+      "name": "ignore",
+      "source": [
+        "registry+https://github.com/rust-lang/crates.io-index"
+      ],
+      "current_versions": [
+        "0.4.33"
+      ],
+      "target_versions": [
+        "0.4.33"
+      ],
+      "classifications": [
+        "baseline-drift",
+        "current"
+      ],
+      "direct_consumers": [
+        "talos-tools"
+      ],
+      "disposition": "isolated-proposal",
+      "authorization": "none",
+      "required_next_step": "Inspect actual consumer/API/native/security/MSRV impact; assign existing Story/iteration/claim before Cargo changes.",
+      "validation": "Locked preflight plus consumer-domain and feature-matrix tests; exact-head authorization-specific review.",
+      "rollback": "Revert complete candidate manifests, lock and migrations; assess data compatibility before implementation."
+    },
+    {
+      "name": "libc",
+      "source": [
+        "registry+https://github.com/rust-lang/crates.io-index"
+      ],
+      "current_versions": [
+        "1.0.0-alpha.3"
+      ],
+      "target_versions": [
+        "0.2.189"
+      ],
+      "classifications": [
+        "prerelease"
+      ],
+      "direct_consumers": [
+        "talos-sandbox",
+        "talos-tools"
+      ],
+      "disposition": "isolated-proposal",
+      "authorization": "none",
+      "required_next_step": "Inspect actual consumer/API/native/security/MSRV impact; assign existing Story/iteration/claim before Cargo changes.",
+      "validation": "Locked preflight plus consumer-domain and feature-matrix tests; exact-head authorization-specific review.",
+      "rollback": "Revert complete candidate manifests, lock and migrations; assess data compatibility before implementation."
+    },
+    {
+      "name": "mermaid-text",
+      "source": [
+        "registry+https://github.com/rust-lang/crates.io-index"
+      ],
+      "current_versions": [
+        "0.57.0"
+      ],
+      "target_versions": [
+        "0.57.0"
+      ],
+      "classifications": [
+        "baseline-drift",
+        "current"
+      ],
+      "direct_consumers": [
+        "talos-tui"
+      ],
+      "disposition": "isolated-proposal",
+      "authorization": "none",
+      "required_next_step": "Inspect actual consumer/API/native/security/MSRV impact; assign existing Story/iteration/claim before Cargo changes.",
+      "validation": "Locked preflight plus consumer-domain and feature-matrix tests; exact-head authorization-specific review.",
+      "rollback": "Revert complete candidate manifests, lock and migrations; assess data compatibility before implementation."
+    },
+    {
+      "name": "regex",
+      "source": [
+        "registry+https://github.com/rust-lang/crates.io-index"
+      ],
+      "current_versions": [
+        "1.13.1"
+      ],
+      "target_versions": [
+        "1.13.1"
+      ],
+      "classifications": [
+        "baseline-drift",
+        "current"
+      ],
+      "direct_consumers": [
+        "talos-tools"
+      ],
+      "disposition": "isolated-proposal",
+      "authorization": "none",
+      "required_next_step": "Inspect actual consumer/API/native/security/MSRV impact; assign existing Story/iteration/claim before Cargo changes.",
+      "validation": "Locked preflight plus consumer-domain and feature-matrix tests; exact-head authorization-specific review.",
+      "rollback": "Revert complete candidate manifests, lock and migrations; assess data compatibility before implementation."
+    },
+    {
+      "name": "rmcp",
+      "source": [
+        "registry+https://github.com/rust-lang/crates.io-index"
+      ],
+      "current_versions": [
+        "3.2.0"
+      ],
+      "target_versions": [
+        "3.2.0"
+      ],
+      "classifications": [
+        "baseline-drift",
+        "current"
+      ],
+      "direct_consumers": [
+        "talos-cli",
+        "talos-mcp"
+      ],
+      "disposition": "isolated-proposal",
+      "authorization": "none",
+      "required_next_step": "Inspect actual consumer/API/native/security/MSRV impact; assign existing Story/iteration/claim before Cargo changes.",
+      "validation": "Locked preflight plus consumer-domain and feature-matrix tests; exact-head authorization-specific review.",
+      "rollback": "Revert complete candidate manifests, lock and migrations; assess data compatibility before implementation."
+    },
+    {
+      "name": "rusqlite",
+      "source": [
+        "registry+https://github.com/rust-lang/crates.io-index"
+      ],
+      "current_versions": [
+        "0.40.2"
+      ],
+      "target_versions": [
+        "0.40.2"
+      ],
+      "classifications": [
+        "baseline-drift",
+        "current"
+      ],
+      "direct_consumers": [
+        "talos-evolution",
+        "talos-exploration",
+        "talos-memory",
+        "talos-models",
+        "talos-session"
+      ],
+      "disposition": "isolated-proposal",
+      "authorization": "none",
+      "required_next_step": "Inspect actual consumer/API/native/security/MSRV impact; assign existing Story/iteration/claim before Cargo changes.",
+      "validation": "Locked preflight plus consumer-domain and feature-matrix tests; exact-head authorization-specific review.",
+      "rollback": "Revert complete candidate manifests, lock and migrations; assess data compatibility before implementation."
+    },
+    {
+      "name": "rust-websearch",
+      "source": [
+        "registry+https://github.com/rust-lang/crates.io-index"
+      ],
+      "current_versions": [
+        "0.1.2"
+      ],
+      "target_versions": [
+        "0.1.2"
+      ],
+      "classifications": [
+        "baseline-drift",
+        "current"
+      ],
+      "direct_consumers": [
+        "talos-tools"
+      ],
+      "disposition": "isolated-proposal",
+      "authorization": "none",
+      "required_next_step": "Inspect actual consumer/API/native/security/MSRV impact; assign existing Story/iteration/claim before Cargo changes.",
+      "validation": "Locked preflight plus consumer-domain and feature-matrix tests; exact-head authorization-specific review.",
+      "rollback": "Revert complete candidate manifests, lock and migrations; assess data compatibility before implementation."
+    },
+    {
+      "name": "schemars",
+      "source": [
+        "registry+https://github.com/rust-lang/crates.io-index"
+      ],
+      "current_versions": [
+        "1.2.2"
+      ],
+      "target_versions": [
+        "1.2.2"
+      ],
+      "classifications": [
+        "baseline-drift",
+        "current"
+      ],
+      "direct_consumers": [
+        "talos-agent",
+        "talos-config",
+        "talos-core",
+        "talos-dashboard",
+        "talos-memory",
+        "talos-permission",
+        "talos-session",
+        "talos-tools"
+      ],
+      "disposition": "isolated-proposal",
+      "authorization": "none",
+      "required_next_step": "Inspect actual consumer/API/native/security/MSRV impact; assign existing Story/iteration/claim before Cargo changes.",
+      "validation": "Locked preflight plus consumer-domain and feature-matrix tests; exact-head authorization-specific review.",
+      "rollback": "Revert complete candidate manifests, lock and migrations; assess data compatibility before implementation."
+    },
+    {
+      "name": "serde_json",
+      "source": [
+        "registry+https://github.com/rust-lang/crates.io-index"
+      ],
+      "current_versions": [
+        "1.0.151"
+      ],
+      "target_versions": [
+        "1.0.151"
+      ],
+      "classifications": [
+        "baseline-drift",
+        "current"
+      ],
+      "direct_consumers": [
+        "talos-agent",
+        "talos-cli",
+        "talos-config",
+        "talos-conversation",
+        "talos-core",
+        "talos-dashboard",
+        "talos-evolution",
+        "talos-exploration",
+        "talos-mcp",
+        "talos-memory",
+        "talos-models",
+        "talos-permission",
+        "talos-plugin",
+        "talos-provider",
+        "talos-rpc",
+        "talos-runtime",
+        "talos-session",
+        "talos-text",
+        "talos-tools",
+        "talos-tui"
+      ],
+      "disposition": "isolated-proposal",
+      "authorization": "none",
+      "required_next_step": "Inspect actual consumer/API/native/security/MSRV impact; assign existing Story/iteration/claim before Cargo changes.",
+      "validation": "Locked preflight plus consumer-domain and feature-matrix tests; exact-head authorization-specific review.",
+      "rollback": "Revert complete candidate manifests, lock and migrations; assess data compatibility before implementation."
+    },
+    {
+      "name": "serde",
+      "source": [
+        "registry+https://github.com/rust-lang/crates.io-index"
+      ],
+      "current_versions": [
+        "1.0.229"
+      ],
+      "target_versions": [
+        "1.0.229"
+      ],
+      "classifications": [
+        "baseline-drift",
+        "current"
+      ],
+      "direct_consumers": [
+        "talos-agent",
+        "talos-cli",
+        "talos-config",
+        "talos-conversation",
+        "talos-core",
+        "talos-dashboard",
+        "talos-evolution",
+        "talos-exploration",
+        "talos-mcp",
+        "talos-memory",
+        "talos-models",
+        "talos-permission",
+        "talos-plugin",
+        "talos-provider",
+        "talos-rpc",
+        "talos-session",
+        "talos-skill",
+        "talos-text",
+        "talos-tools"
+      ],
+      "disposition": "isolated-proposal",
+      "authorization": "none",
+      "required_next_step": "Inspect actual consumer/API/native/security/MSRV impact; assign existing Story/iteration/claim before Cargo changes.",
+      "validation": "Locked preflight plus consumer-domain and feature-matrix tests; exact-head authorization-specific review.",
+      "rollback": "Revert complete candidate manifests, lock and migrations; assess data compatibility before implementation."
+    },
+    {
+      "name": "similar",
+      "source": [
+        "registry+https://github.com/rust-lang/crates.io-index"
+      ],
+      "current_versions": [
+        "3.2.0"
+      ],
+      "target_versions": [
+        "3.2.0"
+      ],
+      "classifications": [
+        "baseline-drift",
+        "current"
+      ],
+      "direct_consumers": [
+        "talos-tools"
+      ],
+      "disposition": "isolated-proposal",
+      "authorization": "none",
+      "required_next_step": "Inspect actual consumer/API/native/security/MSRV impact; assign existing Story/iteration/claim before Cargo changes.",
+      "validation": "Locked preflight plus consumer-domain and feature-matrix tests; exact-head authorization-specific review.",
+      "rollback": "Revert complete candidate manifests, lock and migrations; assess data compatibility before implementation."
+    },
+    {
+      "name": "thiserror",
+      "source": [
+        "registry+https://github.com/rust-lang/crates.io-index"
+      ],
+      "current_versions": [
+        "2.0.20"
+      ],
+      "target_versions": [
+        "2.0.20"
+      ],
+      "classifications": [
+        "baseline-drift",
+        "current"
+      ],
+      "direct_consumers": [
+        "talos-agent",
+        "talos-config",
+        "talos-core",
+        "talos-dashboard",
+        "talos-evolution",
+        "talos-exploration",
+        "talos-mcp",
+        "talos-memory",
+        "talos-models",
+        "talos-permission",
+        "talos-plugin",
+        "talos-provider",
+        "talos-rpc",
+        "talos-runtime",
+        "talos-sandbox",
+        "talos-session",
+        "talos-skill",
+        "talos-tools"
+      ],
+      "disposition": "isolated-proposal",
+      "authorization": "none",
+      "required_next_step": "Inspect actual consumer/API/native/security/MSRV impact; assign existing Story/iteration/claim before Cargo changes.",
+      "validation": "Locked preflight plus consumer-domain and feature-matrix tests; exact-head authorization-specific review.",
+      "rollback": "Revert complete candidate manifests, lock and migrations; assess data compatibility before implementation."
+    },
+    {
+      "name": "tokio-stream",
+      "source": [
+        "registry+https://github.com/rust-lang/crates.io-index"
+      ],
+      "current_versions": [
+        "0.1.19"
+      ],
+      "target_versions": [
+        "0.1.19"
+      ],
+      "classifications": [
+        "baseline-drift",
+        "current"
+      ],
+      "direct_consumers": [
+        "talos-conversation"
+      ],
+      "disposition": "isolated-proposal",
+      "authorization": "none",
+      "required_next_step": "Inspect actual consumer/API/native/security/MSRV impact; assign existing Story/iteration/claim before Cargo changes.",
+      "validation": "Locked preflight plus consumer-domain and feature-matrix tests; exact-head authorization-specific review.",
+      "rollback": "Revert complete candidate manifests, lock and migrations; assess data compatibility before implementation."
+    },
+    {
+      "name": "tokio-util",
+      "source": [
+        "registry+https://github.com/rust-lang/crates.io-index"
+      ],
+      "current_versions": [
+        "0.7.19"
+      ],
+      "target_versions": [
+        "0.7.19"
+      ],
+      "classifications": [
+        "baseline-drift",
+        "current"
+      ],
+      "direct_consumers": [
+        "talos-agent",
+        "talos-cli",
+        "talos-provider",
+        "talos-rpc"
+      ],
+      "disposition": "isolated-proposal",
+      "authorization": "none",
+      "required_next_step": "Inspect actual consumer/API/native/security/MSRV impact; assign existing Story/iteration/claim before Cargo changes.",
+      "validation": "Locked preflight plus consumer-domain and feature-matrix tests; exact-head authorization-specific review.",
+      "rollback": "Revert complete candidate manifests, lock and migrations; assess data compatibility before implementation."
+    },
+    {
+      "name": "tokio",
+      "source": [
+        "registry+https://github.com/rust-lang/crates.io-index"
+      ],
+      "current_versions": [
+        "1.53.1"
+      ],
+      "target_versions": [
+        "1.53.1"
+      ],
+      "classifications": [
+        "baseline-drift",
+        "current"
+      ],
+      "direct_consumers": [
+        "talos-agent",
+        "talos-cli",
+        "talos-conversation",
+        "talos-core",
+        "talos-dashboard",
+        "talos-evolution",
+        "talos-mcp",
+        "talos-plugin",
+        "talos-provider",
+        "talos-rpc",
+        "talos-runtime",
+        "talos-sandbox",
+        "talos-session",
+        "talos-tools",
+        "talos-tui"
+      ],
+      "disposition": "isolated-proposal",
+      "authorization": "none",
+      "required_next_step": "Inspect actual consumer/API/native/security/MSRV impact; assign existing Story/iteration/claim before Cargo changes.",
+      "validation": "Locked preflight plus consumer-domain and feature-matrix tests; exact-head authorization-specific review.",
+      "rollback": "Revert complete candidate manifests, lock and migrations; assess data compatibility before implementation."
+    },
+    {
+      "name": "toml",
+      "source": [
+        "registry+https://github.com/rust-lang/crates.io-index"
+      ],
+      "current_versions": [
+        "1.1.5+spec-1.1.0"
+      ],
+      "target_versions": [
+        "1.1.5+spec-1.1.0"
+      ],
+      "classifications": [
+        "baseline-drift",
+        "current"
+      ],
+      "direct_consumers": [
+        "talos-cli",
+        "talos-config",
+        "talos-plugin",
+        "talos-tools"
+      ],
+      "disposition": "isolated-proposal",
+      "authorization": "none",
+      "required_next_step": "Inspect actual consumer/API/native/security/MSRV impact; assign existing Story/iteration/claim before Cargo changes.",
+      "validation": "Locked preflight plus consumer-domain and feature-matrix tests; exact-head authorization-specific review.",
+      "rollback": "Revert complete candidate manifests, lock and migrations; assess data compatibility before implementation."
+    },
+    {
+      "name": "tui-markdown",
+      "source": [
+        "registry+https://github.com/rust-lang/crates.io-index"
+      ],
+      "current_versions": [
+        "0.3.9"
+      ],
+      "target_versions": [
+        "0.3.9"
+      ],
+      "classifications": [
+        "baseline-drift",
+        "current"
+      ],
+      "direct_consumers": [
+        "talos-tui"
+      ],
+      "disposition": "isolated-proposal",
+      "authorization": "none",
+      "required_next_step": "Inspect actual consumer/API/native/security/MSRV impact; assign existing Story/iteration/claim before Cargo changes.",
+      "validation": "Locked preflight plus consumer-domain and feature-matrix tests; exact-head authorization-specific review.",
+      "rollback": "Revert complete candidate manifests, lock and migrations; assess data compatibility before implementation."
+    },
+    {
+      "name": "uuid",
+      "source": [
+        "registry+https://github.com/rust-lang/crates.io-index"
+      ],
+      "current_versions": [
+        "1.26.0"
+      ],
+      "target_versions": [
+        "1.26.0"
+      ],
+      "classifications": [
+        "baseline-drift",
+        "current"
+      ],
+      "direct_consumers": [
+        "talos-agent",
+        "talos-cli",
+        "talos-conversation",
+        "talos-core",
+        "talos-dashboard",
+        "talos-evolution",
+        "talos-exploration",
+        "talos-memory",
+        "talos-permission",
+        "talos-provider",
+        "talos-session",
+        "talos-tools"
+      ],
+      "disposition": "isolated-proposal",
+      "authorization": "none",
+      "required_next_step": "Inspect actual consumer/API/native/security/MSRV impact; assign existing Story/iteration/claim before Cargo changes.",
+      "validation": "Locked preflight plus consumer-domain and feature-matrix tests; exact-head authorization-specific review.",
+      "rollback": "Revert complete candidate manifests, lock and migrations; assess data compatibility before implementation."
+    },
+    {
+      "name": "wasmtime",
+      "source": [
+        "registry+https://github.com/rust-lang/crates.io-index"
+      ],
+      "current_versions": [
+        "48.0.1"
+      ],
+      "target_versions": [
+        "48.0.1"
+      ],
+      "classifications": [
+        "baseline-drift",
+        "current"
+      ],
+      "direct_consumers": [
+        "talos-plugin"
+      ],
+      "disposition": "isolated-proposal",
+      "authorization": "none",
+      "required_next_step": "Inspect actual consumer/API/native/security/MSRV impact; assign existing Story/iteration/claim before Cargo changes.",
+      "validation": "Locked preflight plus consumer-domain and feature-matrix tests; exact-head authorization-specific review.",
+      "rollback": "Revert complete candidate manifests, lock and migrations; assess data compatibility before implementation."
+    },
+    {
+      "name": "yaml_serde",
+      "source": [
+        "registry+https://github.com/rust-lang/crates.io-index"
+      ],
+      "current_versions": [
+        "0.10.7"
+      ],
+      "target_versions": [
+        "0.10.7"
+      ],
+      "classifications": [
+        "baseline-drift",
+        "current"
+      ],
+      "direct_consumers": [
+        "talos-skill"
+      ],
+      "disposition": "isolated-proposal",
+      "authorization": "none",
+      "required_next_step": "Inspect actual consumer/API/native/security/MSRV impact; assign existing Story/iteration/claim before Cargo changes.",
+      "validation": "Locked preflight plus consumer-domain and feature-matrix tests; exact-head authorization-specific review.",
+      "rollback": "Revert complete candidate manifests, lock and migrations; assess data compatibility before implementation."
+    },
+    {
+      "name": "zstd",
+      "source": [
+        "registry+https://github.com/rust-lang/crates.io-index"
+      ],
+      "current_versions": [
+        "0.14.0"
+      ],
+      "target_versions": [
+        "0.14.0"
+      ],
+      "classifications": [
+        "baseline-drift",
+        "current"
+      ],
+      "direct_consumers": [
+        "talos-config",
+        "talos-session"
+      ],
+      "disposition": "isolated-proposal",
+      "authorization": "none",
+      "required_next_step": "Inspect actual consumer/API/native/security/MSRV impact; assign existing Story/iteration/claim before Cargo changes.",
+      "validation": "Locked preflight plus consumer-domain and feature-matrix tests; exact-head authorization-specific review.",
+      "rollback": "Revert complete candidate manifests, lock and migrations; assess data compatibility before implementation."
+    }
+  ]
+}

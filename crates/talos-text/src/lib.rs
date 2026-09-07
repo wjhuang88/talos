@@ -231,8 +231,14 @@ mod tests {
 
     #[test]
     fn aliases_normalize_to_one_identifier() {
-        assert_eq!(LanguageId::parse("TSX").unwrap().as_str(), "typescript");
-        assert_eq!(LanguageId::parse(".rs").unwrap().as_str(), "rust");
+        assert_eq!(
+            LanguageId::parse("TSX").expect("TSX should parse").as_str(),
+            "typescript"
+        );
+        assert_eq!(
+            LanguageId::parse(".rs").expect(".rs should parse").as_str(),
+            "rust"
+        );
     }
 
     #[test]
@@ -242,13 +248,18 @@ mod tests {
             end: 3,
             capture: "keyword".into(),
         }]);
-        let encoded = serde_json::to_string(&result).unwrap();
+        let encoded = serde_json::to_string(&result).expect("language result should serialize");
         assert!(encoded.contains("keyword"));
     }
 
     #[test]
     fn language_ids_trim_extensions_and_reject_empty_values() {
-        assert_eq!(LanguageId::parse(" .PY ").unwrap().as_str(), "python");
+        assert_eq!(
+            LanguageId::parse(" .PY ")
+                .expect(".PY should parse")
+                .as_str(),
+            "python"
+        );
         assert!(LanguageId::parse("   ").is_none());
     }
 }

@@ -852,19 +852,22 @@ mod tests {
     }
 
     #[test]
-    fn direct_file_symbol_listing_retains_unbounded_read_contract() {
+    fn direct_file_symbol_listing_bypasses_traversal_cap_but_retains_parser_budget() {
         let workspace = tempfile::tempdir().expect("tempdir should be created");
         let path = workspace.path().join("large.rs");
-        let mut source = String::from("fn needle() {}\n");
+        let mut source = format!(
+            "fn needle() {{ {} 0; {} }}\n",
+            "{".repeat(150),
+            "}".repeat(150)
+        );
         source.push_str(&" ".repeat(MAX_FILE_BYTES));
         fs::write(&path, source).expect("large direct-file fixture should be writable");
 
-        let listed = list_symbols_in_path(&path, None).expect("direct listing should succeed");
-        assert!(!listed.is_empty());
+        let error = list_symbols_in_path(&path, None)
+            .expect_err("parser budget should reject adversarial nesting");
         assert!(
-            listed
-                .iter()
-                .all(|item| matches!(item, TraversalOutput::Result(_)))
+            error == "parse budget exceeded" || error == "parse failed",
+            "unexpected parser failure: {error}"
         );
     }
 }

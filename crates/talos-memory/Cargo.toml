@@ -9,16 +9,16 @@ homepage.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-rusqlite = { version = "0.40", features = ["bundled"] }
-thiserror = "2"
+rusqlite = { version = "0.40.2", features = ["bundled"] }
+thiserror = "2.0.20"
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde_json = "1.0.151"
 tracing = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
 sha2 = "0.11"
 hex = "0.4"
-uuid = { version = "1", features = ["v4"] }
-schemars = "1.2.1"
+uuid = { version = "1.26.0", features = ["v4"] }
+schemars = "1.2.2"
 
 [dev-dependencies]
 tempfile = "3"

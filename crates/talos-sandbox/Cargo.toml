@@ -10,9 +10,9 @@ rust-version.workspace = true
 
 [dependencies]
 talos-core = { version = "0.9.0", path = "../talos-core" }
-async-trait = "0.1"
-thiserror = "2"
-tokio = { version = "1", features = ["process", "time"] }
+async-trait = "0.1.92"
+thiserror = "2.0.20"
+tokio = { version = "1.53.1", features = ["process", "time"] }
 
 [target.'cfg(unix)'.dependencies]
 libc = "1.0.0-alpha.3"
@@ -21,7 +21,7 @@ libc = "1.0.0-alpha.3"
 tempfile = "3"
 
 [dev-dependencies]
-tokio = { version = "1", features = ["macros", "rt", "time"] }
+tokio = { version = "1.53.1", features = ["macros", "rt", "time"] }
 tempfile = "3"
 
 [lints]
