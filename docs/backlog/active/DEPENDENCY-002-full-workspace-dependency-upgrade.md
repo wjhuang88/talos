@@ -1,11 +1,13 @@
 # DEPENDENCY-002: Full Workspace Dependency Upgrade
 
+> Document status: Active (proposed; ineffective until governance merge)
+
 | Field | Value |
 |---|---|
 | Story ID | DEPENDENCY-002 |
 | Type | Dependency Upgrade Story |
 | Priority | P0 |
-| Status | Planned / Unclaimed |
+| Status | In Progress / Claimed |
 | Source | [GitHub Issue #474](https://github.com/wjhuang88/talos/issues/474) |
 | Selected Iteration | I250 |
 | Depends On | I248 complete; fresh dependency audit and candidate handoff |
@@ -14,18 +16,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-6 mainline governance session |
 | Work Slice | Full workspace dependency-version upgrade; every I248 identity row must be upgraded or explicitly dispositioned |
-| Claimed At | Not applicable |
+| Claimed At | 2026-09-07 |
 | Source Issue | #474 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | No Cargo manifest/lock mutation is authorized before an effective I250 claim |
+| Governance Claim PR | #500 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Proposed atomic I250 claim/activation; effective only after #500 merges |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-07 |
-| Handoff / Release Condition | Select and activate I250 after fresh inventory and candidate review |
+| Handoff / Release Condition | #500 merge; begin implementation only from merged claim or later main |
 
 ## Scope And Definition Of Done
 
