@@ -16,7 +16,7 @@
 | Work Slice | Full workspace dependency-version upgrade from I248 live audit: compatible batches plus isolated major/pre-1.0/native/runtime candidates; no unrelated product work |
 | Claimed At | Not applicable |
 | Source Issue | #474 |
-| Governance Claim PR | Not applicable |
+| Governance Claim PR | Pending |
 | Authorization Mode | Not applicable |
 | Authorization Evidence | Not applicable; Cargo manifest/lock edits are unauthorized until an effective claim reaches main |
 | Implementation PR | Not started |
@@ -80,6 +80,50 @@
 | 2026-09-07 | Planning | Created after I248/#497 completed. I249's one-package published baseline remains unchanged and is not widened; no Cargo change is authorized before I250 claim activation. |
 
 ## Verification Evidence
+
+### 2026-09-07 Claim Preparation And Serial Execution Contract
+
+Inventory base: `a7d168ee4c00b3788e50b72d606cd52257ed46ad`. I248 is Review on that
+base and closes in this proposal using previously merged #497/#498 evidence. I249 remains
+Planned/Unclaimed and is explicitly deferred; its one-package baseline is unchanged. I250 is the
+selected next iteration. I164 remains Paused/superseded by I165. No other current iteration header
+declares Active, Review, Planned or Blocked; legacy files without current status and historical
+superseded shells confer no authority. No open PR exists at preparation. The detached
+`talos-i474-upgrade` experiment and divergent local main are not accepted implementation.
+
+This proposal covers the full outcome. Execute serially, with independently revertible commits
+and separately reviewable stable candidates for these surfaces:
+
+| Slice | Scope | Additional validation |
+|---|---|---|
+| Compatible utility/runtime batch | Fresh-audit compatible candidates, excluding native and persistence changes below | Full workspace and all-feature checks/tests, minimal/default tools/runtime feature matrices, provider cancellation/streaming and permission regression tests |
+| Native parser | arborium and its parser graph | talos-text parser/rendering fixtures, panic/containment review |
+| SQLite | rusqlite and libsqlite3-sys | consumer validator policy, storage restart/migration/failure tests; preserve bundled configuration |
+| MCP | rmcp across CLI/MCP manifests | client/server/transport fixtures, public API assessment and protocol interoperability |
+| WASM | wasmtime and graph | wasm-enabled plugin load/trap/resource limits/cancellation tests; enforce MSRV |
+| Git | gix across tools/TUI | repository status/diff/revision/worktree fixtures and default-feature comparison |
+| Rendering | mermaid-text and tui-markdown | snapshots and terminal acceptance if visible behavior changes |
+| Encoding | base64 | provider image/request encoding fixtures |
+| Compression | zstd across config/session | read old compressed data, roundtrip/restart/error tests |
+| Directory discovery | dirs | home/config-path compatibility tests on supported platforms |
+| OS ABI | libc stable/prerelease decision | inspect all consumers and ADR-007 boundaries; mandatory independent security review and platform checks |
+
+Refresh targets before each slice; the 56 names/67 identities are the starting inventory, not a
+cap excluding newly discovered identities. Record every final disposition. Large version changes
+are attempted and independently validated; compiler failures are investigated, not automatically
+converted into exceptions. Preserve workspace MSRV 1.95 separately from pinned compiler 1.97.0;
+any required public Talos API or MSRV policy change needs an accepted decision before landing.
+Do not use `--ignore-rust-version` as acceptance evidence. Keep workspace membership, default
+members, default features, and normal run/build selection unchanged.
+
+Allowed production files after claim merge: root/member Cargo manifests and lockfile, affected
+dependency consumer code/tests required for migration, existing dependency-sensitive validators,
+and directly related migration/baseline docs. No unrelated feature work, centralization, release
+or publication. Each candidate records its changed-file inventory and dependency rationale.
+Permission/sandbox/process-hardening changes require independent security review before merge;
+all slices require fresh CI and applicable independent API/domain review. The final baseline is
+generated only from merged validated dependency state. Source-only rollback is insufficient for
+data-format changes unless old-reader compatibility is proven.
 
 - Pending I250 claim, fresh audit and local convergence.
 

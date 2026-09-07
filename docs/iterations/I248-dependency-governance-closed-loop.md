@@ -1,6 +1,6 @@
 # Iteration I248: Dependency Governance Closed Loop
 
-> Document status: Review
+> Document status: Complete / Closed
 > Published plan date: 2026-09-06
 > Planned objective: Deliver the complete #474 dependency baseline, audit, SOP, and live handoff loop.
 > Baseline rule: preserve this scope; a different outcome requires a new iteration.
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 mainline governance session |
 | Work Slice | Full #474 governance mechanism: baseline, cross-platform audit, SOP, live handoff; no dependency upgrade |
@@ -21,7 +21,7 @@
 | Authorization Evidence | Claim PR #496 merged as `7c3f6421a073aad62e6a4aaf8f6e1c7df9a674bd`; claim effective. This records the actual merge, not missing historical CAS/review evidence. Implementation requires its own stable-candidate gates. |
 | Implementation PR | #497; acceptance follow-up #498 |
 | Last Updated | 2026-09-07 |
-| Handoff / Release Condition | Complete platform audit acceptance in #498 before closeout; full dependency-version upgrade remains separately governed |
+| Handoff / Release Condition | Platform acceptance passed in #498; full dependency upgrade remains under I250 |
 
 ## Published Baseline
 
@@ -220,10 +220,24 @@ version lookup is not an advisory clearance. The full upgrade remains under plan
 
 - Completion Commit: `dbd847ec5092d8097d985582c3289692745cf681`
 
+### 2026-09-07 Final Acceptance And Closeout
+
+This checkpoint supersedes the pending acceptance statements above without rewriting them.
+PR #498 merged as `a7d168ee4c00b3788e50b72d606cd52257ed46ad` after CI `34074942674`
+passed all five jobs at `5d2e444308d395171e821d103b35d4ce28756b88`, including native Windows
+PowerShell fixture/workspace audit and Unix Bash/PowerShell parity. Independent Agent-role review
+`5564114577` approved that head against base `7b4e21ce`; merge-time CAS confirmed unchanged
+head/base, green checks and no overlapping open PR. Local release preflight exited 0.
+
+Completion Commit: `dbd847ec5092d8097d985582c3289692745cf681`, `5d2e444308d395171e821d103b35d4ce28756b88`.
+Both predate this status change and are ancestors of target main. All mechanism acceptance rows
+are now satisfied; unknown advisory signals remain explicit, and full dependency upgrades are
+still required under I250 before the expanded #474 task can close.
+
 ## Variance And Residuals
 
 - I247 local branch is rejected evidence and remains preserved for audit only.
 
 ## Retrospective
 
-- Outcome: Mechanism merged; Windows audit acceptance remains in Review. Full upgrade remains planned under I250.
+- Outcome: Mechanism and native Windows acceptance complete. Full upgrade remains under I250.
