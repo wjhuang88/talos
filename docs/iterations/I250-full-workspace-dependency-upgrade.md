@@ -153,9 +153,10 @@ bash scripts/dependency_audit.sh --live --baseline docs/reference/dependency-bas
 The registry was queried successfully. Evidence is preserved in
 `docs/reference/dependency-audit-2026-09-07.json`, the provenance-wrapped observation in
 `docs/reference/dependency-observation-2026-09-07.json`, and the generated candidate grouping in
-`docs/reference/dependency-upgrade-candidates-2026-09-07.json`. The report contains 67 identity
-rows and the candidate generator emits 34 name/source groups (duplicate identities remain
-visible). The source timestamp is `2026-09-07T09:57:18Z`.
+`docs/reference/dependency-upgrade-candidates-2026-09-07.json`. The refreshed report contains 71
+identity rows and the candidate generator emits 34 name/source groups (duplicate requirements,
+kinds and identities remain visible). The 67-row value above is the accepted starting baseline,
+not the refreshed observation. The source timestamp is `2026-09-07T09:57:18Z`.
 
 The local candidate updates direct workspace declarations and `Cargo.lock` for the following
 validated groups: `anyhow 1.0.104`, `arborium 2.18.2`, `async-trait 0.1.92`, `base64 0.23.1`,
