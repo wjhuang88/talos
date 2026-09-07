@@ -1,6 +1,6 @@
 # Iteration I248: Dependency Governance Closed Loop
 
-> Document status: Complete / Closed
+> Document status: Review
 > Published plan date: 2026-09-06
 > Planned objective: Deliver the complete #474 dependency baseline, audit, SOP, and live handoff loop.
 > Baseline rule: preserve this scope; a different outcome requires a new iteration.
@@ -19,9 +19,9 @@
 | Governance Claim PR | #496 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Claim PR #496 merged as `7c3f6421a073aad62e6a4aaf8f6e1c7df9a674bd`; claim effective. This records the actual merge, not missing historical CAS/review evidence. Implementation requires its own stable-candidate gates. |
-| Implementation PR | #497 |
+| Implementation PR | #497; acceptance follow-up #498 |
 | Last Updated | 2026-09-07 |
-| Handoff / Release Condition | Closed after #497 merge; full dependency-version upgrade remains separately governed |
+| Handoff / Release Condition | Complete platform audit acceptance in #498 before closeout; full dependency-version upgrade remains separately governed |
 
 ## Published Baseline
 
@@ -198,6 +198,26 @@ full live audit and generated candidate handoff, supported-platform evidence, sc
 final local preflight and stable-candidate review/CI/merge/closeout. Security/deprecation signals
 currently remain explicitly unknown; registry version lookup is not an advisory audit.
 
+### 2026-09-07 Acceptance Audit — Supersedes Earlier Completion Proposal
+
+The preceding dated local checkpoint is preserved as historical evidence. The completion proposal
+in this branch was premature: #497's Windows Rust job did not execute the dependency audit scripts.
+I248 remains Review/Claimed until its PowerShell frontend has passed on Windows. #498 is the
+in-scope acceptance follow-up under the existing #496 claim and collaboration SOP reviewer-follow-up
+rule. No new dependency-version authority is established by this correction.
+
+| Required result | Evidence and current disposition |
+|---|---|
+| Accepted baseline | `docs/reference/dependency-baseline.json`: 67 identities, source `ce3d4cb948f0f5f1a346f87630bad282a03a1704`, acceptance time and CI `33979958221`; Cargo/crates/toolchain diff to #497 merge is empty |
+| Live handoff | `dependency-audit-2026-09-06.json` records source `7c3f6421`, command, observation date and all 67 rows; `dependency-upgrade-candidates-2026-09-06.json` contains 34 proposals; neither advances the baseline |
+| Schema, errors and parity | `scripts/test_dependency_audit.sh` exercises actual Bash/PowerShell entrypoints, JSON/table/Markdown, malformed metadata, registry failures, snapshots and candidate grouping; #497 independent review `5563452959` records passing local execution |
+| Workspace validation | #497 CI `34043207621` passed Unix preflight and Windows Rust checks at `dbd847ec`; this proves Rust compatibility but not Windows audit execution |
+| Windows audit acceptance | Pending #498 native PowerShell frontend fixture and workspace collection checks; must record successful run/head before Complete |
+| Independent review and merge | #497 review `5563452959`, merge `7b4e21ce`; #498 requires fresh review after correcting finding `5563583120` |
+
+Deprecated/security signals remain unknown as required by the audit contract; ordinary registry
+version lookup is not an advisory clearance. The full upgrade remains under planned I250.
+
 - Completion Commit: `dbd847ec5092d8097d985582c3289692745cf681`
 
 ## Variance And Residuals
@@ -206,4 +226,4 @@ currently remain explicitly unknown; registry version lookup is not an advisory 
 
 ## Retrospective
 
-- Outcome: Complete governance loop delivered. Full dependency upgrade remains the next governed outcome under I250.
+- Outcome: Mechanism merged; Windows audit acceptance remains in Review. Full upgrade remains planned under I250.

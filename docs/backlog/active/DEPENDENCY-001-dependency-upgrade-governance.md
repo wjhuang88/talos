@@ -5,7 +5,7 @@
 | Story ID | DEPENDENCY-001 |
 | Type | Technical Governance Story |
 | Priority | P1 |
-| Status | Complete / Closed |
+| Status | Review / Claimed |
 | Source | [GitHub Issue #474](https://github.com/wjhuang88/talos/issues/474) |
 | Selected Iteration | I248 |
 | Depends On | Existing release, testing, and collaboration SOPs |
@@ -23,9 +23,9 @@
 | Governance Claim PR | #496 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | #496 merged as `7c3f6421a073aad62e6a4aaf8f6e1c7df9a674bd`; claim effective. Actual merge is not a substitute for missing historical CAS/review evidence or new implementation gates. |
-| Implementation PR | #497 |
+| Implementation PR | #497; acceptance follow-up #498 |
 | Last Updated | 2026-09-06 |
-| Handoff / Release Condition | Closed after #497 merge `7b4e21ce`; full dependency-version upgrade is separately owned by DEPENDENCY-002 / I250. |
+| Handoff / Release Condition | #497 merged; native Windows audit acceptance in #498 remains required before closing I248. Full upgrade is separately owned by DEPENDENCY-002 / I250. |
 | Completion Commit | `dbd847ec5092d8097d985582c3289692745cf681` |
 
 ## Scope
@@ -69,8 +69,8 @@ See [I248](../../iterations/I248-dependency-governance-closed-loop.md).
 Current scope clarification (2026-09-06): the user's full-upgrade request is a long-task outcome
 beyond the mechanism, not satisfied by I249's one-package pilot. Preserve I249's published baseline;
 the fresh full audit must feed a full-upgrade owner and appropriately isolated slices before Cargo
-changes. I248 is Complete/Closed with Completion Commit `dbd847ec5092d8097d985582c3289692745cf681`;
-no dependency upgrade was claimed here. The full-upgrade outcome is now planned as I250.
+changes. I248 is Review/Claimed with merged implementation `dbd847ec5092d8097d985582c3289692745cf681`;
+native Windows audit acceptance remains pending in #498. The full-upgrade outcome is planned as I250.
 
 Read #474 in full, I248, the recovery ledger, root and member Cargo manifests, Cargo.lock,
 rust-toolchain.toml and REQUIREMENT-INTAKE, START-ITERATION, ITERATION-WORKFLOW,

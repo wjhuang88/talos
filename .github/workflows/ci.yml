@@ -143,6 +143,10 @@ jobs:
         if: needs.classify-changes.result != 'success' || needs.classify-changes.outputs.full_validation != 'false'
         run: ./scripts/release_preflight.sh
 
+      - name: Dependency audit parity (offline)
+        if: needs.classify-changes.result != 'success' || needs.classify-changes.outputs.full_validation != 'false'
+        run: bash scripts/test_dependency_audit.sh
+
   windows-rust:
     name: Windows Rust workspace
     needs: classify-changes
@@ -235,6 +239,10 @@ jobs:
       - name: Validate project governance
         shell: pwsh
         run: ./scripts/validate_project_governance.ps1 .
+
+      - name: Native PowerShell dependency audit (offline)
+        shell: pwsh
+        run: ./scripts/test_dependency_windows.ps1 -Workspace
 
       - name: Validate collaboration claims
         shell: bash

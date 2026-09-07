@@ -64,7 +64,7 @@ risk_gates:
 migration:
   legacy_assets: []
   next_actions:
-    - "I248/#474 dependency governance is Complete/Closed via implementation PR #497 merge `7b4e21ce` (source evidence `dbd847ec`, exact-head CI `34043207621`, independent review `5563452959`). It delivered the 67-row baseline, live observation, candidate handoff and SOP; user-requested full dependency upgrade remains separately governed by planned/unclaimed I250 and is not yet authorized."
+    - "I248/#474 is Review/Claimed: implementation #497 merged as `7b4e21ce` (source `dbd847ec`, CI `34043207621`, review `5563452959`); #498 adds missing native Windows audit acceptance and permanent offline CI tests. Full dependency upgrade remains planned/unclaimed under DEPENDENCY-002/I250."
     - "WORK-001 is Complete/Closed across P0-P4: P1 I237 Completion Commit `f2b0b5c7`; P2 I238 `209931e5`; P3 I239 `2ff8b9f4`; P4 WORK-001-E/I240 Completion Commit `29fb900e`, PR #451 merge `2d667085`, final exact-head CI `33412796197` and independent Agent-role review `5481320406`. Desktop, Dashboard, durable Mission/session storage and multi-client attachment remain separately governed."
     - "Use Deferred Human Validation Mode only when the long-task startup/change record links a validation Issue and cleanup iteration; keep source owners Review, preserve exact implementation heads, never defer AGENTS.md security-review gates, and resolve every required row before long-task completion"
     - "Keep I222/TOOL-024-B, I224/TOOL-024-C, I225/TOOL-024-D1-A, I226/D1-B, I228/D2 and I223/Issue #378 Complete/Closed through their recorded implementation/evidence merges; PERM-006-D/E and `/auto` remain separately governed"

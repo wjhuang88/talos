@@ -1,6 +1,6 @@
 # #474 Dependency Governance Recovery And Delivery
 
-Status: Refinement / Unclaimed. This is the recovery ledger, not an effective implementation claim.
+Status: I248 Review / Claimed; I250 Planned / Unclaimed. Recovery ledger; claims live in the iteration owners.
 Requirement owner: [DEPENDENCY-001](../backlog/active/DEPENDENCY-001-dependency-upgrade-governance.md).
 
 ## Verified Checkpoint — 2026-09-06
@@ -97,3 +97,14 @@ after execution, not inferred from the presence of a script or a tool output wit
 The complete remaining #474 requirement stays owned by DEPENDENCY-001; this ledger is not a
 parallel dependency task database. Unrelated branch cleanup and historical owner drift are outside
 this correction and must not be used to block a valid future non-overlapping candidate.
+
+## 2026-09-07 Resume Checkpoint
+
+#497 merged as `7b4e21ce`; #498 supplies the Windows audit evidence missed by the original
+implementation CI. I248 remains Review until that acceptance passes. The full-upgrade request
+is owned by DEPENDENCY-002/I250, currently Planned/Unclaimed; I249's one-package published baseline
+is preserved and is not the full-upgrade deliverable. Next: finish #498 local tests and native
+Windows CI, obtain fresh independent review, then combine truthful I248 closeout with the next
+ready upgrade claim where the collaboration SOP permits. Keep Issue #474 open through full upgrade.
+The local `main` branch has divergent historical governance commits; use verified `origin/main`
+as the source for new branches and never push the divergent local branch to main.
