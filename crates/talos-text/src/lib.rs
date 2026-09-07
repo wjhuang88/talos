@@ -231,8 +231,14 @@ mod tests {
 
     #[test]
     fn aliases_normalize_to_one_identifier() {
-        assert_eq!(LanguageId::parse("TSX").expect("TSX should parse").as_str(), "typescript");
-        assert_eq!(LanguageId::parse(".rs").expect(".rs should parse").as_str(), "rust");
+        assert_eq!(
+            LanguageId::parse("TSX").expect("TSX should parse").as_str(),
+            "typescript"
+        );
+        assert_eq!(
+            LanguageId::parse(".rs").expect(".rs should parse").as_str(),
+            "rust"
+        );
     }
 
     #[test]
@@ -248,7 +254,12 @@ mod tests {
 
     #[test]
     fn language_ids_trim_extensions_and_reject_empty_values() {
-        assert_eq!(LanguageId::parse(" .PY ").expect(".PY should parse").as_str(), "python");
+        assert_eq!(
+            LanguageId::parse(" .PY ")
+                .expect(".PY should parse")
+                .as_str(),
+            "python"
+        );
         assert!(LanguageId::parse("   ").is_none());
     }
 }
