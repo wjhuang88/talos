@@ -9,15 +9,15 @@ homepage.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-glob = "0.3"
-schemars = { version = "1.2.1", features = ["uuid1"] }
+glob = "0.3.4"
+schemars = { version = "1.2.2", features = ["uuid1"] }
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde_json = "1.0.151"
 sha2 = "0.11"
 talos-core = { version = "0.9.0", path = "../talos-core" }
-thiserror = "2"
+thiserror = "2.0.20"
 url = "2"
-uuid = { version = "1", features = ["serde", "v4"] }
+uuid = { version = "1.26.0", features = ["serde", "v4"] }
 
 [dev-dependencies]
 tempfile = "3"

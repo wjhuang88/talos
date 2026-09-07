@@ -6,8 +6,8 @@ use std::sync::Arc;
 use rmcp::ErrorData as McpError;
 use rmcp::ServerHandler;
 use rmcp::model::{
-    CallToolRequestParams, CallToolResult, Content, ErrorCode, ListToolsResult,
-    PaginatedRequestParams, ServerCapabilities, ServerInfo, Tool, ToolAnnotations,
+    CallToolRequestParams, CallToolResponse, CallToolResult, ContentBlock, ErrorCode,
+    ListToolsResult, PaginatedRequestParams, ServerCapabilities, ServerInfo, Tool, ToolAnnotations,
 };
 use talos_core::tool::ToolRegistry;
 use talos_plugin::{HookContext, TurnId};
@@ -65,7 +65,7 @@ impl ServerHandler for TalosMcpHandler {
         &self,
         request: CallToolRequestParams,
         _context: rmcp::service::RequestContext<rmcp::RoleServer>,
-    ) -> Result<CallToolResult, McpError> {
+    ) -> Result<CallToolResponse, McpError> {
         let hook_context = HookContext::new(TurnId::new(), std::path::PathBuf::from("."));
         let Some(tool) = self.tool_registry.get(request.name.as_ref()) else {
             return Err(McpError::new(
@@ -108,11 +108,11 @@ impl ServerHandler for TalosMcpHandler {
             .await
             .result;
 
-        let content = vec![Content::text(result.content)];
+        let content = vec![ContentBlock::text(result.content)];
         if result.is_error {
-            Ok(CallToolResult::error(content))
+            Ok(CallToolResponse::Complete(CallToolResult::error(content)))
         } else {
-            Ok(CallToolResult::success(content))
+            Ok(CallToolResponse::Complete(CallToolResult::success(content)))
         }
     }
 }

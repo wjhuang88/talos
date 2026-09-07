@@ -19,7 +19,7 @@
 | Governance Claim PR | #500 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Atomic claim/activation merged in #500; merge commit `ea9a4c37c129c2eb77825191b9e86baced4c91d4`; implementation authority effective from that commit |
-| Implementation PR | Not started |
+| Implementation PR | Not started (local convergence) |
 | Last Updated | 2026-09-07 |
 | Handoff / Release Condition | Claim active after #500 merge; implementation starts from `ea9a4c37` or later main after local inventory |
 
@@ -80,6 +80,7 @@
 | 2026-09-07 | Planning | Created after I248/#497 completed. I249's one-package published baseline remains unchanged and is not widened; no Cargo change is authorized before I250 claim activation. |
 | 2026-09-07 | Claim proposal | #500 proposes atomic I250 Active/Claimed activation. The proposal is ineffective until merged; no Cargo changes are included. |
 | 2026-09-07 | Activation | #500 merged as `ea9a4c37c129c2eb77825191b9e86baced4c91d4` into `origin/main`; I250 claim and Active state are effective. Implementation starts from this merge or later main. |
+| 2026-09-07 | Implementation | Fresh live audit queried crates.io from implementation head `16f0f6d2027356912697401076857b37124964f0`; 34 candidate groups generated. Local dependency candidate is converging; no implementation PR has been pushed. |
 
 ## Verification Evidence
 
@@ -134,11 +135,48 @@ all slices require fresh CI and applicable independent API/domain review. The fi
 generated only from merged validated dependency state. Source-only rollback is insufficient for
 data-format changes unless old-reader compatibility is proven.
 
-- Active I250 claim; pending fresh audit and local convergence.
+- Active I250 claim; local dependency candidate is converging from fresh audit source `16f0f6d2027356912697401076857b37124964f0` (observed `2026-09-07T09:42:13Z`).
 
 ## Completion Evidence
 
 - Completion Commit: pending
+
+## 2026-09-07 Fresh Audit And Local Upgrade Candidate
+
+The live audit was run after claim activation against implementation head
+`16f0f6d2027356912697401076857b37124964f0`:
+
+```text
+bash scripts/dependency_audit.sh --live --baseline docs/reference/dependency-baseline.json --format json
+```
+
+The registry was queried successfully. Evidence is preserved in
+`docs/reference/dependency-audit-2026-09-07.json`, the provenance-wrapped observation in
+`docs/reference/dependency-observation-2026-09-07.json`, and the generated candidate grouping in
+`docs/reference/dependency-upgrade-candidates-2026-09-07.json`. The report contains 67 identity
+rows and the candidate generator emits 34 name/source groups (duplicate identities remain
+visible). The source timestamp is `2026-09-07T09:42:13Z`.
+
+The local candidate updates direct workspace declarations and `Cargo.lock` for the following
+validated groups: `anyhow 1.0.104`, `arborium 2.18.2`, `async-trait 0.1.92`, `base64 0.23.1`,
+`clap 4.6.6`, `dirs 7.0.0`, `futures 0.3.34` family, `gix 0.87.1`, `glob 0.3.4`,
+`grep-matcher 0.1.9`, `grep-searcher 0.1.17`, `ignore 0.4.33`, `mermaid-text 0.57.0`,
+`regex 1.13.1`, `rmcp 3.2.0`, `rusqlite 0.40.2`, `rust-websearch 0.1.2`, `schemars 1.2.2`,
+`serde 1.0.229`, `serde_json 1.0.151`, `similar 3.2.0`, `thiserror 2.0.20`,
+`tokio 1.53.1`, `tokio-stream 0.1.19`, `tokio-util 0.7.19`, `toml 1.1.5`,
+`tui-markdown 0.3.9`, `uuid 1.26.0`, `wasmtime 48.0.1`, `yaml_serde 0.10.7`, and
+`zstd 0.14.0`. Existing broad requirements whose lock resolution is unchanged are retained only
+where no consumer-facing migration is needed; the lockfile is the exact resolution authority.
+
+| Identity / group | Final disposition | Evidence or follow-up |
+|---|---|---|
+| 33 groups listed above | Upgraded | Direct declaration and/or locked resolution updated; workspace all-feature check passed. |
+| `libc` (`1.0.0-alpha.3` → stable `0.2.189`) | Exception / blocked | The alpha API is used at the OS-ABI boundary under ADR-007; changing major API semantics requires a dedicated compatibility and security review. Revisit when an owner accepts that migration contract. |
+| Registry/security/deprecation signals | Exception / unknown | crates.io version API does not provide advisory clearance; retain `unknown` rather than infer safety. |
+
+The remaining verification is full locked test/clippy/preflight, feature/default behavior comparison,
+and exact-head review. This section is execution evidence, not completion evidence; the owner stays
+`Review / Claimed` until the candidate is merged and the accepted baseline advances.
 
 ## Variance And Residuals
 
