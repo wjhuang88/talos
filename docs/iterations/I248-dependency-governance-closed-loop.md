@@ -1,6 +1,6 @@
 # Iteration I248: Dependency Governance Closed Loop
 
-> Document status: Active
+> Document status: Complete / Closed
 > Published plan date: 2026-09-06
 > Planned objective: Deliver the complete #474 dependency baseline, audit, SOP, and live handoff loop.
 > Baseline rule: preserve this scope; a different outcome requires a new iteration.
@@ -19,9 +19,9 @@
 | Governance Claim PR | #496 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Claim PR #496 merged as `7c3f6421a073aad62e6a4aaf8f6e1c7df9a674bd`; claim effective. This records the actual merge, not missing historical CAS/review evidence. Implementation requires its own stable-candidate gates. |
-| Implementation PR | Not started |
-| Last Updated | 2026-09-06 |
-| Handoff / Release Condition | #496 merged as `7c3f6421`; local convergence and one stable candidate |
+| Implementation PR | #497 |
+| Last Updated | 2026-09-07 |
+| Handoff / Release Condition | Closed after #497 merge; full dependency-version upgrade remains separately governed |
 
 ## Published Baseline
 
@@ -71,6 +71,7 @@
 |---|---|---|
 | 2026-09-06 | Planning | I248 replaces the invalidly widened local I247 attempt; claim remains ineffective until target-main merge. |
 | 2026-09-06 | Activation | #496 merged as `7c3f6421`; claim and Active state are effective on target main. |
+| 2026-09-07 | Completion | Implementation PR #497 merged as `7b4e21ce6514cc4ce7e79e0a2b2491ffe497be27`; source implementation head `dbd847ec5092d8097d985582c3289692745cf681`, exact-head CI `34043207621`, and independent review `5563452959` were bound before merge. The governance mechanism is complete; the requested full dependency upgrade is owned by a separate iteration. |
 
 ## Verification Evidence
 
@@ -197,7 +198,7 @@ full live audit and generated candidate handoff, supported-platform evidence, sc
 final local preflight and stable-candidate review/CI/merge/closeout. Security/deprecation signals
 currently remain explicitly unknown; registry version lookup is not an advisory audit.
 
-- Completion Commit: pending
+- Completion Commit: `dbd847ec5092d8097d985582c3289692745cf681`
 
 ## Variance And Residuals
 
@@ -205,4 +206,4 @@ currently remain explicitly unknown; registry version lookup is not an advisory 
 
 ## Retrospective
 
-- Outcome: pending
+- Outcome: Complete governance loop delivered. Full dependency upgrade remains the next governed outcome under I250.
