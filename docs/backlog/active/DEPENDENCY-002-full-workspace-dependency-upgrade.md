@@ -1,13 +1,13 @@
 # DEPENDENCY-002: Full Workspace Dependency Upgrade
 
-> Document status: Active
+> Document status: Review
 
 | Field | Value |
 |---|---|
 | Story ID | DEPENDENCY-002 |
 | Type | Dependency Upgrade Story |
 | Priority | P0 |
-| Status | In Progress / Claimed |
+| Status | Review / Claimed |
 | Source | [GitHub Issue #474](https://github.com/wjhuang88/talos/issues/474) |
 | Selected Iteration | I250 |
 | Depends On | I248 complete; fresh dependency audit and candidate handoff |
@@ -25,9 +25,9 @@
 | Governance Claim PR | #500 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | #500 merged as `ea9a4c37c129c2eb77825191b9e86baced4c91d4`; claim and activation effective |
-| Implementation PR | Not started (local convergence) |
+| Implementation PR | #501 |
 | Last Updated | 2026-09-07 |
-| Handoff / Release Condition | Claim active; begin implementation from `ea9a4c37` or later main |
+| Handoff / Release Condition | #501 awaits final independent review and merge-time CAS, then accepted-baseline advancement and owner-first closeout |
 
 ## Scope And Definition Of Done
 

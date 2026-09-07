@@ -1,6 +1,6 @@
 # #474 Dependency Governance Recovery And Delivery
 
-Status: I248 Complete / Closed; I250 Active / Claimed after #500 merge `ea9a4c37`. Recovery ledger; claims live in the iteration owners.
+Status: I248 Complete / Closed; I250 Review / Claimed after #500 merge `ea9a4c37`. Recovery ledger; claims live in the iteration owners.
 Requirement owner: [DEPENDENCY-001](../backlog/active/DEPENDENCY-001-dependency-upgrade-governance.md).
 
 ## Verified Checkpoint — 2026-09-06
@@ -135,3 +135,12 @@ I249 remains unselected and #499 / RUNTIME-007 remains independent and excluded.
 default features, workspace membership and normal `cargo run`/`cargo build` behavior; do not
 close #474 until every audited identity has an evidence-backed disposition and the accepted
 baseline has advanced after a merged implementation.
+
+## 2026-09-07 Review Resume Checkpoint
+
+I250 / DEPENDENCY-002 is Review/Claimed under implementation PR #501. CI `34115594137`
+passed all five jobs on `87284ceb`; subsequent owner synchronization is documentation-only.
+Next: finish independent review and merge-time CAS for the final submitted candidate, then
+generate the accepted baseline from its merged main commit and close I250/#474 owner-first.
+The 71-row refreshed audit supersedes the 67-row starting inventory for final disposition.
+DEPENDENCY-003 / #502 owns the explicit libc and advisory-evidence residuals.
