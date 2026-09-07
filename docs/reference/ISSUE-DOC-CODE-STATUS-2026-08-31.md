@@ -54,6 +54,7 @@
 | [#453](https://github.com/wjhuang88/talos/issues/453) | Unified `talos upgrade` coordinator | [REL-004](../backlog/active/REL-004-unified-upgrade-coordinator.md) | Intake / Unclaimed | Intake only; preserve REL-003 publication boundary and define planner/helper ownership before implementation. |
 | [#474](https://github.com/wjhuang88/talos/issues/474) | dependency upgrade governance | [DEPENDENCY-001](../backlog/active/DEPENDENCY-001-dependency-upgrade-governance.md) | Intake / Unclaimed | Governance intake only; define baseline, audit, and SOP boundaries before any Cargo or dependency change. |
 | [#475](https://github.com/wjhuang88/talos/issues/475) | evolving durable memory through reflection, recall, and outcome-aware experience | [MEM-012](../backlog/active/MEM-012-evolving-memory-experience.md) | Intake / Unclaimed | Architecture intake only; preserve ADR-016 and defer schema/runtime changes to separately governed child slices. |
+| [#499](https://github.com/wjhuang88/talos/issues/499) | pre-provider rejected submissions block model switching | [RUNTIME-007](../backlog/active/RUNTIME-007-preprovider-rejection-terminalization.md) | Refinement / Unclaimed | Characterize submission lifecycle ownership and preserve queued-work identity before selecting implementation. Excluded from I250 dependency upgrades. |
 
 ## Synchronization Notes
 

@@ -87,7 +87,8 @@
 Inventory base: `a7d168ee4c00b3788e50b72d606cd52257ed46ad`. I248 is Review on that
 base and closes in this proposal using previously merged #497/#498 evidence. I249 remains
 Planned/Unclaimed and is explicitly deferred; its one-package baseline is unchanged. I250 is the
-selected next iteration. I164 remains Paused/superseded by I165. No other current iteration header
+selected next iteration. I164 remains Paused/superseded by I165. Issue #499 is tracked independently
+by RUNTIME-007 and is excluded from I250. No other current iteration header
 declares Active, Review, Planned or Blocked; legacy files without current status and historical
 superseded shells confer no authority. No open PR exists at preparation. The detached
 `talos-i474-upgrade` experiment and divergent local main are not accepted implementation.
