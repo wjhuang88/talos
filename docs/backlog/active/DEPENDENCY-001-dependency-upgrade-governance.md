@@ -5,7 +5,7 @@
 | Story ID | DEPENDENCY-001 |
 | Type | Technical Governance Story |
 | Priority | P1 |
-| Status | In Progress / Claimed |
+| Status | Review / Claimed |
 | Source | [GitHub Issue #474](https://github.com/wjhuang88/talos/issues/474) |
 | Selected Iteration | I248 |
 | Depends On | Existing release, testing, and collaboration SOPs |
@@ -23,9 +23,10 @@
 | Governance Claim PR | #496 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | #496 merged as `7c3f6421a073aad62e6a4aaf8f6e1c7df9a674bd`; claim effective. Actual merge is not a substitute for missing historical CAS/review evidence or new implementation gates. |
-| Implementation PR | Not started |
+| Implementation PR | #497; acceptance follow-up #498 |
 | Last Updated | 2026-09-06 |
-| Handoff / Release Condition | #496 merged; complete local convergence before one stable implementation candidate. |
+| Handoff / Release Condition | #497 merged; native Windows audit acceptance in #498 remains required before closing I248. Full upgrade is separately owned by DEPENDENCY-002 / I250. |
+| Completion Commit | `dbd847ec5092d8097d985582c3289692745cf681` |
 
 ## Scope
 
@@ -40,6 +41,12 @@ effective when #496 merged into main as `7c3f6421`.
 Audit scripts and baseline generation belong to I248's proposed claim. Concrete dependency
 upgrades and workspace dependency centralization remain separately governed follow-ups; neither is
 required or authorized merely to close this mechanism Story.
+
+## Completion Evidence
+
+- Completion Commit: `dbd847ec5092d8097d985582c3289692745cf681`
+- Implementation PR #497 merged as `7b4e21ce6514cc4ce7e79e0a2b2491ffe497be27` after exact-head CI
+  `34043207621` and independent review `5563452959`.
 
 ## 2026-09-06 Recovery Checkpoint
 
@@ -62,8 +69,8 @@ See [I248](../../iterations/I248-dependency-governance-closed-loop.md).
 Current scope clarification (2026-09-06): the user's full-upgrade request is a long-task outcome
 beyond the mechanism, not satisfied by I249's one-package pilot. Preserve I249's published baseline;
 the fresh full audit must feed a full-upgrade owner and appropriately isolated slices before Cargo
-changes. I248 remains Active/Claimed and incomplete. See its appended local convergence checkpoint
-for verification and residuals; no implementation PR or dependency upgrade is claimed here.
+changes. I248 is Review/Claimed with merged implementation `dbd847ec5092d8097d985582c3289692745cf681`;
+native Windows audit acceptance remains pending in #498. The full-upgrade outcome is planned as I250.
 
 Read #474 in full, I248, the recovery ledger, root and member Cargo manifests, Cargo.lock,
 rust-toolchain.toml and REQUIREMENT-INTAKE, START-ITERATION, ITERATION-WORKFLOW,
