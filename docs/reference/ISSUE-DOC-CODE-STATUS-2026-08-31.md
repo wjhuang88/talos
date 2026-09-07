@@ -55,6 +55,7 @@
 | [#474](https://github.com/wjhuang88/talos/issues/474) | dependency upgrade governance | [DEPENDENCY-001](../backlog/active/DEPENDENCY-001-dependency-upgrade-governance.md) | Complete / Closed; I250 full upgrade remains Active / Claimed via #500 | I248 governance mechanism is closed; the user-requested full upgrade remains open under I250. |
 | [#475](https://github.com/wjhuang88/talos/issues/475) | evolving durable memory through reflection, recall, and outcome-aware experience | [MEM-012](../backlog/active/MEM-012-evolving-memory-experience.md) | Intake / Unclaimed | Architecture intake only; preserve ADR-016 and defer schema/runtime changes to separately governed child slices. |
 | [#499](https://github.com/wjhuang88/talos/issues/499) | pre-provider rejected submissions block model switching | [RUNTIME-007](../backlog/active/RUNTIME-007-preprovider-rejection-terminalization.md) | Refinement / Unclaimed | Characterize submission lifecycle ownership and preserve queued-work identity before selecting implementation. Excluded from I250 dependency upgrades. |
+| [#502](https://github.com/wjhuang88/talos/issues/502) | libc migration and dependency advisory evidence residuals | [DEPENDENCY-003](../backlog/active/DEPENDENCY-003-dependency-risk-evidence-residuals.md) | Refinement / Unclaimed | Post-I250 residual owner only; no dependency, native-boundary, audit or release implementation is authorized. |
 
 ## Synchronization Notes
 
