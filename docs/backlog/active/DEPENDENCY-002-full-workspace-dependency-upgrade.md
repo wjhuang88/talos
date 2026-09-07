@@ -1,6 +1,6 @@
 # DEPENDENCY-002: Full Workspace Dependency Upgrade
 
-> Document status: Active
+> Document status: Active (proposed; ineffective until governance merge)
 
 | Field | Value |
 |---|---|

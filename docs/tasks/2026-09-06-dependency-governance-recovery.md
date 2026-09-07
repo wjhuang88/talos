@@ -1,6 +1,6 @@
 # #474 Dependency Governance Recovery And Delivery
 
-Status: I248 Review / Claimed; I250 Planned / Unclaimed. Recovery ledger; claims live in the iteration owners.
+Status: I248 Complete / Closed; I250 proposed Active / Claimed via #500, ineffective until merge. Recovery ledger; claims live in the iteration owners.
 Requirement owner: [DEPENDENCY-001](../backlog/active/DEPENDENCY-001-dependency-upgrade-governance.md).
 
 ## Verified Checkpoint — 2026-09-06
@@ -108,3 +108,19 @@ Windows CI, obtain fresh independent review, then combine truthful I248 closeout
 ready upgrade claim where the collaboration SOP permits. Keep Issue #474 open through full upgrade.
 The local `main` branch has divergent historical governance commits; use verified `origin/main`
 as the source for new branches and never push the divergent local branch to main.
+
+## 2026-09-07 Current Resume Checkpoint — After #498 Acceptance
+
+This checkpoint supersedes the earlier recovery/resume instructions without changing their
+historical record. I248 / DEPENDENCY-001 is Complete/Closed: implementation `dbd847ec` landed
+through #497; #498 merged as `a7d168ee4c00b3788e50b72d606cd52257ed46ad`, with acceptance
+head `5d2e444308d395171e821d103b35d4ce28756b88`, successful CI `34074942674` and independent
+review `5564114577`. The owner final-acceptance checkpoint is authoritative; Board, backlog and
+iteration index now mirror it. Mechanism completion does not close the expanded Issue #474.
+
+Next: finish #500 exact-head CI/review and merge-time CAS. I250 / DEPENDENCY-002 proposes atomic
+Active/Claimed status, effective only when #500 reaches main. Only then start implementation
+from that merge or later main, run a fresh full audit, and complete the full dependency upgrade
+with per-candidate evidence and preserved default run/build/features. I249 stays unselected;
+RUNTIME-007 / #499 remains independent and excluded. No Cargo changes are authorized by this
+recovery checkpoint. Keep #474 open until the full upgrade and accepted-baseline advancement close.

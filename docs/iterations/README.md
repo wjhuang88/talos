@@ -33,7 +33,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 
 | ID | Codename | State | Activation / Completion Gate |
 |---|---|---|---|
-| I248 | Dependency Governance Closed Loop | Review / Claimed | [I248](I248-dependency-governance-closed-loop.md); implementation `dbd847ec` merged via #497; native Windows audit acceptance is pending in #498. Full upgrade is I250. |
+| I248 | Dependency Governance Closed Loop | Complete / Closed | [I248](I248-dependency-governance-closed-loop.md); implementation `dbd847ec` merged via #497; #498 merged as `a7d168ee`, acceptance head `5d2e4443`, CI `34074942674`, independent review `5564114577`. Full upgrade remains I250. |
 | I250 | Full Workspace Dependency Upgrade | Active / Claimed via proposed #500 (ineffective until merge) | [I250](I250-full-workspace-dependency-upgrade.md); all candidates from the accepted live audit must be upgraded to latest stable or explicitly blocked/excepted. No Cargo changes before #500 merges. |
 | I158 | Tool Registration Composition Consolidation | Complete | Completion Commit `c88c1d1a`; scheduler/status exceptions and documentation closeout accepted. TUI-037 remains independent. |
 | I171 | Workspace Architecture Rebaseline | Complete | Completion Commit `56f419f7`; source v0.7.0 audit/register evidence `c88c1d1a`; bounded remediation owners validated; no production refactor. |
