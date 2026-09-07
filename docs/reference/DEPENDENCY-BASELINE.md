@@ -20,7 +20,6 @@ See [Dependency Upgrade](../sop/DEPENDENCY-UPGRADE.md) for refresh and advanceme
 ## Generated Direct Dependency Inventory
 
 <!-- dependency-baseline:begin -->
-<!-- dependency-baseline:begin -->
 | Name | Manifest | Accepted resolutions | Direct consumers | Kind | Target |
 |---|---|---|---|---|---|
 | anyhow | ^1.0.104 | 1.0.104 | talos-cli, talos-mcp, talos-rpc | normal | all |
