@@ -1,6 +1,6 @@
 # #474 Dependency Governance Recovery And Delivery
 
-Status: I248 Complete / Closed; I250 proposed Active / Claimed via #500, ineffective until merge. Recovery ledger; claims live in the iteration owners.
+Status: I248 Complete / Closed; I250 Active / Claimed after #500 merge `ea9a4c37`. Recovery ledger; claims live in the iteration owners.
 Requirement owner: [DEPENDENCY-001](../backlog/active/DEPENDENCY-001-dependency-upgrade-governance.md).
 
 ## Verified Checkpoint — 2026-09-06
@@ -124,3 +124,14 @@ from that merge or later main, run a fresh full audit, and complete the full dep
 with per-candidate evidence and preserved default run/build/features. I249 stays unselected;
 RUNTIME-007 / #499 remains independent and excluded. No Cargo changes are authorized by this
 recovery checkpoint. Keep #474 open until the full upgrade and accepted-baseline advancement close.
+
+## 2026-09-07 Activation Checkpoint — I250 Claim Effective
+
+The preceding resume instructions are historical. #500 merged into `origin/main` as
+`ea9a4c37c129c2eb77825191b9e86baced4c91d4`; I250 / DEPENDENCY-002 is now Active/Claimed.
+Implementation is authorized only from this merge or a later target-main commit. The next
+step is a fresh live audit, followed by local convergence of the complete dependency upgrade.
+I249 remains unselected and #499 / RUNTIME-007 remains independent and excluded. Preserve
+default features, workspace membership and normal `cargo run`/`cargo build` behavior; do not
+close #474 until every audited identity has an evidence-backed disposition and the accepted
+baseline has advanced after a merged implementation.

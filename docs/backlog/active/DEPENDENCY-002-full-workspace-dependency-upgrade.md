@@ -1,6 +1,6 @@
 # DEPENDENCY-002: Full Workspace Dependency Upgrade
 
-> Document status: Active (proposed; ineffective until governance merge)
+> Document status: Active
 
 | Field | Value |
 |---|---|
@@ -24,10 +24,10 @@
 | Source Issue | #474 |
 | Governance Claim PR | #500 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Proposed atomic I250 claim/activation; effective only after #500 merges |
+| Authorization Evidence | #500 merged as `ea9a4c37c129c2eb77825191b9e86baced4c91d4`; claim and activation effective |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-07 |
-| Handoff / Release Condition | #500 merge; begin implementation only from merged claim or later main |
+| Handoff / Release Condition | Claim active; begin implementation from `ea9a4c37` or later main |
 
 ## Scope And Definition Of Done
 
