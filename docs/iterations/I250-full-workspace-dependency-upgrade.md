@@ -80,7 +80,7 @@
 | 2026-09-07 | Planning | Created after I248/#497 completed. I249's one-package published baseline remains unchanged and is not widened; no Cargo change is authorized before I250 claim activation. |
 | 2026-09-07 | Claim proposal | #500 proposes atomic I250 Active/Claimed activation. The proposal is ineffective until merged; no Cargo changes are included. |
 | 2026-09-07 | Activation | #500 merged as `ea9a4c37c129c2eb77825191b9e86baced4c91d4` into `origin/main`; I250 claim and Active state are effective. Implementation starts from this merge or later main. |
-| 2026-09-07 | Implementation | Fresh live audit queried crates.io from implementation head `16f0f6d2027356912697401076857b37124964f0`; 34 candidate groups generated. Local dependency candidate is converging; no implementation PR has been pushed. |
+| 2026-09-07 | Implementation | Fresh live audit queried crates.io from implementation head `9de1290a0cf933c0caec9e67d4741dc5dd596086`; 34 candidate groups generated. Local dependency candidate is converging; no implementation PR has been pushed. |
 
 ## Verification Evidence
 
@@ -135,7 +135,7 @@ all slices require fresh CI and applicable independent API/domain review. The fi
 generated only from merged validated dependency state. Source-only rollback is insufficient for
 data-format changes unless old-reader compatibility is proven.
 
-- Active I250 claim; local dependency candidate is converging from fresh audit source `16f0f6d2027356912697401076857b37124964f0` (observed `2026-09-07T09:42:13Z`).
+- Active I250 claim; local dependency candidate is converging from fresh audit source `9de1290a0cf933c0caec9e67d4741dc5dd596086` (observed `2026-09-07T09:57:18Z`).
 
 ## Completion Evidence
 
@@ -144,7 +144,7 @@ data-format changes unless old-reader compatibility is proven.
 ## 2026-09-07 Fresh Audit And Local Upgrade Candidate
 
 The live audit was run after claim activation against implementation head
-`16f0f6d2027356912697401076857b37124964f0`:
+`9de1290a0cf933c0caec9e67d4741dc5dd596086`:
 
 ```text
 bash scripts/dependency_audit.sh --live --baseline docs/reference/dependency-baseline.json --format json
@@ -155,7 +155,7 @@ The registry was queried successfully. Evidence is preserved in
 `docs/reference/dependency-observation-2026-09-07.json`, and the generated candidate grouping in
 `docs/reference/dependency-upgrade-candidates-2026-09-07.json`. The report contains 67 identity
 rows and the candidate generator emits 34 name/source groups (duplicate identities remain
-visible). The source timestamp is `2026-09-07T09:42:13Z`.
+visible). The source timestamp is `2026-09-07T09:57:18Z`.
 
 The local candidate updates direct workspace declarations and `Cargo.lock` for the following
 validated groups: `anyhow 1.0.104`, `arborium 2.18.2`, `async-trait 0.1.92`, `base64 0.23.1`,

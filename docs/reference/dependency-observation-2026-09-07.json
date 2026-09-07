@@ -1,7 +1,7 @@
 {
   "schema": "talos.dependency-observation/v1",
-  "source_commit": "16f0f6d2027356912697401076857b37124964f0",
-  "observed_date_utc": "2026-09-07T09:42:13Z",
+  "source_commit": "9de1290a0cf933c0caec9e67d4741dc5dd596086",
+  "observed_date_utc": "2026-09-07T09:57:18Z",
   "report": {
     "schema": "talos.dependency-audit/v1",
     "status": "audited",
