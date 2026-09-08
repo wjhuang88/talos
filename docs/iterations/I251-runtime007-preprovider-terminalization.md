@@ -11,7 +11,7 @@
 | Field | Value |
 |---|---|
 | Claim State | Claimed |
-| Responsible Actor | @wjhuang88 (shared account; Agent-role execution, no natural-person identity claim) |
+| Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex Agent / mainline unattended session |
 | Work Slice | Runtime submission lifecycle only: deterministic non-resumable pre-Provider rejection terminalization, exactly-once release, model-switch guard, and focused regression evidence for Issue #499. |
 | Claimed At | 2026-09-08 |
