@@ -115,6 +115,9 @@ independent review are required before merge.
 
 ## Variance And Residuals
 
+- Windows lifecycle fixture diagnostics remain a CI residual: prior failures timed out before
+  the marker was observed, so no production behavior change is inferred; investigate fixture
+  event draining separately before treating a Windows failure as an implementation defect.
 - #408 remains a related symptom and may share lifecycle primitives, but its acceptance is not silently subsumed.
 - CAP-001 / #466 remains an unclaimed architecture parent; follow-up governance is separate and serial after #499.
 
