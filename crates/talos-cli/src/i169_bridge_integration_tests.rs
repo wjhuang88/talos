@@ -192,7 +192,7 @@ async fn wait_for_visible_user_order(
 }
 
 #[tokio::test]
-async fn bridge_and_actor_retain_durable_custody_when_request_plan_exceeds_budget() {
+async fn bridge_and_actor_release_model_switch_when_request_plan_exceeds_budget() {
     let temp = tempfile::tempdir().expect("operation should succeed");
     let manager = SessionManager::with_dir(temp.path().join("sessions"));
     let durable = manager
@@ -225,7 +225,7 @@ async fn bridge_and_actor_retain_durable_custody_when_request_plan_exceeds_budge
     let (ui_tx, mut ui_rx) = mpsc::unbounded_channel();
     let (_sq_watch_tx, sq_watch_rx) = tokio::sync::watch::channel(session_handle.sq_tx);
     let (_model_tx, model_rx) = tokio::sync::watch::channel(model_info(64));
-    let (session_tx, _session_rx) = mpsc::unbounded_channel::<SessionLifecycleRequest>();
+    let (session_tx, mut session_rx) = mpsc::unbounded_channel::<SessionLifecycleRequest>();
 
     let bridge_task = tokio::spawn(run_conversation_loop(
         engine,
@@ -257,7 +257,7 @@ async fn bridge_and_actor_retain_durable_custody_when_request_plan_exceeds_budge
                 Some(UiOutput::Content(ContentOutput::Block {
                     source: MessageSource::Error,
                     text,
-                })) if text.contains("paused before Provider start") => break text,
+                })) if text.contains("not executed or automatically retried") => break text,
                 Some(_) => {}
                 None => panic!("bridge UI channel closed before durable pause"),
             }
@@ -266,7 +266,7 @@ async fn bridge_and_actor_retain_durable_custody_when_request_plan_exceeds_budge
     .await
     .expect("Bridge must observe Actor pre-Provider pause");
 
-    assert!(pause_message.contains("ContextBudgetExceeded"));
+    assert!(pause_message.contains("not executed or automatically retried"));
     assert_eq!(
         last_snapshot.total_count, 0,
         "Engine reservation must be removed only after Actor durable custody"
@@ -276,13 +276,22 @@ async fn bridge_and_actor_retain_durable_custody_when_request_plan_exceeds_budge
     let recovered = pending_store
         .recover_unstarted()
         .expect("recover durable paused submission");
-    assert_eq!(recovered.len(), 1);
-    assert_eq!(recovered[0].state, PendingSubmissionState::PausedPending);
-    assert_eq!(recovered[0].submission.items.len(), 1);
-    assert_eq!(
-        recovered[0].submission.items[0].text,
-        "preserve this exact user input"
+    assert!(
+        recovered.is_empty(),
+        "rejection must not leave resumable work"
     );
+    user_tx
+        .send(UserInput::SwitchModel {
+            provider: "replacement-provider".into(),
+            model_id: "replacement-model".into(),
+            variant: None,
+        })
+        .expect("switch without synthetic cancellation");
+    let request = tokio::time::timeout(Duration::from_secs(2), session_rx.recv())
+        .await
+        .expect("model switch must reach lifecycle handler")
+        .expect("lifecycle channel");
+    assert!(matches!(request, SessionLifecycleRequest::ModelSwitch(_)));
 
     user_tx
         .send(UserInput::Exit)
@@ -895,7 +904,7 @@ async fn bridge_adopts_retained_user_fifo_before_new_resume_submission() {
 }
 
 #[tokio::test]
-async fn cancelling_deterministic_prestart_pause_releases_newer_bridge_acceptance() {
+async fn terminalizing_retained_prestart_rejection_preserves_newer_bridge_acceptance() {
     let temp = tempfile::tempdir().expect("operation should succeed");
     let manager = SessionManager::with_dir(temp.path().join("sessions"));
     let durable = manager
@@ -951,38 +960,6 @@ async fn cancelling_deterministic_prestart_pause_releases_newer_bridge_acceptanc
     user_tx
         .send(UserInput::Message("R".into()))
         .expect("operation should succeed");
-    tokio::time::timeout(Duration::from_secs(5), async {
-        loop {
-            match ui_rx.recv().await {
-                Some(UiOutput::Content(ContentOutput::Block {
-                    source: MessageSource::Error,
-                    text,
-                })) if text
-                    .contains("older retained submission retained-cancel-u1 paused before")
-                    && text.contains("press cancel") =>
-                {
-                    break;
-                }
-                Some(_) => {}
-                None => panic!("Bridge closed before retained pre-start pause evidence"),
-            }
-        }
-    })
-    .await
-    .expect("retained pre-start pause must expose a resolution action");
-    assert_eq!(
-        store
-            .get(&retained.id)
-            .expect("operation should succeed")
-            .expect("operation should succeed")
-            .state,
-        PendingSubmissionState::PausedPending
-    );
-    assert!(order.lock().expect("operation should succeed").is_empty());
-
-    user_tx
-        .send(UserInput::Cancel)
-        .expect("operation should succeed");
     wait_for_order(&order, &["R"]).await;
     assert_eq!(
         store
@@ -990,7 +967,7 @@ async fn cancelling_deterministic_prestart_pause_releases_newer_bridge_acceptanc
             .expect("operation should succeed")
             .expect("operation should succeed")
             .state,
-        PendingSubmissionState::TerminalCancelled
+        PendingSubmissionState::TerminalError
     );
 
     user_tx

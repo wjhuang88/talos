@@ -7,6 +7,7 @@ use std::time::Duration;
 use talos_core::message::{Message, StopReason};
 use talos_core::provider::{LanguageModel, ProviderProgress, ProviderResult, ToolDefinition};
 use talos_core::session::{RuntimePolicy, SessionEvent, TurnCompletionStatus, TurnEventPayload};
+use talos_core::submission::PendingSubmissionState;
 use talos_core::tool::ToolRegistry;
 use tokio::sync::mpsc;
 
@@ -762,7 +763,7 @@ async fn closed_eq_does_not_revoke_actor_custody_or_duplicate_execution() {
 }
 
 #[tokio::test]
-async fn context_budget_pauses_before_submission_started() {
+async fn context_budget_terminalizes_before_submission_started() {
     let captured = Arc::new(Mutex::new(Vec::new()));
     let agent = make_agent(CapturingModel {
         captured: captured.clone(),
@@ -775,6 +776,7 @@ async fn context_budget_pauses_before_submission_started() {
     };
     let (handle, mut actor) = AppServerSession::new(agent, config);
     set_authoritative_generation(&mut actor, 13);
+    let pending_store = actor.pending_store.clone();
     let sq_tx = handle.sq_tx;
     let mut eq_rx = handle.eq_rx;
     let actor_task = tokio::spawn(async move { actor.run().await });
@@ -796,18 +798,51 @@ async fn context_budget_pauses_before_submission_started() {
     loop {
         let event = tokio::time::timeout(Duration::from_secs(2), eq_rx.recv())
             .await
-            .expect("budget pause timeout")
+            .expect("budget terminalization timeout")
             .expect("session event channel");
-        let paused = matches!(
+        let terminalized = matches!(
             event,
-            SessionEvent::SubmissionPaused {
-                reason: SubmissionRejectionReason::ContextBudgetExceeded,
+            SessionEvent::SubmissionResolved {
+                state: PendingSubmissionState::TerminalError,
                 ..
             }
         );
         events.push(event);
-        if paused {
+        if terminalized {
             break;
+        }
+    }
+    // Exceed the queue's lifetime capacity to detect leaked admission counters.
+    for index in 0..=MAX_STEERING_QUEUE_ITEMS {
+        let id = format!("rejected-{index}");
+        sq_tx
+            .send(SessionOp::SubmitStructured {
+                submission: structured_submission(
+                    &id,
+                    &format!("item-{index}"),
+                    13,
+                    "request",
+                    SubmissionSource::User,
+                ),
+            })
+            .await
+            .expect("submit after terminal rejection");
+        loop {
+            let event = tokio::time::timeout(Duration::from_secs(2), eq_rx.recv())
+                .await
+                .expect("next rejection must not stall")
+                .expect("event channel");
+            assert!(
+                !matches!(&event, SessionEvent::SubmissionRejected { .. }),
+                "terminal submissions must not consume queue capacity: {event:?}"
+            );
+            let resolved = matches!(&event, SessionEvent::SubmissionResolved {
+                submission_id, state: PendingSubmissionState::TerminalError, ..
+            } if submission_id == &id);
+            events.push(event);
+            if resolved {
+                break;
+            }
         }
     }
     sq_tx
@@ -815,6 +850,28 @@ async fn context_budget_pauses_before_submission_started() {
         .await
         .expect("operation should succeed");
     actor_task.await.expect("operation should succeed");
+
+    let record = pending_store
+        .get("over_budget_batch")
+        .expect("durable lookup")
+        .expect("terminal record retained");
+    assert_eq!(record.state, PendingSubmissionState::TerminalError);
+    assert!(
+        record.turn_id.is_none(),
+        "rejection must not fabricate a Turn"
+    );
+    assert!(
+        pending_store
+            .recover_unstarted()
+            .expect("recover pending")
+            .is_empty()
+    );
+    assert!(
+        pending_store
+            .recover_running()
+            .expect("recover running")
+            .is_empty()
+    );
 
     assert!(
         !events

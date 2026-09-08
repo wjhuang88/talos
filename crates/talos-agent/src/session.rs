@@ -84,6 +84,11 @@ struct StartedTurn {
     boundary_ack_rx: mpsc::UnboundedReceiver<SteeringBoundaryAcknowledgement>,
 }
 
+enum UnstartedOutcome {
+    Retained,
+    Terminal,
+}
+
 fn immediate_started_turn(
     eq_tx: mpsc::UnboundedSender<SessionEvent>,
     session_id: String,
@@ -402,7 +407,7 @@ impl AppServerSession {
                     .start_submission(submission.clone(), turn_counter, start_token)
                     .await
                 {
-                    Some(started) => {
+                    Ok(started) => {
                         current_turn = Some(started.handle);
                         current_submission_size = Some(submission_size);
                         current_structured = started.structured;
@@ -410,12 +415,21 @@ impl AppServerSession {
                         current_boundary_ack_rx = Some(started.boundary_ack_rx);
                         cancel_token = Some(started.token);
                     }
-                    None => {
+                    Err(outcome) => {
                         if let Some(admission) = &self.runtime_admission {
                             admission.finish_active(None);
                         }
-                        pending.push_front(submission);
-                        paused = true;
+                        if matches!(outcome, UnstartedOutcome::Terminal) {
+                            pending_items = pending_items.saturating_sub(submission_size.0);
+                            pending_bytes = pending_bytes.saturating_sub(submission_size.1);
+                            pending_images = pending_images.saturating_sub(submission_size.2);
+                            pending_image_bytes =
+                                pending_image_bytes.saturating_sub(submission_size.3);
+                            continue;
+                        } else {
+                            pending.push_front(submission);
+                            paused = true;
+                        }
                     }
                 }
             }
@@ -956,7 +970,7 @@ impl AppServerSession {
         submission: StructuredSubmission,
         turn_counter: u64,
         token: CancellationToken,
-    ) -> Option<StartedTurn> {
+    ) -> Result<StartedTurn, UnstartedOutcome> {
         let runtime_managed = self.runtime_admission.is_some();
         let prepared_before_commit = if runtime_managed {
             None
@@ -991,11 +1005,15 @@ impl AppServerSession {
                 {
                     Ok(prepared) => Some(prepared),
                     Err(crate::AgentError::ContextBudgetExceeded { .. }) => {
-                        self.pause_before_start(
+                        let terminal = self.pause_before_start(
                             &submission,
                             SubmissionRejectionReason::ContextBudgetExceeded,
                         );
-                        return None;
+                        return Err(if terminal {
+                            UnstartedOutcome::Terminal
+                        } else {
+                            UnstartedOutcome::Retained
+                        });
                     }
                     Err(error) => {
                         let _ = self.eq_tx.send(SessionEvent::Error {
@@ -1008,7 +1026,7 @@ impl AppServerSession {
                             &submission,
                             SubmissionRejectionReason::InvalidStructure,
                         );
-                        return None;
+                        return Err(UnstartedOutcome::Retained);
                     }
                 }
             }
@@ -1025,16 +1043,16 @@ impl AppServerSession {
                         "accepted structured submission is missing from journal",
                         &submission.id,
                     );
-                    return None;
+                    return Err(UnstartedOutcome::Retained);
                 }
                 Err(error) => {
                     self.emit_custody_error("failed to load accepted submission", &error);
-                    return None;
+                    return Err(UnstartedOutcome::Retained);
                 }
             };
             if let Err(error) = self.pending_store.mark_running(&submission.id, &turn_id) {
                 self.emit_custody_error("failed to mark structured submission running", &error);
-                return None;
+                return Err(UnstartedOutcome::Retained);
             }
             let active = ActiveStructuredTurn {
                 submission_id: submission.id.clone(),
@@ -1082,7 +1100,7 @@ impl AppServerSession {
             let compacted = self.compactor.apply_microcompact(compacted);
             let compact_result = tokio::select! {
                 () = token.cancelled() => {
-                    return Some(immediate_started_turn(
+                    return Ok(immediate_started_turn(
                         self.eq_tx.clone(),
                         self.session_id.clone(),
                         turn_id,
@@ -1098,7 +1116,7 @@ impl AppServerSession {
                 Err(_) => self.compactor.compact_deterministic(self.history.clone()).0,
             };
             if token.is_cancelled() {
-                return Some(immediate_started_turn(
+                return Ok(immediate_started_turn(
                     self.eq_tx.clone(),
                     self.session_id.clone(),
                     turn_id,
@@ -1119,7 +1137,7 @@ impl AppServerSession {
         } else {
             let prepare_result = tokio::select! {
                 () = token.cancelled() => {
-                    return Some(immediate_started_turn(
+                    return Ok(immediate_started_turn(
                         self.eq_tx.clone(),
                         self.session_id.clone(),
                         turn_id,
@@ -1143,7 +1161,7 @@ impl AppServerSession {
                             submission.id
                         ),
                     });
-                    return Some(immediate_started_turn(
+                    return Ok(immediate_started_turn(
                         self.eq_tx.clone(),
                         self.session_id.clone(),
                         turn_id,
@@ -1254,7 +1272,7 @@ impl AppServerSession {
                     completion,
                 })
             });
-            return Some(StartedTurn {
+            return Ok(StartedTurn {
                 handle,
                 token,
                 structured,
@@ -1310,7 +1328,7 @@ impl AppServerSession {
             .await;
             result_rx.await.ok()
         });
-        Some(StartedTurn {
+        Ok(StartedTurn {
             handle,
             token,
             structured,

@@ -19,6 +19,44 @@ fn submission() -> StructuredSubmission {
 }
 
 #[test]
+fn prestart_error_is_idempotent_but_cannot_erase_a_started_turn() {
+    let dir = tempfile::tempdir().expect("temporary directory");
+    let store =
+        PendingSubmissionStore::for_session_file(&dir.path().join("session.tlog"), "session-1");
+    let payload = submission();
+    store.accept(&payload).expect("accept");
+    store.error_unstarted(&payload.id).expect("terminalize");
+    store
+        .error_unstarted(&payload.id)
+        .expect("duplicate terminalization");
+    let record = store.get(&payload.id).expect("read").expect("record");
+    assert_eq!(record.state, PendingSubmissionState::TerminalError);
+    assert_eq!(record.turn_id, None);
+
+    let mut started = submission();
+    started.id = "started-batch".into();
+    started.items[0].id = "started-item".into();
+    store.accept(&started).expect("accept started");
+    store.mark_running(&started.id, "turn-1").expect("start");
+    store
+        .mark_terminal(&started.id, PendingSubmissionState::TerminalError, "turn-1")
+        .expect("terminalize started");
+    assert!(matches!(
+        store.error_unstarted(&started.id),
+        Err(PendingSubmissionError::InvalidTransition)
+    ));
+    assert_eq!(
+        store
+            .get(&started.id)
+            .expect("read")
+            .expect("record")
+            .turn_id
+            .as_deref(),
+        Some("turn-1")
+    );
+}
+
+#[test]
 fn accept_is_durable_and_idempotent() {
     let dir = tempfile::tempdir().expect("operation should succeed");
     let store =

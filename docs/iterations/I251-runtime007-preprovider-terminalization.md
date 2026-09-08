@@ -1,6 +1,6 @@
 # Iteration I251: Pre-Provider Rejection Terminalization
 
-> Document status: Active / Claimed (proposed; ineffective until merge)
+> Document status: Active / Claimed
 > Published plan date: 2026-09-08
 > Planned objective: Convert deterministic pre-Provider rejection into an idempotent terminal lifecycle outcome so model/provider switching is not blocked by stale active submission state.
 > Baseline rule: preserve this target; a changed objective requires a new iteration ID.
@@ -19,7 +19,7 @@
 | Governance Claim PR | #504 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Prior head fa1c40f7: CI 34188252548 passed; review comment 5579449346 requested changes. Corrected head requires fresh CI and independent APPROVE before merge; no approval is claimed. |
-| Implementation PR | Not started |
+| Implementation PR | #505 (Review) |
 | Last Updated | 2026-09-08 |
 | Handoff / Release Condition | Claim becomes effective only when this activation record reaches `main`; implementation starts from that merge or a later `main` commit. #466 remains a separate architecture-only parent. |
 
@@ -83,7 +83,7 @@ I162's Complete / Review-outcome header is terminal, not an open Review iteratio
 
 | Item | Current state | Disposition |
 |---|---|---|
-| I251 / RUNTIME-007 / #499 / PR #504 | Active / Claimed proposed; ineffective until merge | Select this bounded correction first; no implementation branch before claim merge. |
+| I251 / RUNTIME-007 / #499 / PR #505 | Active / Claimed | Implementation candidate under review; claim #504 is effective on main. |
 | I249 | Planned / Unclaimed | Defer the one-package dependency pilot; I250's full upgrade is Complete and no dependency change is selected here. |
 | I164 | Paused / superseded by I165 | Preserve pause; do not resume or repurpose. |
 | Legacy status-less and superseded iterations | Historical records | Confer no current authority; do not activate or restore. |
@@ -102,10 +102,22 @@ natural-person separation. A fresh APPROVE must bind the corrected candidate bef
 
 ## Completion Evidence
 
+### 2026-09-08 Candidate Validation Checkpoint
+
+Implementation candidate PR #505 currently points to `8de70a58`. Local locked validation
+passed for the focused agent/session/CLI regression paths; prior exact-head CI run
+`34242505749` failed during test compilation because of the import correction, so it provides no valid exact-head evidence;
+its reconciliation job also predated the current owner synchronization. Issue #499 reconciliation
+comment `5587908427` records the current owner and candidate state. A fresh exact-head CI and
+independent review are required before merge.
+
 - Completion Commit: pending
 
 ## Variance And Residuals
 
+- Windows lifecycle fixture diagnostics remain a CI residual: prior failures timed out before
+  the marker was observed, so no production behavior change is inferred; investigate fixture
+  event draining separately before treating a Windows failure as an implementation defect.
 - #408 remains a related symptom and may share lifecycle primitives, but its acceptance is not silently subsumed.
 - CAP-001 / #466 remains an unclaimed architecture parent; follow-up governance is separate and serial after #499.
 

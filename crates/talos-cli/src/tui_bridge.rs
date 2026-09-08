@@ -151,15 +151,20 @@ pub(super) enum BridgeTurnState {
         receipt_id: String,
     },
     PausedAfterFailure,
+    /// A durable submission terminated before any Turn started.
+    PreStartFailed,
 }
 
 impl BridgeTurnState {
     fn accepts_queued_input(&self) -> bool {
-        !matches!(self, Self::Idle | Self::PausedAfterFailure)
+        !matches!(
+            self,
+            Self::Idle | Self::PausedAfterFailure | Self::PreStartFailed
+        )
     }
 
     fn blocks_session_mutation(&self) -> bool {
-        !matches!(self, Self::Idle)
+        !matches!(self, Self::Idle | Self::PreStartFailed)
     }
 }
 
@@ -965,14 +970,17 @@ async fn handle_session_event(
             });
             if matches_active || matches_deferred {
                 if matches_active {
-                    *turn_state = BridgeTurnState::PausedAfterFailure;
+                    *turn_state = deferred_accepted.take().map_or(
+                        BridgeTurnState::PreStartFailed,
+                        DeferredAcceptedSubmission::into_turn_state,
+                    );
                 }
                 if matches_deferred {
                     deferred_accepted.take();
                 }
                 emit_bridge_error(
                     ui_tx,
-                    "steering handoff failed before model visibility; the input was not executed or automatically retried; submit it again explicitly",
+                    "submission failed before model visibility; the input was not executed or automatically retried; review the failure and submit it again explicitly",
                 );
             } else {
                 emit_bridge_error(ui_tx, "ignored stale boundary-submission resolution");
@@ -1709,6 +1717,13 @@ mod completion_continuation_tests {
 mod boundary_submission_tests {
     use super::*;
 
+    #[test]
+    fn prestart_terminalization_does_not_relax_started_failure_guard() {
+        assert!(!BridgeTurnState::PreStartFailed.blocks_session_mutation());
+        assert!(BridgeTurnState::PausedAfterFailure.blocks_session_mutation());
+        assert!(!BridgeTurnState::PreStartFailed.accepts_queued_input());
+    }
+
     #[tokio::test]
     async fn unacknowledged_boundary_resolution_releases_waiting_identity() {
         for receipt_matches in [false, true] {
@@ -1744,7 +1759,7 @@ mod boundary_submission_tests {
             )
             .await;
             if receipt_matches {
-                assert!(matches!(state, BridgeTurnState::PausedAfterFailure));
+                assert!(matches!(state, BridgeTurnState::PreStartFailed));
             } else {
                 assert!(matches!(state, BridgeTurnState::PreStartPaused { .. }));
             }

@@ -530,6 +530,20 @@ impl PendingSubmissionStore {
         )
     }
 
+    /// Terminalizes an accepted or paused submission with an error before a Turn exists.
+    pub fn error_unstarted(&self, submission_id: &str) -> Result<(), PendingSubmissionError> {
+        self.transition(
+            submission_id,
+            PendingSubmissionState::TerminalError,
+            None,
+            &[
+                PendingSubmissionState::AcceptedPending,
+                PendingSubmissionState::PausedPending,
+                PendingSubmissionState::TerminalError,
+            ],
+        )
+    }
+
     /// Marks a started submission terminal without making it resumable.
     pub fn mark_terminal(
         &self,
@@ -704,15 +718,17 @@ impl PendingSubmissionStore {
         let mut connection = self.connection()?;
         let transaction = immediate(&mut connection)?;
         ensure_schema(&transaction)?;
-        let current = transaction
+        let (current, current_turn_id) = transaction
             .query_row(
-                "SELECT state FROM pending_submissions WHERE batch_id = ?1",
+                "SELECT state, turn_id FROM pending_submissions WHERE batch_id = ?1",
                 params![submission_id],
-                |row| row.get::<_, String>(0),
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?)),
             )
             .optional()?
             .ok_or(PendingSubmissionError::MissingRecord)?;
-        if !expected.contains(&decode_state(&current)?) {
+        if !expected.contains(&decode_state(&current)?)
+            || (turn_id.is_none() && current_turn_id.is_some())
+        {
             return Err(PendingSubmissionError::InvalidTransition);
         }
         transaction.execute(
