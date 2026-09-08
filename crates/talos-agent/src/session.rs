@@ -19,8 +19,8 @@ use tokio_util::sync::CancellationToken;
 use talos_core::message::{AgentEvent, Message};
 use talos_core::session::{
     MAX_STEERING_QUEUE_BYTES, MAX_STEERING_QUEUE_IMAGE_BYTES, MAX_STEERING_QUEUE_IMAGES,
-    MAX_STEERING_QUEUE_ITEMS, PendingSubmissionState, SessionConfig, SessionEvent, SessionHandle,
-    SessionOp, StructuredSubmission, SubmissionItem, SubmissionKind, SubmissionRejectionReason,
+    MAX_STEERING_QUEUE_ITEMS, SessionConfig, SessionEvent, SessionHandle, SessionOp,
+    StructuredSubmission, SubmissionItem, SubmissionKind, SubmissionRejectionReason,
     SubmissionSource, TurnCompletionStatus, TurnEventPayload,
 };
 #[cfg(test)]
