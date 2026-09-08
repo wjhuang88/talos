@@ -1,13 +1,13 @@
 # RUNTIME-007: Pre-Provider Rejection Terminalization
 
-> Document status: Active / Claimed
+> Document status: Complete / Closed
 
 | Field | Value |
 |---|---|
 | Story ID | RUNTIME-007 |
 | Type | Runtime / Session Story |
 | Priority | P1 |
-| Status | Active / Claimed |
+| Status | Complete / Closed |
 | Source | [GitHub Issue #499](https://github.com/wjhuang88/talos/issues/499) |
 | Selected Iteration | I251 |
 | Depends On | Runtime submission lifecycle characterization; #408 relationship review |
@@ -25,7 +25,7 @@
 | Governance Claim PR | #504 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Prior head fa1c40f7: CI 34188252548 passed; review comment 5579449346 requested changes. Corrected head requires fresh CI and independent APPROVE before merge; no approval is claimed. |
-| Implementation PR | #505 (Review) |
+| Implementation PR | #505 (Merged) |
 | Last Updated | 2026-09-08 |
 | Handoff / Release Condition | Claim/activation are ineffective until the finalized record reaches `main`; implementation starts from that merge or later. |
 
@@ -49,8 +49,9 @@ permission/sandbox behavior. Any dependency change requires separate dependency 
 
 ## Verification Evidence
 
-- I251 selection and atomic claim preparation recorded; effective claim, implementation and exact-head evidence remain pending.
+- Implementation PR #505 merged as `c9225abf`; exact-head CI and independent review
+  were successful for `7d770822`.
 
 ## Completion Evidence
 
-- Completion Commit: pending
+- Completion Commit: c9225abf
