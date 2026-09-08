@@ -431,7 +431,8 @@ impl AppServerSession {
                             pending_items = pending_items.saturating_sub(submission_size.0);
                             pending_bytes = pending_bytes.saturating_sub(submission_size.1);
                             pending_images = pending_images.saturating_sub(submission_size.2);
-                            pending_image_bytes = pending_image_bytes.saturating_sub(submission_size.3);
+                            pending_image_bytes =
+                                pending_image_bytes.saturating_sub(submission_size.3);
                             continue;
                         } else {
                             pending.push_front(submission);

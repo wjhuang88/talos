@@ -814,21 +814,34 @@ async fn context_budget_terminalizes_before_submission_started() {
     // Exceed the queue's lifetime capacity to detect leaked admission counters.
     for index in 0..=MAX_STEERING_QUEUE_ITEMS {
         let id = format!("rejected-{index}");
-        sq_tx.send(SessionOp::SubmitStructured {
-            submission: structured_submission(
-                &id, &format!("item-{index}"), 13, "request", SubmissionSource::User,
-            ),
-        }).await.expect("submit after terminal rejection");
+        sq_tx
+            .send(SessionOp::SubmitStructured {
+                submission: structured_submission(
+                    &id,
+                    &format!("item-{index}"),
+                    13,
+                    "request",
+                    SubmissionSource::User,
+                ),
+            })
+            .await
+            .expect("submit after terminal rejection");
         loop {
             let event = tokio::time::timeout(Duration::from_secs(2), eq_rx.recv())
-                .await.expect("next rejection must not stall").expect("event channel");
-            assert!(!matches!(&event, SessionEvent::SubmissionRejected { .. }),
-                "terminal submissions must not consume queue capacity: {event:?}");
+                .await
+                .expect("next rejection must not stall")
+                .expect("event channel");
+            assert!(
+                !matches!(&event, SessionEvent::SubmissionRejected { .. }),
+                "terminal submissions must not consume queue capacity: {event:?}"
+            );
             let resolved = matches!(&event, SessionEvent::SubmissionResolved {
                 submission_id, state: PendingSubmissionState::TerminalError, ..
             } if submission_id == &id);
             events.push(event);
-            if resolved { break; }
+            if resolved {
+                break;
+            }
         }
     }
     sq_tx
