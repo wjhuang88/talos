@@ -17,12 +17,12 @@
 | Field | Value |
 |---|---|
 | Claim State | Claimed (proposed; ineffective until merge) |
-| Responsible Actor | `@wjhuang88` (shared account; Agent-role execution) |
+| Responsible Actor | @wjhuang88 (shared account; Agent-role execution) |
 | Executing Agent | Codex Agent / mainline unattended session |
 | Work Slice | Pre-Provider non-resumable rejection terminalization and model-switch guard correctness |
 | Claimed At | 2026-09-08 |
 | Source Issue | #499 |
-| Governance Claim PR | Pending atomic claim PR |
+| Governance Claim PR | #504 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Pending exact-head governance validation and independent review |
 | Implementation PR | Not started |
