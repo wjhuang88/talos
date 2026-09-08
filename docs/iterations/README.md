@@ -35,7 +35,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 |---|---|---|---|
 | I248 | Dependency Governance Closed Loop | Complete / Closed | [I248](I248-dependency-governance-closed-loop.md); implementation `dbd847ec` merged via #497; #498 merged as `a7d168ee`, acceptance head `5d2e4443`, CI `34074942674`, independent review `5564114577`. Full upgrade remains I250. |
 | I250 | Full Workspace Dependency Upgrade | Complete / Closed | [I250](I250-full-workspace-dependency-upgrade.md); implementation #501 merged as `76f0a41b`; accepted baseline advanced, residuals under DEPENDENCY-003 / #502. |
-| I251 | Pre-Provider Rejection Terminalization | Active / Claimed (proposed; ineffective until claim merge) | [I251](I251-runtime007-preprovider-terminalization.md) / RUNTIME-007 / Issue #499; runtime implementation starts only after atomic claim activation reaches `main`. |
+| I251 | Pre-Provider Rejection Terminalization | Complete / Closed | [I251](I251-runtime007-preprovider-terminalization.md) / RUNTIME-007 / Issue #499; implementation merged as `c9225abf`. |
 | I158 | Tool Registration Composition Consolidation | Complete | Completion Commit `c88c1d1a`; scheduler/status exceptions and documentation closeout accepted. TUI-037 remains independent. |
 | I171 | Workspace Architecture Rebaseline | Complete | Completion Commit `56f419f7`; source v0.7.0 audit/register evidence `c88c1d1a`; bounded remediation owners validated; no production refactor. |
 | I159 | `talos-tools` Lightweight Feature Boundary | Complete / Closed | Completion Commit `d886917e45d5ca0f110e111b966cd379485e3580` plus cfg follow-up `34c09b14`; exact head `33a2c6ff` passed CI `31801484313`, approval `5293622712` and CAS, then PR #236 merged as `f79c1ead`. |
