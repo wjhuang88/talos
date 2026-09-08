@@ -530,6 +530,20 @@ impl PendingSubmissionStore {
         )
     }
 
+    /// Terminalizes an accepted or paused submission with an error before a Turn exists.
+    pub fn error_unstarted(&self, submission_id: &str) -> Result<(), PendingSubmissionError> {
+        self.transition(
+            submission_id,
+            PendingSubmissionState::TerminalError,
+            None,
+            &[
+                PendingSubmissionState::AcceptedPending,
+                PendingSubmissionState::PausedPending,
+                PendingSubmissionState::TerminalError,
+            ],
+        )
+    }
+
     /// Marks a started submission terminal without making it resumable.
     pub fn mark_terminal(
         &self,

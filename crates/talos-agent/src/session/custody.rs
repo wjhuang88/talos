@@ -559,7 +559,7 @@ impl AppServerSession {
                 .flatten()
                 .map(|r| r.receipt_id)
                 .unwrap_or_default();
-            if let Err(error) = self.pending_store.cancel_unstarted(&submission.id) {
+            if let Err(error) = self.pending_store.error_unstarted(&submission.id) {
                 self.emit_custody_error(
                     "failed to terminalize non-resumable pre-start submission",
                     &error,

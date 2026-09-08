@@ -775,6 +775,7 @@ async fn context_budget_terminalizes_before_submission_started() {
     };
     let (handle, mut actor) = AppServerSession::new(agent, config);
     set_authoritative_generation(&mut actor, 13);
+    let pending_store = actor.pending_store.clone();
     let sq_tx = handle.sq_tx;
     let mut eq_rx = handle.eq_rx;
     let actor_task = tokio::spawn(async move { actor.run().await });
@@ -815,6 +816,28 @@ async fn context_budget_terminalizes_before_submission_started() {
         .await
         .expect("operation should succeed");
     actor_task.await.expect("operation should succeed");
+
+    let record = pending_store
+        .get("over_budget_batch")
+        .expect("durable lookup")
+        .expect("terminal record retained");
+    assert_eq!(record.state, PendingSubmissionState::TerminalError);
+    assert!(
+        record.turn_id.is_none(),
+        "rejection must not fabricate a Turn"
+    );
+    assert!(
+        pending_store
+            .recover_unstarted()
+            .expect("recover pending")
+            .is_empty()
+    );
+    assert!(
+        pending_store
+            .recover_running()
+            .expect("recover running")
+            .is_empty()
+    );
 
     assert!(
         !events
