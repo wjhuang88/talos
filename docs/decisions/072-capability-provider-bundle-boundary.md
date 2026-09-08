@@ -1,6 +1,10 @@
 # ADR-072: Capability, Provider, Plugin and Bundle Boundary
 
-*Status: Proposed*
+*Status: Accepted*
+
+Accepted by maintainer authorization on 2026-09-09. This acceptance covers the architecture
+boundary and migration contract only; implementation remains delegated to separately claimed
+CAP-001 child stories.
 
 ## Context
 
@@ -72,6 +76,6 @@ Each child must have its own owner, iteration, claim, acceptance evidence, and e
 
 ## Acceptance checklist
 
-- [ ] Independent architecture review accepts this ADR.
+- [x] Maintainer authorization accepts this ADR; independent review evidence is recorded separately.
 - [ ] CAP-001 child owners and dependencies are created after acceptance.
 - [ ] Existing completed stories retain their original scope and evidence.
