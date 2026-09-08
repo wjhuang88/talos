@@ -1,6 +1,6 @@
 # Iteration I251: Pre-Provider Rejection Terminalization
 
-> Document status: Active / Claimed
+> Document status: Complete / Closed
 > Published plan date: 2026-09-08
 > Planned objective: Convert deterministic pre-Provider rejection into an idempotent terminal lifecycle outcome so model/provider switching is not blocked by stale active submission state.
 > Baseline rule: preserve this target; a changed objective requires a new iteration ID.
@@ -19,8 +19,8 @@
 | Governance Claim PR | #504 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Prior head fa1c40f7: CI 34188252548 passed; review comment 5579449346 requested changes. Corrected head requires fresh CI and independent APPROVE before merge; no approval is claimed. |
-| Implementation PR | #505 (Review) |
-| Last Updated | 2026-09-08 |
+| Implementation PR | #505 (Merged) |
+| Last Updated | 2026-09-09 |
 | Handoff / Release Condition | Claim becomes effective only when this activation record reaches `main`; implementation starts from that merge or a later `main` commit. #466 remains a separate architecture-only parent. |
 
 ## Published Baseline
@@ -102,6 +102,11 @@ natural-person separation. A fresh APPROVE must bind the corrected candidate bef
 
 ## Completion Evidence
 
+### 2026-09-09 Closeout Checkpoint
+
+Implementation PR #505 merged to `main` as `c9225abf`; exact head `7d770822` had
+five successful CI jobs and an independent APPROVE bound to that head.
+
 ### 2026-09-08 Candidate Validation Checkpoint
 
 Implementation candidate PR #505 currently points to `8de70a58`. Local locked validation
@@ -111,7 +116,7 @@ its reconciliation job also predated the current owner synchronization. Issue #4
 comment `5587908427` records the current owner and candidate state. A fresh exact-head CI and
 independent review are required before merge.
 
-- Completion Commit: pending
+- Completion Commit: c9225abf
 
 ## Variance And Residuals
 
@@ -123,6 +128,6 @@ independent review are required before merge.
 
 ## Retrospective
 
-- Outcome: pending
-- Documentation: pending
-- Lessons: pending
+- Outcome: Complete / Closed
+- Documentation: Updated
+- Lessons: Exact-head evidence was re-bound after substantive corrections.
