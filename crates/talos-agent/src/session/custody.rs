@@ -551,6 +551,30 @@ impl AppServerSession {
             self.reject_submission(&submission.id, submission.sender_generation, reason);
             return;
         }
+        if reason == SubmissionRejectionReason::ContextBudgetExceeded {
+            let receipt_id = self
+                .pending_store
+                .get(&submission.id)
+                .ok()
+                .flatten()
+                .map(|r| r.receipt_id)
+                .unwrap_or_default();
+            if let Err(error) = self.pending_store.cancel_unstarted(&submission.id) {
+                self.emit_custody_error(
+                    "failed to terminalize non-resumable pre-start submission",
+                    &error,
+                );
+                return;
+            }
+            let _ = self.eq_tx.send(SessionEvent::SubmissionResolved {
+                session_id: self.session_id.clone(),
+                session_generation: self.session_generation,
+                submission_id: submission.id.clone(),
+                receipt_id,
+                state: PendingSubmissionState::TerminalError,
+            });
+            return;
+        }
         if let Err(error) = self.pending_store.mark_paused(&submission.id) {
             self.emit_custody_error("failed to pause accepted pre-start submission", &error);
             return;

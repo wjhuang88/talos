@@ -19,8 +19,8 @@ use tokio_util::sync::CancellationToken;
 use talos_core::message::{AgentEvent, Message};
 use talos_core::session::{
     MAX_STEERING_QUEUE_BYTES, MAX_STEERING_QUEUE_IMAGE_BYTES, MAX_STEERING_QUEUE_IMAGES,
-    MAX_STEERING_QUEUE_ITEMS, SessionConfig, SessionEvent, SessionHandle, SessionOp,
-    StructuredSubmission, SubmissionItem, SubmissionKind, SubmissionRejectionReason,
+    MAX_STEERING_QUEUE_ITEMS, PendingSubmissionState, SessionConfig, SessionEvent, SessionHandle,
+    SessionOp, StructuredSubmission, SubmissionItem, SubmissionKind, SubmissionRejectionReason,
     SubmissionSource, TurnCompletionStatus, TurnEventPayload,
 };
 #[cfg(test)]
@@ -414,8 +414,23 @@ impl AppServerSession {
                         if let Some(admission) = &self.runtime_admission {
                             admission.finish_active(None);
                         }
-                        pending.push_front(submission);
-                        paused = true;
+                        let terminal = self
+                            .pending_store
+                            .get(&submission.id)
+                            .ok()
+                            .flatten()
+                            .is_some_and(|record| {
+                                matches!(
+                                    record.state,
+                                    PendingSubmissionState::TerminalError
+                                        | PendingSubmissionState::TerminalCancelled
+                                        | PendingSubmissionState::Committed
+                                )
+                            });
+                        if !terminal {
+                            pending.push_front(submission);
+                            paused = true;
+                        }
                     }
                 }
             }

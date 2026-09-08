@@ -762,7 +762,7 @@ async fn closed_eq_does_not_revoke_actor_custody_or_duplicate_execution() {
 }
 
 #[tokio::test]
-async fn context_budget_pauses_before_submission_started() {
+async fn context_budget_terminalizes_before_submission_started() {
     let captured = Arc::new(Mutex::new(Vec::new()));
     let agent = make_agent(CapturingModel {
         captured: captured.clone(),
@@ -798,15 +798,15 @@ async fn context_budget_pauses_before_submission_started() {
             .await
             .expect("budget pause timeout")
             .expect("session event channel");
-        let paused = matches!(
+        let terminalized = matches!(
             event,
-            SessionEvent::SubmissionPaused {
-                reason: SubmissionRejectionReason::ContextBudgetExceeded,
+            SessionEvent::SubmissionResolved {
+                state: PendingSubmissionState::TerminalError,
                 ..
             }
         );
         events.push(event);
-        if paused {
+        if terminalized {
             break;
         }
     }
