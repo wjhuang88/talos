@@ -23,7 +23,7 @@
 | Source Issue | #466 |
 | Governance Claim PR | Local authorization; implementation remains on this iteration branch until stable candidate. |
 | Authorization Mode | Maintainer authorization |
-| Implementation PR | Not started |
+| Implementation PR | Main commit `71cc03b3` (stable candidate; review pending) |
 
 ## Acceptance
 
@@ -37,6 +37,12 @@
 
 - Focused unit and conformance tests for valid, invalid, and forward-compatible descriptors.
 - Locked checks for affected crate(s), governance validators, and `git diff --check`.
+
+## Execution checkpoint (2026-09-09)
+
+Descriptor contract implementation is present on `main` at `71cc03b322d80d19c3767e4ef2014fecb84c1994`.
+The focused `talos-core` test suite passed locally. Exact-head independent review remains pending;
+this iteration is not marked Complete until that evidence and owner-first closeout are recorded.
 
 ## Residuals
 
