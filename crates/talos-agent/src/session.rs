@@ -414,6 +414,10 @@ impl AppServerSession {
                         if let Some(admission) = &self.runtime_admission {
                             admission.finish_active(None);
                         }
+                        pending_items = pending_items.saturating_sub(submission_size.0);
+                        pending_bytes = pending_bytes.saturating_sub(submission_size.1);
+                        pending_images = pending_images.saturating_sub(submission_size.2);
+                        pending_image_bytes = pending_image_bytes.saturating_sub(submission_size.3);
                         let terminal = self
                             .pending_store
                             .get(&submission.id)

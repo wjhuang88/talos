@@ -159,7 +159,7 @@ impl BridgeTurnState {
     }
 
     fn blocks_session_mutation(&self) -> bool {
-        !matches!(self, Self::Idle)
+        !matches!(self, Self::Idle | Self::PausedAfterFailure)
     }
 }
 
