@@ -16,7 +16,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed (proposed; ineffective until merge) |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 (shared account; Agent-role execution) |
 | Executing Agent | Codex Agent / mainline unattended session |
 | Work Slice | Pre-Provider non-resumable rejection terminalization and model-switch guard correctness |
