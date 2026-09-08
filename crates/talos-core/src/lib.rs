@@ -2,6 +2,7 @@
 
 pub mod approval;
 pub mod background_job;
+pub mod capability;
 pub mod evaluation;
 pub mod message;
 pub mod model;
@@ -11,6 +12,8 @@ pub mod submission;
 pub mod tool;
 pub mod tool_filter;
 pub mod work;
+
+pub use capability::{CapabilityDescriptor, DescriptorError, ProviderDescriptor};
 
 pub use approval::{ApprovalChoice, TuiApprovalRequest};
 pub use evaluation::{
