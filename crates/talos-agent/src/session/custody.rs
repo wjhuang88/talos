@@ -546,25 +546,29 @@ impl AppServerSession {
         &self,
         submission: &StructuredSubmission,
         reason: SubmissionRejectionReason,
-    ) {
+    ) -> bool {
         if submission.source == SubmissionSource::Compatibility {
             self.reject_submission(&submission.id, submission.sender_generation, reason);
-            return;
+            return reason == SubmissionRejectionReason::ContextBudgetExceeded;
         }
         if reason == SubmissionRejectionReason::ContextBudgetExceeded {
-            let receipt_id = self
-                .pending_store
-                .get(&submission.id)
-                .ok()
-                .flatten()
-                .map(|r| r.receipt_id)
-                .unwrap_or_default();
+            let receipt_id = match self.pending_store.get(&submission.id) {
+                Ok(Some(record)) => record.receipt_id,
+                Ok(None) => {
+                    self.emit_custody_error("missing pre-start submission", &submission.id);
+                    return false;
+                }
+                Err(error) => {
+                    self.emit_custody_error("failed to load pre-start submission", &error);
+                    return false;
+                }
+            };
             if let Err(error) = self.pending_store.error_unstarted(&submission.id) {
                 self.emit_custody_error(
                     "failed to terminalize non-resumable pre-start submission",
                     &error,
                 );
-                return;
+                return false;
             }
             let _ = self.eq_tx.send(SessionEvent::SubmissionResolved {
                 session_id: self.session_id.clone(),
@@ -573,11 +577,11 @@ impl AppServerSession {
                 receipt_id,
                 state: PendingSubmissionState::TerminalError,
             });
-            return;
+            return true;
         }
         if let Err(error) = self.pending_store.mark_paused(&submission.id) {
             self.emit_custody_error("failed to pause accepted pre-start submission", &error);
-            return;
+            return false;
         }
         let receipt_id = match self.pending_store.get(&submission.id) {
             Ok(Some(record)) => record.receipt_id,
@@ -594,5 +598,6 @@ impl AppServerSession {
             receipt_id,
             reason,
         });
+        false
     }
 }
