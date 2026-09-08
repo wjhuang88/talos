@@ -48,6 +48,28 @@ documents, runnable iterations, effective claims, and exact-head validation.
 - Adding a second TUI/Desktop capability registry.
 - Embedding all optional language parsers in the default binary.
 
+## Migration matrix (proposed)
+
+| Existing concept | Target concept | Compatibility rule | Rollback boundary |
+|---|---|---|---|
+| Plugin package references | Bundle references | Read existing package metadata; emit target vocabulary only after a versioned migration | Revert metadata migration without changing runtime state |
+| `enabled` boolean | Installed/Active lifecycle states | Do not reinterpret persisted `enabled`; introduce explicit state fields in a separately versioned schema | Continue legacy interpretation until migration completes |
+| Direct parser consumers | Language Provider consumer contract | Keep current consumers behind adapters until one provider vertical slice is validated | Remove adapter and restore existing consumer path |
+| Tool/backend disclosure | Provider registration plus presentation policy | Registration never implies prompt exposure; preserve TOOL-012/014 decisions | Disable provider contribution while retaining disclosure policy |
+
+Migration must be dual-read before controlled-write, must preserve unknown fields, and must fail
+closed on invalid or incompatible versions. No network fetch, executable installation, permission
+grant, or persisted schema rewrite is implied by this ADR.
+
+## Staged child boundaries (proposed)
+
+1. CAP-001-A: descriptor contracts and compatibility types.
+2. CAP-001-B: offline registry/resolver and conformance tests.
+3. CAP-001-C: Plugin contribution and Carrier adapters.
+4. BUNDLE/TEXT/LANG/DIST/BROWSER children only after the contracts are accepted.
+
+Each child must have its own owner, iteration, claim, acceptance evidence, and exact-head review.
+
 ## Acceptance checklist
 
 - [ ] Independent architecture review accepts this ADR.
