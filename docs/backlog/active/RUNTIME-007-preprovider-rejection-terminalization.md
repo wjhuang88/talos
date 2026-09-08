@@ -1,33 +1,33 @@
 # RUNTIME-007: Pre-Provider Rejection Terminalization
 
-> Document status: Refinement / Unclaimed
+> Document status: Active / Claimed (proposed; ineffective until atomic claim record merges)
 
 | Field | Value |
 |---|---|
 | Story ID | RUNTIME-007 |
 | Type | Runtime / Session Story |
 | Priority | P1 |
-| Status | Refinement / Unclaimed |
+| Status | Active / Claimed (proposed; ineffective until merge) |
 | Source | [GitHub Issue #499](https://github.com/wjhuang88/talos/issues/499) |
-| Selected Iteration | None |
+| Selected Iteration | I251 |
 | Depends On | Runtime submission lifecycle characterization; #408 relationship review |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex Agent / mainline unattended session |
 | Work Slice | Pre-Provider non-resumable rejection terminalization and model-switch guard correctness |
-| Claimed At | Not applicable |
+| Claimed At | 2026-09-08 |
 | Source Issue | #499 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #504 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Prior head fa1c40f7: CI 34188252548 passed; review comment 5579449346 requested changes. Corrected head requires fresh CI and independent APPROVE before merge; no approval is claimed. |
 | Implementation PR | Not started |
-| Last Updated | 2026-09-07 |
-| Handoff / Release Condition | Characterize runtime owner and preserve queued-work identity before selecting an iteration |
+| Last Updated | 2026-09-08 |
+| Handoff / Release Condition | Claim/activation are ineffective until the finalized record reaches `main`; implementation starts from that merge or later. |
 
 ## Scope
 
@@ -49,7 +49,7 @@ permission/sandbox behavior. Any dependency change requires separate dependency 
 
 ## Verification Evidence
 
-- Pending characterization, iteration selection and effective claim.
+- I251 selection and atomic claim preparation recorded; effective claim, implementation and exact-head evidence remain pending.
 
 ## Completion Evidence
 
