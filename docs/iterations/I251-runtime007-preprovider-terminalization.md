@@ -1,6 +1,6 @@
 # Iteration I251: Pre-Provider Rejection Terminalization
 
-> Document status: Planned
+> Document status: Active / Claimed (proposed; ineffective until merge)
 > Published plan date: 2026-09-08
 > Planned objective: Convert deterministic pre-Provider rejection into an idempotent terminal lifecycle outcome so model/provider switching is not blocked by stale active submission state.
 > Baseline rule: preserve this target; a changed objective requires a new iteration ID.
@@ -18,7 +18,7 @@
 | Source Issue | #499 |
 | Governance Claim PR | #504 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Pending exact-head governance validation and independent review |
+| Authorization Evidence | Prior head fa1c40f7: CI 34188252548 passed; review comment 5579449346 requested changes. Corrected head requires fresh CI and independent APPROVE before merge; no approval is claimed. |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-08 |
 | Handoff / Release Condition | Claim becomes effective only when this activation record reaches `main`; implementation starts from that merge or a later `main` commit. #466 remains a separate architecture-only parent. |
@@ -74,6 +74,29 @@
 | 2026-09-08 | Claim preparation | Prepared atomic claim+activation for #499 after inventorying non-terminal iterations. Both claim and Active state remain ineffective until the governance record merges to `main`. |
 
 ## Verification Evidence
+
+### 2026-09-08 Inventory And Review Correction Checkpoint
+
+Target baseline: `main@891c7800943c8337df6e2a0f74f2361ef9c086d2`.
+The current iteration headers contain no Active, Review or Blocked iteration on that baseline.
+I162's Complete / Review-outcome header is terminal, not an open Review iteration.
+
+| Item | Current state | Disposition |
+|---|---|---|
+| I251 / RUNTIME-007 / #499 / PR #504 | Active / Claimed proposed; ineffective until merge | Select this bounded correction first; no implementation branch before claim merge. |
+| I249 | Planned / Unclaimed | Defer the one-package dependency pilot; I250's full upgrade is Complete and no dependency change is selected here. |
+| I164 | Paused / superseded by I165 | Preserve pause; do not resume or repurpose. |
+| Legacy status-less and superseded iterations | Historical records | Confer no current authority; do not activate or restore. |
+| #408 | Closed; related Esc-cancellation symptom | Preserve its completion; characterize shared queue/model-switch guards without reopening or substituting for #499 acceptance. |
+| CAP-001 / #466 | Refinement / Unclaimed parent Epic | Handle architecture governance serially after #499; no parent implementation authority. |
+| DEPENDENCY-003 / #502 | Refinement / Unclaimed residual | Keep dependency risk work separate; no activation or Cargo changes. |
+| Open PR inventory | #504 only | No overlapping implementation PR; repeat this check at merge-time CAS. |
+
+This checkpoint supplies the previously omitted inventory and corrects current owner/derived
+activation fields. The Published Baseline remains unchanged. Review comment `5579449346`
+and the independent GLM-5.3 review on #504 both requested changes; neither is approval.
+Execution and review share a GitHub account and claim Agent-role separation only, not
+natural-person separation. A fresh APPROVE must bind the corrected candidate before merge.
 
 - Pending effective claim, implementation, focused runtime tests, and exact-head review.
 

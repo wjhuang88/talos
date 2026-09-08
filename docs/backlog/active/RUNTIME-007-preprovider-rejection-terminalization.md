@@ -7,7 +7,7 @@
 | Story ID | RUNTIME-007 |
 | Type | Runtime / Session Story |
 | Priority | P1 |
-| Status | Refinement / Unclaimed |
+| Status | Active / Claimed (proposed; ineffective until merge) |
 | Source | [GitHub Issue #499](https://github.com/wjhuang88/talos/issues/499) |
 | Selected Iteration | I251 |
 | Depends On | Runtime submission lifecycle characterization; #408 relationship review |
@@ -24,7 +24,7 @@
 | Source Issue | #499 |
 | Governance Claim PR | #504 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Pending exact-head governance validation and independent review |
+| Authorization Evidence | Prior head fa1c40f7: CI 34188252548 passed; review comment 5579449346 requested changes. Corrected head requires fresh CI and independent APPROVE before merge; no approval is claimed. |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-08 |
 | Handoff / Release Condition | Claim/activation are ineffective until the finalized record reaches `main`; implementation starts from that merge or later. |
