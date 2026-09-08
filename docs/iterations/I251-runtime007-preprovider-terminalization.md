@@ -102,6 +102,15 @@ natural-person separation. A fresh APPROVE must bind the corrected candidate bef
 
 ## Completion Evidence
 
+### 2026-09-08 Candidate Validation Checkpoint
+
+Implementation candidate PR #505 currently points to `8de70a58`. Local locked validation
+passed for the focused agent/session/CLI regression paths; prior exact-head CI run
+`34242505749` passed all compile, test, and Windows jobs after the import correction, while
+its reconciliation job predated the current owner synchronization. Issue #499 reconciliation
+comment `5587908427` records the current owner and candidate state. A fresh exact-head CI and
+independent review are required before merge.
+
 - Completion Commit: pending
 
 ## Variance And Residuals
