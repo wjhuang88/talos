@@ -1,6 +1,6 @@
 # Iteration I253: Capability Architecture Governance Convergence
 
-> Document status: Review
+> Document status: Complete / Closed
 > Claim and activation effective on main through PR #518 merge `53fc57b3a607ab33d8aad51faf4662f672d55efa`.
 > Published plan date: 2026-09-09
 > MVP deliverable: An auditable requirement-to-owner map for every governance acceptance item in Issue #466, with independently executable downstream Stories.
@@ -9,7 +9,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex mainline execution Agent |
 | Work Slice | CAP-001-G architecture audit, terminology migration contract, child decomposition and documentation synchronization only. |
@@ -19,7 +19,7 @@
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer authorized single-developer unattended completion of #499 then #466 and accepted ADR-072. Independent Agent-role review and exact-head CI were completed for #518; shared GitHub identity does not prove natural-person separation. Claim is effective after merge `53fc57b3`. |
 | Implementation PR | #521 |
-| Last Updated | 2026-09-09 |
+| Last Updated | 2026-09-10 |
 | Handoff / Release Condition | Handoff requires the documented governance audit and closeout; no runtime implementation authority. |
 
 ## Published Baseline
@@ -132,9 +132,11 @@ Collaboration Claim.
 
 ## Execution And Completion Evidence
 
-Completion Commit: Pending. Status changes cannot self-certify.
-Next: complete the post-claim governance audit locally from merge `53fc57b3`;
-push only after the full acceptance matrix and migration evidence converge.
+Completion Commit: `60851fb23128a151ecbd17e86ec4730ffebb3135` (PR #521 merge).
+Status changes cannot self-certify. The completion commit is the already-merged governance
+implementation that reconciled the audit, migration contract, owner map, and required indexes.
+Next: CAP-001-B / #512 is the only dependency-ready downstream child. It remains Ready / Unclaimed
+until a separately selected iteration and effective Collaboration Claim exist.
 
 ### 2026-09-09 Atomic Claim Candidate Checkpoint
 
@@ -352,3 +354,18 @@ evidence for this candidate is `git diff --check`, project-governance validation
 Collaboration Claim validation, manifest YAML parsing, and changed-file review; no Rust/Cargo files
 changed, so Rust workspace validation is not applicable. Independent exact-head review, applicable
 CI, merge-time CAS, and owner-first closeout remain required before `Complete` or `Closed`.
+
+### 2026-09-10 Completion Checkpoint
+
+PR #521 merged as `60851fb23128a151ecbd17e86ec4730ffebb3135` after exact-head CI
+`34376084496` passed its applicable documentation checks, including the remote Issue/owner
+reconciliation rerun. Independent Agent-role governance review bound to head
+`6f958fb686eeea5955251efc5cadcd8fc56c6303` and base
+`53fc57b3a607ab33d8aad51faf4662f672d55efa` approved the complete acceptance matrix, preserved
+Published Baseline, and confirmed no downstream child activation. Shared GitHub identity does not
+prove natural-person separation.
+
+This iteration is Complete / Closed. The completion commit above predates this owner-first
+closeout; this status/documentation change is not completion evidence. CAP-001 / #466 remains an
+open architecture Epic. CAP-001-B / #512 is the next dependency-ready child but has no active
+iteration, claim, or implementation authority.
