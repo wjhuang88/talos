@@ -21,9 +21,13 @@
 | Executing Agent | Codex Agent / single-developer unattended session |
 | Work Slice | Descriptor identity, version/capability compatibility, provider metadata, validation errors, and offline conformance fixtures. |
 | Source Issue | #466 |
-| Governance Claim PR | Local authorization; implementation remains on this iteration branch until stable candidate. |
-| Authorization Mode | Maintainer authorization |
+| Claimed At | 2026-09-09 |
+| Governance Claim PR | Direct commit `4f8e641a` (effective claim on main) |
+| Authorization Mode | Direct commit |
+| Authorization Evidence | Maintainer authorization recorded in ADR-072; single-developer unattended session. |
 | Implementation PR | Main commit `71cc03b3` (stable candidate; review pending) |
+| Last Updated | 2026-09-09 |
+| Handoff / Release Condition | Independent exact-head review and owner-first closeout required before Complete. |
 
 ## Acceptance
 
