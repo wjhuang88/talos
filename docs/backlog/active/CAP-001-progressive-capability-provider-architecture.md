@@ -70,7 +70,7 @@ This Epic is an architecture and decomposition owner. It does not authorize impl
 | BUNDLE-001 / Issue #514 | Bundle manifest, installation identity and terminology migration. | Refinement / Unclaimed; owner created, blocked on CAP-001-C |
 | TEXT-001 / Issue #511 | UI-neutral text semantics contract. | Refinement / Unclaimed; owner created, blocked on CAP-001-C |
 | LANG-001 / Issue #510 | Shared Language Provider contract and existing consumer migration. | Refinement / Unclaimed; owner created, blocked on TEXT-001 and CAP-001-C |
-| LANG-002 / Issue #516 | Rust Language Provider vertical slice. | Refinement / Unclaimed; owner created, blocked on LANG-001 |
+| LANG-002 / Issue #516 | Rust WASM Language Provider vertical slice. | Refinement / Unclaimed; owner created, blocked on LANG-001/CAP-001-C/DIST-001-A |
 | LANG-003 / Issue #517 | Remaining Language Provider migration and default distribution. | Refinement / Unclaimed; owner created, blocked on LANG-002/BUNDLE-001/DIST-001-A |
 | DIST-001-A / Issue #509 | Verified manual Bundle installation. | Refinement / Unclaimed; owner created, blocked on BUNDLE-001/CAP-001-C |
 | DIST-001-B / Issue #515 | Consented on-demand capability resolution. | Refinement / Unclaimed; owner created, blocked on DIST-001-A/CAP-001-B/C/BUNDLE-001 |

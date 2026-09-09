@@ -1,6 +1,7 @@
 # Iteration I253: Capability Architecture Governance Convergence
 
-> Document status: Planned
+> Document status: Active
+> Proposed through PR #518; claim and activation are ineffective until merge to main.
 > Published plan date: 2026-09-09
 > MVP deliverable: An auditable requirement-to-owner map for every governance acceptance item in Issue #466, with independently executable downstream Stories.
 
@@ -8,15 +9,15 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex mainline execution Agent |
 | Work Slice | CAP-001-G architecture audit, terminology migration contract, child decomposition and documentation synchronization only. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-09-09 |
 | Source Issue | #466 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Maintainer requests unattended completion of #499 then #466; claim preparation only. |
+| Governance Claim PR | #518 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Maintainer authorized single-developer unattended completion of #499 then #466 and accepted ADR-072. Independent Agent-role review and exact-head CI remain required; shared GitHub identity does not prove natural-person separation. Proposed claim is ineffective until merge. |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-09 |
 | Handoff / Release Condition | Claim and activation must reach main before governance implementation; no runtime implementation authority. |
@@ -131,6 +132,32 @@ Collaboration Claim.
 
 ## Execution And Completion Evidence
 
-Claim preparation only. Completion Commit: Pending. Status changes cannot self-certify.
+Completion Commit: Pending. Status changes cannot self-certify.
 Next: finalize atomic claim using the actual PR number, obtain stage checks, CAS and merge;
 then start the governance implementation from that merge or later main.
+
+### 2026-09-09 Atomic Claim Candidate Checkpoint
+
+PR #518 now proposes Active / Claimed for I253 and CAP-001-G only. This checkpoint
+supersedes the earlier claim-preparation current state, not the Published Baseline.
+Both ownership and activation remain ineffective until merge. No implementation branch
+may start before that merge or a later main commit. CAP-001 and all ten downstream
+children retain their existing unclaimed states; ADR acceptance grants no runtime authority.
+
+Fresh fetch confirms main remains `c878eabcee9ca3064b15291ce8fa073874915791`.
+Inventory: I249 remains Planned/Unclaimed and deferred; I164 remains Paused/superseded;
+all other current iteration headers are terminal, with I162's Complete/Review-outcome
+treated as terminal. I253 is the sole proposed activation. PR #518 is the only open PR;
+there is one worktree and no stash. Earlier CI `34322110835` proved the planning head
+`111199b9`, not this changed claim candidate; fresh exact-head CI/review are required.
+
+Next gate: validate this finalized candidate locally, push it once, obtain independent
+Agent-role governance review, then perform merge-time CAS. After merge, audit the full
+#466 acceptance matrix and migration contracts locally; do not claim the intake map
+alone completes #466. No Rust build is required for this documentation-only candidate.
+
+The earlier dated Child Issue Map is superseded for LANG-002 dependency detail: the
+Rust WASM vertical slice requires LANG-001, CAP-001-C and DIST-001-A (verified manual
+installation), not just LANG-001. BUNDLE-001 owns the actual compatible schema/manifest
+migration after its decision gate, not only the migration plan. These corrections
+preserve #466's installation/loading and WASM requirements without activating children.
