@@ -161,3 +161,23 @@ Rust WASM vertical slice requires LANG-001, CAP-001-C and DIST-001-A (verified m
 installation), not just LANG-001. BUNDLE-001 owns the actual compatible schema/manifest
 migration after its decision gate, not only the migration plan. These corrections
 preserve #466's installation/loading and WASM requirements without activating children.
+
+### 2026-09-09 Claim Review Disposition
+
+The dated Child Issue Map remains historical. Current dependencies are owned by the
+child documents: TEXT-001 depends on completed CAP-001-A, LANG-001 on TEXT-001 and
+CAP-001-A, and BUNDLE-001 on ADR-072 plus manifest compatibility evidence and a dedicated
+migration decision. CAP-001-C is not a prerequisite for those contracts. TEXT-001
+remains Refinement pending this governance audit and its consumer ownership inventory;
+only CAP-001-B has completed readiness preparation. This is scheduling, not a fabricated
+technical dependency. LANG-002 still needs CAP-001-C and DIST-001-A for real WASM loading.
+
+The following acceptance remains unfulfilled and belongs to post-claim I253 execution,
+not this activation candidate: ADR-029 supersession note; linked supersession of the
+old Plugin encapsulation proposal and ADR/proposal indexes; plugins/ runtime-source
+versus bundles/ artifact layout; concrete PluginManifest skills/tools/hooks versus
+missing mcp/provides evidence; full #466 acceptance matrix and migration audit; and
+distinct executable Issue mapping for CAP-001-G with a reciprocal Epic child link.
+Issue #466 remains the parent requirement source, not authorization to implement all
+children. These rows must be completed before governance closeout; intake alone is
+not completion evidence.

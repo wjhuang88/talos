@@ -8,7 +8,7 @@
 | Status | Refinement / Unclaimed |
 | Selected Iteration | None |
 | Source Issue | [GitHub Issue #510](https://github.com/wjhuang88/talos/issues/510) |
-| Depends On | TEXT-001; CAP-001-B/C |
+| Depends On | TEXT-001; CAP-001-A |
 
 ## Collaboration Claim
 
@@ -30,6 +30,9 @@
 
 Define a shared LanguageProvider surface for highlighting, syntax queries, symbols and outline
 consumers, then migrate existing consumers without exposing parser-native types.
+
+This contract and existing-consumer migration do not require Plugin/Carrier loading.
+CAP-001-C and verified installation instead gate the separate LANG-002 WASM slice.
 
 ## Non-Goals
 

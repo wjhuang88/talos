@@ -67,9 +67,9 @@ This Epic is an architecture and decomposition owner. It does not authorize impl
 | CAP-001-A / I252 | Stable Capability and Provider descriptor contracts. | Complete / Closed; Completion Commit `71cc03b322d80d19c3767e4ef2014fecb84c1994`, merged via PR #507 as `0835afc4b982a5ed409ccfb55538bbeaf6fe5eab` |
 | CAP-001-B / Issue #512 | Capability registry and resolver. | Ready / Unclaimed; owner created, not activated |
 | CAP-001-C / Issue #513 | Plugin capability declarations and Carrier adapters. | Refinement / Unclaimed; owner created, blocked on CAP-001-B |
-| BUNDLE-001 / Issue #514 | Bundle manifest, installation identity and terminology migration. | Refinement / Unclaimed; owner created, blocked on CAP-001-C |
-| TEXT-001 / Issue #511 | UI-neutral text semantics contract. | Refinement / Unclaimed; owner created, blocked on CAP-001-C |
-| LANG-001 / Issue #510 | Shared Language Provider contract and existing consumer migration. | Refinement / Unclaimed; owner created, blocked on TEXT-001 and CAP-001-C |
+| BUNDLE-001 / Issue #514 | Bundle manifest, installation identity and terminology migration. | Refinement / Unclaimed; compatibility audit and dedicated migration decision required, not blocked on CAP-001-C |
+| TEXT-001 / Issue #511 | UI-neutral text semantics contract. | Refinement / Unclaimed; CAP-001-A prerequisite met, I253 audit and consumer ownership inventory pending |
+| LANG-001 / Issue #510 | Shared Language Provider contract and existing consumer migration. | Refinement / Unclaimed; blocked on TEXT-001, not on CAP-001-C |
 | LANG-002 / Issue #516 | Rust WASM Language Provider vertical slice. | Refinement / Unclaimed; owner created, blocked on LANG-001/CAP-001-C/DIST-001-A |
 | LANG-003 / Issue #517 | Remaining Language Provider migration and default distribution. | Refinement / Unclaimed; owner created, blocked on LANG-002/BUNDLE-001/DIST-001-A |
 | DIST-001-A / Issue #509 | Verified manual Bundle installation. | Refinement / Unclaimed; owner created, blocked on BUNDLE-001/CAP-001-C |

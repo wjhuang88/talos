@@ -8,7 +8,7 @@
 | Status | Refinement / Unclaimed |
 | Selected Iteration | None |
 | Source Issue | [GitHub Issue #514](https://github.com/wjhuang88/talos/issues/514) |
-| Depends On | CAP-001-C; ADR-072; existing PluginManifest compatibility evidence |
+| Depends On | ADR-072; existing PluginManifest compatibility evidence; dedicated manifest migration ADR before implementation |
 
 ## Collaboration Claim
 

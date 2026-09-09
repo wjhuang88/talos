@@ -8,7 +8,7 @@
 | Status | Refinement / Unclaimed |
 | Selected Iteration | None |
 | Source Issue | [GitHub Issue #511](https://github.com/wjhuang88/talos/issues/511) |
-| Depends On | CAP-001-C; ADR-072 |
+| Depends On | CAP-001-A; ADR-072 |
 
 ## Collaboration Claim
 
@@ -30,6 +30,10 @@
 
 Define shared text/code-block semantics and deterministic plain-text fallback for TUI, Desktop and
 tools. Results must not expose Ratatui, GPUI, Arborium or Tree-sitter types.
+
+CAP-001-C is not a prerequisite for this contract. It remains Refinement pending the
+I253 acceptance audit and consumer ownership inventory; scheduling CAP-001-B first
+does not create a technical dependency on its Plugin/Carrier branch.
 
 ## Non-Goals
 
