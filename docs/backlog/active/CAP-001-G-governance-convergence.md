@@ -1,0 +1,50 @@
+# CAP-001-G: Capability Architecture Governance Convergence
+
+| Field | Value |
+|---|---|
+| Story ID | CAP-001-G |
+| Type | Governance Story |
+| Parent | CAP-001 |
+| Status | Ready / Unclaimed |
+| Selected Iteration | I253 (claim preparation only) |
+| Source | Issue #466 |
+| Depends On | ADR-072 Accepted; CAP-001-P0 Complete |
+
+## Collaboration Claim
+
+| Field | Value |
+|---|---|
+| Claim State | Unclaimed |
+| Responsible Actor | Not assigned |
+| Executing Agent | Not assigned |
+| Work Slice | CAP-001-G architecture audit, terminology migration contract, child decomposition and documentation synchronization only. |
+| Claimed At | Not applicable |
+| Source Issue | #466 |
+| Governance Claim PR | Pending |
+| Authorization Mode | Not applicable |
+| Authorization Evidence | Unattended #499 then #466 request; no effective claim yet. |
+| Implementation PR | Not started |
+| Last Updated | 2026-09-09 |
+| Handoff / Release Condition | Effective governance claim required; no CAP-001-B/C or runtime authorization. |
+
+## Goal And Acceptance
+
+Deliver the architecture-governance outcome explicitly requested by #466, not all downstream
+product implementations and not a descriptor-only substitute. The complete scope, exclusions,
+requirements-to-evidence acceptance, validation and documentation targets are the published
+[I253 plan](../../iterations/I253-capability-governance-convergence.md).
+Each governance acceptance bullet in #466 must have concrete evidence; missing downstream
+features require real child owners/Issues and must not be described as implemented.
+
+## Required Reads
+
+- [CAP-001](CAP-001-progressive-capability-provider-architecture.md)
+- [I253](../../iterations/I253-capability-governance-convergence.md), including its Required Reads.
+- [ADR-072](../../decisions/072-capability-provider-bundle-boundary.md)
+- Full Issue #466 body/comments and the #467 compatibility evidence.
+
+## State Owners And Residuals
+
+This file owns Story state; I253 owns execution. Parent CAP-001 owns architecture and child map.
+Later runtime, API, schema and domain work remains with separately claimed children.
+Complete requires an already-existing governance implementation commit plus full acceptance evidence.
