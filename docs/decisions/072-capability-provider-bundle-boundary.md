@@ -77,5 +77,8 @@ Each child must have its own owner, iteration, claim, acceptance evidence, and e
 ## Acceptance checklist
 
 - [x] Maintainer authorization accepts this ADR; independent review evidence is recorded separately.
-- [ ] CAP-001 child owners and dependencies are created after acceptance.
+- [x] CAP-001 child owners and dependencies are created after acceptance: CAP-001-B #512,
+  CAP-001-C #513, TEXT-001 #511, LANG-001 #510, LANG-002 #516, LANG-003 #517,
+  BUNDLE-001 #514, DIST-001-A #509, DIST-001-B #515 and BROWSER-001 #508. These owners
+  remain separately unclaimed and do not authorize implementation.
 - [ ] Existing completed stories retain their original scope and evidence.
