@@ -12,7 +12,7 @@ Issue #466 requires a single vocabulary for capabilities, executable extensions,
 installation artifacts. Existing Plugin, Tool, language, browser, and distribution
 documents use overlapping terms and must not be treated as one runtime contract.
 
-## Decision (proposed)
+## Decision
 
 - **Capability** is a stable core contract; it is not an implementation or install unit.
 - **Provider** implements one or more capabilities behind a UI-neutral contract.
@@ -37,7 +37,7 @@ to a safe domain-specific fallback without crashing the process.
 No persisted manifest field or public Rust API is renamed by this ADR. Any rename requires a
 versioned migration matrix, dual-read/controlled-write period, rollback behavior, and a separate
 accepted ADR. Existing ADR-027 WASM safety conclusions remain authoritative; only the package
-terminology portion of ADR-029 is proposed for supersession.
+terminology portion of ADR-029 is superseded by this ADR.
 
 ## Scope and gates
 
@@ -52,7 +52,7 @@ documents, runnable iterations, effective claims, and exact-head validation.
 - Adding a second TUI/Desktop capability registry.
 - Embedding all optional language parsers in the default binary.
 
-## Migration matrix (proposed)
+## Migration matrix
 
 | Existing concept | Target concept | Compatibility rule | Rollback boundary |
 |---|---|---|---|
@@ -65,7 +65,7 @@ Migration must be dual-read before controlled-write, must preserve unknown field
 closed on invalid or incompatible versions. No network fetch, executable installation, permission
 grant, or persisted schema rewrite is implied by this ADR.
 
-## Staged child boundaries (proposed)
+## Staged child boundaries
 
 1. CAP-001-A: descriptor contracts and compatibility types.
 2. CAP-001-B: offline registry/resolver and conformance tests.
