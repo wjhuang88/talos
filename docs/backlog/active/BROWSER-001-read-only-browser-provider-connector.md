@@ -26,6 +26,11 @@
 | Last Updated | 2026-09-09 |
 | Handoff / Release Condition | Requires a connector ADR/security review and explicit overlap agreement with WEB-005/TOOL-014. |
 
+## Required Reads
+
+- [CAP-001 parent](CAP-001-progressive-capability-provider-architecture.md), [ADR-072](../../decisions/072-capability-provider-bundle-boundary.md), and [WEB-005](WEB-005-browser-session-continuity-research.md).
+- [TOOL-014](TOOL-014-conditional-tool-backends.md) and the connector ADR/security gate. This read-only connector does not authorize frame-aware interaction requested by Issue #520.
+
 ## Goal And Scope
 
 Implement a selected read-only browser connector that produces the existing redacted

@@ -62,6 +62,17 @@ A single PR may proceed without creating a governed task only when all of these 
 The PR description must state why the bounded-maintenance exception applies. If any condition stops
 being true, pause and establish a governed claim.
 
+### Issue Granularity And Local Subtasks
+
+GitHub Issues represent externally meaningful requirements, independently scheduled Stories,
+cross-agent handoffs, security or incident records, or long-task validation queues. They are not a
+checklist mechanism for every implementation step. Keep local design notes, test fixes, wording
+corrections, review follow-ups, intermediate commits, and owner/derived-view synchronization inside
+the existing iteration owner and candidate PR while the Work Slice remains unchanged. Do not open a
+new Issue, claim, iteration, or PR for those steps. Create or amend a separately governed Issue only
+when the work becomes an independently deliverable requirement, crosses an ownership boundary, or
+needs a durable external handoff or acceptance record.
+
 ### Release And Reviewer Follow-Ups
 
 - Release execution uses its existing release task owner and authorization record. A separate claim

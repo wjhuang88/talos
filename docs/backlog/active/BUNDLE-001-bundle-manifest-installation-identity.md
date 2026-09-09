@@ -26,6 +26,11 @@
 | Last Updated | 2026-09-09 |
 | Handoff / Release Condition | Requires a dedicated migration ADR or accepted change-control record before schema edits. |
 
+## Required Reads
+
+- [CAP-001 parent](CAP-001-progressive-capability-provider-architecture.md) and [ADR-072](../../decisions/072-capability-provider-bundle-boundary.md).
+- `crates/talos-plugin/src/manifest.rs`, the I253 migration matrix, and a dedicated manifest migration ADR or accepted change-control record before schema edits.
+
 ## Goal And Scope
 
 Separate install/distribution Bundles from executable Plugins. Define package root, cache identity,

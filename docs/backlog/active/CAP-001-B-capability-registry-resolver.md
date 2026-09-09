@@ -26,6 +26,11 @@
 | Last Updated | 2026-09-09 |
 | Handoff / Release Condition | A fresh runnable iteration and effective claim are required before code or Cargo changes. |
 
+## Required Reads
+
+- [CAP-001 parent](CAP-001-progressive-capability-provider-architecture.md) and [ADR-072](../../decisions/072-capability-provider-bundle-boundary.md).
+- CAP-001-A/I252 descriptor evidence; do not infer Plugin carrier or Bundle installation authority from this registry scope.
+
 ## Goal And Scope
 
 Provide one deterministic, UI-neutral registry/resolver boundary for the Capability and Provider

@@ -4,6 +4,14 @@
 
 Accepted
 
+### 2026-09-09 Partial Supersession
+
+[ADR-072](072-capability-provider-bundle-boundary.md) supersedes the package terminology below:
+Bundle is the distribution/install unit; Plugin is the executable extension. The historical
+decision and rationale are preserved. Independent component configuration, explicit conflicts,
+hook failure boundaries and ADR-027 WASM safety remain authoritative. No public API or stored
+manifest is renamed by this terminology decision; see the ADR-072 migration contract.
+
 ## Context
 
 Talos currently has skills, MCP servers, hooks, and a planned plugin concept, but they are not

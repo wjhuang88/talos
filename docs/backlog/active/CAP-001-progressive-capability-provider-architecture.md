@@ -63,6 +63,7 @@ This Epic is an architecture and decomposition owner. It does not authorize impl
 
 | Child | Outcome | Current State |
 |---|---|---|
+| [CAP-001-G](CAP-001-G-governance-convergence.md) / Issue #519 | Architecture governance audit and migration contract. | I253 Active / Claimed through #518 merge `53fc57b3`; no downstream implementation authority |
 | CAP-001-P0 / Issue #467 | Characterize current behavior and prepare compatibility seams plus cross-lane ownership before capability implementation. | I246 Complete / Closed; Completion Commit `9a3c1d860408c1438ec1a7ad4b57860167d0cb01` via implementation PR #492 |
 | CAP-001-A / I252 | Stable Capability and Provider descriptor contracts. | Complete / Closed; Completion Commit `71cc03b322d80d19c3767e4ef2014fecb84c1994`, merged via PR #507 as `0835afc4b982a5ed409ccfb55538bbeaf6fe5eab` |
 | CAP-001-B / Issue #512 | Capability registry and resolver. | Ready / Unclaimed; owner created, not activated |

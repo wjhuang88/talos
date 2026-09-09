@@ -26,6 +26,11 @@
 | Last Updated | 2026-09-09 |
 | Handoff / Release Condition | Requires manual installation evidence, consent UX/security decision and network policy owner. |
 
+## Required Reads
+
+- [CAP-001 parent](CAP-001-progressive-capability-provider-architecture.md), [ADR-072](../../decisions/072-capability-provider-bundle-boundary.md), [DIST-001-A](DIST-001-A-verified-manual-bundle-installation.md), and [BUNDLE-001](BUNDLE-001-bundle-manifest-installation-identity.md).
+- [DIST-001 policy](DIST-001-optional-runtime-asset-distribution.md); no startup network dependency or silent executable download is authorized.
+
 ## Goal And Scope
 
 Resolve a missing optional capability only after explicit user consent, bounded network policy,

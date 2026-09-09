@@ -19,6 +19,19 @@ I091 A8 produced `docs/proposals/optional-runtime-asset-distribution.md`, an ADR
 manifest schema, checksum/signature verification, Talos-controlled cache layout, consent UX,
 offline/mirror behavior, activation separation, uninstall/cleanup, and failure fallback.
 
+## 2026-09-09 Implementation Ownership
+
+The policy-only completion above is unchanged; installation is not implemented by that evidence.
+Under [ADR-072](../../decisions/072-capability-provider-bundle-boundary.md), historical
+"plugin package" distribution references below mean Bundles containing executable Plugins.
+The old proposal remains policy input, not a current schema or installation API.
+[DIST-001-A](DIST-001-A-verified-manual-bundle-installation.md) / #509 owns verified manual
+installation; [DIST-001-B](DIST-001-B-consented-on-demand-resolution.md) / #515 owns consented
+on-demand acquisition. Both are unclaimed children of
+[CAP-001](CAP-001-progressive-capability-provider-architecture.md), with schema migration in
+[BUNDLE-001](BUNDLE-001-bundle-manifest-installation-identity.md). No download, permission or
+activation authority is granted here; distribution/security decisions remain required.
+
 ## Priority
 
 P3.

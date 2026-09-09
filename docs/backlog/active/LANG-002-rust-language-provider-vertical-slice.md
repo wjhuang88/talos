@@ -26,6 +26,11 @@
 | Last Updated | 2026-09-09 |
 | Handoff / Release Condition | Requires LANG-001 implementation evidence and a separate security/dependency review. |
 
+## Required Reads
+
+- [CAP-001 parent](CAP-001-progressive-capability-provider-architecture.md), [ADR-072](../../decisions/072-capability-provider-bundle-boundary.md), and [ADR-027](../../decisions/027-plugin-runtime-boundary.md).
+- [LANG-001](LANG-001-language-provider-contract-migration.md), [CAP-001-C](CAP-001-C-plugin-capability-carriers.md), and [DIST-001-A](DIST-001-A-verified-manual-bundle-installation.md).
+
 ## Goal And Scope
 
 Prove one end-to-end `language.rust` WASM Provider can serve highlighting and symbol consumers

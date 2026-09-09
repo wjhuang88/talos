@@ -26,6 +26,11 @@
 | Last Updated | 2026-09-09 |
 | Handoff / Release Condition | Requires a selected iteration and explicit overlap agreement with TUI/Desktop consumers. |
 
+## Required Reads
+
+- [CAP-001 parent](CAP-001-progressive-capability-provider-architecture.md) and [ADR-072](../../decisions/072-capability-provider-bundle-boundary.md).
+- I246/CAP-001-P0 compatibility evidence; this contract must remain UI-neutral and does not authorize parser loading or distribution.
+
 ## Goal And Scope
 
 Define shared text/code-block semantics and deterministic plain-text fallback for TUI, Desktop and

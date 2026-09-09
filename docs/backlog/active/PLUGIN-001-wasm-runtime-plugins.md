@@ -10,6 +10,21 @@
 
 ## Current Selection
 
+### 2026-09-09 Scope And Terminology Clarification
+
+The Complete status covers the local explicit read-only WASM Tool adapter and `/plugins`
+product evidence only. The dated plans below are retained as history, not authorization to
+implement every listed extension. [ADR-072](../../decisions/072-capability-provider-bundle-boundary.md)
+supersedes the old package definition: Bundle is distribution; Plugin is executable runtime.
+Legacy `PluginManifest`, `[plugin]`, `--plugin` and `/plugins` remain current compatibility
+spellings, not evidence of a general Bundle installer or Capability Provider runtime.
+Future package/schema work belongs to [BUNDLE-001](BUNDLE-001-bundle-manifest-installation-identity.md);
+runtime contributions belong to [CAP-001-C](CAP-001-C-plugin-capability-carriers.md), under
+[CAP-001](CAP-001-progressive-capability-provider-architecture.md). This clarification neither
+reopens PLUGIN-001 nor broadens its completion evidence; ADR-027 safety constraints remain intact.
+
+### Historical Selection And Evidence
+
 I091 activated 2026-07-04 to audit the local explicit plugin diagnostics/runtime state after the
 T111 read-only WASM slice. The I091 scope is diagnostics/provenance/confinement visibility only:
 no remote install, marketplace, automatic discovery, write-capable plugin tools, Lua, dynamic

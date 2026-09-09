@@ -1,5 +1,10 @@
 # Optional Runtime Asset Distribution
 
+> 2026-09-09 terminology mapping: [ADR-072](../decisions/072-capability-provider-bundle-boundary.md)
+> supersedes package terminology, not this policy history. "Plugin package" below means a Bundle
+> containing executable Plugins. Current implementation owners are DIST-001-A/B and BUNDLE-001;
+> this proposal is neither a shipped installer nor a schema/activation authorization.
+
 > Status: ADR-ready proposal from I091 A8.
 > Scope: policy only; no runtime downloader, registry client, marketplace, or package installer is
 > implemented by this proposal.
