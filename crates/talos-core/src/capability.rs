@@ -14,6 +14,12 @@ pub struct CapabilityDescriptor {
     pub version: String,
     /// Human-readable display name.
     pub name: String,
+    /// Implementation provenance.
+    #[serde(default)]
+    pub provenance: Provenance,
+    /// Delivery carrier.
+    #[serde(default)]
+    pub carrier: Carrier,
     /// Optional provider-specific metadata; not interpreted by the core.
     #[serde(default)]
     pub metadata: BTreeMap<String, String>,
@@ -34,6 +40,12 @@ pub struct ProviderDescriptor {
     pub id: String,
     /// Provider implementation version.
     pub version: String,
+    /// Implementation provenance.
+    #[serde(default)]
+    pub provenance: Provenance,
+    /// Delivery carrier.
+    #[serde(default)]
+    pub carrier: Carrier,
     /// Capabilities offered by this provider.
     #[serde(default)]
     pub capabilities: Vec<CapabilityDescriptor>,
@@ -41,6 +53,14 @@ pub struct ProviderDescriptor {
     #[serde(default)]
     pub metadata: BTreeMap<String, String>,
 }
+
+/// Provenance classification for descriptor consumers.
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+pub enum Provenance { #[default] BuiltIn, Plugin, External }
+
+/// Delivery carrier classification.
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+pub enum Carrier { #[default] BuiltIn, Wasm, Mcp, Helper, Remote }
 
 impl ProviderDescriptor {
     /// Validate this provider and each nested capability descriptor.
@@ -108,6 +128,8 @@ mod tests {
             id: "provider.test".into(),
             version: version.into(),
             capabilities: vec![],
+            provenance: Provenance::BuiltIn,
+            carrier: Carrier::BuiltIn,
             metadata: BTreeMap::new(),
         }
     }
