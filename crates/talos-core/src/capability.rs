@@ -56,11 +56,23 @@ pub struct ProviderDescriptor {
 
 /// Provenance classification for descriptor consumers.
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
-pub enum Provenance { #[default] BuiltIn, Plugin, External }
+pub enum Provenance {
+    #[default]
+    BuiltIn,
+    Plugin,
+    External,
+}
 
 /// Delivery carrier classification.
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
-pub enum Carrier { #[default] BuiltIn, Wasm, Mcp, Helper, Remote }
+pub enum Carrier {
+    #[default]
+    BuiltIn,
+    Wasm,
+    Mcp,
+    Helper,
+    Remote,
+}
 
 impl ProviderDescriptor {
     /// Validate this provider and each nested capability descriptor.
@@ -155,5 +167,29 @@ mod tests {
             descriptor.validate(),
             Err(DescriptorError::InvalidId(_))
         ));
+    }
+
+    #[test]
+    fn offline_fixture_has_deterministic_serialization_and_round_trip() {
+        let mut descriptor = provider("1.2.3");
+        descriptor.metadata.insert("z".into(), "last".into());
+        descriptor.metadata.insert("a".into(), "first".into());
+        let encoded = serde_json::to_string(&descriptor).unwrap();
+        let decoded: ProviderDescriptor = serde_json::from_str(&encoded).unwrap();
+        assert_eq!(descriptor, decoded);
+        assert!(decoded.validate().is_ok());
+        assert_eq!(serde_json::to_string(&decoded).unwrap(), encoded);
+        assert!(encoded.find("\"a\"").unwrap() < encoded.find("\"z\"").unwrap());
+    }
+
+    #[test]
+    fn unknown_carrier_and_provenance_fail_closed() {
+        let descriptor = provider("1.2.3");
+        let mut value = serde_json::to_value(&descriptor).unwrap();
+        value["carrier"] = serde_json::json!("FutureCarrier");
+        assert!(serde_json::from_value::<ProviderDescriptor>(value).is_err());
+        let mut value = serde_json::to_value(&descriptor).unwrap();
+        value["provenance"] = serde_json::json!("FutureProvenance");
+        assert!(serde_json::from_value::<ProviderDescriptor>(value).is_err());
     }
 }
