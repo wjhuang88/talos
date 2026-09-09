@@ -23,7 +23,7 @@
 | Governance Claim PR | #518 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer authorized single-developer unattended completion of #499 then #466 and accepted ADR-072. PR #518 received exact-head CI and independent Agent-role APPROVE; shared GitHub identity does not prove natural-person separation. Claim is effective through merge `53fc57b3`. |
-| Implementation PR | Not started |
+| Implementation PR | #521 |
 | Last Updated | 2026-09-09 |
 | Handoff / Release Condition | Handoff requires the I253 governance audit and closeout; no CAP-001-B/C or runtime authorization. |
 
