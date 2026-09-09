@@ -44,6 +44,12 @@ Descriptor contract implementation is present on `main` at `71cc03b322d80d19c376
 The focused `talos-core` test suite passed locally. Exact-head independent review remains pending;
 this iteration is not marked Complete until that evidence and owner-first closeout are recorded.
 
+Local correction checkpoint (2026-09-09): `ec7db027` adds explicit provenance/carrier enums and
+`c28f9764` adds deterministic serde round-trip and unknown-value conformance tests; `8c888271`
+ensures legacy descriptors with missing origin metadata remain readable but fail validation closed.
+`cargo test --locked -p talos-core` passes (83 tests). These commits are local stable-candidate
+work and do not change the completion state or authorize CAP-001-B.
+
 ## Residuals
 
 Registry/resolver belongs to CAP-001-B; Plugin/Carrier adapters belong to CAP-001-C.
