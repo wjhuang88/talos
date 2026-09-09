@@ -1,6 +1,6 @@
 # Iteration I253: Capability Architecture Governance Convergence
 
-> Document status: Active
+> Document status: Review
 > Claim and activation effective on main through PR #518 merge `53fc57b3a607ab33d8aad51faf4662f672d55efa`.
 > Published plan date: 2026-09-09
 > MVP deliverable: An auditable requirement-to-owner map for every governance acceptance item in Issue #466, with independently executable downstream Stories.
@@ -334,3 +334,21 @@ Local review added child Required Reads and identified stale remote child source
 fields and missing full parent Issue backlinks. O6/R3/R4 remain partial pending reconciliation;
 the earlier R3-satisfied sentence refers only to creation of #519, not full remote convergence.
 Do not push this incomplete audit as a stable candidate or mark I253 Complete.
+
+### 2026-09-10 Local Subtask Tracking Boundary
+
+The I253 audit uses local convergence for its remaining corrections. No new GitHub Issue is created
+for individual document edits, validator reruns, review corrections, or derived-view synchronization
+while the CAP-001-G Work Slice remains unchanged. Existing Issue #520 is an independent
+`INTEGRATION-001 / Intake / Unclaimed` intake and is not a subtask, dependency, or authorization for
+I253. Its contract questions remain outside this candidate.
+
+### 2026-09-10 Stable Candidate Review Checkpoint
+
+The full I253 governance audit has converged locally and is now `Review / Claimed`. The current
+candidate retains the effective #518 claim, reconciles the existing #508-#517 child Issue bodies
+and #466/#519 reciprocal mapping, and preserves every downstream child as unactivated. Local
+evidence for this candidate is `git diff --check`, project-governance validation, exact-base
+Collaboration Claim validation, manifest YAML parsing, and changed-file review; no Rust/Cargo files
+changed, so Rust workspace validation is not applicable. Independent exact-head review, applicable
+CI, merge-time CAS, and owner-first closeout remain required before `Complete` or `Closed`.

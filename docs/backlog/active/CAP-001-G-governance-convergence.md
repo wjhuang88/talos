@@ -5,7 +5,7 @@
 | Story ID | CAP-001-G |
 | Type | Governance Story |
 | Parent | CAP-001 |
-| Status | In Progress / Claimed (effective through PR #518 merge `53fc57b3`) |
+| Status | Review / Claimed (effective through PR #518 merge `53fc57b3`) |
 | Selected Iteration | I253 |
 | Source | Issue #519 (parent requirement #466) |
 | Depends On | ADR-072 Accepted; CAP-001-P0 Complete |
@@ -71,4 +71,15 @@ This checkpoint does not mark #466 or CAP-001 complete and does not activate any
 Executable Issue [#519](https://github.com/wjhuang88/talos/issues/519) tracks this Story;
 #466 remains the parent Epic. This supersedes the pending-Issue statement above. Claim scope
 and activation remain unchanged; the audit and remote reciprocal linkage are still to be
-verified before a stable candidate is submitted.
+verified before a stable candidate is submitted. The reconciliation is now recorded in the I253
+review checkpoint; this owner remains pending independent review and closeout.
+
+## 2026-09-09 Reconciliation Review Checkpoint
+
+I253 completed the governance reconciliation required by #466: child Issue bodies #508-#517 now
+match their authoritative owners, parent #466 carries the complete #508-#519 child map, and #519
+has reciprocal linkage and status evidence. Issue #520 is independently tracked as INTEGRATION-001
+`Intake / Unclaimed` with no implementation authority. This Story is now `Review / Claimed`; it
+is not Complete and does not activate CAP-001-B/C or any downstream product work. Completion still
+requires independent review, merge-time CAS and a closeout citing an existing implementation or
+governance commit.

@@ -32,6 +32,15 @@ Global Issue reconciliation and unrelated Board/matrix synchronization are not p
 loop. Record them as separately owned governance residuals and continue when the selected slice has
 its own owner, claim, acceptance, and relevant local checks.
 
+### Subtask Tracking Boundary
+
+An iteration may contain local subtasks and intermediate checkpoints without creating a GitHub
+Issue for each one. Design adjustments, focused test repairs, documentation corrections, reviewer
+follow-ups, and owner/derived-view synchronization stay in the current iteration and candidate PR
+when they do not change the Work Slice or acceptance target. Create a new Issue or child Story only
+for an independently deliverable requirement, a new ownership boundary, a durable cross-session
+handoff, or a required external/manual validation queue.
+
 ### 3. Verify
 
 For each story:
