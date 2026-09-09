@@ -1,6 +1,6 @@
 # Iteration I254: Capability Registry And Resolver
 
-> Document status: Active / Claimed (proposed; ineffective until PR #523 merges)
+> Document status: Active / Claimed (effective on main via PR #523 merge `4cd7b42e`)
 > Published plan date: 2026-09-10
 > Planned objective: Deliver the deterministic, offline Capability/Provider registry and resolver defined by CAP-001-B / Issue #512.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -90,7 +90,7 @@ branch. Implementation then converges locally before the first stable stage cand
 
 | Date | Type | Record |
 |---|---|---|
-| 2026-09-10 | Draft governance candidate | I252 and ADR-072 are complete/accepted; CAP-001-B/#512 is the only dependency-ready child. Claim remains ineffective until the finalized governance PR reaches `main`; no implementation branch or code changes are authorized. |
+| 2026-09-10 | Claim activation | PR #523 (`d3cfbdd8`) merged to `main` as `4cd7b42e`; claim/activation are effective. Implementation may begin from this merge or later; no implementation PR exists yet. |
 
 ### Selection Inventory (2026-09-10)
 

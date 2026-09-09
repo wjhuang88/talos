@@ -5,7 +5,7 @@
 | Story ID | CAP-001-B |
 | Type | Capability infrastructure implementation |
 | Parent | CAP-001 / #466 |
-| Status | Active / Claimed (proposed; ineffective until PR #523 merges) |
+| Status | Active / Claimed (effective on main via PR #523 merge `4cd7b42e`) |
 | Selected Iteration | I254 |
 | Source Issue | [GitHub Issue #512](https://github.com/wjhuang88/talos/issues/512) |
 | Depends On | ADR-072 Accepted; CAP-001-A / I252 Complete |
@@ -71,7 +71,6 @@ additional Issues or iterations. No Rust, Cargo, storage or runtime behavior is 
 
 ## Finalized Claim Proposal (2026-09-10)
 
-PR #523 now proposes Active / Claimed for this owner and I254 atomically, superseding the draft
-state above only on merge. Scope and acceptance are unchanged. Registration does not attest trust,
-grant execution permission, install code or disclose a tool. Implementation remains unauthorized
-until the finalized claim is present on main.
+PR #523 established Active / Claimed for this owner and I254 atomically, merging to `main` as
+`4cd7b42e`. Scope and acceptance are unchanged. Registration does not attest trust, grant execution
+permission, install code or disclose a tool. Implementation starts from this merge or later.
