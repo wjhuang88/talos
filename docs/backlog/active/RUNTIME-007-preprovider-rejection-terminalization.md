@@ -16,7 +16,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex Agent / mainline unattended session |
 | Work Slice | Pre-Provider non-resumable rejection terminalization and model-switch guard correctness |
@@ -24,10 +24,10 @@
 | Source Issue | #499 |
 | Governance Claim PR | #504 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Prior head fa1c40f7: CI 34188252548 passed; review comment 5579449346 requested changes. Corrected head requires fresh CI and independent APPROVE before merge; no approval is claimed. |
+| Authorization Evidence | Corrected implementation head `7d770822a0f5dd72d97897777c2786adcc2f3362`: CI `34248498571` passed and independent APPROVE `5588712770` bound to that head; closeout head `cb407ca004dea7d8cd021281de30d6d8d35beda4`: CI `34254709125` passed and approval `5588909334` bound to that head. |
 | Implementation PR | #505 (Merged) |
-| Last Updated | 2026-09-08 |
-| Handoff / Release Condition | Claim/activation are ineffective until the finalized record reaches `main`; implementation starts from that merge or later. |
+| Last Updated | 2026-09-09 |
+| Handoff / Release Condition | Claim and implementation are closed on `main`; any further runtime lifecycle work requires a separate effective claim. |
 
 ## Scope
 
@@ -51,6 +51,15 @@ permission/sandbox behavior. Any dependency change requires separate dependency 
 
 - Implementation PR #505 merged as `c9225abf`; exact-head CI and independent review
   were successful for `7d770822`.
+
+## Closeout Checkpoint (2026-09-09)
+
+Implementation PR #505 merged as `c9225abf13c299d38e9eadc1335b59098d8d6d3f`; exact-head CI
+`34248498571` and independent approval `5588712770` were bound to
+`7d770822a0f5dd72d97897777c2786adcc2f3362`. Closeout PR #506 merged as
+`8ccd020e948e874a51437bd735955fe8282b8885`; exact-head CI `34254709125` and approval
+`5588909334` were bound to `cb407ca004dea7d8cd021281de30d6d8d35beda4`. Completion Commit
+remains the pre-existing implementation commit `c9225abf13c299d38e9eadc1335b59098d8d6d3f`.
 
 ## Completion Evidence
 

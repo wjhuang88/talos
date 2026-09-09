@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex Agent / mainline unattended session |
 | Work Slice | Runtime submission lifecycle only: deterministic non-resumable pre-Provider rejection terminalization, exactly-once release, model-switch guard, and focused regression evidence for Issue #499. |
@@ -18,10 +18,10 @@
 | Source Issue | #499 |
 | Governance Claim PR | #504 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Prior head fa1c40f7: CI 34188252548 passed; review comment 5579449346 requested changes. Corrected head requires fresh CI and independent APPROVE before merge; no approval is claimed. |
+| Authorization Evidence | Corrected implementation head `7d770822a0f5dd72d97897777c2786adcc2f3362`: CI `34248498571` passed and independent APPROVE `5588712770` bound to that head; closeout head `cb407ca004dea7d8cd021281de30d6d8d35beda4`: CI `34254709125` passed and approval `5588909334` bound to that head. |
 | Implementation PR | #505 (Merged) |
 | Last Updated | 2026-09-09 |
-| Handoff / Release Condition | Claim becomes effective only when this activation record reaches `main`; implementation starts from that merge or a later `main` commit. #466 remains a separate architecture-only parent. |
+| Handoff / Release Condition | Claim and implementation are closed on `main`; further runtime or #466 capability work requires a separate effective claim. |
 
 ## Published Baseline
 
@@ -72,6 +72,7 @@
 | Date | Type | Record |
 |---|---|---|
 | 2026-09-08 | Claim preparation | Prepared atomic claim+activation for #499 after inventorying non-terminal iterations. Both claim and Active state remain ineffective until the governance record merges to `main`. |
+| 2026-09-09 | Closeout | Implementation PR #505 merged as `c9225abf13c299d38e9eadc1335b59098d8d6d3f` from exact head `7d770822a0f5dd72d97897777c2786adcc2f3362`; CI `34248498571` passed and independent approval `5588712770` bound to that head. Closeout PR #506 merged as `8ccd020e948e874a51437bd735955fe8282b8885` from exact head `cb407ca004dea7d8cd021281de30d6d8d35beda4`; CI `34254709125` passed and approval `5588909334` bound to that head. Completion Commit remains the pre-existing implementation commit `c9225abf13c299d38e9eadc1335b59098d8d6d3f`; this status record is not its own evidence. |
 
 ## Verification Evidence
 
@@ -104,8 +105,11 @@ natural-person separation. A fresh APPROVE must bind the corrected candidate bef
 
 ### 2026-09-09 Closeout Checkpoint
 
-Implementation PR #505 merged to `main` as `c9225abf`; exact head `7d770822` had
-five successful CI jobs and an independent APPROVE bound to that head.
+Implementation PR #505 merged to `main` as `c9225abf13c299d38e9eadc1335b59098d8d6d3f`; exact head
+`7d770822a0f5dd72d97897777c2786adcc2f3362` had five successful CI jobs (`34248498571`) and an
+independent APPROVE (`5588712770`) bound to that head. Closeout PR #506 merged as
+`8ccd020e948e874a51437bd735955fe8282b8885`; its exact-head CI `34254709125` and approval
+`5588909334` were bound to `cb407ca004dea7d8cd021281de30d6d8d35beda4`.
 
 ### 2026-09-08 Candidate Validation Checkpoint
 

@@ -1,6 +1,6 @@
 # Iteration I252: Capability/Provider Descriptor Contract
 
-> Document status: Planned / Claimed
+> Document status: Review / Claimed
 
 | Field | Value |
 |---|---|
@@ -25,9 +25,13 @@
 | Governance Claim PR | Direct commit 4f8e641a |
 | Authorization Mode | Direct commit |
 | Authorization Evidence | Maintainer authorization recorded in ADR-072; single-developer unattended session. |
-| Implementation PR | Main commit `71cc03b3` (stable candidate; review pending) |
+| Implementation PR | #507 |
+| Completion Commit | `71cc03b322d80d19c3767e4ef2014fecb84c1994` |
+| Merge Commit | `0835afc4b982a5ed409ccfb55538bbeaf6fe5eab` |
+| Exact-head CI | `34294884578` (success; including Windows) |
+| Independent Review | Handoff reports approval; original exact-head/base review record awaits verification. PR #507 has no public review/comment record. |
 | Last Updated | 2026-09-09 |
-| Handoff / Release Condition | Independent exact-head review and owner-first closeout required before Complete. |
+| Handoff / Release Condition | Verify original exact-head review and merge-time CAS evidence before completion. CAP-001-B/C remain separately unclaimed and unauthorized. |
 
 ## Acceptance
 
@@ -53,6 +57,19 @@ Local correction checkpoint (2026-09-09): `ec7db027` adds explicit provenance/ca
 ensures legacy descriptors with missing origin metadata remain readable but fail validation closed.
 `cargo test --locked -p talos-core` passes (83 tests). These commits are local stable-candidate
 work and do not change the completion state or authorize CAP-001-B.
+
+## Closeout checkpoint (2026-09-09)
+
+I252 remains Review / Claimed pending verification of original review evidence. Implementation commit `71cc03b322d80d19c3767e4ef2014fecb84c1994`
+is present in the merge of PR #507 as `0835afc4b982a5ed409ccfb55538bbeaf6fe5eab`.
+Completion Commit: `71cc03b322d80d19c3767e4ef2014fecb84c1994` (pre-existing implementation
+commit; this governance closeout is not its own evidence).
+Exact-head CI `34294884578` passed all required jobs, including Windows, at head
+`f0103a7f4e78e42fc88364f6e4cbb801b1c96553`. The handoff reports Agent-role approval,
+but the original exact-head/base review and CAS records have not yet been verified in this
+resumed session. No public review identity or unavailable comment ID is asserted.
+The closeout changes only owner and derived governance records. CAP-001 remains Refinement /
+Unclaimed; CAP-001-B and CAP-001-C are not activated or authorized by this closeout.
 
 ## Residuals
 
