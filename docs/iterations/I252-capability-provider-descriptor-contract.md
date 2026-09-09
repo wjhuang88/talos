@@ -22,7 +22,7 @@
 | Work Slice | Descriptor identity, version/capability compatibility, provider metadata, validation errors, and offline conformance fixtures. |
 | Source Issue | #466 |
 | Claimed At | 2026-09-09 |
-| Governance Claim PR | Direct commit `4f8e641a` (effective claim on main) |
+| Governance Claim PR | Direct commit 4f8e641a (effective claim on main) |
 | Authorization Mode | Direct commit |
 | Authorization Evidence | Maintainer authorization recorded in ADR-072; single-developer unattended session. |
 | Implementation PR | Main commit `71cc03b3` (stable candidate; review pending) |
