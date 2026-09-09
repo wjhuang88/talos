@@ -33,6 +33,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 
 | ID | Codename | State | Activation / Completion Gate |
 |---|---|---|---|
+| I254 | Capability Registry And Resolver | Active / Claimed (proposed) | [I254](I254-capability-registry-resolver.md) / CAP-001-B / #512; atomic claim PR #523 is ineffective until merge. No code implementation yet. |
 | I248 | Dependency Governance Closed Loop | Complete / Closed | [I248](I248-dependency-governance-closed-loop.md); implementation `dbd847ec` merged via #497; #498 merged as `a7d168ee`, acceptance head `5d2e4443`, CI `34074942674`, independent review `5564114577`. Full upgrade remains I250. |
 | I250 | Full Workspace Dependency Upgrade | Complete / Closed | [I250](I250-full-workspace-dependency-upgrade.md); implementation #501 merged as `76f0a41b`; accepted baseline advanced, residuals under DEPENDENCY-003 / #502. |
 | I251 | Pre-Provider Rejection Terminalization | Complete / Closed | [I251](I251-runtime007-preprovider-terminalization.md) / RUNTIME-007 / Issue #499; implementation merged as `c9225abf`. |

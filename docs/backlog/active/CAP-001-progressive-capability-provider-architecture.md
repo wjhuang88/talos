@@ -66,7 +66,7 @@ This Epic is an architecture and decomposition owner. It does not authorize impl
 | [CAP-001-G](CAP-001-G-governance-convergence.md) / Issue #519 | Architecture governance audit and migration contract. | I253 Complete / Closed; Completion Commit `60851fb23128a151ecbd17e86ec4730ffebb3135` via PR #521 merge. No downstream implementation authority. |
 | CAP-001-P0 / Issue #467 | Characterize current behavior and prepare compatibility seams plus cross-lane ownership before capability implementation. | I246 Complete / Closed; Completion Commit `9a3c1d860408c1438ec1a7ad4b57860167d0cb01` via implementation PR #492 |
 | CAP-001-A / I252 | Stable Capability and Provider descriptor contracts. | Complete / Closed; Completion Commit `71cc03b322d80d19c3767e4ef2014fecb84c1994`, merged via PR #507 as `0835afc4b982a5ed409ccfb55538bbeaf6fe5eab` |
-| CAP-001-B / Issue #512 | Capability registry and resolver. | Ready / Unclaimed; owner created, not activated |
+| CAP-001-B / Issue #512 | Capability registry and resolver. | I254 Active / Claimed proposed by PR #523; ineffective until merge |
 | CAP-001-C / Issue #513 | Plugin capability declarations and Carrier adapters. | Refinement / Unclaimed; owner created, blocked on CAP-001-B |
 | BUNDLE-001 / Issue #514 | Bundle manifest, installation identity and terminology migration. | Refinement / Unclaimed; compatibility audit and dedicated migration decision required, not blocked on CAP-001-C |
 | TEXT-001 / Issue #511 | UI-neutral text semantics contract. | Refinement / Unclaimed; CAP-001-A prerequisite met, I253 audit and consumer ownership inventory pending |
@@ -84,7 +84,8 @@ Refinement / Unclaimed and these child Issues/owners do not authorize implementa
 The 2026-09-09 I253 governance convergence created the child Issue map: CAP-001-B #512,
 CAP-001-C #513, TEXT-001 #511, LANG-001 #510, LANG-002 #516, LANG-003 #517, BUNDLE-001 #514,
 DIST-001-A #509, DIST-001-B #515 and BROWSER-001 #508. Only CAP-001-B is dependency-ready;
-all children remain unclaimed and require their own selected iteration and effective claim.
+at that checkpoint all children remained unclaimed and required their own selected iteration and
+effective claim. PR #523 now proposes I254/CAP-001-B alone; all other children remain unclaimed.
 
 ## Acceptance
 
