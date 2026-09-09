@@ -6,7 +6,7 @@
 | Type | Capability infrastructure implementation |
 | Parent | CAP-001 / #466 |
 | Status | Ready / Unclaimed |
-| Selected Iteration | None |
+| Selected Iteration | I254 (draft plan; no effective claim) |
 | Source Issue | [GitHub Issue #512](https://github.com/wjhuang88/talos/issues/512) |
 | Depends On | ADR-072 Accepted; CAP-001-A / I252 Complete |
 
@@ -60,3 +60,11 @@ files and an independent permission/security/API review where applicable.
 ## Residuals
 
 Plugin/Carrier adapters remain CAP-001-C. Bundle installation remains BUNDLE-001 and DIST-001-A/B.
+
+## Selection Preparation (2026-09-10)
+
+[I254](../../iterations/I254-capability-registry-resolver.md) records the runnable API deliverable,
+acceptance, validation and non-terminal inventory from `main@540ad257`. This is local preparation
+only: the Story remains Ready / Unclaimed until the finalized atomic claim reaches main. Existing
+Issue #512 remains the sole requirement tracker; local design/test/review corrections do not create
+additional Issues or iterations. No Rust, Cargo, storage or runtime behavior is changed here.
