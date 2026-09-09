@@ -1,6 +1,6 @@
 # Iteration I254: Capability Registry And Resolver
 
-> Document status: Planned
+> Document status: Active / Claimed (proposed; ineffective until PR #523 merges)
 > Published plan date: 2026-09-10
 > Planned objective: Deliver the deterministic, offline Capability/Provider registry and resolver defined by CAP-001-B / Issue #512.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -10,15 +10,15 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex mainline execution Agent |
 | Work Slice | Capability identity lookup, registry ownership and bounded resolver contract only. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-09-10 |
 | Source Issue | #512 (parent #466) |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #523 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Draft governance candidate; claim and activation are ineffective until merge. |
+| Authorization Evidence | Maintainer authorized single-developer unattended completion of #499 then #466. No independent human reviewer is available; shared GitHub identity does not prove human separation. PR #523 requires exact-head CI, both validators and merge-time CAS; proposed claim and activation remain ineffective until merge. |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-10 |
 | Handoff / Release Condition | Implementation starts only after this claim reaches main; no Plugin, Bundle, permission, release or product-surface authority. |
@@ -117,8 +117,20 @@ Use existing Issue #512; do not create remote Issues for these local steps.
 
 ## Verification Evidence
 
-- Draft planning validation pending finalized claim and implementation.
+- Draft `203d1168`: both governance validators passed with 0 warnings; collaboration validation
+  used `COLLABORATION_VALIDATION_BASE=origin/main`. Staged diff and whitespace checks passed.
+- Finalized claim validation and exact-head CI remain pending; draft evidence does not substitute.
 - Runtime evidence: not applicable before implementation authorization.
+
+## Atomic Claim Candidate (2026-09-10)
+
+PR #523 proposes Active / Claimed for I254 and CAP-001-B together. The selection inventory above
+is the pre-claim checkpoint, not a competing current state. Implementation starts at the claim
+merge or a later main commit. Local work uses the existing checkout on a short-lived branch;
+no additional worktree, release, publication, dependency upgrade or destructive cleanup is needed.
+Converge implementation, tests, API docs and owner Review state locally before the stable push.
+Then obtain exact-head CI and applicable independent API/security review, execute CAS, merge and
+close using pre-existing implementation evidence. All intermediate fixes remain under #512.
 
 ## Completion Evidence
 

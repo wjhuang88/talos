@@ -5,8 +5,8 @@
 | Story ID | CAP-001-B |
 | Type | Capability infrastructure implementation |
 | Parent | CAP-001 / #466 |
-| Status | Ready / Unclaimed |
-| Selected Iteration | I254 (draft plan; no effective claim) |
+| Status | Active / Claimed (proposed; ineffective until PR #523 merges) |
+| Selected Iteration | I254 |
 | Source Issue | [GitHub Issue #512](https://github.com/wjhuang88/talos/issues/512) |
 | Depends On | ADR-072 Accepted; CAP-001-A / I252 Complete |
 
@@ -14,17 +14,17 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex mainline execution Agent |
 | Work Slice | Capability identity lookup, registry ownership and bounded resolver contract only. |
-| Claimed At | Not applicable |
-| Authorization Evidence | No effective claim; intake owner only. Implementation is not authorized. |
-| Governance Claim PR | Not applicable |
+| Claimed At | 2026-09-10 |
+| Authorization Evidence | Maintainer authorized single-developer unattended completion of #499 then #466. No independent human reviewer is available; shared GitHub identity does not prove human separation. PR #523 requires exact-head CI, both validators and merge-time CAS; proposed claim and activation remain ineffective until merge. |
+| Governance Claim PR | #523 |
 | Implementation PR | Not started |
-| Authorization Mode | Not applicable |
-| Last Updated | 2026-09-09 |
-| Handoff / Release Condition | A fresh runnable iteration and effective claim are required before code or Cargo changes. |
+| Authorization Mode | Single-maintainer merge |
+| Last Updated | 2026-09-10 |
+| Handoff / Release Condition | Implementation starts only after PR #523 reaches main; preserve CAP-001-C, Bundle, permission and product boundaries. Exact-head implementation API/security review remains required where applicable. |
 
 ## Required Reads
 
@@ -68,3 +68,10 @@ acceptance, validation and non-terminal inventory from `main@540ad257`. This is 
 only: the Story remains Ready / Unclaimed until the finalized atomic claim reaches main. Existing
 Issue #512 remains the sole requirement tracker; local design/test/review corrections do not create
 additional Issues or iterations. No Rust, Cargo, storage or runtime behavior is changed here.
+
+## Finalized Claim Proposal (2026-09-10)
+
+PR #523 now proposes Active / Claimed for this owner and I254 atomically, superseding the draft
+state above only on merge. Scope and acceptance are unchanged. Registration does not attest trust,
+grant execution permission, install code or disclose a tool. Implementation remains unauthorized
+until the finalized claim is present on main.
