@@ -81,8 +81,8 @@ ADR-072 and I253/CAP-001-G define the staged governance boundary for future capa
 providers, Plugins, Bundles, Language Providers and Browser connectors. The current runtime
 does not provide a registry, resolver, Bundle installer, dynamic Language Provider, or Browser
 connector from this planning work. Child owners and their Issues are tracked separately:
-CAP-001-B #512, CAP-001-C #513, TEXT-001 #511, LANG-001 #510, LANG-002 #516, LANG-003 #517,
-BUNDLE-001 #514, DIST-001-A #509, DIST-001-B #515 and BROWSER-001 #508. Their creation is
+CAP-001-G #519, CAP-001-B #512, CAP-001-C #513, TEXT-001 #511, LANG-001 #510, LANG-002 #516,
+LANG-003 #517, BUNDLE-001 #514, DIST-001-A #509, DIST-001-B #515 and BROWSER-001 #508. Their creation is
 governance decomposition only; each requires its own selected iteration and effective claim.
 
 ### Session Persistence Boundary

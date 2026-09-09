@@ -26,6 +26,11 @@
 | Last Updated | 2026-09-09 |
 | Handoff / Release Condition | Requires TEXT-001 and a behavior-characterization iteration before implementation. |
 
+## Required Reads
+
+- [CAP-001 parent](CAP-001-progressive-capability-provider-architecture.md), [ADR-072](../../decisions/072-capability-provider-bundle-boundary.md), and [TEXT-001](TEXT-001-ui-neutral-text-semantics.md).
+- [TOOL-008](TOOL-008-tree-sitter-on-demand.md) and I246 evidence; feature trimming is not Provider loading.
+
 ## Goal And Scope
 
 Define a shared LanguageProvider surface for highlighting, syntax queries, symbols and outline

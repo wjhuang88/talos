@@ -26,6 +26,11 @@
 | Last Updated | 2026-09-09 |
 | Handoff / Release Condition | Requires a separate distribution and compatibility decision before changing defaults. |
 
+## Required Reads
+
+- [CAP-001 parent](CAP-001-progressive-capability-provider-architecture.md), [ADR-072](../../decisions/072-capability-provider-bundle-boundary.md), and [LANG-002](LANG-002-rust-language-provider-vertical-slice.md).
+- [BUNDLE-001](BUNDLE-001-bundle-manifest-installation-identity.md) and [DIST-001-A](DIST-001-A-verified-manual-bundle-installation.md) before any default-distribution change.
+
 ## Goal And Scope
 
 Migrate additional languages only after the Rust vertical slice proves the contract, and decide

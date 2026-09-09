@@ -79,10 +79,10 @@ docs/proposals/
   session query and command protocol (mobile app, web dashboard, cross-device continuity).
 - [WASM Runtime Plugin Protocol](wasm-runtime-plugin-protocol.md) — long-term protocol-first
   design for WASM plugins that can provide tools, commands, hooks, filters, and future capabilities.
-- [Plugin Encapsulation Format](plugin-encapsulation-format.md) — **DRAFT 2026-06-30, awaiting
-  decision.** Four-entity model: skill/mcp/hook are config-introduced atomic components; plugin is a
-  packaging format bundling any subset of them plus tools, carried by WASM/Lua/dylib. Blocks
-  PLUGIN-001, CMD-002, HOOK-001, TOOL-008 Phase 3.
+- [Plugin Encapsulation Format](plugin-encapsulation-format.md) — historical baseline accepted
+  through ADR-027/028/029/030; package terminology is superseded by ADR-072. Bundle is distribution,
+  Plugin is executable. Native dynamic libraries remain rejected; this proposal grants no new
+  implementation authority.
 - [Optional Runtime Asset Distribution](optional-runtime-asset-distribution.md) — ADR-ready policy
   for optional model weights, WASM plugin packages, and resource packs with explicit consent,
   checksums/signatures, cache layout, offline/mirror behavior, and graceful fallback.

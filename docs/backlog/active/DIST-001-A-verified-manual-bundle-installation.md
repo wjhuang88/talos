@@ -26,6 +26,11 @@
 | Last Updated | 2026-09-09 |
 | Handoff / Release Condition | Requires accepted Bundle schema/identity and independent security review. |
 
+## Required Reads
+
+- [CAP-001 parent](CAP-001-progressive-capability-provider-architecture.md), [ADR-072](../../decisions/072-capability-provider-bundle-boundary.md), and [BUNDLE-001](BUNDLE-001-bundle-manifest-installation-identity.md).
+- [DIST-001 policy](DIST-001-optional-runtime-asset-distribution.md); installation must remain distinct from activation and permission grant.
+
 ## Goal And Scope
 
 Install a user-selected Bundle from a local or manually supplied artifact after integrity and

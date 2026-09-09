@@ -23,6 +23,7 @@ silently rewrite the reason or boundary that governed an earlier implementation.
 
 | ADR | State | Current Boundary / Gate |
 |---|---|---|
+| [072: Capability, Provider, Plugin And Bundle Boundary](072-capability-provider-bundle-boundary.md) | **Accepted / I253 governance** | Supersedes ADR-029 package terminology only; separates executable Plugin from distributable Bundle. Runtime, API/schema and installation changes require separately claimed children. |
 | [071: Local Convergence And Scoped Remote Gates](071-local-convergence-and-scoped-remote-gates.md) | **Accepted / governance workflow** | Local convergence is the normal edit loop; exact-head and independent review remain scope-relevant hard gates; unrelated global reconciliation is batched and advisory for implementation PRs. |
 | [070: Shell Auto Classifier Context And Precedence](070-shell-auto-classifier-context.md) | **Accepted / I243 Complete** | Claude-like shell classification after deterministic Deny/Ask, using isolated exact-action and trusted-environment context. Decision-only; I244 is Review/Claimed under effective claim #465. |
 | [068: Windows Job Object Process Ownership](068-windows-job-object-process-ownership.md) | **Accepted / I225 Complete** | Decision-only contract for assigned-before-exec Job Object ownership, allowlisted stdio handles, kill-on-close descendants, bounded OS-ABI/unsafe and fail-closed migration. D1-B implementation remains separately gated; Windows background admission remains fail-closed. |

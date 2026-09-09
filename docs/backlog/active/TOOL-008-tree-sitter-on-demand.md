@@ -5,6 +5,25 @@
 **Source**: Binary size analysis 2026-06-20
 **Depends on**: CODE-001, CODE-002 (tree-sitter infrastructure); TOOL-007 (tool set audit)
 
+## 2026-09-09 Current Ownership Split
+
+The original phases, measurements and Phase 2 acceptance below remain the published plan,
+not current binary measurements or implementation evidence. This owner retains only the
+unimplemented short-term feature-selection/size outcome; it is not a runtime-loading owner.
+[CAP-001](CAP-001-progressive-capability-provider-architecture.md) owns the architecture:
+[TEXT-001](TEXT-001-ui-neutral-text-semantics.md) owns text semantics,
+[LANG-001](LANG-001-language-provider-contract-migration.md) owns the shared Provider contract,
+[LANG-002](LANG-002-rust-language-provider-vertical-slice.md) owns the first real Rust WASM slice,
+and [LANG-003](LANG-003-language-provider-migration-default-distribution.md) owns expansion/defaults.
+Those owners supersede Phase 3 as an execution entrypoint; none is activated here.
+
+I246 centralized Arborium behind `crates/talos-text/`; `code-intelligence` still enables its
+declared static language set. Moving parser ownership does not satisfy Phase 2 size acceptance
+or runtime loading. A future TOOL-008 iteration must coordinate any default-feature change
+with LANG-003, measure a new baseline and preserve the original acceptance targets below.
+Current parser declarations are in `crates/talos-text/Cargo.toml`, not directly in the two
+consumer manifests. ADR-072 and the I253 migration audit govern new architecture work.
+
 ## Problem
 
 Talos embeds 23 tree-sitter language parsers (via arborium) as compile-time static

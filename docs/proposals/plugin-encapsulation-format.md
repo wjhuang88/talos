@@ -1,5 +1,12 @@
 # Plugin Encapsulation Format
 
+> Current interpretation (2026-09-09): the historical baseline below is partially superseded by
+> [ADR-072](../decisions/072-capability-provider-bundle-boundary.md). Bundle now means distribution
+> and installation; Plugin means executable extension. Preserve the old terminology and examples
+> as history, not current code truth. The draft `mcp`/permissions/schema fields are not evidence
+> of supported manifest fields. I253 owns the compatibility audit; BUNDLE-001 owns a future
+> separately decided schema migration. ADR-027 WASM safety and the native-library rejection remain.
+
 > Status: **Accepted as architecture baseline — ADR-027/028/029/030 unblock implementation planning.**
 > Supersedes/extends: [wasm-runtime-plugin-protocol.md](wasm-runtime-plugin-protocol.md)
 > Owner declaration: user, 2026-06-30
