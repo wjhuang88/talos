@@ -1,6 +1,6 @@
 # Iteration I252: Capability/Provider Descriptor Contract
 
-> Document status: Review / Claimed
+> Document status: Complete / Closed
 
 | Field | Value |
 |---|---|
@@ -16,7 +16,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex Agent / single-developer unattended session |
 | Work Slice | Descriptor identity, version/capability compatibility, provider metadata, validation errors, and offline conformance fixtures. |
@@ -29,9 +29,9 @@
 | Completion Commit | `71cc03b322d80d19c3767e4ef2014fecb84c1994` |
 | Merge Commit | `0835afc4b982a5ed409ccfb55538bbeaf6fe5eab` |
 | Exact-head CI | `34294884578` (success; including Windows) |
-| Independent Review | Handoff reports approval; original exact-head/base review record awaits verification. PR #507 has no public review/comment record. |
+| Independent Review | Post-merge Agent-role approval, comment `5596471399`, bound to exact head `f0103a7f4e78e42fc88364f6e4cbb801b1c96553` and base `73cd950b9b6d32aec4cce9d11d52ea110ee1aeed`. |
 | Last Updated | 2026-09-09 |
-| Handoff / Release Condition | Verify original exact-head review and merge-time CAS evidence before completion. CAP-001-B/C remain separately unclaimed and unauthorized. |
+| Handoff / Release Condition | Closed after implementation merge and retrospective exact-head review. CAP-001-B/C remain separately unclaimed and unauthorized. |
 
 ## Acceptance
 
@@ -70,6 +70,22 @@ but the original exact-head/base review and CAS records have not yet been verifi
 resumed session. No public review identity or unavailable comment ID is asserted.
 The closeout changes only owner and derived governance records. CAP-001 remains Refinement /
 Unclaimed; CAP-001-B and CAP-001-C are not activated or authorized by this closeout.
+
+## Verified closeout checkpoint (2026-09-09)
+
+This checkpoint supersedes the pending-review state above without rewriting its history.
+I252 is Complete / Closed. Completion Commit: `71cc03b322d80d19c3767e4ef2014fecb84c1994`,
+already on main through PR #507 merge `0835afc4b982a5ed409ccfb55538bbeaf6fe5eab`;
+this status-only commit is not its own completion evidence.
+Post-merge independent Agent-role APPROVE:
+https://github.com/wjhuang88/talos/pull/507#issuecomment-5596471399,
+bound to head `f0103a7f4e78e42fc88364f6e4cbb801b1c96553` and base
+`73cd950b9b6d32aec4cce9d11d52ea110ee1aeed`, with exact-head CI `34294884578` successful.
+This is retrospective verification, not reconstructed pre-merge authorization or CAS evidence;
+the shared GitHub account permits Agent-role separation, not natural-person identity separation.
+All descriptor acceptance items are covered by the implementation, conformance fixtures,
+83 passing locked talos-core tests and the independent review. No user-facing behavior changed.
+CAP-001 remains Refinement / Unclaimed; CAP-001-B/C remain unactivated and unauthorized.
 
 ## Residuals
 

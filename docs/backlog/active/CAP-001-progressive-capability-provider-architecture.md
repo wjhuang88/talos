@@ -64,7 +64,7 @@ This Epic is an architecture and decomposition owner. It does not authorize impl
 | Child | Outcome | Current State |
 |---|---|---|
 | CAP-001-P0 / Issue #467 | Characterize current behavior and prepare compatibility seams plus cross-lane ownership before capability implementation. | I246 Complete / Closed; Completion Commit `9a3c1d860408c1438ec1a7ad4b57860167d0cb01` via implementation PR #492 |
-| CAP-001-A / I252 | Stable Capability and Provider descriptor contracts. | Review / Claimed; implementation `71cc03b322d80d19c3767e4ef2014fecb84c1994`, merged via PR #507 as `0835afc4b982a5ed409ccfb55538bbeaf6fe5eab` |
+| CAP-001-A / I252 | Stable Capability and Provider descriptor contracts. | Complete / Closed; Completion Commit `71cc03b322d80d19c3767e4ef2014fecb84c1994`, merged via PR #507 as `0835afc4b982a5ed409ccfb55538bbeaf6fe5eab` |
 | CAP-001-B | Capability registry and resolver. | Identifier reserved by Issue #466; owner not created |
 | CAP-001-C | Plugin capability declarations and Carrier adapters. | Identifier reserved by Issue #466; owner not created |
 | BUNDLE/TEXT/LANG/DIST/BROWSER children | Domain-specific implementation slices after the architecture decision. | Proposed only; owner IDs require separate intake and collision checks |
