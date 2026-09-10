@@ -1,6 +1,6 @@
 # Iteration I255: Plugin Capability Lifecycle
 
-> Document status: Review / Claimed (#527 effective on main; local implementation candidate)
+> Document status: Complete / Closed
 > Published plan date: 2026-09-10
 > Objective: Connect installed Plugin declarations and lifecycle to the shared Capability registry.
 > MVP deliverable: An explicitly loaded local WASM Plugin declares capabilities, activates a Provider, executes through the existing permission pipeline, and becomes unavailable after stop.
@@ -9,7 +9,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex mainline execution Agent |
 | Work Slice | Installed Plugin capability declarations, carrier adapter lifecycle, registry availability and existing explicit CLI Plugin integration. |
@@ -17,10 +17,10 @@
 | Source Issue | #513 (parent #466) |
 | Governance Claim PR | #527 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Claim #527 effective at 07066e76e92c30d63a2a9068dfdd5e0737d3f1a1; head eb26aaef, CI 34449342743, independent Agent-role API/security plan review 5615007238 and CAS 5615007433. Shared account does not prove natural-person separation. Implementation needs fresh exact-head API/security review. |
-| Implementation PR | Not started |
+| Authorization Evidence | Claim #527 effective at 07066e76e92c30d63a2a9068dfdd5e0737d3f1a1; head eb26aaef, CI 34449342743, independent Agent-role API/security plan review 5615007238 and CAS 5615007433. Shared account does not prove natural-person separation. Implementation #528 head e1b9997a passed CI 34471207754 and independent API/security APPROVE 5617962523; CAS 5618114017 preceded merge 9404c338. |
+| Implementation PR | #528 |
 | Last Updated | 2026-09-10 |
-| Handoff / Release Condition | Claim #527 is effective. Implementation requires stable-candidate exact-head CI, independent API/security review and merge-time CAS; retain Review until owner-first closeout. |
+| Handoff / Release Condition | #528 merged with exact-head CI, independent API/security approval and CAS; acceptance evidence below closes this slice only. Other CAP-001 children remain independently governed. |
 
 ## Required Reads
 
@@ -131,14 +131,15 @@ owner headers; historical timeline status words and template rows do not activat
 
 ## Completion Evidence
 
-Completion Commit: pending implementation.
-This plan cannot certify its own completion. Claim/activation preparation requires no Rust tests.
+Completion Commit: e1b9997abc57a17a2f536c97f063830b569dc4c0
+Implementation PR #528 merged as `9404c3383a3ac076af086a5f6e0bd72fae5e27b8`.
+This pre-existing implementation commit, not this status change, supplies completion evidence.
 
 ## Resume
 
-Finalize this plan and CAP-001-C atomically under the actual governance PR number; obtain
-independent API/security plan review and documentation CI. After claim merge, start implementation
-from that merge or newer main, converge locally and submit one stable implementation candidate.
+Implementation is complete. Finish review/merge of this evidence-only closeout and close #513;
+then select the next separately governed CAP-001 child. Do not resume I255 implementation or
+infer completion of #466. Dated checkpoints below retain their original historical states.
 
 ## Atomic Claim Proposal (2026-09-10)
 
@@ -209,3 +210,34 @@ after the socket fixture correction: pinned Rust 1.97.0, locked workspace check/
 format, both governance validators (0 warnings), text boundary and classifier checks.
 The final owner/derived Review synchronization is documentation-only and is checked again before
 commit; no implementation completion or remote exact-head validation is inferred from this run.
+
+## Acceptance Closeout (2026-09-10)
+
+Implementation head `e1b9997abc57a17a2f536c97f063830b569dc4c0`, reviewed base
+`07066e76e92c30d63a2a9068dfdd5e0737d3f1a1`, reached main through #528 merge
+`9404c3383a3ac076af086a5f6e0bd72fae5e27b8`. CI `34471207754` attempt 2 has five
+successful jobs, including macOS full locked preflight and Windows workspace/CLI smoke.
+Only the Issue reconciliation job was rerun after status comment `5617924067`; original
+successful Rust job timestamps were retained. Independent API/security APPROVE `5617962523`
+and merge-time CAS `5618114017` bind that head/base. The reviewer independently ran lifecycle
+integration 6/6, ownership 3/3 and lifecycle unit tests 3/3; shared GitHub identity establishes
+Agent-role separation only, not natural-person separation.
+
+| Published acceptance | Evidence and result |
+|---|---|
+| 1. Legacy compatibility | `legacy_non_semver_and_names_preserved_without_public_struct_changes`, existing WASM package tests and legacy file-loader rejection test passed; constructors, names and permission facets retained. |
+| 2. Availability tracks activation | `activate_execute_stop_rejects_stale_handles_and_allows_new_owner` asserts unavailable after load/initialize and available after activation. |
+| 3. Invalid declaration/binding/carrier | `malformed_explicit_declarations_and_unsupported_carriers_fail_closed`, `partial_initialization_and_path_escape_never_publish_tools` and initialization binding tests passed; panic containment injection passed. |
+| 4. Stop/failure and stale calls | Lifecycle trap/fuel test withdraws availability; existing `timeout_handled` exercises bounded WASM timeout/fuel failure without distinguishing which limit fired. Unit tests `admitted_before_stop_can_finish_but_later_calls_are_denied` and `cancelled_invocation_closes_future_admission` cover admission/cancellation. |
+| 5. Ownership/atomicity | Three `i255_provider_ownership` tests cover invalid/colliding batches, replacement/other owners and registry snapshots; lifecycle duplicate activation and repeated stop passed. |
+| 6. Permission/disclosure | Lifecycle test checks hidden/default versus explicit presentation; real CLI `capability_registration_does_not_bypass_outside_workspace_permission` denies the request. |
+| 7. Real execution and stop | Real CLI `explicit_capability_package_executes_through_print_permission_pipeline` returns fixture result 7; public lifecycle test proves stop and stale-call denial. |
+| 8. Defaults/documentation | No Cargo/Cargo.lock or default feature/member edits. README, architecture and public lifecycle rustdoc describe implemented WASM scope, not future carriers. |
+
+All eight acceptance rows are satisfied within the published slice. The final diff remains the
+20-file inventory recorded above; no Dashboard, release, permission policy or carrier expansion.
+Stopped host tool entries may remain displayed until host registry rebuild but cannot execute;
+already-admitted calls retain the existing bounded WASM execution policy. These are the published
+compatibility semantics, not a new unload/cancellation guarantee. Bundle installation remains
+BUNDLE-001/DIST-001-A, language integration LANG-001/002/003, on-demand resolution DIST-001-B,
+and Browser integration BROWSER-001. No downstream activation is included in this closeout.

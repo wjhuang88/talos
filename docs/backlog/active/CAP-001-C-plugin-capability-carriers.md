@@ -1,13 +1,13 @@
 # CAP-001-C: Plugin Capability Declarations And Carrier Adapters
 
-**Status**: Review / Claimed (#527 effective on main; local implementation candidate)
+**Status**: Complete / Closed
 
 | Field | Value |
 |---|---|
 | Story ID | CAP-001-C |
 | Type | Plugin runtime integration |
 | Parent | CAP-001 / #466 |
-| Status | Review / Claimed (#527 effective on main; local implementation candidate) |
+| Status | Complete / Closed |
 | Selected Iteration | I255 |
 | Source Issue | [GitHub Issue #513](https://github.com/wjhuang88/talos/issues/513) |
 | Depends On | CAP-001-B; ADR-027; ADR-072 |
@@ -16,17 +16,17 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex mainline execution Agent |
 | Work Slice | Installed Plugin capability declarations, carrier adapter lifecycle, registry availability and existing explicit CLI Plugin integration. |
 | Claimed At | 2026-09-10 |
-| Authorization Evidence | Claim #527 effective at 07066e76e92c30d63a2a9068dfdd5e0737d3f1a1; head eb26aaef, CI 34449342743, independent Agent-role API/security plan review 5615007238 and CAS 5615007433. Shared account does not prove natural-person separation. Implementation needs fresh exact-head API/security review. |
+| Authorization Evidence | Claim #527 effective at 07066e76e92c30d63a2a9068dfdd5e0737d3f1a1; head eb26aaef, CI 34449342743, independent Agent-role API/security plan review 5615007238 and CAS 5615007433. Shared account does not prove natural-person separation. Implementation #528 head e1b9997a passed CI 34471207754 and independent API/security APPROVE 5617962523; CAS 5618114017 preceded merge 9404c338. |
 | Governance Claim PR | #527 |
-| Implementation PR | Not started |
+| Implementation PR | #528 |
 | Authorization Mode | Independent review |
 | Last Updated | 2026-09-10 |
-| Handoff / Release Condition | #527 is effective; implementation needs fresh exact-head CI, independent API/security review and CAS before merge. No new carrier, permission, Bundle or product authority. |
+| Handoff / Release Condition | #528 merged; I255 acceptance closeout records exact-head CI, independent API/security approval and CAS. No new carrier, permission, Bundle or product authority. |
 
 ## Required Reads
 
@@ -90,3 +90,17 @@ I255 now records the implemented lifecycle, core ownership leases, CLI integrati
 adapters, tests and complete changed-file inventory. Initial HTTP fixture and initialization
 panic findings were repaired locally. Final full validation and exact-head remote review remain
 required; this is Review, not completion. #513 stays open until owner-first closeout reaches main.
+
+## Acceptance Closeout (2026-09-10)
+
+Completion Commit: e1b9997abc57a17a2f536c97f063830b569dc4c0
+
+Implementation #528 merged at `9404c3383a3ac076af086a5f6e0bd72fae5e27b8` after CI
+`34471207754` (five jobs successful), independent API/security APPROVE `5617962523` and CAS
+`5618114017`. [I255](../../iterations/I255-plugin-capability-lifecycle.md) maps all eight
+published acceptance rows to tests and records identity limits. Declarations, actual activation,
+owned withdrawal, fail-closed stale handles and real CLI permission/disclosure evidence satisfy
+this WASM carrier slice. Existing ADR-027 restrictions and legacy constructors remain intact.
+The status-only closeout cannot certify itself; the implementation SHA already exists on main.
+Other carriers, Bundle installation, Language and Browser work remain their separate owners;
+this completion neither closes #466 nor activates its remaining children.
