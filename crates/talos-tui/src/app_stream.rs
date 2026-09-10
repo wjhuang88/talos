@@ -113,7 +113,11 @@ impl StreamRenderState {
         let mut lines = Vec::new();
 
         while let Some(pos) = self.buffer.find('\n') {
-            let line = self.buffer[..pos].to_string();
+            // CR belongs to the CRLF delimiter, even when the provider split the pair.
+            let line = self.buffer[..pos]
+                .strip_suffix('\r')
+                .unwrap_or(&self.buffer[..pos])
+                .to_string();
             self.buffer = self.buffer[pos + 1..].to_string();
             if self.hold_complete_lines {
                 self.held_lines.push((self.line_count, line));
@@ -139,13 +143,21 @@ impl StreamRenderState {
             lines.push(self.render_next_line(&line));
         }
 
+        // Preview may be a progress label, not source. Deliver the actual trailing
+        // source through the same classifier before flushing its held state.
+        if !self.buffer.is_empty() {
+            let tail = std::mem::take(&mut self.buffer);
+            if self.hold_complete_lines {
+                if !self.should_skip_leading_empty_line(&tail) {
+                    lines.push(self.render_next_line(&tail));
+                }
+            } else {
+                lines.extend(self.push_complete_line(tail));
+            }
+        }
+        self.preview.clear();
         let decisions = self.block_classifier.finish();
         lines.extend(self.apply_block_decisions(decisions));
-
-        if !self.preview.is_empty() {
-            let preview = std::mem::take(&mut self.preview);
-            lines.push(self.render_next_line(&preview));
-        }
 
         if self.bg().is_some() {
             lines.push(self.styled_line(Vec::new()));
@@ -369,7 +381,7 @@ impl StreamRenderState {
                     lines.push(self.render_next_line(&line));
                 }
                 BlockDecision::StartHold { status } | BlockDecision::ContinueHold { status } => {
-                    self.preview = status.preview_text().to_string();
+                    self.preview = crate::stream_markdown::preview_text(&status).to_string();
                     self.hold_status = Some(status);
                 }
                 BlockDecision::FinishHold {
@@ -389,7 +401,12 @@ impl StreamRenderState {
                 } => {
                     self.hold_status = None;
                     self.preview = self.buffer.clone();
-                    if kind == MarkdownBlockKind::CodeFence
+                    if reason == FallbackReason::HeldBlockTooLarge {
+                        for line in rendered {
+                            lines.push(self.render_plain_line(self.line_count, &line));
+                            self.line_count += 1;
+                        }
+                    } else if kind == MarkdownBlockKind::CodeFence
                         && reason == FallbackReason::UnterminatedCodeFence
                     {
                         lines.extend(self.render_inline_fallback_lines(rendered));
@@ -443,5 +460,71 @@ impl StreamRenderState {
         self.held_lines.clear();
         self.block_classifier.reset();
         self.hold_status = None;
+    }
+}
+
+#[cfg(test)]
+mod i256_tests {
+    use super::*;
+
+    fn render(chunks: &[&str]) -> Vec<ScrollbackLine> {
+        let mut state = StreamRenderState::default();
+        let mut lines = state.start(MessageSource::Assistant);
+        for chunk in chunks {
+            lines.extend(state.push_chunk(chunk));
+        }
+        lines.extend(state.finish());
+        assert!(state.preview().is_empty());
+        assert!(state.hold_status().is_none());
+        lines
+    }
+
+    #[test]
+    fn final_partial_line_is_source_not_hold_preview() {
+        for input in [
+            "```text\n界 tail",
+            "- first\n- last",
+            "> first\n> last",
+            "| a | b |\nlast",
+        ] {
+            let output = render(&[input]);
+            let text = output
+                .iter()
+                .map(|line| line.text.as_str())
+                .collect::<Vec<_>>()
+                .join("\n");
+            assert!(text.contains("tail") || text.contains("last"), "{text}");
+            for placeholder in [
+                "receiving code block",
+                "formatting list",
+                "formatting quote",
+                "rendering table",
+            ] {
+                assert!(!text.contains(placeholder), "{text}");
+            }
+        }
+    }
+
+    #[test]
+    fn every_utf8_chunk_split_preserves_final_rendering() {
+        let input = "Intro 界\n```text\nλ界\n```\n| a | b |\n| --- | --- |\n| 一 | 二 |\n- one\n- two\n> quote\ntrailing λ";
+        let expected = render(&[input]);
+        for split in (0..=input.len()).filter(|&offset| input.is_char_boundary(offset)) {
+            let actual = render(&[&input[..split], &input[split..]]);
+            assert_eq!(actual, expected, "split={split}");
+            assert_eq!(
+                format!("{actual:?}"),
+                format!("{expected:?}"),
+                "styled split={split}"
+            );
+        }
+    }
+
+    #[test]
+    fn crlf_split_between_chunks_matches_lf_lines() {
+        assert_eq!(
+            render(&["plain\r", "\nnext\r", "\ntail"]),
+            render(&["plain\nnext\ntail"])
+        );
     }
 }

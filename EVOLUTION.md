@@ -60,8 +60,19 @@ repeating known mistakes.
 | 48 | Governance / Windows | 结构化子进程输出必须显式指定协议编码，不能继承 Windows locale | I183 / PR #184 |
 | 49 | Governance / CI | 分支级 validator 本地复现必须显式绑定 PR base，不能依赖 `HEAD^` 回退 | I159 / PR #236 |
 | 50 | Governance / Long Task | 人工验证不可用时建立 Issue 批量跟踪，不能让未验项冒充通过或空转阻塞实现队列 | I200 / VALIDATION-002 |
+| 51 | TUI / Streaming | 最终 flush 必须消费源缓冲，不能把 transient preview 当作源文 | I256 / TEXT-001 |
 
 ## Lessons
+
+## 2026-09-10 - Stream finalization must not consume display previews
+
+- Trigger: I256 added cross-chunk and final-partial-line characterization during classifier extraction.
+- Symptom: a pending table candidate could replace the final source line with `rendering table...`.
+- Root cause: finalization rendered the preview field, which can contain either source or a progress label.
+- Fix: feed the actual source buffer through classification before flushing, then clear the preview.
+- Prevention: test every UTF-8 split, final partial lines across held block kinds and CRLF boundaries;
+  terminal evidence must distinguish transient preview output from final history.
+- Promoted to rule/check: `crates/talos-tui/src/app_stream.rs` `i256_tests`.
 
 ## 2026-08-14 - Branch-level governance validation must bind the PR base
 

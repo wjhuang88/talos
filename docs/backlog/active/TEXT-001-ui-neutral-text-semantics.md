@@ -5,7 +5,7 @@
 | Story ID | TEXT-001 |
 | Type | Shared text contract |
 | Parent | CAP-001 / #466 |
-| Status | In Progress / Claimed (proposed by #530; ineffective until main merge) |
+| Status | Review / Claimed |
 | Selected Iteration | I256 |
 | Source Issue | [GitHub Issue #511](https://github.com/wjhuang88/talos/issues/511) |
 | Depends On | CAP-001-A; ADR-072 |
@@ -19,12 +19,12 @@
 | Executing Agent | Codex mainline execution Agent |
 | Work Slice | Shared text classification, language identity and validated semantic fallback; narrow TUI adapters only. |
 | Claimed At | 2026-09-10 |
-| Authorization Evidence | #530 proposes atomic claim/activation under the maintainer-authorized unattended #466 task. Independent API/compatibility review and exact-head CI/CAS required; shared account establishes Agent-role separation only. Ineffective until main merge. |
+| Authorization Evidence | #530 effective at c8b596980136a577921bf92cdcbe1e517e64d10a; exact head c5f94f31, CI 34474441483, independent API/compatibility APPROVE 5618377071 and CAS 5618385106. Shared account establishes Agent-role separation only. |
 | Governance Claim PR | #530 |
 | Implementation PR | Not started |
 | Authorization Mode | Independent review |
 | Last Updated | 2026-09-10 |
-| Handoff / Release Condition | I256 records the serial consumer authority agreement; #530 must merge after independent plan review, CI and CAS before implementation. |
+| Handoff / Release Condition | Claim #530 is effective; converge the complete slice locally, then require fresh exact-head CI, independent API/compatibility review and CAS before implementation merge. |
 
 ## Required Reads
 
@@ -37,7 +37,7 @@ Define shared text/code-block semantics and deterministic plain-text fallback fo
 tools. Results must not expose Ratatui, GPUI, Arborium or Tree-sitter types.
 
 CAP-001-C is not a prerequisite for this contract. I253 is complete and I256 records the
-consumer ownership inventory. #530 proposes selection; scheduling CAP-001-B/C first
+consumer ownership inventory. #530 established selection; scheduling CAP-001-B/C first
 does not create a technical dependency on their Plugin/Carrier branch.
 
 ## Non-Goals
@@ -78,3 +78,22 @@ exceptional-input corrections: bounded fallback for previously unbounded held bl
 lines, and whole-result plain-text fallback for malformed highlights instead of clamp/skip.
 Normal rendering, public constructors/serde and default build behavior remain unchanged.
 No other TUI, Desktop, LanguageProvider, installation or permission authority is transferred.
+
+## Effective Activation (2026-09-10)
+
+#530 merged at `c8b596980136a577921bf92cdcbe1e517e64d10a` after exact head
+`c5f94f3114d60260528a8ddf40ceadaddadcd7a8` / base
+`dba3419c88f89ed6aa108de8d638ebe1c8ac3c64`, CI `34474441483`, independent
+API/compatibility approval `5618377071` and CAS `5618385106`. This supersedes
+proposal-only current wording; the Published Baseline and dated preparation facts are preserved.
+Implementation branch `feat/i256-ui-neutral-text-semantics` starts exactly at the claim merge.
+No implementation PR exists yet; all implementation/testing corrections remain local.
+
+## Local Acceptance (2026-09-10)
+
+I256 records passing shared/default/optional-parser tests, 571 TUI library tests, full locked
+workspace preflight and real binary PTY evidence. Shared classification and whole-result highlight
+validation are consumed by the TUI; legacy public types/defaults and normal rendering are preserved.
+README/architecture/rustdoc describe the implemented boundary. Review / Claimed awaits stable
+candidate exact-head CI, independent API/compatibility approval and CAS; no Complete claim or
+implementation SHA exists yet. Detailed acceptance and changed-file inventory are in I256.

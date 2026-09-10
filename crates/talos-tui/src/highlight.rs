@@ -51,10 +51,7 @@ impl HighlightEngine {
 
 /// Convert raw tree-sitter spans into per-line colored text segments.
 fn segments_from_result(code: &str, result: &talos_text::HighlightResult) -> Vec<LineSegments> {
-    let spans: &[talos_text::HighlightSpan] = match result {
-        talos_text::HighlightResult::Spans(spans) => spans,
-        talos_text::HighlightResult::PlainText => &[],
-    };
+    let spans = result.validated_spans(code).unwrap_or(&[]);
     let line_offsets: Vec<usize> = code
         .match_indices('\n')
         .map(|(i, _)| i + 1)
@@ -66,12 +63,8 @@ fn segments_from_result(code: &str, result: &talos_text::HighlightResult) -> Vec
     let mut cursor: usize = 0;
 
     for span in spans {
-        let s = span.start.min(code.len());
-        let e = span.end.min(code.len());
-
-        if s < cursor || e < s || !code.is_char_boundary(s) || !code.is_char_boundary(e) {
-            continue;
-        }
+        let s = span.start;
+        let e = span.end;
 
         if s > cursor {
             emit_plain_segment(code, &mut lines, &mut line_idx, cursor, s);
@@ -202,5 +195,27 @@ mod tests {
             segments_from_result("一", &result),
             vec![vec![("一".into(), None)]]
         );
+    }
+
+    #[test]
+    fn later_bad_span_discards_earlier_coloring() {
+        for bad in [(2, 3), (0, 1), (4, 99)] {
+            let result = HighlightResult::Spans(vec![
+                HighlightSpan {
+                    start: 0,
+                    end: 1,
+                    capture: "keyword".into(),
+                },
+                HighlightSpan {
+                    start: bad.0,
+                    end: bad.1,
+                    capture: "string".into(),
+                },
+            ]);
+            assert_eq!(
+                segments_from_result("a界z", &result),
+                vec![vec![("a界z".into(), None)]]
+            );
+        }
     }
 }

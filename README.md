@@ -37,6 +37,23 @@ dashboard, broader dotagents compatibility, plugin carriers, and advanced docume
 - **Progressive context**: runtime Skill discovery plus explicit Skill body/reference activation without dumping hidden content into visible history.
 - **Extensible surface**: MCP tools, hooks, JSON-RPC, governance-aware project status, and explicit local read-only WASM packages are implemented; remote plugin distribution and browser control remain bounded separately.
 
+### Shared text semantics (source development)
+
+`talos-text` exposes renderer-independent language IDs, highlight spans and streaming Markdown
+block classification. The TUI consumes the shared classifier while retaining its own colors,
+padding and progress wording. Oversized held blocks fall back to plain source; invalid highlight
+ranges reject the entire result instead of displaying partially accepted coloring. Final partial
+lines are flushed as source, not as progress labels, and CRLF line delimiters work across chunks.
+The classifier's 200-line / 16-KiB hold limits exclude delimiters and do not limit an incoming
+unfinished line in the TUI adapter.
+
+Embedders can use `talos_text::stream::StreamBlockClassifier` with complete UTF-8 lines, and
+`HighlightResult::validated_spans(source)` to validate source ranges before rendering. Callers
+assemble incoming chunks and render the resulting semantic decisions. Default `talos-text`
+does not load parsers or import TUI/Desktop types; the existing optional `code-intelligence`
+adapter remains unchanged. This is not dynamic LanguageProvider loading or Bundle installation,
+and does not claim these source changes are in an already-published release.
+
 ## Current Release Boundary
 
 `v0.9.1` is suitable for local developer use where the operator reviews tool actions and keeps
