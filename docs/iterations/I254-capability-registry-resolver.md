@@ -1,6 +1,6 @@
 # Iteration I254: Capability Registry And Resolver
 
-> Document status: Review / Claimed (implementation candidate `2d060655`, not yet merged)
+> Document status: Review / Claimed (#524 merged; local acceptance hardening pending)
 > Published plan date: 2026-09-10
 > Planned objective: Deliver the deterministic, offline Capability/Provider registry and resolver defined by CAP-001-B / Issue #512.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -18,14 +18,13 @@
 | Source Issue | #512 (parent #466) |
 | Governance Claim PR | #523 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Maintainer authorized single-developer unattended completion of #499 then #466. No independent human reviewer is available; shared GitHub identity does not prove human separation. PR #523 requires exact-head CI, both validators and merge-time CAS; proposed claim and activation remain ineffective until merge. |
-| Implementation PR | Pending stable candidate push |
+| Authorization Evidence | Maintainer authorized single-developer unattended completion of #499 then #466. Claim #523 is effective on main at 4cd7b42e958e73235597a984b6805219ea1f2256. Shared GitHub identity does not prove human separation; each stable implementation candidate requires fresh exact-head CI and independent Agent-role API review. |
+| Implementation PR | #524 (merged); acceptance-hardening follow-up pending stable push |
 | Last Updated | 2026-09-10 |
 | Handoff / Release Condition | Implementation starts only after this claim reaches main; no Plugin, Bundle, permission, release or product-surface authority. |
 
-Before implementation, follow `docs/sop/AGENT-COLLABORATION.md`. One governance-only PR proposes
-both `Claimed` and `Active`; both are ineffective until the finalized record reaches the target
-branch. Implementation then converges locally before the first stable stage candidate is pushed.
+Claim #523 established ownership and activation on main. Follow `docs/sop/AGENT-COLLABORATION.md`
+for local convergence, fresh stable-candidate evidence and final owner-first closure.
 
 ## Published Baseline
 
@@ -150,10 +149,50 @@ close using pre-existing implementation evidence. All intermediate fixes remain 
 
 ## Variance And Residuals
 
-- No variance; implementation remains unauthorized until the claim is effective on `main`. CAP-001-C and all domain children remain separately governed.
+- Claim #523 is effective. CAP-001-C and all domain children remain separately governed;
+  this library-only slice does not claim runtime integration or completion of parent #466.
 
 ## Retrospective
 
 - Outcome: planned.
 - Documentation: governance and API documentation targets are listed above.
 - Lessons: pending implementation closeout.
+
+## Post-Merge Acceptance Checkpoint (2026-09-10)
+
+This checkpoint supersedes earlier candidate/pending statements as current execution truth;
+the Published Baseline and dated planning records above remain historical evidence.
+
+- PR #524 merged as `d7a836dee37a003a8f36476c124ba63cbc5decf2`, with head
+  `d03da4940dfd0a749fa7b3ffebb2dcf3a60c5464` and base
+  `4cd7b42e958e73235597a984b6805219ea1f2256`. CI `34428178830` attempt 2 and
+  independent Agent-role approval `5612024153` apply only to that head.
+- Acceptance hardening remains under I254/#512: callback unwind containment, checks within
+  capability scans and before returning a selected provider, invalid request identity rejection,
+  deterministic distinct-provider selection, and atomic validation of same-ID replacement.
+- A synchronous host callback must return promptly. Deadlines are cooperative, not a mechanism
+  to preempt a blocking callback; aborting panics cannot be recovered. No execution permission,
+  installation, trust decision, tool/schema disclosure or persisted format changes are introduced.
+- Public integration fixture `i254_capability_contract` drives unavailable -> registration ->
+  available via exported APIs and preserves descriptor serialization and existing ToolRegistry
+  names/schemas. This is the planned library-only acceptance, not CLI/runtime binding.
+- Local validation: 90 core unit tests and 5 integration tests passed. Full
+  `COLLABORATION_VALIDATION_BASE=origin/main CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 ./scripts/release_preflight.sh`
+  passed with Rust 1.97.0 and main at `d7a836de` (fmt/check/Clippy/workspace tests/doctests).
+  The first sandboxed attempt failed when an existing skill test created
+  `~/.agents/skills/dedup-test`; the authorized unsandboxed rerun passed, with no fixture change.
+  Core rustdoc built with seven pre-existing unrelated broken-link warnings, not a warning-free claim.
+- Follow-up branch `fix/i254-resolver-conformance` starts at the #524 merge. The verified code
+  retains the locally verified behavior. #512 remains open; Completion Commit
+  remains pending until the follow-up is merged and acceptance is closed.
+- Complete follow-up inventory: `crates/talos-core/src/capability.rs`,
+  `crates/talos-core/tests/i254_capability_contract.rs`, this iteration owner,
+  `docs/backlog/active/CAP-001-B-capability-registry-resolver.md`, CAP-001 parent,
+  `docs/reference/ARCHITECTURE.md`, `docs/BOARD.md`, `docs/backlog/PRODUCT-BACKLOG.md`,
+  `docs/iterations/README.md`, `docs/reference/ISSUE-DOC-CODE-STATUS-2026-08-31.md`,
+  and `.agent-governance/manifest.yaml`.
+  The two Rust files implement/test I254; remaining files document its actual boundary and
+  mirror owner state. No Cargo, dependency, permission, Dashboard, release or unrelated owner edits.
+- Resume: finish local governance/staged-diff checks, submit one stable follow-up, obtain new
+  exact-head CI/API review and perform merge-time CAS. Then close owner-first with existing
+  implementation evidence. Do not activate another #466 child before this acceptance gate.

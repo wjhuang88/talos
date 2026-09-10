@@ -5,7 +5,7 @@
 | Story ID | CAP-001-B |
 | Type | Capability infrastructure implementation |
 | Parent | CAP-001 / #466 |
-| Status | Review / Claimed (implementation candidate `2d060655`, not yet merged) |
+| Status | Review / Claimed (#524 merged; acceptance-hardening follow-up pending) |
 | Selected Iteration | I254 |
 | Source Issue | [GitHub Issue #512](https://github.com/wjhuang88/talos/issues/512) |
 | Depends On | ADR-072 Accepted; CAP-001-A / I252 Complete |
@@ -19,9 +19,9 @@
 | Executing Agent | Codex mainline execution Agent |
 | Work Slice | Capability identity lookup, registry ownership and bounded resolver contract only. |
 | Claimed At | 2026-09-10 |
-| Authorization Evidence | Maintainer authorized single-developer unattended completion of #499 then #466. No independent human reviewer is available; shared GitHub identity does not prove human separation. PR #523 requires exact-head CI, both validators and merge-time CAS; proposed claim and activation remain ineffective until merge. |
+| Authorization Evidence | Maintainer authorized single-developer unattended completion of #499 then #466. Claim #523 is effective on main at 4cd7b42e958e73235597a984b6805219ea1f2256. Shared GitHub identity does not prove human separation; each stable implementation candidate requires fresh exact-head CI and independent Agent-role API review. |
 | Governance Claim PR | #523 |
-| Implementation PR | Pending stable candidate push |
+| Implementation PR | #524 (merged); acceptance-hardening follow-up pending stable push |
 | Authorization Mode | Single-maintainer merge |
 | Last Updated | 2026-09-10 |
 | Handoff / Release Condition | Implementation starts only after PR #523 reaches main; preserve CAP-001-C, Bundle, permission and product boundaries. Exact-head implementation API/security review remains required where applicable. |
@@ -74,3 +74,14 @@ additional Issues or iterations. No Rust, Cargo, storage or runtime behavior is 
 PR #523 established Active / Claimed for this owner and I254 atomically, merging to `main` as
 `4cd7b42e`. Scope and acceptance are unchanged. Registration does not attest trust, grant execution
 permission, install code or disclose a tool. Implementation starts from this merge or later.
+
+## Post-Merge Acceptance Checkpoint (2026-09-10)
+
+PR #524 merged at `d7a836dee37a003a8f36476c124ba63cbc5decf2`; I254 records its exact-head
+CI/review and the subsequent locally converged acceptance hardening. This supersedes the
+pre-claim/current-candidate descriptions above without changing scope. The resolver remains
+library-only, with cooperative cancellation/deadline checks and panic containment for promptly
+returning host callbacks, not preemption. Registration neither grants permission nor exposes tools.
+Full local release preflight passed; new exact-head remote evidence is still required for the
+follow-up. I254 and this owner remain Review / Claimed; #512 stays open and CAP-001-C remains
+unclaimed. Completion Commit: pending final acceptance and follow-up merge.

@@ -1,4 +1,4 @@
-//! UI-neutral capability and provider descriptor contracts (CAP-001-A).
+//! UI-neutral capability descriptors and offline resolution (CAP-001-A/B).
 
 use std::collections::BTreeMap;
 use std::time::Instant;
@@ -136,12 +136,16 @@ pub enum ResolutionResult {
     Invalid(DescriptorError),
     /// Resolution was cancelled or exceeded its deadline.
     Cancelled,
-    /// The resolver failed closed due to an internal error.
+    /// The host cancellation callback panicked; no provider was selected.
     Error,
 }
 
 impl CapabilityRegistry {
     /// Register a validated provider without exposing tools or schemas.
+    ///
+    /// A valid descriptor replaces the previous descriptor with the same provider ID.
+    /// Validation happens before mutation; invalid updates preserve the old record.
+    /// Registration order between distinct provider IDs does not affect selection.
     pub fn register(&mut self, provider: ProviderDescriptor) -> Result<(), DescriptorError> {
         provider.validate()?;
         self.providers.insert(provider.id.clone(), provider);
@@ -154,14 +158,36 @@ impl CapabilityRegistry {
     }
 
     /// Resolve while observing cancellation and an optional deadline.
+    ///
+    /// The callback must return promptly: a synchronous callback cannot be preempted.
+    /// Unwinding callback panics return [`ResolutionResult::Error`]; aborting panics
+    /// cannot be recovered. A failed callback is not invoked again in this request.
     pub fn resolve_with<F: Fn() -> bool>(
         &self,
         request: &CapabilityRequest,
         is_cancelled: F,
         deadline: Option<Instant>,
     ) -> ResolutionResult {
-        if is_cancelled() || deadline.is_some_and(|at| Instant::now() >= at) {
-            return ResolutionResult::Cancelled;
+        let check = || {
+            if deadline.is_some_and(|at| Instant::now() >= at) {
+                return Err(ResolutionResult::Cancelled);
+            }
+            // Only the host callback crosses the unwind boundary. On failure we
+            // abandon this resolution rather than reusing potentially changed state.
+            match std::panic::catch_unwind(std::panic::AssertUnwindSafe(&is_cancelled)) {
+                Err(_) => Err(ResolutionResult::Error),
+                Ok(true) => Err(ResolutionResult::Cancelled),
+                Ok(false) if deadline.is_some_and(|at| Instant::now() >= at) => {
+                    Err(ResolutionResult::Cancelled)
+                }
+                Ok(false) => Ok(()),
+            }
+        };
+        if let Err(result) = check() {
+            return result;
+        }
+        if let Err(error) = validate_id(&request.capability_id) {
+            return ResolutionResult::Invalid(error);
         }
         let required = match parse_version(&request.version) {
             Ok(version) => version,
@@ -169,24 +195,31 @@ impl CapabilityRegistry {
         };
         let mut found = false;
         for provider in self.providers.values() {
-            if is_cancelled() || deadline.is_some_and(|at| Instant::now() >= at) {
-                return ResolutionResult::Cancelled;
+            if let Err(result) = check() {
+                return result;
             }
-            if provider
-                .capabilities
-                .iter()
-                .any(|cap| cap.id == request.capability_id)
-            {
+            for capability in &provider.capabilities {
+                if let Err(result) = check() {
+                    return result;
+                }
+                if capability.id != request.capability_id {
+                    continue;
+                }
                 found = true;
-                if provider.capabilities.iter().any(|cap| {
-                    cap.id == request.capability_id
-                        && parse_version(&cap.version)
-                            .map(|v| v.0 == required.0)
-                            .unwrap_or(false)
-                }) {
-                    return ResolutionResult::Available(provider.clone());
+                if parse_version(&capability.version)
+                    .map(|v| v.0 == required.0)
+                    .unwrap_or(false)
+                {
+                    let selected = provider.clone();
+                    if let Err(result) = check() {
+                        return result;
+                    }
+                    return ResolutionResult::Available(selected);
                 }
             }
+        }
+        if let Err(result) = check() {
+            return result;
         }
         if found {
             ResolutionResult::Incompatible
@@ -361,5 +394,175 @@ mod tests {
             }),
             ResolutionResult::Invalid(_)
         ));
+    }
+
+    #[test]
+    fn registry_matches_capability_version_not_provider_version() {
+        let mut descriptor = provider("2.0.0");
+        descriptor.capabilities.push(CapabilityDescriptor {
+            id: "text.search".into(),
+            version: "1.4.0".into(),
+            name: "Search".into(),
+            provenance: Provenance::BuiltIn,
+            carrier: Carrier::BuiltIn,
+            metadata: BTreeMap::new(),
+        });
+        let mut registry = CapabilityRegistry::default();
+        registry
+            .register(descriptor)
+            .expect("valid provider fixture");
+        let mut request = CapabilityRequest {
+            capability_id: "text.search".into(),
+            version: "1.0.0".into(),
+        };
+        assert!(matches!(
+            registry.resolve(&request),
+            ResolutionResult::Available(_)
+        ));
+        request.version = "2.0.0".into();
+        assert_eq!(registry.resolve(&request), ResolutionResult::Incompatible);
+    }
+
+    #[test]
+    fn registry_cancelled_and_expired_requests_do_not_resolve() {
+        let registry = CapabilityRegistry::default();
+        let request = CapabilityRequest {
+            capability_id: "text.search".into(),
+            version: "1.0.0".into(),
+        };
+        assert_eq!(
+            registry.resolve_with(&request, || true, None),
+            ResolutionResult::Cancelled
+        );
+        assert_eq!(
+            registry.resolve_with(&request, || false, Some(Instant::now())),
+            ResolutionResult::Cancelled
+        );
+    }
+
+    #[test]
+    fn registry_callback_panic_returns_error_without_unwinding() {
+        let registry = CapabilityRegistry::default();
+        let request = CapabilityRequest {
+            capability_id: "text.search".into(),
+            version: "1.0.0".into(),
+        };
+        assert_eq!(
+            registry.resolve_with(&request, || panic!("host callback failed"), None),
+            ResolutionResult::Error
+        );
+        assert_eq!(registry.resolve(&request), ResolutionResult::Unavailable);
+    }
+
+    #[test]
+    fn registry_cancellation_during_capability_scan_fails_closed() {
+        let mut descriptor = provider("1.0.0");
+        descriptor.capabilities = ["first", "target"]
+            .map(|id| CapabilityDescriptor {
+                id: id.into(),
+                version: "1.0.0".into(),
+                name: id.into(),
+                provenance: Provenance::BuiltIn,
+                carrier: Carrier::BuiltIn,
+                metadata: BTreeMap::new(),
+            })
+            .to_vec();
+        let mut registry = CapabilityRegistry::default();
+        assert!(registry.register(descriptor).is_ok());
+        let request = CapabilityRequest {
+            capability_id: "target".into(),
+            version: "1.0.0".into(),
+        };
+        // Checks 4 and 5 guard the target capability and the final return,
+        // respectively. Neither cancellation point may expose a selection.
+        for cancel_at in [4, 5] {
+            let calls = std::cell::Cell::new(0);
+            assert_eq!(
+                registry.resolve_with(
+                    &request,
+                    || {
+                        calls.set(calls.get() + 1);
+                        calls.get() >= cancel_at
+                    },
+                    None
+                ),
+                ResolutionResult::Cancelled
+            );
+        }
+        let calls = std::cell::Cell::new(0);
+        assert_eq!(
+            registry.resolve_with(
+                &request,
+                || {
+                    calls.set(calls.get() + 1);
+                    assert!(calls.get() < 4, "callback failed during scan");
+                    false
+                },
+                None
+            ),
+            ResolutionResult::Error
+        );
+        assert!(matches!(
+            registry.resolve(&request),
+            ResolutionResult::Available(_)
+        ));
+    }
+
+    #[test]
+    fn registry_rejects_invalid_request_identity() {
+        let registry = CapabilityRegistry::default();
+        assert!(matches!(
+            registry.resolve(&CapabilityRequest {
+                capability_id: "invalid id".into(),
+                version: "1.0.0".into(),
+            }),
+            ResolutionResult::Invalid(DescriptorError::InvalidId(_))
+        ));
+    }
+
+    #[test]
+    fn registry_selection_is_independent_of_distinct_provider_registration_order() {
+        let make_provider = |id: &str| {
+            let mut descriptor = provider("3.0.0");
+            descriptor.id = id.into();
+            descriptor.capabilities.push(CapabilityDescriptor {
+                id: "text.search".into(),
+                version: "1.0.0".into(),
+                name: "Search".into(),
+                provenance: Provenance::BuiltIn,
+                carrier: Carrier::BuiltIn,
+                metadata: BTreeMap::new(),
+            });
+            descriptor
+        };
+        let request = CapabilityRequest {
+            capability_id: "text.search".into(),
+            version: "1.0.0".into(),
+        };
+        let mut forward = CapabilityRegistry::default();
+        let mut reverse = CapabilityRegistry::default();
+        for id in ["a.provider", "z.provider"] {
+            assert!(forward.register(make_provider(id)).is_ok());
+        }
+        for id in ["z.provider", "a.provider"] {
+            assert!(reverse.register(make_provider(id)).is_ok());
+        }
+        assert_eq!(forward.resolve(&request), reverse.resolve(&request));
+        assert!(
+            matches!(forward.resolve(&request), ResolutionResult::Available(p) if p.id == "a.provider")
+        );
+
+        let mut invalid = make_provider("a.provider");
+        invalid.capabilities[0].version = "invalid".into();
+        assert!(forward.register(invalid).is_err());
+        assert_eq!(forward.resolve(&request), reverse.resolve(&request));
+
+        let mut replacement = make_provider("a.provider");
+        replacement.version = "4.0.0".into();
+        assert!(forward.register(replacement).is_ok());
+        assert!(
+            matches!(forward.resolve(&request), ResolutionResult::Available(p)
+            if p.id == "a.provider" && p.version == "4.0.0")
+        );
     }
 }
