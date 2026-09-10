@@ -1,11 +1,13 @@
 # CAP-001-B: Capability Registry And Resolver
 
+**Status**: Complete / Closed
+
 | Field | Value |
 |---|---|
 | Story ID | CAP-001-B |
 | Type | Capability infrastructure implementation |
 | Parent | CAP-001 / #466 |
-| Status | Review / Claimed (#524 merged; acceptance-hardening follow-up pending) |
+| Status | Complete / Closed |
 | Selected Iteration | I254 |
 | Source Issue | [GitHub Issue #512](https://github.com/wjhuang88/talos/issues/512) |
 | Depends On | ADR-072 Accepted; CAP-001-A / I252 Complete |
@@ -14,14 +16,14 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex mainline execution Agent |
 | Work Slice | Capability identity lookup, registry ownership and bounded resolver contract only. |
 | Claimed At | 2026-09-10 |
 | Authorization Evidence | Maintainer authorized single-developer unattended completion of #499 then #466. Claim #523 is effective on main at 4cd7b42e958e73235597a984b6805219ea1f2256. Shared GitHub identity does not prove human separation; each stable implementation candidate requires fresh exact-head CI and independent Agent-role API review. |
 | Governance Claim PR | #523 |
-| Implementation PR | #524 (merged); acceptance-hardening follow-up pending stable push |
+| Implementation PR | #524 and #525 (merged) |
 | Authorization Mode | Single-maintainer merge |
 | Last Updated | 2026-09-10 |
 | Handoff / Release Condition | Implementation starts only after PR #523 reaches main; preserve CAP-001-C, Bundle, permission and product boundaries. Exact-head implementation API/security review remains required where applicable. |
@@ -85,3 +87,17 @@ returning host callbacks, not preemption. Registration neither grants permission
 Full local release preflight passed; new exact-head remote evidence is still required for the
 follow-up. I254 and this owner remain Review / Claimed; #512 stays open and CAP-001-C remains
 unclaimed. Completion Commit: pending final acceptance and follow-up merge.
+
+## Acceptance Closeout (2026-09-10)
+
+Completion Commit: d03da4940dfd0a749fa7b3ffebb2dcf3a60c5464, 63328e53e3e4759d99826c4dcc1a48bf7088f235.
+
+Both pre-existing implementation commits are ancestors of main at #525 merge
+`80b6678bbaf52e0bfb5ebace55f3c143a18e4f18`; no status commit self-certifies completion.
+[I254 acceptance closeout](../../iterations/I254-capability-registry-resolver.md#acceptance-closeout-2026-09-10)
+maps every published acceptance row to implementation fixtures, exact-head CI `34441380091`
+(5/5 success), independent Agent-role API review `5613682105` and CAS `5613808695`.
+Full local preflight passed. This supersedes the earlier pending checkpoint: Complete / Closed
+applies only to the offline library registry/resolver, with cooperative callback deadlines.
+Plugin lifecycle/Carrier integration remains CAP-001-C; installation remains BUNDLE/DIST.
+No runtime product integration or parent #466 completion is claimed.
