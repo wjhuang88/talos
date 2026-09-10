@@ -1,6 +1,6 @@
 # Iteration I255: Plugin Capability Lifecycle
 
-> Document status: Active / Claimed (proposed by #527; ineffective until merge)
+> Document status: Review / Claimed (#527 effective on main; local implementation candidate)
 > Published plan date: 2026-09-10
 > Objective: Connect installed Plugin declarations and lifecycle to the shared Capability registry.
 > MVP deliverable: An explicitly loaded local WASM Plugin declares capabilities, activates a Provider, executes through the existing permission pipeline, and becomes unavailable after stop.
@@ -17,10 +17,10 @@
 | Source Issue | #513 (parent #466) |
 | Governance Claim PR | #527 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Maintainer authorized serial unattended #499 then #466. Independent Agent-role API/security plan review and exact-head CI must pass before #527 merges; shared account does not prove natural-person separation. Proposed claim/activation remain ineffective until merge. |
+| Authorization Evidence | Claim #527 effective at 07066e76e92c30d63a2a9068dfdd5e0737d3f1a1; head eb26aaef, CI 34449342743, independent Agent-role API/security plan review 5615007238 and CAS 5615007433. Shared account does not prove natural-person separation. Implementation needs fresh exact-head API/security review. |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-10 |
-| Handoff / Release Condition | Finalize atomic claim/activation, pass independent API/security review and exact-head CI, then merge before implementation. |
+| Handoff / Release Condition | Claim #527 is effective. Implementation requires stable-candidate exact-head CI, independent API/security review and merge-time CAS; retain Review until owner-first closeout. |
 
 ## Required Reads
 
@@ -149,3 +149,63 @@ withdrawal, Plugin lifecycle and CLI integration are within this slice; permissi
 Dashboard and other carriers are excluded. Published Baseline is unchanged from `2f8c0657`.
 Both governance validators passed for draft preparation (0 warnings); final proposal checks and
 independent API/security plan review remain required. No implementation or completion is claimed.
+
+## Effective Activation (2026-09-10)
+
+Claim #527 merged at `07066e76e92c30d63a2a9068dfdd5e0737d3f1a1`, from head
+`eb26aaef1ea0224d3c1a263bc6cfb8625f23c488` and base
+`cefb8320ffd3fc53d7c333d19f08346c4e1c5ec0`. Exact-head CI `34449342743` passed;
+independent API/security plan approval `5615007238` and merge-time CAS `5615007433` are
+recorded on #527. This supersedes proposal-only current statements, preserving dated records
+and Published Baseline. Branch `feat/i255-plugin-capability-lifecycle` starts at that merge.
+Implementation now converges locally; no implementation PR exists and Completion Commit is pending.
+
+## Local Implementation Checkpoint (2026-09-10)
+
+The candidate implements owned registry publication/withdrawal, optional version-1 declarations,
+legacy mapping, static WASM binding validation, and the shared load/initialize/activate/stop
+controller consumed by explicit CLI print/TUI composition. Original manifest constructors,
+provenance, tool names, dependency versions and default feature/member sets are retained.
+The legacy file loader rejects explicit new declarations with migration guidance rather than
+silently ignoring them; typed legacy build/register adapters keep their prior contract.
+
+Stop and invocation admission linearize under one mutex. Already-admitted calls may finish with
+existing WASM bounds; new/stale calls fail closed. Trap, timeout, cancelled invocation and final
+handle drop withdraw only the owned lease. Stopped host tool entries are retained but cannot
+execute; host registry rebuild is the presentation cleanup boundary. No new carrier is enabled.
+
+Local independent Agent-role API/security pre-review found missing unwind containment around
+initialization. It was repaired before submission and covered by injected panic testing. This
+pre-review is not final exact-head approval and does not claim natural-person separation.
+
+Focused core ownership tests passed (3); Plugin tests passed including lifecycle, trap/fuel,
+permission, stale ownership and no-start-on-initialize checks. Two real CLI binary tests use a
+bounded local model endpoint: explicit package execution returns 7 through the real permission
+pipeline; the same package outside workspace is denied. Runtime-default disclosure remains off.
+The first workspace preflight failed on the new HTTP test fixture: macOS accepted sockets could
+inherit nonblocking mode and read returned WouldBlock. Explicit blocking mode with bounded read
+timeout repaired it; both binary paths then passed. Final full preflight is pending below.
+
+Changed-file inventory (all I255):
+
+- Core: `crates/talos-core/src/capability.rs`, `crates/talos-core/tests/i255_provider_ownership.rs`.
+- Plugin: `crates/talos-plugin/src/{lib,lifecycle,wasm}.rs`,
+  `crates/talos-plugin/tests/i255_lifecycle.rs`, and the two `capability-demo` fixture files.
+- CLI: `crates/talos-cli/src/registry.rs`, `crates/talos-cli/tests/i255_plugin_e2e.rs`.
+- User/API docs: `README.md`, `docs/reference/ARCHITECTURE.md`.
+- Owners/derived views: this owner, CAP-001-C, CAP-001 parent, Board, PRODUCT-BACKLOG,
+  iterations README, governance manifest, and the Issue/owner matrix.
+
+No Cargo/lock/default build change, Dashboard, permission policy, release or publication edit.
+Resume: finish full local checks, bind the actual implementation PR, obtain fresh exact-head
+CI/API/security review, CAS merge, then owner-first closeout using pre-existing implementation SHA.
+Completion Commit remains pending; #513 remains open and #466 is not complete.
+
+### Stable Local Validation
+
+`env COLLABORATION_VALIDATION_BASE=origin/main CARGO_PROFILE_DEV_DEBUG=0
+CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 ./scripts/release_preflight.sh` passed
+after the socket fixture correction: pinned Rust 1.97.0, locked workspace check/Clippy/tests,
+format, both governance validators (0 warnings), text boundary and classifier checks.
+The final owner/derived Review synchronization is documentation-only and is checked again before
+commit; no implementation completion or remote exact-head validation is inferred from this run.

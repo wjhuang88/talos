@@ -4,6 +4,8 @@ pub mod builtin;
 pub mod error;
 pub mod event;
 pub mod handler;
+#[cfg(feature = "wasm")]
+pub mod lifecycle;
 pub mod manifest;
 pub mod registry;
 #[cfg(feature = "wasm")]

@@ -173,6 +173,25 @@ pub struct WasmPluginTool {
 }
 
 impl WasmPluginTool {
+    /// Validate the no-import, `run: () -> i32` binding without instantiation.
+    /// A guest start function is not executed by this check.
+    pub fn validate_binding(&self) -> Result<(), WasmError> {
+        if self.module.module.imports().next().is_some() {
+            return Err(WasmError::Instantiate(
+                "plugin imports are not permitted".into(),
+            ));
+        }
+        let Some(wasmtime::ExternType::Func(function)) = self.module.module.get_export("run")
+        else {
+            return Err(WasmError::MissingExport);
+        };
+        let results: Vec<_> = function.results().collect();
+        if function.params().len() != 0 || !matches!(results.as_slice(), [wasmtime::ValType::I32]) {
+            return Err(WasmError::MissingExport);
+        }
+        Ok(())
+    }
+
     /// Builds a read-only plugin tool from one validated manifest tool entry.
     pub fn from_manifest_tool(
         runtime: Arc<WasmRuntime>,
@@ -316,6 +335,10 @@ pub fn build_read_only_wasm_tools(
 
 /// Loads the conventional manifest from an explicitly selected local package
 /// directory and builds its read-only WASM tools.
+///
+/// This legacy entrypoint has no capability registry or stop controller. Packages
+/// declaring `capability_provider` must use [`crate::lifecycle::PluginLifecycle`]
+/// instead; declarations are never silently ignored.
 pub fn load_read_only_wasm_package(
     runtime: Arc<WasmRuntime>,
     package_root: &Path,
@@ -323,6 +346,13 @@ pub fn load_read_only_wasm_package(
     let manifest_path = package_root.join(PLUGIN_MANIFEST_FILE);
     let text = std::fs::read_to_string(&manifest_path)
         .map_err(|error| WasmError::Io(error.to_string()))?;
+    let envelope: toml::Value =
+        toml::from_str(&text).map_err(|error| WasmError::Manifest(error.to_string()))?;
+    if envelope.get("capability_provider").is_some() {
+        return Err(WasmError::Manifest(
+            "capability_provider requires PluginLifecycle with a shared CapabilityRegistry".into(),
+        ));
+    }
     let manifest = parse_manifest(&text).map_err(|error| WasmError::Manifest(error.to_string()))?;
     build_read_only_wasm_tools(runtime, package_root, &manifest)
 }

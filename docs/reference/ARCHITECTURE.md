@@ -85,8 +85,11 @@ Compatibility uses the capability's major version, independently of the provider
 Valid same-ID registration replaces a descriptor; invalid replacement preserves the prior record.
 Registration does not expose tools/schemas, attest trust, grant permission or install content.
 Cancellation/deadlines are cooperative; promptly returning host callback panics fail closed.
-The runtime does not yet consume this registry and has no Bundle installer, dynamic Language
-Provider or Browser connector from this work. Child owners and their Issues are tracked separately:
+I255 connects explicit CLI Plugin loading to this same registry through `PluginLifecycle`.
+Owned registration rejects collisions atomically and opaque leases prevent old cleanup from
+removing another owner's replacement. Legacy host `register` remains a replacement API.
+There is no Bundle installer, dynamic Language Provider or Browser connector from this work.
+Child owners and their Issues are tracked separately:
 CAP-001-G #519, CAP-001-B #512, CAP-001-C #513, TEXT-001 #511, LANG-001 #510, LANG-002 #516,
 LANG-003 #517, BUNDLE-001 #514, DIST-001-A #509, DIST-001-B #515 and BROWSER-001 #508. Their creation is
 governance decomposition only; each requires its own selected iteration and effective claim.
@@ -605,6 +608,21 @@ Native `.so`, `.dll`, or `.dylib` loading, remote package installation, automati
 and alternative carriers such as Lua are not current capabilities. Plugin manifests may describe
 skills, tools, and hooks, but executable registration remains explicit at the product composition
 root.
+
+`PluginLifecycle` separates Unloaded, Loaded, Initialized, Active and Stopped. A companion
+`capability_provider` table (schema version 1) leaves public legacy manifest constructors and
+persisted files unchanged. Tool bindings are checked against actual WASM imports and `run` export
+types before activation; initialization never instantiates guest start functions. Legacy arbitrary
+names/versions remain in metadata/provenance, with hex-encoded internal IDs and version-1 adapter
+contracts rather than imposing new descriptor syntax on old packages.
+
+Provider publication and tool admission use the controller's shared lifecycle gate. Stop takes
+that gate, transitions to Stopped and withdraws its registry lease. An execution admitted before
+the fence may finish, even if scheduled afterward; subsequent admissions fail closed. Guest code
+does not hold the gate. Failure or cancellation stops the affected Plugin; a retained tool handle
+keeps the same fence, not an independent executable lifetime. Host tool entries are not removed
+by provider withdrawal, so unrelated contributions are never deleted. CLI print/TUI share this
+implementation and retain existing contribution collision, permission and disclosure behavior.
 
 ## Channel Topology Audit (ARCH-032, 2026-07-09)
 

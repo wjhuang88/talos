@@ -634,6 +634,38 @@ talos --plugin /path/to/plugin-package
 Repeat `--plugin` for multiple packages. `/plugins` reports the packages that successfully loaded
 and their registered capabilities; with no flag, existing behavior is unchanged.
 
+An optional versioned declaration connects a package's existing WASM tools to the offline
+capability registry (see `crates/talos-plugin/tests/fixtures/capability-demo`):
+
+```toml
+[capability_provider]
+schema_version = 1
+provider_id = "example.answer"
+version = "2.0.0"
+
+[[capability_provider.capabilities]]
+id = "example.answer.value"
+version = "1.0.0"
+tool = "answer" # must name an existing [[tools]] entry
+```
+
+Capability versions describe their contract independently of the provider version. Parsing and
+initialization do not publish availability or run guest start functions. Explicit CLI loading
+activates the validated package; the existing permission and presentation policies still apply.
+Legacy manifests need no edits: tools receive internal version-1 capability identities, preserving
+their original public tool names and provenance. Invalid explicit declarations fail closed.
+
+Embedders use `talos_plugin::lifecycle::PluginLifecycle` with one shared `CapabilityRegistry`.
+The legacy `load_read_only_wasm_package` API remains for old packages and rejects explicit
+`capability_provider` declarations with guidance to use the lifecycle API.
+`stop()` withdraws only that registration and rejects calls through retained tool handles. Calls
+admitted before stop may finish under the existing WASM fuel/timeout bounds; trap, timeout or
+cancellation stops the affected Plugin. Dropping all controller/tool handles also withdraws it.
+Stopped handles may remain in the host tool inventory but cannot execute; hosts may rebuild their
+tool registry to remove presentation entries. MCP/helper/remote/built-in declarations do not gain
+an executable adapter through this API. No installation, automatic discovery or new host calls
+are provided.
+
 ## TUI Text Selection
 
 In the interactive TUI, drag with the primary mouse button to select any visible cells, including

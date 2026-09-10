@@ -33,7 +33,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 
 | ID | Codename | State | Activation / Completion Gate |
 |---|---|---|---|
-| I255 | Plugin Capability Lifecycle | Active / Claimed (proposed) | [I255](I255-plugin-capability-lifecycle.md) / CAP-001-C / #513; atomic claim #527 ineffective until merge; no implementation yet. |
+| I255 | Plugin Capability Lifecycle | Review / Claimed | [I255](I255-plugin-capability-lifecycle.md) / CAP-001-C / #513; claim #527 effective at `07066e76`; local implementation candidate; final validation and exact-head review pending. |
 | I254 | Capability Registry And Resolver | Complete / Closed | [I254](I254-capability-registry-resolver.md) / CAP-001-B / #512; Completion Commits `d03da494`, `63328e53`, #525 merge `80b6678b`; library acceptance passed, later children unclaimed. |
 | I248 | Dependency Governance Closed Loop | Complete / Closed | [I248](I248-dependency-governance-closed-loop.md); implementation `dbd847ec` merged via #497; #498 merged as `a7d168ee`, acceptance head `5d2e4443`, CI `34074942674`, independent review `5564114577`. Full upgrade remains I250. |
 | I250 | Full Workspace Dependency Upgrade | Complete / Closed | [I250](I250-full-workspace-dependency-upgrade.md); implementation #501 merged as `76f0a41b`; accepted baseline advanced, residuals under DEPENDENCY-003 / #502. |

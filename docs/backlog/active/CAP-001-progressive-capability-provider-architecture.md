@@ -67,7 +67,7 @@ This Epic is an architecture and decomposition owner. It does not authorize impl
 | CAP-001-P0 / Issue #467 | Characterize current behavior and prepare compatibility seams plus cross-lane ownership before capability implementation. | I246 Complete / Closed; Completion Commit `9a3c1d860408c1438ec1a7ad4b57860167d0cb01` via implementation PR #492 |
 | CAP-001-A / I252 | Stable Capability and Provider descriptor contracts. | Complete / Closed; Completion Commit `71cc03b322d80d19c3767e4ef2014fecb84c1994`, merged via PR #507 as `0835afc4b982a5ed409ccfb55538bbeaf6fe5eab` |
 | CAP-001-B / Issue #512 | Capability registry and resolver. | I254 Complete / Closed; Completion Commits `d03da494`, `63328e53`; #525 merge `80b6678b`, library-only conformance passed |
-| CAP-001-C / Issue #513 | Plugin capability declarations and Carrier adapters. | I255 In Progress / Claimed proposed by #527, ineffective until merge; CAP-001-B prerequisite met |
+| CAP-001-C / Issue #513 | Plugin capability declarations and Carrier adapters. | I255 Review / Claimed under effective #527 merge `07066e76`; CAP-001-B prerequisite met |
 | BUNDLE-001 / Issue #514 | Bundle manifest, installation identity and terminology migration. | Refinement / Unclaimed; compatibility audit and dedicated migration decision required, not blocked on CAP-001-C |
 | TEXT-001 / Issue #511 | UI-neutral text semantics contract. | Refinement / Unclaimed; CAP-001-A prerequisite met, I253 audit and consumer ownership inventory pending |
 | LANG-001 / Issue #510 | Shared Language Provider contract and existing consumer migration. | Refinement / Unclaimed; blocked on TEXT-001, not on CAP-001-C |
@@ -86,8 +86,8 @@ CAP-001-C #513, TEXT-001 #511, LANG-001 #510, LANG-002 #516, LANG-003 #517, BUND
 DIST-001-A #509, DIST-001-B #515 and BROWSER-001 #508. Only CAP-001-B is dependency-ready;
 at that checkpoint all children remained unclaimed and required their own selected iteration and
 effective claim. PR #523 established I254/CAP-001-B alone; #524/#525 are merged and I254
-library-only acceptance is Complete / Closed. PR #527 proposes I255/CAP-001-C next; the claim
-is ineffective until merge. Remaining children stay unclaimed.
+library-only acceptance is Complete / Closed. PR #527 established I255/CAP-001-C at `07066e76`;
+its implementation is in Review. Remaining children stay unclaimed.
 
 ## Acceptance
 
