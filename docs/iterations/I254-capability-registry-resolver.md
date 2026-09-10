@@ -1,6 +1,6 @@
 # Iteration I254: Capability Registry And Resolver
 
-> Document status: Review / Claimed (#524 merged; local acceptance hardening pending)
+> Document status: Complete / Closed
 > Published plan date: 2026-09-10
 > Planned objective: Deliver the deterministic, offline Capability/Provider registry and resolver defined by CAP-001-B / Issue #512.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex mainline execution Agent |
 | Work Slice | Capability identity lookup, registry ownership and bounded resolver contract only. |
@@ -19,7 +19,7 @@
 | Governance Claim PR | #523 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer authorized single-developer unattended completion of #499 then #466. Claim #523 is effective on main at 4cd7b42e958e73235597a984b6805219ea1f2256. Shared GitHub identity does not prove human separation; each stable implementation candidate requires fresh exact-head CI and independent Agent-role API review. |
-| Implementation PR | #524 (merged); acceptance-hardening follow-up pending stable push |
+| Implementation PR | #524 and #525 (merged) |
 | Last Updated | 2026-09-10 |
 | Handoff / Release Condition | Implementation starts only after this claim reaches main; no Plugin, Bundle, permission, release or product-surface authority. |
 
@@ -144,8 +144,9 @@ close using pre-existing implementation evidence. All intermediate fixes remain 
 
 ## Completion Evidence
 
-- Completion Commit: pending implementation evidence.
-- Status-only documentation commits must not cite themselves. Retain `Planned`, `Active`, or `Review` until implementation evidence exists.
+- Completion Commit: d03da4940dfd0a749fa7b3ffebb2dcf3a60c5464, 63328e53e3e4759d99826c4dcc1a48bf7088f235.
+- Both implementation commits exist on main before this state-only closeout; this closeout
+  is not its own completion evidence.
 
 ## Variance And Residuals
 
@@ -154,9 +155,10 @@ close using pre-existing implementation evidence. All intermediate fixes remain 
 
 ## Retrospective
 
-- Outcome: planned.
-- Documentation: governance and API documentation targets are listed above.
-- Lessons: pending implementation closeout.
+- Outcome: offline library registry/resolver and public conformance acceptance completed.
+- Documentation: public rustdoc, architecture boundary, owners and derived views synchronized.
+- Lessons: verify callback failure and selection-return cancellation explicitly; keep intermediate
+  fixes local, and never treat a healthy Windows job's duration as failure evidence.
 
 ## Post-Merge Acceptance Checkpoint (2026-09-10)
 
@@ -196,3 +198,33 @@ the Published Baseline and dated planning records above remain historical eviden
 - Resume: finish local governance/staged-diff checks, submit one stable follow-up, obtain new
   exact-head CI/API review and perform merge-time CAS. Then close owner-first with existing
   implementation evidence. Do not activate another #466 child before this acceptance gate.
+
+## Acceptance Closeout (2026-09-10)
+
+This checkpoint supersedes earlier pending execution/recovery instructions, not the Published
+Baseline. PR #525 merged as `80b6678bbaf52e0bfb5ebace55f3c143a18e4f18` from exact head
+`63328e53e3e4759d99826c4dcc1a48bf7088f235` and base
+`d7a836dee37a003a8f36476c124ba63cbc5decf2`. CI `34441380091` passed all five jobs,
+including Windows workspace (14m14s). Independent Agent-role API APPROVE is
+[5613682105](https://github.com/wjhuang88/talos/pull/525#issuecomment-5613682105);
+merge-time CAS is [5613808695](https://github.com/wjhuang88/talos/pull/525#issuecomment-5613808695).
+Review and implementation roles are separate; shared GitHub identity does not establish
+natural-person separation. No substantive candidate change followed these checks.
+
+| Published acceptance | Evidence on main | Result |
+|---|---|---|
+| Deterministic compatible selection | `registry_selection_is_independent_of_distinct_provider_registration_order`; capability/provider major mismatch test | Pass |
+| Typed unavailable/incompatible/invalid outcomes | Core resolver fixtures, invalid identity and descriptor tests | Pass |
+| Cancellation, deadline and failure fail closed | Entry/deadline, nested scan, final-return cancellation and callback panic fixtures | Pass within documented cooperative callback contract |
+| No tool/schema disclosure | Public `i254_capability_contract` compares ToolRegistry names/schema before and after registration/resolution | Pass |
+| Offline startup | In-memory registry API has no I/O, install or network call; public fixture resolves host-registered descriptor offline | Pass |
+
+No binary runtime integration is claimed: the Published Baseline explicitly selects library-only
+conformance. CAP-001-C owns Plugin lifecycle/Carrier integration; BUNDLE/DIST own installation.
+The synchronous callback must return promptly; aborting panics and blocking host callbacks are
+outside recovery guarantees. No dependency, permission, persisted format or product UI changed.
+The existing home-directory skill fixture limitation remains under TEST-001/#316, not I254.
+
+Resume after this closeout reaches main: synchronize and close #512, inventory non-terminal
+iterations, then prepare the next #466 child with its own effective claim. Do not infer a claim
+for CAP-001-C or completion of CAP-001/#466 from this closeout.
