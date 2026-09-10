@@ -1,6 +1,6 @@
 # Iteration I254: Capability Registry And Resolver
 
-> Document status: Active / Claimed (effective on main via PR #523 merge `4cd7b42e`)
+> Document status: Review / Claimed (implementation candidate `2d060655`, not yet merged)
 > Published plan date: 2026-09-10
 > Planned objective: Deliver the deterministic, offline Capability/Provider registry and resolver defined by CAP-001-B / Issue #512.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -19,7 +19,7 @@
 | Governance Claim PR | #523 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer authorized single-developer unattended completion of #499 then #466. No independent human reviewer is available; shared GitHub identity does not prove human separation. PR #523 requires exact-head CI, both validators and merge-time CAS; proposed claim and activation remain ineffective until merge. |
-| Implementation PR | Not started |
+| Implementation PR | Pending stable candidate push |
 | Last Updated | 2026-09-10 |
 | Handoff / Release Condition | Implementation starts only after this claim reaches main; no Plugin, Bundle, permission, release or product-surface authority. |
 
@@ -130,6 +130,8 @@ Use existing Issue #512; do not create remote Issues for these local steps.
 - `cargo test --locked -p talos-core` passed: 84 tests, 0 failures.
 - `git diff --check` passed; no Dashboard, permission, release or persistence files changed.
 - Candidate remains local until the complete affected-workspace and governance checks finish.
+- Changed-file inventory: `crates/talos-core/src/capability.rs`, `crates/talos-core/src/lib.rs`,
+  and this owner document only; all are within I254's UI-neutral core/API scope.
 
 ## Atomic Claim Candidate (2026-09-10)
 

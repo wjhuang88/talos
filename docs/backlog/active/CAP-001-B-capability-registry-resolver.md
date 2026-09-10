@@ -5,7 +5,7 @@
 | Story ID | CAP-001-B |
 | Type | Capability infrastructure implementation |
 | Parent | CAP-001 / #466 |
-| Status | Active / Claimed (effective on main via PR #523 merge `4cd7b42e`) |
+| Status | Review / Claimed (implementation candidate `2d060655`, not yet merged) |
 | Selected Iteration | I254 |
 | Source Issue | [GitHub Issue #512](https://github.com/wjhuang88/talos/issues/512) |
 | Depends On | ADR-072 Accepted; CAP-001-A / I252 Complete |
@@ -21,7 +21,7 @@
 | Claimed At | 2026-09-10 |
 | Authorization Evidence | Maintainer authorized single-developer unattended completion of #499 then #466. No independent human reviewer is available; shared GitHub identity does not prove human separation. PR #523 requires exact-head CI, both validators and merge-time CAS; proposed claim and activation remain ineffective until merge. |
 | Governance Claim PR | #523 |
-| Implementation PR | Not started |
+| Implementation PR | Pending stable candidate push |
 | Authorization Mode | Single-maintainer merge |
 | Last Updated | 2026-09-10 |
 | Handoff / Release Condition | Implementation starts only after PR #523 reaches main; preserve CAP-001-C, Bundle, permission and product boundaries. Exact-head implementation API/security review remains required where applicable. |
