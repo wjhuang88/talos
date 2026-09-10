@@ -122,6 +122,15 @@ Use existing Issue #512; do not create remote Issues for these local steps.
 - Finalized claim validation and exact-head CI remain pending; draft evidence does not substitute.
 - Runtime evidence: not applicable before implementation authorization.
 
+## Local Convergence Checkpoint (2026-09-10)
+
+- Implementation commit: `2d060655` (local stable candidate; not yet pushed).
+- `cargo fmt --all -- --check` passed.
+- `cargo check --locked -p talos-core` passed.
+- `cargo test --locked -p talos-core` passed: 84 tests, 0 failures.
+- `git diff --check` passed; no Dashboard, permission, release or persistence files changed.
+- Candidate remains local until the complete affected-workspace and governance checks finish.
+
 ## Atomic Claim Candidate (2026-09-10)
 
 PR #523 proposes Active / Claimed for I254 and CAP-001-B together. The selection inventory above
