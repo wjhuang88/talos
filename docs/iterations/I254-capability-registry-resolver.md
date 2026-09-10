@@ -1,6 +1,6 @@
 # Iteration I254: Capability Registry And Resolver
 
-> Document status: Active / Claimed (proposed; ineffective until PR #523 merges)
+> Document status: Review / Claimed (implementation candidate `2d060655`, not yet merged)
 > Published plan date: 2026-09-10
 > Planned objective: Deliver the deterministic, offline Capability/Provider registry and resolver defined by CAP-001-B / Issue #512.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -19,7 +19,7 @@
 | Governance Claim PR | #523 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer authorized single-developer unattended completion of #499 then #466. No independent human reviewer is available; shared GitHub identity does not prove human separation. PR #523 requires exact-head CI, both validators and merge-time CAS; proposed claim and activation remain ineffective until merge. |
-| Implementation PR | Not started |
+| Implementation PR | Pending stable candidate push |
 | Last Updated | 2026-09-10 |
 | Handoff / Release Condition | Implementation starts only after this claim reaches main; no Plugin, Bundle, permission, release or product-surface authority. |
 
@@ -90,7 +90,7 @@ branch. Implementation then converges locally before the first stable stage cand
 
 | Date | Type | Record |
 |---|---|---|
-| 2026-09-10 | Draft governance candidate | I252 and ADR-072 are complete/accepted; CAP-001-B/#512 is the only dependency-ready child. Claim remains ineffective until the finalized governance PR reaches `main`; no implementation branch or code changes are authorized. |
+| 2026-09-10 | Claim activation | PR #523 (`d3cfbdd8`) merged to `main` as `4cd7b42e`; claim/activation are effective. Implementation may begin from this merge or later; no implementation PR exists yet. |
 
 ### Selection Inventory (2026-09-10)
 
@@ -121,6 +121,17 @@ Use existing Issue #512; do not create remote Issues for these local steps.
   used `COLLABORATION_VALIDATION_BASE=origin/main`. Staged diff and whitespace checks passed.
 - Finalized claim validation and exact-head CI remain pending; draft evidence does not substitute.
 - Runtime evidence: not applicable before implementation authorization.
+
+## Local Convergence Checkpoint (2026-09-10)
+
+- Implementation commit: `2d060655` (local stable candidate; not yet pushed).
+- `cargo fmt --all -- --check` passed.
+- `cargo check --locked -p talos-core` passed.
+- `cargo test --locked -p talos-core` passed: 84 tests, 0 failures.
+- `git diff --check` passed; no Dashboard, permission, release or persistence files changed.
+- Candidate remains local until the complete affected-workspace and governance checks finish.
+- Changed-file inventory: `crates/talos-core/src/capability.rs`, `crates/talos-core/src/lib.rs`,
+  and this owner document only; all are within I254's UI-neutral core/API scope.
 
 ## Atomic Claim Candidate (2026-09-10)
 
