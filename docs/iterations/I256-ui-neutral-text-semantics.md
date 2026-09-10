@@ -1,6 +1,6 @@
 # Iteration I256: UI-Neutral Text Semantics
 
-> Document status: Planned / Unclaimed
+> Document status: Active / Claimed (proposed by #530; ineffective until main merge)
 > Published plan date: 2026-09-10
 > Objective: Complete TEXT-001 using the existing talos-text compatibility seam.
 > MVP deliverable: The real TUI consumes shared streaming block classification and validated neutral highlight results, preserving current rendering and plain-text fallback.
@@ -9,15 +9,15 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex mainline execution Agent |
 | Work Slice | Shared text classification, language identity and validated semantic fallback; narrow TUI adapters only. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-09-10 |
 | Source Issue | #511 (parent #466) |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #530 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Preparation only; no implementation until finalized atomic claim reaches main. |
+| Authorization Evidence | #530 proposes atomic claim/activation under the maintainer-authorized unattended #466 task. Independent API/compatibility review and exact-head CI/CAS required; shared account establishes Agent-role separation only. Ineffective until main merge. |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-10 |
 | Handoff / Release Condition | Independent API/compatibility plan review, exact-head governance CI and CAS precede implementation from the claim merge or later main. |
@@ -150,3 +150,14 @@ Finalize one atomic claim/activation PR for I256 and TEXT-001, with actual PR nu
 inventory and independent plan review. After merge, start the implementation branch from that
 merge or later main, converge design/code/tests/docs locally, and submit one stable candidate.
 Local subtasks and review corrections stay under #511; do not create extra Issues for them.
+
+## Atomic Claim Proposal (2026-09-10)
+
+#530 proposes Active / Claimed for I256 and In Progress / Claimed for TEXT-001 together.
+Neither is effective before merge. Published Baseline and the initial selection inventory at
+`0f1ae3f9` remain unchanged; that inventory records preparation, not current claim effectiveness.
+Main is still `dba3419c`; #530 is the only open PR. The local plan review clarified exceptional
+oversized-block and malformed-span fallback before publishing the baseline, and inventoried
+direct TUI adapters. No Rust/Cargo/default, Dashboard or Desktop edits are included.
+The same governance batch removes the now-closed #513 from the open-Issue snapshot; I255
+completion remains recorded in its owners and parent row. No I255 implementation is reopened.

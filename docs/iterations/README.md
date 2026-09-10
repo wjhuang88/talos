@@ -33,6 +33,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 
 | ID | Codename | State | Activation / Completion Gate |
 |---|---|---|---|
+| I256 | UI-Neutral Text Semantics | Active / Claimed (proposed; ineffective until #530 merges) | [I256](I256-ui-neutral-text-semantics.md) / TEXT-001 / #511; shared semantics and narrow TUI adapters; no implementation authority before merge. |
 | I255 | Plugin Capability Lifecycle | Complete / Closed | [I255](I255-plugin-capability-lifecycle.md) / CAP-001-C / #513; claim #527 effective at `07066e76`; Completion Commit `e1b9997a`; #528 merge `9404c338`; CI/review passed. |
 | I254 | Capability Registry And Resolver | Complete / Closed | [I254](I254-capability-registry-resolver.md) / CAP-001-B / #512; Completion Commits `d03da494`, `63328e53`, #525 merge `80b6678b`; library acceptance passed, later children unclaimed. |
 | I248 | Dependency Governance Closed Loop | Complete / Closed | [I248](I248-dependency-governance-closed-loop.md); implementation `dbd847ec` merged via #497; #498 merged as `a7d168ee`, acceptance head `5d2e4443`, CI `34074942674`, independent review `5564114577`. Full upgrade remains I250. |
