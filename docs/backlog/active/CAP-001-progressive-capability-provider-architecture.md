@@ -69,7 +69,7 @@ This Epic is an architecture and decomposition owner. It does not authorize impl
 | CAP-001-B / Issue #512 | Capability registry and resolver. | I254 Complete / Closed; Completion Commits `d03da494`, `63328e53`; #525 merge `80b6678b`, library-only conformance passed |
 | CAP-001-C / Issue #513 | Plugin capability declarations and Carrier adapters. | I255 Complete / Closed; Completion Commit `e1b9997a`; implementation #528 merge `9404c338` |
 | BUNDLE-001 / Issue #514 | Bundle manifest, installation identity and terminology migration. | Refinement / Unclaimed; compatibility audit and dedicated migration decision required, not blocked on CAP-001-C |
-| TEXT-001 / Issue #511 | UI-neutral text semantics contract. | Refinement / Unclaimed; CAP-001-A prerequisite met, I253 audit and consumer ownership inventory pending |
+| TEXT-001 / Issue #511 | UI-neutral text semantics contract. | I256 In Progress / Claimed proposed by #530; ineffective until main merge. I253 audit and consumer inventory ready; no code authority yet. |
 | LANG-001 / Issue #510 | Shared Language Provider contract and existing consumer migration. | Refinement / Unclaimed; blocked on TEXT-001, not on CAP-001-C |
 | LANG-002 / Issue #516 | Rust WASM Language Provider vertical slice. | Refinement / Unclaimed; owner created, blocked on LANG-001/CAP-001-C/DIST-001-A |
 | LANG-003 / Issue #517 | Remaining Language Provider migration and default distribution. | Refinement / Unclaimed; owner created, blocked on LANG-002/BUNDLE-001/DIST-001-A |
@@ -88,7 +88,8 @@ at that checkpoint all children remained unclaimed and required their own select
 effective claim. PR #523 established I254/CAP-001-B alone; #524/#525 are merged and I254
 library-only acceptance is Complete / Closed. PR #527 established I255/CAP-001-C at `07066e76`;
 its implementation #528 merged at `9404c338` and acceptance is Complete / Closed with
-Completion Commit `e1b9997a`. Remaining children stay unclaimed.
+Completion Commit `e1b9997a`. I256/TEXT-001 proposes claim/activation through #530, ineffective
+until merge; all other remaining children stay unclaimed.
 
 ## Acceptance
 
