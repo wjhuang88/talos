@@ -6,7 +6,7 @@
 | Type | Plugin runtime integration |
 | Parent | CAP-001 / #466 |
 | Status | Refinement / Unclaimed |
-| Selected Iteration | None |
+| Selected Iteration | I255 (preparation only) |
 | Source Issue | [GitHub Issue #513](https://github.com/wjhuang88/talos/issues/513) |
 | Depends On | CAP-001-B; ADR-027; ADR-072 |
 
@@ -54,3 +54,17 @@ browser Provider, Desktop/Dashboard, public manifest rename, or expansion of WAS
 
 Carrier-specific contract fixtures, Plugin regression tests, security review, locked checks and
 architecture/API documentation. Changed-file inventory must exclude Dashboard and unrelated lanes.
+
+## I255 Selection Preparation (2026-09-10)
+
+I254/CAP-001-B is Complete on main through closeout #526 (`cefb8320`), with existing
+implementation `d03da494`/`63328e53`. The dependency is satisfied; this is not an implementation
+claim. [I255](../../iterations/I255-plugin-capability-lifecycle.md) specifies the runnable Plugin
+lifecycle integration, compatibility contract, failure/ownership/stop tests and current inventory.
+
+The first executable adapter retains ADR-027 WASM restrictions. Other carrier identities remain
+distinct and unsupported until an authorized adapter exists; declarations cannot make them Ready.
+Legacy public manifest fields and persisted files are not renamed or rewritten. Additive APIs
+must preserve old constructors and loading behavior; any required break needs decision control.
+Real CLI and public lifecycle tests must prove the behavior, not descriptor registration alone.
+All local subtasks stay under #513. Complete does not imply future carriers or Bundle installation.
