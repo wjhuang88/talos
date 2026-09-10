@@ -13,7 +13,10 @@ pub mod tool;
 pub mod tool_filter;
 pub mod work;
 
-pub use capability::{CapabilityDescriptor, DescriptorError, ProviderDescriptor};
+pub use capability::{
+    CapabilityDescriptor, CapabilityRegistry, CapabilityRequest, DescriptorError,
+    ProviderDescriptor, ResolutionResult,
+};
 
 pub use approval::{ApprovalChoice, TuiApprovalRequest};
 pub use evaluation::{

@@ -1,6 +1,7 @@
 //! UI-neutral capability and provider descriptor contracts (CAP-001-A).
 
 use std::collections::BTreeMap;
+use std::time::Instant;
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -104,6 +105,92 @@ impl ProviderDescriptor {
         let actual = parse_version(&self.version)?;
         let required = parse_version(required)?;
         Ok(actual.0 == required.0)
+    }
+}
+
+/// A deterministic, UI-neutral registry of host-declared providers.
+#[derive(Clone, Debug, Default)]
+pub struct CapabilityRegistry {
+    providers: BTreeMap<String, ProviderDescriptor>,
+}
+
+/// A capability resolution request.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CapabilityRequest {
+    /// Stable capability identifier.
+    pub capability_id: String,
+    /// Required compatible major version.
+    pub version: String,
+}
+
+/// The typed result of resolving a capability.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ResolutionResult {
+    /// A compatible provider was selected deterministically.
+    Available(ProviderDescriptor),
+    /// No provider advertises the requested capability.
+    Unavailable,
+    /// Providers exist, but none match the requested major version.
+    Incompatible,
+    /// The request or a registered descriptor is invalid.
+    Invalid(DescriptorError),
+    /// Resolution was cancelled or exceeded its deadline.
+    Cancelled,
+    /// The resolver failed closed due to an internal error.
+    Error,
+}
+
+impl CapabilityRegistry {
+    /// Register a validated provider without exposing tools or schemas.
+    pub fn register(&mut self, provider: ProviderDescriptor) -> Result<(), DescriptorError> {
+        provider.validate()?;
+        self.providers.insert(provider.id.clone(), provider);
+        Ok(())
+    }
+
+    /// Resolve a request using deterministic provider-id ordering.
+    pub fn resolve(&self, request: &CapabilityRequest) -> ResolutionResult {
+        self.resolve_with(request, || false, None)
+    }
+
+    /// Resolve while observing cancellation and an optional deadline.
+    pub fn resolve_with<F: Fn() -> bool>(
+        &self,
+        request: &CapabilityRequest,
+        is_cancelled: F,
+        deadline: Option<Instant>,
+    ) -> ResolutionResult {
+        if is_cancelled() || deadline.is_some_and(|at| Instant::now() >= at) {
+            return ResolutionResult::Cancelled;
+        }
+        let required = match parse_version(&request.version) {
+            Ok(version) => version,
+            Err(error) => return ResolutionResult::Invalid(error),
+        };
+        let mut found = false;
+        for provider in self.providers.values() {
+            if is_cancelled() || deadline.is_some_and(|at| Instant::now() >= at) {
+                return ResolutionResult::Cancelled;
+            }
+            if provider
+                .capabilities
+                .iter()
+                .any(|cap| cap.id == request.capability_id)
+            {
+                found = true;
+                if parse_version(&provider.version)
+                    .map(|v| v.0 == required.0)
+                    .unwrap_or(false)
+                {
+                    return ResolutionResult::Available(provider.clone());
+                }
+            }
+        }
+        if found {
+            ResolutionResult::Incompatible
+        } else {
+            ResolutionResult::Unavailable
+        }
     }
 }
 
@@ -230,5 +317,47 @@ mod tests {
             let decoded: ProviderDescriptor = serde_json::from_value(value).unwrap();
             assert_eq!(decoded.validate(), Err(DescriptorError::UnknownOrigin));
         }
+    }
+
+    #[test]
+    fn registry_resolves_deterministically_and_fails_closed() {
+        let capability = CapabilityDescriptor {
+            id: "text.search".into(),
+            version: "1.0.0".into(),
+            name: "Search".into(),
+            provenance: Provenance::BuiltIn,
+            carrier: Carrier::BuiltIn,
+            metadata: BTreeMap::new(),
+        };
+        let mut first = provider("1.2.0");
+        first.id = "z.provider".into();
+        first.capabilities = vec![capability.clone()];
+        let mut second = provider("1.3.0");
+        second.id = "a.provider".into();
+        second.capabilities = vec![capability];
+        let mut registry = CapabilityRegistry::default();
+        registry.register(first).unwrap();
+        registry.register(second).unwrap();
+        let request = CapabilityRequest {
+            capability_id: "text.search".into(),
+            version: "1.0.0".into(),
+        };
+        assert!(
+            matches!(registry.resolve(&request), ResolutionResult::Available(p) if p.id == "a.provider")
+        );
+        assert_eq!(
+            registry.resolve(&CapabilityRequest {
+                capability_id: "missing".into(),
+                version: "1.0.0".into()
+            }),
+            ResolutionResult::Unavailable
+        );
+        assert!(matches!(
+            registry.resolve(&CapabilityRequest {
+                capability_id: "text.search".into(),
+                version: "bad".into()
+            }),
+            ResolutionResult::Invalid(_)
+        ));
     }
 }
