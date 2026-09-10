@@ -119,7 +119,7 @@ pub struct CapabilityRegistry {
 pub struct CapabilityRequest {
     /// Stable capability identifier.
     pub capability_id: String,
-    /// Required compatible major version.
+    /// Required compatible capability contract major version.
     pub version: String,
 }
 
@@ -178,10 +178,12 @@ impl CapabilityRegistry {
                 .any(|cap| cap.id == request.capability_id)
             {
                 found = true;
-                if parse_version(&provider.version)
-                    .map(|v| v.0 == required.0)
-                    .unwrap_or(false)
-                {
+                if provider.capabilities.iter().any(|cap| {
+                    cap.id == request.capability_id
+                        && parse_version(&cap.version)
+                            .map(|v| v.0 == required.0)
+                            .unwrap_or(false)
+                }) {
                     return ResolutionResult::Available(provider.clone());
                 }
             }
