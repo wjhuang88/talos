@@ -1,6 +1,6 @@
 # Iteration I255: Plugin Capability Lifecycle
 
-> Document status: Planned / Unclaimed
+> Document status: Active / Claimed (proposed by #527; ineffective until merge)
 > Published plan date: 2026-09-10
 > Objective: Connect installed Plugin declarations and lifecycle to the shared Capability registry.
 > MVP deliverable: An explicitly loaded local WASM Plugin declares capabilities, activates a Provider, executes through the existing permission pipeline, and becomes unavailable after stop.
@@ -9,15 +9,15 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex mainline execution Agent |
 | Work Slice | Installed Plugin capability declarations, carrier adapter lifecycle, registry availability and existing explicit CLI Plugin integration. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-09-10 |
 | Source Issue | #513 (parent #466) |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Preparation only; no effective implementation claim. |
+| Governance Claim PR | #527 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Maintainer authorized serial unattended #499 then #466. Independent Agent-role API/security plan review and exact-head CI must pass before #527 merges; shared account does not prove natural-person separation. Proposed claim/activation remain ineffective until merge. |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-10 |
 | Handoff / Release Condition | Finalize atomic claim/activation, pass independent API/security review and exact-head CI, then merge before implementation. |
@@ -139,3 +139,13 @@ This plan cannot certify its own completion. Claim/activation preparation requir
 Finalize this plan and CAP-001-C atomically under the actual governance PR number; obtain
 independent API/security plan review and documentation CI. After claim merge, start implementation
 from that merge or newer main, converge locally and submit one stable implementation candidate.
+
+## Atomic Claim Proposal (2026-09-10)
+
+PR #527 proposes Active / Claimed for I255 and CAP-001-C together. The selection table above
+preserves the earlier Unclaimed inventory; only merge establishes the new authority.
+Implementation starts from that merge or later main, in a new implementation branch. Core registry
+withdrawal, Plugin lifecycle and CLI integration are within this slice; permission policy,
+Dashboard and other carriers are excluded. Published Baseline is unchanged from `2f8c0657`.
+Both governance validators passed for draft preparation (0 warnings); final proposal checks and
+independent API/security plan review remain required. No implementation or completion is claimed.

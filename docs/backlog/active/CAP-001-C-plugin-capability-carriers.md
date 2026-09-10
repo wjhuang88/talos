@@ -1,12 +1,14 @@
 # CAP-001-C: Plugin Capability Declarations And Carrier Adapters
 
+**Status**: In Progress / Claimed (proposed by #527; ineffective until merge)
+
 | Field | Value |
 |---|---|
 | Story ID | CAP-001-C |
 | Type | Plugin runtime integration |
 | Parent | CAP-001 / #466 |
-| Status | Refinement / Unclaimed |
-| Selected Iteration | I255 (preparation only) |
+| Status | In Progress / Claimed (proposed by #527; ineffective until merge) |
+| Selected Iteration | I255 |
 | Source Issue | [GitHub Issue #513](https://github.com/wjhuang88/talos/issues/513) |
 | Depends On | CAP-001-B; ADR-027; ADR-072 |
 
@@ -14,17 +16,17 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Capability declarations and carrier-specific adapter boundary for installed Plugins. |
-| Claimed At | Not applicable |
-| Authorization Evidence | No effective claim; intake owner only. Implementation is not authorized. |
-| Governance Claim PR | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex mainline execution Agent |
+| Work Slice | Installed Plugin capability declarations, carrier adapter lifecycle, registry availability and existing explicit CLI Plugin integration. |
+| Claimed At | 2026-09-10 |
+| Authorization Evidence | Maintainer authorized serial unattended #499 then #466. Independent Agent-role API/security plan review and exact-head CI must pass before #527 merges; shared account does not prove natural-person separation. Proposed claim/activation remain ineffective until merge. |
+| Governance Claim PR | #527 |
 | Implementation PR | Not started |
-| Authorization Mode | Not applicable |
-| Last Updated | 2026-09-09 |
-| Handoff / Release Condition | Requires a selected runnable iteration and effective claim after CAP-001-B. |
+| Authorization Mode | Independent review |
+| Last Updated | 2026-09-10 |
+| Handoff / Release Condition | #527 must merge before implementation; I255 contract and independent API/security review required; no new carrier, permission, Bundle or product authority. |
 
 ## Required Reads
 
@@ -68,3 +70,9 @@ Legacy public manifest fields and persisted files are not renamed or rewritten. 
 must preserve old constructors and loading behavior; any required break needs decision control.
 Real CLI and public lifecycle tests must prove the behavior, not descriptor registration alone.
 All local subtasks stay under #513. Complete does not imply future carriers or Bundle installation.
+
+## Atomic Claim Proposal (2026-09-10)
+
+PR #527 proposes I255 Active / Claimed and this Story In Progress / Claimed atomically.
+Earlier Unclaimed/preparation text is historical; neither proposed status is effective until
+merge. Scope and compatibility contract are in I255; no implementation code accompanies this PR.
