@@ -78,9 +78,15 @@ See `CRATE-PUBLICATION-MATRIX.md` for per-crate publication/readiness state.
 ### Capability Provider Governance Boundary
 
 ADR-072 and I253/CAP-001-G define the staged governance boundary for future capability
-providers, Plugins, Bundles, Language Providers and Browser connectors. The current runtime
-does not provide a registry, resolver, Bundle installer, dynamic Language Provider, or Browser
-connector from this planning work. Child owners and their Issues are tracked separately:
+providers, Plugins, Bundles, Language Providers and Browser connectors. I254/CAP-001-B provides
+a library-only `talos-core::CapabilityRegistry`: hosts register validated descriptors and resolve
+already-available capabilities offline, selecting the first compatible provider by sorted ID.
+Compatibility uses the capability's major version, independently of the provider's version.
+Valid same-ID registration replaces a descriptor; invalid replacement preserves the prior record.
+Registration does not expose tools/schemas, attest trust, grant permission or install content.
+Cancellation/deadlines are cooperative; promptly returning host callback panics fail closed.
+The runtime does not yet consume this registry and has no Bundle installer, dynamic Language
+Provider or Browser connector from this work. Child owners and their Issues are tracked separately:
 CAP-001-G #519, CAP-001-B #512, CAP-001-C #513, TEXT-001 #511, LANG-001 #510, LANG-002 #516,
 LANG-003 #517, BUNDLE-001 #514, DIST-001-A #509, DIST-001-B #515 and BROWSER-001 #508. Their creation is
 governance decomposition only; each requires its own selected iteration and effective claim.
