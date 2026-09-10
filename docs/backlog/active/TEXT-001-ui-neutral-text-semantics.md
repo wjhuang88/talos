@@ -6,7 +6,7 @@
 | Type | Shared text contract |
 | Parent | CAP-001 / #466 |
 | Status | Refinement / Unclaimed |
-| Selected Iteration | None |
+| Selected Iteration | I256 (preparation; not activated) |
 | Source Issue | [GitHub Issue #511](https://github.com/wjhuang88/talos/issues/511) |
 | Depends On | CAP-001-A; ADR-072 |
 
@@ -20,10 +20,10 @@
 | Work Slice | UI-neutral text classification, language identity and semantic result contract. |
 | Claimed At | Not applicable |
 | Authorization Evidence | No effective claim; intake owner only. Implementation is not authorized. |
-| Governance Claim PR | Not applicable |
+| Governance Claim PR | Pending |
 | Implementation PR | Not started |
 | Authorization Mode | Not applicable |
-| Last Updated | 2026-09-09 |
+| Last Updated | 2026-09-10 |
 | Handoff / Release Condition | Requires a selected iteration and explicit overlap agreement with TUI/Desktop consumers. |
 
 ## Required Reads
@@ -56,3 +56,16 @@ or language-specific implementation.
 
 Contract fixtures, fallback/property tests, architecture/API docs and an explicit shared-file
 ownership inventory. No default Cargo feature expansion is permitted by this owner.
+
+## I256 Selection Preparation (2026-09-10)
+
+I253 audit is Complete, as are CAP-001-A and I246 compatibility preparation. The consumer
+inventory and bounded shared-file agreement are recorded in
+[I256](../../iterations/I256-ui-neutral-text-semantics.md): reuse existing `talos-text`, extract
+renderer-neutral stream classification and validate semantic fallback, with narrow TUI adapters.
+Current main has no competing Active/Review iteration or open PR. This is a proposed serial
+ownership boundary, not effective authority before atomic claim merge and plan review.
+Preserve public constructors/serialized forms, canonical-only TUI grammar admission, existing
+stream rendering, Cargo defaults and dependency versions. LanguageProvider dispatch and symbol
+migration remain LANG-001; parser loading, distribution and Desktop binding remain excluded.
+No implementation code is authorized by this preparation.
