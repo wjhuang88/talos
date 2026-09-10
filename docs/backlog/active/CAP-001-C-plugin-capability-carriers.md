@@ -1,13 +1,13 @@
 # CAP-001-C: Plugin Capability Declarations And Carrier Adapters
 
-**Status**: In Progress / Claimed (proposed by #527; ineffective until merge)
+**Status**: Review / Claimed (#527 effective on main; local implementation candidate)
 
 | Field | Value |
 |---|---|
 | Story ID | CAP-001-C |
 | Type | Plugin runtime integration |
 | Parent | CAP-001 / #466 |
-| Status | In Progress / Claimed (proposed by #527; ineffective until merge) |
+| Status | Review / Claimed (#527 effective on main; local implementation candidate) |
 | Selected Iteration | I255 |
 | Source Issue | [GitHub Issue #513](https://github.com/wjhuang88/talos/issues/513) |
 | Depends On | CAP-001-B; ADR-027; ADR-072 |
@@ -21,12 +21,12 @@
 | Executing Agent | Codex mainline execution Agent |
 | Work Slice | Installed Plugin capability declarations, carrier adapter lifecycle, registry availability and existing explicit CLI Plugin integration. |
 | Claimed At | 2026-09-10 |
-| Authorization Evidence | Maintainer authorized serial unattended #499 then #466. Independent Agent-role API/security plan review and exact-head CI must pass before #527 merges; shared account does not prove natural-person separation. Proposed claim/activation remain ineffective until merge. |
+| Authorization Evidence | Claim #527 effective at 07066e76e92c30d63a2a9068dfdd5e0737d3f1a1; head eb26aaef, CI 34449342743, independent Agent-role API/security plan review 5615007238 and CAS 5615007433. Shared account does not prove natural-person separation. Implementation needs fresh exact-head API/security review. |
 | Governance Claim PR | #527 |
 | Implementation PR | Not started |
 | Authorization Mode | Independent review |
 | Last Updated | 2026-09-10 |
-| Handoff / Release Condition | #527 must merge before implementation; I255 contract and independent API/security review required; no new carrier, permission, Bundle or product authority. |
+| Handoff / Release Condition | #527 is effective; implementation needs fresh exact-head CI, independent API/security review and CAS before merge. No new carrier, permission, Bundle or product authority. |
 
 ## Required Reads
 
@@ -76,3 +76,17 @@ All local subtasks stay under #513. Complete does not imply future carriers or B
 PR #527 proposes I255 Active / Claimed and this Story In Progress / Claimed atomically.
 Earlier Unclaimed/preparation text is historical; neither proposed status is effective until
 merge. Scope and compatibility contract are in I255; no implementation code accompanies this PR.
+
+## Effective Activation (2026-09-10)
+
+#527 merged at `07066e76e92c30d63a2a9068dfdd5e0737d3f1a1`; I255 records exact-head
+CI, independent plan review and CAS. Claim/activation are now effective, superseding the dated
+proposal state. Implementation remains local until the whole slice passes its stable-candidate
+checkpoint; no implementation PR or completion evidence exists yet.
+
+## Local Review Candidate (2026-09-10)
+
+I255 now records the implemented lifecycle, core ownership leases, CLI integration, compatibility
+adapters, tests and complete changed-file inventory. Initial HTTP fixture and initialization
+panic findings were repaired locally. Final full validation and exact-head remote review remain
+required; this is Review, not completion. #513 stays open until owner-first closeout reaches main.

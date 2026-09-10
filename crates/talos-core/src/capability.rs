@@ -1,6 +1,7 @@
 //! UI-neutral capability descriptors and offline resolution (CAP-001-A/B).
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 use std::time::Instant;
 
 use schemars::JsonSchema;
@@ -112,6 +113,28 @@ impl ProviderDescriptor {
 #[derive(Clone, Debug, Default)]
 pub struct CapabilityRegistry {
     providers: BTreeMap<String, ProviderDescriptor>,
+    owners: BTreeMap<String, Arc<()>>,
+}
+
+/// Opaque authority to withdraw exactly one successful owned registration batch.
+///
+/// Registry clones are snapshots: this lease can withdraw its entries from either
+/// snapshot, but a replacement registered afterward is never removed.
+#[derive(Debug)]
+pub struct ProviderRegistration {
+    identity: Arc<()>,
+    ids: Vec<String>,
+}
+
+/// Failure to atomically register an exclusively owned provider batch.
+#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
+pub enum ProviderRegistrationError {
+    /// A descriptor failed validation; the registry was not changed.
+    #[error(transparent)]
+    Invalid(#[from] DescriptorError),
+    /// An ID is already registered or occurs twice in the proposed batch.
+    #[error("provider identity already registered: {0}")]
+    Occupied(String),
 }
 
 /// A capability resolution request.
@@ -148,8 +171,50 @@ impl CapabilityRegistry {
     /// Registration order between distinct provider IDs does not affect selection.
     pub fn register(&mut self, provider: ProviderDescriptor) -> Result<(), DescriptorError> {
         provider.validate()?;
+        self.owners.remove(&provider.id);
         self.providers.insert(provider.id.clone(), provider);
         Ok(())
+    }
+
+    /// Publish an exclusive batch atomically, without replacing existing providers.
+    ///
+    /// This is the Plugin lifecycle entrypoint. The legacy [`Self::register`]
+    /// remains a host-authorized replacement operation and invalidates old leases.
+    pub fn register_owned(
+        &mut self,
+        providers: Vec<ProviderDescriptor>,
+    ) -> Result<ProviderRegistration, ProviderRegistrationError> {
+        let mut ids = std::collections::BTreeSet::new();
+        for provider in &providers {
+            provider.validate()?;
+            if self.providers.contains_key(&provider.id) || !ids.insert(provider.id.clone()) {
+                return Err(ProviderRegistrationError::Occupied(provider.id.clone()));
+            }
+        }
+        let identity = Arc::new(());
+        for provider in providers {
+            self.owners.insert(provider.id.clone(), identity.clone());
+            self.providers.insert(provider.id.clone(), provider);
+        }
+        Ok(ProviderRegistration {
+            identity,
+            ids: ids.into_iter().collect(),
+        })
+    }
+
+    /// Withdraw entries still owned by this lease; replacements and unrelated
+    /// providers are preserved. Repeated withdrawal is harmless.
+    pub fn withdraw(&mut self, registration: &ProviderRegistration) {
+        for id in &registration.ids {
+            if self
+                .owners
+                .get(id)
+                .is_some_and(|owner| Arc::ptr_eq(owner, &registration.identity))
+            {
+                self.owners.remove(id);
+                self.providers.remove(id);
+            }
+        }
     }
 
     /// Resolve a request using deterministic provider-id ordering.

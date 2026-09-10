@@ -28,7 +28,8 @@ use talos_permission::{
     PermissionMode, PermissionRequest,
 };
 use talos_permission::{PermissionEngine, PermissionSessionState};
-use talos_plugin::wasm::{LoadedPluginPackage, WasmRuntime, load_read_only_wasm_package};
+use talos_plugin::lifecycle::PluginLifecycle;
+use talos_plugin::wasm::{LoadedPluginPackage, WasmRuntime};
 use talos_runtime::composition::{
     SharedToolProfile, contribution_groups, contribution_groups_with_capability,
 };
@@ -549,15 +550,40 @@ fn load_explicit_plugin_tools(package_roots: &[PathBuf]) -> Result<Vec<LoadedPlu
             .map_err(|error| format!("failed to initialize WASM runtime: {error}"))?,
     );
     let mut loaded = Vec::with_capacity(package_roots.len());
+    let mut lifecycles = Vec::with_capacity(package_roots.len());
+    let capabilities = Arc::new(Mutex::new(talos_core::CapabilityRegistry::default()));
     for package_root in package_roots {
-        let (tools, package) =
-            load_read_only_wasm_package(runtime.clone(), package_root).map_err(|error| {
+        let mut lifecycle = PluginLifecycle::new(capabilities.clone());
+        lifecycle
+            .load(package_root)
+            .and_then(|()| lifecycle.initialize(runtime.clone()))
+            .map_err(|error| {
                 format!(
                     "failed to load plugin package '{}': {error}",
                     package_root.display()
                 )
             })?;
+        let tools = lifecycle.tools();
+        let package = lifecycle
+            .package()
+            .cloned()
+            .ok_or_else(|| "initialized plugin has no package metadata".to_owned())?;
         loaded.push((tools, package));
+        lifecycles.push(lifecycle);
+    }
+    // Reuse core's transactional collision semantics, including source diagnostics,
+    // before publishing capabilities. No production tool registry is mutated here.
+    let mut checked = ToolRegistry::new();
+    checked
+        .register_contributions(loaded.iter().flat_map(|(tools, package)| {
+            let source = plugin_source(package);
+            tools
+                .iter()
+                .map(move |tool| ToolContribution::new(source.clone(), tool.clone()))
+        }))
+        .map_err(|error| error.to_string())?;
+    for lifecycle in &mut lifecycles {
+        lifecycle.activate().map_err(|error| error.to_string())?;
     }
     Ok(loaded)
 }
