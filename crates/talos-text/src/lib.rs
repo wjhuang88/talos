@@ -124,6 +124,11 @@ impl Default for BuiltinHighlighter {
 
 #[cfg(feature = "code-intelligence")]
 impl BuiltinHighlighter {
+    /// Construct a provider for source-only symbol queries without allocating
+    /// the arborium highlighter bundle.
+    pub fn symbol_only() -> Self {
+        Self(None)
+    }
     /// Highlight a source using the existing built-in grammars, falling back on failure.
     pub fn highlight(&mut self, language: &LanguageId, source: &str) -> HighlightResult {
         let Some(highlighter) = self.0.as_mut() else {
