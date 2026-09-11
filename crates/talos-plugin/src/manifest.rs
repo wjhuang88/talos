@@ -250,7 +250,7 @@ impl PluginManifest {
         if p.version.trim().is_empty() {
             return Err(ManifestError::Validation("plugin.version is empty".into()));
         }
-        if !safe_relative_path(&p.artifact) {
+        if p.artifact.trim().is_empty() {
             return Err(ManifestError::Validation("plugin.artifact is empty".into()));
         }
         if p.carrier != "wasm" {
@@ -266,7 +266,7 @@ impl PluginManifest {
                     "tool name is empty in [[tools]]".into(),
                 ));
             }
-            if !safe_relative_path(&tool.handler) {
+            if tool.handler.trim().is_empty() {
                 return Err(ManifestError::Validation(format!(
                     "tool '{}' has empty handler",
                     tool.name
@@ -285,7 +285,7 @@ impl PluginManifest {
                     "skill name is empty in [[skills]]".into(),
                 ));
             }
-            if !safe_relative_path(&skill.path) {
+            if skill.path.trim().is_empty() {
                 return Err(ManifestError::Validation(format!(
                     "skill '{}' has empty path",
                     skill.name
@@ -364,7 +364,25 @@ impl BundleManifest {
                 "bundle.digest cannot be empty".into(),
             ));
         }
-        validate_components(&self.tools, &self.skills, &self.hooks)
+        validate_components(&self.tools, &self.skills, &self.hooks)?;
+        if self
+            .tools
+            .iter()
+            .any(|tool| !safe_relative_path(&tool.handler))
+            || self
+                .skills
+                .iter()
+                .any(|skill| !safe_relative_path(&skill.path))
+            || self
+                .hooks
+                .iter()
+                .any(|hook| !safe_relative_path(&hook.handler))
+        {
+            return Err(ManifestError::Validation(
+                "bundle component paths must be safe relative paths".into(),
+            ));
+        }
+        Ok(())
     }
 }
 
@@ -376,7 +394,7 @@ fn validate_components(
     let mut names = HashSet::new();
     for tool in tools {
         if tool.name.trim().is_empty()
-            || !safe_relative_path(&tool.handler)
+            || tool.handler.trim().is_empty()
             || !names.insert(tool.name.as_str())
         {
             return Err(ManifestError::Validation(
@@ -391,7 +409,7 @@ fn validate_components(
     }
     for hook in hooks {
         if hook.name.trim().is_empty()
-            || !safe_relative_path(&hook.handler)
+            || hook.handler.trim().is_empty()
             || !is_known_hook_event(&hook.event)
         {
             return Err(ManifestError::Validation("invalid hook".into()));
