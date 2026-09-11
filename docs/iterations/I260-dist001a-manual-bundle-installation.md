@@ -6,11 +6,20 @@
 
 ## Collaboration Claim
 
-Claim State: Unclaimed
-Responsible Actor: Not assigned
-Executing Agent: Not assigned
-Implementation PR: Not started
-Authorization: No implementation authorization until an effective claim reaches `main`.
+| Field | Value |
+|---|---|
+| Claim State | Unclaimed |
+| Responsible Actor | Not assigned |
+| Executing Agent | Not assigned |
+| Work Slice | Explicit local/manual Bundle installation with verification and rollback. |
+| Claimed At | Not applicable |
+| Source Issue | #509 |
+| Governance Claim PR | Not applicable |
+| Authorization Mode | Not applicable |
+| Authorization Evidence | No effective claim; implementation is not authorized. |
+| Implementation PR | Not started |
+| Last Updated | 2026-09-11 |
+| Handoff / Release Condition | Requires an effective claim on main before implementation. |
 
 ## Scope
 
