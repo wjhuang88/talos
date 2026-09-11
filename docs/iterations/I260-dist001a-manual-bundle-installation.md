@@ -14,8 +14,8 @@
 | Work Slice | Explicit local/manual Bundle installation with verification and rollback. |
 | Claimed At | 2026-09-11 |
 | Source Issue | #509 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Single-maintainer merge with independent review |
+| Governance Claim PR | #540 |
+| Authorization Mode | Independent review |
 | Authorization Evidence | Claim is proposed and ineffective until merged to main; implementation remains unauthorized. |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-11 |
