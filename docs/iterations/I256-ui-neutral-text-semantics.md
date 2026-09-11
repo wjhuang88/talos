@@ -1,6 +1,6 @@
 # Iteration I256: UI-Neutral Text Semantics
 
-> Document status: Review / Claimed
+> Document status: Complete / Closed
 > Published plan date: 2026-09-10
 > Objective: Complete TEXT-001 using the existing talos-text compatibility seam.
 > MVP deliverable: The real TUI consumes shared streaming block classification and validated neutral highlight results, preserving current rendering and plain-text fallback.
@@ -9,7 +9,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex mainline execution Agent |
 | Work Slice | Shared text classification, language identity and validated semantic fallback; narrow TUI adapters only. |
@@ -18,9 +18,9 @@
 | Governance Claim PR | #530 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | #530 effective at c8b596980136a577921bf92cdcbe1e517e64d10a; exact head c5f94f31, CI 34474441483, independent API/compatibility APPROVE 5618377071 and CAS 5618385106. Shared account establishes Agent-role separation only. |
-| Implementation PR | Not started |
-| Last Updated | 2026-09-10 |
-| Handoff / Release Condition | Claim #530 is effective; converge the complete slice locally, then require fresh exact-head CI, independent API/compatibility review and CAS before implementation merge. |
+| Implementation PR | #531 |
+| Last Updated | 2026-09-11 |
+| Handoff / Release Condition | Implementation merged through #531; LANG-001 requires its own effective claim. |
 
 ## Required Reads
 
@@ -141,16 +141,13 @@ this agreement. Any newly overlapping claimant requires a fresh overlap check be
 
 ## Completion Evidence
 
-Completion Commit: pending implementation.
-This planning/status commit cannot certify completion.
+Completion Commit: `a1a215e02635a984c4ee3524d18f4c096eb83fa9`
+PR #531 merged with exact-head CI `34476929013` and independent approval `5618698607`.
 
 ## Resume
 
-Claim/activation #530 is effective at `c8b59698`; implementation is locally converged on
-`feat/i256-ui-neutral-text-semantics`. Finish staged-diff review and submit one stable candidate,
-then obtain fresh exact-head CI, independent API/compatibility review and merge-time CAS.
-Do not mark Complete before merged implementation evidence and owner-first closeout.
-Local subtasks and review corrections stay under #511; do not create extra Issues for them.
+Implementation #531 is merged at `a1a215e0`. Finish this owner-first closeout and synchronize
+#511 before selecting LANG-001. No further I256 implementation or transferred child authority.
 
 ## Atomic Claim Proposal (2026-09-10)
 

@@ -1,11 +1,13 @@
 # TEXT-001: UI-Neutral Text Semantics
 
+**Status**: Complete / Closed
+
 | Field | Value |
 |---|---|
 | Story ID | TEXT-001 |
 | Type | Shared text contract |
 | Parent | CAP-001 / #466 |
-| Status | Review / Claimed |
+| Status | Complete / Closed |
 | Selected Iteration | I256 |
 | Source Issue | [GitHub Issue #511](https://github.com/wjhuang88/talos/issues/511) |
 | Depends On | CAP-001-A; ADR-072 |
@@ -14,17 +16,25 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex mainline execution Agent |
 | Work Slice | Shared text classification, language identity and validated semantic fallback; narrow TUI adapters only. |
 | Claimed At | 2026-09-10 |
 | Authorization Evidence | #530 effective at c8b596980136a577921bf92cdcbe1e517e64d10a; exact head c5f94f31, CI 34474441483, independent API/compatibility APPROVE 5618377071 and CAS 5618385106. Shared account establishes Agent-role separation only. |
 | Governance Claim PR | #530 |
-| Implementation PR | Not started |
+| Implementation PR | #531 |
 | Authorization Mode | Independent review |
-| Last Updated | 2026-09-10 |
-| Handoff / Release Condition | Claim #530 is effective; converge the complete slice locally, then require fresh exact-head CI, independent API/compatibility review and CAS before implementation merge. |
+| Last Updated | 2026-09-11 |
+| Handoff / Release Condition | Implementation merged through #531; LANG-001 requires its own effective claim. |
+
+## Completion Evidence (2026-09-11)
+
+Completion Commit: `a1a215e02635a984c4ee3524d18f4c096eb83fa9` (PR #531 merge).
+Exact-head CI `34476929013` and independent approval `5618698607` passed.
+This supersedes the dated pre-merge checkpoints below, without rewriting their history.
+Shared/default/optional-parser tests, full workspace preflight and the binary PTY fixture
+passed; I256 records the detailed acceptance and limits. Desktop integration is not claimed.
 
 ## Required Reads
 
