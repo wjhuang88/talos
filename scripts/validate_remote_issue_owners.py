@@ -137,7 +137,16 @@ def main() -> int:
     matrix_numbers = set(matrix)
 
     missing = sorted(open_issue_numbers - matrix_numbers)
-    stale = sorted(matrix_numbers - open_issue_numbers)
+    # Dated matrices are append-only historical evidence.  A row may therefore
+    # legitimately refer to an issue that has since been closed; only active
+    # owner documents should participate in the live stale check.
+    stale = []
+    for issue in sorted(matrix_numbers - open_issue_numbers):
+        _owner, owner_path, status = matrix[issue]
+        owner_text = owner_path.read_text(encoding="utf-8")
+        if "Complete / Closed" in owner_text or "**Status**: Complete" in owner_text:
+            continue
+        stale.append(issue)
     if missing or stale:
         details = []
         if missing:
