@@ -14,7 +14,7 @@
 | Work Slice | `talos-plugin` Bundle manifest adapter, compatibility fixtures, identity validation and metadata-only rollback; no installer, network, activation, provider registration or permission changes. |
 | Claimed At | 2026-09-11 |
 | Source Issue | #514 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #538 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Proposed atomic claim+activation; ineffective until finalized governance record merges. ADR-073 accepted in I258. Fresh exact-head CI and independent security/API review required before implementation merge. |
 | Implementation PR | Not started |
