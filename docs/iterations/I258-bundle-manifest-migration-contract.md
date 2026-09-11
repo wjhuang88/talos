@@ -1,6 +1,6 @@
 # Iteration I258: Bundle Manifest Migration Contract
 
-> Document status: Planned
+> Document status: Review / Claimed (proposed; ineffective until merge)
 > Planned objective: Accept ADR-073 as the migration contract for BUNDLE-001 without changing runtime or persisted behavior.
 > MVP deliverable: a reviewable, testable compatibility matrix and rollback contract for the later Bundle implementation.
 
@@ -8,18 +8,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex mainline execution Agent |
 | Work Slice | Decision and migration-contract documentation only; no schema or runtime implementation. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-09-11 |
 | Source Issue | #514 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | No implementation authorization. |
-| Implementation PR | Not started |
+| Governance Claim PR | #536 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Proposed atomic decision-only claim in #536 under maintainer instruction to continue #466. Fresh exact-head independent architecture/governance approval and CI required before merge; shared account provides Agent-role separation only. No BUNDLE implementation authorization. |
+| Implementation PR | #536 (decision documents only) |
 | Last Updated | 2026-09-11 |
-| Handoff / Release Condition | ADR-073 must be independently reviewed and accepted before BUNDLE-001 implementation claim. |
+| Handoff / Release Condition | This proposed claim and Review state are ineffective until #536 merges. ADR-073 must be independently reviewed and accepted before BUNDLE-001 implementation claim. |
 
 ## Published Baseline
 
@@ -35,6 +35,38 @@
 
 - ADR-073 contains a deterministic compatibility matrix and explicit rollback boundary.
 - BUNDLE-001 and DIST-001-A dependency boundaries are recorded.
+
+## Selection Inventory And Correction Checkpoint (2026-09-11)
+
+Verified base: `main@b8faf39aa6fcd7cfec9c701a9436e0ef1c2cf7a0`. Current owner headers
+were enumerated across iteration files; historical logs, templates and empty-status legacy plans
+do not establish active authority. The Published Baseline above is unchanged.
+
+| Owner / work | Current state | Disposition |
+|---|---|---|
+| Existing Active / Review / Blocked iterations | None | No overlapping active implementation; I162 is Complete with a historical Review outcome. |
+| I164 | Paused / superseded by I165 | Preserve; do not resume. |
+| I249 | Planned / Unclaimed | Retain unselected dependency pilot; no dependency upgrade here. |
+| I258 | Review / Claimed proposal | #536 is the sole decision candidate; no effect before merge. |
+| BUNDLE-001 / #514 | Refinement / Unclaimed | I258 supplies only its migration decision prerequisite; no implementation activation. |
+| DIST-001-A / #509 | Refinement / Unclaimed | Dependency-blocked on BUNDLE-001 implementation; CAP-001-C is complete. |
+| CAP-001-A/B/C/G, TEXT-001, LANG-001 | Terminal (owners record Complete) | Preserve I252-I257 evidence; no reopening. |
+| LANG-002 / #516 | Refinement / Unclaimed | Wait for DIST-001-A; LANG-001 and CAP-001-C are complete. |
+| LANG-003 / #517 | Refinement / Unclaimed | Wait for LANG-002, BUNDLE-001 and DIST-001-A. |
+| DIST-001-B / #515 | Refinement / Unclaimed | Wait for DIST-001-A and BUNDLE-001; completed CAP dependencies transfer no authority. |
+| BROWSER-001 / #508 | Refinement / Unclaimed | Separate unselected Provider slice. |
+| INTEGRATION-001 / #520 | Intake / Unclaimed | Separate clarification; excluded. |
+
+All other terminal iterations remain terminal and all unselected backlog items retain owner-defined
+gates. One worktree, no stash, and only #536 open were observed; retained branches are historical
+references, not active claim authority.
+
+Review `5630168797` requested the proposed claim and inventory above; it found ADR-073's
+contract acceptable but did not approve the candidate. Corrections stay in #536. Obtain fresh
+exact-head review/CI after the batch. ADR-073 remains Proposed; after independent approval,
+record explicit maintainer acceptance before closing I258. This status correction is not completion
+evidence. BUNDLE-001 must separately decide legacy-reader retirement criteria before any future
+removal; this ADR authorizes no retirement.
 
 ## Verification Evidence
 
