@@ -5,7 +5,7 @@
 | Story ID | BUNDLE-001 |
 | Type | Distribution contract and compatible manifest implementation |
 | Parent | CAP-001 / #466 |
-| Status | Active / Claimed |
+| Status | Complete / Closed |
 | Selected Iteration | I259 |
 | Source Issue | [GitHub Issue #514](https://github.com/wjhuang88/talos/issues/514) |
 | Depends On | ADR-072; existing PluginManifest compatibility evidence; dedicated manifest migration ADR before implementation |
@@ -21,10 +21,10 @@
 | Claimed At | 2026-09-11 |
 | Authorization Evidence | Claim #538 merged as `b88be2a6`; ADR-073 accepted in I258. Implementation scope is limited to the I259 manifest adapter; independent security/API review remains mandatory. |
 | Governance Claim PR | #538 |
-| Implementation PR | Not started |
+| Implementation PR | #539 (merged `137da646`) |
 | Authorization Mode | Single-maintainer merge |
 | Last Updated | 2026-09-09 |
-| Handoff / Release Condition | I259 implementation may proceed from `b88be2a6`; preserve legacy compatibility and obtain independent security/API review before merge. |
+| Handoff / Release Condition | I259 implementation merged; legacy compatibility preserved and independent security/API review passed. |
 
 ## Required Reads
 
@@ -61,3 +61,8 @@ No ungated breaking manifest change. Historical Plugin terminology remains prese
 Manifest compatibility fixtures, migration ADR review, YAML/TOML/schema validation, architecture
 and user-facing terminology documentation. No Cargo or runtime behavior is authorized by this
 intake; implementation requires its own selected iteration and effective claim.
+
+## Completion Evidence
+
+- Completion Commit: `137da646b43671c4400ddfbba59fc2a77c25c1b4` (I259 implementation merge).
+- Exact-head CI `34590922053` passed 5/5; independent security/API APPROVE bound to `7a30feb3`.

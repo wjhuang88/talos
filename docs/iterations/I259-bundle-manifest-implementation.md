@@ -1,6 +1,6 @@
 # Iteration I259: Bundle Manifest Compatibility Implementation
 
-> Document status: Review / Claimed
+> Document status: Complete / Closed
 > Planned objective: Implement the ADR-073-compatible Bundle manifest adapter without changing installation or activation behavior.
 > MVP deliverable: versioned Bundle manifest parsing and validation with legacy dual-read, controlled-write, unknown-field preservation, stable identity and rollback fixtures.
 
@@ -19,7 +19,7 @@
 | Authorization Evidence | Proposed atomic claim+activation; ineffective until finalized governance record merges. ADR-073 accepted in I258. Fresh exact-head CI and independent security/API review required before implementation merge. |
 | Implementation PR | #539 |
 | Last Updated | 2026-09-11 |
-| Handoff / Release Condition | Create implementation branch only after this claim reaches main; preserve DIST-001-A as unclaimed and blocked on this implementation. |
+| Handoff / Release Condition | Implementation merged; closeout evidence recorded below. |
 
 ## Published Baseline
 
@@ -70,5 +70,6 @@ Unclaimed. Existing CAP-001 children and LANG-002/003 retain their owner-defined
 
 ## Completion Evidence
 
-Pending implementation and independent security/API review. This proposal has no implementation
-authorization until its claim record reaches main.
+- Completion Commit: `137da646b43671c4400ddfbba59fc2a77c25c1b4` (PR #539 merge; implementation commit `7a30feb3`)
+- Exact-head CI: `34590922053`, 5/5 success; independent security/API APPROVE bound to `7a30feb3`.
+- No installer, activation, registration, network, permission, release or publication behavior changed.
