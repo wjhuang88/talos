@@ -5,8 +5,8 @@
 | Story ID | LANG-001 |
 | Type | Language capability contract |
 | Parent | CAP-001 / #466 |
-| Status | Refinement / Unclaimed |
-| Selected Iteration | None |
+| Status | In Progress / Claimed |
+| Selected Iteration | I257 |
 | Source Issue | [GitHub Issue #510](https://github.com/wjhuang88/talos/issues/510) |
 | Depends On | TEXT-001; CAP-001-A |
 
@@ -14,16 +14,16 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex unattended single-developer mode |
 | Work Slice | LanguageProvider contract and migration of existing TUI/symbol consumers to one seam. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-09-11 |
 | Authorization Evidence | No effective claim; intake owner only. Implementation is not authorized. |
-| Governance Claim PR | Not applicable |
+| Governance Claim PR | #533 |
 | Implementation PR | Not started |
-| Authorization Mode | Not applicable |
-| Last Updated | 2026-09-09 |
+| Authorization Mode | Independent review |
+| Last Updated | 2026-09-11 |
 | Handoff / Release Condition | Requires TEXT-001 and a behavior-characterization iteration before implementation. |
 
 ## Required Reads
