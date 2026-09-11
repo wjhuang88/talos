@@ -105,4 +105,23 @@ mod tests {
         );
         let _ = fs::remove_dir_all(root);
     }
+
+    #[test]
+    fn valid_bundle_installs_and_repeats_deterministically() {
+        let root = std::env::temp_dir().join(format!("talos-i260-ok-{}", std::process::id()));
+        let source = root.join("source");
+        let destination = root.join("installed");
+        fs::create_dir_all(source.join("artifacts")).unwrap();
+        fs::write(source.join("artifacts/main.wasm"), b"wasm").unwrap();
+        fs::write(source.join("manifest.toml"), "schema_version=1\n[bundle]\nname=\"b\"\nversion=\"1.0.0\"\ncarrier=\"wasm\"\nartifact=\"artifacts/main.wasm\"").unwrap();
+        let first = install_bundle(&source, &destination).unwrap();
+        assert_eq!(first.bundle.name, "b");
+        assert_eq!(
+            fs::read(destination.join("artifacts/main.wasm")).unwrap(),
+            b"wasm"
+        );
+        let second = install_bundle(&source, &destination).unwrap();
+        assert_eq!(second.bundle.version, first.bundle.version);
+        let _ = fs::remove_dir_all(root);
+    }
 }
