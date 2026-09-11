@@ -205,6 +205,33 @@ pub fn parse_compatible_manifest(toml_str: &str) -> Result<CompatibleManifest, M
         manifest.validate()?;
         Ok(CompatibleManifest::Bundle(manifest))
     } else {
+        let allowed = ["plugin", "skills", "tools", "hooks"];
+        if let Some(unknown) = value
+            .as_table()
+            .and_then(|table| table.keys().find(|key| !allowed.contains(&key.as_str())))
+        {
+            return Err(ManifestError::Validation(format!(
+                "unknown legacy manifest field '{unknown}'"
+            )));
+        }
+        if let Some(plugin) = value.get("plugin").and_then(toml::Value::as_table) {
+            let allowed_plugin = [
+                "name",
+                "version",
+                "carrier",
+                "artifact",
+                "description",
+                "talos_protocol",
+            ];
+            if let Some(unknown) = plugin
+                .keys()
+                .find(|key| !allowed_plugin.contains(&key.as_str()))
+            {
+                return Err(ManifestError::Validation(format!(
+                    "unknown legacy plugin field '{unknown}'"
+                )));
+            }
+        }
         Ok(CompatibleManifest::Legacy(parse_manifest(toml_str)?))
     }
 }
@@ -450,6 +477,8 @@ artifact = "b.wasm"
 "#;
         let err = parse_compatible_manifest(unknown).expect_err("unknown field must fail closed");
         assert!(err.to_string().contains("unknown bundle manifest field"));
+        let unknown_legacy = format!("unknown = true\n{}", VALID_MANIFEST);
+        assert!(parse_compatible_manifest(&unknown_legacy).is_err());
     }
 
     #[test]
