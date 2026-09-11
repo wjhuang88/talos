@@ -33,6 +33,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 
 | ID | Codename | State | Activation / Completion Gate |
 |---|---|---|---|
+| I258 | Bundle Manifest Migration Contract | Review / Claimed (proposed) | [I258](I258-bundle-manifest-migration-contract.md); decision-only #536, ineffective until merge; independent review and ADR-073 acceptance pending. No BUNDLE implementation authority. |
 | I256 | UI-Neutral Text Semantics | Complete / Closed | [I256](I256-ui-neutral-text-semantics.md) / TEXT-001 / #511; PR #531 merged with CI 34476929013 and independent approval 5618698607. |
 | I257 | Shared Language Provider | Complete / Closed | [I257](I257-lang001-language-provider.md) / LANG-001 / #510; Completion Commit `f6b77b51`; PR #534 merge, CI `34556132023`, independent approval bound to `c9a3f1ce`. |
 | I255 | Plugin Capability Lifecycle | Complete / Closed | [I255](I255-plugin-capability-lifecycle.md) / CAP-001-C / #513; claim #527 effective at `07066e76`; Completion Commit `e1b9997a`; #528 merge `9404c338`; CI/review passed. |
