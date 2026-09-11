@@ -94,6 +94,19 @@ CAP-001-G #519, CAP-001-B #512, CAP-001-C #513, TEXT-001 #511, LANG-001 #510, LA
 LANG-003 #517, BUNDLE-001 #514, DIST-001-A #509, DIST-001-B #515 and BROWSER-001 #508. Their creation is
 governance decomposition only; each requires its own selected iteration and effective claim.
 
+### Shared Text Semantics
+
+Shared text semantics live in `talos-text`, not the TUI: `stream::StreamBlockClassifier` accepts
+complete UTF-8 lines and emits original source plus code/table/list/quote boundary decisions.
+The TUI adapter owns chunk assembly, CRLF handling, progress wording and rendering; it feeds
+the actual final partial line before flushing held blocks. Held complete-line blocks exceeding
+200 lines or 16 KiB (excluding delimiters) fall back to plain source; this is not a bound on
+the adapter's unfinished input line. `HighlightResult::validated_spans` accepts only ordered, nonoverlapping,
+in-range UTF-8 boundaries; absent or malformed results use plain text without mutating old public
+types or serialized forms. No Ratatui, GPUI, Arborium or tree-sitter types cross this contract.
+Existing optional built-in parser adapters and language aliases remain compatible. LanguageProvider
+dispatch/consumer migration (LANG-001), dynamic providers and distribution are separate slices.
+
 ### Session Persistence Boundary
 
 `talos-session` is the persistence boundary for local conversation history and session indexes. Its

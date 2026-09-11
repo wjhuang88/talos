@@ -468,7 +468,7 @@ pub(crate) fn preview_line_spans<'a>(
 }
 
 pub(crate) fn animated_hold_preview_text(status: &HoldStatus, frame: usize) -> String {
-    let base = status.preview_text().trim_end_matches('.');
+    let base = crate::stream_markdown::preview_text(status).trim_end_matches('.');
     let dots = match (frame / 2) % 4 {
         0 => "",
         1 => ".",

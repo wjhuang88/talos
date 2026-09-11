@@ -1,5 +1,8 @@
 //! UI-neutral text and language contracts.
 
+/// Shared streaming Markdown semantics without renderer or parser dependencies.
+pub mod stream;
+
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "code-intelligence")]
@@ -190,6 +193,32 @@ pub enum HighlightResult {
     Spans(Vec<HighlightSpan>),
     /// No provider is available; consumers should render plain text.
     PlainText,
+}
+
+impl HighlightResult {
+    /// Return spans only when the entire result is valid for this UTF-8 source.
+    ///
+    /// Absent or malformed results return `None`: render the original source as
+    /// plain text rather than clamping, reordering or partially accepting spans.
+    /// Empty spans are valid. This check does not change serialized forms.
+    pub fn validated_spans<'a>(&'a self, source: &str) -> Option<&'a [HighlightSpan]> {
+        let Self::Spans(spans) = self else {
+            return None;
+        };
+        let mut previous_end = 0;
+        for span in spans {
+            if span.start < previous_end
+                || span.end < span.start
+                || span.end > source.len()
+                || !source.is_char_boundary(span.start)
+                || !source.is_char_boundary(span.end)
+            {
+                return None;
+            }
+            previous_end = span.end;
+        }
+        Some(spans)
+    }
 }
 
 /// Provider-independent source request.
