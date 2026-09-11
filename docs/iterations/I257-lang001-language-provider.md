@@ -1,6 +1,7 @@
 # Iteration I257: Shared Language Provider
 
-> Document status: Review / Claimed
+> Document status: Complete / Closed
+> Completion Commit: `f6b77b5162b2dcfea1a9d849fee60b11f96b6d0e`
 > Objective: Implement LANG-001 shared LanguageProvider contract and migrate existing TUI and symbol-tool consumers.
 > MVP deliverable: one renderer-neutral provider seam with guarded built-in implementation and injectable dispatch tests.
 
@@ -20,6 +21,12 @@
 | Implementation PR | #534 |
 | Last Updated | 2026-09-11 |
 | Handoff / Release Condition | Claim must merge before implementation; preserve I256 and I246 compatibility. |
+
+## Closeout Checkpoint (2026-09-11)
+
+Implementation PR #534 merged at `f6b77b5162b2dcfea1a9d849fee60b11f96b6d0e` from exact head
+`c9a3f1ce4d69c29857b175791f45b58b17f1d6dc`; CI `34556132023` passed 5/5 and independent
+API/compatibility review approved the exact head. This merge commit is the Completion Commit.
 
 ## Local Implementation Checkpoint (2026-09-11)
 
