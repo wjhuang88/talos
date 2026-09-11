@@ -3,6 +3,48 @@
 /// Shared streaming Markdown semantics without renderer or parser dependencies.
 pub mod stream;
 
+/// Renderer-neutral language operations shared by text consumers.
+#[cfg(feature = "code-intelligence")]
+pub trait LanguageProvider {
+    /// Return highlighted semantic spans, or plain text when unavailable.
+    fn highlight(&mut self, language: &LanguageId, source: &str) -> HighlightResult;
+    /// Whether a grammar is available for the language.
+    fn supports(&self, language: &LanguageId) -> bool;
+
+    /// Find a named definition and its references in caller-provided source.
+    fn find_symbol(
+        &self,
+        language: &str,
+        source: &str,
+        root: &std::path::Path,
+        path: &std::path::Path,
+        name: &str,
+    ) -> Option<symbol_queries::SymbolResult>;
+    /// Find references in caller-provided source.
+    fn find_references(
+        &self,
+        language: &str,
+        source: &str,
+        path: &std::path::Path,
+        name: &str,
+    ) -> Result<Vec<SourceLocation>, String>;
+    /// List symbols in caller-provided source.
+    fn list_symbols(
+        &self,
+        language: &str,
+        source: &str,
+        file: &str,
+        kind: Option<&str>,
+    ) -> Result<Vec<SymbolInfo>, String>;
+    /// List imports in caller-provided source.
+    fn list_imports(
+        &self,
+        language: &str,
+        source: &str,
+        path: &std::path::Path,
+    ) -> Result<Vec<symbol_queries::ImportInfo>, String>;
+}
+
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "code-intelligence")]
@@ -82,6 +124,11 @@ impl Default for BuiltinHighlighter {
 
 #[cfg(feature = "code-intelligence")]
 impl BuiltinHighlighter {
+    /// Construct a provider for source-only symbol queries without allocating
+    /// the arborium highlighter bundle.
+    pub fn symbol_only() -> Self {
+        Self(None)
+    }
     /// Highlight a source using the existing built-in grammars, falling back on failure.
     pub fn highlight(&mut self, language: &LanguageId, source: &str) -> HighlightResult {
         let Some(highlighter) = self.0.as_mut() else {
@@ -110,6 +157,54 @@ impl BuiltinHighlighter {
     pub fn supports(&self, language: &LanguageId) -> bool {
         std::panic::catch_unwind(|| arborium::get_language(language.as_str()).is_some())
             .unwrap_or(false)
+    }
+}
+
+#[cfg(feature = "code-intelligence")]
+impl LanguageProvider for BuiltinHighlighter {
+    fn highlight(&mut self, language: &LanguageId, source: &str) -> HighlightResult {
+        Self::highlight(self, language, source)
+    }
+
+    fn supports(&self, language: &LanguageId) -> bool {
+        Self::supports(self, language)
+    }
+
+    fn find_symbol(
+        &self,
+        language: &str,
+        source: &str,
+        root: &std::path::Path,
+        path: &std::path::Path,
+        name: &str,
+    ) -> Option<symbol_queries::SymbolResult> {
+        symbol_queries::find_symbol(language, source, root, path, name)
+    }
+    fn find_references(
+        &self,
+        language: &str,
+        source: &str,
+        path: &std::path::Path,
+        name: &str,
+    ) -> Result<Vec<SourceLocation>, String> {
+        symbol_queries::find_references(language, source, path, name)
+    }
+    fn list_symbols(
+        &self,
+        language: &str,
+        source: &str,
+        file: &str,
+        kind: Option<&str>,
+    ) -> Result<Vec<SymbolInfo>, String> {
+        symbol::list_symbols(language, source, file, kind)
+    }
+    fn list_imports(
+        &self,
+        language: &str,
+        source: &str,
+        path: &std::path::Path,
+    ) -> Result<Vec<symbol_queries::ImportInfo>, String> {
+        symbol_queries::list_imports(language, source, path)
     }
 }
 
