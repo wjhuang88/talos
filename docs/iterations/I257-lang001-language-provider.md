@@ -1,6 +1,6 @@
 # Iteration I257: Shared Language Provider
 
-> Document status: Active / Claimed
+> Document status: Review / Claimed
 > Objective: Implement LANG-001 shared LanguageProvider contract and migrate existing TUI and symbol-tool consumers.
 > MVP deliverable: one renderer-neutral provider seam with guarded built-in implementation and injectable dispatch tests.
 
@@ -17,9 +17,13 @@
 | Governance Claim PR | #533 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Proposed claim #533; ineffective until merged to main; independent review required. |
-| Implementation PR | Not started |
+| Implementation PR | #534 |
 | Last Updated | 2026-09-11 |
 | Handoff / Release Condition | Claim must merge before implementation; preserve I256 and I246 compatibility. |
+
+## Local Implementation Checkpoint (2026-09-11)
+
+Implementation commit `98c331dc` adds the shared provider seam and routes TUI plus four symbol consumers through the built-in adapter. Focused locked tests and clippy passed; default feature closure is unchanged. Stable candidate PR #534 contains the complete slice and awaits exact-head CI and independent API/compatibility review.
 
 ## Dependencies and non-goals
 

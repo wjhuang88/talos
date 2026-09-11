@@ -5,7 +5,7 @@
 | Story ID | LANG-001 |
 | Type | Language capability contract |
 | Parent | CAP-001 / #466 |
-| Status | In Progress / Claimed |
+| Status | Review / Claimed |
 | Selected Iteration | I257 |
 | Source Issue | [GitHub Issue #510](https://github.com/wjhuang88/talos/issues/510) |
 | Depends On | TEXT-001; CAP-001-A |
@@ -21,10 +21,10 @@
 | Claimed At | 2026-09-11 |
 | Authorization Evidence | No effective claim; intake owner only. Implementation is not authorized. |
 | Governance Claim PR | #533 |
-| Implementation PR | Not started |
+| Implementation PR | #534 |
 | Authorization Mode | Independent review |
 | Last Updated | 2026-09-11 |
-| Handoff / Release Condition | Requires TEXT-001 and a behavior-characterization iteration before implementation. |
+| Handoff / Release Condition | Claim #533 effective; implementation #534 awaits exact-head CI and independent API/compatibility review. |
 
 ## Required Reads
 
