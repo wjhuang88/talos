@@ -1,6 +1,6 @@
 # Iteration I260: Verified Manual Bundle Installation
 
-> Document status: Planned / Unclaimed
+> Document status: Planned / Claimed (pending governance merge)
 > Parent: CAP-001 / #466; DIST-001-A / #509
 > Objective: deliver an offline, user-selected Bundle installation path with deterministic integrity, compatibility, destination, and rollback behavior.
 
@@ -8,18 +8,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex unattended single-developer mode |
 | Work Slice | Explicit local/manual Bundle installation with verification and rollback. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-09-11 |
 | Source Issue | #509 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | No effective claim; implementation is not authorized. |
+| Governance Claim PR | Pending |
+| Authorization Mode | Single-maintainer merge with independent review |
+| Authorization Evidence | Claim is proposed and ineffective until merged to main; implementation remains unauthorized. |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-11 |
-| Handoff / Release Condition | Requires an effective claim on main before implementation. |
+| Handoff / Release Condition | Merge this governance claim to main before creating an implementation branch. |
 
 ## Scope
 
