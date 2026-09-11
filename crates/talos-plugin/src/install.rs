@@ -48,6 +48,9 @@ pub fn install_bundle(source: &Path, destination: &Path) -> Result<BundleManifes
         }
     }
     let stage = destination.with_extension("staging");
+    if let Some(parent) = destination.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
     if stage.exists() {
         std::fs::remove_dir_all(&stage)?;
     }
