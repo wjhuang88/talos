@@ -6,7 +6,7 @@
 | Type | Distribution implementation |
 | Parent | CAP-001 / #466; DIST-001 |
 | Status | Refinement / Unclaimed |
-| Selected Iteration | None |
+| Selected Iteration | I260 |
 | Source Issue | [GitHub Issue #509](https://github.com/wjhuang88/talos/issues/509) |
 | Depends On | BUNDLE-001; CAP-001-C |
 
@@ -23,7 +23,7 @@
 | Governance Claim PR | Not applicable |
 | Implementation PR | Not started |
 | Authorization Mode | Not applicable |
-| Last Updated | 2026-09-09 |
+| Last Updated | 2026-09-11 |
 | Handoff / Release Condition | Requires accepted Bundle schema/identity and independent security review. |
 
 ## Required Reads
