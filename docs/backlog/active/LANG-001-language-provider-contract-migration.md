@@ -5,7 +5,7 @@
 | Story ID | LANG-001 |
 | Type | Language capability contract |
 | Parent | CAP-001 / #466 |
-| Status | Review / Claimed |
+| Status | Complete / Closed |
 | Selected Iteration | I257 |
 | Source Issue | [GitHub Issue #510](https://github.com/wjhuang88/talos/issues/510) |
 | Depends On | TEXT-001; CAP-001-A |
@@ -19,12 +19,14 @@
 | Executing Agent | Codex unattended single-developer mode |
 | Work Slice | LanguageProvider contract and migration of existing TUI/symbol consumers to one seam. |
 | Claimed At | 2026-09-11 |
-| Authorization Evidence | No effective claim; intake owner only. Implementation is not authorized. |
+| Authorization Evidence | Claim #533 effective on main; implementation #534 merged. |
 | Governance Claim PR | #533 |
 | Implementation PR | #534 |
 | Authorization Mode | Independent review |
 | Last Updated | 2026-09-11 |
-| Handoff / Release Condition | Claim #533 effective; implementation #534 awaits exact-head CI and independent API/compatibility review. |
+| Handoff / Release Condition | Closed after merge commit `f6b77b51`; follow-up language slices remain separately governed. |
+
+Completion Commit: `f6b77b5162b2dcfea1a9d849fee60b11f96b6d0e`
 
 ## Required Reads
 
