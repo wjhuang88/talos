@@ -67,7 +67,15 @@ pub fn install_bundle(source: &Path, destination: &Path) -> Result<BundleManifes
     if destination.exists() {
         std::fs::rename(destination, &backup)?;
     }
-    std::fs::rename(&stage, destination)?;
+    if let Err(error) = std::fs::rename(&stage, destination) {
+        // Best-effort restoration keeps a previously working installation
+        // available when the final replacement cannot be committed.
+        if backup.exists() && !destination.exists() {
+            let _ = std::fs::rename(&backup, destination);
+        }
+        let _ = std::fs::remove_dir_all(&stage);
+        return Err(error.into());
+    }
     if backup.exists() {
         std::fs::remove_dir_all(backup)?;
     }
@@ -79,7 +87,14 @@ fn copy_tree(source: &Path, destination: &Path) -> Result<(), std::io::Error> {
     for entry in std::fs::read_dir(source)? {
         let entry = entry?;
         let target = destination.join(entry.file_name());
-        if entry.file_type()?.is_dir() {
+        let file_type = entry.file_type()?;
+        if file_type.is_symlink() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "bundle symlinks are not permitted",
+            ));
+        }
+        if file_type.is_dir() {
             copy_tree(&entry.path(), &target)?;
         } else {
             std::fs::copy(entry.path(), target)?;
