@@ -247,7 +247,7 @@ impl PluginManifest {
         if p.name.trim().is_empty() {
             return Err(ManifestError::Validation("plugin.name is empty".into()));
         }
-        if p.version.trim().is_empty() {
+        if !valid_semver(&p.version) {
             return Err(ManifestError::Validation("plugin.version is empty".into()));
         }
         if p.artifact.trim().is_empty() {
@@ -336,7 +336,7 @@ impl BundleManifest {
                 self.schema_version
             )));
         }
-        if self.bundle.name.trim().is_empty() || self.bundle.version.trim().is_empty() {
+        if self.bundle.name.trim().is_empty() || !valid_semver(&self.bundle.version) {
             return Err(ManifestError::Validation(
                 "bundle name and version are required".into(),
             ));
@@ -434,6 +434,16 @@ fn valid_digest(digest: &str) -> bool {
         return false;
     };
     hex.len() == 64 && hex.bytes().all(|b| b.is_ascii_hexdigit())
+}
+
+fn valid_semver(version: &str) -> bool {
+    let mut parts = version.trim().split('.');
+    let valid = (0..3).all(|_| {
+        parts
+            .next()
+            .is_some_and(|part| !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit()))
+    });
+    valid && parts.next().is_none()
 }
 
 fn is_known_hook_event(event: &str) -> bool {
