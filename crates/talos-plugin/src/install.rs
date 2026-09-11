@@ -147,4 +147,27 @@ mod tests {
         assert_eq!(second.bundle.version, first.bundle.version);
         let _ = fs::remove_dir_all(root);
     }
+
+    #[cfg(unix)]
+    #[test]
+    fn symlink_in_bundle_is_rejected_before_replacement() {
+        let root = std::env::temp_dir().join(format!("talos-i260-link-{}", std::process::id()));
+        let source = root.join("source");
+        let destination = root.join("installed");
+        fs::create_dir_all(&source).unwrap();
+        fs::create_dir_all(&destination).unwrap();
+        fs::write(destination.join("sentinel"), "old").unwrap();
+        fs::write(source.join("bundle.wasm"), b"wasm").unwrap();
+        fs::write(source.join("manifest.toml"), "schema_version=1\n[bundle]\nname=\"b\"\nversion=\"1.0.0\"\ncarrier=\"wasm\"\nartifact=\"bundle.wasm\"").unwrap();
+        std::os::unix::fs::symlink(destination.join("sentinel"), source.join("escape")).unwrap();
+        assert!(matches!(
+            install_bundle(&source, &destination),
+            Err(InstallError::Io(_))
+        ));
+        assert_eq!(
+            fs::read_to_string(destination.join("sentinel")).unwrap(),
+            "old"
+        );
+        let _ = fs::remove_dir_all(root);
+    }
 }
