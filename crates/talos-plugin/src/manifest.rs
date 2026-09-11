@@ -800,4 +800,27 @@ handler = "hooks/b.wasm"
             matches!(err, ManifestError::Validation(ref m) if m.contains("duplicate hook name"))
         );
     }
+
+    #[test]
+    fn bundle_semver_boundary_and_legacy_compatibility() {
+        let bundle = |version: &str| {
+            format!(
+                "schema_version = 1\n[bundle]\nname=\"b\"\nversion=\"{version}\"\ncarrier=\"wasm\"\nartifact=\"b.wasm\""
+            )
+        };
+        assert!(parse_compatible_manifest(&bundle("1.2.3")).is_ok());
+        assert!(parse_compatible_manifest(&bundle("garbage")).is_err());
+        let legacy = VALID_MANIFEST.replace("0.1.0", "0.1");
+        assert!(parse_compatible_manifest(&legacy).is_ok());
+        assert!(
+            migrate_legacy_manifest(
+                &legacy,
+                MigrationOptions {
+                    schema_version: 1,
+                    allow_write: true
+                }
+            )
+            .is_err()
+        );
+    }
 }
