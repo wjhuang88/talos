@@ -1,5 +1,6 @@
 //! Offline, explicit Bundle installation with atomic staging.
 
+use sha2::{Digest, Sha256};
 use std::path::Path;
 
 use crate::{BundleManifest, CompatibleManifest, ManifestError, parse_compatible_manifest};
@@ -16,6 +17,8 @@ pub enum InstallError {
     LegacyManifest,
     #[error("bundle artifact is missing: {0}")]
     MissingArtifact(String),
+    #[error("bundle artifact digest mismatch")]
+    DigestMismatch,
 }
 
 /// Validate and atomically install a manually supplied Bundle directory.
@@ -33,8 +36,16 @@ pub fn install_bundle(source: &Path, destination: &Path) -> Result<BundleManifes
         CompatibleManifest::Bundle(bundle) => bundle,
         CompatibleManifest::Legacy(_) => return Err(InstallError::LegacyManifest),
     };
-    if !source.join(&manifest.bundle.artifact).is_file() {
+    let artifact = source.join(&manifest.bundle.artifact);
+    if !artifact.is_file() {
         return Err(InstallError::MissingArtifact(manifest.bundle.artifact));
+    }
+    if let Some(expected) = manifest.bundle.digest.as_deref() {
+        let bytes = std::fs::read(&artifact)?;
+        let actual = format!("sha256:{:x}", Sha256::digest(bytes));
+        if actual != expected {
+            return Err(InstallError::DigestMismatch);
+        }
     }
     let stage = destination.with_extension("staging");
     if stage.exists() {

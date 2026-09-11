@@ -6013,6 +6013,7 @@ dependencies = [
  "futures-util",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "talos-core",
  "talos-permission",
  "thiserror 2.0.20",
