@@ -1,6 +1,6 @@
 # Iteration I258: Bundle Manifest Migration Contract
 
-> Document status: Review / Claimed (proposed; ineffective until merge)
+> Document status: Review / Claimed
 > Planned objective: Accept ADR-073 as the migration contract for BUNDLE-001 without changing runtime or persisted behavior.
 > MVP deliverable: a reviewable, testable compatibility matrix and rollback contract for the later Bundle implementation.
 
@@ -16,10 +16,10 @@
 | Source Issue | #514 |
 | Governance Claim PR | #536 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Proposed atomic decision-only claim in #536 under maintainer instruction to continue #466. Fresh exact-head independent architecture/governance approval and CI required before merge; shared account provides Agent-role separation only. No BUNDLE implementation authorization. |
+| Authorization Evidence | Claim #536 effective at 9994397b580d9edd38c0b81f6939a845ef772e4a; independent approval 5630320484 and CI 34568546795 bound to a3351dba4cb584a9d3eeea9af213084c8b88ff3a. Shared account provides Agent-role separation only. No BUNDLE implementation authorization. |
 | Implementation PR | #536 (decision documents only) |
 | Last Updated | 2026-09-11 |
-| Handoff / Release Condition | This proposed claim and Review state are ineffective until #536 merges. ADR-073 must be independently reviewed and accepted before BUNDLE-001 implementation claim. |
+| Handoff / Release Condition | Claim is effective through #536. Independent review passed; explicit ADR-073 maintainer acceptance remains required before I258 closure and BUNDLE-001 implementation claim. |
 
 ## Published Baseline
 
@@ -76,3 +76,18 @@ removal; this ADR authorizes no retirement.
 ## Completion Evidence
 
 Pending independent architecture review and maintainer acceptance of ADR-073.
+
+## Post-Merge Checkpoint (2026-09-11)
+
+PR #536 merged as `9994397b580d9edd38c0b81f6939a845ef772e4a` after approval
+[5630320484](https://github.com/wjhuang88/talos/pull/536#issuecomment-5630320484)
+and CI `34568546795` (four successful jobs, Windows Rust skipped) on exact head
+`a3351dba4cb584a9d3eeea9af213084c8b88ff3a`, base
+`b8faf39aa6fcd7cfec9c701a9436e0ef1c2cf7a0`. Merge-time CAS confirmed unchanged
+head/base, CLEAN merge state and clean worktree. The local cleanup failure occurred after the
+remote merge and did not invalidate it; local main was subsequently aligned to the merge commit.
+
+This checkpoint supersedes the pending-review and ineffective-claim wording in historical records.
+ADR-073 remains Proposed pending explicit maintainer acceptance; I258 is Review / Claimed,
+not Complete. The existing decision merge above is eligible evidence for a later closeout;
+the future status commit must not cite itself. BUNDLE-001 and DIST-001-A remain unclaimed.

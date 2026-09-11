@@ -16,7 +16,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| I258 Bundle Migration Decision | Review / Claimed (proposed) | [I258](iterations/I258-bundle-manifest-migration-contract.md) | #536 claim ineffective until merge; ADR-073 remains Proposed pending independent review and maintainer acceptance. No BUNDLE implementation authority. |
+| I258 Bundle Migration Decision | Review / Claimed | [I258](iterations/I258-bundle-manifest-migration-contract.md) | #536 claim effective at `9994397b`; independent review passed, ADR-073 remains Proposed pending maintainer acceptance. No BUNDLE implementation authority. |
 | I248 Dependency Governance | Complete / Closed | [DEPENDENCY-001](backlog/active/DEPENDENCY-001-dependency-upgrade-governance.md) / [I248](iterations/I248-dependency-governance-closed-loop.md) | #497 implementation `dbd847ec`; #498 merged as `a7d168ee`, acceptance head `5d2e4443`, CI `34074942674`, independent review `5564114577`. Full dependency upgrade remains I250. |
 | I250 Full Workspace Dependency Upgrade | Complete / Closed | [DEPENDENCY-002](backlog/active/DEPENDENCY-002-full-workspace-dependency-upgrade.md) / [I250](iterations/I250-full-workspace-dependency-upgrade.md) / Issue #474 | #501 merged as `76f0a41b`; accepted baseline records 71 identity rows; residuals continue under DEPENDENCY-003 / #502. |
 | I251 Pre-Provider Rejection Terminalization | Complete / Closed | [RUNTIME-007](backlog/active/RUNTIME-007-preprovider-rejection-terminalization.md) / [I251](iterations/I251-runtime007-preprovider-terminalization.md) / Issue #499 | Implemented and merged as `c9225abf`; #466 remains a separate architecture parent. |
