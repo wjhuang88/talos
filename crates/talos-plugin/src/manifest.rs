@@ -247,7 +247,7 @@ impl PluginManifest {
         if p.name.trim().is_empty() {
             return Err(ManifestError::Validation("plugin.name is empty".into()));
         }
-        if !valid_semver(&p.version) {
+        if p.version.trim().is_empty() {
             return Err(ManifestError::Validation("plugin.version is empty".into()));
         }
         if p.artifact.trim().is_empty() {
