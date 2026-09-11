@@ -24,6 +24,10 @@ pub fn install_bundle(source: &Path, destination: &Path) -> Result<BundleManifes
     if !source.is_dir() {
         return Err(InstallError::NotDirectory);
     }
+    let source_abs = source.canonicalize()?;
+    if destination.exists() && destination.canonicalize()? == source_abs {
+        return Err(InstallError::NotDirectory);
+    }
     let text = std::fs::read_to_string(source.join("manifest.toml"))?;
     let manifest = match parse_compatible_manifest(&text)? {
         CompatibleManifest::Bundle(bundle) => bundle,
@@ -37,10 +41,17 @@ pub fn install_bundle(source: &Path, destination: &Path) -> Result<BundleManifes
         std::fs::remove_dir_all(&stage)?;
     }
     copy_tree(source, &stage)?;
+    let backup = destination.with_extension("backup");
+    if backup.exists() {
+        std::fs::remove_dir_all(&backup)?;
+    }
     if destination.exists() {
-        std::fs::remove_dir_all(destination)?;
+        std::fs::rename(destination, &backup)?;
     }
     std::fs::rename(&stage, destination)?;
+    if backup.exists() {
+        std::fs::remove_dir_all(backup)?;
+    }
     Ok(manifest)
 }
 
