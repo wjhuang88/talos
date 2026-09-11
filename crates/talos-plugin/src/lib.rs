@@ -19,6 +19,8 @@ pub use event::{
 };
 pub use handler::{HookContext, HookHandler, HookResult};
 pub use manifest::{
-    ManifestError, PluginHook, PluginManifest, PluginMetadata, PluginSkill, PluginTool,
+    BundleManifest, BundleMetadata, CompatibleManifest, ManifestError, MigrationOptions,
+    PluginHook, PluginManifest, PluginMetadata, PluginSkill, PluginTool, migrate_legacy_manifest,
+    parse_compatible_manifest,
 };
 pub use registry::{HookOutcome, HookRegistration, HookRegistry};

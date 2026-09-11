@@ -5,8 +5,8 @@
 | Story ID | BUNDLE-001 |
 | Type | Distribution contract and compatible manifest implementation |
 | Parent | CAP-001 / #466 |
-| Status | Refinement / Unclaimed |
-| Selected Iteration | None |
+| Status | Active / Claimed |
+| Selected Iteration | I259 |
 | Source Issue | [GitHub Issue #514](https://github.com/wjhuang88/talos/issues/514) |
 | Depends On | ADR-072; existing PluginManifest compatibility evidence; dedicated manifest migration ADR before implementation |
 
@@ -14,17 +14,17 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex unattended single-developer mode |
 | Work Slice | Bundle terminology, manifest shape, installation identity and staged compatible manifest implementation after its migration decision gate. |
-| Claimed At | Not applicable |
-| Authorization Evidence | No effective claim; intake owner only. Implementation is not authorized. |
-| Governance Claim PR | Not applicable |
+| Claimed At | 2026-09-11 |
+| Authorization Evidence | Claim #538 merged as `b88be2a6`; ADR-073 accepted in I258. Implementation scope is limited to the I259 manifest adapter; independent security/API review remains mandatory. |
+| Governance Claim PR | #538 |
 | Implementation PR | Not started |
-| Authorization Mode | Not applicable |
+| Authorization Mode | Single-maintainer merge |
 | Last Updated | 2026-09-09 |
-| Handoff / Release Condition | Requires a dedicated migration ADR or accepted change-control record before schema edits. |
+| Handoff / Release Condition | I259 implementation may proceed from `b88be2a6`; preserve legacy compatibility and obtain independent security/API review before merge. |
 
 ## Required Reads
 
