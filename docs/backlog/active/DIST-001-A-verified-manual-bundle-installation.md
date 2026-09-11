@@ -5,7 +5,7 @@
 | Story ID | DIST-001-A |
 | Type | Distribution implementation |
 | Parent | CAP-001 / #466; DIST-001 |
-| Status | Refinement / Unclaimed |
+| Status | Planned / Claimed (pending governance merge) |
 | Selected Iteration | I260 |
 | Source Issue | [GitHub Issue #509](https://github.com/wjhuang88/talos/issues/509) |
 | Depends On | BUNDLE-001; CAP-001-C |
@@ -14,17 +14,17 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex unattended single-developer mode |
 | Work Slice | Explicit local/manual Bundle installation with verification and rollback. |
-| Claimed At | Not applicable |
-| Authorization Evidence | No effective claim; intake owner only. Implementation is not authorized. |
-| Governance Claim PR | Not applicable |
+| Claimed At | 2026-09-11 |
+| Authorization Evidence | Proposed claim is ineffective until PR #540 merges to main; implementation is not authorized. |
+| Governance Claim PR | #540 |
 | Implementation PR | Not started |
-| Authorization Mode | Not applicable |
+| Authorization Mode | Independent review |
 | Last Updated | 2026-09-11 |
-| Handoff / Release Condition | Requires accepted Bundle schema/identity and independent security review. |
+| Handoff / Release Condition | Requires PR #540 merge, then a fresh implementation branch and independent security review. |
 
 ## Required Reads
 
