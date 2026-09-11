@@ -22,7 +22,12 @@ pub enum InstallError {
 }
 
 /// Validate and atomically install a manually supplied Bundle directory.
-/// This function never loads, activates, registers, or grants permissions.
+///
+/// The source must contain a versioned `manifest.toml` and its declared artifact.
+/// When the manifest contains a SHA-256 digest, the artifact bytes are checked
+/// before staging. Existing installations are left untouched on validation
+/// failure. Installation copies files only; it never loads, activates,
+/// registers, resolves, or grants permissions to a Plugin.
 pub fn install_bundle(source: &Path, destination: &Path) -> Result<BundleManifest, InstallError> {
     if !source.is_dir() {
         return Err(InstallError::NotDirectory);
