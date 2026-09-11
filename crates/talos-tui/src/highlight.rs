@@ -3,11 +3,12 @@
 use crossterm::style::Color as CColor;
 
 use crate::theme::to_crossterm_color;
+use talos_text::LanguageProvider;
 
 type LineSegments = Vec<(String, Option<CColor>)>;
 
 pub(crate) struct HighlightEngine {
-    highlighter: talos_text::BuiltinHighlighter,
+    highlighter: Box<dyn LanguageProvider>,
 }
 
 impl Default for HighlightEngine {
@@ -19,7 +20,7 @@ impl Default for HighlightEngine {
 impl HighlightEngine {
     pub(crate) fn new() -> Self {
         Self {
-            highlighter: talos_text::BuiltinHighlighter::default(),
+            highlighter: Box::new(talos_text::BuiltinHighlighter::default()),
         }
     }
 

@@ -404,13 +404,15 @@ fn find_symbol_in_file(
     let FileAdmission::Admitted { language, code } = admit_file(path, state).ok()? else {
         return None;
     };
-    talos_text::symbol_queries::find_symbol(language, &code, root, path, name)
+    let provider = talos_text::BuiltinHighlighter::default();
+    talos_text::LanguageProvider::find_symbol(&provider, language, &code, root, path, name)
 }
 
 fn find_refs_in_file(path: &Path, name: &str) -> Result<Vec<SourceLocation>, String> {
     let lang = detect_language(path).ok_or_else(|| "unsupported file type".to_string())?;
     let code = fs::read_to_string(path).map_err(|e| e.to_string())?;
-    talos_text::symbol_queries::find_references(lang, &code, path, name)
+    let provider = talos_text::BuiltinHighlighter::default();
+    talos_text::LanguageProvider::find_references(&provider, lang, &code, path, name)
 }
 
 fn list_symbols_in_path(
@@ -508,7 +510,9 @@ fn collect_file_symbols(
     results: &mut Vec<SymbolInfo>,
 ) -> Result<(), String> {
     let file = path.strip_prefix(root).unwrap_or(path).to_string_lossy();
-    results.extend(talos_text::symbol::list_symbols(
+    let provider = talos_text::BuiltinHighlighter::default();
+    results.extend(talos_text::LanguageProvider::list_symbols(
+        &provider,
         language,
         code,
         &file,
@@ -520,7 +524,8 @@ fn collect_file_symbols(
 fn list_imports_in_file(path: &Path) -> Result<Vec<ImportInfo>, String> {
     let lang = detect_language(path).ok_or_else(|| "unsupported file type".to_string())?;
     let code = fs::read_to_string(path).map_err(|e| e.to_string())?;
-    talos_text::symbol_queries::list_imports(lang, &code, path)
+    let provider = talos_text::BuiltinHighlighter::default();
+    talos_text::LanguageProvider::list_imports(&provider, lang, &code, path)
 }
 
 #[cfg(test)]
