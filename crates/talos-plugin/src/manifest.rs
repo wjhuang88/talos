@@ -32,6 +32,7 @@ pub struct PluginManifest {
 
 /// Versioned Bundle manifest accepted alongside the legacy Plugin shape.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct BundleManifest {
     pub schema_version: u32,
     pub bundle: BundleMetadata,
@@ -45,6 +46,7 @@ pub struct BundleManifest {
 
 /// Stable identity and artifact metadata for a Bundle.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct BundleMetadata {
     pub name: String,
     pub version: String,
@@ -153,18 +155,21 @@ pub struct PluginMetadata {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PluginSkill {
     pub name: String,
     pub path: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PluginTool {
     pub name: String,
     pub handler: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PluginHook {
     pub name: String,
     pub event: String,
@@ -245,7 +250,7 @@ impl PluginManifest {
         if p.version.trim().is_empty() {
             return Err(ManifestError::Validation("plugin.version is empty".into()));
         }
-        if p.artifact.trim().is_empty() {
+        if !safe_relative_path(&p.artifact) {
             return Err(ManifestError::Validation("plugin.artifact is empty".into()));
         }
         if p.carrier != "wasm" {
@@ -261,7 +266,7 @@ impl PluginManifest {
                     "tool name is empty in [[tools]]".into(),
                 ));
             }
-            if tool.handler.trim().is_empty() {
+            if !safe_relative_path(&tool.handler) {
                 return Err(ManifestError::Validation(format!(
                     "tool '{}' has empty handler",
                     tool.name
@@ -280,7 +285,7 @@ impl PluginManifest {
                     "skill name is empty in [[skills]]".into(),
                 ));
             }
-            if skill.path.trim().is_empty() {
+            if !safe_relative_path(&skill.path) {
                 return Err(ManifestError::Validation(format!(
                     "skill '{}' has empty path",
                     skill.name
@@ -338,7 +343,7 @@ impl BundleManifest {
         }
         if self.bundle.artifact.trim().is_empty()
             || self.bundle.artifact.starts_with('/')
-            || self.bundle.artifact.contains("..")
+            || !safe_relative_path(&self.bundle.artifact)
         {
             return Err(ManifestError::Validation(
                 "bundle.artifact must be a safe relative path".into(),
@@ -349,7 +354,12 @@ impl BundleManifest {
                 "bundle.carrier must be 'wasm'".into(),
             ));
         }
-        if self.bundle.digest.as_deref().is_some_and(str::is_empty) {
+        if self
+            .bundle
+            .digest
+            .as_deref()
+            .is_some_and(|d| !valid_digest(d))
+        {
             return Err(ManifestError::Validation(
                 "bundle.digest cannot be empty".into(),
             ));
@@ -366,7 +376,7 @@ fn validate_components(
     let mut names = HashSet::new();
     for tool in tools {
         if tool.name.trim().is_empty()
-            || tool.handler.trim().is_empty()
+            || !safe_relative_path(&tool.handler)
             || !names.insert(tool.name.as_str())
         {
             return Err(ManifestError::Validation(
@@ -375,19 +385,37 @@ fn validate_components(
         }
     }
     for skill in skills {
-        if skill.name.trim().is_empty() || skill.path.trim().is_empty() {
+        if skill.name.trim().is_empty() || !safe_relative_path(&skill.path) {
             return Err(ManifestError::Validation("invalid skill".into()));
         }
     }
     for hook in hooks {
         if hook.name.trim().is_empty()
-            || hook.handler.trim().is_empty()
+            || !safe_relative_path(&hook.handler)
             || !is_known_hook_event(&hook.event)
         {
             return Err(ManifestError::Validation("invalid hook".into()));
         }
     }
     Ok(())
+}
+
+fn safe_relative_path(path: &str) -> bool {
+    let path = path.trim();
+    !path.is_empty()
+        && !path.starts_with('/')
+        && !path.starts_with('\\')
+        && !path.contains(':')
+        && !path
+            .split(['/', '\\'])
+            .any(|part| part.is_empty() || part == "..")
+}
+
+fn valid_digest(digest: &str) -> bool {
+    let Some(hex) = digest.strip_prefix("sha256:") else {
+        return false;
+    };
+    hex.len() == 64 && hex.bytes().all(|b| b.is_ascii_hexdigit())
 }
 
 fn is_known_hook_event(event: &str) -> bool {
@@ -450,7 +478,7 @@ name = "my-bundle"
 version = "1.0.0"
 carrier = "wasm"
 artifact = "artifacts/main.wasm"
-digest = "sha256:abc"
+digest = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
 "#;
         let parsed = parse_compatible_manifest(toml).expect("bundle manifest");
         assert!(matches!(
