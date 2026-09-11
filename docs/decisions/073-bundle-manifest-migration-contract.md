@@ -2,7 +2,9 @@
 
 ## Status
 
-Proposed
+Accepted
+
+Accepted by maintainer authorization on 2026-09-11. Implementation remains separately governed by BUNDLE-001.
 
 ## Context
 
