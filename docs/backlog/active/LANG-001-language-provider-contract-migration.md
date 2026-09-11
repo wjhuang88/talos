@@ -20,7 +20,7 @@
 | Work Slice | LanguageProvider contract and migration of existing TUI/symbol consumers to one seam. |
 | Claimed At | 2026-09-11 |
 | Authorization Evidence | No effective claim; intake owner only. Implementation is not authorized. |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #533 |
 | Implementation PR | Not started |
 | Authorization Mode | Independent review |
 | Last Updated | 2026-09-11 |

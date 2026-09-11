@@ -14,9 +14,9 @@
 | Work Slice | LanguageProvider contract, built-in Arborium adapter, TUI HighlightEngine and four talos-tools symbol consumers; compatibility wrappers and tests. |
 | Claimed At | 2026-09-11 |
 | Source Issue | #510 (parent #466) |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #533 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Proposed claim; ineffective until merged to main. |
+| Authorization Evidence | Proposed claim #533; ineffective until merged to main; independent review required. |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-11 |
 | Handoff / Release Condition | Claim must merge before implementation; preserve I256 and I246 compatibility. |
