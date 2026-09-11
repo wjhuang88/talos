@@ -54,6 +54,8 @@ pub struct BundleMetadata {
     pub digest: Option<String>,
     #[serde(default)]
     pub description: Option<String>,
+    #[serde(default)]
+    pub talos_protocol: Option<String>,
 }
 
 /// A manifest parsed through the compatibility boundary.
@@ -99,6 +101,24 @@ pub fn migrate_legacy_manifest(
             "unknown legacy manifest field '{unknown}'"
         )));
     }
+    if let Some(plugin) = value.get("plugin").and_then(toml::Value::as_table) {
+        let allowed_plugin = [
+            "name",
+            "version",
+            "carrier",
+            "artifact",
+            "description",
+            "talos_protocol",
+        ];
+        if let Some(unknown) = plugin
+            .keys()
+            .find(|key| !allowed_plugin.contains(&key.as_str()))
+        {
+            return Err(ManifestError::Validation(format!(
+                "unknown legacy plugin field '{unknown}'"
+            )));
+        }
+    }
     let legacy = parse_manifest(input)?;
     let bundle = BundleManifest {
         schema_version: 1,
@@ -109,6 +129,7 @@ pub fn migrate_legacy_manifest(
             artifact: legacy.plugin.artifact,
             digest: None,
             description: legacy.plugin.description,
+            talos_protocol: legacy.plugin.talos_protocol,
         },
         skills: legacy.skills,
         tools: legacy.tools,
