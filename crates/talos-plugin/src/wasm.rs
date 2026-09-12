@@ -436,6 +436,18 @@ mod tests {
         Arc::new(WasmRuntime::new(FUEL, TIMEOUT_MS).expect("runtime"))
     }
 
+    #[test]
+    fn language_provider_abi_probe_accepts_version_one() {
+        let module = WasmModule::from_wat(runtime(), r#"(module (func (export "talos_language_abi_version") (result i32) i32.const 1))"#).expect("compile");
+        assert!(validate_language_provider_abi(&module).is_ok());
+    }
+
+    #[test]
+    fn language_provider_abi_probe_rejects_incompatible_version() {
+        let module = WasmModule::from_wat(runtime(), r#"(module (func (export "talos_language_abi_version") (result i32) i32.const 99))"#).expect("compile");
+        assert!(validate_language_provider_abi(&module).is_err());
+    }
+
 
     #[tokio::test]
     async fn checked_in_package_loads_with_typed_capabilities_and_executes_offline() {
