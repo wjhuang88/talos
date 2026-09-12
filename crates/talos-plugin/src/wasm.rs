@@ -115,6 +115,105 @@ impl talos_text::HighlightProvider for LoadedLanguageProvider {
     }
 }
 
+#[cfg(all(feature = "wasm", feature = "code-intelligence"))]
+impl talos_text::SymbolProvider for LoadedLanguageProvider {
+    fn find_symbol(
+        &mut self,
+        language: &str,
+        source: &str,
+        _root: &std::path::Path,
+        path: &std::path::Path,
+        name: &str,
+    ) -> Option<talos_text::symbol_queries::SymbolResult> {
+        let request = SymbolRequest {
+            abi_version: talos_text::wasm_provider::WASM_LANGUAGE_SYMBOL_ABI_VERSION,
+            language: language.to_owned(),
+            source: source.to_owned(),
+            operation: talos_text::wasm_provider::SymbolOperation::FindSymbol {
+                name: name.to_owned(),
+            },
+        };
+        self.provider
+            .execute_symbol(&self.module, &request)
+            .ok()
+            .and_then(|r| talos_text::decode_symbol_value(r).ok())
+    }
+    fn find_references(
+        &mut self,
+        language: &str,
+        source: &str,
+        path: &std::path::Path,
+        name: &str,
+    ) -> Result<Vec<talos_text::SourceLocation>, String> {
+        let request = SymbolRequest {
+            abi_version: talos_text::wasm_provider::WASM_LANGUAGE_SYMBOL_ABI_VERSION,
+            language: language.to_owned(),
+            source: source.to_owned(),
+            operation: talos_text::wasm_provider::SymbolOperation::FindReferences {
+                name: name.to_owned(),
+            },
+        };
+        self.provider
+            .execute_symbol(&self.module, &request)
+            .map_err(|e| e.to_string())
+            .and_then(|r| talos_text::decode_symbol_value(r).map_err(str::to_owned))
+            .map(|mut v: Vec<_>| {
+                let _ = path;
+                v.iter_mut().for_each(|l| {
+                    if l.file.is_empty() {
+                        l.file = path.to_string_lossy().into_owned();
+                    }
+                });
+                v
+            })
+    }
+    fn list_symbols(
+        &mut self,
+        language: &str,
+        source: &str,
+        _file: &str,
+        kind: Option<&str>,
+    ) -> Result<Vec<talos_text::SymbolInfo>, String> {
+        let request = SymbolRequest {
+            abi_version: talos_text::wasm_provider::WASM_LANGUAGE_SYMBOL_ABI_VERSION,
+            language: language.to_owned(),
+            source: source.to_owned(),
+            operation: talos_text::wasm_provider::SymbolOperation::ListSymbols {
+                kind: kind.map(str::to_owned),
+            },
+        };
+        self.provider
+            .execute_symbol(&self.module, &request)
+            .map_err(|e| e.to_string())
+            .and_then(|r| talos_text::decode_symbol_value(r).map_err(str::to_owned))
+    }
+    fn list_imports(
+        &mut self,
+        language: &str,
+        source: &str,
+        path: &std::path::Path,
+    ) -> Result<Vec<talos_text::symbol_queries::ImportInfo>, String> {
+        let request = SymbolRequest {
+            abi_version: talos_text::wasm_provider::WASM_LANGUAGE_SYMBOL_ABI_VERSION,
+            language: language.to_owned(),
+            source: source.to_owned(),
+            operation: talos_text::wasm_provider::SymbolOperation::ListImports,
+        };
+        self.provider
+            .execute_symbol(&self.module, &request)
+            .map_err(|e| e.to_string())
+            .and_then(|r| talos_text::decode_symbol_value(r).map_err(str::to_owned))
+            .map(|mut v: Vec<_>| {
+                v.iter_mut().for_each(|i| {
+                    if i.file.is_empty() {
+                        i.file = path.to_string_lossy().into_owned();
+                    }
+                });
+                v
+            })
+    }
+}
+
 /// Load a declared language provider from an explicitly selected package.
 pub fn load_declared_language_provider(
     runtime: Arc<WasmRuntime>,

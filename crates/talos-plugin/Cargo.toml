@@ -10,6 +10,7 @@ rust-version.workspace = true
 
 [features]
 wasm = ["dep:wasmtime"]
+code-intelligence = ["talos-text/code-intelligence"]
 
 [dependencies]
 talos-core = { version = "0.9.0", path = "../talos-core" }
