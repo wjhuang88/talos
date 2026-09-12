@@ -10,6 +10,22 @@ pub const WASM_LANGUAGE_RUN_EXPORT: &str = "talos_language_run";
 /// ABI contract version for the memory transport described by [`WASM_LANGUAGE_RUN_EXPORT`].
 pub const WASM_LANGUAGE_MEMORY_ABI_VERSION: u32 = 1;
 
+/// Validate a guest memory range without allowing integer overflow.
+pub fn validate_memory_range(
+    offset: u32,
+    length: u32,
+    memory_len: usize,
+) -> Result<std::ops::Range<usize>, &'static str> {
+    let start = offset as usize;
+    let end = start
+        .checked_add(length as usize)
+        .ok_or("provider memory range overflow")?;
+    if end > memory_len {
+        return Err("provider memory range out of bounds");
+    }
+    Ok(start..end)
+}
+
 use std::time::Duration;
 
 /// Resource limits applied before a guest provider is admitted.
@@ -206,6 +222,12 @@ mod tests {
         assert_eq!(WASM_LANGUAGE_ABI_VERSION, 1);
         assert_eq!(WASM_LANGUAGE_MEMORY_ABI_VERSION, 1);
         assert_eq!(WASM_LANGUAGE_RUN_EXPORT, "talos_language_run");
+    }
+
+    #[test]
+    fn memory_ranges_are_checked_before_guest_decode() {
+        assert_eq!(validate_memory_range(2, 3, 8).unwrap(), 2..5);
+        assert!(validate_memory_range(7, 2, 8).is_err());
     }
 }
 
