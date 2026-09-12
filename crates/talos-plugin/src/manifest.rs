@@ -593,6 +593,22 @@ artifact = "b.wasm"
     }
 
     #[test]
+    fn reject_bundle_language_provider_path_escape() {
+        let toml = r#"
+schema_version = 1
+[bundle]
+name = "bundle"
+version = "1.0.0"
+carrier = "wasm"
+artifact = "main.wasm"
+[language_provider]
+language = "rust"
+artifact = "../provider.wasm"
+"#;
+        assert!(parse_compatible_manifest(toml).is_err());
+    }
+
+    #[test]
     fn migration_requires_explicit_opt_in_and_preserves_legacy_input() {
         let migrated = migrate_legacy_manifest(
             VALID_MANIFEST,
