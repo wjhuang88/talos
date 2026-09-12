@@ -6,6 +6,7 @@ use std::sync::{Arc, Mutex};
 use talos_core::{CapabilityRegistry, CapabilityRequest, ResolutionResult};
 use talos_plugin::lifecycle::{LifecycleError, PluginLifecycle, PluginState};
 use talos_plugin::wasm::WasmRuntime;
+use talos_text::HighlightProvider;
 
 fn runtime() -> Arc<WasmRuntime> {
     Arc::new(WasmRuntime::new(100_000, 250).expect("runtime"))
@@ -25,6 +26,21 @@ async fn language_provider_fixture_loads_only_during_initialization() {
     assert!(plugin.language_provider().is_none());
     plugin.initialize(runtime()).expect("provider initializes");
     assert!(plugin.language_provider().is_some());
+}
+
+#[tokio::test]
+async fn language_provider_fixture_has_safe_highlight_fallback() {
+    let registry = Arc::new(Mutex::new(CapabilityRegistry::default()));
+    let mut plugin = PluginLifecycle::new(registry);
+    plugin.load(&language_fixture()).expect("manifest loads");
+    plugin.initialize(runtime()).expect("provider initializes");
+    let provider = plugin.language_provider().expect("provider handle");
+    let language = talos_text::LanguageId::parse("rust").expect("language");
+    assert!(provider.supports(&language));
+    assert!(matches!(
+        provider.highlight(&language, "fn main() {}"),
+        talos_text::HighlightResult::PlainText
+    ));
 }
 fn resolve(registry: &Mutex<CapabilityRegistry>) -> ResolutionResult {
     registry
