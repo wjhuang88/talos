@@ -493,6 +493,73 @@ pub struct SymbolInfo {
 mod tests {
     use super::{HighlightResult, HighlightSpan, LanguageId};
 
+    #[cfg(feature = "code-intelligence")]
+    struct TestProvider;
+    #[cfg(feature = "code-intelligence")]
+    impl super::HighlightProvider for TestProvider {
+        fn highlight(&mut self, _: &LanguageId, _: &str) -> HighlightResult {
+            HighlightResult::PlainText
+        }
+        fn supports(&self, _: &LanguageId) -> bool {
+            true
+        }
+    }
+    #[cfg(feature = "code-intelligence")]
+    impl super::SymbolProvider for TestProvider {
+        fn find_symbol(
+            &mut self,
+            _: &str,
+            _: &str,
+            _: &std::path::Path,
+            _: &std::path::Path,
+            _: &str,
+        ) -> Option<super::symbol_queries::SymbolResult> {
+            None
+        }
+        fn find_references(
+            &mut self,
+            _: &str,
+            _: &str,
+            _: &std::path::Path,
+            _: &str,
+        ) -> Result<Vec<super::SourceLocation>, String> {
+            Ok(Vec::new())
+        }
+        fn list_symbols(
+            &mut self,
+            _: &str,
+            _: &str,
+            _: &str,
+            _: Option<&str>,
+        ) -> Result<Vec<super::SymbolInfo>, String> {
+            Ok(Vec::new())
+        }
+        fn list_imports(
+            &mut self,
+            _: &str,
+            _: &str,
+            _: &std::path::Path,
+        ) -> Result<Vec<super::symbol_queries::ImportInfo>, String> {
+            Ok(Vec::new())
+        }
+    }
+
+    #[cfg(feature = "code-intelligence")]
+    #[test]
+    fn shared_provider_context_routes_both_consumer_families() {
+        let context = super::SharedLanguageProvider::new(Box::new(TestProvider));
+        let language = LanguageId::parse("rust").expect("language");
+        assert!(matches!(
+            context.highlight(&language, "fn main() {}"),
+            HighlightResult::PlainText
+        ));
+        assert!(
+            context
+                .with_symbols(|p| p.find_references("rust", "", std::path::Path::new("x"), "main"))
+                .is_some()
+        );
+    }
+
     #[test]
     fn aliases_normalize_to_one_identifier() {
         assert_eq!(
