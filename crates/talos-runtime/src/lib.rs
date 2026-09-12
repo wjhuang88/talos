@@ -48,6 +48,13 @@ pub struct LanguageProviderHost {
 }
 
 #[cfg(feature = "language-provider")]
+impl Clone for LanguageProviderHost {
+    fn clone(&self) -> Self {
+        Self { context: self.context.clone() }
+    }
+}
+
+#[cfg(feature = "language-provider")]
 impl LanguageProviderHost {
     /// Construct a host from one loaded provider instance.
     pub fn new(provider: Box<dyn talos_text::LanguageProviderBundle>) -> Self {
@@ -59,6 +66,19 @@ impl LanguageProviderHost {
     /// Access the shared provider context.
     pub fn context(&self) -> &talos_text::SharedLanguageProvider {
         &self.context
+    }
+
+    /// Clone the shared context for injection into a TUI or tool consumer.
+    pub fn shared_context(&self) -> talos_text::SharedLanguageProvider {
+        self.context.clone()
+    }
+
+    /// Execute a symbol operation against the same provider instance used for highlighting.
+    pub fn with_symbols<R>(
+        &self,
+        operation: impl FnOnce(&mut dyn talos_text::SymbolProvider) -> R,
+    ) -> Option<R> {
+        self.context.with_symbols(operation)
     }
 }
 
