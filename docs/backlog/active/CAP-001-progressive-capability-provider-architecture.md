@@ -73,7 +73,7 @@ This Epic is an architecture and decomposition owner. It does not authorize impl
 | LANG-001 / Issue #510 | Shared Language Provider contract and existing consumer migration. | Refinement / Unclaimed; blocked on TEXT-001, not on CAP-001-C |
 | LANG-002 / Issue #516 | Rust WASM Language Provider vertical slice. | Refinement / Unclaimed; owner created, blocked on LANG-001/CAP-001-C/DIST-001-A |
 | LANG-003 / Issue #517 | Remaining Language Provider migration and default distribution. | Refinement / Unclaimed; owner created, blocked on LANG-002/BUNDLE-001/DIST-001-A |
-| DIST-001-A / Issue #509 | Verified manual Bundle installation. | I260 Review / Claimed; local convergence before implementation PR; dependencies BUNDLE-001/CAP-001-C complete |
+| DIST-001-A / Issue #509 | Verified manual Bundle installation. | I260 Complete / Closed; implementation #541 merge `7e4a0dba`; dependencies BUNDLE-001/CAP-001-C complete |
 | DIST-001-B / Issue #515 | Consented on-demand capability resolution. | Refinement / Unclaimed; owner created, blocked on DIST-001-A/CAP-001-B/C/BUNDLE-001 |
 | BROWSER-001 / Issue #508 | Read-only Browser Provider connector. | Refinement / Unclaimed; owner created, blocked on CAP-001-B/C and WEB-005 |
 

@@ -1,6 +1,6 @@
 # Iteration I260: Verified Manual Bundle Installation
 
-> Document status: Review / Claimed
+> Document status: Complete / Closed
 > Parent: CAP-001 / #466; DIST-001-A / #509
 > Objective: deliver an offline, user-selected Bundle installation path with deterministic integrity, compatibility, destination, and rollback behavior.
 
@@ -17,11 +17,17 @@
 | Governance Claim PR | #540 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Claim PR #540 merged to main at bc46d8cc; implementation active under this claim. |
-| Implementation PR | Not started (local convergence) |
+| Implementation PR | #541 (merge `7e4a0dba`) |
+| Completion Commit | `fbd5adb1d67dbda94ecfc57696df20b074ffbf5b` |
 | Last Updated | 2026-09-11 |
 | Handoff / Release Condition | Stable local candidate required before implementation PR; independent security/API review. |
 
 ## Scope
+
+### Closeout Checkpoint — 2026-09-12
+
+Implementation PR #541 merged at `7e4a0dba` after exact-head CI `34616149051` (5/5) and
+independent security/API approval bound to `fbd5adb1`. Local and remote validation passed.
 
 ### Activation Checkpoint — 2026-09-11
 

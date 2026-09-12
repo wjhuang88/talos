@@ -5,7 +5,7 @@
 | Story ID | DIST-001-A |
 | Type | Distribution implementation |
 | Parent | CAP-001 / #466; DIST-001 |
-| Status | Review / Claimed |
+| Status | Complete / Closed |
 | Selected Iteration | I260 |
 | Source Issue | [GitHub Issue #509](https://github.com/wjhuang88/talos/issues/509) |
 | Depends On | BUNDLE-001; CAP-001-C |
@@ -21,7 +21,8 @@
 | Claimed At | 2026-09-11 |
 | Authorization Evidence | PR #540 merged to main at `bc46d8cc`; implementation active under this claim. |
 | Governance Claim PR | #540 |
-| Implementation PR | Not started (local convergence) |
+| Implementation PR | #541 (merge `7e4a0dba`) |
+| Completion Commit | `fbd5adb1d67dbda94ecfc57696df20b074ffbf5b` |
 | Authorization Mode | Independent review |
 | Last Updated | 2026-09-11 |
 | Handoff / Release Condition | Stable local candidate, implementation PR, and independent security review required. |
