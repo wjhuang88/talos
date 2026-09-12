@@ -18,6 +18,12 @@ pub struct WasmProviderLimits {
     pub max_source_bytes: usize,
 }
 
+impl Default for WasmProviderLimits {
+    fn default() -> Self {
+        Self { fuel: 1_000_000, timeout: Duration::from_millis(500), max_source_bytes: 1_000_000 }
+    }
+}
+
 /// Validates a provider source request before it crosses the WASM boundary.
 pub fn validate_source(source: &str, limits: WasmProviderLimits) -> Result<(), &'static str> {
     if source.len() > limits.max_source_bytes {
