@@ -711,6 +711,21 @@ mod tests {
     }
 
     #[test]
+    fn declared_language_provider_loader_confines_artifact_path() {
+        let declaration = crate::manifest::LanguageProviderDeclaration {
+            language: "rust".into(),
+            artifact: "../escape.wasm".into(),
+        };
+        let result = load_declared_language_provider(
+            runtime(),
+            Path::new("/tmp/provider-package"),
+            &declaration,
+            WasmProviderLimits::default(),
+        );
+        assert!(matches!(result, Err(WasmError::PathEscape(_))));
+    }
+
+    #[test]
     fn language_provider_abi_probe_rejects_incompatible_version() {
         let module = WasmModule::from_wat(
             runtime(),
