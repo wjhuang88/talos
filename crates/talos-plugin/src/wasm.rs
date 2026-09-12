@@ -250,6 +250,20 @@ impl WasmLanguageProvider {
         request_bytes: &[u8],
         source_len: usize,
     ) -> Result<talos_text::HighlightResult, WasmError> {
+        let response = self.execute_payload(module, request_bytes)?;
+        Ok(decode_highlight(
+            &response,
+            self.limits.max_source_bytes,
+            source_len,
+        ))
+    }
+
+    /// Execute a bounded guest request and return its validated response bytes.
+    pub fn execute_payload(
+        &self,
+        module: &WasmModule,
+        request_bytes: &[u8],
+    ) -> Result<Vec<u8>, WasmError> {
         if module.module.imports().next().is_some() {
             return Err(WasmError::Instantiate(
                 "language providers cannot import host functions".into(),
@@ -313,11 +327,12 @@ impl WasmLanguageProvider {
             validate_memory_range(response_offset, response_len, memory.data_size(&store))
                 .map_err(|error| WasmError::Instantiate(error.into()))?;
         let response = memory.data(&store)[response_range].to_vec();
-        Ok(decode_highlight(
-            &response,
-            self.limits.max_source_bytes,
-            source_len,
-        ))
+        if response.len() > self.limits.max_source_bytes {
+            return Err(WasmError::Instantiate(
+                "provider response exceeds limit".into(),
+            ));
+        }
+        Ok(response)
     }
 }
 
