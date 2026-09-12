@@ -239,7 +239,15 @@ pub fn validate_language_provider_abi(module: &WasmModule) -> Result<(), WasmErr
     if function.params().len() != 0 || !matches!(function.results().collect::<Vec<_>>().as_slice(), [wasmtime::ValType::I32]) {
         return Err(WasmError::MissingExport);
     }
-    validate_abi_version(WASM_LANGUAGE_ABI_VERSION).map_err(|error| WasmError::Instantiate(error.into()))
+    let mut store = wasmtime::Store::new(&module.runtime.engine, ());
+    let instance = wasmtime::Instance::new(&mut store, &module.module, &[])
+        .map_err(|e| WasmError::Instantiate(e.to_string()))?;
+    let version = instance
+        .get_typed_func::<(), i32>(&mut store, WASM_LANGUAGE_ABI_EXPORT)
+        .map_err(|_| WasmError::MissingExport)?
+        .call(&mut store, ())
+        .map_err(|e| WasmError::Instantiate(e.to_string()))?;
+    validate_abi_version(version as u32).map_err(|error| WasmError::Instantiate(error.into()))
 }
 
 #[async_trait]
