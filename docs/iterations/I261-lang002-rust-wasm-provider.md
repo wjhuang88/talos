@@ -1,6 +1,6 @@
 # Iteration I261: Rust WASM Language Provider Vertical Slice
 
-> Document status: Planned / Unclaimed
+> Document status: Planned / Claimed (pending governance merge)
 > Parent: CAP-001 / #466; LANG-002 / #516
 > Objective: prove one manually installed Rust WASM Language Provider serves highlighting and symbol consumers through the shared contract.
 
@@ -8,15 +8,17 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex unattended single-developer mode |
 | Work Slice | One Rust WASM LanguageProvider vertical slice through verified Bundle installation, bounded loading, registration, and shared consumers. |
 | Source Issue | #516 |
-| Governance Claim PR | Not applicable |
+| Governance Claim PR | Pending |
 | Implementation PR | Not started |
-| Authorization Evidence | No effective claim; implementation unauthorized. |
+| Authorization Evidence | Proposed claim is ineffective until merged to main; implementation remains unauthorized. |
 | Last Updated | 2026-09-12 |
+
+Claim preparation is governance-only; implementation starts only after the claim reaches main.
 
 ## Scope and Acceptance
 
