@@ -21,9 +21,9 @@ pub use event::{
 pub use handler::{HookContext, HookHandler, HookResult};
 pub use install::{InstallError, install_bundle};
 pub use manifest::{
-    BundleManifest, BundleMetadata, CompatibleManifest, ManifestError, MigrationOptions,
-    PluginHook, PluginManifest, PluginMetadata, PluginSkill, PluginTool, migrate_legacy_manifest,
-    parse_compatible_manifest,
+    BundleManifest, BundleMetadata, CompatibleManifest, LanguageProviderDeclaration, ManifestError,
+    MigrationOptions, PluginHook, PluginManifest, PluginMetadata, PluginSkill, PluginTool,
+    migrate_legacy_manifest, parse_compatible_manifest,
 };
 pub use registry::{HookOutcome, HookRegistration, HookRegistry};
 #[cfg(feature = "wasm")]

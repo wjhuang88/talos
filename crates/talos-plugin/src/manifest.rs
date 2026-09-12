@@ -28,6 +28,19 @@ pub struct PluginManifest {
     pub tools: Vec<PluginTool>,
     #[serde(default)]
     pub hooks: Vec<PluginHook>,
+    /// Optional language-provider declaration; loading remains explicit and bounded.
+    #[serde(default)]
+    pub language_provider: Option<LanguageProviderDeclaration>,
+}
+
+/// Manifest declaration for a language provider sharing the plugin artifact boundary.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LanguageProviderDeclaration {
+    /// Stable language identifier, for example `rust`.
+    pub language: String,
+    /// Exported provider module path relative to the package root.
+    pub artifact: String,
 }
 
 /// Versioned Bundle manifest accepted alongside the legacy Plugin shape.

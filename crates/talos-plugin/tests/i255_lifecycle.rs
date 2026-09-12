@@ -224,6 +224,7 @@ async fn legacy_non_semver_and_names_preserved_without_public_struct_changes() {
         tools: vec![],
         hooks: vec![],
         skills: vec![],
+        language_provider: None,
     };
     assert!(legacy.validate().is_ok());
 }
