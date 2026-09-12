@@ -50,6 +50,19 @@ impl SharedLanguageProvider {
     }
 }
 
+#[cfg(feature = "code-intelligence")]
+impl HighlightProvider for SharedLanguageProvider {
+    fn highlight(&mut self, language: &LanguageId, source: &str) -> HighlightResult {
+        self.highlight(language, source)
+    }
+    fn supports(&self, language: &LanguageId) -> bool {
+        self.inner
+            .lock()
+            .map(|p| p.supports(language))
+            .unwrap_or(false)
+    }
+}
+
 /// Source-only symbol capability that can be supplied by built-in or WASM providers.
 #[cfg(feature = "code-intelligence")]
 pub trait SymbolProvider {
