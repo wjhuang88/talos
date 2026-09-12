@@ -19,6 +19,7 @@ use talos_core::tool::{
 };
 use thiserror::Error;
 
+use crate::manifest::LanguageProviderDeclaration;
 use crate::manifest::parse_manifest;
 use crate::{PluginManifest, PluginTool};
 use talos_text::wasm_provider::{
@@ -78,6 +79,18 @@ pub struct WasmRuntime {
 /// UI-neutral adapter for bounded language-provider wire payloads.
 pub struct WasmLanguageProvider {
     limits: WasmProviderLimits,
+}
+
+/// Load a declared language provider from an explicitly selected package.
+pub fn load_declared_language_provider(
+    runtime: Arc<WasmRuntime>,
+    package_root: &Path,
+    declaration: &LanguageProviderDeclaration,
+    limits: WasmProviderLimits,
+) -> Result<(String, WasmLanguageProvider, WasmModule), WasmError> {
+    let (provider, module) =
+        WasmLanguageProvider::load_from_path(runtime, package_root, &declaration.artifact, limits)?;
+    Ok((declaration.language.clone(), provider, module))
 }
 
 impl WasmLanguageProvider {
