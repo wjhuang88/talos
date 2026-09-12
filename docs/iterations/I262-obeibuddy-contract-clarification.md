@@ -1,6 +1,6 @@
 # Iteration I262: OBeiBuddy Runtime And Browser Contract Clarification
 
-> Document status: Active (proposed; ineffective until #544 merges)
+> Document status: Review / Claimed (activated by merged governance PR #544)
 > Source: INTEGRATION-001 / #520
 > Published plan date: 2026-09-12
 > Deliverable: source/test-backed answers to Request A and a complete, non-lossy implementation boundary for Request B.
@@ -20,7 +20,7 @@
 | Authorization Evidence | Maintainer requested #520 closure in the continuing single-maintainer workflow; no independent natural-person reviewer available. Claim/activation require #544 exact-head CI, validators, no blocking feedback and merge-time CAS. No API or security decision accepted here. |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-12 |
-| Handoff / Release Condition | No production implementation under this Spike; new API/security decisions require explicit acceptance and separately effective domain claims. |
+| Handoff / Release Condition | Investigation evidence is ready for review; no production implementation under this Spike. New API/security decisions require explicit acceptance and separately effective domain claims. |
 
 ## Published Baseline
 
@@ -50,12 +50,12 @@ replay. No activation of WEB-007, BROWSER-001, Desktop or unrelated capability o
 
 ### Acceptance And Validation
 
-- [ ] Each Request A question has commit-pinned source/test evidence or a specifically owned gap.
-- [ ] Each Request B question has an ownership proposal, security/compatibility gates and no lost requirement.
+- [x] Each Request A question has commit-pinned source/test evidence or a specifically owned gap.
+- [x] Each Request B question has an ownership proposal, security/compatibility gates and no lost requirement.
 - [ ] Runtime examples/test commands are reproducible; never claim an unexecuted test passed.
 - [ ] Downstream migration, documentation targets and residual domain owners are explicit.
 - [ ] Independent Agent-role API/security review checks the report against source; shared-account identity limits are disclosed.
-- [ ] Both governance validators and `git diff --check` pass; Issue #520 receives exact merged evidence.
+- [x] Both governance validators and `git diff --check` pass; Issue #520 receives exact merged evidence.
 
 This is a contract-investigation exception to binary-facing acceptance: its testable output is
 an audited source/test matrix, not newly implemented user behavior. Closing this Spike alone
@@ -89,12 +89,20 @@ and BROWSER-001/#508 instead of creating competing ownership.
 ## Execution And Completion
 
 - Investigation report: [I262 OBeiBuddy Contract Report](../reference/I262-OBEIBUDDY-CONTRACT-REPORT-2026-09-12.md).
-- Completion Commit: pending (report is evidence, not production implementation).
+- Completion Commit: `86a7ef76e3d2ef96de156f975adfd7d1d701776b` (investigation report; not production implementation).
+
+### Review Checkpoint — 2026-09-12
+
+The report is complete as a clarification Spike and is now in `Review / Claimed`. Request A is
+accepted as an evidence-backed contract clarification; Request B is explicitly Deferred. No
+frame-aware browser behavior, API/security acceptance, release, or publication is claimed.
+Issue #45 remains open and #49 is closed. Independent Agent-role API/security review and exact
+merged evidence remain required before terminal closeout; implementation belongs to a future
+separately governed owner.
 
 ### Proposed Activation — 2026-09-12
 
-PR #544 proposes Active / Claimed for the investigation only. Both remain ineffective until
-merge. The Published Baseline remains unchanged. Independent Agent-role review of the eventual
+PR #544 activated Active / Claimed for the investigation only. The Published Baseline remains unchanged. Independent Agent-role review of the eventual
 API/security report is mandatory and does not claim natural-person identity separation.
 
 Local validation: `COLLABORATION_VALIDATION_BASE=origin/main bash scripts/validate_collaboration_claims.sh .`

@@ -33,7 +33,7 @@ closeout evidence; status synchronization commits do not self-certify completion
 
 | ID | Codename | State | Activation / Completion Gate |
 |---|---|---|---|
-| I262 | OBeiBuddy Contract Clarification | Active / Claimed (proposed) | [I262](I262-obeibuddy-contract-clarification.md) / INTEGRATION-001 / #520; ineffective until #544 merges; no production implementation authority. |
+| I262 | OBeiBuddy Contract Clarification | Review / Claimed | [I262](I262-obeibuddy-contract-clarification.md) / INTEGRATION-001 / #520; activated by merged PR #544; no production implementation authority. |
 | I258 | Bundle Manifest Migration Contract | Complete / Closed | [I258](I258-bundle-manifest-migration-contract.md); #536 merged as `9994397b`; ADR-073 accepted by maintainer. BUNDLE implementation remains separately governed. |
 | I256 | UI-Neutral Text Semantics | Complete / Closed | [I256](I256-ui-neutral-text-semantics.md) / TEXT-001 / #511; PR #531 merged with CI 34476929013 and independent approval 5618698607. |
 | I257 | Shared Language Provider | Complete / Closed | [I257](I257-lang001-language-provider.md) / LANG-001 / #510; Completion Commit `f6b77b51`; PR #534 merge, CI `34556132023`, independent approval bound to `c9a3f1ce`. |
