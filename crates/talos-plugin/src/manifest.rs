@@ -55,6 +55,9 @@ pub struct BundleManifest {
     pub tools: Vec<PluginTool>,
     #[serde(default)]
     pub hooks: Vec<PluginHook>,
+    /// Optional language provider declared by this bundle; installation never activates it.
+    #[serde(default)]
+    pub language_provider: Option<LanguageProviderDeclaration>,
 }
 
 /// Stable identity and artifact metadata for a Bundle.
@@ -149,6 +152,7 @@ pub fn migrate_legacy_manifest(
         skills: legacy.skills,
         tools: legacy.tools,
         hooks: legacy.hooks,
+        language_provider: legacy.language_provider,
     };
     bundle.validate()?;
     toml::to_string_pretty(&bundle)
