@@ -612,6 +612,47 @@ mod tests {
         assert!(validate_language_provider_abi(&module).is_err());
     }
 
+    #[test]
+    fn language_provider_requires_memory_and_run_export() {
+        let module = WasmModule::from_wat(
+            runtime(),
+            r#"(module
+                (func (export "talos_language_run") (param i32 i32) (result i64)
+                    i64.const 0))"#,
+        )
+        .expect("compile");
+        let provider = WasmLanguageProvider::new(WasmProviderLimits::default());
+        let request = ProviderRequest {
+            language: "rust".into(),
+            source: "fn main() {}".into(),
+        };
+        let error = provider
+            .execute_highlight(&module, &request)
+            .expect_err("missing guest memory must fail closed");
+        assert!(error.to_string().contains("must export memory"));
+    }
+
+    #[test]
+    fn language_provider_rejects_wrong_run_signature() {
+        let module = WasmModule::from_wat(
+            runtime(),
+            r#"(module
+                (memory (export "memory") 1)
+                (func (export "talos_language_run") (param i32) (result i64)
+                    i64.const 0))"#,
+        )
+        .expect("compile");
+        let provider = WasmLanguageProvider::new(WasmProviderLimits::default());
+        let request = ProviderRequest {
+            language: "rust".into(),
+            source: "x".into(),
+        };
+        assert!(matches!(
+            provider.execute_highlight(&module, &request),
+            Err(WasmError::MissingLanguageProviderExport)
+        ));
+    }
+
     #[tokio::test]
     async fn checked_in_package_loads_with_typed_capabilities_and_executes_offline() {
         let package =
