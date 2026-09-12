@@ -241,6 +241,7 @@ pub fn validate_language_provider_abi(module: &WasmModule) -> Result<(), WasmErr
     }
     let mut store = wasmtime::Store::new(&module.runtime.engine, ());
     store.set_fuel(module.runtime.fuel).map_err(|e| WasmError::Instantiate(e.to_string()))?;
+    store.set_epoch_deadline(u64::MAX);
     let instance = wasmtime::Instance::new(&mut store, &module.module, &[])
         .map_err(|e| WasmError::Instantiate(e.to_string()))?;
     let version = instance
