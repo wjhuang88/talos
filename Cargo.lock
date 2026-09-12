@@ -6135,6 +6135,7 @@ dependencies = [
  "arborium",
  "serde",
  "serde_json",
+ "wasmtime",
 ]
 
 [[package]]

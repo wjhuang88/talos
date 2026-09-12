@@ -3,6 +3,9 @@
 /// Shared streaming Markdown semantics without renderer or parser dependencies.
 pub mod stream;
 
+#[cfg(feature = "wasm-provider")]
+pub mod wasm_provider;
+
 /// Renderer-neutral language operations shared by text consumers.
 #[cfg(feature = "code-intelligence")]
 pub trait LanguageProvider {
