@@ -196,30 +196,74 @@ pub struct ListImportsTool {
 
 impl FindSymbolTool {
     pub fn new(workspace_root: PathBuf) -> Self {
-        Self { workspace_root, provider: None }
+        Self {
+            workspace_root,
+            provider: None,
+        }
     }
-    pub fn with_provider(workspace_root: PathBuf, provider: talos_text::SharedLanguageProvider) -> Self { Self { workspace_root, provider: Some(provider) } }
+    pub fn with_provider(
+        workspace_root: PathBuf,
+        provider: talos_text::SharedLanguageProvider,
+    ) -> Self {
+        Self {
+            workspace_root,
+            provider: Some(provider),
+        }
+    }
 }
 
 impl FindReferencesTool {
     pub fn new(workspace_root: PathBuf) -> Self {
-        Self { workspace_root, provider: None }
+        Self {
+            workspace_root,
+            provider: None,
+        }
     }
-    pub fn with_provider(workspace_root: PathBuf, provider: talos_text::SharedLanguageProvider) -> Self { Self { workspace_root, provider: Some(provider) } }
+    pub fn with_provider(
+        workspace_root: PathBuf,
+        provider: talos_text::SharedLanguageProvider,
+    ) -> Self {
+        Self {
+            workspace_root,
+            provider: Some(provider),
+        }
+    }
 }
 
 impl ListSymbolsTool {
     pub fn new(workspace_root: PathBuf) -> Self {
-        Self { workspace_root, provider: None }
+        Self {
+            workspace_root,
+            provider: None,
+        }
     }
-    pub fn with_provider(workspace_root: PathBuf, provider: talos_text::SharedLanguageProvider) -> Self { Self { workspace_root, provider: Some(provider) } }
+    pub fn with_provider(
+        workspace_root: PathBuf,
+        provider: talos_text::SharedLanguageProvider,
+    ) -> Self {
+        Self {
+            workspace_root,
+            provider: Some(provider),
+        }
+    }
 }
 
 impl ListImportsTool {
     pub fn new(workspace_root: PathBuf) -> Self {
-        Self { workspace_root, provider: None }
+        Self {
+            workspace_root,
+            provider: None,
+        }
     }
-    pub fn with_provider(workspace_root: PathBuf, provider: talos_text::SharedLanguageProvider) -> Self { Self { workspace_root, provider: Some(provider) } }
+    pub fn with_provider(
+        workspace_root: PathBuf,
+        provider: talos_text::SharedLanguageProvider,
+    ) -> Self {
+        Self {
+            workspace_root,
+            provider: Some(provider),
+        }
+    }
 }
 
 macro_rules! impl_read_only_tool {
@@ -326,7 +370,8 @@ async fn execute_list_symbols(tool: &ListSymbolsTool, input: Value) -> ToolResul
     };
 
     let path = tool.workspace_root.join(&params.path);
-    match list_symbols_in_path_with_provider(&path, params.kind.as_deref(), tool.provider.as_ref()) {
+    match list_symbols_in_path_with_provider(&path, params.kind.as_deref(), tool.provider.as_ref())
+    {
         Ok(symbols) => {
             ToolResult::success(serde_json::to_string_pretty(&symbols).unwrap_or_default())
         }
@@ -354,10 +399,14 @@ fn scan_workspace(root: &Path, name: &str) -> Result<Vec<TraversalOutput<SymbolR
     scan_workspace_with_provider(root, name, None)
 }
 
-fn scan_workspace_with_provider(root: &Path, name: &str, shared: Option<&talos_text::SharedLanguageProvider>) -> Result<Vec<TraversalOutput<SymbolResult>>, String> {
+fn scan_workspace_with_provider(
+    root: &Path,
+    name: &str,
+    shared: Option<&talos_text::SharedLanguageProvider>,
+) -> Result<Vec<TraversalOutput<SymbolResult>>, String> {
     let mut results = Vec::new();
     let mut state = TraversalState::new();
-        scan_dir_with_provider(root, root, name, &mut results, &mut state, 0, shared)?;
+    scan_dir_with_provider(root, root, name, &mut results, &mut state, 0, shared)?;
     if let Some(notice) = state.notice() {
         results.push(TraversalOutput::Notice(notice));
     }
@@ -377,8 +426,13 @@ fn scan_dir(
 }
 
 fn scan_dir_with_provider(
-    root: &Path, dir: &Path, name: &str, results: &mut Vec<TraversalOutput<SymbolResult>>,
-    state: &mut TraversalState, depth: usize, shared: Option<&talos_text::SharedLanguageProvider>,
+    root: &Path,
+    dir: &Path,
+    name: &str,
+    results: &mut Vec<TraversalOutput<SymbolResult>>,
+    state: &mut TraversalState,
+    depth: usize,
+    shared: Option<&talos_text::SharedLanguageProvider>,
 ) -> Result<(), String> {
     for entry in fs::read_dir(dir).map_err(|e| e.to_string())? {
         if state.exhausted {
@@ -403,7 +457,8 @@ fn scan_dir_with_provider(
             }
             scan_dir_with_provider(root, &path, name, results, state, depth + 1, shared)?;
         } else if file_type.is_file()
-            && let Some(result) = find_symbol_in_file_with_provider(&path, root, name, state, shared)
+            && let Some(result) =
+                find_symbol_in_file_with_provider(&path, root, name, state, shared)
         {
             results.push(TraversalOutput::Result(result));
         }
@@ -416,24 +471,21 @@ fn should_skip_dir(path: &Path) -> bool {
     name == "target" || name == "node_modules" || name == ".git" || name.starts_with('.')
 }
 
-#[cfg(test)]
-fn find_symbol_in_file(
+fn find_symbol_in_file_with_provider(
     path: &Path,
     root: &Path,
     name: &str,
     state: &mut TraversalState,
-) -> Option<SymbolResult> {
-    find_symbol_in_file_with_provider(path, root, name, state, None)
-}
-
-fn find_symbol_in_file_with_provider(
-    path: &Path, root: &Path, name: &str, state: &mut TraversalState,
     shared: Option<&talos_text::SharedLanguageProvider>,
 ) -> Option<SymbolResult> {
     let FileAdmission::Admitted { language, code } = admit_file(path, state).ok()? else {
         return None;
     };
-    if let Some(shared) = shared { return shared.with_symbols(|provider| provider.find_symbol(language, &code, root, path, name)).flatten(); }
+    if let Some(shared) = shared {
+        return shared
+            .with_symbols(|provider| provider.find_symbol(language, &code, root, path, name))
+            .flatten();
+    }
     let mut provider = talos_text::BuiltinHighlighter::symbol_only();
     talos_text::SymbolProvider::find_symbol(&mut provider, language, &code, root, path, name)
 }
@@ -482,15 +534,18 @@ pub fn list_imports_with_provider(
     provider.list_imports(language, source, path)
 }
 
-#[cfg(test)]
-fn find_refs_in_file(path: &Path, name: &str) -> Result<Vec<SourceLocation>, String> {
-    find_refs_in_file_with_provider(path, name, None)
-}
-
-fn find_refs_in_file_with_provider(path: &Path, name: &str, shared: Option<&talos_text::SharedLanguageProvider>) -> Result<Vec<SourceLocation>, String> {
+fn find_refs_in_file_with_provider(
+    path: &Path,
+    name: &str,
+    shared: Option<&talos_text::SharedLanguageProvider>,
+) -> Result<Vec<SourceLocation>, String> {
     let lang = detect_language(path).ok_or_else(|| "unsupported file type".to_string())?;
     let code = fs::read_to_string(path).map_err(|e| e.to_string())?;
-    if let Some(shared) = shared { return shared.with_symbols(|provider| provider.find_references(lang, &code, path, name)).unwrap_or_else(|| Err("provider unavailable".into())); }
+    if let Some(shared) = shared {
+        return shared
+            .with_symbols(|provider| provider.find_references(lang, &code, path, name))
+            .unwrap_or_else(|| Err("provider unavailable".into()));
+    }
     let mut provider = talos_text::BuiltinHighlighter::symbol_only();
     talos_text::SymbolProvider::find_references(&mut provider, lang, &code, path, name)
 }
@@ -503,11 +558,23 @@ fn list_symbols_in_path(
     list_symbols_in_path_with_provider(path, kind_filter, None)
 }
 
-fn list_symbols_in_path_with_provider(path: &Path, kind_filter: Option<&str>, shared: Option<&talos_text::SharedLanguageProvider>) -> Result<Vec<TraversalOutput<SymbolInfo>>, String> {
+fn list_symbols_in_path_with_provider(
+    path: &Path,
+    kind_filter: Option<&str>,
+    shared: Option<&talos_text::SharedLanguageProvider>,
+) -> Result<Vec<TraversalOutput<SymbolInfo>>, String> {
     let mut results = Vec::new();
     if path.is_dir() {
         let mut state = TraversalState::new();
-        list_dir_symbols_with_provider(path, path, kind_filter, &mut results, &mut state, 0, shared)?;
+        list_dir_symbols_with_provider(
+            path,
+            path,
+            kind_filter,
+            &mut results,
+            &mut state,
+            0,
+            shared,
+        )?;
         if let Some(notice) = state.notice() {
             results.push(TraversalOutput::Notice(notice));
         }
@@ -531,7 +598,15 @@ fn list_dir_symbols(
     list_dir_symbols_with_provider(root, dir, kind_filter, results, state, depth, None)
 }
 
-fn list_dir_symbols_with_provider(root: &Path, dir: &Path, kind_filter: Option<&str>, results: &mut Vec<TraversalOutput<SymbolInfo>>, state: &mut TraversalState, depth: usize, shared: Option<&talos_text::SharedLanguageProvider>) -> Result<(), String> {
+fn list_dir_symbols_with_provider(
+    root: &Path,
+    dir: &Path,
+    kind_filter: Option<&str>,
+    results: &mut Vec<TraversalOutput<SymbolInfo>>,
+    state: &mut TraversalState,
+    depth: usize,
+    shared: Option<&talos_text::SharedLanguageProvider>,
+) -> Result<(), String> {
     for entry in fs::read_dir(dir).map_err(|e| e.to_string())? {
         if state.exhausted {
             break;
@@ -553,46 +628,61 @@ fn list_dir_symbols_with_provider(root: &Path, dir: &Path, kind_filter: Option<&
                 state.depth_limit_hits += 1;
                 continue;
             }
-            list_dir_symbols_with_provider(root, &path, kind_filter, results, state, depth + 1, shared)?;
+            list_dir_symbols_with_provider(
+                root,
+                &path,
+                kind_filter,
+                results,
+                state,
+                depth + 1,
+                shared,
+            )?;
         } else if file_type.is_file() {
-            list_file_symbols_bounded_with_provider(root, &path, kind_filter, results, state, shared)?;
+            list_file_symbols_bounded_with_provider(
+                root,
+                &path,
+                kind_filter,
+                results,
+                state,
+                shared,
+            )?;
         }
     }
     Ok(())
 }
 
-#[cfg(test)]
-fn list_file_symbols_bounded(
+fn list_file_symbols_bounded_with_provider(
     root: &Path,
     path: &Path,
     kind_filter: Option<&str>,
     results: &mut Vec<TraversalOutput<SymbolInfo>>,
     state: &mut TraversalState,
+    shared: Option<&talos_text::SharedLanguageProvider>,
 ) -> Result<(), String> {
-    list_file_symbols_bounded_with_provider(root, path, kind_filter, results, state, None)
-}
-
-fn list_file_symbols_bounded_with_provider(root: &Path, path: &Path, kind_filter: Option<&str>, results: &mut Vec<TraversalOutput<SymbolInfo>>, state: &mut TraversalState, shared: Option<&talos_text::SharedLanguageProvider>) -> Result<(), String> {
     let FileAdmission::Admitted { language, code } = admit_file(path, state)? else {
         return Ok(());
     };
     let mut file_results = Vec::new();
-    collect_file_symbols_with_provider(root, path, kind_filter, language, &code, &mut file_results, shared)?;
+    collect_file_symbols_with_provider(
+        root,
+        path,
+        kind_filter,
+        language,
+        &code,
+        &mut file_results,
+        shared,
+    )?;
     results.extend(file_results.into_iter().map(TraversalOutput::Result));
     Ok(())
 }
 
-#[cfg(test)]
-fn list_file_symbols(
+fn list_file_symbols_with_provider(
     root: &Path,
     path: &Path,
     kind_filter: Option<&str>,
     results: &mut Vec<SymbolInfo>,
+    shared: Option<&talos_text::SharedLanguageProvider>,
 ) -> Result<(), String> {
-    list_file_symbols_with_provider(root, path, kind_filter, results, None)
-}
-
-fn list_file_symbols_with_provider(root: &Path, path: &Path, kind_filter: Option<&str>, results: &mut Vec<SymbolInfo>, shared: Option<&talos_text::SharedLanguageProvider>) -> Result<(), String> {
     let language = match detect_language(path) {
         Some(l) => l,
         None => return Ok(()),
@@ -601,21 +691,24 @@ fn list_file_symbols_with_provider(root: &Path, path: &Path, kind_filter: Option
     collect_file_symbols_with_provider(root, path, kind_filter, language, &code, results, shared)
 }
 
-#[cfg(test)]
-fn collect_file_symbols(
+fn collect_file_symbols_with_provider(
     root: &Path,
     path: &Path,
     kind_filter: Option<&str>,
     language: &str,
     code: &str,
     results: &mut Vec<SymbolInfo>,
+    shared: Option<&talos_text::SharedLanguageProvider>,
 ) -> Result<(), String> {
-    collect_file_symbols_with_provider(root, path, kind_filter, language, code, results, None)
-}
-
-fn collect_file_symbols_with_provider(root: &Path, path: &Path, kind_filter: Option<&str>, language: &str, code: &str, results: &mut Vec<SymbolInfo>, shared: Option<&talos_text::SharedLanguageProvider>) -> Result<(), String> {
     let file = path.strip_prefix(root).unwrap_or(path).to_string_lossy();
-    if let Some(shared) = shared { results.extend(shared.with_symbols(|provider| provider.list_symbols(language, code, &file, kind_filter)).unwrap_or_else(|| Err("provider unavailable".into()))?); return Ok(()); }
+    if let Some(shared) = shared {
+        results.extend(
+            shared
+                .with_symbols(|provider| provider.list_symbols(language, code, &file, kind_filter))
+                .unwrap_or_else(|| Err("provider unavailable".into()))?,
+        );
+        return Ok(());
+    }
     let mut provider = talos_text::BuiltinHighlighter::symbol_only();
     results.extend(talos_text::SymbolProvider::list_symbols(
         &mut provider,
@@ -627,15 +720,17 @@ fn collect_file_symbols_with_provider(root: &Path, path: &Path, kind_filter: Opt
     Ok(())
 }
 
-#[cfg(test)]
-fn list_imports_in_file(path: &Path) -> Result<Vec<ImportInfo>, String> {
-    list_imports_in_file_with_provider(path, None)
-}
-
-fn list_imports_in_file_with_provider(path: &Path, shared: Option<&talos_text::SharedLanguageProvider>) -> Result<Vec<ImportInfo>, String> {
+fn list_imports_in_file_with_provider(
+    path: &Path,
+    shared: Option<&talos_text::SharedLanguageProvider>,
+) -> Result<Vec<ImportInfo>, String> {
     let lang = detect_language(path).ok_or_else(|| "unsupported file type".to_string())?;
     let code = fs::read_to_string(path).map_err(|e| e.to_string())?;
-    if let Some(shared) = shared { return shared.with_symbols(|provider| provider.list_imports(lang, &code, path)).unwrap_or_else(|| Err("provider unavailable".into())); }
+    if let Some(shared) = shared {
+        return shared
+            .with_symbols(|provider| provider.list_imports(lang, &code, path))
+            .unwrap_or_else(|| Err("provider unavailable".into()));
+    }
     let mut provider = talos_text::BuiltinHighlighter::symbol_only();
     talos_text::SymbolProvider::list_imports(&mut provider, lang, &code, path)
 }
