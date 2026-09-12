@@ -20,6 +20,11 @@
 
 Claim preparation is governance-only; implementation starts only after the claim reaches main.
 
+### Claim Preparation Checkpoint — 2026-09-12
+
+Owner and work slice are recorded locally for governance review. This checkpoint does not
+authorize implementation; the claim becomes effective only when its governance PR merges to main.
+
 ## Scope and Acceptance
 
 - Resolve one `language.rust` WASM Provider through the shared contract for TUI highlighting and symbol queries.
