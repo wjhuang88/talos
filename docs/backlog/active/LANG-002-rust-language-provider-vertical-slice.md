@@ -6,7 +6,7 @@
 | Type | Language Provider implementation |
 | Parent | CAP-001 / #466 |
 | Status | Refinement / Unclaimed |
-| Selected Iteration | None |
+| Selected Iteration | I261 |
 | Source Issue | [GitHub Issue #516](https://github.com/wjhuang88/talos/issues/516) |
 | Depends On | LANG-001; CAP-001-C; DIST-001-A verified manual installation |
 
