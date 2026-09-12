@@ -24,6 +24,13 @@ impl HighlightEngine {
         }
     }
 
+    /// Construct an engine with an explicitly selected highlighting provider.
+    pub(crate) fn with_provider(provider: Box<dyn HighlightProvider>) -> Self {
+        Self {
+            highlighter: provider,
+        }
+    }
+
     /// Highlight code and return per-line segments with crossterm colors.
     ///
     /// Each inner `Vec` represents one line; each element is `(text, color)`
