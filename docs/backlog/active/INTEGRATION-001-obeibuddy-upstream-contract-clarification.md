@@ -4,27 +4,27 @@
 |---|---|
 | Story ID | INTEGRATION-001 |
 | Type | Integration contract clarification Spike |
-| Status | Intake / Unclaimed |
+| Status | In Progress / Claimed (proposed; ineffective until #544 merges) |
 | Source Issue | #520 |
-| Selected Iteration | None |
+| Selected Iteration | I262 (proposed; ineffective until claim merge) |
 | Implementation PR | Not started |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex single-developer mainline |
+| Work Slice | Evidence-backed runtime shutdown/recovery clarification and frame-aware browser ownership/API/security proposal; no production changes. |
+| Claimed At | 2026-09-12 |
 | Source Issue | #520 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #544 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Maintainer requested #520 closure in the continuing single-maintainer workflow; no independent natural-person reviewer available. Claim/activation require #544 exact-head CI, validators, no blocking feedback and merge-time CAS. No API or security decision accepted here. |
 | Implementation PR | Not started |
-| Last Updated | 2026-09-09 |
-| Handoff / Release Condition | Select a bounded contract investigation and establish an effective claim before execution; any resulting implementation belongs to separately governed domain owners. |
+| Last Updated | 2026-09-12 |
+| Handoff / Release Condition | #544 must merge before I262 execution; independent Agent-role API/security report review and separately governed domain implementation remain required. |
 
 ## Scope And Value
 
@@ -83,3 +83,11 @@ migration, selected iteration, effective claim and protected review.
 
 2026-09-09: registered only. Neither request has been accepted as an implementation promise.
 Owner-first backlog and Issue matrix synchronization tracks this separately from I253/#519.
+
+## Selection Preparation — 2026-09-12
+
+The maintainer requested development closure of #520. Proposed investigation iteration:
+[I262](../../iterations/I262-obeibuddy-contract-clarification.md). Establish a source/test-backed
+runtime response and a non-lossy browser implementation proposal before claiming new behavior.
+This does not narrow away Request B or authorize production/API/security changes. A completed
+clarification Spike cannot by itself certify frame-aware browser delivery or close #520.
