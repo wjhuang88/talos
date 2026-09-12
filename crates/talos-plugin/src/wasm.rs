@@ -676,6 +676,34 @@ mod tests {
     }
 
     #[test]
+    fn language_provider_decodes_guest_highlight_spans() {
+        let payload = r#"{"Spans":[[0,2,"keyword"]]}"#;
+        let offset = 64u32;
+        let packed = ((offset as u64) << 32) | payload.len() as u64;
+        let wat_payload = payload.replace('"', r#"\22"#);
+        let module = WasmModule::from_wat(
+            runtime(),
+            &format!(
+                r#"(module (memory (export "memory") 1)
+                    (data (i32.const {offset}) "{wat_payload}")
+                    (func (export "talos_language_run") (param i32 i32) (result i64)
+                        i64.const {packed}))"#,
+            ),
+        )
+        .expect("compile");
+        let provider = WasmLanguageProvider::new(WasmProviderLimits::default());
+        let request = ProviderRequest {
+            language: "rust".into(),
+            source: "fn".into(),
+        };
+        assert!(matches!(
+            provider.execute_highlight(&module, &request),
+            Ok(talos_text::HighlightResult::Spans(ref spans))
+                if spans.len() == 1 && spans[0].start == 0 && spans[0].end == 2
+        ));
+    }
+
+    #[test]
     fn language_provider_executes_with_bounded_memory_transport() {
         let module = WasmModule::from_wat(
             runtime(),
