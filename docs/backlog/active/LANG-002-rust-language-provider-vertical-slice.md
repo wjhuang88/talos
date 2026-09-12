@@ -5,7 +5,7 @@
 | Story ID | LANG-002 |
 | Type | Language Provider implementation |
 | Parent | CAP-001 / #466 |
-| Status | Planned / Claimed (pending governance merge) |
+| Status | Active / Claimed |
 | Selected Iteration | I261 |
 | Source Issue | [GitHub Issue #516](https://github.com/wjhuang88/talos/issues/516) |
 | Depends On | LANG-001; CAP-001-C; DIST-001-A verified manual installation |
@@ -19,12 +19,12 @@
 | Executing Agent | Codex unattended single-developer mode |
 | Work Slice | One Rust WASM LanguageProvider vertical slice through verified Bundle installation, Plugin loading and the shared consumer contract. |
 | Claimed At | 2026-09-12 |
-| Authorization Evidence | Proposed claim is ineffective until its governance PR merges to main; implementation is not authorized. |
+| Authorization Evidence | Claim PR #542 merged to main as `aa91ddc2`; implementation authorized within this Work Slice. |
 | Governance Claim PR | #542 |
 | Implementation PR | Not started |
 | Authorization Mode | Independent review |
 | Last Updated | 2026-09-12 |
-| Handoff / Release Condition | Requires LANG-001 implementation evidence and a separate security/dependency review. |
+| Handoff / Release Condition | Requires a separate security/dependency review before implementation merge. |
 
 ## Required Reads
 

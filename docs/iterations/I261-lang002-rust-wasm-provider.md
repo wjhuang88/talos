@@ -1,6 +1,6 @@
 # Iteration I261: Rust WASM Language Provider Vertical Slice
 
-> Document status: Planned / Claimed (pending governance merge)
+> Document status: Active / Claimed
 > Parent: CAP-001 / #466; LANG-002 / #516
 > Objective: prove one manually installed Rust WASM Language Provider serves highlighting and symbol consumers through the shared contract.
 
