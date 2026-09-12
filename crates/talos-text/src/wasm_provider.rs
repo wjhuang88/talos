@@ -12,6 +12,69 @@ pub const WASM_LANGUAGE_RUN_SIGNATURE: &str = "(i32,i32)->i64";
 /// ABI contract version for the memory transport described by [`WASM_LANGUAGE_RUN_EXPORT`].
 pub const WASM_LANGUAGE_MEMORY_ABI_VERSION: u32 = 1;
 
+/// Versioned symbol operation transport contract.
+pub const WASM_LANGUAGE_SYMBOL_ABI_VERSION: u32 = 1;
+
+/// Source-only symbol operation requested from a provider.
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "operation", rename_all = "snake_case")]
+pub enum SymbolOperation {
+    /// Find definitions and references for a name.
+    FindSymbol { name: String },
+    /// List symbols in the supplied source.
+    ListSymbols { kind: Option<String> },
+    /// List imports in the supplied source.
+    ListImports,
+    /// Find references for a name.
+    FindReferences { name: String },
+}
+
+/// Request envelope for a bounded source-only symbol query.
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct SymbolRequest {
+    /// Contract version.
+    pub abi_version: u32,
+    /// Canonical language identifier.
+    pub language: String,
+    /// Source text; providers must not access the filesystem.
+    pub source: String,
+    /// Requested operation.
+    pub operation: SymbolOperation,
+}
+
+/// Provider-neutral symbol response envelope.
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum SymbolResponse {
+    /// JSON-compatible provider result.
+    Result(serde_json::Value),
+    /// Provider cannot serve this operation.
+    Unavailable(String),
+}
+
+/// Validate a symbol request before crossing the provider boundary.
+pub fn validate_symbol_request(
+    request: &SymbolRequest,
+    limits: WasmProviderLimits,
+) -> Result<(), &'static str> {
+    if request.abi_version != WASM_LANGUAGE_SYMBOL_ABI_VERSION {
+        return Err("unsupported symbol provider ABI version");
+    }
+    if request.language.trim().is_empty() {
+        return Err("language is empty");
+    }
+    if request.source.len() > limits.max_source_bytes {
+        return Err("source exceeds provider limit");
+    }
+    match &request.operation {
+        SymbolOperation::FindSymbol { name } | SymbolOperation::FindReferences { name }
+            if name.trim().is_empty() =>
+        {
+            Err("symbol name is empty")
+        }
+        _ => Ok(()),
+    }
+}
+
 /// Validate a guest memory range without allowing integer overflow.
 pub fn validate_memory_range(
     offset: u32,
@@ -231,6 +294,22 @@ mod tests {
     fn memory_ranges_are_checked_before_guest_decode() {
         assert_eq!(validate_memory_range(2, 3, 8).unwrap(), 2..5);
         assert!(validate_memory_range(7, 2, 8).is_err());
+    }
+
+    #[test]
+    fn symbol_request_wire_contract_is_versioned_and_bounded() {
+        let request = SymbolRequest {
+            abi_version: WASM_LANGUAGE_SYMBOL_ABI_VERSION,
+            language: "rust".into(),
+            source: "fn main() {}".into(),
+            operation: SymbolOperation::FindSymbol {
+                name: "main".into(),
+            },
+        };
+        validate_symbol_request(&request, WasmProviderLimits::default()).expect("valid request");
+        let encoded = serde_json::to_vec(&request).expect("encode");
+        let decoded: SymbolRequest = serde_json::from_slice(&encoded).expect("decode");
+        assert_eq!(decoded, request);
     }
 }
 
