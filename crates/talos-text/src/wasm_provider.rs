@@ -75,6 +75,26 @@ pub fn validate_symbol_request(
     }
 }
 
+/// Encode a validated symbol request for guest transport.
+pub fn encode_symbol_request(
+    request: &SymbolRequest,
+    limits: WasmProviderLimits,
+) -> Result<Vec<u8>, &'static str> {
+    validate_symbol_request(request, limits)?;
+    serde_json::to_vec(request).map_err(|_| "symbol request serialization failed")
+}
+
+/// Decode a bounded symbol response from guest transport.
+pub fn decode_symbol_response(
+    bytes: &[u8],
+    max_bytes: usize,
+) -> Result<SymbolResponse, &'static str> {
+    if bytes.len() > max_bytes {
+        return Err("symbol response exceeds limit");
+    }
+    serde_json::from_slice(bytes).map_err(|_| "symbol response decode failed")
+}
+
 /// Validate a guest memory range without allowing integer overflow.
 pub fn validate_memory_range(
     offset: u32,
