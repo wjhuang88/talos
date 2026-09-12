@@ -21,6 +21,9 @@ use thiserror::Error;
 
 use crate::manifest::parse_manifest;
 use crate::{PluginManifest, PluginTool};
+use talos_text::wasm_provider::{
+    ProviderRequest, WasmProviderLimits, decode_highlight, encode_request,
+};
 use talos_text::wasm_provider::{WASM_LANGUAGE_ABI_EXPORT, validate_abi_version};
 
 const MAX_PLUGIN_TOOL_OUTPUT: usize = 2_000;
@@ -67,6 +70,30 @@ pub struct WasmRuntime {
     engine: Arc<wasmtime::Engine>,
     fuel: u64,
     timeout: Duration,
+}
+
+/// UI-neutral adapter for bounded language-provider wire payloads.
+pub struct WasmLanguageProvider {
+    limits: WasmProviderLimits,
+}
+
+impl WasmLanguageProvider {
+    /// Construct with explicit provider limits.
+    pub fn new(limits: WasmProviderLimits) -> Self {
+        Self { limits }
+    }
+    /// Encode a validated request for a guest transport.
+    pub fn encode_request(&self, request: &ProviderRequest) -> Result<Vec<u8>, &'static str> {
+        encode_request(request, self.limits)
+    }
+    /// Decode a guest highlight payload, falling back on malformed output.
+    pub fn decode_highlight(
+        &self,
+        payload: &[u8],
+        source_len: usize,
+    ) -> talos_text::HighlightResult {
+        decode_highlight(payload, self.limits.max_source_bytes, source_len)
+    }
 }
 
 impl WasmRuntime {

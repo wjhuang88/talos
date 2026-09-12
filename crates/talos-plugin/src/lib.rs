@@ -26,3 +26,5 @@ pub use manifest::{
     parse_compatible_manifest,
 };
 pub use registry::{HookOutcome, HookRegistration, HookRegistry};
+#[cfg(feature = "wasm")]
+pub use wasm::WasmLanguageProvider;
