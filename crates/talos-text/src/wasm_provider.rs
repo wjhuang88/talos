@@ -27,7 +27,7 @@ pub fn validate_source(source: &str, limits: WasmProviderLimits) -> Result<(), &
 }
 
 /// UI-neutral request sent to a language provider.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ProviderRequest {
     /// Canonical language identifier.
     pub language: String,
@@ -41,7 +41,7 @@ pub fn validate_abi_version(version: u32) -> Result<(), &'static str> {
 }
 
 /// Safe result returned when a provider is unavailable or fails.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum ProviderResponse {
     /// Provider produced semantic spans.
     Spans(Vec<(usize, usize, String)>),
@@ -104,6 +104,15 @@ mod tests {
     fn malformed_guest_spans_are_rejected() {
         assert!(validate_spans(&[(0, 2, "x".into()), (1, 3, "y".into())], 3).is_err());
         assert!(validate_spans(&[(0, 2, "x".into()), (2, 3, "y".into())], 3).is_ok());
+    }
+
+    #[test]
+    fn request_response_wire_format_is_stable() {
+        let request = ProviderRequest { language: "rust".into(), source: "fn main() {}".into() };
+        let value = serde_json::to_value(&request).expect("serialize");
+        assert_eq!(value["language"], "rust");
+        let decoded: ProviderRequest = serde_json::from_value(value).expect("decode");
+        assert_eq!(decoded, request);
     }
 }
 
