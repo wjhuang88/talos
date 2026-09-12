@@ -25,6 +25,15 @@ pub struct SharedLanguageProvider {
 }
 
 #[cfg(feature = "code-intelligence")]
+impl Clone for SharedLanguageProvider {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+        }
+    }
+}
+
+#[cfg(feature = "code-intelligence")]
 impl SharedLanguageProvider {
     /// Create a context from one provider instance.
     pub fn new(provider: Box<dyn LanguageProviderBundle>) -> Self {
