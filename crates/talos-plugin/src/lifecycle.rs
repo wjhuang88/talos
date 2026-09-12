@@ -258,6 +258,20 @@ impl PluginLifecycle {
         self.language_provider.as_mut()
     }
 
+    /// Transfer the active provider into a shared consumer context.
+    #[cfg(feature = "code-intelligence")]
+    pub fn take_language_provider_context(
+        &mut self,
+    ) -> Result<Option<talos_text::SharedLanguageProvider>, LifecycleError> {
+        if self.state() != PluginState::Active {
+            return Err(LifecycleError::State(self.state()));
+        }
+        Ok(self
+            .language_provider
+            .take()
+            .map(LoadedLanguageProvider::into_shared_context))
+    }
+
     /// Publish the validated provider exclusively. Collision leaves no partial entry.
     pub fn activate(&mut self) -> Result<(), LifecycleError> {
         let mut gate = self
