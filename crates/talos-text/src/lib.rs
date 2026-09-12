@@ -11,8 +11,46 @@ pub trait HighlightProvider {
     fn supports(&self, language: &LanguageId) -> bool;
 }
 
+/// Source-only symbol capability that can be supplied by built-in or WASM providers.
+#[cfg(feature = "code-intelligence")]
+pub trait SymbolProvider {
+    /// Find a definition and references.
+    fn find_symbol(
+        &mut self,
+        language: &str,
+        source: &str,
+        root: &std::path::Path,
+        path: &std::path::Path,
+        name: &str,
+    ) -> Option<symbol_queries::SymbolResult>;
+    /// Find all references.
+    fn find_references(
+        &mut self,
+        language: &str,
+        source: &str,
+        path: &std::path::Path,
+        name: &str,
+    ) -> Result<Vec<SourceLocation>, String>;
+    /// List symbols.
+    fn list_symbols(
+        &mut self,
+        language: &str,
+        source: &str,
+        file: &str,
+        kind: Option<&str>,
+    ) -> Result<Vec<SymbolInfo>, String>;
+    /// List imports.
+    fn list_imports(
+        &mut self,
+        language: &str,
+        source: &str,
+        path: &std::path::Path,
+    ) -> Result<Vec<symbol_queries::ImportInfo>, String>;
+}
+
 #[cfg(feature = "wasm-provider")]
 pub mod wasm_provider;
+#[cfg(feature = "wasm-provider")]
 pub use wasm_provider::decode_symbol_value;
 
 /// Renderer-neutral language operations shared by text consumers.
@@ -180,6 +218,46 @@ impl HighlightProvider for BuiltinHighlighter {
 
     fn supports(&self, language: &LanguageId) -> bool {
         Self::supports(self, language)
+    }
+}
+
+#[cfg(feature = "code-intelligence")]
+impl SymbolProvider for BuiltinHighlighter {
+    fn find_symbol(
+        &mut self,
+        l: &str,
+        s: &str,
+        r: &std::path::Path,
+        p: &std::path::Path,
+        n: &str,
+    ) -> Option<symbol_queries::SymbolResult> {
+        <Self as LanguageProvider>::find_symbol(self, l, s, r, p, n)
+    }
+    fn find_references(
+        &mut self,
+        l: &str,
+        s: &str,
+        p: &std::path::Path,
+        n: &str,
+    ) -> Result<Vec<SourceLocation>, String> {
+        <Self as LanguageProvider>::find_references(self, l, s, p, n)
+    }
+    fn list_symbols(
+        &mut self,
+        l: &str,
+        s: &str,
+        f: &str,
+        k: Option<&str>,
+    ) -> Result<Vec<SymbolInfo>, String> {
+        <Self as LanguageProvider>::list_symbols(self, l, s, f, k)
+    }
+    fn list_imports(
+        &mut self,
+        l: &str,
+        s: &str,
+        p: &std::path::Path,
+    ) -> Result<Vec<symbol_queries::ImportInfo>, String> {
+        <Self as LanguageProvider>::list_imports(self, l, s, p)
     }
 }
 
