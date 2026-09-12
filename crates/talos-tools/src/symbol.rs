@@ -417,10 +417,7 @@ pub fn find_symbol_with_provider(
     path: &Path,
     name: &str,
 ) -> Result<Option<SymbolResult>, String> {
-    provider
-        .find_symbol(language, source, root, path, name)
-        .map(Ok)
-        .unwrap_or_else(|| Ok(None))
+    Ok(provider.find_symbol(language, source, root, path, name))
 }
 
 /// Run reference lookup through an explicitly supplied provider.
