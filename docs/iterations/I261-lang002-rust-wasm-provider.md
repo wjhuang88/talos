@@ -1,6 +1,6 @@
 # Iteration I261: Rust WASM Language Provider Vertical Slice
 
-> Document status: Active / Claimed
+> Document status: Review / Claimed
 > Parent: CAP-001 / #466; LANG-002 / #516
 > Objective: prove one manually installed Rust WASM Language Provider serves highlighting and symbol consumers through the shared contract.
 
@@ -15,13 +15,13 @@
 | Source Issue | #516 |
 | Claimed At | 2026-09-12 |
 | Governance Claim PR | #542 |
-| Implementation PR | Not started |
+| Implementation PR | #543 |
 | Authorization Evidence | Claim PR #542 merged to main as `aa91ddc2`; implementation is authorized within this Work Slice. |
 | Authorization Mode | Independent review |
 | Last Updated | 2026-09-12 |
 | Handoff / Release Condition | Claim #542 must merge before implementation; independent security/dependency review required. |
 
-Claim preparation is governance-only; implementation starts only after the claim reaches main.
+Implementation candidate #543 is the first stable stage candidate after the claim merge; completion remains pending until merge and closeout.
 
 ### Non-terminal iteration inventory — 2026-09-12
 
@@ -57,4 +57,11 @@ LANG-001/I257, CAP-001-C/I255, BUNDLE-001/I259, and DIST-001-A/I260 are Complete
 
 ## Governance Gate
 
-Before implementation, retain the effective Collaboration Claim and obtain an independent security/dependency review. I261 is Active / Claimed after PR #542 merged to `main` as `aa91ddc2`.
+Before implementation, retain the effective Collaboration Claim and obtain an independent security/dependency review. I261 is Review / Claimed after PR #542 merged to `main` as `aa91ddc2`.
+
+### Execution Checkpoint — 2026-09-12
+
+- Stable implementation candidate: PR #543, current head `d5fe9020`.
+- Local evidence: workspace check, CLI/tools/runtime/plugin focused tests, collaboration validator, and diff check passed.
+- Project governance validator: SQLite consumer check remains blocked by local Cargo registry write permissions for `android_system_properties`; no pass is claimed.
+- Completion Commit: Pending; implementation has not merged to `main`.
