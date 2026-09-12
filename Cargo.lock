@@ -6016,6 +6016,7 @@ dependencies = [
  "sha2 0.10.9",
  "talos-core",
  "talos-permission",
+ "talos-text",
  "thiserror 2.0.20",
  "tokio",
  "toml",
