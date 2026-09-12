@@ -401,6 +401,17 @@ impl BundleManifest {
             ));
         }
         validate_components(&self.tools, &self.skills, &self.hooks)?;
+        if let Some(provider) = &self.language_provider {
+            if provider.language.trim().is_empty()
+                || provider.artifact.trim().is_empty()
+                || !safe_relative_path(&provider.artifact)
+            {
+                return Err(ManifestError::Validation(
+                    "bundle language_provider must use a non-empty safe relative artifact path"
+                        .into(),
+                ));
+            }
+        }
         if self
             .tools
             .iter()
