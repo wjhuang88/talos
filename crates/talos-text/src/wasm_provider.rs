@@ -61,6 +61,14 @@ pub fn validate_spans(spans: &[(usize, usize, String)], source_len: usize) -> Re
     Ok(())
 }
 
+/// Convert validated guest spans to the shared highlighting result.
+pub fn spans_to_highlight(spans: Vec<(usize, usize, String)>, source_len: usize) -> super::HighlightResult {
+    if validate_spans(&spans, source_len).is_err() {
+        return super::HighlightResult::PlainText;
+    }
+    super::HighlightResult::Spans(spans.into_iter().map(|(start, end, capture)| super::HighlightSpan { start, end, capture }).collect())
+}
+
 /// Convert a bounded provider response into the existing renderer-neutral result.
 pub fn fallback_response(request: &ProviderRequest, limits: WasmProviderLimits) -> ProviderResponse {
     match validate_request(request, limits) {
