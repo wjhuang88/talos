@@ -81,6 +81,14 @@ pub fn decode_response(bytes: &[u8], max_bytes: usize) -> Result<ProviderRespons
     serde_json::from_slice(bytes).map_err(|_| "provider response decode failed")
 }
 
+/// Decode and validate a guest response for a source buffer.
+pub fn decode_highlight(bytes: &[u8], max_bytes: usize, source_len: usize) -> super::HighlightResult {
+    match decode_response(bytes, max_bytes) {
+        Ok(ProviderResponse::Spans(spans)) => spans_to_highlight(spans, source_len),
+        _ => super::HighlightResult::PlainText,
+    }
+}
+
 /// Convert a bounded provider response into the existing renderer-neutral result.
 pub fn fallback_response(request: &ProviderRequest, limits: WasmProviderLimits) -> ProviderResponse {
     match validate_request(request, limits) {
