@@ -1064,6 +1064,19 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn typed_symbol_response_decodes_source_location() {
+        let provider = WasmLanguageProvider::new(WasmProviderLimits::default());
+        let payload = serde_json::to_vec(&SymbolResponse::Result(serde_json::json!([
+            {"file":"src/lib.rs","line":3,"column":1}
+        ])))
+        .expect("encode");
+        let locations: Vec<talos_text::SourceLocation> = provider
+            .decode_symbol_response_as(&payload)
+            .expect("typed response");
+        assert_eq!(locations[0].file, "src/lib.rs");
+    }
+
     #[tokio::test]
     async fn checked_in_package_loads_with_typed_capabilities_and_executes_offline() {
         let package =
