@@ -11,6 +11,7 @@ rust-version.workspace = true
 [features]
 default = []
 shared-composition = ["dep:talos-tools"]
+language-provider = ["dep:talos-text", "talos-text/code-intelligence"]
 
 [dependencies]
 async-trait = "0.1.92"
@@ -22,6 +23,7 @@ talos-plugin = { version = "0.9.0", path = "../talos-plugin" }
 talos-sandbox = { version = "0.9.0", path = "../talos-sandbox" }
 talos-session = { version = "0.9.0", path = "../talos-session" }
 talos-skill = { version = "0.9.0", path = "../talos-skill" }
+talos-text = { version = "0.9.0", path = "../talos-text", optional = true }
 talos-tools = { version = "0.9.0", path = "../talos-tools", optional = true, features = ["coding"] }
 
 thiserror = "2.0.20"

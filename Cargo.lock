@@ -6079,6 +6079,7 @@ dependencies = [
  "talos-sandbox",
  "talos-session",
  "talos-skill",
+ "talos-text",
  "talos-tools",
  "tempfile",
  "thiserror 2.0.20",
