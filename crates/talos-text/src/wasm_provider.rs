@@ -48,7 +48,7 @@ pub enum ProviderResponse {
     /// Plain source fallback; consumers remain usable.
     PlainText,
     /// Provider was rejected before execution.
-    Unavailable(&'static str),
+    Unavailable(String),
 }
 
 /// Reject malformed or overlapping guest spans before exposing them to consumers.
@@ -69,11 +69,23 @@ pub fn spans_to_highlight(spans: Vec<(usize, usize, String)>, source_len: usize)
     super::HighlightResult::Spans(spans.into_iter().map(|(start, end, capture)| super::HighlightSpan { start, end, capture }).collect())
 }
 
+/// Encode a request for the versioned guest boundary.
+pub fn encode_request(request: &ProviderRequest, limits: WasmProviderLimits) -> Result<Vec<u8>, &'static str> {
+    validate_request(request, limits)?;
+    serde_json::to_vec(request).map_err(|_| "provider request serialization failed")
+}
+
+/// Decode a bounded provider response payload.
+pub fn decode_response(bytes: &[u8], max_bytes: usize) -> Result<ProviderResponse, &'static str> {
+    if bytes.len() > max_bytes { return Err("provider response exceeds limit"); }
+    serde_json::from_slice(bytes).map_err(|_| "provider response decode failed")
+}
+
 /// Convert a bounded provider response into the existing renderer-neutral result.
 pub fn fallback_response(request: &ProviderRequest, limits: WasmProviderLimits) -> ProviderResponse {
     match validate_request(request, limits) {
         Ok(()) => ProviderResponse::PlainText,
-        Err(reason) => ProviderResponse::Unavailable(reason),
+        Err(reason) => ProviderResponse::Unavailable(reason.to_owned()),
     }
 }
 
@@ -97,7 +109,7 @@ mod tests {
     #[test]
     fn invalid_request_degrades_without_execution() {
         let request = ProviderRequest { language: String::new(), source: "x".into() };
-        assert_eq!(fallback_response(&request, WasmProviderLimits::default()), ProviderResponse::Unavailable("language is empty"));
+        assert_eq!(fallback_response(&request, WasmProviderLimits::default()), ProviderResponse::Unavailable("language is empty".into()));
     }
 
     #[test]
@@ -113,6 +125,13 @@ mod tests {
         assert_eq!(value["language"], "rust");
         let decoded: ProviderRequest = serde_json::from_value(value).expect("decode");
         assert_eq!(decoded, request);
+    }
+
+    #[test]
+    fn wire_helpers_enforce_bounds() {
+        let request = ProviderRequest { language: "rust".into(), source: "fn main() {}".into() };
+        let bytes = encode_request(&request, WasmProviderLimits::default()).expect("encode");
+        assert_eq!(decode_response(&bytes, 1), Err("provider response exceeds limit"));
     }
 }
 
