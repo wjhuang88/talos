@@ -13,6 +13,19 @@ fn runtime() -> Arc<WasmRuntime> {
 fn fixture() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/capability-demo")
 }
+fn language_fixture() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/language-provider")
+}
+
+#[tokio::test]
+async fn language_provider_fixture_loads_only_during_initialization() {
+    let registry = Arc::new(Mutex::new(CapabilityRegistry::default()));
+    let mut plugin = PluginLifecycle::new(registry);
+    plugin.load(&language_fixture()).expect("manifest loads");
+    assert!(plugin.language_provider().is_none());
+    plugin.initialize(runtime()).expect("provider initializes");
+    assert!(plugin.language_provider().is_some());
+}
 fn resolve(registry: &Mutex<CapabilityRegistry>) -> ResolutionResult {
     registry
         .lock()
