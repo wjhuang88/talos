@@ -25,6 +25,7 @@ impl HighlightEngine {
     }
 
     /// Construct an engine with an explicitly selected highlighting provider.
+    #[allow(dead_code)]
     pub(crate) fn with_provider(provider: Box<dyn HighlightProvider>) -> Self {
         Self {
             highlighter: provider,
