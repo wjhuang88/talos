@@ -130,6 +130,21 @@ mod tests {
     }
 
     #[test]
+    fn bundle_install_preserves_language_provider_declaration_without_activation() {
+        let root =
+            std::env::temp_dir().join(format!("talos-provider-install-{}", std::process::id()));
+        let source = root.join("source");
+        let destination = root.join("installed");
+        fs::create_dir_all(&source).unwrap();
+        fs::write(source.join("provider.wasm"), b"wasm").unwrap();
+        fs::write(source.join("manifest.toml"), "schema_version=1\n[bundle]\nname=\"b\"\nversion=\"1.0.0\"\ncarrier=\"wasm\"\nartifact=\"provider.wasm\"\n[language_provider]\nlanguage=\"rust\"\nartifact=\"provider.wasm\"").unwrap();
+        let installed = install_bundle(&source, &destination).unwrap();
+        assert_eq!(installed.language_provider.unwrap().language, "rust");
+        assert!(destination.join("manifest.toml").is_file());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
     fn valid_bundle_installs_and_repeats_deterministically() {
         let root = std::env::temp_dir().join(format!("talos-i260-ok-{}", std::process::id()));
         let source = root.join("source");
