@@ -6,7 +6,7 @@
 | Type | Integration contract clarification Spike |
 | Status | Intake / Unclaimed |
 | Source Issue | #520 |
-| Selected Iteration | None |
+| Selected Iteration | I262 (proposed; ineffective until claim merge) |
 | Implementation PR | Not started |
 
 ## Collaboration Claim
@@ -19,7 +19,7 @@
 | Work Slice | Not assigned |
 | Claimed At | Not applicable |
 | Source Issue | #520 |
-| Governance Claim PR | Not applicable |
+| Governance Claim PR | Pending |
 | Authorization Mode | Not applicable |
 | Authorization Evidence | Not applicable |
 | Implementation PR | Not started |
@@ -83,3 +83,11 @@ migration, selected iteration, effective claim and protected review.
 
 2026-09-09: registered only. Neither request has been accepted as an implementation promise.
 Owner-first backlog and Issue matrix synchronization tracks this separately from I253/#519.
+
+## Selection Preparation — 2026-09-12
+
+The maintainer requested development closure of #520. Proposed investigation iteration:
+[I262](../../iterations/I262-obeibuddy-contract-clarification.md). Establish a source/test-backed
+runtime response and a non-lossy browser implementation proposal before claiming new behavior.
+This does not narrow away Request B or authorize production/API/security changes. A completed
+clarification Spike cannot by itself certify frame-aware browser delivery or close #520.
