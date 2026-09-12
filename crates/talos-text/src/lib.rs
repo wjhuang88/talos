@@ -3,6 +3,14 @@
 /// Shared streaming Markdown semantics without renderer or parser dependencies.
 pub mod stream;
 
+/// Minimal renderer-neutral highlighting capability for optional providers.
+pub trait HighlightProvider {
+    /// Highlight source, returning plain text when unavailable.
+    fn highlight(&mut self, language: &LanguageId, source: &str) -> HighlightResult;
+    /// Whether this provider can serve the language.
+    fn supports(&self, language: &LanguageId) -> bool;
+}
+
 #[cfg(feature = "wasm-provider")]
 pub mod wasm_provider;
 
@@ -160,6 +168,17 @@ impl BuiltinHighlighter {
     pub fn supports(&self, language: &LanguageId) -> bool {
         std::panic::catch_unwind(|| arborium::get_language(language.as_str()).is_some())
             .unwrap_or(false)
+    }
+}
+
+#[cfg(feature = "code-intelligence")]
+impl HighlightProvider for BuiltinHighlighter {
+    fn highlight(&mut self, language: &LanguageId, source: &str) -> HighlightResult {
+        Self::highlight(self, language, source)
+    }
+
+    fn supports(&self, language: &LanguageId) -> bool {
+        Self::supports(self, language)
     }
 }
 
