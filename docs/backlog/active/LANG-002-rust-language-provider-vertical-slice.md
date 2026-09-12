@@ -18,11 +18,11 @@
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex unattended single-developer mode |
 | Work Slice | One Rust WASM LanguageProvider vertical slice through verified Bundle installation, Plugin loading and the shared consumer contract. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-09-12 |
 | Authorization Evidence | Proposed claim is ineffective until its governance PR merges to main; implementation is not authorized. |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #542 |
 | Implementation PR | Not started |
-| Authorization Mode | Not applicable |
+| Authorization Mode | Independent review |
 | Last Updated | 2026-09-12 |
 | Handoff / Release Condition | Requires LANG-001 implementation evidence and a separate security/dependency review. |
 

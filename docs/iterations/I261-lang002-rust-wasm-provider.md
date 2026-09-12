@@ -13,10 +13,13 @@
 | Executing Agent | Codex unattended single-developer mode |
 | Work Slice | One Rust WASM LanguageProvider vertical slice through verified Bundle installation, bounded loading, registration, and shared consumers. |
 | Source Issue | #516 |
-| Governance Claim PR | Pending |
+| Claimed At | 2026-09-12 |
+| Governance Claim PR | #542 |
 | Implementation PR | Not started |
 | Authorization Evidence | Proposed claim is ineffective until merged to main; implementation remains unauthorized. |
+| Authorization Mode | Independent review |
 | Last Updated | 2026-09-12 |
+| Handoff / Release Condition | Claim #542 must merge before implementation; independent security/dependency review required. |
 
 Claim preparation is governance-only; implementation starts only after the claim reaches main.
 
