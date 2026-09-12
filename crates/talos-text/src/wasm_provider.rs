@@ -4,6 +4,11 @@
 pub const WASM_LANGUAGE_ABI_VERSION: u32 = 1;
 /// Required guest export for provider probing (must not be called during discovery).
 pub const WASM_LANGUAGE_ABI_EXPORT: &str = "talos_language_abi_version";
+/// Required guest export for a provider invocation. It receives a pointer/length pair
+/// in guest memory and returns a pointer/length pair for a JSON response.
+pub const WASM_LANGUAGE_RUN_EXPORT: &str = "talos_language_run";
+/// ABI contract version for the memory transport described by [`WASM_LANGUAGE_RUN_EXPORT`].
+pub const WASM_LANGUAGE_MEMORY_ABI_VERSION: u32 = 1;
 
 use std::time::Duration;
 
@@ -194,6 +199,13 @@ mod tests {
             decode_response(&bytes, 1),
             Err("provider response exceeds limit")
         );
+    }
+
+    #[test]
+    fn guest_abi_exports_are_versioned_and_stable() {
+        assert_eq!(WASM_LANGUAGE_ABI_VERSION, 1);
+        assert_eq!(WASM_LANGUAGE_MEMORY_ABI_VERSION, 1);
+        assert_eq!(WASM_LANGUAGE_RUN_EXPORT, "talos_language_run");
     }
 }
 
