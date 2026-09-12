@@ -212,7 +212,14 @@ pub fn parse_compatible_manifest(toml_str: &str) -> Result<CompatibleManifest, M
         ));
     }
     if has_bundle {
-        let allowed = ["schema_version", "bundle", "skills", "tools", "hooks"];
+        let allowed = [
+            "schema_version",
+            "bundle",
+            "skills",
+            "tools",
+            "hooks",
+            "language_provider",
+        ];
         if let Some(unknown) = value
             .as_table()
             .and_then(|table| table.keys().find(|key| !allowed.contains(&key.as_str())))
@@ -536,15 +543,23 @@ version = "1.0.0"
 carrier = "wasm"
 artifact = "artifacts/main.wasm"
 digest = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+
+[language_provider]
+language = "rust"
+artifact = "artifacts/rust.wasm"
 "#;
         let parsed = parse_compatible_manifest(toml).expect("bundle manifest");
         assert!(matches!(
-            parsed,
+            &parsed,
             CompatibleManifest::Bundle(BundleManifest {
                 schema_version: 1,
                 ..
             })
         ));
+        let CompatibleManifest::Bundle(bundle) = parsed else {
+            unreachable!()
+        };
+        assert_eq!(bundle.language_provider.expect("provider").language, "rust");
     }
 
     #[test]
