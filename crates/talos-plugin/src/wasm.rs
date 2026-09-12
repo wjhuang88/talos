@@ -653,6 +653,28 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn language_provider_executes_with_bounded_memory_transport() {
+        let module = WasmModule::from_wat(
+            runtime(),
+            r#"(module
+                (memory (export "memory") 1)
+                (func (export "talos_language_run") (param i32 i32) (result i64)
+                    ;; A zero-length response is intentionally decoded as safe plain text.
+                    i64.const 0))"#,
+        )
+        .expect("compile");
+        let provider = WasmLanguageProvider::new(WasmProviderLimits::default());
+        let request = ProviderRequest {
+            language: "rust".into(),
+            source: "fn main() {}".into(),
+        };
+        assert!(matches!(
+            provider.execute_highlight(&module, &request),
+            Ok(talos_text::HighlightResult::PlainText)
+        ));
+    }
+
     #[tokio::test]
     async fn checked_in_package_loads_with_typed_capabilities_and_executes_offline() {
         let package =
