@@ -61,6 +61,7 @@ pub(crate) struct PreparedTuiRuntime {
     runtime_config: Config,
     runtime_skills: RuntimeSkills,
     loaded_plugin_packages: Vec<LoadedPluginPackage>,
+    language_provider_context: Option<crate::registry::LoadedLanguageContext>,
     session: Session,
     workspace_root: PathBuf,
 }
@@ -86,6 +87,7 @@ impl PreparedTuiRuntime {
             mcp_runtime: self.mcp_runtime,
             runtime_skills: self.runtime_skills,
             loaded_plugin_packages: self.loaded_plugin_packages,
+            language_provider_context: self.language_provider_context,
         }
     }
 }
@@ -97,6 +99,7 @@ pub(crate) struct BuiltTuiRuntime {
     pub mcp_runtime: McpSessionRuntime,
     pub runtime_skills: RuntimeSkills,
     pub loaded_plugin_packages: Vec<LoadedPluginPackage>,
+    pub language_provider_context: Option<crate::registry::LoadedLanguageContext>,
 }
 
 impl TuiRuntimeBuilder {
@@ -189,7 +192,7 @@ impl TuiRuntimeBuilder {
             mcp_runtime.tools(),
             self.approval_handler.clone(),
         );
-        let (loaded_plugin_packages, _language_provider_context) = register_explicit_tui_plugins(
+        let (loaded_plugin_packages, language_provider_context) = register_explicit_tui_plugins(
             &mut registry,
             self.plugin_packages.as_slice(),
             self.approval_handler.clone(),
@@ -279,6 +282,7 @@ impl TuiRuntimeBuilder {
             runtime_config,
             runtime_skills,
             loaded_plugin_packages,
+            language_provider_context,
             session: session.clone(),
             workspace_root: self.workspace_root.clone(),
         })
