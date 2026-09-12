@@ -343,6 +343,19 @@ mod tests {
         let decoded: SymbolRequest = serde_json::from_slice(&encoded).expect("decode");
         assert_eq!(decoded, request);
     }
+
+    #[test]
+    fn typed_symbol_value_rejects_unavailable_and_wrong_shape() {
+        let unavailable: Result<serde_json::Value, _> =
+            decode_symbol_value(SymbolResponse::Unavailable("not supported".into()));
+        assert_eq!(unavailable, Err("symbol provider result unavailable"));
+        let malformed: Result<crate::SourceLocation, _> =
+            decode_symbol_value(SymbolResponse::Result(serde_json::json!({"file": 4})));
+        assert_eq!(
+            malformed,
+            Err("symbol provider result has an invalid shape")
+        );
+    }
 }
 
 impl Default for WasmProviderLimits {
