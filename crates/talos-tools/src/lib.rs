@@ -95,7 +95,7 @@ pub use contributions::network_tool_contributions;
 #[cfg(feature = "image")]
 pub use contributions::read_image_tool_contribution;
 #[cfg(feature = "code-intelligence")]
-pub use contributions::symbol_tool_contributions;
+pub use contributions::{symbol_tool_contributions, symbol_tool_contributions_with_provider};
 #[cfg(all(feature = "file-read", feature = "search", feature = "git"))]
 pub use contributions::workspace_non_document_tool_contributions;
 #[cfg(all(
