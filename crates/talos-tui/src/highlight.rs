@@ -184,16 +184,14 @@ mod tests {
     #[test]
     fn injected_provider_drives_rendering_and_plain_fallback() {
         let calls = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
-        let mut engine = HighlightEngine {
-            highlighter: Box::new(RecordingProvider {
-                calls: calls.clone(),
-                result: HighlightResult::Spans(vec![HighlightSpan {
-                    start: 0,
-                    end: 1,
-                    capture: "keyword".into(),
-                }]),
-            }),
-        };
+        let mut engine = HighlightEngine::with_provider(Box::new(RecordingProvider {
+            calls: calls.clone(),
+            result: HighlightResult::Spans(vec![HighlightSpan {
+                start: 0,
+                end: 1,
+                capture: "keyword".into(),
+            }]),
+        }));
         assert_eq!(
             engine.highlight("rust", "x"),
             Some(vec![vec![("x".into(), capture_color("keyword"))]])
