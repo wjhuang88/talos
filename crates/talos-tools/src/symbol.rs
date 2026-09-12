@@ -455,8 +455,8 @@ pub fn list_imports_with_provider(
 fn find_refs_in_file(path: &Path, name: &str) -> Result<Vec<SourceLocation>, String> {
     let lang = detect_language(path).ok_or_else(|| "unsupported file type".to_string())?;
     let code = fs::read_to_string(path).map_err(|e| e.to_string())?;
-    let provider = talos_text::BuiltinHighlighter::symbol_only();
-    talos_text::LanguageProvider::find_references(&provider, lang, &code, path, name)
+    let mut provider = talos_text::BuiltinHighlighter::symbol_only();
+    talos_text::SymbolProvider::find_references(&mut provider, lang, &code, path, name)
 }
 
 fn list_symbols_in_path(
@@ -554,9 +554,9 @@ fn collect_file_symbols(
     results: &mut Vec<SymbolInfo>,
 ) -> Result<(), String> {
     let file = path.strip_prefix(root).unwrap_or(path).to_string_lossy();
-    let provider = talos_text::BuiltinHighlighter::symbol_only();
-    results.extend(talos_text::LanguageProvider::list_symbols(
-        &provider,
+    let mut provider = talos_text::BuiltinHighlighter::symbol_only();
+    results.extend(talos_text::SymbolProvider::list_symbols(
+        &mut provider,
         language,
         code,
         &file,
@@ -568,8 +568,8 @@ fn collect_file_symbols(
 fn list_imports_in_file(path: &Path) -> Result<Vec<ImportInfo>, String> {
     let lang = detect_language(path).ok_or_else(|| "unsupported file type".to_string())?;
     let code = fs::read_to_string(path).map_err(|e| e.to_string())?;
-    let provider = talos_text::BuiltinHighlighter::symbol_only();
-    talos_text::LanguageProvider::list_imports(&provider, lang, &code, path)
+    let mut provider = talos_text::BuiltinHighlighter::symbol_only();
+    talos_text::SymbolProvider::list_imports(&mut provider, lang, &code, path)
 }
 
 #[cfg(test)]
