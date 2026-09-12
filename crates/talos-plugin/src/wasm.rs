@@ -334,6 +334,20 @@ impl WasmLanguageProvider {
         }
         Ok(response)
     }
+
+    /// Execute a bounded symbol request through the shared guest transport.
+    pub fn execute_symbol(
+        &self,
+        module: &WasmModule,
+        request: &SymbolRequest,
+    ) -> Result<SymbolResponse, WasmError> {
+        let bytes = self
+            .encode_symbol_request(request)
+            .map_err(|error| WasmError::Instantiate(error.into()))?;
+        let payload = self.execute_payload(module, &bytes)?;
+        self.decode_symbol_response(&payload)
+            .map_err(|error| WasmError::Instantiate(error.into()))
+    }
 }
 
 fn classify_execution_error(error: wasmtime::Error, timeout: Duration) -> WasmError {
