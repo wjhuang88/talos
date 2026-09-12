@@ -21,6 +21,7 @@ use thiserror::Error;
 
 use crate::manifest::parse_manifest;
 use crate::{PluginManifest, PluginTool};
+use talos_text::wasm_provider::{WASM_LANGUAGE_ABI_EXPORT, WASM_LANGUAGE_ABI_VERSION, validate_abi_version};
 
 const MAX_PLUGIN_TOOL_OUTPUT: usize = 2_000;
 /// Manifest filename for an explicitly selected local plugin package.
@@ -228,6 +229,17 @@ impl WasmPluginTool {
             package_root: package_root.display().to_string(),
         })
     }
+}
+
+/// Validate the versioned language-provider ABI export without invoking guest code.
+pub fn validate_language_provider_abi(module: &WasmModule) -> Result<(), WasmError> {
+    let Some(wasmtime::ExternType::Func(function)) = module.module.get_export(WASM_LANGUAGE_ABI_EXPORT) else {
+        return Err(WasmError::MissingExport);
+    };
+    if function.params().len() != 0 || !matches!(function.results().collect::<Vec<_>>().as_slice(), [wasmtime::ValType::I32]) {
+        return Err(WasmError::MissingExport);
+    }
+    validate_abi_version(WASM_LANGUAGE_ABI_VERSION).map_err(|error| WasmError::Instantiate(error.into()))
 }
 
 #[async_trait]
