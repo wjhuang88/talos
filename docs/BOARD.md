@@ -16,6 +16,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
+| I262 OBeiBuddy Contract Clarification | Active / Claimed (proposed) | [I262](iterations/I262-obeibuddy-contract-clarification.md) / [INTEGRATION-001](backlog/active/INTEGRATION-001-obeibuddy-upstream-contract-clarification.md) / #520 | Ineffective until #544 merges; investigation only, no runtime/browser implementation or security decision acceptance. |
 | I258 Bundle Migration Decision | Complete / Closed | [I258](iterations/I258-bundle-manifest-migration-contract.md) | #536 merged as `9994397b`; ADR-073 accepted by maintainer. BUNDLE implementation requires separate claim and review. |
 | I248 Dependency Governance | Complete / Closed | [DEPENDENCY-001](backlog/active/DEPENDENCY-001-dependency-upgrade-governance.md) / [I248](iterations/I248-dependency-governance-closed-loop.md) | #497 implementation `dbd847ec`; #498 merged as `a7d168ee`, acceptance head `5d2e4443`, CI `34074942674`, independent review `5564114577`. Full dependency upgrade remains I250. |
 | I250 Full Workspace Dependency Upgrade | Complete / Closed | [DEPENDENCY-002](backlog/active/DEPENDENCY-002-full-workspace-dependency-upgrade.md) / [I250](iterations/I250-full-workspace-dependency-upgrade.md) / Issue #474 | #501 merged as `76f0a41b`; accepted baseline records 71 identity rows; residuals continue under DEPENDENCY-003 / #502. |

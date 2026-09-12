@@ -1,6 +1,6 @@
 # Iteration I262: OBeiBuddy Runtime And Browser Contract Clarification
 
-> Document status: Planned
+> Document status: Active (proposed; ineffective until #544 merges)
 > Source: INTEGRATION-001 / #520
 > Published plan date: 2026-09-12
 > Deliverable: source/test-backed answers to Request A and a complete, non-lossy implementation boundary for Request B.
@@ -9,15 +9,15 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex single-developer mainline |
 | Work Slice | Evidence-backed runtime shutdown/recovery clarification and frame-aware browser ownership/API/security proposal; no production changes. |
 | Source Issue | #520 |
-| Claimed At | Not applicable |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Governance preparation only; claim and activation require target-branch merge. |
+| Claimed At | 2026-09-12 |
+| Governance Claim PR | #544 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Maintainer requested #520 closure in the continuing single-maintainer workflow; no independent natural-person reviewer available. Claim/activation require #544 exact-head CI, validators, no blocking feedback and merge-time CAS. No API or security decision accepted here. |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-12 |
 | Handoff / Release Condition | No production implementation under this Spike; new API/security decisions require explicit acceptance and separately effective domain claims. |
@@ -90,3 +90,15 @@ and BROWSER-001/#508 instead of creating competing ownership.
 
 - Governance preparation only; no investigation deliverable or implementation claimed complete.
 - Completion Commit: pending
+
+### Proposed Activation — 2026-09-12
+
+PR #544 proposes Active / Claimed for the investigation only. Both remain ineffective until
+merge. The Published Baseline remains unchanged. Independent Agent-role review of the eventual
+API/security report is mandatory and does not claim natural-person identity separation.
+
+Local validation: `COLLABORATION_VALIDATION_BASE=origin/main bash scripts/validate_collaboration_claims.sh .`
+and `bash scripts/validate_project_governance.sh .` passed with 0 warnings; `git diff --check`
+passed. The first project-validator attempt failed because the sandbox denied Cargo registry
+metadata extraction; the authorized retry passed (17 SQLite fixtures, 12 delivery fixtures).
+No Rust compilation/test result is claimed for this governance-only candidate.
