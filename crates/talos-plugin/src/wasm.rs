@@ -85,6 +85,43 @@ impl WasmLanguageProvider {
     pub fn new(limits: WasmProviderLimits) -> Self {
         Self { limits }
     }
+
+    /// Validate that a module exposes the complete language-provider boundary
+    /// before it is registered or invoked.
+    pub fn validate_module(&self, module: &WasmModule) -> Result<(), WasmError> {
+        validate_language_provider_abi(module)?;
+        if module.module.imports().next().is_some() {
+            return Err(WasmError::Instantiate(
+                "language providers cannot import host functions".into(),
+            ));
+        }
+        if !matches!(
+            module.module.get_export("memory"),
+            Some(wasmtime::ExternType::Memory(_))
+        ) {
+            return Err(WasmError::Instantiate(
+                "language provider must export memory".into(),
+            ));
+        }
+        let Some(wasmtime::ExternType::Func(function)) =
+            module.module.get_export(WASM_LANGUAGE_RUN_EXPORT)
+        else {
+            return Err(WasmError::MissingLanguageProviderExport);
+        };
+        if function.params().len() != 2
+            || !matches!(
+                function.params().collect::<Vec<_>>().as_slice(),
+                [wasmtime::ValType::I32, wasmtime::ValType::I32]
+            )
+            || !matches!(
+                function.results().collect::<Vec<_>>().as_slice(),
+                [wasmtime::ValType::I64]
+            )
+        {
+            return Err(WasmError::MissingLanguageProviderExport);
+        }
+        Ok(())
+    }
     /// Encode a validated request for a guest transport.
     pub fn encode_request(&self, request: &ProviderRequest) -> Result<Vec<u8>, &'static str> {
         encode_request(request, self.limits)
