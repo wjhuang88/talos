@@ -13,7 +13,10 @@ use talos_core::{CapabilityDescriptor, CapabilityRegistry, ProviderDescriptor};
 
 use crate::PluginManifest;
 use crate::manifest::parse_manifest;
-use crate::wasm::{LoadedPluginPackage, PLUGIN_MANIFEST_FILE, WasmPluginTool, WasmRuntime};
+use crate::wasm::{
+    LoadedLanguageProvider, LoadedPluginPackage, PLUGIN_MANIFEST_FILE, WasmPluginTool, WasmRuntime,
+    load_declared_language_provider,
+};
 
 /// Observable lifecycle of an explicitly selected Plugin.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -126,6 +129,7 @@ pub struct PluginLifecycle {
     root: PathBuf,
     tools: Vec<Arc<dyn AgentTool>>,
     package: Option<LoadedPluginPackage>,
+    language_provider: Option<LoadedLanguageProvider>,
 }
 
 impl PluginLifecycle {
@@ -144,6 +148,7 @@ impl PluginLifecycle {
             root: PathBuf::new(),
             tools: Vec::new(),
             package: None,
+            language_provider: None,
         }
     }
 
@@ -207,6 +212,19 @@ impl PluginLifecycle {
             })?;
             tools.push(Arc::new(executable));
         }
+        let language_provider = manifest
+            .language_provider
+            .as_ref()
+            .map(|declaration| {
+                load_declared_language_provider(
+                    runtime.clone(),
+                    &self.root,
+                    declaration,
+                    talos_text::wasm_provider::WasmProviderLimits::default(),
+                )
+                .map_err(|error| LifecycleError::Invalid(error.to_string()))
+            })
+            .transpose()?;
         let package = LoadedPluginPackage {
             name: manifest.plugin.name.clone(),
             version: manifest.plugin.version.clone(),
@@ -223,12 +241,18 @@ impl PluginLifecycle {
             })
             .collect();
         self.package = Some(package);
+        self.language_provider = language_provider;
         self.shared
             .gate
             .lock()
             .map_err(|_| LifecycleError::Synchronization)?
             .state = PluginState::Initialized;
         Ok(())
+    }
+
+    /// Return the explicitly loaded language provider, if declared by the package.
+    pub fn language_provider(&mut self) -> Option<&mut LoadedLanguageProvider> {
+        self.language_provider.as_mut()
     }
 
     /// Publish the validated provider exclusively. Collision leaves no partial entry.
