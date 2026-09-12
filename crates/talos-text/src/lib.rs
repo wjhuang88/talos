@@ -11,6 +11,13 @@ pub trait HighlightProvider {
     fn supports(&self, language: &LanguageId) -> bool;
 }
 
+/// Combined provider contract for hosts that share one provider across consumers.
+#[cfg(feature = "code-intelligence")]
+pub trait LanguageProviderBundle: HighlightProvider + SymbolProvider + Send {}
+
+#[cfg(feature = "code-intelligence")]
+impl<T> LanguageProviderBundle for T where T: HighlightProvider + SymbolProvider + Send {}
+
 /// Source-only symbol capability that can be supplied by built-in or WASM providers.
 #[cfg(feature = "code-intelligence")]
 pub trait SymbolProvider {
