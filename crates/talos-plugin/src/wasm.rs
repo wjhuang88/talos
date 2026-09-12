@@ -22,7 +22,8 @@ use thiserror::Error;
 use crate::manifest::parse_manifest;
 use crate::{PluginManifest, PluginTool};
 use talos_text::wasm_provider::{
-    ProviderRequest, WasmProviderLimits, decode_highlight, encode_request,
+    ProviderRequest, WASM_LANGUAGE_RUN_EXPORT, WasmProviderLimits, decode_highlight,
+    encode_request, validate_memory_range,
 };
 use talos_text::wasm_provider::{WASM_LANGUAGE_ABI_EXPORT, validate_abi_version};
 
@@ -54,6 +55,8 @@ pub enum WasmError {
     Instantiate(String),
     #[error("exported function 'run' not found or has wrong signature")]
     MissingExport,
+    #[error("language provider export not found or has wrong signature")]
+    MissingLanguageProviderExport,
     #[error("execution trapped: {0}")]
     Trap(String),
     #[error("execution timed out after {timeout_ms}ms")]
@@ -93,6 +96,123 @@ impl WasmLanguageProvider {
         source_len: usize,
     ) -> talos_text::HighlightResult {
         decode_highlight(payload, self.limits.max_source_bytes, source_len)
+    }
+
+    /// Execute one bounded language-provider request against a validated module.
+    ///
+    /// The request is written at guest offset zero and the guest returns a packed
+    /// `(pointer, length)` pair in the upper and lower 32 bits of its `i64` result.
+    /// No imports are admitted, and every memory range is checked before access.
+    pub fn execute_highlight(
+        &self,
+        module: &WasmModule,
+        request: &ProviderRequest,
+    ) -> Result<talos_text::HighlightResult, WasmError> {
+        let request_bytes = encode_request(request, self.limits)
+            .map_err(|error| WasmError::Instantiate(error.to_owned()))?;
+        if request_bytes.len() > u32::MAX as usize {
+            return Err(WasmError::Instantiate(
+                "language provider request exceeds ABI address space".into(),
+            ));
+        }
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            self.execute_highlight_inner(module, &request_bytes, request.source.len())
+        }));
+        match result {
+            Ok(result) => result,
+            Err(_) => Err(WasmError::Trap(
+                "host panic during language provider execution".into(),
+            )),
+        }
+    }
+
+    fn execute_highlight_inner(
+        &self,
+        module: &WasmModule,
+        request_bytes: &[u8],
+        source_len: usize,
+    ) -> Result<talos_text::HighlightResult, WasmError> {
+        if module.module.imports().next().is_some() {
+            return Err(WasmError::Instantiate(
+                "language providers cannot import host functions".into(),
+            ));
+        }
+        let Some(wasmtime::ExternType::Func(function)) =
+            module.module.get_export(WASM_LANGUAGE_RUN_EXPORT)
+        else {
+            return Err(WasmError::MissingLanguageProviderExport);
+        };
+        if function.params().len() != 2
+            || !matches!(
+                function.params().collect::<Vec<_>>().as_slice(),
+                [wasmtime::ValType::I32, wasmtime::ValType::I32]
+            )
+            || !matches!(
+                function.results().collect::<Vec<_>>().as_slice(),
+                [wasmtime::ValType::I64]
+            )
+        {
+            return Err(WasmError::MissingLanguageProviderExport);
+        }
+
+        let engine = module.runtime.engine.clone();
+        let mut store = wasmtime::Store::new(&engine, ());
+        store
+            .set_fuel(self.limits.fuel)
+            .map_err(|error| WasmError::Instantiate(error.to_string()))?;
+        store.epoch_deadline_trap();
+        store.set_epoch_deadline(1);
+        let instance = wasmtime::Instance::new(&mut store, &module.module, &[])
+            .map_err(|error| WasmError::Instantiate(error.to_string()))?;
+        let memory = instance
+            .get_memory(&mut store, "memory")
+            .ok_or_else(|| WasmError::Instantiate("language provider must export memory".into()))?;
+        let request_range =
+            validate_memory_range(0, request_bytes.len() as u32, memory.data_size(&store))
+                .map_err(|error| WasmError::Instantiate(error.into()))?;
+        memory.data_mut(&mut store)[request_range].copy_from_slice(request_bytes);
+
+        let (done_tx, done_rx) = mpsc::channel();
+        let timeout = self.limits.timeout;
+        let engine_for_timeout = engine.clone();
+        thread::spawn(move || {
+            thread::sleep(timeout);
+            if done_tx.send(()).is_ok() {
+                engine_for_timeout.increment_epoch();
+            }
+        });
+        let run = instance
+            .get_typed_func::<(i32, i32), i64>(&mut store, WASM_LANGUAGE_RUN_EXPORT)
+            .map_err(|_| WasmError::MissingLanguageProviderExport)?;
+        let packed = run
+            .call(&mut store, (0, request_bytes.len() as i32))
+            .map_err(|error| classify_execution_error(error, timeout))?;
+        drop(done_rx);
+
+        let response_offset = (packed as u64 >> 32) as u32;
+        let response_len = packed as u32;
+        let response_range =
+            validate_memory_range(response_offset, response_len, memory.data_size(&store))
+                .map_err(|error| WasmError::Instantiate(error.into()))?;
+        let response = memory.data(&store)[response_range].to_vec();
+        Ok(decode_highlight(
+            &response,
+            self.limits.max_source_bytes,
+            source_len,
+        ))
+    }
+}
+
+fn classify_execution_error(error: wasmtime::Error, timeout: Duration) -> WasmError {
+    let message = error.to_string();
+    if message.contains("epoch") || message.contains("interrupt") {
+        WasmError::Timeout {
+            timeout_ms: timeout.as_millis() as u64,
+        }
+    } else if message.contains("fuel") {
+        WasmError::Trap("language provider fuel exhausted".into())
+    } else {
+        WasmError::Trap(message)
     }
 }
 
