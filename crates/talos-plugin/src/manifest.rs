@@ -590,6 +590,29 @@ artifact = "bare.wasm"
     }
 
     #[test]
+    fn parse_explicit_language_provider_declaration() {
+        let manifest = parse_manifest(
+            r#"
+[plugin]
+name = "rust-provider"
+version = "1.0.0"
+carrier = "wasm"
+artifact = "provider.wasm"
+
+[language_provider]
+language = "rust"
+artifact = "provider.wasm"
+"#,
+        )
+        .expect("manifest should parse");
+        let declaration = manifest
+            .language_provider
+            .expect("provider declaration should be retained");
+        assert_eq!(declaration.language, "rust");
+        assert_eq!(declaration.artifact, "provider.wasm");
+    }
+
+    #[test]
     fn reject_empty_name() {
         let toml = r#"
 [plugin]
