@@ -250,8 +250,11 @@ impl PluginLifecycle {
         Ok(())
     }
 
-    /// Return the explicitly loaded language provider, if declared by the package.
+    /// Borrow the language provider only while its publication is active.
     pub fn language_provider(&mut self) -> Option<&mut LoadedLanguageProvider> {
+        if self.state() != PluginState::Active {
+            return None;
+        }
         self.language_provider.as_mut()
     }
 
@@ -373,6 +376,22 @@ fn descriptor(
                 "tool".into(),
                 format!("{}.{}", manifest.plugin.name, binding.tool),
             )]),
+        });
+    }
+    if let Some(language) = &manifest.language_provider {
+        let id = format!("language.{}", language.language);
+        if !seen.insert(id.clone()) {
+            return Err(LifecycleError::Invalid(
+                "duplicate language capability".into(),
+            ));
+        }
+        capabilities.push(CapabilityDescriptor {
+            id,
+            version: "1.0.0".into(),
+            name: language.language.clone(),
+            provenance: Provenance::Plugin,
+            carrier: Carrier::Wasm,
+            metadata: BTreeMap::new(),
         });
     }
     let descriptor = ProviderDescriptor {

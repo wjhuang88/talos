@@ -19,13 +19,24 @@ fn language_fixture() -> PathBuf {
 }
 
 #[tokio::test]
-async fn language_provider_fixture_loads_only_during_initialization() {
+async fn language_provider_publication_requires_activation_and_is_withdrawn_on_stop() {
     let registry = Arc::new(Mutex::new(CapabilityRegistry::default()));
-    let mut plugin = PluginLifecycle::new(registry);
+    let mut plugin = PluginLifecycle::new(registry.clone());
+    let request = CapabilityRequest {
+        capability_id: "language.rust".into(),
+        version: "1.0.0".into(),
+    };
     plugin.load(&language_fixture()).expect("manifest loads");
     assert!(plugin.language_provider().is_none());
     plugin.initialize(runtime()).expect("provider initializes");
+    assert!(plugin.language_provider().is_none());
+    assert_eq!(registry.lock().expect("registry").resolve(&request), ResolutionResult::Unavailable);
+    plugin.activate().expect("activate language provider");
     assert!(plugin.language_provider().is_some());
+    assert!(matches!(registry.lock().expect("registry").resolve(&request), ResolutionResult::Available(_)));
+    plugin.stop().expect("stop language provider");
+    assert!(plugin.language_provider().is_none());
+    assert_eq!(registry.lock().expect("registry").resolve(&request), ResolutionResult::Unavailable);
 }
 
 #[tokio::test]
@@ -34,6 +45,7 @@ async fn language_provider_fixture_has_safe_highlight_fallback() {
     let mut plugin = PluginLifecycle::new(registry);
     plugin.load(&language_fixture()).expect("manifest loads");
     plugin.initialize(runtime()).expect("provider initializes");
+    plugin.activate().expect("activate language provider");
     let provider = plugin.language_provider().expect("provider handle");
     let language = talos_text::LanguageId::parse("rust").expect("language");
     assert!(provider.supports(&language));
