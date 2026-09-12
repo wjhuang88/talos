@@ -233,14 +233,23 @@ impl WasmPluginTool {
 
 /// Validate the versioned language-provider ABI export without invoking guest code.
 pub fn validate_language_provider_abi(module: &WasmModule) -> Result<(), WasmError> {
-    let Some(wasmtime::ExternType::Func(function)) = module.module.get_export(WASM_LANGUAGE_ABI_EXPORT) else {
+    let Some(wasmtime::ExternType::Func(function)) =
+        module.module.get_export(WASM_LANGUAGE_ABI_EXPORT)
+    else {
         return Err(WasmError::MissingExport);
     };
-    if function.params().len() != 0 || !matches!(function.results().collect::<Vec<_>>().as_slice(), [wasmtime::ValType::I32]) {
+    if function.params().len() != 0
+        || !matches!(
+            function.results().collect::<Vec<_>>().as_slice(),
+            [wasmtime::ValType::I32]
+        )
+    {
         return Err(WasmError::MissingExport);
     }
     let mut store = wasmtime::Store::new(&module.runtime.engine, ());
-    store.set_fuel(module.runtime.fuel).map_err(|e| WasmError::Instantiate(e.to_string()))?;
+    store
+        .set_fuel(module.runtime.fuel)
+        .map_err(|e| WasmError::Instantiate(e.to_string()))?;
     store.set_epoch_deadline(u64::MAX);
     let instance = wasmtime::Instance::new(&mut store, &module.module, &[])
         .map_err(|e| WasmError::Instantiate(e.to_string()))?;
@@ -438,16 +447,23 @@ mod tests {
 
     #[test]
     fn language_provider_abi_probe_accepts_version_one() {
-        let module = WasmModule::from_wat(runtime(), r#"(module (func (export "talos_language_abi_version") (result i32) i32.const 1))"#).expect("compile");
+        let module = WasmModule::from_wat(
+            runtime(),
+            r#"(module (func (export "talos_language_abi_version") (result i32) i32.const 1))"#,
+        )
+        .expect("compile");
         assert!(validate_language_provider_abi(&module).is_ok());
     }
 
     #[test]
     fn language_provider_abi_probe_rejects_incompatible_version() {
-        let module = WasmModule::from_wat(runtime(), r#"(module (func (export "talos_language_abi_version") (result i32) i32.const 99))"#).expect("compile");
+        let module = WasmModule::from_wat(
+            runtime(),
+            r#"(module (func (export "talos_language_abi_version") (result i32) i32.const 99))"#,
+        )
+        .expect("compile");
         assert!(validate_language_provider_abi(&module).is_err());
     }
-
 
     #[tokio::test]
     async fn checked_in_package_loads_with_typed_capabilities_and_executes_offline() {

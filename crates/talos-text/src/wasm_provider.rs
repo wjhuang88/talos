@@ -18,12 +18,6 @@ pub struct WasmProviderLimits {
     pub max_source_bytes: usize,
 }
 
-impl Default for WasmProviderLimits {
-    fn default() -> Self {
-        Self { fuel: 1_000_000, timeout: Duration::from_millis(500), max_source_bytes: 1_000_000 }
-    }
-}
-
 /// Validates a provider source request before it crosses the WASM boundary.
 pub fn validate_source(source: &str, limits: WasmProviderLimits) -> Result<(), &'static str> {
     if source.len() > limits.max_source_bytes {
@@ -43,7 +37,9 @@ pub struct ProviderRequest {
 
 /// Validate the declared ABI version without executing a provider.
 pub fn validate_abi_version(version: u32) -> Result<(), &'static str> {
-    (version == WASM_LANGUAGE_ABI_VERSION).then_some(()).ok_or("unsupported provider ABI version")
+    (version == WASM_LANGUAGE_ABI_VERSION)
+        .then_some(())
+        .ok_or("unsupported provider ABI version")
 }
 
 /// Safe result returned when a provider is unavailable or fails.
@@ -58,37 +54,63 @@ pub enum ProviderResponse {
 }
 
 /// Reject malformed or overlapping guest spans before exposing them to consumers.
-pub fn validate_spans(spans: &[(usize, usize, String)], source_len: usize) -> Result<(), &'static str> {
+pub fn validate_spans(
+    spans: &[(usize, usize, String)],
+    source_len: usize,
+) -> Result<(), &'static str> {
     let mut end = 0;
     for (start, stop, _) in spans {
-        if *start > *stop || *stop > source_len || *start < end { return Err("invalid provider span"); }
+        if *start > *stop || *stop > source_len || *start < end {
+            return Err("invalid provider span");
+        }
         end = *stop;
     }
     Ok(())
 }
 
 /// Convert validated guest spans to the shared highlighting result.
-pub fn spans_to_highlight(spans: Vec<(usize, usize, String)>, source_len: usize) -> super::HighlightResult {
+pub fn spans_to_highlight(
+    spans: Vec<(usize, usize, String)>,
+    source_len: usize,
+) -> super::HighlightResult {
     if validate_spans(&spans, source_len).is_err() {
         return super::HighlightResult::PlainText;
     }
-    super::HighlightResult::Spans(spans.into_iter().map(|(start, end, capture)| super::HighlightSpan { start, end, capture }).collect())
+    super::HighlightResult::Spans(
+        spans
+            .into_iter()
+            .map(|(start, end, capture)| super::HighlightSpan {
+                start,
+                end,
+                capture,
+            })
+            .collect(),
+    )
 }
 
 /// Encode a request for the versioned guest boundary.
-pub fn encode_request(request: &ProviderRequest, limits: WasmProviderLimits) -> Result<Vec<u8>, &'static str> {
+pub fn encode_request(
+    request: &ProviderRequest,
+    limits: WasmProviderLimits,
+) -> Result<Vec<u8>, &'static str> {
     validate_request(request, limits)?;
     serde_json::to_vec(request).map_err(|_| "provider request serialization failed")
 }
 
 /// Decode a bounded provider response payload.
 pub fn decode_response(bytes: &[u8], max_bytes: usize) -> Result<ProviderResponse, &'static str> {
-    if bytes.len() > max_bytes { return Err("provider response exceeds limit"); }
+    if bytes.len() > max_bytes {
+        return Err("provider response exceeds limit");
+    }
     serde_json::from_slice(bytes).map_err(|_| "provider response decode failed")
 }
 
 /// Decode and validate a guest response for a source buffer.
-pub fn decode_highlight(bytes: &[u8], max_bytes: usize, source_len: usize) -> super::HighlightResult {
+pub fn decode_highlight(
+    bytes: &[u8],
+    max_bytes: usize,
+    source_len: usize,
+) -> super::HighlightResult {
     match decode_response(bytes, max_bytes) {
         Ok(ProviderResponse::Spans(spans)) => spans_to_highlight(spans, source_len),
         _ => super::HighlightResult::PlainText,
@@ -96,7 +118,10 @@ pub fn decode_highlight(bytes: &[u8], max_bytes: usize, source_len: usize) -> su
 }
 
 /// Convert a bounded provider response into the existing renderer-neutral result.
-pub fn fallback_response(request: &ProviderRequest, limits: WasmProviderLimits) -> ProviderResponse {
+pub fn fallback_response(
+    request: &ProviderRequest,
+    limits: WasmProviderLimits,
+) -> ProviderResponse {
     match validate_request(request, limits) {
         Ok(()) => ProviderResponse::PlainText,
         Err(reason) => ProviderResponse::Unavailable(reason.to_owned()),
@@ -104,8 +129,13 @@ pub fn fallback_response(request: &ProviderRequest, limits: WasmProviderLimits) 
 }
 
 /// Validate a request without executing guest code.
-pub fn validate_request(request: &ProviderRequest, limits: WasmProviderLimits) -> Result<(), &'static str> {
-    if request.language.trim().is_empty() { return Err("language is empty"); }
+pub fn validate_request(
+    request: &ProviderRequest,
+    limits: WasmProviderLimits,
+) -> Result<(), &'static str> {
+    if request.language.trim().is_empty() {
+        return Err("language is empty");
+    }
     validate_source(&request.source, limits)
 }
 
@@ -115,15 +145,24 @@ mod tests {
 
     #[test]
     fn rejects_oversized_source() {
-        let limits = WasmProviderLimits { max_source_bytes: 2, ..Default::default() };
+        let limits = WasmProviderLimits {
+            max_source_bytes: 2,
+            ..Default::default()
+        };
         assert!(validate_source("abc", limits).is_err());
         assert!(validate_source("ab", limits).is_ok());
     }
 
     #[test]
     fn invalid_request_degrades_without_execution() {
-        let request = ProviderRequest { language: String::new(), source: "x".into() };
-        assert_eq!(fallback_response(&request, WasmProviderLimits::default()), ProviderResponse::Unavailable("language is empty".into()));
+        let request = ProviderRequest {
+            language: String::new(),
+            source: "x".into(),
+        };
+        assert_eq!(
+            fallback_response(&request, WasmProviderLimits::default()),
+            ProviderResponse::Unavailable("language is empty".into())
+        );
     }
 
     #[test]
@@ -134,7 +173,10 @@ mod tests {
 
     #[test]
     fn request_response_wire_format_is_stable() {
-        let request = ProviderRequest { language: "rust".into(), source: "fn main() {}".into() };
+        let request = ProviderRequest {
+            language: "rust".into(),
+            source: "fn main() {}".into(),
+        };
         let value = serde_json::to_value(&request).expect("serialize");
         assert_eq!(value["language"], "rust");
         let decoded: ProviderRequest = serde_json::from_value(value).expect("decode");
@@ -143,14 +185,24 @@ mod tests {
 
     #[test]
     fn wire_helpers_enforce_bounds() {
-        let request = ProviderRequest { language: "rust".into(), source: "fn main() {}".into() };
+        let request = ProviderRequest {
+            language: "rust".into(),
+            source: "fn main() {}".into(),
+        };
         let bytes = encode_request(&request, WasmProviderLimits::default()).expect("encode");
-        assert_eq!(decode_response(&bytes, 1), Err("provider response exceeds limit"));
+        assert_eq!(
+            decode_response(&bytes, 1),
+            Err("provider response exceeds limit")
+        );
     }
 }
 
 impl Default for WasmProviderLimits {
     fn default() -> Self {
-        Self { fuel: 1_000_000, timeout: Duration::from_millis(500), max_source_bytes: 1_000_000 }
+        Self {
+            fuel: 1_000_000,
+            timeout: Duration::from_millis(500),
+            max_source_bytes: 1_000_000,
+        }
     }
 }
