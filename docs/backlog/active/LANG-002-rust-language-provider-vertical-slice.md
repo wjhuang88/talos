@@ -5,7 +5,7 @@
 | Story ID | LANG-002 |
 | Type | Language Provider implementation |
 | Parent | CAP-001 / #466 |
-| Status | Active / Claimed |
+| Status | Complete / Closed |
 | Selected Iteration | I261 |
 | Source Issue | [GitHub Issue #516](https://github.com/wjhuang88/talos/issues/516) |
 | Depends On | LANG-001; CAP-001-C; DIST-001-A verified manual installation |
@@ -21,10 +21,14 @@
 | Claimed At | 2026-09-12 |
 | Authorization Evidence | Claim PR #542 merged to main as `aa91ddc2`; implementation authorized within this Work Slice. |
 | Governance Claim PR | #542 |
-| Implementation PR | Not started |
+| Implementation PR | #543 (merged as `935c4b86`) |
 | Authorization Mode | Independent review |
 | Last Updated | 2026-09-12 |
 | Handoff / Release Condition | Requires a separate security/dependency review before implementation merge. |
+
+Completion Commit: `935c4b861c4bda75cb0d05383db110a50256afbe`
+
+Exact-head CI `34694711467` and independent security/dependency approval `5646284106` are recorded in I261 closeout.
 
 ## Required Reads
 

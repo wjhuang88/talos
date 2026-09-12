@@ -1,6 +1,6 @@
 # Iteration I261: Rust WASM Language Provider Vertical Slice
 
-> Document status: Review / Claimed
+> Document status: Complete / Closed
 > Parent: CAP-001 / #466; LANG-002 / #516
 > Objective: prove one manually installed Rust WASM Language Provider serves highlighting and symbol consumers through the shared contract.
 
@@ -8,7 +8,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex unattended single-developer mode |
 | Work Slice | One Rust WASM LanguageProvider vertical slice through verified Bundle installation, bounded loading, registration, and shared consumers. |
@@ -21,13 +21,13 @@
 | Last Updated | 2026-09-12 |
 | Handoff / Release Condition | Claim #542 must merge before implementation; independent security/dependency review required. |
 
-Implementation candidate #543 is the first stable stage candidate after the claim merge; completion remains pending until merge and closeout.
+Implementation PR #543 merged to `main` as `935c4b86`; closeout records the existing implementation evidence below.
 
 ### Non-terminal iteration inventory — 2026-09-12
 
 | Item | Current disposition |
 |---|---|
-| I261 / LANG-002 | Active / Claimed after #542 merge; implementation limited to this slice |
+| I261 / LANG-002 | Complete / Closed via implementation PR #543 merge |
 | I164 / legacy migration | Paused / superseded; do not resume |
 | I249 and other active capability work | Frozen or separately governed; no overlap with this slice |
 | LANG-003 / #517, DIST-001-B / #515, BROWSER-001 / #508 | Refinement / Unclaimed; remain future work |
@@ -57,11 +57,11 @@ LANG-001/I257, CAP-001-C/I255, BUNDLE-001/I259, and DIST-001-A/I260 are Complete
 
 ## Governance Gate
 
-Before implementation, retain the effective Collaboration Claim and obtain an independent security/dependency review. I261 is Review / Claimed after PR #542 merged to `main` as `aa91ddc2`.
+Independent security/dependency review approved exact head `1c99c1e0` (comment `5646284106`); I261 is Complete / Closed after PR #543 merged as `935c4b86`.
 
 ### Execution Checkpoint — 2026-09-12
 
-- Stable implementation candidate: PR #543, current head `d5fe9020`.
+- Implementation PR #543 exact head: `1c99c1e0`; merge commit: `935c4b86`.
+- Exact-head CI `34694711467`: 5/5 SUCCESS; independent review comment `5646284106` APPROVE.
 - Local evidence: workspace check, CLI/tools/runtime/plugin focused tests, collaboration validator, and diff check passed.
-- Project governance validator: SQLite consumer check remains blocked by local Cargo registry write permissions for `android_system_properties`; no pass is claimed.
-- Completion Commit: Pending; implementation has not merged to `main`.
+- Completion Commit: `935c4b861c4bda75cb0d05383db110a50256afbe`.
