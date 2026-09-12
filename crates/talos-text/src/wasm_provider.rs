@@ -7,6 +7,8 @@ pub const WASM_LANGUAGE_ABI_EXPORT: &str = "talos_language_abi_version";
 /// Required guest export for a provider invocation. It receives a pointer/length pair
 /// in guest memory and returns a pointer/length pair for a JSON response.
 pub const WASM_LANGUAGE_RUN_EXPORT: &str = "talos_language_run";
+/// Guest run signature: request pointer/length, packed response pointer/length.
+pub const WASM_LANGUAGE_RUN_SIGNATURE: &str = "(i32,i32)->i64";
 /// ABI contract version for the memory transport described by [`WASM_LANGUAGE_RUN_EXPORT`].
 pub const WASM_LANGUAGE_MEMORY_ABI_VERSION: u32 = 1;
 
@@ -222,6 +224,7 @@ mod tests {
         assert_eq!(WASM_LANGUAGE_ABI_VERSION, 1);
         assert_eq!(WASM_LANGUAGE_MEMORY_ABI_VERSION, 1);
         assert_eq!(WASM_LANGUAGE_RUN_EXPORT, "talos_language_run");
+        assert_eq!(WASM_LANGUAGE_RUN_SIGNATURE, "(i32,i32)->i64");
     }
 
     #[test]
