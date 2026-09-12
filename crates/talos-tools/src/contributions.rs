@@ -304,7 +304,7 @@ pub fn symbol_tool_contributions_with_provider(
     vec![
         contribution(
             SYMBOL_CONTRIBUTION_SOURCE,
-            Arc::new(FindSymbolTool::new(workspace_root.clone())),
+            Arc::new(match provider.clone() { Some(ref p) => FindSymbolTool::with_provider(workspace_root.clone(), p.clone()), None => FindSymbolTool::new(workspace_root.clone()) }),
         ),
         contribution(
             SYMBOL_CONTRIBUTION_SOURCE,
@@ -312,7 +312,7 @@ pub fn symbol_tool_contributions_with_provider(
         ),
         contribution(
             SYMBOL_CONTRIBUTION_SOURCE,
-            Arc::new(ListSymbolsTool::new(workspace_root.clone())),
+            Arc::new(match provider.clone() { Some(ref p) => ListSymbolsTool::with_provider(workspace_root.clone(), p.clone()), None => ListSymbolsTool::new(workspace_root.clone()) }),
         ),
         contribution(
             SYMBOL_CONTRIBUTION_SOURCE,
