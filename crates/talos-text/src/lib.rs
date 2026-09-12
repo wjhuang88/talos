@@ -22,6 +22,7 @@ impl<T> LanguageProviderBundle for T where T: HighlightProvider + SymbolProvider
 #[cfg(feature = "code-intelligence")]
 pub struct SharedLanguageProvider {
     inner: std::sync::Arc<std::sync::Mutex<Box<dyn LanguageProviderBundle>>>,
+    active: std::sync::Arc<std::sync::atomic::AtomicBool>,
 }
 
 #[cfg(feature = "code-intelligence")]
@@ -29,6 +30,7 @@ impl Clone for SharedLanguageProvider {
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
+            active: self.active.clone(),
         }
     }
 }
@@ -37,13 +39,34 @@ impl Clone for SharedLanguageProvider {
 impl SharedLanguageProvider {
     /// Create a context from one provider instance.
     pub fn new(provider: Box<dyn LanguageProviderBundle>) -> Self {
+        Self::new_with_gate(
+            provider,
+            std::sync::Arc::new(std::sync::atomic::AtomicBool::new(true)),
+        )
+    }
+
+    /// Create a provider context controlled by a shared lifecycle gate.
+    pub fn new_with_gate(
+        provider: Box<dyn LanguageProviderBundle>,
+        active: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    ) -> Self {
         Self {
             inner: std::sync::Arc::new(std::sync::Mutex::new(provider)),
+            active,
         }
+    }
+
+    /// Revoke access for all cloned contexts retained by consumers.
+    pub fn deactivate(&self) {
+        self.active
+            .store(false, std::sync::atomic::Ordering::Release);
     }
 
     /// Run a highlighting operation through the shared provider.
     pub fn highlight(&self, language: &LanguageId, source: &str) -> HighlightResult {
+        if !self.active.load(std::sync::atomic::Ordering::Acquire) {
+            return HighlightResult::PlainText;
+        }
         self.inner
             .lock()
             .map(|mut p| p.highlight(language, source))
@@ -55,6 +78,9 @@ impl SharedLanguageProvider {
         &self,
         operation: impl FnOnce(&mut dyn SymbolProvider) -> R,
     ) -> Option<R> {
+        if !self.active.load(std::sync::atomic::Ordering::Acquire) {
+            return None;
+        }
         self.inner.lock().ok().map(|mut p| operation(&mut **p))
     }
 }
@@ -65,6 +91,9 @@ impl HighlightProvider for SharedLanguageProvider {
         SharedLanguageProvider::highlight(self, language, source)
     }
     fn supports(&self, language: &LanguageId) -> bool {
+        if !self.active.load(std::sync::atomic::Ordering::Acquire) {
+            return false;
+        }
         self.inner
             .lock()
             .map(|p| p.supports(language))

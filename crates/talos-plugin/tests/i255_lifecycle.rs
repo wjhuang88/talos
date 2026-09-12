@@ -40,8 +40,28 @@ async fn language_provider_publication_requires_activation_and_is_withdrawn_on_s
         registry.lock().expect("registry").resolve(&request),
         ResolutionResult::Available(_)
     ));
+    let shared = plugin
+        .take_language_provider_context()
+        .expect("context transfer")
+        .expect("declared provider");
+    assert!(matches!(
+        shared.highlight(
+            &talos_text::LanguageId::parse("rust").expect("language"),
+            "fn main() {}"
+        ),
+        talos_text::HighlightResult::PlainText
+    ));
+    assert!(shared.with_symbols(|_| ()).is_some());
     plugin.stop().expect("stop language provider");
     assert!(plugin.language_provider().is_none());
+    assert!(matches!(
+        shared.highlight(
+            &talos_text::LanguageId::parse("rust").expect("language"),
+            "fn main() {}"
+        ),
+        talos_text::HighlightResult::PlainText
+    ));
+    assert!(shared.with_symbols(|_| ()).is_none());
     assert_eq!(
         registry.lock().expect("registry").resolve(&request),
         ResolutionResult::Unavailable

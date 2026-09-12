@@ -121,6 +121,14 @@ impl LoadedLanguageProvider {
     pub fn into_shared_context(self) -> talos_text::SharedLanguageProvider {
         talos_text::SharedLanguageProvider::new(Box::new(self))
     }
+
+    /// Move this provider into a context governed by its lifecycle.
+    pub fn into_shared_context_with_gate(
+        self,
+        gate: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    ) -> talos_text::SharedLanguageProvider {
+        talos_text::SharedLanguageProvider::new_with_gate(Box::new(self), gate)
+    }
 }
 
 #[cfg(all(feature = "wasm", feature = "code-intelligence"))]
@@ -348,7 +356,7 @@ impl WasmLanguageProvider {
     ) -> Result<talos_text::HighlightResult, WasmError> {
         let request_bytes = encode_request(request, self.limits)
             .map_err(|error| WasmError::Instantiate(error.to_owned()))?;
-        if request_bytes.len() > u32::MAX as usize {
+        if request_bytes.len() > i32::MAX as usize {
             return Err(WasmError::Instantiate(
                 "language provider request exceeds ABI address space".into(),
             ));

@@ -130,6 +130,7 @@ pub struct PluginLifecycle {
     tools: Vec<Arc<dyn AgentTool>>,
     package: Option<LoadedPluginPackage>,
     language_provider: Option<LoadedLanguageProvider>,
+    language_provider_gate: std::sync::Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl PluginLifecycle {
@@ -149,6 +150,7 @@ impl PluginLifecycle {
             tools: Vec::new(),
             package: None,
             language_provider: None,
+            language_provider_gate: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
         }
     }
 
@@ -242,6 +244,8 @@ impl PluginLifecycle {
             .collect();
         self.package = Some(package);
         self.language_provider = language_provider;
+        self.language_provider_gate
+            .store(false, std::sync::atomic::Ordering::Release);
         self.shared
             .gate
             .lock()
@@ -266,10 +270,12 @@ impl PluginLifecycle {
         if self.state() != PluginState::Active {
             return Err(LifecycleError::State(self.state()));
         }
-        Ok(self
-            .language_provider
-            .take()
-            .map(LoadedLanguageProvider::into_shared_context))
+        Ok(self.language_provider.take().map(|provider| {
+            LoadedLanguageProvider::into_shared_context_with_gate(
+                provider,
+                self.language_provider_gate.clone(),
+            )
+        }))
     }
 
     /// Publish the validated provider exclusively. Collision leaves no partial entry.
@@ -295,12 +301,16 @@ impl PluginLifecycle {
             .map_err(|error| LifecycleError::Invalid(error.to_string()))?;
         gate.registration = Some(registration);
         gate.state = PluginState::Active;
+        self.language_provider_gate
+            .store(true, std::sync::atomic::Ordering::Release);
         Ok(())
     }
 
     /// Stop new admissions and withdraw owned capabilities. Calls admitted before
     /// this fence may finish under their existing WASM fuel/wall-clock bounds.
     pub fn stop(&self) -> Result<(), LifecycleError> {
+        self.language_provider_gate
+            .store(false, std::sync::atomic::Ordering::Release);
         self.shared.stop()
     }
 
