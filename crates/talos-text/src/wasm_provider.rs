@@ -51,6 +51,16 @@ pub enum ProviderResponse {
     Unavailable(&'static str),
 }
 
+/// Reject malformed or overlapping guest spans before exposing them to consumers.
+pub fn validate_spans(spans: &[(usize, usize, String)], source_len: usize) -> Result<(), &'static str> {
+    let mut end = 0;
+    for (start, stop, _) in spans {
+        if *start > *stop || *stop > source_len || *start < end { return Err("invalid provider span"); }
+        end = *stop;
+    }
+    Ok(())
+}
+
 /// Convert a bounded provider response into the existing renderer-neutral result.
 pub fn fallback_response(request: &ProviderRequest, limits: WasmProviderLimits) -> ProviderResponse {
     match validate_request(request, limits) {
@@ -80,6 +90,12 @@ mod tests {
     fn invalid_request_degrades_without_execution() {
         let request = ProviderRequest { language: String::new(), source: "x".into() };
         assert_eq!(fallback_response(&request, WasmProviderLimits::default()), ProviderResponse::Unavailable("language is empty"));
+    }
+
+    #[test]
+    fn malformed_guest_spans_are_rejected() {
+        assert!(validate_spans(&[(0, 2, "x".into()), (1, 3, "y".into())], 3).is_err());
+        assert!(validate_spans(&[(0, 2, "x".into()), (2, 3, "y".into())], 3).is_ok());
     }
 }
 
