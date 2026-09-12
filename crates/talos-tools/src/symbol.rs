@@ -180,6 +180,7 @@ pub struct FindSymbolTool {
 
 pub struct FindReferencesTool {
     workspace_root: PathBuf,
+    provider: Option<talos_text::SharedLanguageProvider>,
 }
 
 pub struct ListSymbolsTool {
@@ -188,6 +189,7 @@ pub struct ListSymbolsTool {
 
 pub struct ListImportsTool {
     workspace_root: PathBuf,
+    provider: Option<talos_text::SharedLanguageProvider>,
 }
 
 impl FindSymbolTool {
@@ -198,8 +200,9 @@ impl FindSymbolTool {
 
 impl FindReferencesTool {
     pub fn new(workspace_root: PathBuf) -> Self {
-        Self { workspace_root }
+        Self { workspace_root, provider: None }
     }
+    pub fn with_provider(workspace_root: PathBuf, provider: talos_text::SharedLanguageProvider) -> Self { Self { workspace_root, provider: Some(provider) } }
 }
 
 impl ListSymbolsTool {
@@ -210,8 +213,9 @@ impl ListSymbolsTool {
 
 impl ListImportsTool {
     pub fn new(workspace_root: PathBuf) -> Self {
-        Self { workspace_root }
+        Self { workspace_root, provider: None }
     }
+    pub fn with_provider(workspace_root: PathBuf, provider: talos_text::SharedLanguageProvider) -> Self { Self { workspace_root, provider: Some(provider) } }
 }
 
 macro_rules! impl_read_only_tool {
@@ -305,7 +309,7 @@ async fn execute_find_references(tool: &FindReferencesTool, input: Value) -> Too
     };
 
     let file_path = tool.workspace_root.join(&params.file);
-    match find_refs_in_file(&file_path, &params.name) {
+    match find_refs_in_file_with_provider(&file_path, &params.name, tool.provider.as_ref()) {
         Ok(refs) => ToolResult::success(serde_json::to_string_pretty(&refs).unwrap_or_default()),
         Err(e) => ToolResult::error(e),
     }
@@ -333,7 +337,7 @@ async fn execute_list_imports(tool: &ListImportsTool, input: Value) -> ToolResul
     };
 
     let file_path = tool.workspace_root.join(&params.file);
-    match list_imports_in_file(&file_path) {
+    match list_imports_in_file_with_provider(&file_path, tool.provider.as_ref()) {
         Ok(imports) => {
             ToolResult::success(serde_json::to_string_pretty(&imports).unwrap_or_default())
         }
@@ -452,9 +456,15 @@ pub fn list_imports_with_provider(
     provider.list_imports(language, source, path)
 }
 
+#[cfg(test)]
 fn find_refs_in_file(path: &Path, name: &str) -> Result<Vec<SourceLocation>, String> {
+    find_refs_in_file_with_provider(path, name, None)
+}
+
+fn find_refs_in_file_with_provider(path: &Path, name: &str, shared: Option<&talos_text::SharedLanguageProvider>) -> Result<Vec<SourceLocation>, String> {
     let lang = detect_language(path).ok_or_else(|| "unsupported file type".to_string())?;
     let code = fs::read_to_string(path).map_err(|e| e.to_string())?;
+    if let Some(shared) = shared { return shared.with_symbols(|provider| provider.find_references(lang, &code, path, name)).unwrap_or_else(|| Err("provider unavailable".into())); }
     let mut provider = talos_text::BuiltinHighlighter::symbol_only();
     talos_text::SymbolProvider::find_references(&mut provider, lang, &code, path, name)
 }
@@ -565,9 +575,15 @@ fn collect_file_symbols(
     Ok(())
 }
 
+#[cfg(test)]
 fn list_imports_in_file(path: &Path) -> Result<Vec<ImportInfo>, String> {
+    list_imports_in_file_with_provider(path, None)
+}
+
+fn list_imports_in_file_with_provider(path: &Path, shared: Option<&talos_text::SharedLanguageProvider>) -> Result<Vec<ImportInfo>, String> {
     let lang = detect_language(path).ok_or_else(|| "unsupported file type".to_string())?;
     let code = fs::read_to_string(path).map_err(|e| e.to_string())?;
+    if let Some(shared) = shared { return shared.with_symbols(|provider| provider.list_imports(lang, &code, path)).unwrap_or_else(|| Err("provider unavailable".into())); }
     let mut provider = talos_text::BuiltinHighlighter::symbol_only();
     talos_text::SymbolProvider::list_imports(&mut provider, lang, &code, path)
 }
