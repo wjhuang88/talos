@@ -51,6 +51,14 @@ pub enum ProviderResponse {
     Unavailable(&'static str),
 }
 
+/// Convert a bounded provider response into the existing renderer-neutral result.
+pub fn fallback_response(request: &ProviderRequest, limits: WasmProviderLimits) -> ProviderResponse {
+    match validate_request(request, limits) {
+        Ok(()) => ProviderResponse::PlainText,
+        Err(reason) => ProviderResponse::Unavailable(reason),
+    }
+}
+
 /// Validate a request without executing guest code.
 pub fn validate_request(request: &ProviderRequest, limits: WasmProviderLimits) -> Result<(), &'static str> {
     if request.language.trim().is_empty() { return Err("language is empty"); }
@@ -66,6 +74,12 @@ mod tests {
         let limits = WasmProviderLimits { max_source_bytes: 2, ..Default::default() };
         assert!(validate_source("abc", limits).is_err());
         assert!(validate_source("ab", limits).is_ok());
+    }
+
+    #[test]
+    fn invalid_request_degrades_without_execution() {
+        let request = ProviderRequest { language: String::new(), source: "x".into() };
+        assert_eq!(fallback_response(&request, WasmProviderLimits::default()), ProviderResponse::Unavailable("language is empty"));
     }
 }
 
