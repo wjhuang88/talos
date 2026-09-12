@@ -71,7 +71,7 @@ This Epic is an architecture and decomposition owner. It does not authorize impl
 | BUNDLE-001 / Issue #514 | Bundle manifest, installation identity and terminology migration. | I259 Complete / Closed; Completion Commit `137da646`; implementation #539 merged `137da646` |
 | TEXT-001 / Issue #511 | UI-neutral text semantics contract. | I256 Complete / Closed; PR #531 merged as `a1a215e02635a984c4ee3524d18f4c096eb83fa9`, CI `34476929013`, independent approval `5618698607`. |
 | LANG-001 / Issue #510 | Shared Language Provider contract and existing consumer migration. | Refinement / Unclaimed; blocked on TEXT-001, not on CAP-001-C |
-| LANG-002 / Issue #516 | Rust WASM Language Provider vertical slice. | Refinement / Unclaimed; owner created, blocked on LANG-001/CAP-001-C/DIST-001-A |
+| LANG-002 / Issue #516 | Rust WASM Language Provider vertical slice. | Planned / Claimed (proposed; ineffective until claim PR #542 merges); implementation unauthorized |
 | LANG-003 / Issue #517 | Remaining Language Provider migration and default distribution. | Refinement / Unclaimed; owner created, blocked on LANG-002/BUNDLE-001/DIST-001-A |
 | DIST-001-A / Issue #509 | Verified manual Bundle installation. | I260 Complete / Closed; implementation #541 merge `7e4a0dba`; dependencies BUNDLE-001/CAP-001-C complete |
 | DIST-001-B / Issue #515 | Consented on-demand capability resolution. | Refinement / Unclaimed; owner created, blocked on DIST-001-A/CAP-001-B/C/BUNDLE-001 |
