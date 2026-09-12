@@ -50,7 +50,9 @@ pub struct LanguageProviderHost {
 #[cfg(feature = "language-provider")]
 impl Clone for LanguageProviderHost {
     fn clone(&self) -> Self {
-        Self { context: self.context.clone() }
+        Self {
+            context: self.context.clone(),
+        }
     }
 }
 

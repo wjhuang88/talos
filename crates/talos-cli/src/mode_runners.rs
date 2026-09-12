@@ -596,8 +596,9 @@ pub(crate) async fn run_tui_mode(
     ));
 
     let mut tui = match language_provider_context {
-        Some(provider) => Tui::with_highlight_provider(Box::new(provider))
-            .context("failed to initialize TUI")?,
+        Some(provider) => {
+            Tui::with_highlight_provider(Box::new(provider)).context("failed to initialize TUI")?
+        }
         None => Tui::new().context("failed to initialize TUI")?,
     };
     tui.hydrate_history(&visible_history);

@@ -90,7 +90,10 @@ pub fn contribution_groups_with_language_provider(
         workspace: workspace_tool_contributions(workspace_root.clone()),
         network: network_tool_contributions(),
         image,
-        symbols: talos_tools::symbol_tool_contributions_with_provider(workspace_root.clone(), language_provider),
+        symbols: talos_tools::symbol_tool_contributions_with_provider(
+            workspace_root.clone(),
+            language_provider,
+        ),
         git_read: git_read_tool_contributions(workspace_root.clone()),
         git_mutation: git_mutation_tool_contributions(workspace_root),
     }

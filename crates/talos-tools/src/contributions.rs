@@ -304,19 +304,31 @@ pub fn symbol_tool_contributions_with_provider(
     vec![
         contribution(
             SYMBOL_CONTRIBUTION_SOURCE,
-            Arc::new(match provider.clone() { Some(ref p) => FindSymbolTool::with_provider(workspace_root.clone(), p.clone()), None => FindSymbolTool::new(workspace_root.clone()) }),
+            Arc::new(match provider.clone() {
+                Some(ref p) => FindSymbolTool::with_provider(workspace_root.clone(), p.clone()),
+                None => FindSymbolTool::new(workspace_root.clone()),
+            }),
         ),
         contribution(
             SYMBOL_CONTRIBUTION_SOURCE,
-            Arc::new(match provider.clone() { Some(ref p) => FindReferencesTool::with_provider(workspace_root.clone(), p.clone()), None => FindReferencesTool::new(workspace_root.clone()) }),
+            Arc::new(match provider.clone() {
+                Some(ref p) => FindReferencesTool::with_provider(workspace_root.clone(), p.clone()),
+                None => FindReferencesTool::new(workspace_root.clone()),
+            }),
         ),
         contribution(
             SYMBOL_CONTRIBUTION_SOURCE,
-            Arc::new(match provider.clone() { Some(ref p) => ListSymbolsTool::with_provider(workspace_root.clone(), p.clone()), None => ListSymbolsTool::new(workspace_root.clone()) }),
+            Arc::new(match provider.clone() {
+                Some(ref p) => ListSymbolsTool::with_provider(workspace_root.clone(), p.clone()),
+                None => ListSymbolsTool::new(workspace_root.clone()),
+            }),
         ),
         contribution(
             SYMBOL_CONTRIBUTION_SOURCE,
-            Arc::new(match provider { Some(p) => ListImportsTool::with_provider(workspace_root, p), None => ListImportsTool::new(workspace_root) }),
+            Arc::new(match provider {
+                Some(p) => ListImportsTool::with_provider(workspace_root, p),
+                None => ListImportsTool::new(workspace_root),
+            }),
         ),
     ]
 }

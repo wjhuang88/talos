@@ -30,13 +30,22 @@ async fn language_provider_publication_requires_activation_and_is_withdrawn_on_s
     assert!(plugin.language_provider().is_none());
     plugin.initialize(runtime()).expect("provider initializes");
     assert!(plugin.language_provider().is_none());
-    assert_eq!(registry.lock().expect("registry").resolve(&request), ResolutionResult::Unavailable);
+    assert_eq!(
+        registry.lock().expect("registry").resolve(&request),
+        ResolutionResult::Unavailable
+    );
     plugin.activate().expect("activate language provider");
     assert!(plugin.language_provider().is_some());
-    assert!(matches!(registry.lock().expect("registry").resolve(&request), ResolutionResult::Available(_)));
+    assert!(matches!(
+        registry.lock().expect("registry").resolve(&request),
+        ResolutionResult::Available(_)
+    ));
     plugin.stop().expect("stop language provider");
     assert!(plugin.language_provider().is_none());
-    assert_eq!(registry.lock().expect("registry").resolve(&request), ResolutionResult::Unavailable);
+    assert_eq!(
+        registry.lock().expect("registry").resolve(&request),
+        ResolutionResult::Unavailable
+    );
 }
 
 #[tokio::test]
