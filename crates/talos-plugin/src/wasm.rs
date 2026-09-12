@@ -207,6 +207,18 @@ impl WasmLanguageProvider {
     pub fn decode_symbol_response(&self, payload: &[u8]) -> Result<SymbolResponse, &'static str> {
         decode_symbol_response(payload, self.limits.max_source_bytes)
     }
+
+    /// Decode a provider response into a typed symbol result.
+    pub fn decode_symbol_response_as<T: serde::de::DeserializeOwned>(
+        &self,
+        payload: &[u8],
+    ) -> Result<T, WasmError> {
+        let response = self
+            .decode_symbol_response(payload)
+            .map_err(|error| WasmError::Instantiate(error.into()))?;
+        talos_text::decode_symbol_value(response)
+            .map_err(|error| WasmError::Instantiate(error.into()))
+    }
     /// Decode a guest highlight payload, falling back on malformed output.
     pub fn decode_highlight(
         &self,

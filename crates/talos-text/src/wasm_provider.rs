@@ -95,6 +95,18 @@ pub fn decode_symbol_response(
     serde_json::from_slice(bytes).map_err(|_| "symbol response decode failed")
 }
 
+/// Decode a successful provider value into a caller-selected typed result.
+pub fn decode_symbol_value<T: serde::de::DeserializeOwned>(
+    response: SymbolResponse,
+) -> Result<T, &'static str> {
+    match response {
+        SymbolResponse::Result(value) => {
+            serde_json::from_value(value).map_err(|_| "symbol provider result has an invalid shape")
+        }
+        SymbolResponse::Unavailable(_) => Err("symbol provider result unavailable"),
+    }
+}
+
 /// Validate a guest memory range without allowing integer overflow.
 pub fn validate_memory_range(
     offset: u32,

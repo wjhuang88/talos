@@ -13,6 +13,7 @@ pub trait HighlightProvider {
 
 #[cfg(feature = "wasm-provider")]
 pub mod wasm_provider;
+pub use wasm_provider::decode_symbol_value;
 
 /// Renderer-neutral language operations shared by text consumers.
 #[cfg(feature = "code-intelligence")]
