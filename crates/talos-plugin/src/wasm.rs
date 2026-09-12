@@ -122,7 +122,7 @@ impl talos_text::SymbolProvider for LoadedLanguageProvider {
         language: &str,
         source: &str,
         _root: &std::path::Path,
-        path: &std::path::Path,
+        _path: &std::path::Path,
         name: &str,
     ) -> Option<talos_text::symbol_queries::SymbolResult> {
         let request = SymbolRequest {
@@ -159,7 +159,7 @@ impl talos_text::SymbolProvider for LoadedLanguageProvider {
             .and_then(|r| talos_text::decode_symbol_value(r).map_err(str::to_owned))
             .map(|mut v: Vec<_>| {
                 let _ = path;
-                v.iter_mut().for_each(|l| {
+                v.iter_mut().for_each(|l: &mut talos_text::SourceLocation| {
                     if l.file.is_empty() {
                         l.file = path.to_string_lossy().into_owned();
                     }
@@ -204,11 +204,12 @@ impl talos_text::SymbolProvider for LoadedLanguageProvider {
             .map_err(|e| e.to_string())
             .and_then(|r| talos_text::decode_symbol_value(r).map_err(str::to_owned))
             .map(|mut v: Vec<_>| {
-                v.iter_mut().for_each(|i| {
-                    if i.file.is_empty() {
-                        i.file = path.to_string_lossy().into_owned();
-                    }
-                });
+                v.iter_mut()
+                    .for_each(|i: &mut talos_text::symbol_queries::ImportInfo| {
+                        if i.file.is_empty() {
+                            i.file = path.to_string_lossy().into_owned();
+                        }
+                    });
                 v
             })
     }
