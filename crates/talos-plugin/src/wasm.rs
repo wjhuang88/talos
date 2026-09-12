@@ -801,6 +801,13 @@ mod tests {
     }
 
     #[test]
+    fn symbol_response_decode_rejects_malformed_payload() {
+        let provider = WasmLanguageProvider::new(WasmProviderLimits::default());
+        let result = provider.decode_symbol_response(b"not-json");
+        assert_eq!(result, Err("symbol response decode failed"));
+    }
+
+    #[test]
     fn language_provider_abi_probe_rejects_incompatible_version() {
         let module = WasmModule::from_wat(
             runtime(),
