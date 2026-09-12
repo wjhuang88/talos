@@ -23,8 +23,9 @@ use crate::manifest::LanguageProviderDeclaration;
 use crate::manifest::parse_manifest;
 use crate::{PluginManifest, PluginTool};
 use talos_text::wasm_provider::{
-    ProviderRequest, WASM_LANGUAGE_RUN_EXPORT, WasmProviderLimits, decode_highlight,
-    encode_request, validate_memory_range,
+    ProviderRequest, SymbolRequest, SymbolResponse, WASM_LANGUAGE_RUN_EXPORT, WasmProviderLimits,
+    decode_highlight, decode_symbol_response, encode_request, encode_symbol_request,
+    validate_memory_range,
 };
 use talos_text::wasm_provider::{WASM_LANGUAGE_ABI_EXPORT, validate_abi_version};
 
@@ -197,6 +198,14 @@ impl WasmLanguageProvider {
     /// Encode a validated request for a guest transport.
     pub fn encode_request(&self, request: &ProviderRequest) -> Result<Vec<u8>, &'static str> {
         encode_request(request, self.limits)
+    }
+    /// Encode a bounded source-only symbol request.
+    pub fn encode_symbol_request(&self, request: &SymbolRequest) -> Result<Vec<u8>, &'static str> {
+        encode_symbol_request(request, self.limits)
+    }
+    /// Decode a bounded symbol response from an admitted guest.
+    pub fn decode_symbol_response(&self, payload: &[u8]) -> Result<SymbolResponse, &'static str> {
+        decode_symbol_response(payload, self.limits.max_source_bytes)
     }
     /// Decode a guest highlight payload, falling back on malformed output.
     pub fn decode_highlight(
