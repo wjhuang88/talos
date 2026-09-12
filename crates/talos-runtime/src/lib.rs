@@ -41,6 +41,27 @@ use talos_skill::SkillIndex;
 use thiserror::Error;
 use tokio::sync::mpsc;
 
+/// Shared language-provider host context for optional TUI and symbol consumers.
+#[cfg(feature = "language-provider")]
+pub struct LanguageProviderHost {
+    context: talos_text::SharedLanguageProvider,
+}
+
+#[cfg(feature = "language-provider")]
+impl LanguageProviderHost {
+    /// Construct a host from one loaded provider instance.
+    pub fn new(provider: Box<dyn talos_text::LanguageProviderBundle>) -> Self {
+        Self {
+            context: talos_text::SharedLanguageProvider::new(provider),
+        }
+    }
+
+    /// Access the shared provider context.
+    pub fn context(&self) -> &talos_text::SharedLanguageProvider {
+        &self.context
+    }
+}
+
 mod shutdown;
 
 pub use shutdown::{
