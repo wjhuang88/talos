@@ -404,8 +404,23 @@ fn find_symbol_in_file(
     let FileAdmission::Admitted { language, code } = admit_file(path, state).ok()? else {
         return None;
     };
-    let provider = talos_text::BuiltinHighlighter::symbol_only();
-    talos_text::LanguageProvider::find_symbol(&provider, language, &code, root, path, name)
+    let mut provider = talos_text::BuiltinHighlighter::symbol_only();
+    talos_text::SymbolProvider::find_symbol(&mut provider, language, &code, root, path, name)
+}
+
+/// Query one admitted source file through an explicitly supplied symbol provider.
+pub fn find_symbol_with_provider(
+    provider: &mut dyn talos_text::SymbolProvider,
+    language: &str,
+    source: &str,
+    root: &Path,
+    path: &Path,
+    name: &str,
+) -> Result<Option<SymbolResult>, String> {
+    provider
+        .find_symbol(language, source, root, path, name)
+        .map(Ok)
+        .unwrap_or_else(|| Ok(None))
 }
 
 fn find_refs_in_file(path: &Path, name: &str) -> Result<Vec<SourceLocation>, String> {
