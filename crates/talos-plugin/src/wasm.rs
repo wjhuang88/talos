@@ -116,6 +116,14 @@ impl talos_text::HighlightProvider for LoadedLanguageProvider {
 }
 
 #[cfg(all(feature = "wasm", feature = "code-intelligence"))]
+impl LoadedLanguageProvider {
+    /// Move this loaded provider into the host's shared consumer context.
+    pub fn into_shared_context(self) -> talos_text::SharedLanguageProvider {
+        talos_text::SharedLanguageProvider::new(Box::new(self))
+    }
+}
+
+#[cfg(all(feature = "wasm", feature = "code-intelligence"))]
 impl talos_text::SymbolProvider for LoadedLanguageProvider {
     fn find_symbol(
         &mut self,
