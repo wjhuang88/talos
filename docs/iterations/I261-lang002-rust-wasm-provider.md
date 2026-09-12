@@ -23,6 +23,19 @@
 
 Claim preparation is governance-only; implementation starts only after the claim reaches main.
 
+### Non-terminal iteration inventory — 2026-09-12
+
+| Item | Current disposition |
+|---|---|
+| I261 / LANG-002 | Planned / Claimed; claim pending merge, implementation unauthorized |
+| I164 / legacy migration | Paused / superseded; do not resume |
+| I249 and other active capability work | Frozen or separately governed; no overlap with this slice |
+| LANG-003 / #517, DIST-001-B / #515, BROWSER-001 / #508 | Refinement / Unclaimed; remain future work |
+| I159–I162 | Terminal or separately blocked; unchanged |
+| Open implementation PRs | None claimed by I261; unrelated PRs remain outside this slice |
+
+This inventory is a governance checkpoint, not implementation authorization.
+
 ### Claim Preparation Checkpoint — 2026-09-12
 
 Owner and work slice are recorded locally for governance review. This checkpoint does not
@@ -44,4 +57,4 @@ LANG-001/I257, CAP-001-C/I255, BUNDLE-001/I259, and DIST-001-A/I260 are Complete
 
 ## Governance Gate
 
-Before implementation, assign an owner, establish an effective Collaboration Claim, and obtain an independent security/dependency review. Until then this iteration remains Planned / Unclaimed.
+Before implementation, assign an owner, establish an effective Collaboration Claim, and obtain an independent security/dependency review. The claim is currently Claimed but remains ineffective until PR #542 merges to `main`; until then this iteration remains Planned and implementation is unauthorized.
