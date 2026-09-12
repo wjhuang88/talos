@@ -27,4 +27,4 @@ pub use manifest::{
 };
 pub use registry::{HookOutcome, HookRegistration, HookRegistry};
 #[cfg(feature = "wasm")]
-pub use wasm::WasmLanguageProvider;
+pub use wasm::{LoadedLanguageProvider, WasmLanguageProvider, load_declared_language_provider};
