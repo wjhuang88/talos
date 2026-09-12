@@ -94,8 +94,6 @@ pub use browser_page::{
 pub use contributions::network_tool_contributions;
 #[cfg(feature = "image")]
 pub use contributions::read_image_tool_contribution;
-#[cfg(feature = "code-intelligence")]
-pub use contributions::symbol_tool_contributions;
 #[cfg(all(feature = "file-read", feature = "search", feature = "git"))]
 pub use contributions::workspace_non_document_tool_contributions;
 #[cfg(all(
@@ -114,6 +112,8 @@ pub use contributions::{
     ordinary_file_tool_contributions, snapshot_aware_file_tool_contributions,
     snapshot_aware_file_tool_contributions_with_capability,
 };
+#[cfg(feature = "code-intelligence")]
+pub use contributions::{symbol_tool_contributions, symbol_tool_contributions_with_provider};
 #[cfg(feature = "git")]
 pub use diff_stat::{DiffInput, DiffTool, StatInput, StatTool};
 #[cfg(feature = "document")]

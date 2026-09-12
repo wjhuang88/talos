@@ -31,7 +31,7 @@ use talos_permission::{PermissionEngine, PermissionSessionState};
 use talos_plugin::lifecycle::PluginLifecycle;
 use talos_plugin::wasm::{LoadedPluginPackage, WasmRuntime};
 use talos_runtime::composition::{
-    SharedToolProfile, contribution_groups, contribution_groups_with_capability,
+    SharedToolProfile, contribution_groups, contribution_groups_with_language_provider,
 };
 use talos_session::{SessionManager, todo_tool_contributions_for_sessions_dir};
 use tokio::sync::mpsc;
@@ -539,9 +539,16 @@ pub(crate) fn register_tui_permission_aware_tools(
     }
 }
 
-type LoadedPluginTools = (Vec<Arc<dyn AgentTool>>, LoadedPluginPackage);
+pub(crate) type LoadedLanguageContext = talos_text::SharedLanguageProvider;
+type LoadedPluginTools = (
+    Vec<Arc<dyn AgentTool>>,
+    LoadedPluginPackage,
+    Option<LoadedLanguageContext>,
+);
 
-fn load_explicit_plugin_tools(package_roots: &[PathBuf]) -> Result<Vec<LoadedPluginTools>, String> {
+pub(crate) fn load_explicit_plugin_tools(
+    package_roots: &[PathBuf],
+) -> Result<Vec<LoadedPluginTools>, String> {
     if package_roots.is_empty() {
         return Ok(Vec::new());
     }
@@ -568,14 +575,14 @@ fn load_explicit_plugin_tools(package_roots: &[PathBuf]) -> Result<Vec<LoadedPlu
             .package()
             .cloned()
             .ok_or_else(|| "initialized plugin has no package metadata".to_owned())?;
-        loaded.push((tools, package));
+        loaded.push((tools, package, None));
         lifecycles.push(lifecycle);
     }
     // Reuse core's transactional collision semantics, including source diagnostics,
     // before publishing capabilities. No production tool registry is mutated here.
     let mut checked = ToolRegistry::new();
     checked
-        .register_contributions(loaded.iter().flat_map(|(tools, package)| {
+        .register_contributions(loaded.iter().flat_map(|(tools, package, _)| {
             let source = plugin_source(package);
             tools
                 .iter()
@@ -584,6 +591,11 @@ fn load_explicit_plugin_tools(package_roots: &[PathBuf]) -> Result<Vec<LoadedPlu
         .map_err(|error| error.to_string())?;
     for lifecycle in &mut lifecycles {
         lifecycle.activate().map_err(|error| error.to_string())?;
+    }
+    for (lifecycle, (_, _, context)) in lifecycles.iter_mut().zip(loaded.iter_mut()) {
+        *context = lifecycle
+            .take_language_provider_context()
+            .map_err(|error| error.to_string())?;
     }
     Ok(loaded)
 }
@@ -603,7 +615,7 @@ pub(crate) fn register_explicit_permission_aware_plugins(
     let loaded = load_explicit_plugin_tools(package_roots)?;
     let mut packages = Vec::with_capacity(loaded.len());
     let mut contributions = Vec::new();
-    for (tools, package) in loaded {
+    for (tools, package, _) in loaded {
         let source = plugin_source(&package);
         contributions.extend(
             tools
@@ -620,15 +632,18 @@ pub(crate) fn register_explicit_permission_aware_plugins(
 
 /// Loads explicitly selected local packages and registers their tools behind
 /// the non-blocking TUI permission adapter.
-pub(crate) fn register_explicit_tui_plugins(
+/// Registers an already initialized and activated set of explicit TUI plugins.
+///
+/// Loading is intentionally separate from registration so callers can obtain an
+/// active language provider before constructing built-in symbol contributions.
+pub(crate) fn register_loaded_tui_plugins(
     registry: &mut ToolRegistry,
-    package_roots: &[PathBuf],
-    _approval: Arc<TuiApprovalHandler>,
-) -> Result<Vec<LoadedPluginPackage>, String> {
-    let loaded = load_explicit_plugin_tools(package_roots)?;
+    loaded: Vec<LoadedPluginTools>,
+) -> Result<(Vec<LoadedPluginPackage>, Option<LoadedLanguageContext>), String> {
     let mut packages = Vec::with_capacity(loaded.len());
     let mut contributions = Vec::new();
-    for (tools, package) in loaded {
+    let mut context = None;
+    for (tools, package, provider_context) in loaded {
         let source = plugin_source(&package);
         contributions.extend(
             tools
@@ -636,11 +651,12 @@ pub(crate) fn register_explicit_tui_plugins(
                 .map(|tool| ToolContribution::new(source.clone(), tool)),
         );
         packages.push(package);
+        context = context.or(provider_context);
     }
     registry
         .register_contributions(contributions)
         .map_err(|error| error.to_string())?;
-    Ok(packages)
+    Ok((packages, context))
 }
 
 /// A lightweight health/status tool for MCP mode.
@@ -769,12 +785,31 @@ pub(crate) fn build_tui_tool_registry_with_capability(
     delay_tool: Vec<Arc<dyn AgentTool>>,
     atomic_create: Option<talos_core::tool::SharedAtomicCreateCapability>,
 ) -> ToolRegistry {
+    build_tui_tool_registry_with_language_provider(
+        approval_handler,
+        workspace_root,
+        session_id,
+        delay_tool,
+        atomic_create,
+        None,
+    )
+}
+
+pub(crate) fn build_tui_tool_registry_with_language_provider(
+    approval_handler: Arc<TuiApprovalHandler>,
+    workspace_root: PathBuf,
+    session_id: Uuid,
+    delay_tool: Vec<Arc<dyn AgentTool>>,
+    atomic_create: Option<talos_core::tool::SharedAtomicCreateCapability>,
+    language_provider: Option<LoadedLanguageContext>,
+) -> ToolRegistry {
     build_tui_tool_registry_with_todo_contributions(
         approval_handler,
         workspace_root,
         delay_tool,
         default_todo_tool_contributions(session_id),
         atomic_create,
+        language_provider,
     )
 }
 
@@ -784,12 +819,14 @@ fn build_tui_tool_registry_with_todo_contributions(
     delay_tool: Vec<Arc<dyn AgentTool>>,
     todo_contributions: Vec<ToolContribution>,
     atomic_create: Option<talos_core::tool::SharedAtomicCreateCapability>,
+    language_provider: Option<LoadedLanguageContext>,
 ) -> ToolRegistry {
     let mut registry = ToolRegistry::new();
-    let shared = contribution_groups_with_capability(
+    let shared = contribution_groups_with_language_provider(
         SharedToolProfile::Product,
         workspace_root,
         atomic_create,
+        language_provider,
     );
     let mut contributions = shared.shell;
     contributions.extend(shared.files);
@@ -1168,6 +1205,7 @@ mod tests {
             PathBuf::from("."),
             Vec::new(),
             todo_tool_contributions_for_sessions_dir(&sessions_dir, session_id),
+            None,
             None,
         );
         let mcp_registry = build_mcp_tool_registry();

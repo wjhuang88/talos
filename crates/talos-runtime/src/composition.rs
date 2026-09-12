@@ -11,7 +11,7 @@ use talos_core::tool::ToolContribution;
 use talos_tools::{
     git_mutation_tool_contributions, git_read_tool_contributions, network_tool_contributions,
     ordinary_file_tool_contributions, read_image_tool_contribution, shell_tool_contributions,
-    symbol_tool_contributions, workspace_tool_contributions,
+    workspace_tool_contributions,
 };
 
 /// Explicit consumer profile for the shared built-in contribution inventory.
@@ -64,6 +64,17 @@ pub fn contribution_groups_with_capability(
     workspace_root: PathBuf,
     atomic_create: Option<SharedAtomicCreateCapability>,
 ) -> SharedToolContributions {
+    contribution_groups_with_language_provider(profile, workspace_root, atomic_create, None)
+}
+
+/// Build contributions with one shared language provider for symbol consumers.
+#[cfg(feature = "shared-composition")]
+pub fn contribution_groups_with_language_provider(
+    profile: SharedToolProfile,
+    workspace_root: PathBuf,
+    atomic_create: Option<SharedAtomicCreateCapability>,
+    language_provider: Option<talos_text::SharedLanguageProvider>,
+) -> SharedToolContributions {
     let image = (profile != SharedToolProfile::Mcp)
         .then(|| read_image_tool_contribution(workspace_root.clone()));
     SharedToolContributions {
@@ -79,7 +90,10 @@ pub fn contribution_groups_with_capability(
         workspace: workspace_tool_contributions(workspace_root.clone()),
         network: network_tool_contributions(),
         image,
-        symbols: symbol_tool_contributions(workspace_root.clone()),
+        symbols: talos_tools::symbol_tool_contributions_with_provider(
+            workspace_root.clone(),
+            language_provider,
+        ),
         git_read: git_read_tool_contributions(workspace_root.clone()),
         git_mutation: git_mutation_tool_contributions(workspace_root),
     }

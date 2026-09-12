@@ -6,12 +6,82 @@ use std::sync::{Arc, Mutex};
 use talos_core::{CapabilityRegistry, CapabilityRequest, ResolutionResult};
 use talos_plugin::lifecycle::{LifecycleError, PluginLifecycle, PluginState};
 use talos_plugin::wasm::WasmRuntime;
+use talos_text::HighlightProvider;
 
 fn runtime() -> Arc<WasmRuntime> {
     Arc::new(WasmRuntime::new(100_000, 250).expect("runtime"))
 }
 fn fixture() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/capability-demo")
+}
+fn language_fixture() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/language-provider")
+}
+
+#[tokio::test]
+async fn language_provider_publication_requires_activation_and_is_withdrawn_on_stop() {
+    let registry = Arc::new(Mutex::new(CapabilityRegistry::default()));
+    let mut plugin = PluginLifecycle::new(registry.clone());
+    let request = CapabilityRequest {
+        capability_id: "language.rust".into(),
+        version: "1.0.0".into(),
+    };
+    plugin.load(&language_fixture()).expect("manifest loads");
+    assert!(plugin.language_provider().is_none());
+    plugin.initialize(runtime()).expect("provider initializes");
+    assert!(plugin.language_provider().is_none());
+    assert_eq!(
+        registry.lock().expect("registry").resolve(&request),
+        ResolutionResult::Unavailable
+    );
+    plugin.activate().expect("activate language provider");
+    assert!(plugin.language_provider().is_some());
+    assert!(matches!(
+        registry.lock().expect("registry").resolve(&request),
+        ResolutionResult::Available(_)
+    ));
+    let shared = plugin
+        .take_language_provider_context()
+        .expect("context transfer")
+        .expect("declared provider");
+    assert!(matches!(
+        shared.highlight(
+            &talos_text::LanguageId::parse("rust").expect("language"),
+            "fn main() {}"
+        ),
+        talos_text::HighlightResult::PlainText
+    ));
+    assert!(shared.with_symbols(|_| ()).is_some());
+    plugin.stop().expect("stop language provider");
+    assert!(plugin.language_provider().is_none());
+    assert!(matches!(
+        shared.highlight(
+            &talos_text::LanguageId::parse("rust").expect("language"),
+            "fn main() {}"
+        ),
+        talos_text::HighlightResult::PlainText
+    ));
+    assert!(shared.with_symbols(|_| ()).is_none());
+    assert_eq!(
+        registry.lock().expect("registry").resolve(&request),
+        ResolutionResult::Unavailable
+    );
+}
+
+#[tokio::test]
+async fn language_provider_fixture_has_safe_highlight_fallback() {
+    let registry = Arc::new(Mutex::new(CapabilityRegistry::default()));
+    let mut plugin = PluginLifecycle::new(registry);
+    plugin.load(&language_fixture()).expect("manifest loads");
+    plugin.initialize(runtime()).expect("provider initializes");
+    plugin.activate().expect("activate language provider");
+    let provider = plugin.language_provider().expect("provider handle");
+    let language = talos_text::LanguageId::parse("rust").expect("language");
+    assert!(provider.supports(&language));
+    assert!(matches!(
+        provider.highlight(&language, "fn main() {}"),
+        talos_text::HighlightResult::PlainText
+    ));
 }
 fn resolve(registry: &Mutex<CapabilityRegistry>) -> ResolutionResult {
     registry
@@ -224,6 +294,7 @@ async fn legacy_non_semver_and_names_preserved_without_public_struct_changes() {
         tools: vec![],
         hooks: vec![],
         skills: vec![],
+        language_provider: None,
     };
     assert!(legacy.validate().is_ok());
 }

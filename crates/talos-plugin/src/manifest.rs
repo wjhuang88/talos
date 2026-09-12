@@ -28,6 +28,19 @@ pub struct PluginManifest {
     pub tools: Vec<PluginTool>,
     #[serde(default)]
     pub hooks: Vec<PluginHook>,
+    /// Optional language-provider declaration; loading remains explicit and bounded.
+    #[serde(default)]
+    pub language_provider: Option<LanguageProviderDeclaration>,
+}
+
+/// Manifest declaration for a language provider sharing the plugin artifact boundary.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LanguageProviderDeclaration {
+    /// Stable language identifier, for example `rust`.
+    pub language: String,
+    /// Exported provider module path relative to the package root.
+    pub artifact: String,
 }
 
 /// Versioned Bundle manifest accepted alongside the legacy Plugin shape.
@@ -42,6 +55,9 @@ pub struct BundleManifest {
     pub tools: Vec<PluginTool>,
     #[serde(default)]
     pub hooks: Vec<PluginHook>,
+    /// Optional language provider declared by this bundle; installation never activates it.
+    #[serde(default)]
+    pub language_provider: Option<LanguageProviderDeclaration>,
 }
 
 /// Stable identity and artifact metadata for a Bundle.
@@ -136,6 +152,7 @@ pub fn migrate_legacy_manifest(
         skills: legacy.skills,
         tools: legacy.tools,
         hooks: legacy.hooks,
+        language_provider: legacy.language_provider,
     };
     bundle.validate()?;
     toml::to_string_pretty(&bundle)
@@ -195,7 +212,14 @@ pub fn parse_compatible_manifest(toml_str: &str) -> Result<CompatibleManifest, M
         ));
     }
     if has_bundle {
-        let allowed = ["schema_version", "bundle", "skills", "tools", "hooks"];
+        let allowed = [
+            "schema_version",
+            "bundle",
+            "skills",
+            "tools",
+            "hooks",
+            "language_provider",
+        ];
         if let Some(unknown) = value
             .as_table()
             .and_then(|table| table.keys().find(|key| !allowed.contains(&key.as_str())))
@@ -258,6 +282,18 @@ impl PluginManifest {
                 "plugin.carrier must be 'wasm' (got '{}'); other carriers are not yet supported",
                 p.carrier
             )));
+        }
+        if let Some(provider) = &self.language_provider {
+            if provider.language.trim().is_empty() {
+                return Err(ManifestError::Validation(
+                    "language_provider.language is empty".into(),
+                ));
+            }
+            if provider.artifact.trim().is_empty() {
+                return Err(ManifestError::Validation(
+                    "language_provider.artifact is empty".into(),
+                ));
+            }
         }
         let mut seen_tools: HashSet<&str> = HashSet::new();
         for tool in &self.tools {
@@ -365,6 +401,15 @@ impl BundleManifest {
             ));
         }
         validate_components(&self.tools, &self.skills, &self.hooks)?;
+        if let Some(provider) = &self.language_provider
+            && (provider.language.trim().is_empty()
+                || provider.artifact.trim().is_empty()
+                || !safe_relative_path(&provider.artifact))
+        {
+            return Err(ManifestError::Validation(
+                "bundle language_provider must use a non-empty safe relative artifact path".into(),
+            ));
+        }
         if self
             .tools
             .iter()
@@ -507,15 +552,23 @@ version = "1.0.0"
 carrier = "wasm"
 artifact = "artifacts/main.wasm"
 digest = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+
+[language_provider]
+language = "rust"
+artifact = "artifacts/rust.wasm"
 "#;
         let parsed = parse_compatible_manifest(toml).expect("bundle manifest");
         assert!(matches!(
-            parsed,
+            &parsed,
             CompatibleManifest::Bundle(BundleManifest {
                 schema_version: 1,
                 ..
             })
         ));
+        let CompatibleManifest::Bundle(bundle) = parsed else {
+            unreachable!()
+        };
+        assert_eq!(bundle.language_provider.expect("provider").language, "rust");
     }
 
     #[test]
@@ -535,6 +588,22 @@ artifact = "b.wasm"
         assert!(err.to_string().contains("unknown bundle manifest field"));
         let unknown_legacy = format!("unknown = true\n{}", VALID_MANIFEST);
         assert!(parse_compatible_manifest(&unknown_legacy).is_err());
+    }
+
+    #[test]
+    fn reject_bundle_language_provider_path_escape() {
+        let toml = r#"
+schema_version = 1
+[bundle]
+name = "bundle"
+version = "1.0.0"
+carrier = "wasm"
+artifact = "main.wasm"
+[language_provider]
+language = "rust"
+artifact = "../provider.wasm"
+"#;
+        assert!(parse_compatible_manifest(toml).is_err());
     }
 
     #[test]
@@ -574,6 +643,29 @@ artifact = "bare.wasm"
         assert!(manifest.tools.is_empty());
         assert!(manifest.skills.is_empty());
         assert!(manifest.hooks.is_empty());
+    }
+
+    #[test]
+    fn parse_explicit_language_provider_declaration() {
+        let manifest = parse_manifest(
+            r#"
+[plugin]
+name = "rust-provider"
+version = "1.0.0"
+carrier = "wasm"
+artifact = "provider.wasm"
+
+[language_provider]
+language = "rust"
+artifact = "provider.wasm"
+"#,
+        )
+        .expect("manifest should parse");
+        let declaration = manifest
+            .language_provider
+            .expect("provider declaration should be retained");
+        assert_eq!(declaration.language, "rust");
+        assert_eq!(declaration.artifact, "provider.wasm");
     }
 
     #[test]

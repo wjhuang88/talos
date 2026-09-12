@@ -5832,6 +5832,7 @@ dependencies = [
  "talos-runtime",
  "talos-session",
  "talos-skill",
+ "talos-text",
  "talos-tools",
  "talos-tui",
  "tempfile",
@@ -6016,6 +6017,7 @@ dependencies = [
  "sha2 0.10.9",
  "talos-core",
  "talos-permission",
+ "talos-text",
  "thiserror 2.0.20",
  "tokio",
  "toml",
@@ -6078,6 +6080,7 @@ dependencies = [
  "talos-sandbox",
  "talos-session",
  "talos-skill",
+ "talos-text",
  "talos-tools",
  "tempfile",
  "thiserror 2.0.20",
@@ -6135,6 +6138,7 @@ dependencies = [
  "arborium",
  "serde",
  "serde_json",
+ "wasmtime",
 ]
 
 [[package]]

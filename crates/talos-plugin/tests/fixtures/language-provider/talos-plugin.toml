@@ -1,0 +1,9 @@
+[plugin]
+name = "offline-rust-language-provider"
+version = "0.1.0"
+carrier = "wasm"
+artifact = "provider.wat"
+
+[language_provider]
+language = "rust"
+artifact = "provider.wat"

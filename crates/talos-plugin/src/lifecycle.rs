@@ -13,7 +13,10 @@ use talos_core::{CapabilityDescriptor, CapabilityRegistry, ProviderDescriptor};
 
 use crate::PluginManifest;
 use crate::manifest::parse_manifest;
-use crate::wasm::{LoadedPluginPackage, PLUGIN_MANIFEST_FILE, WasmPluginTool, WasmRuntime};
+use crate::wasm::{
+    LoadedLanguageProvider, LoadedPluginPackage, PLUGIN_MANIFEST_FILE, WasmPluginTool, WasmRuntime,
+    load_declared_language_provider,
+};
 
 /// Observable lifecycle of an explicitly selected Plugin.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -126,6 +129,8 @@ pub struct PluginLifecycle {
     root: PathBuf,
     tools: Vec<Arc<dyn AgentTool>>,
     package: Option<LoadedPluginPackage>,
+    language_provider: Option<LoadedLanguageProvider>,
+    language_provider_gate: std::sync::Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl PluginLifecycle {
@@ -144,6 +149,8 @@ impl PluginLifecycle {
             root: PathBuf::new(),
             tools: Vec::new(),
             package: None,
+            language_provider: None,
+            language_provider_gate: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
         }
     }
 
@@ -207,6 +214,19 @@ impl PluginLifecycle {
             })?;
             tools.push(Arc::new(executable));
         }
+        let language_provider = manifest
+            .language_provider
+            .as_ref()
+            .map(|declaration| {
+                load_declared_language_provider(
+                    runtime.clone(),
+                    &self.root,
+                    declaration,
+                    talos_text::wasm_provider::WasmProviderLimits::default(),
+                )
+                .map_err(|error| LifecycleError::Invalid(error.to_string()))
+            })
+            .transpose()?;
         let package = LoadedPluginPackage {
             name: manifest.plugin.name.clone(),
             version: manifest.plugin.version.clone(),
@@ -223,12 +243,39 @@ impl PluginLifecycle {
             })
             .collect();
         self.package = Some(package);
+        self.language_provider = language_provider;
+        self.language_provider_gate
+            .store(false, std::sync::atomic::Ordering::Release);
         self.shared
             .gate
             .lock()
             .map_err(|_| LifecycleError::Synchronization)?
             .state = PluginState::Initialized;
         Ok(())
+    }
+
+    /// Borrow the language provider only while its publication is active.
+    pub fn language_provider(&mut self) -> Option<&mut LoadedLanguageProvider> {
+        if self.state() != PluginState::Active {
+            return None;
+        }
+        self.language_provider.as_mut()
+    }
+
+    /// Transfer the active provider into a shared consumer context.
+    #[cfg(feature = "code-intelligence")]
+    pub fn take_language_provider_context(
+        &mut self,
+    ) -> Result<Option<talos_text::SharedLanguageProvider>, LifecycleError> {
+        if self.state() != PluginState::Active {
+            return Err(LifecycleError::State(self.state()));
+        }
+        Ok(self.language_provider.take().map(|provider| {
+            LoadedLanguageProvider::into_shared_context_with_gate(
+                provider,
+                self.language_provider_gate.clone(),
+            )
+        }))
     }
 
     /// Publish the validated provider exclusively. Collision leaves no partial entry.
@@ -254,12 +301,16 @@ impl PluginLifecycle {
             .map_err(|error| LifecycleError::Invalid(error.to_string()))?;
         gate.registration = Some(registration);
         gate.state = PluginState::Active;
+        self.language_provider_gate
+            .store(true, std::sync::atomic::Ordering::Release);
         Ok(())
     }
 
     /// Stop new admissions and withdraw owned capabilities. Calls admitted before
     /// this fence may finish under their existing WASM fuel/wall-clock bounds.
     pub fn stop(&self) -> Result<(), LifecycleError> {
+        self.language_provider_gate
+            .store(false, std::sync::atomic::Ordering::Release);
         self.shared.stop()
     }
 
@@ -349,6 +400,22 @@ fn descriptor(
                 "tool".into(),
                 format!("{}.{}", manifest.plugin.name, binding.tool),
             )]),
+        });
+    }
+    if let Some(language) = &manifest.language_provider {
+        let id = format!("language.{}", language.language);
+        if !seen.insert(id.clone()) {
+            return Err(LifecycleError::Invalid(
+                "duplicate language capability".into(),
+            ));
+        }
+        capabilities.push(CapabilityDescriptor {
+            id,
+            version: "1.0.0".into(),
+            name: language.language.clone(),
+            provenance: Provenance::Plugin,
+            carrier: Carrier::Wasm,
+            metadata: BTreeMap::new(),
         });
     }
     let descriptor = ProviderDescriptor {

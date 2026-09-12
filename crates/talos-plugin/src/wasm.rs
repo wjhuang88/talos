@@ -19,8 +19,15 @@ use talos_core::tool::{
 };
 use thiserror::Error;
 
+use crate::manifest::LanguageProviderDeclaration;
 use crate::manifest::parse_manifest;
 use crate::{PluginManifest, PluginTool};
+use talos_text::wasm_provider::{
+    ProviderRequest, SymbolRequest, SymbolResponse, WASM_LANGUAGE_RUN_EXPORT, WasmProviderLimits,
+    decode_highlight, decode_symbol_response, encode_request, encode_symbol_request,
+    validate_memory_range,
+};
+use talos_text::wasm_provider::{WASM_LANGUAGE_ABI_EXPORT, validate_abi_version};
 
 const MAX_PLUGIN_TOOL_OUTPUT: usize = 2_000;
 /// Manifest filename for an explicitly selected local plugin package.
@@ -50,6 +57,8 @@ pub enum WasmError {
     Instantiate(String),
     #[error("exported function 'run' not found or has wrong signature")]
     MissingExport,
+    #[error("language provider export not found or has wrong signature")]
+    MissingLanguageProviderExport,
     #[error("execution trapped: {0}")]
     Trap(String),
     #[error("execution timed out after {timeout_ms}ms")]
@@ -66,6 +75,420 @@ pub struct WasmRuntime {
     engine: Arc<wasmtime::Engine>,
     fuel: u64,
     timeout: Duration,
+}
+
+/// UI-neutral adapter for bounded language-provider wire payloads.
+pub struct WasmLanguageProvider {
+    limits: WasmProviderLimits,
+}
+
+/// An explicitly loaded, admitted language provider with its stable language identity.
+pub struct LoadedLanguageProvider {
+    /// Canonical language identifier from the package declaration.
+    pub language: String,
+    /// Bounded provider adapter.
+    pub provider: WasmLanguageProvider,
+    /// Validated WASM module retained for invocation.
+    pub module: WasmModule,
+}
+
+impl talos_text::HighlightProvider for LoadedLanguageProvider {
+    fn highlight(
+        &mut self,
+        language: &talos_text::LanguageId,
+        source: &str,
+    ) -> talos_text::HighlightResult {
+        if !self.supports(language) {
+            return talos_text::HighlightResult::PlainText;
+        }
+        let request = ProviderRequest {
+            language: self.language.clone(),
+            source: source.to_owned(),
+        };
+        self.provider
+            .execute_highlight(&self.module, &request)
+            .unwrap_or(talos_text::HighlightResult::PlainText)
+    }
+
+    fn supports(&self, language: &talos_text::LanguageId) -> bool {
+        language.as_str() == self.language
+    }
+}
+
+#[cfg(all(feature = "wasm", feature = "code-intelligence"))]
+impl LoadedLanguageProvider {
+    /// Move this loaded provider into the host's shared consumer context.
+    pub fn into_shared_context(self) -> talos_text::SharedLanguageProvider {
+        talos_text::SharedLanguageProvider::new(Box::new(self))
+    }
+
+    /// Move this provider into a context governed by its lifecycle.
+    pub fn into_shared_context_with_gate(
+        self,
+        gate: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    ) -> talos_text::SharedLanguageProvider {
+        talos_text::SharedLanguageProvider::new_with_gate(Box::new(self), gate)
+    }
+}
+
+#[cfg(all(feature = "wasm", feature = "code-intelligence"))]
+impl talos_text::SymbolProvider for LoadedLanguageProvider {
+    fn find_symbol(
+        &mut self,
+        language: &str,
+        source: &str,
+        _root: &std::path::Path,
+        _path: &std::path::Path,
+        name: &str,
+    ) -> Option<talos_text::symbol_queries::SymbolResult> {
+        let request = SymbolRequest {
+            abi_version: talos_text::wasm_provider::WASM_LANGUAGE_SYMBOL_ABI_VERSION,
+            language: language.to_owned(),
+            source: source.to_owned(),
+            operation: talos_text::wasm_provider::SymbolOperation::FindSymbol {
+                name: name.to_owned(),
+            },
+        };
+        self.provider
+            .execute_symbol(&self.module, &request)
+            .ok()
+            .and_then(|r| talos_text::decode_symbol_value(r).ok())
+    }
+    fn find_references(
+        &mut self,
+        language: &str,
+        source: &str,
+        path: &std::path::Path,
+        name: &str,
+    ) -> Result<Vec<talos_text::SourceLocation>, String> {
+        let request = SymbolRequest {
+            abi_version: talos_text::wasm_provider::WASM_LANGUAGE_SYMBOL_ABI_VERSION,
+            language: language.to_owned(),
+            source: source.to_owned(),
+            operation: talos_text::wasm_provider::SymbolOperation::FindReferences {
+                name: name.to_owned(),
+            },
+        };
+        self.provider
+            .execute_symbol(&self.module, &request)
+            .map_err(|e| e.to_string())
+            .and_then(|r| talos_text::decode_symbol_value(r).map_err(str::to_owned))
+            .map(|mut v: Vec<_>| {
+                let _ = path;
+                v.iter_mut().for_each(|l: &mut talos_text::SourceLocation| {
+                    if l.file.is_empty() {
+                        l.file = path.to_string_lossy().into_owned();
+                    }
+                });
+                v
+            })
+    }
+    fn list_symbols(
+        &mut self,
+        language: &str,
+        source: &str,
+        _file: &str,
+        kind: Option<&str>,
+    ) -> Result<Vec<talos_text::SymbolInfo>, String> {
+        let request = SymbolRequest {
+            abi_version: talos_text::wasm_provider::WASM_LANGUAGE_SYMBOL_ABI_VERSION,
+            language: language.to_owned(),
+            source: source.to_owned(),
+            operation: talos_text::wasm_provider::SymbolOperation::ListSymbols {
+                kind: kind.map(str::to_owned),
+            },
+        };
+        self.provider
+            .execute_symbol(&self.module, &request)
+            .map_err(|e| e.to_string())
+            .and_then(|r| talos_text::decode_symbol_value(r).map_err(str::to_owned))
+    }
+    fn list_imports(
+        &mut self,
+        language: &str,
+        source: &str,
+        path: &std::path::Path,
+    ) -> Result<Vec<talos_text::symbol_queries::ImportInfo>, String> {
+        let request = SymbolRequest {
+            abi_version: talos_text::wasm_provider::WASM_LANGUAGE_SYMBOL_ABI_VERSION,
+            language: language.to_owned(),
+            source: source.to_owned(),
+            operation: talos_text::wasm_provider::SymbolOperation::ListImports,
+        };
+        self.provider
+            .execute_symbol(&self.module, &request)
+            .map_err(|e| e.to_string())
+            .and_then(|r| talos_text::decode_symbol_value(r).map_err(str::to_owned))
+            .map(|mut v: Vec<_>| {
+                v.iter_mut()
+                    .for_each(|i: &mut talos_text::symbol_queries::ImportInfo| {
+                        if i.file.is_empty() {
+                            i.file = path.to_string_lossy().into_owned();
+                        }
+                    });
+                v
+            })
+    }
+}
+
+/// Load a declared language provider from an explicitly selected package.
+pub fn load_declared_language_provider(
+    runtime: Arc<WasmRuntime>,
+    package_root: &Path,
+    declaration: &LanguageProviderDeclaration,
+    limits: WasmProviderLimits,
+) -> Result<LoadedLanguageProvider, WasmError> {
+    let (provider, module) =
+        WasmLanguageProvider::load_from_path(runtime, package_root, &declaration.artifact, limits)?;
+    Ok(LoadedLanguageProvider {
+        language: declaration.language.clone(),
+        provider,
+        module,
+    })
+}
+
+impl WasmLanguageProvider {
+    /// Construct with explicit provider limits.
+    pub fn new(limits: WasmProviderLimits) -> Self {
+        Self { limits }
+    }
+
+    /// Validate that a module exposes the complete language-provider boundary
+    /// before it is registered or invoked.
+    pub fn validate_module(&self, module: &WasmModule) -> Result<(), WasmError> {
+        if module.module.imports().next().is_some() {
+            return Err(WasmError::Instantiate(
+                "language providers cannot import host functions".into(),
+            ));
+        }
+        validate_language_provider_abi(module)?;
+        if !matches!(
+            module.module.get_export("memory"),
+            Some(wasmtime::ExternType::Memory(_))
+        ) {
+            return Err(WasmError::Instantiate(
+                "language provider must export memory".into(),
+            ));
+        }
+        let Some(wasmtime::ExternType::Func(function)) =
+            module.module.get_export(WASM_LANGUAGE_RUN_EXPORT)
+        else {
+            return Err(WasmError::MissingLanguageProviderExport);
+        };
+        if function.params().len() != 2
+            || !matches!(
+                function.params().collect::<Vec<_>>().as_slice(),
+                [wasmtime::ValType::I32, wasmtime::ValType::I32]
+            )
+            || !matches!(
+                function.results().collect::<Vec<_>>().as_slice(),
+                [wasmtime::ValType::I64]
+            )
+        {
+            return Err(WasmError::MissingLanguageProviderExport);
+        }
+        Ok(())
+    }
+
+    /// Load and admit an explicitly selected provider artifact from a package root.
+    /// The path is confined to the package and no provider is loaded implicitly.
+    pub fn load_from_path(
+        runtime: Arc<WasmRuntime>,
+        package_root: &Path,
+        artifact: &str,
+        limits: WasmProviderLimits,
+    ) -> Result<(Self, WasmModule), WasmError> {
+        let path = confined_package_path(package_root, artifact)?;
+        let bytes = std::fs::read(&path).map_err(|error| WasmError::Io(error.to_string()))?;
+        let module = if path.extension().is_some_and(|extension| extension == "wat") {
+            let text = std::str::from_utf8(&bytes)
+                .map_err(|error| WasmError::Compile(error.to_string()))?;
+            WasmModule::from_wat(runtime, text)?
+        } else {
+            WasmModule::from_bytes(runtime, &bytes)?
+        };
+        let provider = Self::new(limits);
+        provider.validate_module(&module)?;
+        Ok((provider, module))
+    }
+    /// Encode a validated request for a guest transport.
+    pub fn encode_request(&self, request: &ProviderRequest) -> Result<Vec<u8>, &'static str> {
+        encode_request(request, self.limits)
+    }
+    /// Encode a bounded source-only symbol request.
+    pub fn encode_symbol_request(&self, request: &SymbolRequest) -> Result<Vec<u8>, &'static str> {
+        encode_symbol_request(request, self.limits)
+    }
+    /// Decode a bounded symbol response from an admitted guest.
+    pub fn decode_symbol_response(&self, payload: &[u8]) -> Result<SymbolResponse, &'static str> {
+        decode_symbol_response(payload, self.limits.max_source_bytes)
+    }
+
+    /// Decode a provider response into a typed symbol result.
+    pub fn decode_symbol_response_as<T: serde::de::DeserializeOwned>(
+        &self,
+        payload: &[u8],
+    ) -> Result<T, WasmError> {
+        let response = self
+            .decode_symbol_response(payload)
+            .map_err(|error| WasmError::Instantiate(error.into()))?;
+        talos_text::decode_symbol_value(response)
+            .map_err(|error| WasmError::Instantiate(error.into()))
+    }
+    /// Decode a guest highlight payload, falling back on malformed output.
+    pub fn decode_highlight(
+        &self,
+        payload: &[u8],
+        source_len: usize,
+    ) -> talos_text::HighlightResult {
+        decode_highlight(payload, self.limits.max_source_bytes, source_len)
+    }
+
+    /// Execute one bounded language-provider request against a validated module.
+    ///
+    /// The request is written at guest offset zero and the guest returns a packed
+    /// `(pointer, length)` pair in the upper and lower 32 bits of its `i64` result.
+    /// No imports are admitted, and every memory range is checked before access.
+    pub fn execute_highlight(
+        &self,
+        module: &WasmModule,
+        request: &ProviderRequest,
+    ) -> Result<talos_text::HighlightResult, WasmError> {
+        let request_bytes = encode_request(request, self.limits)
+            .map_err(|error| WasmError::Instantiate(error.to_owned()))?;
+        if request_bytes.len() > i32::MAX as usize {
+            return Err(WasmError::Instantiate(
+                "language provider request exceeds ABI address space".into(),
+            ));
+        }
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            self.execute_highlight_inner(module, &request_bytes, request.source.len())
+        }));
+        match result {
+            Ok(result) => result,
+            Err(_) => Err(WasmError::Trap(
+                "host panic during language provider execution".into(),
+            )),
+        }
+    }
+
+    fn execute_highlight_inner(
+        &self,
+        module: &WasmModule,
+        request_bytes: &[u8],
+        source_len: usize,
+    ) -> Result<talos_text::HighlightResult, WasmError> {
+        let response = self.execute_payload(module, request_bytes)?;
+        Ok(decode_highlight(
+            &response,
+            self.limits.max_source_bytes,
+            source_len,
+        ))
+    }
+
+    /// Execute a bounded guest request and return its validated response bytes.
+    pub fn execute_payload(
+        &self,
+        module: &WasmModule,
+        request_bytes: &[u8],
+    ) -> Result<Vec<u8>, WasmError> {
+        if module.module.imports().next().is_some() {
+            return Err(WasmError::Instantiate(
+                "language providers cannot import host functions".into(),
+            ));
+        }
+        let Some(wasmtime::ExternType::Func(function)) =
+            module.module.get_export(WASM_LANGUAGE_RUN_EXPORT)
+        else {
+            return Err(WasmError::MissingLanguageProviderExport);
+        };
+        if function.params().len() != 2
+            || !matches!(
+                function.params().collect::<Vec<_>>().as_slice(),
+                [wasmtime::ValType::I32, wasmtime::ValType::I32]
+            )
+            || !matches!(
+                function.results().collect::<Vec<_>>().as_slice(),
+                [wasmtime::ValType::I64]
+            )
+        {
+            return Err(WasmError::MissingLanguageProviderExport);
+        }
+
+        let engine = module.runtime.engine.clone();
+        let mut store = wasmtime::Store::new(&engine, ());
+        store
+            .set_fuel(self.limits.fuel)
+            .map_err(|error| WasmError::Instantiate(error.to_string()))?;
+        store.epoch_deadline_trap();
+        store.set_epoch_deadline(1);
+        let instance = wasmtime::Instance::new(&mut store, &module.module, &[])
+            .map_err(|error| WasmError::Instantiate(error.to_string()))?;
+        let memory = instance
+            .get_memory(&mut store, "memory")
+            .ok_or_else(|| WasmError::Instantiate("language provider must export memory".into()))?;
+        let request_range =
+            validate_memory_range(0, request_bytes.len() as u32, memory.data_size(&store))
+                .map_err(|error| WasmError::Instantiate(error.into()))?;
+        memory.data_mut(&mut store)[request_range].copy_from_slice(request_bytes);
+
+        let (done_tx, done_rx) = mpsc::channel();
+        let timeout = self.limits.timeout;
+        let engine_for_timeout = engine.clone();
+        thread::spawn(move || {
+            thread::sleep(timeout);
+            if done_tx.send(()).is_ok() {
+                engine_for_timeout.increment_epoch();
+            }
+        });
+        let run = instance
+            .get_typed_func::<(i32, i32), i64>(&mut store, WASM_LANGUAGE_RUN_EXPORT)
+            .map_err(|_| WasmError::MissingLanguageProviderExport)?;
+        let packed = run
+            .call(&mut store, (0, request_bytes.len() as i32))
+            .map_err(|error| classify_execution_error(error, timeout))?;
+        drop(done_rx);
+
+        let response_offset = (packed as u64 >> 32) as u32;
+        let response_len = packed as u32;
+        let response_range =
+            validate_memory_range(response_offset, response_len, memory.data_size(&store))
+                .map_err(|error| WasmError::Instantiate(error.into()))?;
+        let response = memory.data(&store)[response_range].to_vec();
+        if response.len() > self.limits.max_source_bytes {
+            return Err(WasmError::Instantiate(
+                "provider response exceeds limit".into(),
+            ));
+        }
+        Ok(response)
+    }
+
+    /// Execute a bounded symbol request through the shared guest transport.
+    pub fn execute_symbol(
+        &self,
+        module: &WasmModule,
+        request: &SymbolRequest,
+    ) -> Result<SymbolResponse, WasmError> {
+        let bytes = self
+            .encode_symbol_request(request)
+            .map_err(|error| WasmError::Instantiate(error.into()))?;
+        let payload = self.execute_payload(module, &bytes)?;
+        self.decode_symbol_response(&payload)
+            .map_err(|error| WasmError::Instantiate(error.into()))
+    }
+}
+
+fn classify_execution_error(error: wasmtime::Error, timeout: Duration) -> WasmError {
+    let message = error.to_string();
+    if message.contains("epoch") || message.contains("interrupt") {
+        WasmError::Timeout {
+            timeout_ms: timeout.as_millis() as u64,
+        }
+    } else if message.contains("fuel") {
+        WasmError::Trap("language provider fuel exhausted".into())
+    } else {
+        WasmError::Trap(message)
+    }
 }
 
 impl WasmRuntime {
@@ -228,6 +651,36 @@ impl WasmPluginTool {
             package_root: package_root.display().to_string(),
         })
     }
+}
+
+/// Validate the versioned language-provider ABI export without invoking guest code.
+pub fn validate_language_provider_abi(module: &WasmModule) -> Result<(), WasmError> {
+    let Some(wasmtime::ExternType::Func(function)) =
+        module.module.get_export(WASM_LANGUAGE_ABI_EXPORT)
+    else {
+        return Err(WasmError::MissingExport);
+    };
+    if function.params().len() != 0
+        || !matches!(
+            function.results().collect::<Vec<_>>().as_slice(),
+            [wasmtime::ValType::I32]
+        )
+    {
+        return Err(WasmError::MissingExport);
+    }
+    let mut store = wasmtime::Store::new(&module.runtime.engine, ());
+    store
+        .set_fuel(module.runtime.fuel)
+        .map_err(|e| WasmError::Instantiate(e.to_string()))?;
+    store.set_epoch_deadline(u64::MAX);
+    let instance = wasmtime::Instance::new(&mut store, &module.module, &[])
+        .map_err(|e| WasmError::Instantiate(e.to_string()))?;
+    let version = instance
+        .get_typed_func::<(), i32>(&mut store, WASM_LANGUAGE_ABI_EXPORT)
+        .map_err(|_| WasmError::MissingExport)?
+        .call(&mut store, ())
+        .map_err(|e| WasmError::Instantiate(e.to_string()))?;
+    validate_abi_version(version as u32).map_err(|error| WasmError::Instantiate(error.into()))
 }
 
 #[async_trait]
@@ -412,6 +865,232 @@ mod tests {
 
     fn runtime() -> Arc<WasmRuntime> {
         Arc::new(WasmRuntime::new(FUEL, TIMEOUT_MS).expect("runtime"))
+    }
+
+    #[test]
+    fn language_provider_abi_probe_accepts_version_one() {
+        let module = WasmModule::from_wat(
+            runtime(),
+            r#"(module (func (export "talos_language_abi_version") (result i32) i32.const 1))"#,
+        )
+        .expect("compile");
+        assert!(validate_language_provider_abi(&module).is_ok());
+    }
+
+    #[test]
+    fn language_provider_admission_accepts_complete_boundary() {
+        let module = WasmModule::from_wat(
+            runtime(),
+            r#"(module
+                (memory (export "memory") 1)
+                (func (export "talos_language_abi_version") (result i32) i32.const 1)
+                (func (export "talos_language_run") (param i32 i32) (result i64)
+                    i64.const 0))"#,
+        )
+        .expect("compile");
+        assert!(
+            WasmLanguageProvider::new(WasmProviderLimits::default())
+                .validate_module(&module)
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn language_provider_admission_rejects_host_imports() {
+        let module = WasmModule::from_wat(
+            runtime(),
+            r#"(module
+                (import "host" "clock" (func))
+                (memory (export "memory") 1)
+                (func (export "talos_language_abi_version") (result i32) i32.const 1)
+                (func (export "talos_language_run") (param i32 i32) (result i64)
+                    i64.const 0))"#,
+        )
+        .expect("compile");
+        let error = WasmLanguageProvider::new(WasmProviderLimits::default())
+            .validate_module(&module)
+            .expect_err("host imports must be rejected");
+        assert!(error.to_string().contains("cannot import host functions"));
+    }
+
+    #[test]
+    fn declared_language_provider_loader_confines_artifact_path() {
+        let declaration = crate::manifest::LanguageProviderDeclaration {
+            language: "rust".into(),
+            artifact: "../escape.wasm".into(),
+        };
+        let result = load_declared_language_provider(
+            runtime(),
+            Path::new("/tmp/provider-package"),
+            &declaration,
+            WasmProviderLimits::default(),
+        );
+        assert!(matches!(result, Err(WasmError::PathEscape(_))));
+    }
+
+    #[test]
+    fn symbol_response_decode_rejects_malformed_payload() {
+        let provider = WasmLanguageProvider::new(WasmProviderLimits::default());
+        let result = provider.decode_symbol_response(b"not-json");
+        assert_eq!(result, Err("symbol response decode failed"));
+    }
+
+    #[test]
+    fn language_provider_abi_probe_rejects_incompatible_version() {
+        let module = WasmModule::from_wat(
+            runtime(),
+            r#"(module (func (export "talos_language_abi_version") (result i32) i32.const 99))"#,
+        )
+        .expect("compile");
+        assert!(validate_language_provider_abi(&module).is_err());
+    }
+
+    #[test]
+    fn language_provider_requires_memory_and_run_export() {
+        let module = WasmModule::from_wat(
+            runtime(),
+            r#"(module
+                (func (export "talos_language_run") (param i32 i32) (result i64)
+                    i64.const 0))"#,
+        )
+        .expect("compile");
+        let provider = WasmLanguageProvider::new(WasmProviderLimits::default());
+        let request = ProviderRequest {
+            language: "rust".into(),
+            source: "fn main() {}".into(),
+        };
+        let error = provider
+            .execute_highlight(&module, &request)
+            .expect_err("missing guest memory must fail closed");
+        assert!(error.to_string().contains("must export memory"));
+    }
+
+    #[test]
+    fn language_provider_rejects_out_of_bounds_response_range() {
+        let module = WasmModule::from_wat(
+            runtime(),
+            r#"(module
+                (memory (export "memory") 1)
+                (func (export "talos_language_run") (param i32 i32) (result i64)
+                    ;; Offset 65536 is one byte past the one-page memory.
+                    i64.const 281474976710657))"#,
+        )
+        .expect("compile");
+        let provider = WasmLanguageProvider::new(WasmProviderLimits::default());
+        let request = ProviderRequest {
+            language: "rust".into(),
+            source: "x".into(),
+        };
+        let error = provider
+            .execute_highlight(&module, &request)
+            .expect_err("out-of-bounds response must fail closed");
+        assert!(error.to_string().contains("out of bounds"));
+    }
+
+    #[test]
+    fn language_provider_rejects_wrong_run_signature() {
+        let module = WasmModule::from_wat(
+            runtime(),
+            r#"(module
+                (memory (export "memory") 1)
+                (func (export "talos_language_run") (param i32) (result i64)
+                    i64.const 0))"#,
+        )
+        .expect("compile");
+        let provider = WasmLanguageProvider::new(WasmProviderLimits::default());
+        let request = ProviderRequest {
+            language: "rust".into(),
+            source: "x".into(),
+        };
+        assert!(matches!(
+            provider.execute_highlight(&module, &request),
+            Err(WasmError::MissingLanguageProviderExport)
+        ));
+    }
+
+    #[test]
+    fn language_provider_decodes_guest_highlight_spans() {
+        let payload = r#"{"Spans":[[0,2,"keyword"]]}"#;
+        let offset = 64u32;
+        let packed = ((offset as u64) << 32) | payload.len() as u64;
+        let wat_payload = payload.replace('"', r#"\22"#);
+        let module = WasmModule::from_wat(
+            runtime(),
+            &format!(
+                r#"(module (memory (export "memory") 1)
+                    (data (i32.const {offset}) "{wat_payload}")
+                    (func (export "talos_language_run") (param i32 i32) (result i64)
+                        i64.const {packed}))"#,
+            ),
+        )
+        .expect("compile");
+        let provider = WasmLanguageProvider::new(WasmProviderLimits::default());
+        let request = ProviderRequest {
+            language: "rust".into(),
+            source: "fn".into(),
+        };
+        assert!(matches!(
+            provider.execute_highlight(&module, &request),
+            Ok(talos_text::HighlightResult::Spans(ref spans))
+                if spans.len() == 1 && spans[0].start == 0 && spans[0].end == 2
+        ));
+    }
+
+    #[test]
+    fn language_provider_executes_with_bounded_memory_transport() {
+        let module = WasmModule::from_wat(
+            runtime(),
+            r#"(module
+                (memory (export "memory") 1)
+                (func (export "talos_language_run") (param i32 i32) (result i64)
+                    ;; A zero-length response is intentionally decoded as safe plain text.
+                    i64.const 0))"#,
+        )
+        .expect("compile");
+        let provider = WasmLanguageProvider::new(WasmProviderLimits::default());
+        let request = ProviderRequest {
+            language: "rust".into(),
+            source: "fn main() {}".into(),
+        };
+        assert!(matches!(
+            provider.execute_highlight(&module, &request),
+            Ok(talos_text::HighlightResult::PlainText)
+        ));
+    }
+
+    #[test]
+    fn language_provider_decodes_non_empty_guest_response() {
+        let module = WasmModule::from_wat(
+            runtime(),
+            r#"(module
+                (memory (export "memory") 1)
+                (data (i32.const 64) "PlainText")
+                (func (export "talos_language_run") (param i32 i32) (result i64)
+                    i64.const 274877906953))"#,
+        )
+        .expect("compile");
+        let provider = WasmLanguageProvider::new(WasmProviderLimits::default());
+        let request = ProviderRequest {
+            language: "rust".into(),
+            source: "fn main() {}".into(),
+        };
+        assert!(matches!(
+            provider.execute_highlight(&module, &request),
+            Ok(talos_text::HighlightResult::PlainText)
+        ));
+    }
+
+    #[test]
+    fn typed_symbol_response_decodes_source_location() {
+        let provider = WasmLanguageProvider::new(WasmProviderLimits::default());
+        let payload = serde_json::to_vec(&SymbolResponse::Result(serde_json::json!([
+            {"file":"src/lib.rs","line":3,"column":1}
+        ])))
+        .expect("encode");
+        let locations: Vec<talos_text::SourceLocation> = provider
+            .decode_symbol_response_as(&payload)
+            .expect("typed response");
+        assert_eq!(locations[0].file, "src/lib.rs");
     }
 
     #[tokio::test]

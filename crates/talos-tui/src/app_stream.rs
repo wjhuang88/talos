@@ -70,6 +70,14 @@ pub(crate) struct StreamRenderState {
 }
 
 impl StreamRenderState {
+    pub(crate) fn with_highlight_provider(
+        provider: Box<dyn talos_text::HighlightProvider>,
+    ) -> Self {
+        Self {
+            highlight_engine: HighlightEngine::with_provider(provider),
+            ..Self::default()
+        }
+    }
     pub(crate) fn start(&mut self, source: MessageSource) -> Vec<ScrollbackLine> {
         self.start_with_hold(source, false)
     }

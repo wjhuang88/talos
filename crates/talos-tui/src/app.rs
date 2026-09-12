@@ -204,6 +204,15 @@ impl SelectionState {
 }
 
 impl Tui {
+    /// Construct a TUI using an explicitly supplied highlighting provider.
+    pub fn with_highlight_provider(
+        provider: Box<dyn talos_text::HighlightProvider>,
+    ) -> io::Result<Self> {
+        let mut tui = Self::new()?;
+        tui.stream_render = StreamRenderState::with_highlight_provider(provider);
+        Ok(tui)
+    }
+
     pub fn new() -> io::Result<Self> {
         let _ = crossterm::terminal::disable_raw_mode();
 

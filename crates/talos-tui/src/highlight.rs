@@ -3,12 +3,12 @@
 use crossterm::style::Color as CColor;
 
 use crate::theme::to_crossterm_color;
-use talos_text::LanguageProvider;
+use talos_text::HighlightProvider;
 
 type LineSegments = Vec<(String, Option<CColor>)>;
 
 pub(crate) struct HighlightEngine {
-    highlighter: Box<dyn LanguageProvider>,
+    highlighter: Box<dyn HighlightProvider>,
 }
 
 impl Default for HighlightEngine {
@@ -21,6 +21,14 @@ impl HighlightEngine {
     pub(crate) fn new() -> Self {
         Self {
             highlighter: Box::new(talos_text::BuiltinHighlighter::default()),
+        }
+    }
+
+    /// Construct an engine with an explicitly selected highlighting provider.
+    #[allow(dead_code)]
+    pub(crate) fn with_provider(provider: Box<dyn HighlightProvider>) -> Self {
+        Self {
+            highlighter: provider,
         }
     }
 
@@ -154,7 +162,7 @@ mod tests {
         result: HighlightResult,
     }
 
-    impl LanguageProvider for RecordingProvider {
+    impl HighlightProvider for RecordingProvider {
         fn supports(&self, language: &talos_text::LanguageId) -> bool {
             self.calls
                 .borrow_mut()
@@ -172,61 +180,19 @@ mod tests {
                 .push(format!("highlight:{}:{source}", language.as_str()));
             std::mem::replace(&mut self.result, HighlightResult::PlainText)
         }
-
-        fn find_symbol(
-            &self,
-            _: &str,
-            _: &str,
-            _: &std::path::Path,
-            _: &std::path::Path,
-            _: &str,
-        ) -> Option<talos_text::symbol_queries::SymbolResult> {
-            panic!("TUI must not query symbols")
-        }
-
-        fn find_references(
-            &self,
-            _: &str,
-            _: &str,
-            _: &std::path::Path,
-            _: &str,
-        ) -> Result<Vec<talos_text::SourceLocation>, String> {
-            panic!("TUI must not query references")
-        }
-
-        fn list_symbols(
-            &self,
-            _: &str,
-            _: &str,
-            _: &str,
-            _: Option<&str>,
-        ) -> Result<Vec<talos_text::SymbolInfo>, String> {
-            panic!("TUI must not list symbols")
-        }
-
-        fn list_imports(
-            &self,
-            _: &str,
-            _: &str,
-            _: &std::path::Path,
-        ) -> Result<Vec<talos_text::symbol_queries::ImportInfo>, String> {
-            panic!("TUI must not list imports")
-        }
     }
 
     #[test]
     fn injected_provider_drives_rendering_and_plain_fallback() {
         let calls = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
-        let mut engine = HighlightEngine {
-            highlighter: Box::new(RecordingProvider {
-                calls: calls.clone(),
-                result: HighlightResult::Spans(vec![HighlightSpan {
-                    start: 0,
-                    end: 1,
-                    capture: "keyword".into(),
-                }]),
-            }),
-        };
+        let mut engine = HighlightEngine::with_provider(Box::new(RecordingProvider {
+            calls: calls.clone(),
+            result: HighlightResult::Spans(vec![HighlightSpan {
+                start: 0,
+                end: 1,
+                capture: "keyword".into(),
+            }]),
+        }));
         assert_eq!(
             engine.highlight("rust", "x"),
             Some(vec![vec![("x".into(), capture_color("keyword"))]])

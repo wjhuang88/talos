@@ -28,11 +28,11 @@ pub fn list_imports(language: &str, code: &str, path: &Path) -> Result<Vec<Impor
     crate::guarded(|| list_imports_inner(language, code, path))
 }
 use arborium::tree_sitter;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 /// Definition lookup result in the existing symbol-tool JSON shape.
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SymbolResult {
     /// Requested name.
     pub name: String,
@@ -45,7 +45,7 @@ pub struct SymbolResult {
 }
 
 /// Existing import extraction result.
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ImportInfo {
     /// Module token extracted from the statement.
     pub module: String,

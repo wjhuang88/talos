@@ -33,8 +33,8 @@ use crate::mode_runtime::{
 use crate::model_lifecycle::materialize_runtime_model_config;
 use crate::provider_setup::build_provider;
 use crate::registry::{
-    TuiApprovalHandler, build_tui_tool_registry_with_capability, register_explicit_tui_plugins,
-    register_tui_permission_aware_tools,
+    TuiApprovalHandler, build_tui_tool_registry_with_language_provider, load_explicit_plugin_tools,
+    register_loaded_tui_plugins, register_tui_permission_aware_tools,
 };
 use crate::skill_runtime::{RuntimeSkills, apply_runtime_skills, discover_runtime_skills};
 use talos_tools::CapStdAtomicCreateCapability;
@@ -61,6 +61,7 @@ pub(crate) struct PreparedTuiRuntime {
     runtime_config: Config,
     runtime_skills: RuntimeSkills,
     loaded_plugin_packages: Vec<LoadedPluginPackage>,
+    language_provider_context: Option<crate::registry::LoadedLanguageContext>,
     session: Session,
     workspace_root: PathBuf,
 }
@@ -86,6 +87,7 @@ impl PreparedTuiRuntime {
             mcp_runtime: self.mcp_runtime,
             runtime_skills: self.runtime_skills,
             loaded_plugin_packages: self.loaded_plugin_packages,
+            language_provider_context: self.language_provider_context,
         }
     }
 }
@@ -97,6 +99,7 @@ pub(crate) struct BuiltTuiRuntime {
     pub mcp_runtime: McpSessionRuntime,
     pub runtime_skills: RuntimeSkills,
     pub loaded_plugin_packages: Vec<LoadedPluginPackage>,
+    pub language_provider_context: Option<crate::registry::LoadedLanguageContext>,
 }
 
 impl TuiRuntimeBuilder {
@@ -177,24 +180,27 @@ impl TuiRuntimeBuilder {
         let atomic_create_capability = CapStdAtomicCreateCapability::open(&self.workspace_root)
             .ok()
             .map(|value| Arc::new(value) as talos_core::tool::SharedAtomicCreateCapability);
-        let mut registry = build_tui_tool_registry_with_capability(
+        let loaded_plugins = load_explicit_plugin_tools(self.plugin_packages.as_slice())
+            .map_err(anyhow::Error::msg)?;
+        let language_provider_context = loaded_plugins
+            .iter()
+            .find_map(|(_, _, context)| context.clone());
+        let mut registry = build_tui_tool_registry_with_language_provider(
             self.approval_handler.clone(),
             self.workspace_root.clone(),
             session.id,
             scheduler_tools,
             atomic_create_capability.clone(),
+            language_provider_context,
         );
         register_tui_permission_aware_tools(
             &mut registry,
             mcp_runtime.tools(),
             self.approval_handler.clone(),
         );
-        let loaded_plugin_packages = register_explicit_tui_plugins(
-            &mut registry,
-            self.plugin_packages.as_slice(),
-            self.approval_handler.clone(),
-        )
-        .map_err(anyhow::Error::msg)?;
+        let (loaded_plugin_packages, language_provider_context) =
+            register_loaded_tui_plugins(&mut registry, loaded_plugins)
+                .map_err(anyhow::Error::msg)?;
 
         let fallback = self.approval_handler.clone();
         let auto_control = self
@@ -279,6 +285,7 @@ impl TuiRuntimeBuilder {
             runtime_config,
             runtime_skills,
             loaded_plugin_packages,
+            language_provider_context,
             session: session.clone(),
             workspace_root: self.workspace_root.clone(),
         })

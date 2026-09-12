@@ -3,6 +3,146 @@
 /// Shared streaming Markdown semantics without renderer or parser dependencies.
 pub mod stream;
 
+/// Minimal renderer-neutral highlighting capability for optional providers.
+pub trait HighlightProvider {
+    /// Highlight source, returning plain text when unavailable.
+    fn highlight(&mut self, language: &LanguageId, source: &str) -> HighlightResult;
+    /// Whether this provider can serve the language.
+    fn supports(&self, language: &LanguageId) -> bool;
+}
+
+/// Combined provider contract for hosts that share one provider across consumers.
+#[cfg(feature = "code-intelligence")]
+pub trait LanguageProviderBundle: HighlightProvider + SymbolProvider + Send {}
+
+#[cfg(feature = "code-intelligence")]
+impl<T> LanguageProviderBundle for T where T: HighlightProvider + SymbolProvider + Send {}
+
+/// Host-owned shared provider context for TUI and symbol consumers.
+#[cfg(feature = "code-intelligence")]
+pub struct SharedLanguageProvider {
+    inner: std::sync::Arc<std::sync::Mutex<Box<dyn LanguageProviderBundle>>>,
+    active: std::sync::Arc<std::sync::atomic::AtomicBool>,
+}
+
+#[cfg(feature = "code-intelligence")]
+impl Clone for SharedLanguageProvider {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            active: self.active.clone(),
+        }
+    }
+}
+
+#[cfg(feature = "code-intelligence")]
+impl SharedLanguageProvider {
+    /// Create a context from one provider instance.
+    pub fn new(provider: Box<dyn LanguageProviderBundle>) -> Self {
+        Self::new_with_gate(
+            provider,
+            std::sync::Arc::new(std::sync::atomic::AtomicBool::new(true)),
+        )
+    }
+
+    /// Create a provider context controlled by a shared lifecycle gate.
+    pub fn new_with_gate(
+        provider: Box<dyn LanguageProviderBundle>,
+        active: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    ) -> Self {
+        Self {
+            inner: std::sync::Arc::new(std::sync::Mutex::new(provider)),
+            active,
+        }
+    }
+
+    /// Revoke access for all cloned contexts retained by consumers.
+    pub fn deactivate(&self) {
+        self.active
+            .store(false, std::sync::atomic::Ordering::Release);
+    }
+
+    /// Run a highlighting operation through the shared provider.
+    pub fn highlight(&self, language: &LanguageId, source: &str) -> HighlightResult {
+        if !self.active.load(std::sync::atomic::Ordering::Acquire) {
+            return HighlightResult::PlainText;
+        }
+        self.inner
+            .lock()
+            .map(|mut p| p.highlight(language, source))
+            .unwrap_or(HighlightResult::PlainText)
+    }
+
+    /// Run a symbol operation while preserving provider ownership.
+    pub fn with_symbols<R>(
+        &self,
+        operation: impl FnOnce(&mut dyn SymbolProvider) -> R,
+    ) -> Option<R> {
+        if !self.active.load(std::sync::atomic::Ordering::Acquire) {
+            return None;
+        }
+        self.inner.lock().ok().map(|mut p| operation(&mut **p))
+    }
+}
+
+#[cfg(feature = "code-intelligence")]
+impl HighlightProvider for SharedLanguageProvider {
+    fn highlight(&mut self, language: &LanguageId, source: &str) -> HighlightResult {
+        SharedLanguageProvider::highlight(self, language, source)
+    }
+    fn supports(&self, language: &LanguageId) -> bool {
+        if !self.active.load(std::sync::atomic::Ordering::Acquire) {
+            return false;
+        }
+        self.inner
+            .lock()
+            .map(|p| p.supports(language))
+            .unwrap_or(false)
+    }
+}
+
+/// Source-only symbol capability that can be supplied by built-in or WASM providers.
+#[cfg(feature = "code-intelligence")]
+pub trait SymbolProvider {
+    /// Find a definition and references.
+    fn find_symbol(
+        &mut self,
+        language: &str,
+        source: &str,
+        root: &std::path::Path,
+        path: &std::path::Path,
+        name: &str,
+    ) -> Option<symbol_queries::SymbolResult>;
+    /// Find all references.
+    fn find_references(
+        &mut self,
+        language: &str,
+        source: &str,
+        path: &std::path::Path,
+        name: &str,
+    ) -> Result<Vec<SourceLocation>, String>;
+    /// List symbols.
+    fn list_symbols(
+        &mut self,
+        language: &str,
+        source: &str,
+        file: &str,
+        kind: Option<&str>,
+    ) -> Result<Vec<SymbolInfo>, String>;
+    /// List imports.
+    fn list_imports(
+        &mut self,
+        language: &str,
+        source: &str,
+        path: &std::path::Path,
+    ) -> Result<Vec<symbol_queries::ImportInfo>, String>;
+}
+
+#[cfg(feature = "wasm-provider")]
+pub mod wasm_provider;
+#[cfg(feature = "wasm-provider")]
+pub use wasm_provider::decode_symbol_value;
+
 /// Renderer-neutral language operations shared by text consumers.
 #[cfg(feature = "code-intelligence")]
 pub trait LanguageProvider {
@@ -157,6 +297,57 @@ impl BuiltinHighlighter {
     pub fn supports(&self, language: &LanguageId) -> bool {
         std::panic::catch_unwind(|| arborium::get_language(language.as_str()).is_some())
             .unwrap_or(false)
+    }
+}
+
+#[cfg(feature = "code-intelligence")]
+impl HighlightProvider for BuiltinHighlighter {
+    fn highlight(&mut self, language: &LanguageId, source: &str) -> HighlightResult {
+        Self::highlight(self, language, source)
+    }
+
+    fn supports(&self, language: &LanguageId) -> bool {
+        Self::supports(self, language)
+    }
+}
+
+#[cfg(feature = "code-intelligence")]
+impl SymbolProvider for BuiltinHighlighter {
+    fn find_symbol(
+        &mut self,
+        l: &str,
+        s: &str,
+        r: &std::path::Path,
+        p: &std::path::Path,
+        n: &str,
+    ) -> Option<symbol_queries::SymbolResult> {
+        <Self as LanguageProvider>::find_symbol(self, l, s, r, p, n)
+    }
+    fn find_references(
+        &mut self,
+        l: &str,
+        s: &str,
+        p: &std::path::Path,
+        n: &str,
+    ) -> Result<Vec<SourceLocation>, String> {
+        <Self as LanguageProvider>::find_references(self, l, s, p, n)
+    }
+    fn list_symbols(
+        &mut self,
+        l: &str,
+        s: &str,
+        f: &str,
+        k: Option<&str>,
+    ) -> Result<Vec<SymbolInfo>, String> {
+        <Self as LanguageProvider>::list_symbols(self, l, s, f, k)
+    }
+    fn list_imports(
+        &mut self,
+        l: &str,
+        s: &str,
+        p: &std::path::Path,
+    ) -> Result<Vec<symbol_queries::ImportInfo>, String> {
+        <Self as LanguageProvider>::list_imports(self, l, s, p)
     }
 }
 
@@ -352,6 +543,73 @@ pub struct SymbolInfo {
 #[cfg(test)]
 mod tests {
     use super::{HighlightResult, HighlightSpan, LanguageId};
+
+    #[cfg(feature = "code-intelligence")]
+    struct TestProvider;
+    #[cfg(feature = "code-intelligence")]
+    impl super::HighlightProvider for TestProvider {
+        fn highlight(&mut self, _: &LanguageId, _: &str) -> HighlightResult {
+            HighlightResult::PlainText
+        }
+        fn supports(&self, _: &LanguageId) -> bool {
+            true
+        }
+    }
+    #[cfg(feature = "code-intelligence")]
+    impl super::SymbolProvider for TestProvider {
+        fn find_symbol(
+            &mut self,
+            _: &str,
+            _: &str,
+            _: &std::path::Path,
+            _: &std::path::Path,
+            _: &str,
+        ) -> Option<super::symbol_queries::SymbolResult> {
+            None
+        }
+        fn find_references(
+            &mut self,
+            _: &str,
+            _: &str,
+            _: &std::path::Path,
+            _: &str,
+        ) -> Result<Vec<super::SourceLocation>, String> {
+            Ok(Vec::new())
+        }
+        fn list_symbols(
+            &mut self,
+            _: &str,
+            _: &str,
+            _: &str,
+            _: Option<&str>,
+        ) -> Result<Vec<super::SymbolInfo>, String> {
+            Ok(Vec::new())
+        }
+        fn list_imports(
+            &mut self,
+            _: &str,
+            _: &str,
+            _: &std::path::Path,
+        ) -> Result<Vec<super::symbol_queries::ImportInfo>, String> {
+            Ok(Vec::new())
+        }
+    }
+
+    #[cfg(feature = "code-intelligence")]
+    #[test]
+    fn shared_provider_context_routes_both_consumer_families() {
+        let context = super::SharedLanguageProvider::new(Box::new(TestProvider));
+        let language = LanguageId::parse("rust").expect("language");
+        assert!(matches!(
+            context.highlight(&language, "fn main() {}"),
+            HighlightResult::PlainText
+        ));
+        assert!(
+            context
+                .with_symbols(|p| p.find_references("rust", "", std::path::Path::new("x"), "main"))
+                .is_some()
+        );
+    }
 
     #[test]
     fn aliases_normalize_to_one_identifier() {

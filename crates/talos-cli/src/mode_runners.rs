@@ -358,6 +358,7 @@ pub(crate) async fn run_tui_mode(
         .context("failed to construct initial TUI runtime")?;
     let runtime_skills = Arc::new(Mutex::new(built_runtime.runtime_skills));
     let loaded_plugin_packages = built_runtime.loaded_plugin_packages;
+    let language_provider_context = built_runtime.language_provider_context;
     let mcp_diagnostics = built_runtime.mcp_runtime.diagnostics().to_vec();
     let mut handle = built_runtime.handle;
     let mut actor = built_runtime.actor;
@@ -594,7 +595,12 @@ pub(crate) async fn run_tui_mode(
         dashboard_activity.clone(),
     ));
 
-    let mut tui = Tui::new().context("failed to initialize TUI")?;
+    let mut tui = match language_provider_context {
+        Some(provider) => {
+            Tui::with_highlight_provider(Box::new(provider)).context("failed to initialize TUI")?
+        }
+        None => Tui::new().context("failed to initialize TUI")?,
+    };
     tui.hydrate_history(&visible_history);
     if !visible_history.is_empty() {
         send_stream(
