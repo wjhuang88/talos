@@ -1,6 +1,6 @@
 # Iteration I260: Verified Manual Bundle Installation
 
-> Document status: Planned / Claimed (pending governance merge)
+> Document status: Review / Claimed
 > Parent: CAP-001 / #466; DIST-001-A / #509
 > Objective: deliver an offline, user-selected Bundle installation path with deterministic integrity, compatibility, destination, and rollback behavior.
 
@@ -16,12 +16,17 @@
 | Source Issue | #509 |
 | Governance Claim PR | #540 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Claim is proposed and ineffective until merged to main; implementation remains unauthorized. |
-| Implementation PR | Not started |
+| Authorization Evidence | Claim PR #540 merged to main at bc46d8cc; implementation active under this claim. |
+| Implementation PR | Not started (local convergence) |
 | Last Updated | 2026-09-11 |
-| Handoff / Release Condition | Merge this governance claim to main before creating an implementation branch. |
+| Handoff / Release Condition | Stable local candidate required before implementation PR; independent security/API review. |
 
 ## Scope
+
+### Activation Checkpoint — 2026-09-11
+
+Claim #540 is effective on main at `bc46d8cc`. Implementation work is in local convergence on
+`impl/i260-manual-bundle-installation`; no implementation PR has been pushed yet.
 
 - Read a manually supplied local Bundle artifact using the I259 manifest contract.
 - Validate identity, schema compatibility, digest, package-root and destination safety.

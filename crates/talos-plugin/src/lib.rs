@@ -4,6 +4,7 @@ pub mod builtin;
 pub mod error;
 pub mod event;
 pub mod handler;
+pub mod install;
 #[cfg(feature = "wasm")]
 pub mod lifecycle;
 pub mod manifest;
@@ -18,6 +19,7 @@ pub use event::{
     TurnId, TurnStatus,
 };
 pub use handler::{HookContext, HookHandler, HookResult};
+pub use install::{InstallError, install_bundle};
 pub use manifest::{
     BundleManifest, BundleMetadata, CompatibleManifest, ManifestError, MigrationOptions,
     PluginHook, PluginManifest, PluginMetadata, PluginSkill, PluginTool, migrate_legacy_manifest,
