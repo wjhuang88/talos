@@ -18,6 +18,38 @@ pub trait LanguageProviderBundle: HighlightProvider + SymbolProvider + Send {}
 #[cfg(feature = "code-intelligence")]
 impl<T> LanguageProviderBundle for T where T: HighlightProvider + SymbolProvider + Send {}
 
+/// Host-owned shared provider context for TUI and symbol consumers.
+#[cfg(feature = "code-intelligence")]
+pub struct SharedLanguageProvider {
+    inner: std::sync::Arc<std::sync::Mutex<Box<dyn LanguageProviderBundle>>>,
+}
+
+#[cfg(feature = "code-intelligence")]
+impl SharedLanguageProvider {
+    /// Create a context from one provider instance.
+    pub fn new(provider: Box<dyn LanguageProviderBundle>) -> Self {
+        Self {
+            inner: std::sync::Arc::new(std::sync::Mutex::new(provider)),
+        }
+    }
+
+    /// Run a highlighting operation through the shared provider.
+    pub fn highlight(&self, language: &LanguageId, source: &str) -> HighlightResult {
+        self.inner
+            .lock()
+            .map(|mut p| p.highlight(language, source))
+            .unwrap_or(HighlightResult::PlainText)
+    }
+
+    /// Run a symbol operation while preserving provider ownership.
+    pub fn with_symbols<R>(
+        &self,
+        operation: impl FnOnce(&mut dyn SymbolProvider) -> R,
+    ) -> Option<R> {
+        self.inner.lock().ok().map(|mut p| operation(&mut **p))
+    }
+}
+
 /// Source-only symbol capability that can be supplied by built-in or WASM providers.
 #[cfg(feature = "code-intelligence")]
 pub trait SymbolProvider {
