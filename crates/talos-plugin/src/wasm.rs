@@ -91,6 +91,29 @@ pub struct LoadedLanguageProvider {
     pub module: WasmModule,
 }
 
+impl talos_text::HighlightProvider for LoadedLanguageProvider {
+    fn highlight(
+        &mut self,
+        language: &talos_text::LanguageId,
+        source: &str,
+    ) -> talos_text::HighlightResult {
+        if !self.supports(language) {
+            return talos_text::HighlightResult::PlainText;
+        }
+        let request = ProviderRequest {
+            language: self.language.clone(),
+            source: source.to_owned(),
+        };
+        self.provider
+            .execute_highlight(&self.module, &request)
+            .unwrap_or(talos_text::HighlightResult::PlainText)
+    }
+
+    fn supports(&self, language: &talos_text::LanguageId) -> bool {
+        language.as_str() == self.language
+    }
+}
+
 /// Load a declared language provider from an explicitly selected package.
 pub fn load_declared_language_provider(
     runtime: Arc<WasmRuntime>,
