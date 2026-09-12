@@ -633,6 +633,28 @@ mod tests {
     }
 
     #[test]
+    fn language_provider_rejects_out_of_bounds_response_range() {
+        let module = WasmModule::from_wat(
+            runtime(),
+            r#"(module
+                (memory (export "memory") 1)
+                (func (export "talos_language_run") (param i32 i32) (result i64)
+                    ;; Offset 65536 is one byte past the one-page memory.
+                    i64.const 281474976710657))"#,
+        )
+        .expect("compile");
+        let provider = WasmLanguageProvider::new(WasmProviderLimits::default());
+        let request = ProviderRequest {
+            language: "rust".into(),
+            source: "x".into(),
+        };
+        let error = provider
+            .execute_highlight(&module, &request)
+            .expect_err("out-of-bounds response must fail closed");
+        assert!(error.to_string().contains("out of bounds"));
+    }
+
+    #[test]
     fn language_provider_rejects_wrong_run_signature() {
         let module = WasmModule::from_wat(
             runtime(),
