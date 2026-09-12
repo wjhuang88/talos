@@ -640,6 +640,24 @@ mod tests {
     }
 
     #[test]
+    fn language_provider_admission_accepts_complete_boundary() {
+        let module = WasmModule::from_wat(
+            runtime(),
+            r#"(module
+                (memory (export "memory") 1)
+                (func (export "talos_language_abi_version") (result i32) i32.const 1)
+                (func (export "talos_language_run") (param i32 i32) (result i64)
+                    i64.const 0))"#,
+        )
+        .expect("compile");
+        assert!(
+            WasmLanguageProvider::new(WasmProviderLimits::default())
+                .validate_module(&module)
+                .is_ok()
+        );
+    }
+
+    #[test]
     fn language_provider_abi_probe_rejects_incompatible_version() {
         let module = WasmModule::from_wat(
             runtime(),
