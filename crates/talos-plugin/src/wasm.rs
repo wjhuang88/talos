@@ -81,16 +81,30 @@ pub struct WasmLanguageProvider {
     limits: WasmProviderLimits,
 }
 
+/// An explicitly loaded, admitted language provider with its stable language identity.
+pub struct LoadedLanguageProvider {
+    /// Canonical language identifier from the package declaration.
+    pub language: String,
+    /// Bounded provider adapter.
+    pub provider: WasmLanguageProvider,
+    /// Validated WASM module retained for invocation.
+    pub module: WasmModule,
+}
+
 /// Load a declared language provider from an explicitly selected package.
 pub fn load_declared_language_provider(
     runtime: Arc<WasmRuntime>,
     package_root: &Path,
     declaration: &LanguageProviderDeclaration,
     limits: WasmProviderLimits,
-) -> Result<(String, WasmLanguageProvider, WasmModule), WasmError> {
+) -> Result<LoadedLanguageProvider, WasmError> {
     let (provider, module) =
         WasmLanguageProvider::load_from_path(runtime, package_root, &declaration.artifact, limits)?;
-    Ok((declaration.language.clone(), provider, module))
+    Ok(LoadedLanguageProvider {
+        language: declaration.language.clone(),
+        provider,
+        module,
+    })
 }
 
 impl WasmLanguageProvider {
