@@ -272,6 +272,18 @@ impl PluginManifest {
                 p.carrier
             )));
         }
+        if let Some(provider) = &self.language_provider {
+            if provider.language.trim().is_empty() {
+                return Err(ManifestError::Validation(
+                    "language_provider.language is empty".into(),
+                ));
+            }
+            if provider.artifact.trim().is_empty() {
+                return Err(ManifestError::Validation(
+                    "language_provider.artifact is empty".into(),
+                ));
+            }
+        }
         let mut seen_tools: HashSet<&str> = HashSet::new();
         for tool in &self.tools {
             if tool.name.trim().is_empty() {
