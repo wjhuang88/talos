@@ -102,3 +102,9 @@ and `bash scripts/validate_project_governance.sh .` passed with 0 warnings; `git
 passed. The first project-validator attempt failed because the sandbox denied Cargo registry
 metadata extraction; the authorized retry passed (17 SQLite fixtures, 12 delivery fixtures).
 No Rust compilation/test result is claimed for this governance-only candidate.
+
+Candidate `794ed1f6` remote reconciliation failed because the #520 matrix owner cell contained
+two links while `validate_remote_issue_owners.py::ROW_RE` accepts a single owner link. The row
+now retains INTEGRATION-001 as its sole owner and mentions I262 in its explanatory cell.
+This is a local correction in #544, not a new Issue or a parser-policy change. New head-bound
+validation and review are required before merge; earlier CI is not carried forward.
