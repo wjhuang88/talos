@@ -1,5 +1,10 @@
 //! Bounded WASM language-provider boundary.
 
+/// Versioned guest ABI identifier. Providers must expose this contract before loading.
+pub const WASM_LANGUAGE_ABI_VERSION: u32 = 1;
+/// Required guest export for provider probing (must not be called during discovery).
+pub const WASM_LANGUAGE_ABI_EXPORT: &str = "talos_language_abi_version";
+
 use std::time::Duration;
 
 /// Resource limits applied before a guest provider is admitted.
@@ -28,6 +33,11 @@ pub struct ProviderRequest {
     pub language: String,
     /// Source text to inspect.
     pub source: String,
+}
+
+/// Validate the declared ABI version without executing a provider.
+pub fn validate_abi_version(version: u32) -> Result<(), &'static str> {
+    (version == WASM_LANGUAGE_ABI_VERSION).then_some(()).ok_or("unsupported provider ABI version")
 }
 
 /// Safe result returned when a provider is unavailable or fails.
