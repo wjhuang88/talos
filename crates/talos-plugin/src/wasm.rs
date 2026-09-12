@@ -89,12 +89,12 @@ impl WasmLanguageProvider {
     /// Validate that a module exposes the complete language-provider boundary
     /// before it is registered or invoked.
     pub fn validate_module(&self, module: &WasmModule) -> Result<(), WasmError> {
-        validate_language_provider_abi(module)?;
         if module.module.imports().next().is_some() {
             return Err(WasmError::Instantiate(
                 "language providers cannot import host functions".into(),
             ));
         }
+        validate_language_provider_abi(module)?;
         if !matches!(
             module.module.get_export("memory"),
             Some(wasmtime::ExternType::Memory(_))
@@ -655,6 +655,24 @@ mod tests {
                 .validate_module(&module)
                 .is_ok()
         );
+    }
+
+    #[test]
+    fn language_provider_admission_rejects_host_imports() {
+        let module = WasmModule::from_wat(
+            runtime(),
+            r#"(module
+                (import "host" "clock" (func))
+                (memory (export "memory") 1)
+                (func (export "talos_language_abi_version") (result i32) i32.const 1)
+                (func (export "talos_language_run") (param i32 i32) (result i64)
+                    i64.const 0))"#,
+        )
+        .expect("compile");
+        let error = WasmLanguageProvider::new(WasmProviderLimits::default())
+            .validate_module(&module)
+            .expect_err("host imports must be rejected");
+        assert!(error.to_string().contains("cannot import host functions"));
     }
 
     #[test]
