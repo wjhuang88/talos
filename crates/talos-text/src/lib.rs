@@ -53,7 +53,7 @@ impl SharedLanguageProvider {
 #[cfg(feature = "code-intelligence")]
 impl HighlightProvider for SharedLanguageProvider {
     fn highlight(&mut self, language: &LanguageId, source: &str) -> HighlightResult {
-        self.highlight(language, source)
+        SharedLanguageProvider::highlight(self, language, source)
     }
     fn supports(&self, language: &LanguageId) -> bool {
         self.inner
