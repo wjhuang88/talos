@@ -88,8 +88,8 @@ and BROWSER-001/#508 instead of creating competing ownership.
 
 ## Execution And Completion
 
-- Governance preparation only; no investigation deliverable or implementation claimed complete.
-- Completion Commit: pending
+- Investigation report: [I262 OBeiBuddy Contract Report](../reference/I262-OBEIBUDDY-CONTRACT-REPORT-2026-09-12.md).
+- Completion Commit: pending (report is evidence, not production implementation).
 
 ### Proposed Activation — 2026-09-12
 
