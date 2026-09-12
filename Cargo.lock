@@ -5832,6 +5832,7 @@ dependencies = [
  "talos-runtime",
  "talos-session",
  "talos-skill",
+ "talos-text",
  "talos-tools",
  "talos-tui",
  "tempfile",

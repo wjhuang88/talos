@@ -539,7 +539,8 @@ pub(crate) fn register_tui_permission_aware_tools(
     }
 }
 
-type LoadedPluginTools = (Vec<Arc<dyn AgentTool>>, LoadedPluginPackage);
+pub(crate) type LoadedLanguageContext = talos_text::SharedLanguageProvider;
+type LoadedPluginTools = (Vec<Arc<dyn AgentTool>>, LoadedPluginPackage, Option<LoadedLanguageContext>);
 
 fn load_explicit_plugin_tools(package_roots: &[PathBuf]) -> Result<Vec<LoadedPluginTools>, String> {
     if package_roots.is_empty() {
@@ -568,14 +569,14 @@ fn load_explicit_plugin_tools(package_roots: &[PathBuf]) -> Result<Vec<LoadedPlu
             .package()
             .cloned()
             .ok_or_else(|| "initialized plugin has no package metadata".to_owned())?;
-        loaded.push((tools, package));
+        loaded.push((tools, package, None));
         lifecycles.push(lifecycle);
     }
     // Reuse core's transactional collision semantics, including source diagnostics,
     // before publishing capabilities. No production tool registry is mutated here.
     let mut checked = ToolRegistry::new();
     checked
-        .register_contributions(loaded.iter().flat_map(|(tools, package)| {
+        .register_contributions(loaded.iter().flat_map(|(tools, package, _)| {
             let source = plugin_source(package);
             tools
                 .iter()
@@ -584,6 +585,9 @@ fn load_explicit_plugin_tools(package_roots: &[PathBuf]) -> Result<Vec<LoadedPlu
         .map_err(|error| error.to_string())?;
     for lifecycle in &mut lifecycles {
         lifecycle.activate().map_err(|error| error.to_string())?;
+    }
+    for (lifecycle, (_, _, context)) in lifecycles.iter_mut().zip(loaded.iter_mut()) {
+        *context = lifecycle.take_language_provider_context().map_err(|error| error.to_string())?;
     }
     Ok(loaded)
 }
@@ -603,7 +607,7 @@ pub(crate) fn register_explicit_permission_aware_plugins(
     let loaded = load_explicit_plugin_tools(package_roots)?;
     let mut packages = Vec::with_capacity(loaded.len());
     let mut contributions = Vec::new();
-    for (tools, package) in loaded {
+    for (tools, package, _) in loaded {
         let source = plugin_source(&package);
         contributions.extend(
             tools
@@ -624,11 +628,12 @@ pub(crate) fn register_explicit_tui_plugins(
     registry: &mut ToolRegistry,
     package_roots: &[PathBuf],
     _approval: Arc<TuiApprovalHandler>,
-) -> Result<Vec<LoadedPluginPackage>, String> {
+) -> Result<(Vec<LoadedPluginPackage>, Option<LoadedLanguageContext>), String> {
     let loaded = load_explicit_plugin_tools(package_roots)?;
     let mut packages = Vec::with_capacity(loaded.len());
     let mut contributions = Vec::new();
-    for (tools, package) in loaded {
+    let mut context = None;
+    for (tools, package, provider_context) in loaded {
         let source = plugin_source(&package);
         contributions.extend(
             tools
@@ -636,11 +641,12 @@ pub(crate) fn register_explicit_tui_plugins(
                 .map(|tool| ToolContribution::new(source.clone(), tool)),
         );
         packages.push(package);
+        context = context.or(provider_context);
     }
     registry
         .register_contributions(contributions)
         .map_err(|error| error.to_string())?;
-    Ok(packages)
+    Ok((packages, context))
 }
 
 /// A lightweight health/status tool for MCP mode.

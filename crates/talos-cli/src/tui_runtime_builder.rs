@@ -189,7 +189,7 @@ impl TuiRuntimeBuilder {
             mcp_runtime.tools(),
             self.approval_handler.clone(),
         );
-        let loaded_plugin_packages = register_explicit_tui_plugins(
+        let (loaded_plugin_packages, _language_provider_context) = register_explicit_tui_plugins(
             &mut registry,
             self.plugin_packages.as_slice(),
             self.approval_handler.clone(),
