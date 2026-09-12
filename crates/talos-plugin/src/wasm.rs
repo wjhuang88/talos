@@ -122,6 +122,28 @@ impl WasmLanguageProvider {
         }
         Ok(())
     }
+
+    /// Load and admit an explicitly selected provider artifact from a package root.
+    /// The path is confined to the package and no provider is loaded implicitly.
+    pub fn load_from_path(
+        runtime: Arc<WasmRuntime>,
+        package_root: &Path,
+        artifact: &str,
+        limits: WasmProviderLimits,
+    ) -> Result<(Self, WasmModule), WasmError> {
+        let path = confined_package_path(package_root, artifact)?;
+        let bytes = std::fs::read(&path).map_err(|error| WasmError::Io(error.to_string()))?;
+        let module = if path.extension().is_some_and(|extension| extension == "wat") {
+            let text = std::str::from_utf8(&bytes)
+                .map_err(|error| WasmError::Compile(error.to_string()))?;
+            WasmModule::from_wat(runtime, text)?
+        } else {
+            WasmModule::from_bytes(runtime, &bytes)?
+        };
+        let provider = Self::new(limits);
+        provider.validate_module(&module)?;
+        Ok((provider, module))
+    }
     /// Encode a validated request for a guest transport.
     pub fn encode_request(&self, request: &ProviderRequest) -> Result<Vec<u8>, &'static str> {
         encode_request(request, self.limits)
