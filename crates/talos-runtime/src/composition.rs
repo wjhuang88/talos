@@ -11,7 +11,7 @@ use talos_core::tool::ToolContribution;
 use talos_tools::{
     git_mutation_tool_contributions, git_read_tool_contributions, network_tool_contributions,
     ordinary_file_tool_contributions, read_image_tool_contribution, shell_tool_contributions,
-    symbol_tool_contributions, workspace_tool_contributions,
+    workspace_tool_contributions,
 };
 
 /// Explicit consumer profile for the shared built-in contribution inventory.
