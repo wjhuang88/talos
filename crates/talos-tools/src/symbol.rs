@@ -423,6 +423,38 @@ pub fn find_symbol_with_provider(
         .unwrap_or_else(|| Ok(None))
 }
 
+/// Run reference lookup through an explicitly supplied provider.
+pub fn find_references_with_provider(
+    provider: &mut dyn talos_text::SymbolProvider,
+    language: &str,
+    source: &str,
+    path: &Path,
+    name: &str,
+) -> Result<Vec<SourceLocation>, String> {
+    provider.find_references(language, source, path, name)
+}
+
+/// Run outline lookup through an explicitly supplied provider.
+pub fn list_symbols_with_provider(
+    provider: &mut dyn talos_text::SymbolProvider,
+    language: &str,
+    source: &str,
+    file: &str,
+    kind: Option<&str>,
+) -> Result<Vec<talos_text::SymbolInfo>, String> {
+    provider.list_symbols(language, source, file, kind)
+}
+
+/// Run import lookup through an explicitly supplied provider.
+pub fn list_imports_with_provider(
+    provider: &mut dyn talos_text::SymbolProvider,
+    language: &str,
+    source: &str,
+    path: &Path,
+) -> Result<Vec<ImportInfo>, String> {
+    provider.list_imports(language, source, path)
+}
+
 fn find_refs_in_file(path: &Path, name: &str) -> Result<Vec<SourceLocation>, String> {
     let lang = detect_language(path).ok_or_else(|| "unsupported file type".to_string())?;
     let code = fs::read_to_string(path).map_err(|e| e.to_string())?;
