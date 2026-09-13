@@ -13,14 +13,14 @@
 | Field | Value |
 |---|---|
 | Claim State | Claimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | @wjhuang88 |
 | Work Slice | AGENTS precedence and safe truncation |
 | Source Issue | #285 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #551 |
 | Claimed At | 2026-09-13 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Claim-only metadata; implementation remains unauthorized until merge. |
+| Authorization Evidence | Claim #551 merged before implementation; post-merge audit records partial completion. |
 | Last Updated | 2026-09-13 |
 | Handoff / Release Condition | Establish effective claim before implementation; preserve existing loading behavior until tests prove migration. |
 | Implementation PR | #552 |
