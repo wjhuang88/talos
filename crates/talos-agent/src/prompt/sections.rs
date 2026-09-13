@@ -31,16 +31,17 @@ pub(super) struct PromptContributionMetadata {
 #[allow(dead_code)]
 pub(super) enum AuthorityDecision {
     HigherWins,
+    LowerWins,
     EqualConflict,
 }
 
 /// Resolves two competing contributions without depending on a model/provider.
 #[allow(dead_code)]
 pub(super) fn resolve_authority(high: PromptContributionMetadata, low: PromptContributionMetadata) -> AuthorityDecision {
-    if high.authority > low.authority {
-        AuthorityDecision::HigherWins
-    } else {
-        AuthorityDecision::EqualConflict
+    match high.authority.cmp(&low.authority) {
+        std::cmp::Ordering::Greater => AuthorityDecision::HigherWins,
+        std::cmp::Ordering::Less => AuthorityDecision::LowerWins,
+        std::cmp::Ordering::Equal => AuthorityDecision::EqualConflict,
     }
 }
 
@@ -223,6 +224,13 @@ mod tests {
         let user = PromptSection { text: "# User Preferences\nA".into(), kind: PromptSectionKind::Dynamic }.metadata();
         let other = PromptContributionMetadata { source: PromptContributionSource::User, authority: user.authority, cacheable: false };
         assert_eq!(resolve_authority(user, other), AuthorityDecision::EqualConflict);
+    }
+
+    #[test]
+    fn behavior_harness_lower_authority_cannot_override() {
+        let advisory = PromptSection { text: "# Memory (advisory)\nstale".into(), kind: PromptSectionKind::Dynamic }.metadata();
+        let runtime = PromptSection { text: "# Runtime Context\nrule".into(), kind: PromptSectionKind::Dynamic }.metadata();
+        assert_eq!(resolve_authority(advisory, runtime), AuthorityDecision::LowerWins);
     }
 
     #[test]
