@@ -38,12 +38,17 @@ existing implementation commit; a status-only commit is not evidence.
 
 ## Collaboration Claim
 
-Claim State: Unclaimed
-Responsible Actor: Not assigned
-Executing Agent: Not assigned
-Work Slice: Not assigned
-Governance Claim PR: Pending
-Authorization Mode: Not applicable
-Authorization Evidence: Not applicable
-Implementation PR: Not started
-Last Updated: 2026-09-13
+| Field | Value |
+|---|---|
+| Claim State | Unclaimed |
+| Responsible Actor | Not assigned |
+| Executing Agent | Not assigned |
+| Work Slice | Not assigned |
+| Claimed At | Not applicable |
+| Source Issue | #285 |
+| Governance Claim PR | #554 |
+| Authorization Mode | Not applicable |
+| Authorization Evidence | Not applicable |
+| Implementation PR | Not started |
+| Last Updated | 2026-09-13 |
+| Handoff / Release Condition | Maintainer acceptance and claim merge before implementation. |
