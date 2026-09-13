@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Planned / Unclaimed |
+| Status | Planned / Claim Pending |
 | Source | PROMPT-001 / Issue #285 |
 | Deliverable | Source-backed inventory and accepted authority/precedence decision boundary for prompt inputs; no semantic prompt rewrite. |
 | Depends On | ADR-033, current prompt/context/evolution/memory/plugin owners |
@@ -12,7 +12,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claim Pending (proposed; ineffective until governance record merges) |
 | Responsible Actor | Not assigned |
 | Executing Agent | Not assigned |
 | Work Slice | Not assigned |
@@ -23,6 +23,12 @@
 | Authorization Evidence | Not applicable |
 | Last Updated | 2026-09-13 |
 | Handoff / Release Condition | Establish an effective claim before implementation; no prompt/runtime changes are authorized. |
+| Governance Claim PR | Pending |
+| Claimed At | 2026-09-13 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Claim-only architecture baseline; no prompt/runtime implementation authorized before merge. |
+| Last Updated | 2026-09-13 |
+| Handoff / Release Condition | Merge claim before implementation; accepted ADR and child slices required. |
 | Implementation PR | Not started |
 
 ## Acceptance
