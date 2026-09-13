@@ -887,20 +887,15 @@ fn migrate_and_validate_schema(conn: &Connection, db_path: &Path) -> Result<(), 
         validate_current_rows(&tx)?;
         tx.commit()?;
     } else {
-        // Older databases may have been written before the session/title
-        // uniqueness invariant was indexed. Keep the earliest durable row so
-        // a stale/failed retry cannot brick every subsequent Todo operation.
-        conn.execute(
-            "DELETE FROM todo_items WHERE rowid NOT IN (SELECT MIN(rowid) FROM todo_items GROUP BY session_id, title)",
-            [],
-        )?;
-        validate_current_rows(conn)?;
+        // Runtime opens must not scan or repair unrelated sessions. Legacy
+        // rows are validated by explicit migration/repair paths; operations
+        // remain session-scoped and idempotent below.
         if version == 0 {
             conn.pragma_update(None, "user_version", TODO_SCHEMA_VERSION)?;
         }
     }
     conn.execute(
-        "CREATE UNIQUE INDEX IF NOT EXISTS idx_todo_items_session_title \
+        "CREATE INDEX IF NOT EXISTS idx_todo_items_session_title \
          ON todo_items(session_id, title)",
         [],
     )?;
