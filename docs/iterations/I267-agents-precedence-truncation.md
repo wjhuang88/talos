@@ -17,10 +17,10 @@
 | Executing Agent | Not assigned |
 | Work Slice | AGENTS precedence and safe truncation |
 | Source Issue | #285 |
-| Governance Claim PR | Not applicable |
-| Claimed At | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | Pending |
+| Claimed At | 2026-09-13 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Claim-only metadata; implementation remains unauthorized until merge. |
 | Last Updated | 2026-09-13 |
 | Handoff / Release Condition | Establish effective claim before implementation; preserve existing loading behavior until tests prove migration. |
 | Implementation PR | Not started |
