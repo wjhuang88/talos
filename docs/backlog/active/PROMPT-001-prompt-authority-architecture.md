@@ -45,6 +45,27 @@ overridden by advisory memory, learned patterns, broad project context or extens
 - Decompose the umbrella into separately claimable decision, harness, authority-correction,
   capability-decomposition and SDK/extension migration children.
 
+### Approved Scope Addition (2026-09-13)
+
+The #285 long task also includes the following independently testable capability slices. This is
+an append-only planning record; it does not activate implementation or alter the published baseline:
+
+- **Automatic tool-protocol selection:** prefer Native when provider capability is confirmed,
+  otherwise select a validated compatibility path; retain manual override only as a diagnostic
+  escape hatch and preserve existing `cargo run`/`build` defaults.
+- **Model-assisted protocol recovery:** use a bounded, sanitized diagnostic model call to classify
+  protocol failures and propose correction, fallback, stop, or human review. Never replay an
+  executed or execution-unknown write, bypass permission Deny, or recurse without a retry bound.
+- **Shared bounded model invocation:** extract one typed primitive for isolated-context,
+  dedicated-toolset, single-request decisions (initial consumers: auto permission assessment and
+  protocol recovery), with explicit deadline, cancellation, budget, provenance, secret-safe
+  observability, and no implicit session/memory/authority inheritance.
+
+Acceptance for this addition requires an accepted ADR/migration contract, focused tests for
+capability selection and failure classification, and user-visible diagnostics. Permission and
+security surfaces require independent security review. Implementation must be split into runnable
+child iterations; I270's harness-only scope remains unchanged.
+
 ## Exclusions
 
 - No prompt, context loader, memory, Evolution, Todo, hook, SDK, provider or runtime implementation
