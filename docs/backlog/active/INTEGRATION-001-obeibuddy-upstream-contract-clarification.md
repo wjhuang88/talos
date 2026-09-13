@@ -4,7 +4,7 @@
 |---|---|
 | Story ID | INTEGRATION-001 |
 | Type | Integration contract clarification Spike |
-| Status | In Progress / Claimed (I262 activated by merged PR #544; Review pending) |
+| Status | Review / Claimed (I262 investigation evidence reviewed; browser implementation Deferred) |
 | Source Issue | #520 |
 | Selected Iteration | I262 (active claim merged; Review pending) |
 | Implementation PR | Not started |
@@ -24,7 +24,7 @@
 | Authorization Evidence | Maintainer requested #520 closure in the continuing single-maintainer workflow; no independent natural-person reviewer available. Claim/activation require #544 exact-head CI, validators, no blocking feedback and merge-time CAS. No API or security decision accepted here. |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-12 |
-| Handoff / Release Condition | I262 evidence is ready for independent Agent-role API/security review; separately governed browser implementation remains required and Request B is Deferred. |
+| Handoff / Release Condition | Independent Agent-role API/security review APPROVE is recorded on I262 exact head; separately governed browser implementation remains required and Request B is Deferred. |
 
 ## Scope And Value
 

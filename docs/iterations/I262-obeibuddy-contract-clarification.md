@@ -54,7 +54,7 @@ replay. No activation of WEB-007, BROWSER-001, Desktop or unrelated capability o
 - [x] Each Request B question has an ownership proposal, security/compatibility gates and no lost requirement.
 - [ ] Runtime examples/test commands are reproducible; never claim an unexecuted test passed.
 - [ ] Downstream migration, documentation targets and residual domain owners are explicit.
-- [ ] Independent Agent-role API/security review checks the report against source; shared-account identity limits are disclosed.
+- [x] Independent Agent-role API/security review checks the report against source; shared-account identity limits are disclosed (APPROVE, exact head `c50b61061636df8abd470c084a4dfa834f0d4b74`).
 - [x] Both governance validators and `git diff --check` pass; Issue #520 receives exact merged evidence.
 
 This is a contract-investigation exception to binary-facing acceptance: its testable output is
