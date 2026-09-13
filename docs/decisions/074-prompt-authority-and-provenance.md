@@ -1,6 +1,8 @@
 # ADR-074: Prompt Authority and Provenance Boundary
 
-Status: Proposed
+Status: Accepted
+
+Accepted: 2026-09-13 via I265 / PR #548 (claim merge `6333ba12`)
 
 ## Context
 

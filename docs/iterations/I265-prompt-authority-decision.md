@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Planned / Unclaimed |
+| Status | Complete / Closed |
 | Source | PROMPT-001 / Issue #285 |
 | Deliverable | Accepted ADR defining prompt authority, provenance, precedence and compatibility boundary. |
 | Depends On | I264 baseline, ADR-033 |
@@ -32,4 +32,4 @@
 - Compatibility and migration boundaries are explicit; current behavior remains unchanged.
 - Follow-up child slices are independently runnable and claimable.
 
-Completion Commit: pending
+Completion Commit: e7d6ef8e
