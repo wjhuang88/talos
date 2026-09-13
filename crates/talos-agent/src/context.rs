@@ -201,13 +201,28 @@ impl ContextLoader {
         let mut result = String::with_capacity(HEAD_SIZE + TAIL_SIZE + 3);
 
         // Head portion
-        result.extend(chars.iter().take(HEAD_SIZE));
+        let head_end = chars
+            .iter()
+            .take(HEAD_SIZE)
+            .rposition(|c| *c == '\n')
+            .map(|index| index + 1)
+            .filter(|index| *index >= HEAD_SIZE / 2)
+            .unwrap_or(HEAD_SIZE);
+        result.extend(chars.iter().take(head_end));
 
         // Truncation indicator
         result.push_str("\n...\n");
 
         // Tail portion
         let tail_start = char_count.saturating_sub(TAIL_SIZE);
+        let tail_start = chars
+            .iter()
+            .enumerate()
+            .skip(tail_start)
+            .find(|(_, c)| **c == '\n')
+            .map(|(index, _)| index + 1)
+            .filter(|index| *index <= char_count.saturating_sub(TAIL_SIZE / 2))
+            .unwrap_or(tail_start);
         result.extend(chars.iter().skip(tail_start));
 
         result
