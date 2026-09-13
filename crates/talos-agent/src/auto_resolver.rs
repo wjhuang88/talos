@@ -507,8 +507,12 @@ impl ProviderAutoPermissionAssessor {
             },
         ];
         crate::bounded_model::invoke_text(
-            self.provider.as_ref(), &messages, remaining, MAX_AUTO_ASSESSOR_OUTPUT_BYTES,
-        ).await
+            self.provider.as_ref(),
+            &messages,
+            remaining,
+            MAX_AUTO_ASSESSOR_OUTPUT_BYTES,
+        )
+        .await
     }
 }
 
@@ -1554,8 +1558,8 @@ fn parse_auto_response(raw: &str) -> Result<AutoPermissionWireResponse, serde_js
 #[cfg(test)]
 mod tests {
     use super::*;
-    use talos_core::message::AgentEvent;
     use std::sync::atomic::AtomicUsize;
+    use talos_core::message::AgentEvent;
 
     use crate::permission_pipeline::PermissionBinding;
     use async_trait::async_trait;

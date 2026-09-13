@@ -22,14 +22,20 @@ pub async fn invoke_text(
                     }
                     output.push_str(&delta);
                 }
-                AgentEvent::ToolCall { .. } => return Err("tool use is forbidden in auto assessment".to_owned()),
+                AgentEvent::ToolCall { .. } => {
+                    return Err("tool use is forbidden in auto assessment".to_owned());
+                }
                 AgentEvent::Error { message } => return Err(message),
                 AgentEvent::TurnEnd { .. } => break,
                 _ => {}
             }
         }
         Ok(())
-    }).await.map_err(|_| "bounded model deadline exceeded".to_owned())??;
-    if output.trim().is_empty() { return Err("bounded model returned no output".to_owned()); }
+    })
+    .await
+    .map_err(|_| "bounded model deadline exceeded".to_owned())??;
+    if output.trim().is_empty() {
+        return Err("bounded model returned no output".to_owned());
+    }
     Ok(output)
 }
