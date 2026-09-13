@@ -34,16 +34,38 @@ pub(super) struct PromptSection {
 
 impl PromptSection {
     pub(super) fn metadata(&self) -> PromptContributionMetadata {
-        let source = if self.text.starts_with("# Identity") { PromptContributionSource::Identity }
-        else if self.text.starts_with("# Tool") { PromptContributionSource::Tools }
-        else if self.text.starts_with("# Skill") { PromptContributionSource::Skills }
-        else if self.text.starts_with("# Context") { PromptContributionSource::Context }
-        else if self.text.starts_with("# Memory") { PromptContributionSource::Memory }
-        else if self.text.starts_with("# Session Todos") { PromptContributionSource::Session }
-        else if self.text.starts_with("# User Preferences") { PromptContributionSource::User }
-        else if self.text.starts_with("# Runtime Context") { PromptContributionSource::Runtime }
-        else { PromptContributionSource::Extension };
-        PromptContributionMetadata { source, authority: match source { PromptContributionSource::Runtime => 100, PromptContributionSource::Identity | PromptContributionSource::Tools | PromptContributionSource::Skills => 90, PromptContributionSource::User => 80, PromptContributionSource::Context => 70, _ => 40 }, cacheable: self.kind == PromptSectionKind::Cacheable }
+        let source = if self.text.starts_with("# Identity") {
+            PromptContributionSource::Identity
+        } else if self.text.starts_with("# Tool") {
+            PromptContributionSource::Tools
+        } else if self.text.starts_with("# Skill") {
+            PromptContributionSource::Skills
+        } else if self.text.starts_with("# Context") {
+            PromptContributionSource::Context
+        } else if self.text.starts_with("# Memory") {
+            PromptContributionSource::Memory
+        } else if self.text.starts_with("# Session Todos") {
+            PromptContributionSource::Session
+        } else if self.text.starts_with("# User Preferences") {
+            PromptContributionSource::User
+        } else if self.text.starts_with("# Runtime Context") {
+            PromptContributionSource::Runtime
+        } else {
+            PromptContributionSource::Extension
+        };
+        PromptContributionMetadata {
+            source,
+            authority: match source {
+                PromptContributionSource::Runtime => 100,
+                PromptContributionSource::Identity
+                | PromptContributionSource::Tools
+                | PromptContributionSource::Skills => 90,
+                PromptContributionSource::User => 80,
+                PromptContributionSource::Context => 70,
+                _ => 40,
+            },
+            cacheable: self.kind == PromptSectionKind::Cacheable,
+        }
     }
 }
 
