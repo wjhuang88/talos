@@ -461,11 +461,19 @@ mod tests {
     fn test_truncation_does_not_split_instruction_lines() {
         let mut content = String::new();
         for index in 0..2_000 {
-            content.push_str(&format!("rule-{index}: preserve this complete instruction\n"));
+            content.push_str(&format!(
+                "rule-{index}: preserve this complete instruction\n"
+            ));
         }
         let result = ContextLoader::apply_size_limit(&content);
         for line in result.lines() {
-            assert!(line.is_empty() || line == "..." || line == "[single-line]" || line.starts_with("rule-") || line.starts_with("--- AGENTS"));
+            assert!(
+                line.is_empty()
+                    || line == "..."
+                    || line == "[single-line]"
+                    || line.starts_with("rule-")
+                    || line.starts_with("--- AGENTS")
+            );
         }
     }
 }
