@@ -206,7 +206,9 @@ impl ContextLoader {
         let chars: Vec<char> = content.chars().collect();
         let mut result = String::with_capacity(HEAD_SIZE + TAIL_SIZE + 3);
 
-        // Head portion
+        // Head portion. If there is no line boundary, keep a deterministic
+        // diagnostic rather than silently presenting a partial rule as whole.
+        let has_boundary = chars.iter().any(|c| *c == '\n');
         let head_end = chars
             .iter()
             .take(HEAD_SIZE)
@@ -217,7 +219,11 @@ impl ContextLoader {
         result.extend(chars.iter().take(head_end));
 
         // Truncation indicator
-        result.push_str("\n...\n");
+        if has_boundary {
+            result.push_str("\n...\n");
+        } else {
+            result.push_str("\n... [single-line]\n");
+        }
 
         // Tail portion
         let tail_start = char_count.saturating_sub(TAIL_SIZE);
@@ -459,7 +465,7 @@ mod tests {
         }
         let result = ContextLoader::apply_size_limit(&content);
         for line in result.lines() {
-            assert!(line.is_empty() || line == "..." || line.starts_with("rule-") || line.starts_with("--- AGENTS"));
+            assert!(line.is_empty() || line == "..." || line == "[single-line]" || line.starts_with("rule-") || line.starts_with("--- AGENTS"));
         }
     }
 }
