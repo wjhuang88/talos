@@ -38,4 +38,11 @@
 
 - `f5cacdd7` adds advisory classification for Memory and Session Todo sections with six focused tests.
 - `d8c04a4f` renders explicit `(advisory)` labels for Memory and Session Todos; 34 prompt tests pass.
-- Runtime rendering and steering interruption scenarios remain before closeout.
+- Steering interruption/resumability is covered by the existing session boundary harness
+  (`test_concurrent_submit_and_interrupt` and the steering handoff matrix in
+  `crates/talos-agent/src/session/tests.rs`): accepted steering is injected after the
+  preceding tool result, before the next response, without starting a second outer turn,
+  and retains the original turn identity across cancellation/error paths.
+- This evidence confirms runtime ordering compatibility, but does not yet provide the
+  provider-independent prompt behavior harness required by I270; I272 remains Partial
+  until a focused runtime-rendering/resumability evidence checkpoint is recorded.
