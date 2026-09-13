@@ -91,6 +91,20 @@ fn test_custom_prompt_with_other_components() {
     assert!(prompt.contains("## bash"));
 }
 
+#[test]
+fn custom_prompt_keeps_runtime_owned_sections() {
+    let builder = SystemPromptBuilder::new()
+        .with_custom_prompt("Custom identity only.".into())
+        .with_tools(vec![ToolDescription {
+            name: "read".into(),
+            description: "Read a file".into(),
+            ..Default::default()
+        }]);
+    let prompt = builder.build();
+    assert!(prompt.contains("# Tools"));
+    assert!(prompt.contains("# Runtime Context"));
+}
+
 // --- Append prompt tests ---
 
 #[test]
