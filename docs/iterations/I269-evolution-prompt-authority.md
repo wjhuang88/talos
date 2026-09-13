@@ -45,11 +45,12 @@
 
 ## Completion Evidence
 
-- Completion Commit: pending (behavior harness and hook-boundary tests remain)
+- Completion Commit: pending (behavior harness and richer persisted authority fields remain)
 
 ## Execution Checkpoint
 
 - `a0a958e5` adds explicit advisory wording and bounded UTF-8-safe output truncation.
+- `90970607` adds stable `evolution-pattern:<id>` provenance markers and advisory regression coverage.
 - Focused `talos-evolution` tests: 63 passed.
 - Remaining acceptance: representative behavior harness and explicit provenance fields.
 
