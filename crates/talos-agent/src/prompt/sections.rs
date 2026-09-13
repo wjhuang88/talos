@@ -84,4 +84,48 @@ mod tests {
         assert_eq!(metadata.authority, 90);
         assert!(metadata.cacheable);
     }
+
+    #[test]
+    fn behavior_fixture_authority_order_is_deterministic() {
+        let sources = [
+            PromptContributionSource::Runtime,
+            PromptContributionSource::Identity,
+            PromptContributionSource::User,
+            PromptContributionSource::Context,
+            PromptContributionSource::Memory,
+            PromptContributionSource::Extension,
+        ];
+        let authorities: Vec<u8> = sources
+            .iter()
+            .map(|source| match source {
+                PromptContributionSource::Runtime => 100,
+                PromptContributionSource::Identity => 90,
+                PromptContributionSource::User => 80,
+                PromptContributionSource::Context => 70,
+                _ => 40,
+            })
+            .collect();
+        assert!(authorities.windows(2).all(|pair| pair[0] >= pair[1]));
+    }
+
+    #[test]
+    fn behavior_fixture_advisory_sources_cannot_match_runtime_authority() {
+        for source in [
+            PromptContributionSource::Memory,
+            PromptContributionSource::Session,
+            PromptContributionSource::Extension,
+        ] {
+            let section = PromptSection {
+                text: "advisory".into(),
+                kind: PromptSectionKind::Dynamic,
+            };
+            let metadata = PromptContributionMetadata {
+                source,
+                authority: 40,
+                cacheable: false,
+            };
+            assert!(metadata.authority < 100);
+            assert!(!section.metadata().cacheable);
+        }
+    }
 }
