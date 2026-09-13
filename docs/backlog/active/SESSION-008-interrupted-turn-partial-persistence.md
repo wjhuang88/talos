@@ -5,7 +5,7 @@
 | Story ID | SESSION-008 |
 | Type | Product / durable-session story |
 | Priority | P1 |
-| Status | Complete — SESSION-008-A and SESSION-008-B complete |
+| Status | Partial — SESSION-008-A/B complete; SESSION-008-C/I263 owns interrupted marker projection gap |
 | Source | [GitHub Issue #45](https://github.com/wjhuang88/talos/issues/45) |
 | Parent Epic | None |
 | Selected Iteration | I193 Complete; implementation merged in `1b5461cd` |
@@ -101,6 +101,7 @@ transcript must identify that the turn did not complete normally.
 |---|---|---|---|
 | SESSION-008-A | Partial-turn lifecycle and durable-format decision | Complete in I187; Completion Commit `e288afb5d97026f7ccb3ce0f519a4a81f99fe104` | Existing ADR-039/ADR-042 and current-path inventory |
 | SESSION-008-B | Atomic/idempotent durable partial commit and replay integration | Complete in I193; Completion Commit `404d7a4bf5b9c7dedeae479fe91fa5400b42d411` | SESSION-008-A Complete; ADR-058 Accepted |
+| SESSION-008-C | Display-safe interrupted marker projection and restart parity | Planned / Unclaimed in I263 | SESSION-008-B Complete; marker currently hidden from transcript projection |
 
 Only one child may be selected at a time. The parent becomes Complete only
 after both children have existing completion evidence and the Issue #45

@@ -28,6 +28,8 @@ That snapshot is historical evidence and not current activation authority.
 
 ## Current Operating Set
 
+| I263 | Interrupted Transcript Projection | Planned / Unclaimed | SESSION-008-C / Issue #45; expose persisted interrupted status without changing successful replay. |
+
 I158 and I171 completion evidence: `Completion Commit: 56f419f7` (source implementation/audit
 closeout evidence; status synchronization commits do not self-certify completion).
 
