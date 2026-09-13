@@ -1,6 +1,6 @@
 # Iteration I273: Bounded Model Decisions and Automatic Protocol Selection
 
-> Document status: Planned / Unclaimed
+> Document status: Active / Claimed
 > Parent: PROMPT-001 / Issue #285
 
 ## Objective
@@ -38,8 +38,13 @@ existing implementation commit; a status-only commit is not evidence.
 
 ## Collaboration Claim
 
-Claim State: Unclaimed
-Responsible Actor: Not assigned
-Executing Agent: Not assigned
-Work Slice: Not assigned
+Claim State: Claimed
+Responsible Actor: @wjhuang88
+Executing Agent: @wjhuang88
+Work Slice: bounded model decision primitive, automatic protocol selection and protocol recovery
+Claimed At: 2026-09-13
+Authorization Mode: Maintainer-authorized local convergence
+Authorization Evidence: Maintainer accepted ADR-075 in-session
+Governance Claim PR: Not applicable (local claim pending remote stage)
 Implementation PR: Not started
+Last Updated: 2026-09-13

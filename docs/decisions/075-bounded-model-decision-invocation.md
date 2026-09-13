@@ -1,7 +1,10 @@
 # ADR-075: Bounded Model Decision Invocation
 
-Status: Proposed
+Status: Accepted
 Date: 2026-09-13
+
+Accepted by maintainer on 2026-09-13 for #285/I273. This acceptance authorizes the bounded
+implementation scope below; it does not authorize release or unrelated permission changes.
 
 ## Context
 
