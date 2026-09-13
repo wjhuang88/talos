@@ -423,7 +423,11 @@ impl SystemPromptBuilder {
     pub fn build(&self) -> String {
         self.prompt_sections()
             .into_iter()
-            .map(|section| section.text)
+            .map(|section| {
+                // Classify each contribution without altering rendered output.
+                let _metadata = section.metadata();
+                section.text
+            })
             .collect::<Vec<_>>()
             .join("\n")
     }
