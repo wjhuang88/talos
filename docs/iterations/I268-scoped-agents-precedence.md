@@ -1,6 +1,6 @@
 # Iteration I268: Scoped AGENTS Precedence And Authority-Safe Truncation
 
-> Document status: Active
+> Document status: Complete / Closed
 > Published plan date: 2026-09-13
 > Planned objective: Complete the semantic precedence and authority-safe truncation residual from I267.
 > MVP deliverable: A deterministic, tested prompt-context projection that preserves nearest-scope rules and never emits ambiguous authority fragments.
@@ -9,7 +9,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | @wjhuang88 |
 | Work Slice | Scoped AGENTS precedence and authority-safe truncation |
@@ -18,7 +18,7 @@
 | Governance Claim PR | Direct commit 9b9ace72213c0e6e213c959ec626e8024b3ea131 |
 | Authorization Mode | Direct commit |
 | Authorization Evidence | User-authorized continuation; claim is limited to this slice. |
-| Implementation PR | Not started |
+| Implementation PR | #553 |
 | Last Updated | 2026-09-13 |
 | Handoff / Release Condition | Keep Evolution, memory, provider, UI, and public API changes out of scope. |
 
@@ -50,10 +50,11 @@
 | Date | Type | Record |
 |---|---|---|
 | 2026-09-13 | Direct claim activation | I268 claim established on main; implementation remains not started. |
+| 2026-09-13 | Implementation merged | PR #553 merged as `88a427c5`; exact-head CI `34750919013` passed; independent Agent-role review approved exact head `de7afcd3`. |
 
 ## Completion Evidence
 
-- Completion Commit: pending
+- Completion Commit: 88a427c5c46aa4f0212b6229eb70788d6f72374a
 
 ## Variance And Residuals
 
