@@ -143,4 +143,31 @@ mod tests {
             assert!(!metadata.cacheable);
         }
     }
+
+    #[test]
+    fn behavior_fixture_capability_data_stays_below_current_user_authority() {
+        let skill = PromptSection {
+            text: "# Skill: formatter".into(),
+            kind: PromptSectionKind::Dynamic,
+        };
+        let tool = PromptSection {
+            text: "# Tool: shell".into(),
+            kind: PromptSectionKind::Dynamic,
+        };
+        let user = PromptSection {
+            text: "# User Preferences\nrequest".into(),
+            kind: PromptSectionKind::Dynamic,
+        };
+        assert!(skill.metadata().authority > 0);
+        assert!(tool.metadata().authority > 0);
+        assert!(
+            user.metadata().authority
+                > PromptContributionMetadata {
+                    source: PromptContributionSource::Memory,
+                    authority: 40,
+                    cacheable: false
+                }
+                .authority
+        );
+    }
 }
