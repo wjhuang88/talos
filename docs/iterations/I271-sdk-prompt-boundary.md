@@ -1,6 +1,6 @@
 # Iteration I271: SDK Prompt Customization Boundary
 
-> Document status: Active
+> Document status: Partial / Open
 
 ## Collaboration Claim
 
@@ -32,4 +32,9 @@
 
 ## Completion Evidence
 
-- Completion Commit: pending
+- Completion Commit: pending (runtime enforcement and hook API tests remain)
+
+## Execution Checkpoint
+
+- `dcffb640` documents the compatibility boundary for `custom_prompt`, `append_prompt`, and hooks.
+- Production API enforcement and dedicated hook-boundary tests remain in scope.
