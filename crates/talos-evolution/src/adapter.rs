@@ -54,9 +54,10 @@ impl<'a> BehaviorAdapter<'a> {
             }
 
             let entry = format!(
-                "{}. [{}] Advisory observation: {} (confidence: {:.0}%, evidence: {})\n",
+                "{}. [{}] Advisory observation (provenance: evolution-pattern:{}) : {} (confidence: {:.0}%, evidence: {})\n",
                 i + 1 - dropped,
                 pattern.category,
+                pattern.id,
                 pattern.instruction,
                 pattern.confidence * 100.0,
                 pattern.evidence_count
@@ -192,7 +193,7 @@ mod tests {
     fn test_get_evolution_context_orders_by_confidence_first() {
         let store = KnowledgeStore::open_memory().expect("operation should succeed");
         let mut config = EvolutionConfig::default();
-        config.max_output_bytes = 500;
+        config.max_output_bytes = 1_000;
         config.min_confidence = 0.0;
 
         for (conf, label) in [(0.5, "low"), (0.9, "high"), (0.7, "mid")] {
@@ -219,5 +220,21 @@ mod tests {
             "high confidence should appear before mid"
         );
         assert!(mid_pos < low_pos, "mid confidence should appear before low");
+    }
+
+    #[test]
+    fn test_learned_patterns_are_explicitly_advisory_with_provenance() {
+        let store = KnowledgeStore::open_memory().expect("operation should succeed");
+        let mut pattern = Pattern::new("Observed".into(), "Prefer X".into(), "preference".into());
+        pattern.confidence = 0.9;
+        pattern.evidence_count = 5;
+        let id = pattern.id.clone();
+        store
+            .insert_pattern(&pattern)
+            .expect("operation should succeed");
+        let context =
+            BehaviorAdapter::new(&store, EvolutionConfig::default()).get_evolution_context();
+        assert!(context.contains("advisory only"));
+        assert!(context.contains(&format!("evolution-pattern:{id}")));
     }
 }

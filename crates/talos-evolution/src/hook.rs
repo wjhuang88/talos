@@ -416,7 +416,7 @@ mod tests {
                     prompt.contains("BASE"),
                     "augmented prompt must keep the original prefix"
                 );
-                assert!(prompt.contains("Learned Patterns"));
+                assert!(prompt.contains("Advisory Learned Patterns"));
                 assert!(prompt.contains("Avoid global mutable state"));
             }
             other => panic!("expected Modify, got {other:?}"),
