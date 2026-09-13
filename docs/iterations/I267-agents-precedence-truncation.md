@@ -27,6 +27,12 @@
 
 ## Acceptance
 
+### 2026-09-13 CI Recovery Checkpoint
+
+The implementation candidate remains unchanged; this governance-only checkpoint exists to
+retrigger pull-request validation after the prior workflow ended with `startup_failure`.
+
+
 - Nearest scoped instructions refine, but cannot weaken, runtime invariants or current user intent.
 - Truncation preserves complete authority-bearing rules and records deterministic diagnostics.
 - Existing prompt behavior remains compatible outside explicitly tested precedence cases.
