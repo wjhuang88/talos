@@ -1554,6 +1554,7 @@ fn parse_auto_response(raw: &str) -> Result<AutoPermissionWireResponse, serde_js
 #[cfg(test)]
 mod tests {
     use super::*;
+    use talos_core::message::AgentEvent;
     use std::sync::atomic::AtomicUsize;
 
     use crate::permission_pipeline::PermissionBinding;
