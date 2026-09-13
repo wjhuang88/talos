@@ -16,7 +16,7 @@
 | Claimed At | 2026-09-13 |
 | Source Issue | #285 |
 | Governance Claim PR | Direct commit 9b9ace72 (claim effective on main) |
-| Authorization Mode | Single-maintainer merge |
+| Authorization Mode | Direct commit |
 | Authorization Evidence | User-authorized continuation; claim is limited to this slice. |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-13 |
