@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Active / Claimed |
+| Status | Complete / Closed |
 | Source | SESSION-008 / Issue #45 |
 | Deliverable | Expose a display-safe interrupted-turn marker in durable transcript projection without leaking hidden diagnostics or changing successful replay. |
 | Depends On | I193 / SESSION-008-B, ADR-058 |
@@ -12,7 +12,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Released |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex single-developer |
 | Work Slice | Display-safe interrupted terminal status projection and restart parity only; no schema or UI implementation. |
@@ -22,8 +22,8 @@
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Claim-only governance PR; implementation remains unauthorized until merge. |
 | Last Updated | 2026-09-13 |
-| Handoff / Release Condition | Merge #545 before implementation; exact-head review and CI required for implementation candidate. |
-| Implementation PR | Not started |
+| Handoff / Release Condition | Complete; PR #546 merged as `239a01cc`. |
+| Implementation PR | #546 |
 
 ## Problem
 
@@ -49,4 +49,8 @@ credentials, reasoning, or provider payloads.
 
 ## Completion Evidence
 
-Completion Commit: pending
+Completion Commit: `0f021a6f10d33917151d9f09957daeff51f6761b`
+
+Closeout evidence: exact-head CI `34735471305` passed; independent Agent-role API/security review
+approved the exact head. `DurableSession::turn_outcome` exposes terminal outcome without changing
+the public transcript entry shape.
