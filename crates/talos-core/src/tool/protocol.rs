@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum ToolProtocol {
+    /// Automatically select the provider-compatible protocol.
+    Auto,
     #[default]
     Native,
     TalosStrict,
@@ -13,11 +15,22 @@ pub enum ToolProtocol {
 impl ToolProtocol {
     pub fn parse(s: &str) -> Option<Self> {
         match s {
+            "auto" => Some(ToolProtocol::Auto),
             "native" => Some(ToolProtocol::Native),
             "talos-strict" | "talos_xml_json_strict" => Some(ToolProtocol::TalosStrict),
             "compat" | "compatibility" => Some(ToolProtocol::Compat),
             _ => None,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ToolProtocol;
+
+    #[test]
+    fn parses_automatic_protocol() {
+        assert_eq!(ToolProtocol::parse("auto"), Some(ToolProtocol::Auto));
     }
 }
 
@@ -32,6 +45,9 @@ pub struct ToolProtocolConfig {
 impl ToolProtocolConfig {
     pub fn for_protocol(protocol: ToolProtocol) -> Self {
         match protocol {
+            ToolProtocol::Auto => ToolProtocolConfig {
+                protocol, strict_prompt: false, stream_filter: false, schema_validate: false,
+            },
             ToolProtocol::Native => ToolProtocolConfig {
                 protocol,
                 strict_prompt: false,
