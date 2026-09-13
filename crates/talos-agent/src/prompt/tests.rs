@@ -509,6 +509,16 @@ fn test_default_builder() {
 }
 
 #[test]
+fn protocol_modes_render_distinct_stable_hints_without_provider_calls() {
+    let native = SystemPromptBuilder::new().build();
+    let strict = SystemPromptBuilder::new().with_strict_tool_format().build();
+    let compat = SystemPromptBuilder::new().with_tool_format(TOOL_CALLING_FORMAT).build();
+    assert!(native.contains("Native tool calling is enabled"));
+    assert!(strict.contains(TOOL_CALLING_STRICT.trim()));
+    assert!(compat.contains(TOOL_CALLING_FORMAT.trim()));
+}
+
+#[test]
 fn activated_skill_context_is_cacheable_stable_prefix() {
     let builder = SystemPromptBuilder::new().with_activated_skill(Some(ActivatedSkillContext {
         name: "review".to_string(),
