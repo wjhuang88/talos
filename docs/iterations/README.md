@@ -30,7 +30,7 @@ That snapshot is historical evidence and not current activation authority.
 
 | I263 | Interrupted Transcript Projection | Complete / Closed | SESSION-008-C / Issue #45; Completion Commit `0f021a6f`; PR #546 merged `239a01cc`. |
 | I264 | Prompt Authority Architecture Baseline | Planned / Unclaimed | PROMPT-001 / Issue #285; inventory and decision boundary only, no prompt implementation. |
-| I269 | Evolution Learned-Pattern Authority | Active / Claimed | PROMPT-001 / Issue #285; advisory Evolution prompt boundary, provenance, and tests. |
+| I269 | Evolution Learned-Pattern Authority | Partial / Open | PROMPT-001 / Issue #285; advisory Evolution prompt boundary landed in `a0a958e5`; behavior harness remains. |
 
 I158 and I171 completion evidence: `Completion Commit: 56f419f7` (source implementation/audit
 closeout evidence; status synchronization commits do not self-certify completion).
