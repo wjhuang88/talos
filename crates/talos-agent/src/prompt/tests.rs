@@ -533,6 +533,16 @@ fn activated_skill_context_is_cacheable_stable_prefix() {
     assert!(!dynamic.contains("Review instructions stay provider-visible only."));
 }
 
+#[test]
+fn advisory_sections_do_not_change_stable_prefix() {
+    let base = SystemPromptBuilder::new().build_stable_prefix();
+    let enriched = SystemPromptBuilder::new()
+        .with_memory_section(Some("old memory".into()))
+        .with_todo_section(Some("- [ ] todo".into()))
+        .build_stable_prefix();
+    assert_eq!(base, enriched, "advisory sections must remain dynamic");
+}
+
 // --- Clone test ---
 
 #[test]
