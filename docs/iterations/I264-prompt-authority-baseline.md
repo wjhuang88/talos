@@ -12,7 +12,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claim Pending (proposed; ineffective until governance record merges) |
+| Claim State | Unclaimed |
 | Responsible Actor | Not assigned |
 | Executing Agent | Not assigned |
 | Work Slice | Not assigned |
