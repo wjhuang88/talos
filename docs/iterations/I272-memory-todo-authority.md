@@ -32,9 +32,10 @@
 
 ## Completion Evidence
 
-- Completion Commit: pending (runtime rendering and interruption behavior remain)
+- Completion Commit: pending (steering interruption behavior remains)
 
 ## Execution Checkpoint
 
 - `f5cacdd7` adds advisory classification for Memory and Session Todo sections with six focused tests.
+- `d8c04a4f` renders explicit `(advisory)` labels for Memory and Session Todos; 34 prompt tests pass.
 - Runtime rendering and steering interruption scenarios remain before closeout.
