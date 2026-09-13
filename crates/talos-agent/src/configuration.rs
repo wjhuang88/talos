@@ -390,7 +390,6 @@ impl Agent {
     /// Sets the provider tool-call protocol.
     pub fn set_tool_protocol(&mut self, protocol: ToolProtocol) {
         self.update_prompt_builder(true, |builder| match protocol {
-            ToolProtocol::Auto => builder.with_tool_format(""),
             ToolProtocol::TalosStrict => builder.with_strict_tool_format(),
             ToolProtocol::Compat => builder.with_tool_format(prompt::TOOL_CALLING_FORMAT),
             ToolProtocol::Native => builder.with_tool_format(""),
