@@ -39,4 +39,7 @@
 - Focused prompt section tests: 3 passed.
 - `2c58b52c` adds protocol-surface authority parity coverage; 4 focused tests pass.
 - `e04da18b` adds capability-data versus user-authority coverage; 5 focused tests pass.
-- Remaining acceptance: provider-independent behavioral scenarios and protocol parity fixtures.
+- `40658643` adds provider-independent `AuthorityDecision` fixtures for runtime-over-advisory,
+  equal-authority conflict reporting, and structural print/TUI/RPC/MCP parity; 9 focused tests pass.
+- Remaining acceptance is limited to broader cross-module scenarios and harness output integration;
+  this iteration remains Partial until those cases are covered.
