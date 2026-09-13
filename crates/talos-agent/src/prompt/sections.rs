@@ -233,4 +233,13 @@ mod tests {
             assert_eq!(actual, expected, "protocol surface diverged: {surface}");
         }
     }
+
+    #[test]
+    fn behavior_harness_current_user_wins_over_memory_and_evolution() {
+        let user = PromptSection { text: "# User Preferences\ncurrent request".into(), kind: PromptSectionKind::Dynamic }.metadata();
+        for advisory in ["# Memory (advisory)\nstale", "## Advisory Learned Patterns\nstale"] {
+            let section = PromptSection { text: advisory.into(), kind: PromptSectionKind::Dynamic }.metadata();
+            assert_eq!(resolve_authority(user, section), AuthorityDecision::HigherWins);
+        }
+    }
 }
