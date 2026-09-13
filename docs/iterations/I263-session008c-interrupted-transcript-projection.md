@@ -17,8 +17,12 @@
 | Executing Agent | Codex single-developer |
 | Work Slice | Display-safe interrupted terminal status projection and restart parity only; no schema or UI implementation. |
 | Source Issue | #45 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #545 |
 | Claimed At | 2026-09-13 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Claim-only governance PR; implementation remains unauthorized until merge. |
+| Last Updated | 2026-09-13 |
+| Handoff / Release Condition | Merge #545 before implementation; exact-head review and CI required for implementation candidate. |
 | Implementation PR | Not started |
 
 ## Problem
