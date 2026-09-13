@@ -41,5 +41,7 @@
 - `e04da18b` adds capability-data versus user-authority coverage; 5 focused tests pass.
 - `40658643` adds provider-independent `AuthorityDecision` fixtures for runtime-over-advisory,
   equal-authority conflict reporting, and structural print/TUI/RPC/MCP parity; 9 focused tests pass.
+- `18ad38b7` extends the decision matrix with Todo-as-advisory precedence against current user
+  and runtime rules; prompt tests pass (35 tests).
 - Remaining acceptance is limited to broader cross-module scenarios and harness output integration;
   this iteration remains Partial until those cases are covered.
