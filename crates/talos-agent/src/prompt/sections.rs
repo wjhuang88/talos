@@ -128,4 +128,19 @@ mod tests {
             assert!(!section.metadata().cacheable);
         }
     }
+
+    #[test]
+    fn behavior_fixture_protocol_surfaces_share_runtime_authority_floor() {
+        let surfaces = ["print", "tui", "rpc", "mcp"];
+        for surface in surfaces {
+            let section = PromptSection {
+                text: format!("# Runtime Context ({surface})"),
+                kind: PromptSectionKind::Dynamic,
+            };
+            let metadata = section.metadata();
+            assert_eq!(metadata.source, PromptContributionSource::Runtime);
+            assert_eq!(metadata.authority, 100);
+            assert!(!metadata.cacheable);
+        }
+    }
 }
