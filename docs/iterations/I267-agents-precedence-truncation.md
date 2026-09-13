@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Complete / Closed |
+| Status | Partial / Open |
 | Source | PROMPT-001 / Issue #285 |
 | Deliverable | Implement nearest-scope AGENTS precedence and instruction-aware truncation while preserving runtime invariants and prompt compatibility. |
 | Depends On | I266, ADR-074 |
@@ -39,3 +39,11 @@ retrigger pull-request validation after the prior workflow ended with `startup_f
 - Tests cover ancestor/child conflicts, truncation boundaries and cache effects.
 
 Completion Commit: 90b49f1fef699a2662c7482d91420a0de38d34ab
+
+### Post-merge completion audit (2026-09-13)
+
+The merged implementation provides newline-aware head/tail truncation only. It does not yet
+implement semantic nearest-scope precedence, protection of authority-bearing rules, deterministic
+precedence diagnostics, or the required ancestor/child and cache-effect tests. The implementation
+commit remains recorded as partial evidence; a follow-up governed slice must complete these
+acceptance items before I267 can be marked Complete.
