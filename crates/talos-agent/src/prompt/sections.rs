@@ -33,6 +33,16 @@ pub(super) struct PromptSection {
 }
 
 impl PromptSection {
+    /// Returns whether this section is advisory and must not override user or runtime authority.
+    pub(super) fn is_advisory(&self) -> bool {
+        matches!(
+            self.metadata().source,
+            PromptContributionSource::Memory
+                | PromptContributionSource::Session
+                | PromptContributionSource::Extension
+        )
+    }
+
     pub(super) fn metadata(&self) -> PromptContributionMetadata {
         let source = if self.text.starts_with("# Identity") {
             PromptContributionSource::Identity
@@ -169,5 +179,17 @@ mod tests {
                 }
                 .authority
         );
+    }
+
+    #[test]
+    fn memory_and_todos_are_advisory_sections() {
+        for text in ["# Memory\nold", "# Session Todos\nold"] {
+            let section = PromptSection {
+                text: text.into(),
+                kind: PromptSectionKind::Dynamic,
+            };
+            assert!(section.is_advisory());
+            assert!(section.metadata().authority < 80);
+        }
     }
 }
