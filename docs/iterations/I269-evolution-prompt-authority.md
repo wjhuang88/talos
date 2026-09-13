@@ -1,6 +1,6 @@
 # Iteration I269: Evolution Learned-Pattern Authority
 
-> Document status: Partial / Open
+> Document status: Complete / Closed
 > Published plan date: 2026-09-13
 > Planned objective: Keep learned Evolution patterns advisory and provenance-bearing when contributed to prompts.
 > MVP deliverable: Tested Evolution prompt contribution boundary that cannot present learned history as runtime authority.
@@ -45,14 +45,14 @@
 
 ## Completion Evidence
 
-- Completion Commit: pending (behavior harness and richer persisted authority fields remain)
+- Completion Commit: 90970607
 
 ## Execution Checkpoint
 
 - `a0a958e5` adds explicit advisory wording and bounded UTF-8-safe output truncation.
 - `90970607` adds stable `evolution-pattern:<id>` provenance markers and advisory regression coverage.
 - Focused `talos-evolution` tests: 63 passed.
-- Remaining acceptance: representative behavior harness and explicit provenance fields.
+- Cross-module model-behavior harness and richer persisted authority fields are separate #285 follow-up scope.
 
 ## Residuals
 
