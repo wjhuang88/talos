@@ -46,3 +46,6 @@
 - This evidence confirms runtime ordering compatibility, but does not yet provide the
   provider-independent prompt behavior harness required by I270; I272 remains Partial
   until a focused runtime-rendering/resumability evidence checkpoint is recorded.
+- Focused prompt and session regression suites were re-run on `main`; advisory Memory/Todo
+  rendering remains dynamic and steering submissions preserve resumability without a second
+  outer turn. No implementation change is claimed by this checkpoint.
