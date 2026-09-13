@@ -391,3 +391,10 @@ changed by I216.
   and a migration note in the release changelog.
 - **Removals** of public items require deprecation for at least one minor version cycle.
 - The 1.0 stability promise is gated by [REL-002](../backlog/active/REL-002-v1-self-bootstrap-release-gate.md).
+### Prompt customization authority
+
+`append_prompt` contributes domain guidance without replacing Talos runtime-owned sections.
+`custom_prompt` remains an explicit raw identity override for compatibility; callers using it
+accept responsibility for restoring any identity guidance they intentionally replace. Hook
+contributions are additive prompt modifications and must not be used to erase runtime safety or
+protocol sections.
