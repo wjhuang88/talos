@@ -887,6 +887,13 @@ fn migrate_and_validate_schema(conn: &Connection, db_path: &Path) -> Result<(), 
         validate_current_rows(&tx)?;
         tx.commit()?;
     } else {
+        // Older databases may have been written before the session/title
+        // uniqueness invariant was indexed. Keep the earliest durable row so
+        // a stale/failed retry cannot brick every subsequent Todo operation.
+        conn.execute(
+            "DELETE FROM todo_items WHERE rowid NOT IN (SELECT MIN(rowid) FROM todo_items GROUP BY session_id, title)",
+            [],
+        )?;
         validate_current_rows(conn)?;
         if version == 0 {
             conn.pragma_update(None, "user_version", TODO_SCHEMA_VERSION)?;
