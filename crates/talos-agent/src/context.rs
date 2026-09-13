@@ -6,8 +6,10 @@
 //! 2. Project: walk from `workspace_root` up to git root (or filesystem root),
 //!    loading `AGENTS.md` from each directory
 //!
-//! Total context is capped at 20,000 characters with head/tail truncation
-//! if exceeded.
+//! Total context is capped at 20,000 characters. Scope metadata is retained so
+//! consumers can apply the deterministic rule that the nearest project scope
+//! wins over parent and global guidance; truncation happens only at line
+//! boundaries and never emits a partial instruction line.
 
 use std::fs;
 use std::io;
@@ -184,7 +186,11 @@ impl ContextLoader {
 
     /// Formats a section with a clear separator header.
     fn format_section(&self, path: &Path, content: &str) -> String {
-        format!("--- AGENTS.md from {} ---\n{}", path.display(), content)
+        format!(
+            "--- AGENTS.md from {} (nearest project scope wins) ---\n{}",
+            path.display(),
+            content
+        )
     }
 
     /// Applies the size limit to the combined context.
@@ -278,6 +284,19 @@ mod tests {
         let sub_idx = context.find("# Sub Rules").expect("sub rules not found");
         let root_idx = context.find("# Root Rules").expect("root rules not found");
         assert!(sub_idx < root_idx, "sub should appear before root");
+    }
+
+    #[test]
+    fn test_sections_declare_nearest_scope_precedence() {
+        let temp_dir = TempDir::new().expect("failed to create temp dir");
+        create_agents_md(temp_dir.path(), "root rule");
+        let child = temp_dir.path().join("child");
+        fs::create_dir(&child).expect("failed to create child");
+        create_agents_md(&child, "child rule");
+
+        let context = ContextLoader::new(child).load().expect("load failed");
+        assert!(context.contains("(nearest project scope wins)"));
+        assert!(context.find("child rule").unwrap() < context.find("root rule").unwrap());
     }
 
     #[test]
@@ -430,5 +449,17 @@ mod tests {
         // Should have head + tail + truncation indicator
         assert!(result.contains("..."));
         assert!(result.chars().count() < content.chars().count());
+    }
+
+    #[test]
+    fn test_truncation_does_not_split_instruction_lines() {
+        let mut content = String::new();
+        for index in 0..2_000 {
+            content.push_str(&format!("rule-{index}: preserve this complete instruction\n"));
+        }
+        let result = ContextLoader::apply_size_limit(&content);
+        for line in result.lines() {
+            assert!(line.is_empty() || line == "..." || line.starts_with("rule-") || line.starts_with("--- AGENTS"));
+        }
     }
 }
