@@ -47,6 +47,8 @@ pub struct DurableTranscriptEntry {
     pub is_error: bool,
     /// Parent entry relationship.
     pub parent_id: Option<String>,
+    /// Terminal outcome for this turn when known.
+    pub turn_outcome: Option<TurnTranscriptOutcome>,
 }
 
 /// Controls what a durable embedded transcript is allowed to retain.
@@ -167,16 +169,18 @@ impl DurableSession {
                     .map(|index| index + 1)
             })
             .unwrap_or(0);
-        Ok(entries
-            .into_iter()
-            .skip(start)
-            .filter(|entry| {
-                !is_terminal_diagnostic_content(&entry.content)
-                    && !is_turn_transcript_outcome_content(&entry.content)
-            })
+        let outcomes = entries.iter().filter_map(|entry| {
+            decode_turn_transcript_outcome(&entry.content)
+                .map(|record| (record.turn_id, record.outcome))
+        }).collect::<std::collections::HashMap<_, _>>();
+        Ok(entries.into_iter().skip(start)
+            .filter(|entry| !is_terminal_diagnostic_content(&entry.content)
+                && !is_turn_transcript_outcome_content(&entry.content))
             .take(limit.min(200))
-            .map(transcript_entry)
-            .collect())
+            .map(|entry| {
+                let outcome = entry.metadata.turn_id.as_ref().and_then(|id| outcomes.get(id).copied());
+                transcript_entry(entry, outcome)
+            }).collect())
     }
 
     /// Atomically commits every model-visible message and the hidden Success
@@ -336,7 +340,7 @@ impl DurableSession {
     }
 }
 
-fn transcript_entry(entry: SessionEntry) -> DurableTranscriptEntry {
+fn transcript_entry(entry: SessionEntry, turn_outcome: Option<TurnTranscriptOutcome>) -> DurableTranscriptEntry {
     let (is_error, tool_call_id, tool_result) = if entry.role == "system" {
         let (is_error, id, content) = crate::jsonl::parse_tool_result(&entry.content);
         (
@@ -367,6 +371,7 @@ fn transcript_entry(entry: SessionEntry) -> DurableTranscriptEntry {
         tool_result,
         is_error,
         parent_id: entry.parent_id,
+        turn_outcome,
     }
 }
 
