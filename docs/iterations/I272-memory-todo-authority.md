@@ -52,3 +52,6 @@
 - Exact focused evidence: `cargo test -p talos-agent session::tests::test_concurrent_submit_and_interrupt --locked`
   passed (1 test). This confirms the representative interruption path, while broader runtime
   rendering/resumability coverage remains explicitly outstanding.
+- Session regression suite rerun: `cargo test -p talos-agent session::tests --lib --locked` passed
+  (35 tests), including durable cancellation, failed continuation, persistence recovery, and
+  steering interruption cases.
