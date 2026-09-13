@@ -820,7 +820,6 @@ fn migrate_and_validate_schema(conn: &Connection, db_path: &Path) -> Result<(), 
     }
 
     if legacy {
-        validate_legacy_rows(conn)?;
         let backup_path = PathBuf::from(format!("{}.pre-work-v1.bak", db_path.display()));
         if backup_path.exists() {
             return Err(TodoError::Migration(format!(
@@ -830,6 +829,14 @@ fn migrate_and_validate_schema(conn: &Connection, db_path: &Path) -> Result<(), 
         }
         conn.backup("main", &backup_path, None)?;
         let tx = Transaction::new_unchecked(conn, TransactionBehavior::Immediate)?;
+        // Legacy databases predate the session/title uniqueness invariant.
+        // Collapse duplicate historical rows before validating or upgrading;
+        // otherwise one stale session can brick every Todo tool at open time.
+        tx.execute(
+            "DELETE FROM todo_items WHERE rowid NOT IN (SELECT MIN(rowid) FROM todo_items GROUP BY session_id, title)",
+            [],
+        )?;
+        validate_legacy_rows(&tx)?;
         tx.execute(
             "ALTER TABLE todo_items ADD COLUMN revision INTEGER NOT NULL DEFAULT 1",
             [],
