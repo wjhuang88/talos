@@ -18,11 +18,11 @@
 | Work Slice | Not assigned |
 | Source Issue | #285 |
 | Claimed At | Not applicable |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #547 (pending merge; ineffective until merged) |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Claim-only architecture baseline; no prompt/runtime implementation authorized before merge. |
 | Last Updated | 2026-09-13 |
-| Handoff / Release Condition | Establish an effective claim before implementation; no prompt/runtime changes are authorized. |
+| Handoff / Release Condition | Merge claim before implementation; accepted ADR and child slices required. |
 | Implementation PR | Not started |
 
 ## Acceptance
