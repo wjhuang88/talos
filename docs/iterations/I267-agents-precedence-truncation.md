@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Planned / Unclaimed |
+| Status | Complete / Closed |
 | Source | PROMPT-001 / Issue #285 |
 | Deliverable | Implement nearest-scope AGENTS precedence and instruction-aware truncation while preserving runtime invariants and prompt compatibility. |
 | Depends On | I266, ADR-074 |
@@ -12,7 +12,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | Not assigned |
 | Executing Agent | Not assigned |
 | Work Slice | AGENTS precedence and safe truncation |
@@ -23,7 +23,7 @@
 | Authorization Evidence | Claim-only metadata; implementation remains unauthorized until merge. |
 | Last Updated | 2026-09-13 |
 | Handoff / Release Condition | Establish effective claim before implementation; preserve existing loading behavior until tests prove migration. |
-| Implementation PR | Not started |
+| Implementation PR | #552 |
 
 ## Acceptance
 
@@ -38,4 +38,4 @@ retrigger pull-request validation after the prior workflow ended with `startup_f
 - Existing prompt behavior remains compatible outside explicitly tested precedence cases.
 - Tests cover ancestor/child conflicts, truncation boundaries and cache effects.
 
-Completion Commit: pending
+Completion Commit: 90b49f1fef699a2662c7482d91420a0de38d34ab
