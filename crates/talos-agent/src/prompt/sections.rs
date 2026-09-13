@@ -250,4 +250,13 @@ mod tests {
             assert_eq!(resolve_authority(user, section), AuthorityDecision::HigherWins);
         }
     }
+
+    #[test]
+    fn behavior_harness_todo_is_advisory_against_runtime_and_user() {
+        let todo = PromptSection { text: "# Session Todos (advisory)\nDo old thing".into(), kind: PromptSectionKind::Dynamic }.metadata();
+        let user = PromptSection { text: "# User Preferences\nDo current thing".into(), kind: PromptSectionKind::Dynamic }.metadata();
+        let runtime = PromptSection { text: "# Runtime Context\nStop".into(), kind: PromptSectionKind::Dynamic }.metadata();
+        assert_eq!(resolve_authority(todo, user), AuthorityDecision::LowerWins);
+        assert_eq!(resolve_authority(todo, runtime), AuthorityDecision::LowerWins);
+    }
 }
