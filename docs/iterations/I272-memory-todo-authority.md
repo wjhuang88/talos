@@ -1,12 +1,12 @@
 # Iteration I272: Memory And Todo Advisory Authority
 
-> Document status: Active
+> Document status: Partial / Open
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | @wjhuang88 |
 | Work Slice | Memory, session Todo, and steering prompt authority boundary |
@@ -15,7 +15,7 @@
 | Governance Claim PR | Direct commit b1820a33 |
 | Authorization Mode | Direct commit |
 | Authorization Evidence | User-authorized continuation; advisory-context scope only. |
-| Implementation PR | Not started |
+| Implementation PR | Direct commit `f5cacdd7` |
 | Last Updated | 2026-09-13 |
 | Handoff / Release Condition | Excludes Evolution, SDK hooks/custom_prompt, provider, UI, permissions, and release changes. |
 
@@ -32,4 +32,9 @@
 
 ## Completion Evidence
 
-- Completion Commit: pending
+- Completion Commit: pending (runtime rendering and interruption behavior remain)
+
+## Execution Checkpoint
+
+- `f5cacdd7` adds advisory classification for Memory and Session Todo sections with six focused tests.
+- Runtime rendering and steering interruption scenarios remain before closeout.
