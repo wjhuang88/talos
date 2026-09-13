@@ -370,14 +370,14 @@ impl SystemPromptBuilder {
 
         if let Some(ref memory) = self.memory_section {
             sections.push(PromptSection {
-                text: format!("# Memory\n{memory}\n"),
+                text: format!("# Memory (advisory)\n{memory}\n"),
                 kind: PromptSectionKind::Dynamic,
             });
         }
 
         if let Some(ref todos) = self.todo_section {
             sections.push(PromptSection {
-                text: format!("# Session Todos\n{todos}\n"),
+                text: format!("# Session Todos (advisory)\n{todos}\n"),
                 kind: PromptSectionKind::Dynamic,
             });
         }

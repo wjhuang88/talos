@@ -609,7 +609,10 @@ fn prompt_builder_with_memory_section() {
 
     let prompt = builder.build();
 
-    assert!(prompt.contains("# Memory"), "Should contain Memory header");
+    assert!(
+        prompt.contains("# Memory (advisory)"),
+        "Should contain advisory Memory header"
+    );
     assert!(
         prompt.contains("test memory"),
         "Should contain memory content"
@@ -622,7 +625,7 @@ fn prompt_builder_without_memory_section() {
     let prompt = builder.build();
 
     assert!(
-        !prompt.contains("# Memory\n"),
+        !prompt.contains("# Memory (advisory)\n"),
         "Should not contain Memory header when no section set"
     );
 }
@@ -634,12 +637,12 @@ fn prompt_builder_with_todo_section_is_dynamic() {
 
     let (prompt, markers) = builder.build_with_cache_markers();
 
-    assert!(prompt.contains("# Session Todos"));
+    assert!(prompt.contains("# Session Todos (advisory)"));
     assert!(prompt.contains("Fix issue"));
     for marker in markers {
         let marked = &prompt[marker.offset..marker.offset + marker.length];
         assert!(
-            !marked.contains("# Session Todos"),
+            !marked.contains("# Session Todos (advisory)"),
             "todo section must not be marked cacheable"
         );
     }
