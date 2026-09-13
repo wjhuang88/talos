@@ -291,9 +291,14 @@ impl Tui {
         self.last_splash_row_count = splash_rows;
         self.last_history_prefix_row_count = splash_rows.saturating_add(startup_spacer_rows);
         let selection = self.selection.and_then(|selection| {
+            let live_focus = if selection.dragging {
+                self.history_selection_point_at_screen(selection.focus.0, selection.focus.1)
+            } else {
+                None
+            };
             match (
                 selection.history_anchor,
-                selection.history_focus,
+                live_focus.or(selection.history_focus),
                 app_layout.history,
             ) {
                 (Some(start), Some(end), Some(area)) => history.visible_selection(
