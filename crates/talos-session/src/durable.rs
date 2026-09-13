@@ -179,6 +179,19 @@ impl DurableSession {
             .collect())
     }
 
+    /// Returns the durable terminal outcome for a turn without exposing marker entries.
+    pub fn turn_outcome(
+        &self,
+        turn_id: &str,
+    ) -> Result<Option<TurnTranscriptOutcome>, SessionError> {
+        Ok(self
+            .session
+            .read_turn_transcript_outcomes()?
+            .into_iter()
+            .find(|record| record.turn_id == turn_id)
+            .map(|record| record.outcome))
+    }
+
     /// Atomically commits every model-visible message and the hidden Success
     /// marker of one completed turn.
     ///
