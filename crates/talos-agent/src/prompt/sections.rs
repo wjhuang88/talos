@@ -45,6 +45,22 @@ pub(super) fn resolve_authority(high: PromptContributionMetadata, low: PromptCon
     }
 }
 
+/// Formats a stable, provider-independent diagnostic for harness consumers.
+#[allow(dead_code)]
+pub(super) fn authority_diagnostic(
+    high: PromptContributionMetadata,
+    low: PromptContributionMetadata,
+) -> String {
+    format!(
+        "authority:{}({:?}) vs {}({:?}) => {:?}",
+        high.authority,
+        high.source,
+        low.authority,
+        low.source,
+        resolve_authority(high, low)
+    )
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub(super) struct PromptSection {
     pub(super) text: String,
@@ -224,6 +240,16 @@ mod tests {
         let user = PromptSection { text: "# User Preferences\nA".into(), kind: PromptSectionKind::Dynamic }.metadata();
         let other = PromptContributionMetadata { source: PromptContributionSource::User, authority: user.authority, cacheable: false };
         assert_eq!(resolve_authority(user, other), AuthorityDecision::EqualConflict);
+    }
+
+    #[test]
+    fn behavior_harness_diagnostic_is_stable_and_actionable() {
+        let runtime = PromptSection { text: "# Runtime Context\nrule".into(), kind: PromptSectionKind::Dynamic }.metadata();
+        let memory = PromptSection { text: "# Memory (advisory)\nstale".into(), kind: PromptSectionKind::Dynamic }.metadata();
+        assert_eq!(
+            authority_diagnostic(runtime, memory),
+            "authority:100(Runtime) vs 40(Memory) => HigherWins"
+        );
     }
 
     #[test]
