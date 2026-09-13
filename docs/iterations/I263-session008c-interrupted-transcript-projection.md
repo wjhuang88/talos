@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Planned / Claim Pending |
+| Status | Active / Claimed |
 | Source | SESSION-008 / Issue #45 |
 | Deliverable | Expose a display-safe interrupted-turn marker in durable transcript projection without leaking hidden diagnostics or changing successful replay. |
 | Depends On | I193 / SESSION-008-B, ADR-058 |
@@ -12,11 +12,17 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claim Pending (proposed; ineffective until governance record merges) |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex single-developer |
 | Work Slice | Display-safe interrupted terminal status projection and restart parity only; no schema or UI implementation. |
 | Source Issue | #45 |
+| Governance Claim PR | #545 |
+| Claimed At | 2026-09-13 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Claim-only governance PR; implementation remains unauthorized until merge. |
+| Last Updated | 2026-09-13 |
+| Handoff / Release Condition | Merge #545 before implementation; exact-head review and CI required for implementation candidate. |
 | Implementation PR | Not started |
 
 ## Problem

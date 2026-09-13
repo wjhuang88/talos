@@ -17,6 +17,12 @@
 | Executing Agent | Not assigned |
 | Work Slice | Not assigned |
 | Source Issue | #285 |
+| Claimed At | Not applicable |
+| Governance Claim PR | Not applicable |
+| Authorization Mode | Not applicable |
+| Authorization Evidence | Not applicable |
+| Last Updated | 2026-09-13 |
+| Handoff / Release Condition | Establish an effective claim before implementation; no prompt/runtime changes are authorized. |
 | Implementation PR | Not started |
 
 ## Acceptance
