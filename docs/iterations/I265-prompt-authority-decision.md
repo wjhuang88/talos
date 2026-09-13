@@ -17,10 +17,10 @@
 | Executing Agent | Not assigned |
 | Work Slice | ADR-074 decision and migration boundary only |
 | Source Issue | #285 |
-| Governance Claim PR | Not applicable |
+| Governance Claim PR | Pending |
 | Claimed At | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Claim-only ADR acceptance; implementation remains unauthorized until merge. |
 | Last Updated | 2026-09-13 |
 | Handoff / Release Condition | Establish an effective claim before accepting ADR-074 or implementing children. |
 | Implementation PR | Not started |
