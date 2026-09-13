@@ -208,7 +208,7 @@ impl ContextLoader {
 
         // Head portion. If there is no line boundary, keep a deterministic
         // diagnostic rather than silently presenting a partial rule as whole.
-        let has_boundary = chars.iter().any(|c| *c == '\n');
+        let has_boundary = chars.contains(&'\n');
         let head_end = chars
             .iter()
             .take(HEAD_SIZE)
