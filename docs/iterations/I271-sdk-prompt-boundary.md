@@ -38,4 +38,5 @@
 
 - `dcffb640` documents the compatibility boundary for `custom_prompt`, `append_prompt`, and hooks.
 - `5736d834` prevents hook modifications from erasing builder-owned Tools and Runtime Context sections; 33 prompt tests pass.
+- `f8fac7b8` adds custom-prompt coverage for retaining runtime-owned sections; 34 prompt tests pass.
 - Production API enforcement and dedicated hook-boundary tests remain in scope.
