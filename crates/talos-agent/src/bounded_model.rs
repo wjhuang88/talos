@@ -22,7 +22,7 @@ pub async fn invoke_text(
                     }
                     output.push_str(&delta);
                 }
-                AgentEvent::ToolCall { .. } => return Err("tool use is forbidden".to_owned()),
+                AgentEvent::ToolCall { .. } => return Err("tool use is forbidden in auto assessment".to_owned()),
                 AgentEvent::Error { message } => return Err(message),
                 AgentEvent::TurnEnd { .. } => break,
                 _ => {}
