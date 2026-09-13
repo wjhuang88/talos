@@ -4,7 +4,7 @@
 |---|---|
 | Story ID | INTEGRATION-001 |
 | Type | Integration contract clarification Spike |
-| Status | Review / Claimed (I262 investigation evidence reviewed; browser implementation Deferred) |
+| Status | Complete / Closed (I262 investigation evidence reviewed; browser implementation Deferred) |
 | Source Issue | #520 |
 | Selected Iteration | I262 (active claim merged; Review pending) |
 | Implementation PR | Not started |

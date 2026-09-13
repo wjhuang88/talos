@@ -1,6 +1,6 @@
 # Iteration I262: OBeiBuddy Runtime And Browser Contract Clarification
 
-> Document status: Review / Claimed (activated by merged governance PR #544)
+> Document status: Complete / Closed (activated by merged governance PR #544)
 > Source: INTEGRATION-001 / #520
 > Published plan date: 2026-09-12
 > Deliverable: source/test-backed answers to Request A and a complete, non-lossy implementation boundary for Request B.
@@ -93,7 +93,7 @@ and BROWSER-001/#508 instead of creating competing ownership.
 
 ### Review Checkpoint — 2026-09-12
 
-The report is complete as a clarification Spike and is now in `Review / Claimed`. Request A is
+The report is complete as a clarification Spike and is now in `Complete / Closed`. Request A is
 accepted as an evidence-backed contract clarification; Request B is explicitly Deferred. No
 frame-aware browser behavior, API/security acceptance, release, or publication is claimed.
 Issue #45 remains open and #49 is closed. Independent Agent-role API/security review and exact
