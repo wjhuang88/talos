@@ -15,8 +15,8 @@
 | Work Slice | Scoped AGENTS precedence and authority-safe truncation |
 | Claimed At | 2026-09-13 |
 | Source Issue | #285 |
-| Governance Claim PR | Direct commit 9b9ace72 (claim effective on main) |
-| Authorization Mode | Single-maintainer merge |
+| Governance Claim PR | Direct commit 9b9ace72213c0e6e213c959ec626e8024b3ea131 |
+| Authorization Mode | Direct commit |
 | Authorization Evidence | User-authorized continuation; claim is limited to this slice. |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-13 |
