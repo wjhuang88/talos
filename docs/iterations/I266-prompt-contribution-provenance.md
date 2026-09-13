@@ -17,9 +17,10 @@
 | Executing Agent | Not assigned |
 | Work Slice | Typed prompt contribution metadata and compatibility tests |
 | Source Issue | #285 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | Pending |
+| Claimed At | 2026-09-13 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Claim-only metadata slice; implementation remains unauthorized until merge. |
 | Last Updated | 2026-09-13 |
 | Handoff / Release Condition | Effective claim required before implementation; preserve rendered prompt output. |
 | Implementation PR | Not started |
