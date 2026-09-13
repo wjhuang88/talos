@@ -72,6 +72,7 @@ pub(super) struct PromptSection {
 
 impl PromptSection {
     /// Returns whether this section is advisory and must not override user or runtime authority.
+    #[allow(dead_code)]
     pub(super) fn is_advisory(&self) -> bool {
         matches!(
             self.metadata().source,
