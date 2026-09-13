@@ -49,3 +49,6 @@
 - Focused prompt and session regression suites were re-run on `main`; advisory Memory/Todo
   rendering remains dynamic and steering submissions preserve resumability without a second
   outer turn. No implementation change is claimed by this checkpoint.
+- Exact focused evidence: `cargo test -p talos-agent session::tests::test_concurrent_submit_and_interrupt --locked`
+  passed (1 test). This confirms the representative interruption path, while broader runtime
+  rendering/resumability coverage remains explicitly outstanding.
