@@ -39,6 +39,7 @@
 //! surface.
 
 mod background_jobs;
+pub(crate) mod bounded_model;
 pub mod compaction;
 pub mod compression;
 mod process_tool;

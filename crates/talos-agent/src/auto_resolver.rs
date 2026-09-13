@@ -14,7 +14,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use talos_core::ApprovalChoice;
-use talos_core::message::{AgentEvent, Message};
+use talos_core::message::Message;
 use talos_core::provider::LanguageModel;
 use talos_core::tool::{
     SharedAtomicCreateCapability, ToolNature, ToolProvenance, ToolResourceKind,
@@ -506,35 +506,9 @@ impl ProviderAutoPermissionAssessor {
                 content: format!("Assess this redacted request and return JSON only:\n{payload}"),
             },
         ];
-        let mut events = self
-            .provider
-            .stream(&messages)
-            .await
-            .map_err(|error| error.to_string())?;
-        let deadline = tokio::time::sleep(remaining);
-        tokio::pin!(deadline);
-        let mut output = String::new();
-        loop {
-            tokio::select! {
-                _ = &mut deadline => return Err("model assessment deadline exceeded".to_owned()),
-                event = events.recv() => match event {
-                    Some(AgentEvent::TextDelta { delta }) => {
-                        if output.len().saturating_add(delta.len()) > MAX_AUTO_ASSESSOR_OUTPUT_BYTES {
-                            return Err("model assessment output exceeded limit".to_owned());
-                        }
-                        output.push_str(&delta);
-                    }
-                    Some(AgentEvent::ToolCall { .. }) => return Err("tool use is forbidden in auto assessment".to_owned()),
-                    Some(AgentEvent::Error { message }) => return Err(message),
-                    Some(AgentEvent::TurnEnd { .. }) | None => break,
-                    Some(_) => {}
-                }
-            }
-        }
-        if output.trim().is_empty() {
-            return Err("model assessment returned no JSON".to_owned());
-        }
-        Ok(output)
+        crate::bounded_model::invoke_text(
+            self.provider.as_ref(), &messages, remaining, MAX_AUTO_ASSESSOR_OUTPUT_BYTES,
+        ).await
     }
 }
 
