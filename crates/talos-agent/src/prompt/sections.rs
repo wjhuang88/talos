@@ -37,7 +37,10 @@ pub(super) enum AuthorityDecision {
 
 /// Resolves two competing contributions without depending on a model/provider.
 #[allow(dead_code)]
-pub(super) fn resolve_authority(high: PromptContributionMetadata, low: PromptContributionMetadata) -> AuthorityDecision {
+pub(super) fn resolve_authority(
+    high: PromptContributionMetadata,
+    low: PromptContributionMetadata,
+) -> AuthorityDecision {
     match high.authority.cmp(&low.authority) {
         std::cmp::Ordering::Greater => AuthorityDecision::HigherWins,
         std::cmp::Ordering::Less => AuthorityDecision::LowerWins,
@@ -230,22 +233,52 @@ mod tests {
 
     #[test]
     fn behavior_harness_runtime_rules_win_over_advisory_context() {
-        let runtime = PromptSection { text: "# Runtime Context\nDeny".into(), kind: PromptSectionKind::Dynamic }.metadata();
-        let memory = PromptSection { text: "# Memory (advisory)\nAllow".into(), kind: PromptSectionKind::Dynamic }.metadata();
-        assert_eq!(resolve_authority(runtime, memory), AuthorityDecision::HigherWins);
+        let runtime = PromptSection {
+            text: "# Runtime Context\nDeny".into(),
+            kind: PromptSectionKind::Dynamic,
+        }
+        .metadata();
+        let memory = PromptSection {
+            text: "# Memory (advisory)\nAllow".into(),
+            kind: PromptSectionKind::Dynamic,
+        }
+        .metadata();
+        assert_eq!(
+            resolve_authority(runtime, memory),
+            AuthorityDecision::HigherWins
+        );
     }
 
     #[test]
     fn behavior_harness_equal_authority_is_reported_as_conflict() {
-        let user = PromptSection { text: "# User Preferences\nA".into(), kind: PromptSectionKind::Dynamic }.metadata();
-        let other = PromptContributionMetadata { source: PromptContributionSource::User, authority: user.authority, cacheable: false };
-        assert_eq!(resolve_authority(user, other), AuthorityDecision::EqualConflict);
+        let user = PromptSection {
+            text: "# User Preferences\nA".into(),
+            kind: PromptSectionKind::Dynamic,
+        }
+        .metadata();
+        let other = PromptContributionMetadata {
+            source: PromptContributionSource::User,
+            authority: user.authority,
+            cacheable: false,
+        };
+        assert_eq!(
+            resolve_authority(user, other),
+            AuthorityDecision::EqualConflict
+        );
     }
 
     #[test]
     fn behavior_harness_diagnostic_is_stable_and_actionable() {
-        let runtime = PromptSection { text: "# Runtime Context\nrule".into(), kind: PromptSectionKind::Dynamic }.metadata();
-        let memory = PromptSection { text: "# Memory (advisory)\nstale".into(), kind: PromptSectionKind::Dynamic }.metadata();
+        let runtime = PromptSection {
+            text: "# Runtime Context\nrule".into(),
+            kind: PromptSectionKind::Dynamic,
+        }
+        .metadata();
+        let memory = PromptSection {
+            text: "# Memory (advisory)\nstale".into(),
+            kind: PromptSectionKind::Dynamic,
+        }
+        .metadata();
         assert_eq!(
             authority_diagnostic(runtime, memory),
             "authority:100(Runtime) vs 40(Memory) => HigherWins"
@@ -254,35 +287,83 @@ mod tests {
 
     #[test]
     fn behavior_harness_lower_authority_cannot_override() {
-        let advisory = PromptSection { text: "# Memory (advisory)\nstale".into(), kind: PromptSectionKind::Dynamic }.metadata();
-        let runtime = PromptSection { text: "# Runtime Context\nrule".into(), kind: PromptSectionKind::Dynamic }.metadata();
-        assert_eq!(resolve_authority(advisory, runtime), AuthorityDecision::LowerWins);
+        let advisory = PromptSection {
+            text: "# Memory (advisory)\nstale".into(),
+            kind: PromptSectionKind::Dynamic,
+        }
+        .metadata();
+        let runtime = PromptSection {
+            text: "# Runtime Context\nrule".into(),
+            kind: PromptSectionKind::Dynamic,
+        }
+        .metadata();
+        assert_eq!(
+            resolve_authority(advisory, runtime),
+            AuthorityDecision::LowerWins
+        );
     }
 
     #[test]
     fn behavior_harness_protocol_parity_is_structural() {
-        let expected = PromptContributionMetadata { source: PromptContributionSource::Runtime, authority: 100, cacheable: false };
+        let expected = PromptContributionMetadata {
+            source: PromptContributionSource::Runtime,
+            authority: 100,
+            cacheable: false,
+        };
         for surface in ["print", "tui", "rpc", "mcp"] {
-            let actual = PromptSection { text: format!("# Runtime Context ({surface})"), kind: PromptSectionKind::Dynamic }.metadata();
+            let actual = PromptSection {
+                text: format!("# Runtime Context ({surface})"),
+                kind: PromptSectionKind::Dynamic,
+            }
+            .metadata();
             assert_eq!(actual, expected, "protocol surface diverged: {surface}");
         }
     }
 
     #[test]
     fn behavior_harness_current_user_wins_over_memory_and_evolution() {
-        let user = PromptSection { text: "# User Preferences\ncurrent request".into(), kind: PromptSectionKind::Dynamic }.metadata();
-        for advisory in ["# Memory (advisory)\nstale", "## Advisory Learned Patterns\nstale"] {
-            let section = PromptSection { text: advisory.into(), kind: PromptSectionKind::Dynamic }.metadata();
-            assert_eq!(resolve_authority(user, section), AuthorityDecision::HigherWins);
+        let user = PromptSection {
+            text: "# User Preferences\ncurrent request".into(),
+            kind: PromptSectionKind::Dynamic,
+        }
+        .metadata();
+        for advisory in [
+            "# Memory (advisory)\nstale",
+            "## Advisory Learned Patterns\nstale",
+        ] {
+            let section = PromptSection {
+                text: advisory.into(),
+                kind: PromptSectionKind::Dynamic,
+            }
+            .metadata();
+            assert_eq!(
+                resolve_authority(user, section),
+                AuthorityDecision::HigherWins
+            );
         }
     }
 
     #[test]
     fn behavior_harness_todo_is_advisory_against_runtime_and_user() {
-        let todo = PromptSection { text: "# Session Todos (advisory)\nDo old thing".into(), kind: PromptSectionKind::Dynamic }.metadata();
-        let user = PromptSection { text: "# User Preferences\nDo current thing".into(), kind: PromptSectionKind::Dynamic }.metadata();
-        let runtime = PromptSection { text: "# Runtime Context\nStop".into(), kind: PromptSectionKind::Dynamic }.metadata();
+        let todo = PromptSection {
+            text: "# Session Todos (advisory)\nDo old thing".into(),
+            kind: PromptSectionKind::Dynamic,
+        }
+        .metadata();
+        let user = PromptSection {
+            text: "# User Preferences\nDo current thing".into(),
+            kind: PromptSectionKind::Dynamic,
+        }
+        .metadata();
+        let runtime = PromptSection {
+            text: "# Runtime Context\nStop".into(),
+            kind: PromptSectionKind::Dynamic,
+        }
+        .metadata();
         assert_eq!(resolve_authority(todo, user), AuthorityDecision::LowerWins);
-        assert_eq!(resolve_authority(todo, runtime), AuthorityDecision::LowerWins);
+        assert_eq!(
+            resolve_authority(todo, runtime),
+            AuthorityDecision::LowerWins
+        );
     }
 }

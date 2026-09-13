@@ -512,7 +512,9 @@ fn test_default_builder() {
 fn protocol_modes_render_distinct_stable_hints_without_provider_calls() {
     let native = SystemPromptBuilder::new().build();
     let strict = SystemPromptBuilder::new().with_strict_tool_format().build();
-    let compat = SystemPromptBuilder::new().with_tool_format(TOOL_CALLING_FORMAT).build();
+    let compat = SystemPromptBuilder::new()
+        .with_tool_format(TOOL_CALLING_FORMAT)
+        .build();
     assert!(native.contains("Native tool calling is enabled"));
     assert!(strict.contains(TOOL_CALLING_STRICT.trim()));
     assert!(compat.contains(TOOL_CALLING_FORMAT.trim()));
