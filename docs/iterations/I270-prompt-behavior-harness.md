@@ -31,10 +31,11 @@
 
 ## Completion Evidence
 
-- Completion Commit: pending (provider/model fixtures and protocol parity remain)
+- Completion Commit: pending (provider/model fixtures and cross-module scenarios remain)
 
 ## Execution Checkpoint
 
 - `33660be2` adds deterministic authority-order and advisory-source fixtures.
 - Focused prompt section tests: 3 passed.
+- `2c58b52c` adds protocol-surface authority parity coverage; 4 focused tests pass.
 - Remaining acceptance: provider-independent behavioral scenarios and protocol parity fixtures.
