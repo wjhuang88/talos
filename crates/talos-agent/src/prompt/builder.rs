@@ -452,6 +452,21 @@ impl SystemPromptBuilder {
             HookOutcome::Continue(HookEvent::OnSystemPromptBuilt { prompt })
             | HookOutcome::Skip(HookEvent::OnSystemPromptBuilt { prompt }) => {
                 let prompt = prompt.to_string();
+                // Hooks may contribute advisory text, but cannot erase the
+                // runtime/tool contracts owned by the builder.
+                let required_sections = ["# Tools", "# Runtime Context"];
+                if required_sections
+                    .iter()
+                    .any(|section| original_prompt.contains(section) && !prompt.contains(section))
+                {
+                    tracing::warn!(
+                        "prompt hook attempted to erase runtime-owned sections; ignoring modification"
+                    );
+                    return Ok((
+                        original_prompt,
+                        markers.into_iter().map(Into::into).collect(),
+                    ));
+                }
                 let markers = if prompt == original_prompt {
                     markers.into_iter().map(Into::into).collect()
                 } else {
