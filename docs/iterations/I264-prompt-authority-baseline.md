@@ -18,7 +18,7 @@
 | Work Slice | Source-backed prompt contributor inventory and authority-boundary baseline only |
 | Source Issue | #285 |
 | Claimed At | 2026-09-13 |
-| Governance Claim PR | #547 (merged) |
+| Governance Claim PR | #547 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Claim-only architecture baseline; no prompt/runtime implementation authorized before merge. |
 | Last Updated | 2026-09-13 |
