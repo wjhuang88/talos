@@ -458,7 +458,10 @@ mod tests {
         // Should have head + tail + truncation indicator
         assert!(result.contains("..."));
         assert!(result.chars().count() < content.chars().count());
-        assert!(!result.contains('X'), "must not emit a partial single-line rule");
+        assert!(
+            !result.contains('X'),
+            "must not emit a partial single-line rule"
+        );
     }
 
     #[test]
