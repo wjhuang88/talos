@@ -868,12 +868,6 @@ impl Agent {
                         } else if matches!(decision, Some(ProtocolFailureDisposition::Correct)) {
                             protocol_override = Some(plan.tool_protocol);
                         }
-                    } else if let Some(ref tx) = event_tx {
-                        let _ = tx.send(AgentEvent::Error {
-                            message:
-                                "protocol recovery: model not consulted (failure is not eligible)"
-                                    .to_owned(),
-                        });
                     }
                     if recovery_retry {
                         continue 'turn_loop;
@@ -1003,13 +997,6 @@ impl Agent {
                     self.assess_protocol_recovery(plan.tool_protocol, &message, &event_tx)
                         .await
                 } else {
-                    if let Some(ref tx) = event_tx {
-                        let _ = tx.send(AgentEvent::Error {
-                            message:
-                                "protocol recovery: model not consulted (failure is not eligible)"
-                                    .to_owned(),
-                        });
-                    }
                     None
                 };
                 if matches!(
