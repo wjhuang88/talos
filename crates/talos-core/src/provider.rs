@@ -5,6 +5,7 @@ use serde_json::Value;
 use tokio::sync::mpsc;
 
 use crate::message::{AgentEvent, Message};
+use crate::tool::CapabilityProbe;
 
 pub type Receiver<T> = mpsc::Receiver<T>;
 
@@ -102,6 +103,11 @@ impl ToolDefinition {
 
 #[async_trait::async_trait]
 pub trait LanguageModel: Send + Sync {
+    /// Returns non-secret protocol capability evidence for automatic selection.
+    fn protocol_capabilities(&self) -> CapabilityProbe {
+        CapabilityProbe::Unknown
+    }
+
     async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>>;
 
     async fn stream_with_tools(
