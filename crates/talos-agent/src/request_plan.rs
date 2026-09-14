@@ -236,11 +236,15 @@ impl Agent {
             });
         }
 
+        // The plan is the request's single source of protocol truth. Configuration normally
+        // resolves `Auto` eagerly; resolve defensively here so a plan can never dispatch an
+        // ambiguous protocol if a caller constructed an agent before configuration settled.
+        let tool_protocol = self.resolve_tool_protocol(self.tool_protocol);
         Ok(ProviderRequestPlan {
             messages: owned_messages,
             tool_definitions,
             estimated_tokens,
-            tool_protocol: self.tool_protocol,
+            tool_protocol,
         })
     }
 }
