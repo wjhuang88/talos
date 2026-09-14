@@ -236,29 +236,11 @@ impl Agent {
             });
         }
 
-        let tool_protocol = match self.tool_protocol {
-            talos_core::tool::ToolProtocol::Auto => {
-                let probe = if let Some(scope) = self.provider.protocol_capability_scope() {
-                    if let Some(cached) = self.protocol_capability_cache.get(&scope) {
-                        cached
-                    } else {
-                        let probe = self.provider.protocol_capabilities();
-                        self.protocol_capability_cache.insert(scope, probe);
-                        probe
-                    }
-                } else {
-                    self.provider.protocol_capabilities()
-                };
-                probe.select()
-            }
-            selected => selected,
-        };
-
         Ok(ProviderRequestPlan {
             messages: owned_messages,
             tool_definitions,
             estimated_tokens,
-            tool_protocol,
+            tool_protocol: self.tool_protocol,
         })
     }
 }

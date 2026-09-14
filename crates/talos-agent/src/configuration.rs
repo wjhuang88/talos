@@ -392,7 +392,26 @@ impl Agent {
     }
 
     /// Sets the provider tool-call protocol.
+    ///
+    /// Automatic selection is resolved here, before constructing any request prompt.
+    /// The prompt and sealed request retain the same selection until reconfigured.
     pub fn set_tool_protocol(&mut self, protocol: ToolProtocol) {
+        let protocol = if protocol == ToolProtocol::Auto {
+            let probe = if let Some(scope) = self.provider.protocol_capability_scope() {
+                if let Some(cached) = self.protocol_capability_cache.get(&scope) {
+                    cached
+                } else {
+                    let probe = self.provider.protocol_capabilities();
+                    self.protocol_capability_cache.insert(scope, probe);
+                    probe
+                }
+            } else {
+                self.provider.protocol_capabilities()
+            };
+            probe.select()
+        } else {
+            protocol
+        };
         self.tool_protocol = protocol;
         self.update_prompt_builder(true, |builder| match protocol {
             ToolProtocol::TalosStrict => builder.with_strict_tool_format(),

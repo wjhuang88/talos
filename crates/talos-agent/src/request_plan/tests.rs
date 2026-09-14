@@ -87,6 +87,102 @@ struct BeforeProviderCounter {
     calls: Arc<AtomicUsize>,
 }
 
+struct ProtocolEvidenceModel {
+    probe: talos_core::tool::CapabilityProbe,
+    probes: Arc<AtomicUsize>,
+    expected: talos_core::tool::ToolProtocol,
+    dispatches: Arc<AtomicUsize>,
+}
+
+#[async_trait]
+impl LanguageModel for ProtocolEvidenceModel {
+    fn protocol_capability_scope(&self) -> Option<String> {
+        Some("fixture-endpoint-and-model".into())
+    }
+
+    fn protocol_capabilities(&self) -> talos_core::tool::CapabilityProbe {
+        self.probes.fetch_add(1, Ordering::SeqCst);
+        self.probe
+    }
+
+    async fn stream(&self, _: &[Message]) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
+        panic!("agent must dispatch its sealed protocol selection")
+    }
+
+    async fn stream_with_protocol(
+        &self,
+        messages: &[Message],
+        _: &[ToolDefinition],
+        protocol: talos_core::tool::ToolProtocol,
+        _: mpsc::UnboundedSender<talos_core::provider::ProviderProgress>,
+    ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
+        assert_eq!(protocol, self.expected);
+        let has_compat_prompt = messages.iter().any(|message| {
+            matches!(
+                message, Message::System { content, .. }
+                if content.contains(crate::prompt::TOOL_CALLING_FORMAT.trim())
+            )
+        });
+        assert_eq!(
+            has_compat_prompt,
+            protocol == talos_core::tool::ToolProtocol::Compat
+        );
+        self.dispatches.fetch_add(1, Ordering::SeqCst);
+        Ok(CapturingModel::response())
+    }
+}
+
+#[tokio::test]
+async fn automatic_protocol_prompt_and_dispatch_share_one_cached_selection() {
+    use talos_core::tool::{CapabilityProbe, ProtocolCapabilities, ToolProtocol};
+    for (probe, expected) in [
+        (CapabilityProbe::Unknown, ToolProtocol::Compat),
+        (
+            CapabilityProbe::Known(ProtocolCapabilities {
+                native_tools: true,
+                compatibility: true,
+            }),
+            ToolProtocol::Native,
+        ),
+    ] {
+        let probes = Arc::new(AtomicUsize::new(0));
+        let dispatches = Arc::new(AtomicUsize::new(0));
+        let model = ProtocolEvidenceModel {
+            probe,
+            probes: probes.clone(),
+            expected,
+            dispatches: dispatches.clone(),
+        };
+        let mut agent = Agent::with_security_and_hooks(
+            Arc::new(model),
+            ToolRegistry::new(),
+            None,
+            None,
+            PathBuf::from("/tmp"),
+            Arc::new(HookRegistry::new()),
+        );
+        agent.set_tool_protocol(ToolProtocol::TalosStrict);
+        agent.set_tool_protocol(ToolProtocol::Auto);
+        agent.set_tool_protocol(ToolProtocol::Auto);
+        assert_eq!(
+            agent
+                .run("first request".into())
+                .await
+                .expect("first response"),
+            "done"
+        );
+        assert_eq!(
+            agent
+                .run("second request".into())
+                .await
+                .expect("second response"),
+            "done"
+        );
+        assert_eq!(probes.load(Ordering::SeqCst), 1);
+        assert_eq!(dispatches.load(Ordering::SeqCst), 2);
+    }
+}
+
 #[async_trait]
 impl HookHandler for BeforeProviderCounter {
     fn name(&self) -> &str {
