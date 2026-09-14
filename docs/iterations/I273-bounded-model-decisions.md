@@ -1,6 +1,6 @@
 # Iteration I273: Bounded Model Decisions and Automatic Protocol Selection
 
-> Document status: Planned / Unclaimed
+> Document status: Active / Claimed
 > Parent: PROMPT-001 / Issue #285
 
 ## Objective
@@ -40,15 +40,15 @@ existing implementation commit; a status-only commit is not evidence.
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | Maintainer |
+| Executing Agent | Codex |
+| Work Slice | Provider capability evidence, automatic protocol selection, bounded protocol recovery, and fail-closed replay policy |
+| Claimed At | 2026-09-14 |
 | Source Issue | #285 |
 | Governance Claim PR | #554 |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
-| Implementation PR | Not started |
-| Last Updated | 2026-09-13 |
-| Handoff / Release Condition | Maintainer acceptance and claim merge before implementation. |
+| Authorization Mode | Maintainer-approved governance claim |
+| Authorization Evidence | Claim PR #554 merged as eb97905d |
+| Implementation PR | Local convergence; not pushed |
+| Last Updated | 2026-09-14 |
+| Handoff / Release Condition | Exact-head CI and independent permission/security/API review before merge. |
