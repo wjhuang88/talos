@@ -8,6 +8,8 @@ pub enum ToolProtocol {
     Native,
     TalosStrict,
     Compat,
+    /// Select Native only when the provider supplies explicit capability evidence.
+    Auto,
 }
 
 /// Provider-advertised evidence used for automatic protocol selection.
@@ -175,6 +177,7 @@ impl ToolProtocol {
             "native" => Some(ToolProtocol::Native),
             "talos-strict" | "talos_xml_json_strict" => Some(ToolProtocol::TalosStrict),
             "compat" | "compatibility" => Some(ToolProtocol::Compat),
+            "auto" => Some(ToolProtocol::Auto),
             _ => None,
         }
     }
@@ -208,6 +211,12 @@ impl ToolProtocolConfig {
                 strict_prompt: false,
                 stream_filter: true,
                 schema_validate: false,
+            },
+            ToolProtocol::Auto => ToolProtocolConfig {
+                protocol,
+                strict_prompt: false,
+                stream_filter: true,
+                schema_validate: true,
             },
         }
     }

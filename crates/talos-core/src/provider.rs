@@ -102,6 +102,15 @@ impl ToolDefinition {
 
 #[async_trait::async_trait]
 pub trait LanguageModel: Send + Sync {
+    /// Reports non-secret evidence for automatic tool-protocol selection.
+    ///
+    /// Implementations must return [`crate::tool::CapabilityProbe::Unknown`] unless
+    /// the evidence is tied to the configured endpoint and model. Unknown evidence
+    /// is handled conservatively by selecting the validated compatibility path.
+    fn protocol_capabilities(&self) -> crate::tool::CapabilityProbe {
+        crate::tool::CapabilityProbe::Unknown
+    }
+
     async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>>;
 
     async fn stream_with_tools(

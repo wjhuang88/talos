@@ -236,11 +236,16 @@ impl Agent {
             });
         }
 
+        let tool_protocol = match self.tool_protocol {
+            talos_core::tool::ToolProtocol::Auto => self.provider.protocol_capabilities().select(),
+            selected => selected,
+        };
+
         Ok(ProviderRequestPlan {
             messages: owned_messages,
             tool_definitions,
             estimated_tokens,
-            tool_protocol: self.tool_protocol,
+            tool_protocol,
         })
     }
 }

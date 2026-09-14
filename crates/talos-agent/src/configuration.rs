@@ -396,6 +396,7 @@ impl Agent {
             ToolProtocol::TalosStrict => builder.with_strict_tool_format(),
             ToolProtocol::Compat => builder.with_tool_format(prompt::TOOL_CALLING_FORMAT),
             ToolProtocol::Native => builder.with_tool_format(""),
+            ToolProtocol::Auto => builder.with_tool_format(prompt::TOOL_CALLING_FORMAT),
         });
     }
 
