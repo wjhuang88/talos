@@ -631,6 +631,22 @@ impl Agent {
             }
         }
 
+        // Reserve the logical call only after final permission admission and
+        // before crossing the actual tool execution boundary. If execution is
+        // cancelled or times out after this point, retaining the reservation is
+        // intentional: the side effect may already have reached the tool.
+        if let Err(error) = self.execution_ledger.reserve(hook_ctx.turn_id, &call) {
+            let message = match error {
+                crate::execution_ledger::ReservationError::AlreadyReserved => {
+                    "tool call was already admitted or may have started; refusing replay"
+                }
+                crate::execution_ledger::ReservationError::IdentityConflict => {
+                    "tool call id was reused with different arguments; refusing execution"
+                }
+            };
+            return Ok((ToolExecutionResult::error(message), Vec::new()));
+        }
+
         let normalized_input = call.input.clone();
 
         let (result, parts) = if call.name == "bash" {
@@ -742,6 +758,8 @@ impl Agent {
             };
             (output.result, output.next_provider_parts)
         };
+
+        self.execution_ledger.complete(hook_ctx.turn_id, &call);
 
         let projected_call = self.project_tool_call(&call);
         let projected_result = self.project_tool_result(&call.name, &result);

@@ -112,6 +112,7 @@ impl Agent {
             request_budget_spec: RequestBudgetSpec::default(),
             background_jobs: None,
             protocol_capability_cache: talos_core::tool::ProtocolCapabilityCache::new(),
+            execution_ledger: crate::execution_ledger::ExecutionLedger::default(),
         }
     }
 
@@ -267,6 +268,7 @@ impl Agent {
             request_budget_spec: RequestBudgetSpec::default(),
             background_jobs: None,
             protocol_capability_cache: talos_core::tool::ProtocolCapabilityCache::new(),
+            execution_ledger: crate::execution_ledger::ExecutionLedger::default(),
         }
     }
 

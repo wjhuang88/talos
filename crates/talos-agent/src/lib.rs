@@ -42,6 +42,7 @@ mod background_jobs;
 pub(crate) mod bounded_model;
 pub mod compaction;
 pub mod compression;
+mod execution_ledger;
 mod process_tool;
 pub mod token;
 mod tool_output;
@@ -334,6 +335,8 @@ pub struct Agent {
     background_jobs: Option<Arc<dyn talos_core::background_job::BackgroundJobHost>>,
     /// Per-agent cache for endpoint/model protocol capability evidence.
     protocol_capability_cache: talos_core::tool::ProtocolCapabilityCache,
+    /// Per-turn custody ledger preventing replay after ambiguous execution.
+    execution_ledger: execution_ledger::ExecutionLedger,
 }
 impl Agent {
     pub(crate) fn set_background_job_host(
