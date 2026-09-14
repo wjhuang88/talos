@@ -990,7 +990,8 @@ impl Agent {
             if let Some(message) = stream_protocol_error {
                 let provider_error = ProviderError::InvalidResponse(message.clone());
                 let disposition = classify_protocol_failure(&provider_error);
-                let decision = if matches!(disposition, ProtocolFailureDisposition::HumanReview)
+                let decision = if is_protocol_recovery_eligible(&message)
+                    && matches!(disposition, ProtocolFailureDisposition::HumanReview)
                     && protocol_recovery_attempts == 0
                 {
                     protocol_recovery_attempts = 1;
@@ -1500,6 +1501,19 @@ fn sanitize_protocol_error_text(text: &str) -> String {
         }
     }
     bounded
+}
+
+fn is_protocol_recovery_eligible(message: &str) -> bool {
+    let lower = message.to_ascii_lowercase();
+    [
+        "protocol",
+        "malformed tool",
+        "invalid tool call",
+        "tool arguments",
+        "tool frame",
+    ]
+    .iter()
+    .any(|marker| lower.contains(marker))
 }
 
 fn sanitize_protocol_error(error: &ProviderError) -> String {
