@@ -56,3 +56,13 @@
   the talos-agent prompt suite passes all 37 tests and the session suite passes all 35 tests
   locally. This records Review readiness; final
   umbrella acceptance and independent review remain outstanding.
+
+## 2026-09-14 Harness Correction Checkpoint
+
+- The initial adjacent-authority rule incorrectly treated the intentional stable-prefix to
+  dynamic-suffix boundary (`Skills`/`Context`) as a violation. The harness now accepts that
+  cache boundary and reports advisory content following current user intent, while also
+  detecting an explicit restrictive runtime rule followed by user text.
+- The rendered builder fixture is a positive default-order case; the negative case is an explicit
+  `User -> Session Todos` conflict. Focused prompt module tests: 66 passed.
+- I270 remains Review pending independent review and broader I285 acceptance.
