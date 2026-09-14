@@ -83,6 +83,11 @@ pub async fn invoke_text_with_context(
     if context.correlation_id.trim().is_empty() || context.purpose.trim().is_empty() {
         return BoundedDecision::Failure("bounded decision context is incomplete".to_owned());
     }
+    if !context.dedicated_tools.is_empty() {
+        return BoundedDecision::Failure(
+            "bounded decision dedicated tools are not enabled for this caller".to_owned(),
+        );
+    }
     invoke_text_bounded_with_limits(provider, messages, deadline, limits, cancellation).await
 }
 
