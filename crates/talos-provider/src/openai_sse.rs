@@ -9,7 +9,7 @@ use talos_core::message::{AgentEvent, ReasoningBlock, StopReason, ToolCall, Usag
 use talos_core::tool::ToolProvenance;
 use tokio::sync::mpsc;
 
-use crate::{parse_text_tool_calls, stream_utf8::Utf8StreamDecoder};
+use crate::{anthropic_stream::parse_protocol_text_calls, stream_utf8::Utf8StreamDecoder};
 
 /// OpenAI stream chunk for SSE response parsing.
 #[derive(Debug, Clone, Deserialize)]
@@ -71,7 +71,14 @@ pub(crate) async fn parse_sse_stream(
     first_packet_timeout: Duration,
     idle_timeout: Duration,
 ) {
-    parse_sse_stream_with_mode(response, tx, first_packet_timeout, idle_timeout, true).await;
+    parse_sse_stream_with_mode(
+        response,
+        tx,
+        first_packet_timeout,
+        idle_timeout,
+        talos_core::tool::ToolProtocol::Compat,
+    )
+    .await;
 }
 
 pub(crate) async fn parse_sse_stream_with_mode(
@@ -79,7 +86,7 @@ pub(crate) async fn parse_sse_stream_with_mode(
     tx: mpsc::Sender<AgentEvent>,
     first_packet_timeout: Duration,
     idle_timeout: Duration,
-    allow_text_tool_calls: bool,
+    protocol: talos_core::tool::ToolProtocol,
 ) {
     let _ = tx.send(AgentEvent::TurnStart).await;
 
@@ -98,10 +105,15 @@ pub(crate) async fn parse_sse_stream_with_mode(
     let mut saw_first_packet = false;
     while let Some(chunk_result) = {
         let next_chunk = stream.next();
-        let wait_result = if saw_first_packet {
-            tokio::time::timeout(idle_timeout, next_chunk).await
+        let timeout = if saw_first_packet {
+            idle_timeout
         } else {
-            tokio::time::timeout(first_packet_timeout, next_chunk).await
+            first_packet_timeout
+        };
+        let wait_result = tokio::select! {
+            biased;
+            _ = tx.closed() => return,
+            result = tokio::time::timeout(timeout, next_chunk) => result,
         };
 
         match wait_result {
@@ -161,8 +173,18 @@ pub(crate) async fn parse_sse_stream_with_mode(
 
             // OpenAI sends `data: [DONE]` at the end
             if data.as_str().map(|s| s.trim()) == Some("[DONE]") {
-                let text_calls = if allow_text_tool_calls {
-                    parse_text_tool_calls(&text_accumulator)
+                let text_calls = if protocol != talos_core::tool::ToolProtocol::Native {
+                    match parse_protocol_text_calls(&text_accumulator, protocol) {
+                        Ok(calls) => calls,
+                        Err(message) => {
+                            let _ = tx
+                                .send(AgentEvent::Error {
+                                    message: message.into(),
+                                })
+                                .await;
+                            return;
+                        }
+                    }
                 } else {
                     Vec::new()
                 };
@@ -383,8 +405,18 @@ pub(crate) async fn parse_sse_stream_with_mode(
                     }
                 }
 
-                let text_calls = if allow_text_tool_calls {
-                    parse_text_tool_calls(&text_accumulator)
+                let text_calls = if protocol != talos_core::tool::ToolProtocol::Native {
+                    match parse_protocol_text_calls(&text_accumulator, protocol) {
+                        Ok(calls) => calls,
+                        Err(message) => {
+                            let _ = tx
+                                .send(AgentEvent::Error {
+                                    message: message.into(),
+                                })
+                                .await;
+                            return;
+                        }
+                    }
                 } else {
                     Vec::new()
                 };

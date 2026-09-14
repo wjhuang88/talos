@@ -54,7 +54,11 @@ pub async fn invoke_text_bounded(
             return BoundedDecision::Failure("bounded model invocation cancelled".to_owned());
         }
         result = tokio::time::timeout(deadline, async {
-        let mut events = provider.stream(messages).await.map_err(|_| "bounded model dispatch failed".to_owned())?;
+        let limits = talos_core::provider::DecisionRequestLimits {
+            max_output_tokens: u32::try_from(max_output_bytes).unwrap_or(u32::MAX).min(4096),
+            max_retries: 0,
+        };
+        let mut events = provider.stream_decision(messages, limits).await.map_err(|_| "bounded model dispatch failed".to_owned())?;
         while let Some(event) = events.recv().await {
             let mut text_bytes = output.len();
             match &event {
@@ -113,6 +117,16 @@ mod tests {
 
     #[async_trait::async_trait]
     impl LanguageModel for ResponseModel {
+        async fn stream_decision(
+            &self,
+            messages: &[Message],
+            limits: talos_core::provider::DecisionRequestLimits,
+        ) -> ProviderResult<Receiver<AgentEvent>> {
+            assert_eq!(limits.max_retries, 0);
+            assert!(limits.max_output_tokens > 0 && limits.max_output_tokens <= 4096);
+            self.stream(messages).await
+        }
+
         async fn stream(&self, _: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
             let (tx, rx) = tokio::sync::mpsc::channel(self.0.len().max(1));
             for event in &self.0 {
@@ -240,6 +254,16 @@ mod tests {
 
     #[async_trait::async_trait]
     impl LanguageModel for DelayedModel {
+        async fn stream_decision(
+            &self,
+            messages: &[Message],
+            limits: talos_core::provider::DecisionRequestLimits,
+        ) -> ProviderResult<Receiver<AgentEvent>> {
+            assert_eq!(limits.max_retries, 0);
+            assert!(limits.max_output_tokens > 0 && limits.max_output_tokens <= 4096);
+            self.stream(messages).await
+        }
+
         async fn stream(&self, _: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
             tokio::time::sleep(self.dispatch).await;
             let (tx, rx) = tokio::sync::mpsc::channel(1);

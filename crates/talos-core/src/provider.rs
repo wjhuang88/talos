@@ -69,6 +69,15 @@ pub enum ProviderError {
 
 pub type ProviderResult<T> = Result<T, ProviderError>;
 
+/// Provider-enforced limits for an isolated, tool-free decision request.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct DecisionRequestLimits {
+    /// Positive maximum generated tokens, including any provider reasoning.
+    pub max_output_tokens: u32,
+    /// Maximum additional transport dispatches; zero disables retries.
+    pub max_retries: u32,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ToolDefinition {
     pub name: String,
@@ -102,6 +111,19 @@ impl ToolDefinition {
 
 #[async_trait::async_trait]
 pub trait LanguageModel: Send + Sync {
+    /// Dispatches an isolated text decision with no tools or inherited reasoning settings.
+    ///
+    /// Implementations must enforce the supplied token and retry limits. Unsupported
+    /// providers fail before dispatch; falling back to unrestricted `stream` is unsafe.
+    async fn stream_decision(
+        &self,
+        _messages: &[Message],
+        _limits: DecisionRequestLimits,
+    ) -> ProviderResult<Receiver<AgentEvent>> {
+        Err(ProviderError::InvalidResponse(
+            "provider does not support bounded decisions".into(),
+        ))
+    }
     /// Returns a stable, non-secret scope for capability evidence caching.
     /// `None` disables caching when the provider cannot describe its endpoint/model safely.
     fn protocol_capability_scope(&self) -> Option<String> {
@@ -144,16 +166,22 @@ pub trait LanguageModel: Send + Sync {
 
     /// Streams a response with an explicit tool protocol selected by the caller.
     ///
-    /// Legacy providers retain their existing behavior until they implement protocol-aware
-    /// request serialization and parsing. Callers must not treat this default as capability
-    /// evidence for automatic fallback.
+    /// Legacy providers retain their Native behavior. Compatibility modes require an
+    /// override implementing both request projection and validated response parsing;
+    /// the default rejects them before dispatch rather than silently sending native tools.
+    /// Auto must be resolved by the caller before dispatch.
     async fn stream_with_protocol(
         &self,
         messages: &[Message],
         tools: &[ToolDefinition],
-        _protocol: crate::tool::ToolProtocol,
+        protocol: crate::tool::ToolProtocol,
         progress_tx: mpsc::UnboundedSender<ProviderProgress>,
     ) -> ProviderResult<Receiver<AgentEvent>> {
+        if protocol != crate::tool::ToolProtocol::Native {
+            return Err(ProviderError::InvalidResponse(
+                "provider has no adapter for the selected tool protocol".into(),
+            ));
+        }
         self.stream_with_tools_and_progress(messages, tools, progress_tx)
             .await
     }
@@ -168,6 +196,46 @@ mod tests {
     use super::*;
 
     struct LegacyModel;
+
+    struct CountingLegacyModel(std::sync::atomic::AtomicUsize);
+
+    #[async_trait::async_trait]
+    impl LanguageModel for CountingLegacyModel {
+        async fn stream(&self, _: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+            self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            let (_, rx) = mpsc::channel(1);
+            Ok(rx)
+        }
+    }
+
+    #[tokio::test]
+    async fn legacy_protocol_adapter_rejects_unsupported_modes_before_dispatch() {
+        use crate::tool::ToolProtocol;
+        let model = CountingLegacyModel(std::sync::atomic::AtomicUsize::new(0));
+        for mode in [
+            ToolProtocol::Compat,
+            ToolProtocol::TalosStrict,
+            ToolProtocol::Auto,
+        ] {
+            let (tx, mut rx) = mpsc::unbounded_channel();
+            assert!(
+                model
+                    .stream_with_protocol(&[], &[], mode, tx)
+                    .await
+                    .is_err()
+            );
+            assert_eq!(rx.recv().await, None);
+            assert_eq!(model.0.load(std::sync::atomic::Ordering::SeqCst), 0);
+        }
+        let (tx, _) = mpsc::unbounded_channel();
+        assert!(
+            model
+                .stream_with_protocol(&[], &[], ToolProtocol::Native, tx)
+                .await
+                .is_ok()
+        );
+        assert_eq!(model.0.load(std::sync::atomic::Ordering::SeqCst), 1);
+    }
 
     #[async_trait::async_trait]
     impl LanguageModel for LegacyModel {
