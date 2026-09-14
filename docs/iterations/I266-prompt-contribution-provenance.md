@@ -12,15 +12,15 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex |
 | Work Slice | Typed prompt contribution metadata and compatibility tests |
 | Source Issue | #285 |
 | Governance Claim PR | #549 (merged; effective) |
 | Claimed At | 2026-09-13 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Claim-only metadata slice; implementation remains unauthorized until merge. |
+| Authorization Evidence | Claim #549 merged; implementation #550 merged. |
 | Last Updated | 2026-09-13 |
 | Handoff / Release Condition | Implementation merged; preserve rendered prompt output and continue with separately claimed authority children. |
 | Implementation PR | #550 (merged) |
