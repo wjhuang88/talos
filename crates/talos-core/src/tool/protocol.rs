@@ -112,6 +112,26 @@ mod capability_tests {
     fn unknown_probe_uses_compatibility_recovery() {
         assert_eq!(CapabilityProbe::Unknown.select(), ToolProtocol::Compat);
     }
+
+    #[test]
+    fn failure_classification_is_fail_closed() {
+        assert_eq!(
+            classify_protocol_failure("request timeout"),
+            ProtocolFailureDisposition::Stop
+        );
+        assert_eq!(
+            classify_protocol_failure("malformed tool call"),
+            ProtocolFailureDisposition::Correct
+        );
+        assert_eq!(
+            classify_protocol_failure("unsupported protocol"),
+            ProtocolFailureDisposition::Fallback
+        );
+        assert_eq!(
+            classify_protocol_failure("unexpected response"),
+            ProtocolFailureDisposition::HumanReview
+        );
+    }
 }
 
 impl ToolProtocol {
