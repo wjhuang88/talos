@@ -79,6 +79,25 @@ pub enum ProtocolFailureDisposition {
     HumanReview,
 }
 
+/// Parses the bounded model's protocol-recovery response.
+///
+/// Recovery is intentionally an exact-token contract. Free-form explanations, unknown
+/// values, and multi-line output are rejected so callers cannot accidentally treat prose
+/// as permission to retry a request.
+pub fn parse_recovery_decision(input: &str) -> Option<ProtocolFailureDisposition> {
+    let token = input.trim();
+    if token.is_empty() || token.contains(char::is_whitespace) {
+        return None;
+    }
+    match token {
+        "correction" => Some(ProtocolFailureDisposition::Correct),
+        "fallback" => Some(ProtocolFailureDisposition::Fallback),
+        "stop" => Some(ProtocolFailureDisposition::Stop),
+        "human-review" => Some(ProtocolFailureDisposition::HumanReview),
+        _ => None,
+    }
+}
+
 /// Whether a request may be safely attempted again.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExecutionOutcome {
@@ -215,6 +234,26 @@ mod capability_tests {
         cache.insert("openai|gpt", CapabilityProbe::Unknown);
         assert_eq!(cache.get("openai|gpt"), Some(CapabilityProbe::Unknown));
         assert_eq!(cache.get("other|gpt"), None);
+    }
+
+    #[test]
+    fn recovery_decision_requires_exact_token() {
+        assert_eq!(
+            parse_recovery_decision("fallback"),
+            Some(ProtocolFailureDisposition::Fallback)
+        );
+        assert_eq!(
+            parse_recovery_decision("human-review"),
+            Some(ProtocolFailureDisposition::HumanReview)
+        );
+        for value in [
+            "Fallback",
+            "fallback now",
+            "{\"decision\":\"fallback\"}",
+            "",
+        ] {
+            assert_eq!(parse_recovery_decision(value), None);
+        }
     }
 }
 
