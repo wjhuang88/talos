@@ -42,11 +42,9 @@ Completion Commit: 90b49f1fef699a2662c7482d91420a0de38d34ab
 
 ### Post-merge completion audit (2026-09-13)
 
-The merged implementation provides newline-aware head/tail truncation only. It does not yet
-implement semantic nearest-scope precedence, protection of authority-bearing rules, deterministic
-precedence diagnostics, or the required ancestor/child and cache-effect tests. The implementation
-commit remains recorded as partial evidence; a follow-up governed slice must complete these
-acceptance items before I267 can be marked Complete.
+The original implementation provided newline-aware head/tail truncation only. The follow-up
+convergence commits now add nearest-scope ordering and deterministic precedence diagnostics; this
+owner remains in Review pending independent audit of the full acceptance matrix.
 
 ### 2026-09-14 Review Checkpoint
 
