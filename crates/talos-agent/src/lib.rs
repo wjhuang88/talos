@@ -851,41 +851,13 @@ impl Agent {
                         && protocol_recovery_attempts == 0
                     {
                         protocol_recovery_attempts = 1;
-                        let prompt = vec![
-                            Message::System {
-                                content: "You are a protocol recovery assessor. Return exactly one token: correction, fallback, stop, or human-review. Choose correction only when the same protocol request can be safely corrected; choose fallback only when a compatibility text protocol is explicitly appropriate. Never infer permission to execute tools.".to_owned(),
-                                cache_markers: Vec::new(),
-                            },
-                            Message::User {
-                                content: format!(
-                                    "Classify this sanitized provider protocol failure. protocol={:?}; error={}",
-                                    plan.tool_protocol,
-                                    sanitize_protocol_error(&error),
-                                ),
-                            },
-                        ];
-                        let decision = crate::bounded_model::invoke_text(
-                            self.provider.as_ref(),
-                            &prompt,
-                            std::time::Duration::from_secs(5),
-                            96,
-                        )
-                        .await
-                        .ok()
-                        .and_then(|raw| parse_recovery_decision(&raw));
-                        let label = match decision {
-                            Some(ProtocolFailureDisposition::Correct) => "correction",
-                            Some(ProtocolFailureDisposition::Fallback) => "fallback",
-                            Some(ProtocolFailureDisposition::Stop) => "stop",
-                            Some(ProtocolFailureDisposition::HumanReview) | None => "human-review",
-                        };
-                        if let Some(ref tx) = event_tx {
-                            let _ = tx.send(AgentEvent::Error {
-                                message: format!(
-                                    "protocol recovery: model consulted (decision: {label})"
-                                ),
-                            });
-                        }
+                        let decision = self
+                            .assess_protocol_recovery(
+                                plan.tool_protocol,
+                                &sanitize_protocol_error(&error),
+                                &event_tx,
+                            )
+                            .await;
                         recovery_retry = matches!(
                             decision,
                             Some(ProtocolFailureDisposition::Correct)
@@ -1033,7 +1005,9 @@ impl Agent {
                 } else {
                     if let Some(ref tx) = event_tx {
                         let _ = tx.send(AgentEvent::Error {
-                            message: "protocol recovery: model not consulted (failure is not eligible)".to_owned(),
+                            message:
+                                "protocol recovery: model not consulted (failure is not eligible)"
+                                    .to_owned(),
                         });
                     }
                     None
