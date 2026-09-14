@@ -19,6 +19,23 @@ pub struct ProtocolCapabilities {
     pub compatibility: bool,
 }
 
+/// Result of a provider capability probe; unknown evidence must not assume native support.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CapabilityProbe {
+    Known(ProtocolCapabilities),
+    Unknown,
+}
+
+impl CapabilityProbe {
+    /// Resolve a protocol conservatively when probing is unavailable.
+    pub fn select(self) -> ToolProtocol {
+        match self {
+            Self::Known(capabilities) => capabilities.select(),
+            Self::Unknown => ToolProtocol::Compat,
+        }
+    }
+}
+
 impl ProtocolCapabilities {
     /// Select the safest deterministic protocol, preferring native calls.
     pub fn select(self) -> ToolProtocol {
@@ -62,6 +79,11 @@ mod capability_tests {
             .select(),
             ToolProtocol::TalosStrict
         );
+    }
+
+    #[test]
+    fn unknown_probe_uses_compatibility_recovery() {
+        assert_eq!(CapabilityProbe::Unknown.select(), ToolProtocol::Compat);
     }
 }
 
