@@ -71,6 +71,16 @@ pub(crate) async fn parse_sse_stream(
     first_packet_timeout: Duration,
     idle_timeout: Duration,
 ) {
+    parse_sse_stream_with_mode(response, tx, first_packet_timeout, idle_timeout, true).await;
+}
+
+pub(crate) async fn parse_sse_stream_with_mode(
+    response: reqwest::Response,
+    tx: mpsc::Sender<AgentEvent>,
+    first_packet_timeout: Duration,
+    idle_timeout: Duration,
+    allow_text_tool_calls: bool,
+) {
     let _ = tx.send(AgentEvent::TurnStart).await;
 
     let mut stream = response.bytes_stream();
@@ -151,7 +161,11 @@ pub(crate) async fn parse_sse_stream(
 
             // OpenAI sends `data: [DONE]` at the end
             if data.as_str().map(|s| s.trim()) == Some("[DONE]") {
-                let text_calls = parse_text_tool_calls(&text_accumulator);
+                let text_calls = if allow_text_tool_calls {
+                    parse_text_tool_calls(&text_accumulator)
+                } else {
+                    Vec::new()
+                };
                 let has_text_tool_calls = !text_calls.is_empty();
                 for call in text_calls {
                     let _ = tx
@@ -369,7 +383,11 @@ pub(crate) async fn parse_sse_stream(
                     }
                 }
 
-                let text_calls = parse_text_tool_calls(&text_accumulator);
+                let text_calls = if allow_text_tool_calls {
+                    parse_text_tool_calls(&text_accumulator)
+                } else {
+                    Vec::new()
+                };
                 for call in text_calls {
                     let _ = tx
                         .send(AgentEvent::ToolCall {
