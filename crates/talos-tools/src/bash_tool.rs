@@ -205,7 +205,10 @@ impl BashTool {
                 _ = &mut deadline => {
                     if completed_status.is_none() {
                         let _ = child.kill().await;
-                        let _ = child.wait().await;
+                        // Do not let an inherited pipe or a platform process-tree quirk turn
+                        // timeout handling into an unbounded wait. The direct child has already
+                        // received the termination request; reaping is best-effort and bounded.
+                        let _ = tokio::time::timeout(Duration::from_millis(100), child.wait()).await;
                     }
                     // Preserve output already received before the absolute deadline. Descendants
                     // can inherit stdout/stderr handles and outlive the direct shell child, so
