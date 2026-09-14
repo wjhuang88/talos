@@ -41,13 +41,13 @@ existing implementation commit; a status-only commit is not evidence.
 | Field | Value |
 |---|---|
 | Claim State | Claimed |
-| Responsible Actor | Maintainer |
+| Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex |
 | Work Slice | Provider capability evidence, automatic protocol selection, bounded protocol recovery, and fail-closed replay policy |
 | Claimed At | 2026-09-14 |
 | Source Issue | #285 |
 | Governance Claim PR | #554 |
-| Authorization Mode | Maintainer-approved governance claim |
+| Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Claim PR #554 merged as eb97905d |
 | Implementation PR | Local convergence; not pushed |
 | Last Updated | 2026-09-14 |
