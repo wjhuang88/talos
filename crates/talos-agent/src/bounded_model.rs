@@ -17,6 +17,31 @@ pub enum BoundedDecision {
     Failure(String),
 }
 
+/// Explicit provenance and isolation contract for one bounded decision.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BoundedDecisionContext {
+    /// Stable identifier used to correlate diagnostics without exposing prompt data.
+    pub correlation_id: String,
+    /// Caller-owned purpose label, such as `permission-review` or `protocol-recovery`.
+    pub purpose: String,
+    /// Explicitly allowed tools. An empty list is the normal tool-free policy.
+    pub dedicated_tools: Vec<String>,
+    /// Maximum provider retry dispatches for this isolated request.
+    pub max_retries: u32,
+}
+
+impl BoundedDecisionContext {
+    /// Creates a tool-free, non-retrying context with a caller-supplied correlation ID.
+    pub fn new(correlation_id: impl Into<String>, purpose: impl Into<String>) -> Self {
+        Self {
+            correlation_id: correlation_id.into(),
+            purpose: purpose.into(),
+            dedicated_tools: Vec::new(),
+            max_retries: 0,
+        }
+    }
+}
+
 /// Invoke a model with no tools and a strict output/deadline boundary.
 pub async fn invoke_text(
     provider: &dyn LanguageModel,
@@ -38,12 +63,57 @@ pub async fn invoke_text(
     }
 }
 
+/// Invoke a bounded decision with an explicit isolation and provenance contract.
+pub async fn invoke_text_with_context(
+    provider: &dyn LanguageModel,
+    messages: &[Message],
+    context: &BoundedDecisionContext,
+    deadline: Duration,
+    max_output_bytes: usize,
+    cancellation: CancellationToken,
+) -> BoundedDecision {
+    let limits = talos_core::provider::DecisionRequestLimits {
+        max_output_tokens: u32::try_from(max_output_bytes)
+            .unwrap_or(u32::MAX)
+            .min(4096),
+        max_retries: context.max_retries,
+    };
+    // The provider receives only caller-supplied messages; session history and tools are
+    // never inherited. Reject empty correlation/purpose labels before dispatch.
+    if context.correlation_id.trim().is_empty() || context.purpose.trim().is_empty() {
+        return BoundedDecision::Failure("bounded decision context is incomplete".to_owned());
+    }
+    invoke_text_bounded_with_limits(provider, messages, deadline, limits, cancellation).await
+}
+
 /// Invoke a model with explicit cancellation and a typed, fail-closed outcome.
 pub async fn invoke_text_bounded(
     provider: &dyn LanguageModel,
     messages: &[Message],
     deadline: Duration,
     max_output_bytes: usize,
+    cancellation: CancellationToken,
+) -> BoundedDecision {
+    invoke_text_bounded_with_limits(
+        provider,
+        messages,
+        deadline,
+        talos_core::provider::DecisionRequestLimits {
+            max_output_tokens: u32::try_from(max_output_bytes)
+                .unwrap_or(u32::MAX)
+                .min(4096),
+            max_retries: 0,
+        },
+        cancellation,
+    )
+    .await
+}
+
+async fn invoke_text_bounded_with_limits(
+    provider: &dyn LanguageModel,
+    messages: &[Message],
+    deadline: Duration,
+    limits: talos_core::provider::DecisionRequestLimits,
     cancellation: CancellationToken,
 ) -> BoundedDecision {
     let mut output = String::new();
@@ -55,10 +125,6 @@ pub async fn invoke_text_bounded(
             return BoundedDecision::Failure("bounded model invocation cancelled".to_owned());
         }
         result = tokio::time::timeout(deadline, async {
-        let limits = talos_core::provider::DecisionRequestLimits {
-            max_output_tokens: u32::try_from(max_output_bytes).unwrap_or(u32::MAX).min(4096),
-            max_retries: 0,
-        };
         // Catch both construction and polling panics from third-party implementations.
         // Never expose panic payloads or retry a request whose dispatch state is unknown.
         let mut events = std::panic::AssertUnwindSafe(async {
@@ -85,7 +151,9 @@ pub async fn invoke_text_bounded(
             }
             // Thinking deltas and their completed replay blocks describe the same output.
             // Count the larger representation, including signatures and opaque payloads.
-            if text_bytes.saturating_add(thinking_bytes.max(reasoning_bytes)) > max_output_bytes {
+            if text_bytes.saturating_add(thinking_bytes.max(reasoning_bytes))
+                > limits.max_output_tokens as usize
+            {
                 return Err("bounded model output exceeded limit".to_owned());
             }
             match event {

@@ -343,6 +343,7 @@ pub struct Agent {
 impl Agent {
     async fn assess_protocol_recovery(
         &self,
+        turn_id: TurnId,
         protocol: talos_core::tool::ToolProtocol,
         error: &str,
         event_tx: &Option<mpsc::UnboundedSender<AgentEvent>>,
@@ -359,11 +360,17 @@ impl Agent {
                 ),
             },
         ];
-        let decision = crate::bounded_model::invoke_text(
+        let context = crate::bounded_model::BoundedDecisionContext::new(
+            format!("protocol-recovery:{turn_id:?}"),
+            "protocol-recovery",
+        );
+        let decision = crate::bounded_model::invoke_text_with_context(
             self.provider.as_ref(),
             &prompt,
+            &context,
             std::time::Duration::from_secs(5),
             96,
+            tokio_util::sync::CancellationToken::new(),
         )
         .await
         .ok()
@@ -853,6 +860,7 @@ impl Agent {
                         protocol_recovery_attempts = 1;
                         let decision = self
                             .assess_protocol_recovery(
+                                hook_ctx.turn_id,
                                 plan.tool_protocol,
                                 &sanitize_protocol_error(&error),
                                 &event_tx,
@@ -995,8 +1003,13 @@ impl Agent {
                     && protocol_recovery_attempts == 0
                 {
                     protocol_recovery_attempts = 1;
-                    self.assess_protocol_recovery(plan.tool_protocol, &message, &event_tx)
-                        .await
+                    self.assess_protocol_recovery(
+                        hook_ctx.turn_id,
+                        plan.tool_protocol,
+                        &message,
+                        &event_tx,
+                    )
+                    .await
                 } else {
                     None
                 };
