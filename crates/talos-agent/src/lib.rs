@@ -280,6 +280,7 @@ type TodoSectionProviderCallback = dyn Fn() -> Option<String> + Send + Sync;
 /// ```
 pub struct Agent {
     provider: Arc<dyn LanguageModel>,
+    tool_protocol: talos_core::tool::ToolProtocol,
     tools: ToolRegistry,
     /// Agent-owned permission pipeline used by migrated composition roots.
     permission_pipeline: Option<Arc<permission_pipeline::PermissionPipeline>>,
@@ -754,9 +755,10 @@ impl Agent {
             );
 
             let (progress_tx, mut progress_rx) = mpsc::unbounded_channel();
-            let provider_request = self.provider.stream_with_tools_and_progress(
+            let provider_request = self.provider.stream_with_protocol(
                 &plan.messages,
                 &plan.tool_definitions,
+                plan.tool_protocol,
                 progress_tx,
             );
             tokio::pin!(provider_request);

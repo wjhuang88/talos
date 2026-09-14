@@ -127,6 +127,22 @@ pub trait LanguageModel: Send + Sync {
         self.stream_with_tools(messages, tools).await
     }
 
+    /// Streams a response with an explicit tool protocol selected by the caller.
+    ///
+    /// Legacy providers retain their existing behavior until they implement protocol-aware
+    /// request serialization and parsing. Callers must not treat this default as capability
+    /// evidence for automatic fallback.
+    async fn stream_with_protocol(
+        &self,
+        messages: &[Message],
+        tools: &[ToolDefinition],
+        _protocol: crate::tool::ToolProtocol,
+        progress_tx: mpsc::UnboundedSender<ProviderProgress>,
+    ) -> ProviderResult<Receiver<AgentEvent>> {
+        self.stream_with_tools_and_progress(messages, tools, progress_tx)
+            .await
+    }
+
     fn request_preview(&self, _messages: &[Message]) -> Option<Value> {
         None
     }

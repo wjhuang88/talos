@@ -17,6 +17,7 @@ pub(super) struct ProviderRequestPlan {
     pub(super) messages: Vec<Message>,
     pub(super) tool_definitions: Vec<ToolDefinition>,
     pub(super) estimated_tokens: u32,
+    pub(super) tool_protocol: talos_core::tool::ToolProtocol,
 }
 
 /// Canonical turn state plus the already sealed initial Provider request.
@@ -239,6 +240,7 @@ impl Agent {
             messages: owned_messages,
             tool_definitions,
             estimated_tokens,
+            tool_protocol: self.tool_protocol,
         })
     }
 }
