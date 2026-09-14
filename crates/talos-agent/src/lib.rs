@@ -372,9 +372,12 @@ impl Agent {
             96,
             tokio_util::sync::CancellationToken::new(),
         )
-        .await
-        .ok()
-        .and_then(|raw| parse_recovery_decision(&raw));
+        .await;
+        let decision = match decision {
+            crate::bounded_model::BoundedDecision::Decision(raw) => parse_recovery_decision(&raw),
+            crate::bounded_model::BoundedDecision::Abstain(_)
+            | crate::bounded_model::BoundedDecision::Failure(_) => None,
+        };
         let label = match decision {
             Some(ProtocolFailureDisposition::Correct) => "correction",
             Some(ProtocolFailureDisposition::Fallback) => "fallback",
