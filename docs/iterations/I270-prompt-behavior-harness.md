@@ -53,5 +53,6 @@
   `SystemPromptBuilder::precedence_report()`, producing deterministic diagnostics for every
   section below the authoritative floor.
 - Cross-module rendered Memory/Session Todo coverage is exercised independently of any provider;
-  talos-agent prompt and session suites pass locally. This records Review readiness; final
+  the talos-agent prompt suite passes all 37 tests and the session suite passes all 35 tests
+  locally. This records Review readiness; final
   umbrella acceptance and independent review remain outstanding.
