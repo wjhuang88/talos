@@ -43,7 +43,7 @@ existing implementation commit; a status-only commit is not evidence.
 | Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex |
-| Work Slice | Provider capability evidence, automatic protocol selection, bounded protocol recovery, and fail-closed replay policy |
+| Work Slice | Provider capability evidence, deterministic automatic protocol selection, protocol failure classification, and fail-closed retry contract primitives |
 | Claimed At | 2026-09-14 |
 | Source Issue | #285 |
 | Governance Claim PR | #554 |
