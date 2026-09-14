@@ -339,12 +339,44 @@ impl LanguageModel for AnthropicProvider {
         progress_tx: mpsc::UnboundedSender<ProviderProgress>,
     ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
         if matches!(protocol, talos_core::tool::ToolProtocol::Native) {
-            self.stream_with_tools_and_progress(messages, tools, progress_tx)
-                .await
+            let body = anthropic_request::build_request_body(
+                &self.model,
+                messages,
+                tools,
+                self.reasoning.as_ref(),
+                self.output_limit,
+            );
+            let response = self.send_request(&body, Some(&progress_tx)).await?;
+            let (tx, rx) = mpsc::channel(32);
+            let timeout_config = self.timeout_config.clone();
+            tokio::spawn(anthropic_stream::parse_sse_stream_with_mode(
+                response,
+                tx,
+                Duration::from_secs(timeout_config.first_packet_timeout_secs),
+                Duration::from_secs(timeout_config.stream_idle_timeout_secs),
+                false,
+            ));
+            Ok(rx)
         } else {
             let projected = compatibility_messages(messages);
-            self.stream_with_tools_and_progress(&projected, &[], progress_tx)
-                .await
+            let body = anthropic_request::build_request_body(
+                &self.model,
+                &projected,
+                &[],
+                self.reasoning.as_ref(),
+                self.output_limit,
+            );
+            let response = self.send_request(&body, Some(&progress_tx)).await?;
+            let (tx, rx) = mpsc::channel(32);
+            let timeout_config = self.timeout_config.clone();
+            tokio::spawn(anthropic_stream::parse_sse_stream_with_mode(
+                response,
+                tx,
+                Duration::from_secs(timeout_config.first_packet_timeout_secs),
+                Duration::from_secs(timeout_config.stream_idle_timeout_secs),
+                true,
+            ));
+            Ok(rx)
         }
     }
 
