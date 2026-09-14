@@ -1,5 +1,6 @@
 //! Shared bounded, tool-free model invocation for isolated decisions.
 
+use futures_util::FutureExt;
 use std::time::Duration;
 use talos_core::message::{AgentEvent, Message, ReasoningBlock, StopReason};
 use talos_core::provider::LanguageModel;
@@ -58,7 +59,13 @@ pub async fn invoke_text_bounded(
             max_output_tokens: u32::try_from(max_output_bytes).unwrap_or(u32::MAX).min(4096),
             max_retries: 0,
         };
-        let mut events = provider.stream_decision(messages, limits).await.map_err(|_| "bounded model dispatch failed".to_owned())?;
+        // Catch both construction and polling panics from third-party implementations.
+        // Never expose panic payloads or retry a request whose dispatch state is unknown.
+        let mut events = std::panic::AssertUnwindSafe(async {
+            provider.stream_decision(messages, limits).await
+        }).catch_unwind().await
+            .map_err(|_| "bounded model provider panicked".to_owned())?
+            .map_err(|_| "bounded model dispatch failed".to_owned())?;
         while let Some(event) = events.recv().await {
             let mut text_bytes = output.len();
             match &event {
@@ -195,6 +202,35 @@ mod tests {
     struct DelayedModel {
         dispatch: Duration,
         response: Duration,
+    }
+
+    struct PanickingModel(std::sync::atomic::AtomicUsize);
+
+    #[async_trait::async_trait]
+    impl LanguageModel for PanickingModel {
+        async fn stream(&self, _: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+            panic!("unbounded entry must not be called")
+        }
+
+        async fn stream_decision(
+            &self,
+            _: &[Message],
+            _: talos_core::provider::DecisionRequestLimits,
+        ) -> ProviderResult<Receiver<AgentEvent>> {
+            self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            tokio::task::yield_now().await;
+            panic!("untrusted provider payload")
+        }
+    }
+
+    #[tokio::test]
+    async fn provider_panic_is_a_sanitized_failure_without_retry() {
+        let model = PanickingModel(std::sync::atomic::AtomicUsize::new(0));
+        assert_eq!(
+            invoke_text(&model, &[], Duration::from_secs(1), 128).await,
+            Err("bounded model provider panicked".into())
+        );
+        assert_eq!(model.0.load(std::sync::atomic::Ordering::SeqCst), 1);
     }
 
     #[tokio::test]
