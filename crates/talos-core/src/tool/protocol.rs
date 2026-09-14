@@ -39,6 +39,24 @@ pub enum ProtocolFailureDisposition {
     HumanReview,
 }
 
+/// Whether a request may be safely attempted again.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExecutionOutcome {
+    /// No provider request was dispatched.
+    NotStarted,
+    /// Provider confirmed completion.
+    Completed,
+    /// Dispatch may have reached the provider; replay is unsafe.
+    Unknown,
+}
+
+impl ExecutionOutcome {
+    /// Returns true only when replay cannot duplicate an operation.
+    pub const fn permits_retry(self) -> bool {
+        matches!(self, Self::NotStarted)
+    }
+}
+
 /// Classifies protocol failures without inspecting secrets or tool arguments.
 pub fn classify_protocol_failure(message: &str) -> ProtocolFailureDisposition {
     let value = message.to_ascii_lowercase();
@@ -131,6 +149,13 @@ mod capability_tests {
             classify_protocol_failure("unexpected response"),
             ProtocolFailureDisposition::HumanReview
         );
+    }
+
+    #[test]
+    fn unknown_execution_never_permits_retry() {
+        assert!(ExecutionOutcome::NotStarted.permits_retry());
+        assert!(!ExecutionOutcome::Completed.permits_retry());
+        assert!(!ExecutionOutcome::Unknown.permits_retry());
     }
 }
 
