@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use talos_core::provider::{LanguageModel, ToolDefinition};
+use talos_core::provider::ToolDefinition;
 use talos_core::tool::{AgentTool, ToolPresentationPolicy, ToolProtocol, ToolRegistry};
 use talos_permission::{
     InteractionCapability, PermissionContext, PermissionEngine, PermissionMode,
