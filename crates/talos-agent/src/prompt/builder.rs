@@ -581,6 +581,7 @@ impl SystemPromptBuilder {
     /// Validates the assembled sections against the runtime authority floor.
     /// This provider-independent report is intended for diagnostics and tests.
     #[must_use]
+    #[allow(dead_code)]
     pub(super) fn precedence_report(&self) -> HarnessReport {
         run_precedence_harness(&self.prompt_sections(), 80)
     }

@@ -68,11 +68,13 @@ pub(super) fn authority_diagnostic(
 /// The report is stable and names every lower-authority section that would
 /// violate the supplied authoritative floor; no provider or model is involved.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(dead_code)]
 pub(super) struct HarnessReport {
     pub(super) passed: bool,
     pub(super) diagnostics: Vec<String>,
 }
 
+#[allow(dead_code)]
 pub(super) fn run_precedence_harness(
     sections: &[PromptSection],
     authoritative_floor: u8,
