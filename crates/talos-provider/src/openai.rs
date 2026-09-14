@@ -21,6 +21,7 @@ use talos_core::message::{AgentEvent, Message};
 use talos_core::provider::{
     LanguageModel, ProviderError, ProviderProgress, ProviderResult, ToolDefinition,
 };
+use talos_core::tool::{CapabilityProbe, ProtocolCapabilities};
 use tokio::sync::mpsc;
 
 use crate::openai_request::{build_request_body, redact_secret};
@@ -301,6 +302,19 @@ fn status_to_error(status: reqwest::StatusCode, body: String) -> ProviderError {
 
 #[async_trait::async_trait]
 impl LanguageModel for OpenAIProvider {
+    fn protocol_capabilities(&self) -> CapabilityProbe {
+        // Custom gateways are deliberately unknown: adapter compatibility does not
+        // constitute evidence that the configured endpoint accepts native tools.
+        if self.base_url.trim_end_matches('/') == OPENAI_API_URL && !self.model.trim().is_empty() {
+            CapabilityProbe::Known(ProtocolCapabilities {
+                native_tools: true,
+                compatibility: true,
+            })
+        } else {
+            CapabilityProbe::Unknown
+        }
+    }
+
     async fn stream_with_protocol(
         &self,
         messages: &[Message],
