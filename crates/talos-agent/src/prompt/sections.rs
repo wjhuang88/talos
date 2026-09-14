@@ -64,6 +64,35 @@ pub(super) fn authority_diagnostic(
     )
 }
 
+/// Runs a deterministic cross-module precedence harness over prompt sections.
+/// The report is stable and names every lower-authority section that would
+/// violate the supplied authoritative floor; no provider or model is involved.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct HarnessReport {
+    pub(super) passed: bool,
+    pub(super) diagnostics: Vec<String>,
+}
+
+pub(super) fn run_precedence_harness(
+    sections: &[PromptSection],
+    authoritative_floor: u8,
+) -> HarnessReport {
+    let mut diagnostics = Vec::new();
+    for section in sections {
+        let metadata = section.metadata();
+        if metadata.authority < authoritative_floor {
+            diagnostics.push(format!(
+                "precedence contract violation: {:?} authority {} below floor {}",
+                metadata.source, metadata.authority, authoritative_floor
+            ));
+        }
+    }
+    HarnessReport {
+        passed: diagnostics.is_empty(),
+        diagnostics,
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub(super) struct PromptSection {
     pub(super) text: String,
@@ -366,5 +395,46 @@ mod tests {
             resolve_authority(todo, runtime),
             AuthorityDecision::LowerWins
         );
+    }
+
+    #[test]
+    fn behavior_harness_cross_module_report_is_stable() {
+        let sections = vec![
+            PromptSection {
+                text: "# Runtime Context\nDeny".into(),
+                kind: PromptSectionKind::Dynamic,
+            },
+            PromptSection {
+                text: "# User Preferences\nrequest".into(),
+                kind: PromptSectionKind::Dynamic,
+            },
+            PromptSection {
+                text: "# Memory (advisory)\nstale".into(),
+                kind: PromptSectionKind::Dynamic,
+            },
+        ];
+        let report = run_precedence_harness(&sections, 80);
+        assert!(!report.passed);
+        assert_eq!(
+            report.diagnostics,
+            vec!["precedence contract violation: Memory authority 40 below floor 80"]
+        );
+    }
+
+    #[test]
+    fn behavior_harness_passes_for_authoritative_surfaces() {
+        let sections = vec![
+            PromptSection {
+                text: "# Runtime Context\nrule".into(),
+                kind: PromptSectionKind::Dynamic,
+            },
+            PromptSection {
+                text: "# User Preferences\nrequest".into(),
+                kind: PromptSectionKind::Dynamic,
+            },
+        ];
+        let report = run_precedence_harness(&sections, 80);
+        assert!(report.passed);
+        assert!(report.diagnostics.is_empty());
     }
 }
