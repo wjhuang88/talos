@@ -218,8 +218,7 @@ impl ContextLoader {
             .take(HEAD_SIZE)
             .rposition(|c| *c == '\n')
             .map(|index| index + 1)
-            .filter(|index| *index >= HEAD_SIZE / 2)
-            .unwrap_or(HEAD_SIZE);
+            .unwrap_or(0);
         result.extend(chars.iter().take(head_end));
 
         // Truncation indicator
@@ -237,8 +236,7 @@ impl ContextLoader {
             .skip(tail_start)
             .find(|(_, c)| **c == '\n')
             .map(|(index, _)| index + 1)
-            .filter(|index| *index <= char_count.saturating_sub(TAIL_SIZE / 2))
-            .unwrap_or(tail_start);
+            .unwrap_or(char_count);
         result.extend(chars.iter().skip(tail_start));
 
         result
@@ -347,10 +345,10 @@ mod tests {
             char_count
         );
 
-        // The separator header shifts the start; verify head chars are present
-        assert!(context.contains(&"A".repeat(100)));
-        // Tail portion should be preserved
-        assert!(context.ends_with(&"B".repeat(100)));
+        // This is one indivisible oversized instruction: neither its beginning
+        // nor its ending may be presented as if it were a complete rule.
+        assert!(!context.contains(&"A".repeat(100)));
+        assert!(!context.contains(&"B".repeat(100)));
         // Truncation indicator should be present
         assert!(context.contains("\n...\n"));
     }
@@ -460,6 +458,7 @@ mod tests {
         // Should have head + tail + truncation indicator
         assert!(result.contains("..."));
         assert!(result.chars().count() < content.chars().count());
+        assert!(!result.contains('X'), "must not emit a partial single-line rule");
     }
 
     #[test]
