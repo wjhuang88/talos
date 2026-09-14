@@ -306,16 +306,27 @@ impl LanguageModel for OpenAIProvider {
         messages: &[Message],
         tools: &[ToolDefinition],
         protocol: talos_core::tool::ToolProtocol,
-        progress_tx: mpsc::UnboundedSender<ProviderProgress>,
+        _progress_tx: mpsc::UnboundedSender<ProviderProgress>,
     ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
-        if matches!(protocol, talos_core::tool::ToolProtocol::Native) {
-            self.stream_with_tools_and_progress(messages, tools, progress_tx)
-                .await
+        let native = matches!(protocol, talos_core::tool::ToolProtocol::Native);
+        let projected = if native {
+            messages.to_vec()
         } else {
-            let projected = crate::compatibility_messages(messages);
-            self.stream_with_tools_and_progress(&projected, &[], progress_tx)
-                .await
-        }
+            crate::compatibility_messages(messages)
+        };
+        let response = self
+            .make_request_with_tools(&projected, if native { tools } else { &[] })
+            .await?;
+        let (tx, rx) = mpsc::channel(32);
+        let timeout_config = self.timeout_config.clone();
+        tokio::spawn(crate::openai_sse::parse_sse_stream_with_mode(
+            response,
+            tx,
+            Duration::from_secs(timeout_config.first_packet_timeout_secs),
+            Duration::from_secs(timeout_config.stream_idle_timeout_secs),
+            !native,
+        ));
+        Ok(rx)
     }
 
     async fn stream(&self, messages: &[Message]) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
