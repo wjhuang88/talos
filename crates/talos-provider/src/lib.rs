@@ -33,6 +33,39 @@ use talos_core::message::{AgentEvent, Message};
 use talos_core::provider::{
     LanguageModel, ProviderError, ProviderProgress, ProviderResult, ToolDefinition,
 };
+
+/// Projects durable native tool blocks into bounded compatibility text while preserving IDs.
+/// This is used only for non-native protocol requests; native requests retain structured blocks.
+pub(crate) fn compatibility_messages(messages: &[Message]) -> Vec<Message> {
+    messages
+        .iter()
+        .map(|message| match message {
+            Message::Assistant {
+                content,
+                tool_calls,
+                reasoning,
+            } if !tool_calls.is_empty() => {
+                let calls = tool_calls
+                    .iter()
+                    .map(|call| format!("{} {}", call.name, call.input))
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                Message::Assistant {
+                    content: format!("{content}\n<tool_calls>\n{calls}\n</tool_calls>"),
+                    tool_calls: Vec::new(),
+                    reasoning: reasoning.clone(),
+                }
+            }
+            Message::Tool { result } => Message::User {
+                content: format!(
+                    "<tool_result id={} error={}>\n{}\n</tool_result>",
+                    result.tool_use_id, result.is_error, result.content
+                ),
+            },
+            other => other.clone(),
+        })
+        .collect()
+}
 use tokio::sync::mpsc;
 
 use crate::retry::{RetryDecision, classify_retry_with_backoff};
@@ -298,6 +331,23 @@ fn status_to_error(status: reqwest::StatusCode, body: String) -> ProviderError {
 
 #[async_trait::async_trait]
 impl LanguageModel for AnthropicProvider {
+    async fn stream_with_protocol(
+        &self,
+        messages: &[Message],
+        tools: &[ToolDefinition],
+        protocol: talos_core::tool::ToolProtocol,
+        progress_tx: mpsc::UnboundedSender<ProviderProgress>,
+    ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
+        if matches!(protocol, talos_core::tool::ToolProtocol::Native) {
+            self.stream_with_tools_and_progress(messages, tools, progress_tx)
+                .await
+        } else {
+            let projected = compatibility_messages(messages);
+            self.stream_with_tools_and_progress(&projected, &[], progress_tx)
+                .await
+        }
+    }
+
     async fn stream(&self, messages: &[Message]) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
         let response = self.make_request(messages).await?;
         let (tx, rx) = mpsc::channel(32);

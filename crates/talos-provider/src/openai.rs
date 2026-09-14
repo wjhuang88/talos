@@ -301,6 +301,23 @@ fn status_to_error(status: reqwest::StatusCode, body: String) -> ProviderError {
 
 #[async_trait::async_trait]
 impl LanguageModel for OpenAIProvider {
+    async fn stream_with_protocol(
+        &self,
+        messages: &[Message],
+        tools: &[ToolDefinition],
+        protocol: talos_core::tool::ToolProtocol,
+        progress_tx: mpsc::UnboundedSender<ProviderProgress>,
+    ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
+        if matches!(protocol, talos_core::tool::ToolProtocol::Native) {
+            self.stream_with_tools_and_progress(messages, tools, progress_tx)
+                .await
+        } else {
+            let projected = crate::compatibility_messages(messages);
+            self.stream_with_tools_and_progress(&projected, &[], progress_tx)
+                .await
+        }
+    }
+
     async fn stream(&self, messages: &[Message]) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
         let response = self.make_request(messages).await?;
         let (tx, rx) = mpsc::channel(32);
