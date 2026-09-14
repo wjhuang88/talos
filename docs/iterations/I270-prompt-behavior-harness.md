@@ -1,6 +1,6 @@
 # Iteration I270: Prompt Model-Behavior Harness
 
-> Document status: Partial / Open
+> Document status: Review / Claimed
 
 ## Collaboration Claim
 
@@ -31,7 +31,8 @@
 
 ## Completion Evidence
 
-- Completion Commit: pending (provider/model fixtures and cross-module scenarios remain)
+- Completion Commit: `d5c6cd11`, `6264c253`, `87402537` and `face3b2a` (deterministic harness,
+  builder integration, warning-free validation, and rendered advisory coverage).
 
 ## Execution Checkpoint
 
@@ -45,3 +46,12 @@
   and runtime rules; prompt tests pass (35 tests).
 - Remaining acceptance is limited to broader cross-module scenarios and harness output integration;
   this iteration remains Partial until those cases are covered.
+
+## 2026-09-14 Review Checkpoint
+
+- `run_precedence_harness` now consumes the actual assembled `PromptSection` set through
+  `SystemPromptBuilder::precedence_report()`, producing deterministic diagnostics for every
+  section below the authoritative floor.
+- Cross-module rendered Memory/Session Todo coverage is exercised independently of any provider;
+  talos-agent prompt and session suites pass locally. This records Review readiness; final
+  umbrella acceptance and independent review remain outstanding.
