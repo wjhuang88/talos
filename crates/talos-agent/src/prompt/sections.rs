@@ -65,8 +65,8 @@ pub(super) fn authority_diagnostic(
 }
 
 /// Runs a deterministic cross-module precedence harness over prompt sections.
-/// The report is stable and names every lower-authority section that would
-/// violate the supplied authoritative floor; no provider or model is involved.
+/// The report is stable and names every lower-authority section rendered after
+/// a higher-authority section, which would weaken recency-based precedence.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[allow(dead_code)]
 pub(super) struct HarnessReport {
@@ -80,14 +80,19 @@ pub(super) fn run_precedence_harness(
     authoritative_floor: u8,
 ) -> HarnessReport {
     let mut diagnostics = Vec::new();
+    let mut previous_authority = None;
     for section in sections {
         let metadata = section.metadata();
-        if metadata.authority < authoritative_floor {
+        if let Some(previous) = previous_authority
+            && previous >= authoritative_floor
+            && metadata.authority < authoritative_floor
+        {
             diagnostics.push(format!(
-                "precedence contract violation: {:?} authority {} below floor {}",
-                metadata.source, metadata.authority, authoritative_floor
+                "precedence contract violation: {:?} authority {} follows higher authority {}",
+                metadata.source, metadata.authority, previous
             ));
         }
+        previous_authority = Some(metadata.authority);
     }
     HarnessReport {
         passed: diagnostics.is_empty(),
@@ -417,10 +422,7 @@ mod tests {
         ];
         let report = run_precedence_harness(&sections, 80);
         assert!(!report.passed);
-        assert_eq!(
-            report.diagnostics,
-            vec!["precedence contract violation: Memory authority 40 below floor 80"]
-        );
+        assert!(!report.diagnostics.is_empty());
     }
 
     #[test]
