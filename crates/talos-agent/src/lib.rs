@@ -858,8 +858,15 @@ impl Agent {
                 Ok(rx) => rx,
                 Err(error) => {
                     let disposition = classify_protocol_failure(&error);
+                    // An InvalidResponse is not, by itself, evidence of a
+                    // protocol mismatch. HTTP 400s, provider validation
+                    // errors, and other ordinary response failures must not
+                    // trigger a model-directed fallback or retry.
+                    let recovery_eligible =
+                        is_protocol_recovery_eligible(&sanitize_protocol_error(&error));
                     let mut recovery_retry = false;
-                    if matches!(disposition, ProtocolFailureDisposition::HumanReview)
+                    if recovery_eligible
+                        && matches!(disposition, ProtocolFailureDisposition::HumanReview)
                         && protocol_recovery_attempts == 0
                     {
                         protocol_recovery_attempts = 1;

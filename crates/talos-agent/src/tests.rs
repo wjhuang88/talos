@@ -5072,3 +5072,19 @@ async fn capability_gate_hides_read_image_when_unsupported() {
         .collect();
     assert_eq!(read_def.len(), 1, "exactly one read tool definition");
 }
+
+#[test]
+fn dispatch_recovery_requires_explicit_protocol_evidence() {
+    assert!(!crate::is_protocol_recovery_eligible(
+        "invalid response: unexpected status 400: invalid request"
+    ));
+    assert!(!crate::is_protocol_recovery_eligible(
+        "invalid isolated decision request"
+    ));
+    assert!(crate::is_protocol_recovery_eligible(
+        "protocol tool frame was malformed"
+    ));
+    assert!(crate::is_protocol_recovery_eligible(
+        "invalid tool call arguments"
+    ));
+}
