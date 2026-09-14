@@ -26,6 +26,33 @@ pub enum CapabilityProbe {
     Unknown,
 }
 
+/// Safe disposition after a provider protocol failure.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProtocolFailureDisposition {
+    /// Retry the same request using the compatibility parser.
+    Fallback,
+    /// Ask for a corrected provider response without executing tools.
+    Correct,
+    /// Stop because execution state is not trustworthy.
+    Stop,
+    /// Require a human decision.
+    HumanReview,
+}
+
+/// Classifies protocol failures without inspecting secrets or tool arguments.
+pub fn classify_protocol_failure(message: &str) -> ProtocolFailureDisposition {
+    let value = message.to_ascii_lowercase();
+    if value.contains("timeout") || value.contains("cancel") {
+        ProtocolFailureDisposition::Stop
+    } else if value.contains("malformed") || value.contains("invalid") {
+        ProtocolFailureDisposition::Correct
+    } else if value.contains("unsupported") || value.contains("protocol") {
+        ProtocolFailureDisposition::Fallback
+    } else {
+        ProtocolFailureDisposition::HumanReview
+    }
+}
+
 impl CapabilityProbe {
     /// Resolve a protocol conservatively when probing is unavailable.
     pub fn select(self) -> ToolProtocol {
