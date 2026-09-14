@@ -64,6 +64,59 @@ pub(super) fn authority_diagnostic(
     )
 }
 
+/// Runs a deterministic cross-module precedence harness over prompt sections.
+/// The report is stable and names every lower-authority section rendered after
+/// a higher-authority section, which would weaken recency-based precedence.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(dead_code)]
+pub(super) struct HarnessReport {
+    pub(super) passed: bool,
+    pub(super) diagnostics: Vec<String>,
+}
+
+#[allow(dead_code)]
+pub(super) fn run_precedence_harness(
+    sections: &[PromptSection],
+    authoritative_floor: u8,
+) -> HarnessReport {
+    let mut diagnostics = Vec::new();
+    let mut previous: Option<PromptContributionMetadata> = None;
+    let mut runtime_restriction = false;
+    for section in sections {
+        let metadata = section.metadata();
+        if metadata.source == PromptContributionSource::Runtime {
+            runtime_restriction = ["deny", "forbid", "never"]
+                .iter()
+                .any(|marker| section.text.to_ascii_lowercase().contains(marker));
+        }
+        if metadata.source == PromptContributionSource::User && runtime_restriction {
+            diagnostics.push(
+                "precedence contract violation: User intent follows a restrictive Runtime rule"
+                    .to_string(),
+            );
+        }
+        if let Some(previous) = previous
+            && previous.authority >= authoritative_floor
+            && metadata.authority < previous.authority
+            && metadata.source != PromptContributionSource::User
+            && matches!(
+                previous.source,
+                PromptContributionSource::Runtime | PromptContributionSource::User
+            )
+        {
+            diagnostics.push(format!(
+                "precedence contract violation: {:?} authority {} follows higher authority {}",
+                metadata.source, metadata.authority, previous.authority
+            ));
+        }
+        previous = Some(metadata);
+    }
+    HarnessReport {
+        passed: diagnostics.is_empty(),
+        diagnostics,
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub(super) struct PromptSection {
     pub(super) text: String,
@@ -366,5 +419,70 @@ mod tests {
             resolve_authority(todo, runtime),
             AuthorityDecision::LowerWins
         );
+    }
+
+    #[test]
+    fn behavior_harness_cross_module_report_is_stable() {
+        let sections = vec![
+            PromptSection {
+                text: "# Runtime Context\nDeny".into(),
+                kind: PromptSectionKind::Dynamic,
+            },
+            PromptSection {
+                text: "# User Preferences\nrequest".into(),
+                kind: PromptSectionKind::Dynamic,
+            },
+            PromptSection {
+                text: "# Memory (advisory)\nstale".into(),
+                kind: PromptSectionKind::Dynamic,
+            },
+        ];
+        let report = run_precedence_harness(&sections, 80);
+        assert!(!report.passed);
+        assert!(!report.diagnostics.is_empty());
+    }
+
+    #[test]
+    fn behavior_harness_detects_advisory_after_user_but_not_capability_context() {
+        let sections = vec![
+            PromptSection {
+                text: "# Skills\ncapability".into(),
+                kind: PromptSectionKind::Cacheable,
+            },
+            PromptSection {
+                text: "# Context\nscoped rule".into(),
+                kind: PromptSectionKind::Dynamic,
+            },
+            PromptSection {
+                text: "# User Preferences\ncurrent intent".into(),
+                kind: PromptSectionKind::Dynamic,
+            },
+            PromptSection {
+                text: "# Session Todos (advisory)\nstale".into(),
+                kind: PromptSectionKind::Dynamic,
+            },
+        ];
+        let report = run_precedence_harness(&sections, 80);
+        assert!(!report.passed);
+        assert_eq!(report.diagnostics.len(), 1);
+        assert!(report.diagnostics[0].contains("Session"));
+    }
+
+    #[test]
+    fn behavior_harness_passes_for_authoritative_surfaces() {
+        let sections = vec![
+            PromptSection {
+                text: "# Runtime Context\nDeny network access".into(),
+                kind: PromptSectionKind::Dynamic,
+            },
+            PromptSection {
+                text: "# User Preferences\nrequest".into(),
+                kind: PromptSectionKind::Dynamic,
+            },
+        ];
+        let report = run_precedence_harness(&sections, 80);
+        assert!(!report.passed);
+        assert_eq!(report.diagnostics.len(), 1);
+        assert!(report.diagnostics[0].contains("restrictive Runtime"));
     }
 }

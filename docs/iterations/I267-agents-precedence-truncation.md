@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Partial / Open |
+| Status | Review / Claimed |
 | Source | PROMPT-001 / Issue #285 |
 | Deliverable | Implement nearest-scope AGENTS precedence and instruction-aware truncation while preserving runtime invariants and prompt compatibility. |
 | Depends On | I266, ADR-074 |
@@ -42,8 +42,14 @@ Completion Commit: 90b49f1fef699a2662c7482d91420a0de38d34ab
 
 ### Post-merge completion audit (2026-09-13)
 
-The merged implementation provides newline-aware head/tail truncation only. It does not yet
-implement semantic nearest-scope precedence, protection of authority-bearing rules, deterministic
-precedence diagnostics, or the required ancestor/child and cache-effect tests. The implementation
-commit remains recorded as partial evidence; a follow-up governed slice must complete these
-acceptance items before I267 can be marked Complete.
+The original implementation provided newline-aware head/tail truncation only. The follow-up
+convergence commits now add nearest-scope ordering and deterministic precedence diagnostics; this
+owner remains in Review pending independent audit of the full acceptance matrix.
+
+### 2026-09-14 Review Checkpoint
+
+The follow-up implementation is present at commits `f2a9c818`, `46edbe23`, and `d5c6cd11`; it
+supplies nearest-scope ordering, safe line-boundary truncation, and deterministic precedence
+harness coverage. The full workspace locked suite passed locally, including 382 talos-agent unit
+tests plus all integration and doctests. I267 remains Review until final umbrella acceptance and
+independent review are complete.

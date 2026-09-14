@@ -1,6 +1,6 @@
 # Iteration I272: Memory And Todo Advisory Authority
 
-> Document status: Partial / Open
+> Document status: Review / Claimed
 
 ## Collaboration Claim
 
@@ -32,7 +32,7 @@
 
 ## Completion Evidence
 
-- Completion Commit: pending (steering interruption behavior remains)
+- Completion Commit: `face3b2a` (prompt precedence report integration) and existing session boundary implementation evidence.
 
 ## Execution Checkpoint
 
@@ -46,7 +46,7 @@
 - This evidence confirms runtime ordering compatibility, but does not yet provide the
   provider-independent prompt behavior harness required by I270; I272 remains Partial
   until a focused runtime-rendering/resumability evidence checkpoint is recorded.
-- Focused prompt and session regression suites were re-run on `main`; advisory Memory/Todo
+- Focused prompt and session regression suites were re-run on `dev/prompt-285-convergence`; advisory Memory/Todo
   rendering remains dynamic and steering submissions preserve resumability without a second
   outer turn. No implementation change is claimed by this checkpoint.
 - Exact focused evidence: `cargo test -p talos-agent session::tests::test_concurrent_submit_and_interrupt --locked`
@@ -55,3 +55,12 @@
 - Session regression suite rerun: `cargo test -p talos-agent session::tests --lib --locked` passed
   (35 tests), including durable cancellation, failed continuation, persistence recovery, and
   steering interruption cases.
+
+## 2026-09-14 Review Checkpoint
+
+- `SystemPromptBuilder::precedence_report()` now runs the deterministic provider-independent
+  harness over the actual rendered section set; Memory and Session Todos are reported below the
+  authoritative floor without relying on provider or string snapshots.
+- Focused prompt and session evidence passed locally: 1 rendered advisory test and 35 session
+  boundary tests. This checkpoint records Review readiness; umbrella PROMPT-001 acceptance and
+  independent review remain outstanding.
