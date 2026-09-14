@@ -28,6 +28,9 @@ That snapshot is historical evidence and not current activation authority.
 
 ## Current Operating Set
 
+| ID | Codename | State | Activation / Completion Gate |
+|---|---|---|---|
+| I273 | Bounded Model Decisions and Automatic Protocol Selection | Active / Claimed (proposed) | #558 claim repair is ineffective until merge; #557 remains unaccepted; complete ADR-075 implementation and cycle ledger before closure. |
 | I263 | Interrupted Transcript Projection | Complete / Closed | SESSION-008-C / Issue #45; Completion Commit `0f021a6f`; PR #546 merged `239a01cc`. |
 | I264 | Prompt Authority Architecture Baseline | Planned / Unclaimed | PROMPT-001 / Issue #285; inventory and decision boundary only, no prompt implementation. |
 | I269 | Evolution Learned-Pattern Authority | Complete / Closed | PROMPT-001 / Issue #285; advisory boundary and provenance landed in `90970607`; 64 focused tests passed. |
