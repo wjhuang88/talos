@@ -1,6 +1,6 @@
 # Iteration I273: Bounded Model Decisions and Automatic Protocol Selection
 
-> Document status: Planned / Unclaimed
+> Document status: Active / Claimed (proposed by #558; effective only after merge)
 > Parent: PROMPT-001 / Issue #285
 
 ## Objective
@@ -40,18 +40,18 @@ existing implementation commit; a status-only commit is not evidence.
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex |
+| Work Slice | Endpoint/model capability evidence and automatic Native/validated compatibility selection; typed isolated bounded model decisions; model-assisted protocol recovery with tool-execution replay protection; migration of the existing auto-permission consumer; tests and user/API documentation under ADR-075. |
+| Claimed At | 2026-09-14 |
 | Source Issue | #285 |
-| Governance Claim PR | #554 |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #558 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Maintainer requested full development-cycle convergence on 2026-09-14; #558 repairs the ineffective #554 record. Proposed authorization becomes effective only on target-branch merge; independent Agent-role permission/security/API review remains mandatory. |
 | Implementation PR | #555 (merged initial primitive); #557 (open, not accepted) |
-| Last Updated | 2026-09-13 |
-| Handoff / Release Condition | Maintainer acceptance and claim merge before implementation. |
+| Last Updated | 2026-09-14 |
+| Handoff / Release Condition | #558 must merge before resumed implementation; resume from its merge or later main. No Dashboard, release, Deny bypass or I270 harness expansion. Final stable code requires local convergence, exact-head CI, independent permission/security/API review and merge-time CAS. |
 
 ## 2026-09-14 Development-Cycle Convergence Checkpoint
 

@@ -1,5 +1,6 @@
 schema_version: "1"
 managed_by: "agent-project-governance"
+prompt_cycle_execution_note: "I273 Active/Claimed is proposed by governance PR #558 and remains ineffective until merge. #554 actually merged Unclaimed; #555 contains initial code and #557 is unaccepted. I273 owns the complete cycle closure ledger; I264/I267/I270/I272 residuals remain in the #285 audit. No release or unrelated implementation is authorized."
 profile: "high-risk"
 status: "conformant"
 initialized_at: "2026-05-29"
