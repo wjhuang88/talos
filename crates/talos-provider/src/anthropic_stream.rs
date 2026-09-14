@@ -16,6 +16,22 @@ struct ToolUseBlock {
     id: String,
     name: String,
     input_json: String,
+    initial_input: Value,
+}
+
+impl ToolUseBlock {
+    fn arguments(&self) -> Result<Value, ()> {
+        let input = if self.input_json.is_empty() {
+            self.initial_input.clone()
+        } else {
+            serde_json::from_str(&self.input_json).map_err(|_| ())?
+        };
+        if input.is_object() {
+            Ok(input)
+        } else {
+            Err(())
+        }
+    }
 }
 
 struct ThinkingBlockState {
@@ -140,6 +156,10 @@ pub(crate) async fn parse_sse_stream(
                                     id,
                                     name: name.clone(),
                                     input_json: String::new(),
+                                    initial_input: block
+                                        .get("input")
+                                        .cloned()
+                                        .unwrap_or(Value::Null),
                                 },
                             );
                             let _ = tx.send(AgentEvent::ToolCallStarted { name }).await;
@@ -204,8 +224,17 @@ pub(crate) async fn parse_sse_stream(
                 Some("content_block_stop") => {
                     let index = data.get("index").and_then(|i| i.as_u64()).unwrap_or(0) as u32;
                     if let Some(block) = tool_use_blocks.remove(&index) {
-                        let input_json: serde_json::Value = serde_json::from_str(&block.input_json)
-                            .unwrap_or(serde_json::json!({}));
+                        let input_json = match block.arguments() {
+                            Ok(input) => input,
+                            Err(()) => {
+                                let _ = tx
+                                    .send(AgentEvent::Error {
+                                        message: "invalid tool arguments JSON".into(),
+                                    })
+                                    .await;
+                                return;
+                            }
+                        };
                         let _ = tx
                             .send(AgentEvent::ToolCall {
                                 call: ToolCall {
@@ -250,7 +279,7 @@ pub(crate) async fn parse_sse_stream(
                             if block.name.is_empty() {
                                 continue;
                             }
-                            let input = match serde_json::from_str(&block.input_json) {
+                            let input = match block.arguments() {
                                 Ok(input) => input,
                                 Err(_) => {
                                     let _ = tx
@@ -1110,19 +1139,71 @@ mod i168_terminal_outcome_tests {
 
     #[tokio::test]
     async fn malformed_native_tool_arguments_stop_before_tool_event() {
-        let body = format!(
-            "{}{}{}",
-            "event: content_block_start\ndata: {\"index\":0,\"content_block\":{\"type\":\"tool_use\",\"id\":\"call_bad\",\"name\":\"bash\",\"input\":{}}}\n\n",
-            "event: content_block_delta\ndata: {\"index\":0,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"not json{\"}}}\n\n",
-            "event: message_delta\ndata: {\"delta\":{\"stop_reason\":\"tool_use\"}}\n\n"
+        for block_stop in [false, true] {
+            for arguments in ["not json{", "[]", "null"] {
+                let events = parse_body(tool_body(Some(arguments), block_stop)).await;
+                assert_eq!(terminal_error(&events), "invalid tool arguments JSON");
+                assert!(!events.iter().any(|event| matches!(
+                    event,
+                    AgentEvent::ToolCall { .. } | AgentEvent::TurnEnd { .. }
+                )));
+            }
+        }
+    }
+
+    fn tool_body(arguments: Option<&str>, block_stop: bool) -> String {
+        use serde_json::json;
+        let event = |kind: &str, data: Value| format!("event: {kind}\ndata: {data}\n\n");
+        let mut body = event(
+            "content_block_start",
+            json!({"index":0,"content_block":{
+                "type":"tool_use", "id":"call_test", "name":"fixture", "input":{}
+            }}),
         );
-        let events = parse_body(body).await;
-        assert!(events.iter().any(|event| matches!(event, AgentEvent::Error { message } if message == "invalid tool arguments JSON")));
-        assert!(
-            !events
-                .iter()
-                .any(|event| matches!(event, AgentEvent::ToolCall { .. }))
-        );
+        if let Some(arguments) = arguments {
+            body.push_str(&event(
+                "content_block_delta",
+                json!({"index":0,"delta":{
+                    "type":"input_json_delta", "partial_json":arguments
+                }}),
+            ));
+        }
+        if block_stop {
+            body.push_str(&event("content_block_stop", json!({"index":0})));
+        }
+        body.push_str(&terminal_event("tool_use"));
+        body
+    }
+
+    #[tokio::test]
+    async fn native_tool_arguments_preserve_valid_objects_and_empty_input() {
+        for block_stop in [false, true] {
+            for arguments in [None, Some("{}"), Some(r#"{"path":"fixture"}"#)] {
+                let events = parse_body(tool_body(arguments, block_stop)).await;
+                let calls: Vec<_> = events
+                    .iter()
+                    .filter_map(|event| match event {
+                        AgentEvent::ToolCall { call, .. } => Some(call),
+                        _ => None,
+                    })
+                    .collect();
+                assert_eq!(calls.len(), 1);
+                assert_eq!(
+                    calls[0].input,
+                    serde_json::from_str::<Value>(arguments.unwrap_or("{}")).expect("fixture JSON")
+                );
+                assert!(
+                    !events
+                        .iter()
+                        .any(|event| matches!(event, AgentEvent::Error { .. }))
+                );
+                assert!(
+                    events
+                        .iter()
+                        .any(|event| matches!(event, AgentEvent::TurnEnd { .. }))
+                );
+            }
+        }
     }
 
     fn text_event(text: &str) -> String {
