@@ -46,10 +46,11 @@ pub async fn invoke_text_bounded(
     cancellation: CancellationToken,
 ) -> BoundedDecision {
     let mut output = String::new();
-    let result = tokio::time::timeout(deadline, async {
-        tokio::select! {
-            _ = cancellation.cancelled() => return Err("bounded model invocation cancelled".to_owned()),
-            result = async {
+    let result = tokio::select! {
+        _ = cancellation.cancelled() => {
+            return BoundedDecision::Failure("bounded model invocation cancelled".to_owned());
+        }
+        result = tokio::time::timeout(deadline, async {
         let mut events = provider.stream(messages).await.map_err(|e| e.to_string())?;
         while let Some(event) = events.recv().await {
             match event {
@@ -68,9 +69,8 @@ pub async fn invoke_text_bounded(
             }
         }
         Ok(())
-            } => result,
-        }
-    }).await;
+        }) => result,
+    };
     if result.is_err() {
         return BoundedDecision::Failure("bounded model deadline exceeded".to_owned());
     }
@@ -137,5 +137,21 @@ mod tests {
         let result = invoke_text(&model, &[], Duration::from_secs(1), 128).await;
         assert_eq!(result, Err("bounded model deadline exceeded".into()));
         assert_eq!(started.elapsed(), Duration::from_secs(1));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn cancellation_is_distinguished_from_deadline() {
+        let model = DelayedModel {
+            dispatch: Duration::from_secs(60),
+            response: Duration::ZERO,
+        };
+        let cancellation = CancellationToken::new();
+        cancellation.cancel();
+        let result =
+            invoke_text_bounded(&model, &[], Duration::from_secs(1), 128, cancellation).await;
+        assert_eq!(
+            result,
+            BoundedDecision::Failure("bounded model invocation cancelled".into())
+        );
     }
 }
