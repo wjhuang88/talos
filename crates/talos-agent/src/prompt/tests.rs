@@ -14,6 +14,17 @@ fn test_build_with_default_identity() {
 }
 
 #[test]
+fn test_precedence_report_covers_rendered_advisory_sections() {
+    let builder = SystemPromptBuilder::new()
+        .with_memory_section(Some("stale memory".into()))
+        .with_todo_section(Some("old todo".into()));
+    let report = builder.precedence_report();
+    assert!(!report.passed);
+    assert!(report.diagnostics.iter().any(|d| d.contains("Memory")));
+    assert!(report.diagnostics.iter().any(|d| d.contains("Session")));
+}
+
+#[test]
 fn test_build_with_all_components() {
     let builder = SystemPromptBuilder::new()
         .with_tools(vec![ToolDescription {
