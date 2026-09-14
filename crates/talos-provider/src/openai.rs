@@ -21,6 +21,7 @@ use talos_core::message::{AgentEvent, Message};
 use talos_core::provider::{
     LanguageModel, ProviderError, ProviderProgress, ProviderResult, ToolDefinition,
 };
+use talos_core::tool::CapabilityProbe;
 use tokio::sync::mpsc;
 
 use crate::openai_request::{build_request_body, redact_secret};
@@ -32,6 +33,7 @@ pub(crate) const CHAT_COMPLETIONS_PATH: &str = "/chat/completions";
 ///
 /// Streams text deltas and tool calls via SSE from the OpenAI Chat Completions API.
 /// Supports custom base URLs for compatible APIs (e.g., Azure OpenAI, local LLMs).
+#[derive(Clone)]
 pub struct OpenAIProvider {
     api_key: String,
     model: String,
@@ -301,6 +303,89 @@ fn status_to_error(status: reqwest::StatusCode, body: String) -> ProviderError {
 
 #[async_trait::async_trait]
 impl LanguageModel for OpenAIProvider {
+    async fn stream_decision(
+        &self,
+        messages: &[Message],
+        limits: talos_core::provider::DecisionRequestLimits,
+    ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
+        crate::validate_decision_messages(messages, limits)?;
+        let mut isolated = self.clone();
+        isolated.timeout_config.max_attempts =
+            limits.max_retries.min(self.timeout_config.max_attempts);
+        let mut body = build_request_body(
+            &self.model,
+            messages,
+            &[],
+            None,
+            Some(limits.max_output_tokens),
+        );
+        body["max_completion_tokens"] = json!(limits.max_output_tokens);
+        let response = isolated.send_request(&body, None).await?;
+        let (tx, rx) = mpsc::channel(32);
+        tokio::spawn(crate::openai_sse::parse_sse_stream_with_mode(
+            response,
+            tx,
+            Duration::from_secs(self.timeout_config.first_packet_timeout_secs),
+            Duration::from_secs(self.timeout_config.stream_idle_timeout_secs),
+            talos_core::tool::ToolProtocol::Native,
+        ));
+        Ok(rx)
+    }
+
+    fn protocol_capability_scope(&self) -> Option<String> {
+        crate::protocol_scope(
+            "openai",
+            &self.base_url,
+            &self.model,
+            self.reasoning.as_ref(),
+            self.output_limit,
+        )
+    }
+
+    fn protocol_capabilities(&self) -> CapabilityProbe {
+        // Neither the adapter nor an official URL proves this model supports tools.
+        // Keep evidence unknown until a model-specific observation is available.
+        CapabilityProbe::Unknown
+    }
+
+    async fn stream_with_protocol(
+        &self,
+        messages: &[Message],
+        tools: &[ToolDefinition],
+        protocol: talos_core::tool::ToolProtocol,
+        progress_tx: mpsc::UnboundedSender<ProviderProgress>,
+    ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
+        if protocol == talos_core::tool::ToolProtocol::Auto {
+            return Err(ProviderError::InvalidResponse(
+                "automatic protocol must be resolved before dispatch".into(),
+            ));
+        }
+        let native = matches!(protocol, talos_core::tool::ToolProtocol::Native);
+        let projected = if native {
+            messages.to_vec()
+        } else {
+            crate::compatibility_messages(messages)
+        };
+        let body = build_request_body(
+            &self.model,
+            &projected,
+            if native { tools } else { &[] },
+            self.reasoning.as_ref(),
+            self.output_limit,
+        );
+        let response = self.send_request(&body, Some(&progress_tx)).await?;
+        let (tx, rx) = mpsc::channel(32);
+        let timeout_config = self.timeout_config.clone();
+        tokio::spawn(crate::openai_sse::parse_sse_stream_with_mode(
+            response,
+            tx,
+            Duration::from_secs(timeout_config.first_packet_timeout_secs),
+            Duration::from_secs(timeout_config.stream_idle_timeout_secs),
+            protocol,
+        ));
+        Ok(rx)
+    }
+
     async fn stream(&self, messages: &[Message]) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
         let response = self.make_request(messages).await?;
         let (tx, rx) = mpsc::channel(32);

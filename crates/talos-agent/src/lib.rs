@@ -42,6 +42,7 @@ mod background_jobs;
 pub(crate) mod bounded_model;
 pub mod compaction;
 pub mod compression;
+mod execution_ledger;
 mod process_tool;
 pub mod token;
 mod tool_output;
@@ -73,6 +74,9 @@ use talos_core::message::{
     ToolCall,
 };
 use talos_core::provider::{LanguageModel, ProviderError};
+use talos_core::tool::{
+    ProtocolFailureDisposition, classify_protocol_failure, parse_recovery_decision,
+};
 use talos_core::tool::{ToolPresentationPolicy, ToolProvenance, ToolRegistry};
 use talos_plugin::{
     BudgetKind, HookContext, HookEvent, HookOutcome, HookRegistry, ToolObservation, TurnId,
@@ -279,6 +283,7 @@ type TodoSectionProviderCallback = dyn Fn() -> Option<String> + Send + Sync;
 /// ```
 pub struct Agent {
     provider: Arc<dyn LanguageModel>,
+    tool_protocol: talos_core::tool::ToolProtocol,
     tools: ToolRegistry,
     /// Agent-owned permission pipeline used by migrated composition roots.
     permission_pipeline: Option<Arc<permission_pipeline::PermissionPipeline>>,
@@ -330,8 +335,63 @@ pub struct Agent {
     /// Exact output reserve and conservative input-estimation policy.
     request_budget_spec: RequestBudgetSpec,
     background_jobs: Option<Arc<dyn talos_core::background_job::BackgroundJobHost>>,
+    /// Per-agent cache for endpoint/model protocol capability evidence.
+    protocol_capability_cache: talos_core::tool::ProtocolCapabilityCache,
+    /// Per-turn custody ledger preventing replay after ambiguous execution.
+    execution_ledger: execution_ledger::ExecutionLedger,
 }
 impl Agent {
+    async fn assess_protocol_recovery(
+        &self,
+        turn_id: TurnId,
+        protocol: talos_core::tool::ToolProtocol,
+        error: &str,
+        event_tx: &Option<mpsc::UnboundedSender<AgentEvent>>,
+    ) -> Option<ProtocolFailureDisposition> {
+        let prompt = vec![
+            Message::System {
+                content: "You are a protocol recovery assessor. Return exactly one token: correction, fallback, stop, or human-review. Choose correction only when the same protocol request can be safely corrected; choose fallback only when a compatibility text protocol is explicitly appropriate. Never infer permission to execute tools.".to_owned(),
+                cache_markers: Vec::new(),
+            },
+            Message::User {
+                content: format!(
+                    "Classify this sanitized provider protocol failure. protocol={protocol:?}; error={}",
+                    sanitize_protocol_error_text(error),
+                ),
+            },
+        ];
+        let context = crate::bounded_model::BoundedDecisionContext::new(
+            format!("protocol-recovery:{turn_id:?}"),
+            "protocol-recovery",
+        );
+        let decision = crate::bounded_model::invoke_text_with_context(
+            self.provider.as_ref(),
+            &prompt,
+            &context,
+            std::time::Duration::from_secs(5),
+            96,
+            tokio_util::sync::CancellationToken::new(),
+        )
+        .await;
+        let decision = match decision {
+            crate::bounded_model::BoundedDecision::Decision(raw) => parse_recovery_decision(&raw),
+            crate::bounded_model::BoundedDecision::Abstain(_)
+            | crate::bounded_model::BoundedDecision::Failure(_) => None,
+        };
+        let label = match decision {
+            Some(ProtocolFailureDisposition::Correct) => "correction",
+            Some(ProtocolFailureDisposition::Fallback) => "fallback",
+            Some(ProtocolFailureDisposition::Stop) => "stop",
+            Some(ProtocolFailureDisposition::HumanReview) | None => "human-review",
+        };
+        if let Some(tx) = event_tx {
+            let _ = tx.send(AgentEvent::Error {
+                message: format!("protocol recovery: model consulted (decision: {label})"),
+            });
+        }
+        decision
+    }
+
     pub(crate) fn set_background_job_host(
         &mut self,
         host: Arc<dyn talos_core::background_job::BackgroundJobHost>,
@@ -724,6 +784,10 @@ impl Agent {
         let mut doom_tracker: HashMap<(String, String), u32> = HashMap::new();
         let mut pending_continuation_parts: Vec<talos_core::message::ContentPart> = Vec::new();
         let mut initial_plan = Some(initial_plan);
+        // Recovery is bounded to one decision and one retry for a sealed request.
+        // It cannot become a recursive model/tool loop.
+        let mut protocol_recovery_attempts = 0u8;
+        let mut protocol_override = None;
 
         if let Some(snapshot_tx) = &snapshot_tx {
             let _ = snapshot_tx.send(self.persistence_projection(&messages[persist_start..]));
@@ -747,15 +811,22 @@ impl Agent {
                     Err(error) => break (Err(error), TurnStatus::Denied),
                 }
             };
+            let mut plan = plan;
+            if let Some(protocol) = protocol_override.take() {
+                plan.tool_protocol = protocol;
+            }
             tracing::trace!(
                 estimated_tokens = plan.estimated_tokens,
                 "dispatching sealed provider request plan"
             );
 
             let (progress_tx, mut progress_rx) = mpsc::unbounded_channel();
-            let provider_request = self.provider.stream_with_tools_and_progress(
+            // The sealed plan is dispatched exactly once through the provider's
+            // protocol adapter (whose native fallback is stream_with_tools_and_progress().
+            let provider_request = self.provider.stream_with_protocol(
                 &plan.messages,
                 &plan.tool_definitions,
+                plan.tool_protocol,
                 progress_tx,
             );
             tokio::pin!(provider_request);
@@ -786,9 +857,53 @@ impl Agent {
             let mut rx = match provider_result {
                 Ok(rx) => rx,
                 Err(error) => {
+                    let disposition = classify_protocol_failure(&error);
+                    // An InvalidResponse is not, by itself, evidence of a
+                    // protocol mismatch. HTTP 400s, provider validation
+                    // errors, and other ordinary response failures must not
+                    // trigger a model-directed fallback or retry.
+                    let recovery_eligible =
+                        is_protocol_recovery_eligible(&sanitize_protocol_error(&error));
+                    let mut recovery_retry = false;
+                    if recovery_eligible
+                        && matches!(disposition, ProtocolFailureDisposition::HumanReview)
+                        && protocol_recovery_attempts == 0
+                    {
+                        protocol_recovery_attempts = 1;
+                        let decision = self
+                            .assess_protocol_recovery(
+                                hook_ctx.turn_id,
+                                plan.tool_protocol,
+                                &sanitize_protocol_error(&error),
+                                &event_tx,
+                            )
+                            .await;
+                        recovery_retry = matches!(
+                            decision,
+                            Some(ProtocolFailureDisposition::Correct)
+                                | Some(ProtocolFailureDisposition::Fallback)
+                        );
+                        if matches!(decision, Some(ProtocolFailureDisposition::Fallback)) {
+                            protocol_override = Some(talos_core::tool::ToolProtocol::Compat);
+                        } else if matches!(decision, Some(ProtocolFailureDisposition::Correct)) {
+                            protocol_override = Some(plan.tool_protocol);
+                        }
+                    }
+                    if recovery_retry {
+                        continue 'turn_loop;
+                    }
+                    let disposition_label = match disposition {
+                        ProtocolFailureDisposition::Fallback => "fallback",
+                        ProtocolFailureDisposition::Correct => "correction",
+                        ProtocolFailureDisposition::Stop => "stop",
+                        ProtocolFailureDisposition::HumanReview => "human-review",
+                    };
                     if let Some(ref tx) = event_tx {
                         let _ = tx.send(AgentEvent::Error {
-                            message: error.to_string(),
+                            message: format!(
+                                "{} (protocol disposition: {})",
+                                error, disposition_label
+                            ),
                         });
                     }
                     let _ = self
@@ -807,6 +922,7 @@ impl Agent {
             let mut saw_turn_end = false;
             let mut turn_stop_reason: Option<StopReason> = None;
             let mut usage = talos_core::message::Usage::default();
+            let mut stream_protocol_error: Option<String> = None;
 
             while let Some(event) = rx.recv().await {
                 if let Some(ref tx) = event_tx
@@ -864,19 +980,12 @@ impl Agent {
                         }
                     }
                     AgentEvent::Error { message } => {
-                        let provider_error = ProviderError::InvalidResponse(message.clone());
-                        let _ = self
-                            .run_hook(
-                                &hook_ctx,
-                                HookEvent::OnProviderError {
-                                    error: &provider_error,
-                                },
-                            )
-                            .await;
-                        break 'turn_loop (
-                            Err(AgentError::UnexpectedEvent(message)),
-                            TurnStatus::UnexpectedEvent,
-                        );
+                        // Hold protocol failures until the sealed response attempt has
+                        // ended. This keeps a failed partial response out of the
+                        // transcript and gives the bounded recovery assessor one chance
+                        // to classify it, just like dispatch-time failures.
+                        stream_protocol_error = Some(message);
+                        break;
                     }
                     AgentEvent::ReasoningComplete { blocks } => {
                         turn_reasoning_blocks = Some(blocks);
@@ -897,6 +1006,50 @@ impl Agent {
                     },
                 )
                 .await;
+
+            if let Some(message) = stream_protocol_error {
+                let provider_error = ProviderError::InvalidResponse(message.clone());
+                let disposition = classify_protocol_failure(&provider_error);
+                let decision = if is_protocol_recovery_eligible(&message)
+                    && matches!(disposition, ProtocolFailureDisposition::HumanReview)
+                    && protocol_recovery_attempts == 0
+                {
+                    protocol_recovery_attempts = 1;
+                    self.assess_protocol_recovery(
+                        hook_ctx.turn_id,
+                        plan.tool_protocol,
+                        &message,
+                        &event_tx,
+                    )
+                    .await
+                } else {
+                    None
+                };
+                if matches!(
+                    decision,
+                    Some(ProtocolFailureDisposition::Correct)
+                        | Some(ProtocolFailureDisposition::Fallback)
+                ) {
+                    if matches!(decision, Some(ProtocolFailureDisposition::Fallback)) {
+                        protocol_override = Some(talos_core::tool::ToolProtocol::Compat);
+                    } else {
+                        protocol_override = Some(plan.tool_protocol);
+                    }
+                    continue 'turn_loop;
+                }
+                let _ = self
+                    .run_hook(
+                        &hook_ctx,
+                        HookEvent::OnProviderError {
+                            error: &provider_error,
+                        },
+                    )
+                    .await;
+                break 'turn_loop (
+                    Err(AgentError::UnexpectedEvent(message)),
+                    TurnStatus::UnexpectedEvent,
+                );
+            }
 
             if !saw_turn_end {
                 break 'turn_loop (
@@ -961,7 +1114,7 @@ impl Agent {
                         blocks,
                     });
                 messages.push(Message::Assistant {
-                    content: talos_core::message::strip_tool_syntax(&turn_text),
+                    content: turn_text.clone(),
                     tool_calls: vec![],
                     reasoning,
                 });
@@ -1362,6 +1515,34 @@ impl Agent {
             *presented_tool_names = names;
         }
     }
+}
+
+fn sanitize_protocol_error_text(text: &str) -> String {
+    let mut bounded = text.chars().take(240).collect::<String>();
+    for secret in ["token", "authorization", "api_key", "password"] {
+        if bounded.to_ascii_lowercase().contains(secret) {
+            bounded = "provider protocol response was invalid".to_owned();
+            break;
+        }
+    }
+    bounded
+}
+
+fn is_protocol_recovery_eligible(message: &str) -> bool {
+    let lower = message.to_ascii_lowercase();
+    [
+        "protocol",
+        "malformed tool",
+        "invalid tool call",
+        "tool arguments",
+        "tool frame",
+    ]
+    .iter()
+    .any(|marker| lower.contains(marker))
+}
+
+fn sanitize_protocol_error(error: &ProviderError) -> String {
+    sanitize_protocol_error_text(&error.to_string())
 }
 
 #[allow(warnings)]

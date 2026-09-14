@@ -16,6 +16,22 @@ struct ToolUseBlock {
     id: String,
     name: String,
     input_json: String,
+    initial_input: Value,
+}
+
+impl ToolUseBlock {
+    fn arguments(&self) -> Result<Value, ()> {
+        let input = if self.input_json.is_empty() {
+            self.initial_input.clone()
+        } else {
+            serde_json::from_str(&self.input_json).map_err(|_| ())?
+        };
+        if input.is_object() {
+            Ok(input)
+        } else {
+            Err(())
+        }
+    }
 }
 
 struct ThinkingBlockState {
@@ -28,6 +44,23 @@ pub(crate) async fn parse_sse_stream(
     tx: mpsc::Sender<AgentEvent>,
     first_packet_timeout: Duration,
     idle_timeout: Duration,
+) {
+    parse_sse_stream_with_mode(
+        response,
+        tx,
+        first_packet_timeout,
+        idle_timeout,
+        talos_core::tool::ToolProtocol::Compat,
+    )
+    .await;
+}
+
+pub(crate) async fn parse_sse_stream_with_mode(
+    response: reqwest::Response,
+    tx: mpsc::Sender<AgentEvent>,
+    first_packet_timeout: Duration,
+    idle_timeout: Duration,
+    protocol: talos_core::tool::ToolProtocol,
 ) {
     let _ = tx.send(AgentEvent::TurnStart).await;
 
@@ -48,10 +81,15 @@ pub(crate) async fn parse_sse_stream(
 
     while let Some(chunk_result) = {
         let next_chunk = stream.next();
-        let wait_result = if saw_first_packet {
-            tokio::time::timeout(idle_timeout, next_chunk).await
+        let timeout = if saw_first_packet {
+            idle_timeout
         } else {
-            tokio::time::timeout(first_packet_timeout, next_chunk).await
+            first_packet_timeout
+        };
+        let wait_result = tokio::select! {
+            biased;
+            _ = tx.closed() => return,
+            result = tokio::time::timeout(timeout, next_chunk) => result,
         };
 
         match wait_result {
@@ -140,6 +178,10 @@ pub(crate) async fn parse_sse_stream(
                                     id,
                                     name: name.clone(),
                                     input_json: String::new(),
+                                    initial_input: block
+                                        .get("input")
+                                        .cloned()
+                                        .unwrap_or(Value::Null),
                                 },
                             );
                             let _ = tx.send(AgentEvent::ToolCallStarted { name }).await;
@@ -204,8 +246,17 @@ pub(crate) async fn parse_sse_stream(
                 Some("content_block_stop") => {
                     let index = data.get("index").and_then(|i| i.as_u64()).unwrap_or(0) as u32;
                     if let Some(block) = tool_use_blocks.remove(&index) {
-                        let input_json: serde_json::Value = serde_json::from_str(&block.input_json)
-                            .unwrap_or(serde_json::json!({}));
+                        let input_json = match block.arguments() {
+                            Ok(input) => input,
+                            Err(()) => {
+                                let _ = tx
+                                    .send(AgentEvent::Error {
+                                        message: "invalid tool arguments JSON".into(),
+                                    })
+                                    .await;
+                                return;
+                            }
+                        };
                         let _ = tx
                             .send(AgentEvent::ToolCall {
                                 call: ToolCall {
@@ -250,8 +301,17 @@ pub(crate) async fn parse_sse_stream(
                             if block.name.is_empty() {
                                 continue;
                             }
-                            let input = serde_json::from_str(&block.input_json)
-                                .unwrap_or_else(|_| serde_json::json!({}));
+                            let input = match block.arguments() {
+                                Ok(input) => input,
+                                Err(_) => {
+                                    let _ = tx
+                                        .send(AgentEvent::Error {
+                                            message: "invalid tool arguments JSON".into(),
+                                        })
+                                        .await;
+                                    return;
+                                }
+                            };
                             let _ = tx
                                 .send(AgentEvent::ToolCall {
                                     call: ToolCall {
@@ -275,7 +335,21 @@ pub(crate) async fn parse_sse_stream(
                                 })
                                 .await;
                         }
-                        let tool_calls = parse_text_tool_calls(&text_accumulator);
+                        let tool_calls = if protocol != talos_core::tool::ToolProtocol::Native {
+                            match parse_protocol_text_calls(&text_accumulator, protocol) {
+                                Ok(calls) => calls,
+                                Err(message) => {
+                                    let _ = tx
+                                        .send(AgentEvent::Error {
+                                            message: message.into(),
+                                        })
+                                        .await;
+                                    return;
+                                }
+                            }
+                        } else {
+                            Vec::new()
+                        };
                         for call in tool_calls {
                             let _ = tx
                                 .send(AgentEvent::ToolCall {
@@ -330,61 +404,65 @@ pub(crate) async fn parse_sse_stream(
         .await;
 }
 
-pub(crate) fn parse_text_tool_calls(text: &str) -> Vec<ToolCall> {
+pub(crate) fn parse_protocol_text_calls(
+    text: &str,
+    protocol: talos_core::tool::ToolProtocol,
+) -> Result<Vec<ToolCall>, &'static str> {
+    use talos_core::tool::ToolProtocol;
+    if protocol == ToolProtocol::Native {
+        return Ok(Vec::new());
+    }
+    if protocol == ToolProtocol::Auto {
+        return Err("automatic protocol must be resolved before parsing");
+    }
+    let calls = parse_text_tool_calls(text)?;
+    if protocol == ToolProtocol::TalosStrict && !calls.is_empty() {
+        let content = text
+            .trim_start()
+            .strip_prefix("<tool_call>")
+            .ok_or("strict tool call must precede text and use the canonical XML tag")?;
+        let end = content
+            .find("</tool_call>")
+            .ok_or("unterminated strict tool block")?;
+        let object: Value = serde_json::from_str(content[..end].trim())
+            .map_err(|_| "strict tool payload must be JSON")?;
+        if calls.len() != 1 || !object.is_object() {
+            return Err("strict protocol requires exactly one JSON tool block");
+        }
+    }
+    Ok(calls)
+}
+
+pub(crate) fn parse_text_tool_calls(text: &str) -> Result<Vec<ToolCall>, &'static str> {
     let mut calls = Vec::new();
     let mut remaining = text;
-
-    while let Some(start) = remaining.find("```json-tool") {
-        let inner_start = start + "```json-tool".len();
-        let inner = remaining[inner_start..].trim_start();
-        let end = inner.find("```").unwrap_or(inner.len());
-        let content = inner[..end].trim();
-
-        if let Some(call) = parse_json_tool_call(content) {
-            calls.push(call);
-        }
-
-        remaining = &inner[end..];
-        if end + 3 < remaining.len() {
-            remaining = &remaining[3..];
-        } else {
-            break;
-        }
-    }
-
-    // Fallback: also check for <tool_call> / <toolcall> XML tags
-    while let Some(start) = remaining
-        .find("<tool_call>")
-        .or_else(|| remaining.find("<toolcall>"))
+    let frames = [
+        ("```json-tool", "```"),
+        ("<tool_call>", "</tool_call>"),
+        ("<toolcall>", "</toolcall>"),
+    ];
+    while let Some((start, open, close)) = frames
+        .iter()
+        .filter_map(|(open, close)| remaining.find(open).map(|start| (start, *open, *close)))
+        .min_by_key(|(start, _, _)| *start)
     {
-        let tag_len = if remaining[start..].starts_with("<tool_call>") {
-            "<tool_call>".len()
-        } else {
-            "<toolcall>".len()
-        };
-        let inner_start = start + tag_len;
-        let inner = &remaining[inner_start..];
-        let end = inner.find("</tool_call>").unwrap_or(inner.len());
-        let content = inner[..end].trim();
-
-        if let Some(call) = parse_json_tool_call(content) {
-            calls.push(call);
+        let inner = &remaining[start + open.len()..];
+        let end = inner
+            .find(close)
+            .ok_or("unterminated compatibility tool block")?;
+        let call = parse_json_tool_call(inner[..end].trim())
+            .ok_or("invalid compatibility tool payload")?;
+        if call.name.trim().is_empty() || !call.input.is_object() {
+            return Err("invalid compatibility tool name or arguments");
         }
-
-        remaining = &inner[end..];
-        let close_len = "</tool_call>".len();
-        if end + close_len < remaining.len() {
-            remaining = &remaining[close_len..];
-        } else {
-            break;
-        }
+        calls.push(call);
+        remaining = &inner[end + close.len()..];
     }
-
-    calls
+    Ok(calls)
 }
 
 pub(crate) fn parse_json_tool_call(content: &str) -> Option<ToolCall> {
-    let content = content.trim().trim_matches('`').trim();
+    let content = content.trim();
 
     // Try: entire content is JSON: {"name":"bash","args":{...}}
     if content.starts_with('{') {
@@ -404,31 +482,11 @@ pub(crate) fn parse_json_tool_call(content: &str) -> Option<ToolCall> {
         });
     }
 
-    // Try: name is first word, JSON follows somewhere in content
+    // Legacy compatibility form: a tool name followed by one complete JSON object.
     let first_space = content.find(|c: char| c.is_whitespace())?;
     let name = content[..first_space].trim().to_string();
 
     let rest = content[first_space..].trim();
-    if let Some(brace_start) = rest.find('{') {
-        let json_str = &rest[brace_start..];
-        if let Some(brace_end) = json_str.rfind('}') {
-            let json_str = &json_str[..=brace_end];
-            if let Ok(args) = serde_json::from_str::<serde_json::Value>(json_str) {
-                let id = serde_json::from_str::<serde_json::Value>(json_str)
-                    .ok()
-                    .and_then(|obj| obj.get("id").and_then(|v| v.as_str()).map(String::from))
-                    .filter(|s| !s.is_empty())
-                    .unwrap_or_else(|| Uuid::new_v4().to_string());
-                return Some(ToolCall {
-                    id,
-                    name,
-                    input: args,
-                });
-            }
-        }
-    }
-
-    // Try: name is first word, rest is key=value pairs
     if let Ok(args) = serde_json::from_str::<serde_json::Value>(rest) {
         return Some(ToolCall {
             id: Uuid::new_v4().to_string(),
@@ -438,6 +496,38 @@ pub(crate) fn parse_json_tool_call(content: &str) -> Option<ToolCall> {
     }
 
     None
+}
+
+#[cfg(test)]
+mod compatibility_batch_tests {
+    use super::parse_text_tool_calls;
+
+    #[test]
+    fn complete_mixed_frames_preserve_order_and_reject_partial_batches() {
+        let first = "<toolcall>{\"name\":\"first\",\"args\":{}}</toolcall>";
+        let second = "```json-tool\n{\"name\":\"second\",\"args\":{}}\n```";
+        let text = format!("{first}\n{second}");
+        let calls = parse_text_tool_calls(&text).expect("valid frames");
+        assert_eq!(
+            calls
+                .iter()
+                .map(|call| call.name.as_str())
+                .collect::<Vec<_>>(),
+            ["first", "second"]
+        );
+        for bad in [
+            "<tool_call>probe {} ignored</tool_call>",
+            "<toolcall>probe {}</tool_call>",
+            "```json-tool\n{\"name\":\"\",\"args\":{}}\n```",
+        ] {
+            assert!(parse_text_tool_calls(&format!("{text}{bad}")).is_err());
+        }
+        assert!(
+            parse_text_tool_calls("ordinary prose")
+                .expect("no frames")
+                .is_empty()
+        );
+    }
 }
 
 fn extract_event_type(event_text: &str) -> Option<String> {
@@ -1097,6 +1187,75 @@ mod i168_terminal_outcome_tests {
                 _ => None,
             })
             .expect("terminal error")
+    }
+
+    #[tokio::test]
+    async fn malformed_native_tool_arguments_stop_before_tool_event() {
+        for block_stop in [false, true] {
+            for arguments in ["not json{", "[]", "null"] {
+                let events = parse_body(tool_body(Some(arguments), block_stop)).await;
+                assert_eq!(terminal_error(&events), "invalid tool arguments JSON");
+                assert!(!events.iter().any(|event| matches!(
+                    event,
+                    AgentEvent::ToolCall { .. } | AgentEvent::TurnEnd { .. }
+                )));
+            }
+        }
+    }
+
+    fn tool_body(arguments: Option<&str>, block_stop: bool) -> String {
+        use serde_json::json;
+        let event = |kind: &str, data: Value| format!("event: {kind}\ndata: {data}\n\n");
+        let mut body = event(
+            "content_block_start",
+            json!({"index":0,"content_block":{
+                "type":"tool_use", "id":"call_test", "name":"fixture", "input":{}
+            }}),
+        );
+        if let Some(arguments) = arguments {
+            body.push_str(&event(
+                "content_block_delta",
+                json!({"index":0,"delta":{
+                    "type":"input_json_delta", "partial_json":arguments
+                }}),
+            ));
+        }
+        if block_stop {
+            body.push_str(&event("content_block_stop", json!({"index":0})));
+        }
+        body.push_str(&terminal_event("tool_use"));
+        body
+    }
+
+    #[tokio::test]
+    async fn native_tool_arguments_preserve_valid_objects_and_empty_input() {
+        for block_stop in [false, true] {
+            for arguments in [None, Some("{}"), Some(r#"{"path":"fixture"}"#)] {
+                let events = parse_body(tool_body(arguments, block_stop)).await;
+                let calls: Vec<_> = events
+                    .iter()
+                    .filter_map(|event| match event {
+                        AgentEvent::ToolCall { call, .. } => Some(call),
+                        _ => None,
+                    })
+                    .collect();
+                assert_eq!(calls.len(), 1);
+                assert_eq!(
+                    calls[0].input,
+                    serde_json::from_str::<Value>(arguments.unwrap_or("{}")).expect("fixture JSON")
+                );
+                assert!(
+                    !events
+                        .iter()
+                        .any(|event| matches!(event, AgentEvent::Error { .. }))
+                );
+                assert!(
+                    events
+                        .iter()
+                        .any(|event| matches!(event, AgentEvent::TurnEnd { .. }))
+                );
+            }
+        }
     }
 
     fn text_event(text: &str) -> String {

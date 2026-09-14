@@ -72,6 +72,38 @@ struct ErroringModel {
     message: String,
 }
 
+#[tokio::test]
+async fn native_text_tool_examples_are_preserved_without_execution() {
+    for text in [
+        "```json-tool\n{\"name\":\"bash\",\"args\":{}}\n```",
+        "```json-tool\n{\"name\":\"bash\"",
+    ] {
+        let model = MockModel::new(vec![vec![
+            AgentEvent::TextDelta { delta: text.into() },
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::EndTurn,
+                usage: Usage::default(),
+            },
+        ]]);
+        let agent = Agent::new(Arc::new(model), ToolRegistry::new());
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let (answer, messages) = agent
+            .run_streaming("Print this example".into(), vec![], tx)
+            .await
+            .expect("ordinary text");
+        assert_eq!(answer, text);
+        assert!(
+            matches!(messages.last(), Some(Message::Assistant { content, tool_calls, .. }) if content == text && tool_calls.is_empty())
+        );
+        while let Ok(event) = rx.try_recv() {
+            assert!(!matches!(
+                event,
+                AgentEvent::ToolCall { .. } | AgentEvent::ToolResult { .. }
+            ));
+        }
+    }
+}
+
 impl ErroringModel {
     fn new(message: impl Into<String>) -> Self {
         Self {
@@ -5039,4 +5071,20 @@ async fn capability_gate_hides_read_image_when_unsupported() {
         .filter(|td| td.name == "read")
         .collect();
     assert_eq!(read_def.len(), 1, "exactly one read tool definition");
+}
+
+#[test]
+fn dispatch_recovery_requires_explicit_protocol_evidence() {
+    assert!(!crate::is_protocol_recovery_eligible(
+        "invalid response: unexpected status 400: invalid request"
+    ));
+    assert!(!crate::is_protocol_recovery_eligible(
+        "invalid isolated decision request"
+    ));
+    assert!(crate::is_protocol_recovery_eligible(
+        "protocol tool frame was malformed"
+    ));
+    assert!(crate::is_protocol_recovery_eligible(
+        "invalid tool call arguments"
+    ));
 }

@@ -4,12 +4,12 @@ use std::time::Duration;
 
 use futures_util::StreamExt;
 use serde::Deserialize;
-use serde_json::{Value, json};
+use serde_json::Value;
 use talos_core::message::{AgentEvent, ReasoningBlock, StopReason, ToolCall, Usage};
 use talos_core::tool::ToolProvenance;
 use tokio::sync::mpsc;
 
-use crate::{parse_text_tool_calls, stream_utf8::Utf8StreamDecoder};
+use crate::{anthropic_stream::parse_protocol_text_calls, stream_utf8::Utf8StreamDecoder};
 
 /// OpenAI stream chunk for SSE response parsing.
 #[derive(Debug, Clone, Deserialize)]
@@ -71,6 +71,23 @@ pub(crate) async fn parse_sse_stream(
     first_packet_timeout: Duration,
     idle_timeout: Duration,
 ) {
+    parse_sse_stream_with_mode(
+        response,
+        tx,
+        first_packet_timeout,
+        idle_timeout,
+        talos_core::tool::ToolProtocol::Compat,
+    )
+    .await;
+}
+
+pub(crate) async fn parse_sse_stream_with_mode(
+    response: reqwest::Response,
+    tx: mpsc::Sender<AgentEvent>,
+    first_packet_timeout: Duration,
+    idle_timeout: Duration,
+    protocol: talos_core::tool::ToolProtocol,
+) {
     let _ = tx.send(AgentEvent::TurnStart).await;
 
     let mut stream = response.bytes_stream();
@@ -88,10 +105,15 @@ pub(crate) async fn parse_sse_stream(
     let mut saw_first_packet = false;
     while let Some(chunk_result) = {
         let next_chunk = stream.next();
-        let wait_result = if saw_first_packet {
-            tokio::time::timeout(idle_timeout, next_chunk).await
+        let timeout = if saw_first_packet {
+            idle_timeout
         } else {
-            tokio::time::timeout(first_packet_timeout, next_chunk).await
+            first_packet_timeout
+        };
+        let wait_result = tokio::select! {
+            biased;
+            _ = tx.closed() => return,
+            result = tokio::time::timeout(timeout, next_chunk) => result,
         };
 
         match wait_result {
@@ -151,7 +173,21 @@ pub(crate) async fn parse_sse_stream(
 
             // OpenAI sends `data: [DONE]` at the end
             if data.as_str().map(|s| s.trim()) == Some("[DONE]") {
-                let text_calls = parse_text_tool_calls(&text_accumulator);
+                let text_calls = if protocol != talos_core::tool::ToolProtocol::Native {
+                    match parse_protocol_text_calls(&text_accumulator, protocol) {
+                        Ok(calls) => calls,
+                        Err(message) => {
+                            let _ = tx
+                                .send(AgentEvent::Error {
+                                    message: message.into(),
+                                })
+                                .await;
+                            return;
+                        }
+                    }
+                } else {
+                    Vec::new()
+                };
                 let has_text_tool_calls = !text_calls.is_empty();
                 for call in text_calls {
                     let _ = tx
@@ -172,8 +208,17 @@ pub(crate) async fn parse_sse_stream(
                 for i in 0..tool_call_ids.len() {
                     if !tool_call_names[i].is_empty() {
                         let tool_call_id = finalized_tool_call_id(&tool_call_ids[i], i);
-                        let args: Value =
-                            serde_json::from_str(&tool_call_args[i]).unwrap_or_else(|_| json!({}));
+                        let args: Value = match serde_json::from_str(&tool_call_args[i]) {
+                            Ok(args) => args,
+                            Err(_) => {
+                                let _ = tx
+                                    .send(AgentEvent::Error {
+                                        message: "invalid tool arguments JSON".into(),
+                                    })
+                                    .await;
+                                return;
+                            }
+                        };
                         let _ = tx
                             .send(AgentEvent::ToolCall {
                                 call: ToolCall {
@@ -335,8 +380,17 @@ pub(crate) async fn parse_sse_stream(
                 for i in 0..tool_call_ids.len() {
                     if !tool_call_names[i].is_empty() {
                         let tool_call_id = finalized_tool_call_id(&tool_call_ids[i], i);
-                        let args: Value =
-                            serde_json::from_str(&tool_call_args[i]).unwrap_or_else(|_| json!({}));
+                        let args: Value = match serde_json::from_str(&tool_call_args[i]) {
+                            Ok(args) => args,
+                            Err(_) => {
+                                let _ = tx
+                                    .send(AgentEvent::Error {
+                                        message: "invalid tool arguments JSON".into(),
+                                    })
+                                    .await;
+                                return;
+                            }
+                        };
                         let _ = tx
                             .send(AgentEvent::ToolCall {
                                 call: ToolCall {
@@ -351,7 +405,21 @@ pub(crate) async fn parse_sse_stream(
                     }
                 }
 
-                let text_calls = parse_text_tool_calls(&text_accumulator);
+                let text_calls = if protocol != talos_core::tool::ToolProtocol::Native {
+                    match parse_protocol_text_calls(&text_accumulator, protocol) {
+                        Ok(calls) => calls,
+                        Err(message) => {
+                            let _ = tx
+                                .send(AgentEvent::Error {
+                                    message: message.into(),
+                                })
+                                .await;
+                            return;
+                        }
+                    }
+                } else {
+                    Vec::new()
+                };
                 for call in text_calls {
                     let _ = tx
                         .send(AgentEvent::ToolCall {
@@ -1406,7 +1474,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn parse_sse_stream_malformed_tool_arguments_becomes_empty_object() {
+    async fn parse_sse_stream_malformed_tool_arguments_stops_before_execution() {
         let mut server = mockito::Server::new_async().await;
         let stream_body = concat!(
             "data: {\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call_bad\",\"type\":\"function\",\"function\":{\"name\":\"bash\",\"arguments\":\"not valid json{\"}}]},\"finish_reason\":null}]}\n\n",
@@ -1445,15 +1513,14 @@ mod tests {
             }
         }
 
-        let call = tool_call.expect("malformed-args tool call should still be emitted");
-        assert_eq!(call.id, "call_bad");
-        assert_eq!(call.name, "bash");
-        assert_eq!(
-            call.input,
-            json!({}),
-            "malformed JSON arguments should degrade to empty object, not panic"
+        assert!(
+            tool_call.is_none(),
+            "malformed arguments must never reach execution"
         );
-        assert_eq!(stop_reason, Some(StopReason::ToolUse));
+        assert!(
+            stop_reason.is_none(),
+            "malformed arguments must not emit completion"
+        );
     }
 
     #[tokio::test]

@@ -1639,6 +1639,16 @@ mod tests {
 
     #[async_trait]
     impl LanguageModel for ToolCallingModel {
+        async fn stream_decision(
+            &self,
+            messages: &[Message],
+            limits: talos_core::provider::DecisionRequestLimits,
+        ) -> ProviderResult<Receiver<AgentEvent>> {
+            assert_eq!(limits.max_retries, 0);
+            assert!(limits.max_output_tokens > 0 && limits.max_output_tokens <= 4096);
+            self.stream(messages).await
+        }
+
         async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
             assert_eq!(messages.len(), 2);
             assert!(matches!(messages[0], Message::System { .. }));

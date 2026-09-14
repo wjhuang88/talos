@@ -33,6 +33,79 @@ use talos_core::message::{AgentEvent, Message};
 use talos_core::provider::{
     LanguageModel, ProviderError, ProviderProgress, ProviderResult, ToolDefinition,
 };
+
+fn validate_decision_messages(
+    messages: &[Message],
+    limits: talos_core::provider::DecisionRequestLimits,
+) -> ProviderResult<()> {
+    if limits.max_output_tokens == 0
+        || messages
+            .iter()
+            .any(|message| !matches!(message, Message::System { .. } | Message::User { .. }))
+    {
+        return Err(ProviderError::InvalidResponse(
+            "invalid isolated decision request".into(),
+        ));
+    }
+    Ok(())
+}
+
+/// Opaque cache identity; URLs carrying credentials or query data disable caching.
+fn protocol_scope(
+    adapter: &str,
+    endpoint: &str,
+    model: &str,
+    reasoning: Option<&ReasoningOptions>,
+    output_limit: Option<u32>,
+) -> Option<String> {
+    use base64::Engine;
+    use sha2::{Digest, Sha256};
+    let url = reqwest::Url::parse(endpoint).ok()?;
+    if !url.username().is_empty()
+        || url.password().is_some()
+        || url.query().is_some()
+        || url.fragment().is_some()
+    {
+        return None;
+    }
+    // JSON tuple encoding preserves field boundaries, including embedded delimiters.
+    let encoded = serde_json::to_vec(&(adapter, endpoint, model, reasoning, output_limit)).ok()?;
+    let digest = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(Sha256::digest(encoded));
+    Some(format!("protocol-v1:{digest}"))
+}
+
+/// Projects durable native tool blocks into bounded compatibility text while preserving IDs.
+/// This is used only for non-native protocol requests; native requests retain structured blocks.
+pub(crate) fn compatibility_messages(messages: &[Message]) -> Vec<Message> {
+    messages
+        .iter()
+        .map(|message| match message {
+            Message::Assistant {
+                content,
+                tool_calls,
+                reasoning,
+            } if !tool_calls.is_empty() => {
+                let calls = tool_calls
+                    .iter()
+                    .map(|call| format!("{} {}", call.name, call.input))
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                Message::Assistant {
+                    content: format!("{content}\n<tool_calls>\n{calls}\n</tool_calls>"),
+                    tool_calls: Vec::new(),
+                    reasoning: reasoning.clone(),
+                }
+            }
+            Message::Tool { result } => Message::User {
+                content: format!(
+                    "<tool_result id={} error={}>\n{}\n</tool_result>",
+                    result.tool_use_id, result.is_error, result.content
+                ),
+            },
+            other => other.clone(),
+        })
+        .collect()
+}
 use tokio::sync::mpsc;
 
 use crate::retry::{RetryDecision, classify_retry_with_backoff};
@@ -44,6 +117,7 @@ const ANTHROPIC_VERSION: &str = "2023-06-01";
 ///
 /// Streams text deltas via SSE from the Anthropic Messages API,
 /// handles errors gracefully, and supports exponential backoff retry.
+#[derive(Clone)]
 pub struct AnthropicProvider {
     api_key: String,
     model: String,
@@ -298,6 +372,92 @@ fn status_to_error(status: reqwest::StatusCode, body: String) -> ProviderError {
 
 #[async_trait::async_trait]
 impl LanguageModel for AnthropicProvider {
+    async fn stream_decision(
+        &self,
+        messages: &[Message],
+        limits: talos_core::provider::DecisionRequestLimits,
+    ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
+        validate_decision_messages(messages, limits)?;
+        let mut isolated = self.clone();
+        isolated.reasoning = None;
+        isolated.output_limit = Some(limits.max_output_tokens);
+        isolated.timeout_config.max_attempts =
+            limits.max_retries.min(self.timeout_config.max_attempts);
+        let (tx, _) = mpsc::unbounded_channel();
+        isolated
+            .stream_with_protocol(messages, &[], talos_core::tool::ToolProtocol::Native, tx)
+            .await
+    }
+
+    fn protocol_capability_scope(&self) -> Option<String> {
+        protocol_scope(
+            "anthropic",
+            &self.base_url,
+            &self.model,
+            self.reasoning.as_ref(),
+            self.output_limit,
+        )
+    }
+
+    fn protocol_capabilities(&self) -> talos_core::tool::CapabilityProbe {
+        // The endpoint alone is not model-specific capability evidence.
+        talos_core::tool::CapabilityProbe::Unknown
+    }
+
+    async fn stream_with_protocol(
+        &self,
+        messages: &[Message],
+        tools: &[ToolDefinition],
+        protocol: talos_core::tool::ToolProtocol,
+        progress_tx: mpsc::UnboundedSender<ProviderProgress>,
+    ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
+        if protocol == talos_core::tool::ToolProtocol::Auto {
+            return Err(ProviderError::InvalidResponse(
+                "automatic protocol must be resolved before dispatch".into(),
+            ));
+        }
+        if matches!(protocol, talos_core::tool::ToolProtocol::Native) {
+            let body = anthropic_request::build_request_body(
+                &self.model,
+                messages,
+                tools,
+                self.reasoning.as_ref(),
+                self.output_limit,
+            );
+            let response = self.send_request(&body, Some(&progress_tx)).await?;
+            let (tx, rx) = mpsc::channel(32);
+            let timeout_config = self.timeout_config.clone();
+            tokio::spawn(anthropic_stream::parse_sse_stream_with_mode(
+                response,
+                tx,
+                Duration::from_secs(timeout_config.first_packet_timeout_secs),
+                Duration::from_secs(timeout_config.stream_idle_timeout_secs),
+                protocol,
+            ));
+            Ok(rx)
+        } else {
+            let projected = compatibility_messages(messages);
+            let body = anthropic_request::build_request_body(
+                &self.model,
+                &projected,
+                &[],
+                self.reasoning.as_ref(),
+                self.output_limit,
+            );
+            let response = self.send_request(&body, Some(&progress_tx)).await?;
+            let (tx, rx) = mpsc::channel(32);
+            let timeout_config = self.timeout_config.clone();
+            tokio::spawn(anthropic_stream::parse_sse_stream_with_mode(
+                response,
+                tx,
+                Duration::from_secs(timeout_config.first_packet_timeout_secs),
+                Duration::from_secs(timeout_config.stream_idle_timeout_secs),
+                protocol,
+            ));
+            Ok(rx)
+        }
+    }
+
     async fn stream(&self, messages: &[Message]) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
         let response = self.make_request(messages).await?;
         let (tx, rx) = mpsc::channel(32);
@@ -376,5 +536,3 @@ impl LanguageModel for AnthropicProvider {
 
 pub use anthropic_request::anthropic_request_debug_snapshot;
 use anthropic_request::redact_secret;
-
-pub(crate) use anthropic_stream::parse_text_tool_calls;
