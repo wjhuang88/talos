@@ -1,6 +1,6 @@
 # Iteration I273: Bounded Model Decisions and Automatic Protocol Selection
 
-> Document status: Active / Claimed (proposed by #558; effective only after merge)
+> Document status: Review / Claimed (implementation #559 merged; closeout pending)
 > Parent: PROMPT-001 / Issue #285
 
 ## Objective
@@ -49,9 +49,19 @@ existing implementation commit; a status-only commit is not evidence.
 | Governance Claim PR | #558 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer requested full development-cycle convergence on 2026-09-14; #558 repairs the ineffective #554 record. Proposed authorization becomes effective only on target-branch merge; independent Agent-role permission/security/API review remains mandatory. |
-| Implementation PR | #555 (merged initial primitive); #557 (open, not accepted) |
+| Implementation PR | #555 (merged initial primitive); #559 (merged as `e4173caf`) |
 | Last Updated | 2026-09-14 |
-| Handoff / Release Condition | #558 must merge before resumed implementation; resume from its merge or later main. No Dashboard, release, Deny bypass or I270 harness expansion. Final stable code requires local convergence, exact-head CI, independent permission/security/API review and merge-time CAS. |
+| Handoff / Release Condition | Implementation #559 is merged. No Dashboard, release, Deny bypass or I270 harness expansion. Final closeout requires owner-first evidence synchronization and umbrella acceptance audit. |
+
+## 2026-09-14 Implementation Merge Checkpoint
+
+- Implementation PR #559 merged to `main` as `e4173caf` from exact head
+  `e4820e1e5b5e0922c2fb7ca8c119a5f4e008a809`.
+- Exact-head CI run `34838903222` passed all five jobs, including Windows Rust workspace.
+- Independent Agent-role permission/security/API review approved the same exact head; shared
+  account constraints mean this records Agent-role separation, not natural-person separation.
+- I273 remains `Review / Claimed` until closeout acceptance is audited; this checkpoint does not
+  claim PROMPT-001/#285 completion or close I264/I267/I270/I272 residuals.
 
 ## 2026-09-14 Development-Cycle Convergence Checkpoint
 
