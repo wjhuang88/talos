@@ -3,6 +3,18 @@
 use std::time::Duration;
 use talos_core::message::{AgentEvent, Message};
 use talos_core::provider::LanguageModel;
+use tokio_util::sync::CancellationToken;
+
+/// Outcome of an isolated bounded model decision.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BoundedDecision {
+    /// The model returned a bounded textual decision.
+    Decision(String),
+    /// The model produced no usable decision within the contract.
+    Abstain(String),
+    /// The invocation failed before a decision could be trusted.
+    Failure(String),
+}
 
 /// Invoke a model with no tools and a strict output/deadline boundary.
 pub async fn invoke_text(
@@ -11,8 +23,33 @@ pub async fn invoke_text(
     deadline: Duration,
     max_output_bytes: usize,
 ) -> Result<String, String> {
+    match invoke_text_bounded(
+        provider,
+        messages,
+        deadline,
+        max_output_bytes,
+        CancellationToken::new(),
+    )
+    .await
+    {
+        BoundedDecision::Decision(output) => Ok(output),
+        BoundedDecision::Abstain(reason) | BoundedDecision::Failure(reason) => Err(reason),
+    }
+}
+
+/// Invoke a model with explicit cancellation and a typed, fail-closed outcome.
+pub async fn invoke_text_bounded(
+    provider: &dyn LanguageModel,
+    messages: &[Message],
+    deadline: Duration,
+    max_output_bytes: usize,
+    cancellation: CancellationToken,
+) -> BoundedDecision {
     let mut output = String::new();
-    tokio::time::timeout(deadline, async {
+    let result = tokio::time::timeout(deadline, async {
+        tokio::select! {
+            _ = cancellation.cancelled() => return Err("bounded model invocation cancelled".to_owned()),
+            result = async {
         let mut events = provider.stream(messages).await.map_err(|e| e.to_string())?;
         while let Some(event) = events.recv().await {
             match event {
@@ -31,13 +68,23 @@ pub async fn invoke_text(
             }
         }
         Ok(())
-    })
-    .await
-    .map_err(|_| "bounded model deadline exceeded".to_owned())??;
-    if output.trim().is_empty() {
-        return Err("bounded model returned no output".to_owned());
+            } => result,
+        }
+    }).await;
+    if result.is_err() {
+        return BoundedDecision::Failure("bounded model deadline exceeded".to_owned());
     }
-    Ok(output)
+    if let Err(error) = result.expect("timeout result checked") {
+        return if error.contains("no output") {
+            BoundedDecision::Abstain(error)
+        } else {
+            BoundedDecision::Failure(error)
+        };
+    }
+    if output.trim().is_empty() {
+        return BoundedDecision::Abstain("bounded model returned no output".to_owned());
+    }
+    BoundedDecision::Decision(output)
 }
 
 #[cfg(test)]
