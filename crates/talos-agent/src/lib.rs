@@ -332,6 +332,8 @@ pub struct Agent {
     /// Exact output reserve and conservative input-estimation policy.
     request_budget_spec: RequestBudgetSpec,
     background_jobs: Option<Arc<dyn talos_core::background_job::BackgroundJobHost>>,
+    /// Per-agent cache for endpoint/model protocol capability evidence.
+    protocol_capability_cache: talos_core::tool::ProtocolCapabilityCache,
 }
 impl Agent {
     pub(crate) fn set_background_job_host(

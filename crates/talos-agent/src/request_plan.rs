@@ -237,7 +237,20 @@ impl Agent {
         }
 
         let tool_protocol = match self.tool_protocol {
-            talos_core::tool::ToolProtocol::Auto => self.provider.protocol_capabilities().select(),
+            talos_core::tool::ToolProtocol::Auto => {
+                let probe = if let Some(scope) = self.provider.protocol_capability_scope() {
+                    if let Some(cached) = self.protocol_capability_cache.get(&scope) {
+                        cached
+                    } else {
+                        let probe = self.provider.protocol_capabilities();
+                        self.protocol_capability_cache.insert(scope, probe);
+                        probe
+                    }
+                } else {
+                    self.provider.protocol_capabilities()
+                };
+                probe.select()
+            }
             selected => selected,
         };
 

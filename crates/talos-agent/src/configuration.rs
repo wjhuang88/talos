@@ -111,6 +111,7 @@ impl Agent {
             image_input_supported: false,
             request_budget_spec: RequestBudgetSpec::default(),
             background_jobs: None,
+            protocol_capability_cache: talos_core::tool::ProtocolCapabilityCache::new(),
         }
     }
 
@@ -265,6 +266,7 @@ impl Agent {
             image_input_supported: false,
             request_budget_spec: RequestBudgetSpec::default(),
             background_jobs: None,
+            protocol_capability_cache: talos_core::tool::ProtocolCapabilityCache::new(),
         }
     }
 

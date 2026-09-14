@@ -102,6 +102,12 @@ impl ToolDefinition {
 
 #[async_trait::async_trait]
 pub trait LanguageModel: Send + Sync {
+    /// Returns a stable, non-secret scope for capability evidence caching.
+    /// `None` disables caching when the provider cannot describe its endpoint/model safely.
+    fn protocol_capability_scope(&self) -> Option<String> {
+        None
+    }
+
     /// Reports non-secret evidence for automatic tool-protocol selection.
     ///
     /// Implementations must return [`crate::tool::CapabilityProbe::Unknown`] unless

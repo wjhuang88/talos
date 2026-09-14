@@ -302,6 +302,14 @@ fn status_to_error(status: reqwest::StatusCode, body: String) -> ProviderError {
 
 #[async_trait::async_trait]
 impl LanguageModel for OpenAIProvider {
+    fn protocol_capability_scope(&self) -> Option<String> {
+        Some(format!(
+            "openai|{}|{}",
+            self.base_url.trim_end_matches('/'),
+            self.model
+        ))
+    }
+
     fn protocol_capabilities(&self) -> CapabilityProbe {
         // Custom gateways are deliberately unknown: adapter compatibility does not
         // constitute evidence that the configured endpoint accepts native tools.

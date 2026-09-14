@@ -331,6 +331,14 @@ fn status_to_error(status: reqwest::StatusCode, body: String) -> ProviderError {
 
 #[async_trait::async_trait]
 impl LanguageModel for AnthropicProvider {
+    fn protocol_capability_scope(&self) -> Option<String> {
+        Some(format!(
+            "anthropic|{}|{}",
+            self.base_url.trim_end_matches('/'),
+            self.model
+        ))
+    }
+
     fn protocol_capabilities(&self) -> talos_core::tool::CapabilityProbe {
         if self.base_url.trim_end_matches('/') == ANTHROPIC_API_URL && !self.model.trim().is_empty()
         {
