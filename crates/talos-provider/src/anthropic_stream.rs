@@ -250,8 +250,17 @@ pub(crate) async fn parse_sse_stream(
                             if block.name.is_empty() {
                                 continue;
                             }
-                            let input = serde_json::from_str(&block.input_json)
-                                .unwrap_or_else(|_| serde_json::json!({}));
+                            let input = match serde_json::from_str(&block.input_json) {
+                                Ok(input) => input,
+                                Err(_) => {
+                                    let _ = tx
+                                        .send(AgentEvent::Error {
+                                            message: "invalid tool arguments JSON".into(),
+                                        })
+                                        .await;
+                                    return;
+                                }
+                            };
                             let _ = tx
                                 .send(AgentEvent::ToolCall {
                                     call: ToolCall {

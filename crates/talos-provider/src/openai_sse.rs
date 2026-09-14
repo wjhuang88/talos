@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use futures_util::StreamExt;
 use serde::Deserialize;
-use serde_json::{Value, json};
+use serde_json::Value;
 use talos_core::message::{AgentEvent, ReasoningBlock, StopReason, ToolCall, Usage};
 use talos_core::tool::ToolProvenance;
 use tokio::sync::mpsc;
@@ -172,8 +172,17 @@ pub(crate) async fn parse_sse_stream(
                 for i in 0..tool_call_ids.len() {
                     if !tool_call_names[i].is_empty() {
                         let tool_call_id = finalized_tool_call_id(&tool_call_ids[i], i);
-                        let args: Value =
-                            serde_json::from_str(&tool_call_args[i]).unwrap_or_else(|_| json!({}));
+                        let args: Value = match serde_json::from_str(&tool_call_args[i]) {
+                            Ok(args) => args,
+                            Err(_) => {
+                                let _ = tx
+                                    .send(AgentEvent::Error {
+                                        message: "invalid tool arguments JSON".into(),
+                                    })
+                                    .await;
+                                return;
+                            }
+                        };
                         let _ = tx
                             .send(AgentEvent::ToolCall {
                                 call: ToolCall {
@@ -335,8 +344,17 @@ pub(crate) async fn parse_sse_stream(
                 for i in 0..tool_call_ids.len() {
                     if !tool_call_names[i].is_empty() {
                         let tool_call_id = finalized_tool_call_id(&tool_call_ids[i], i);
-                        let args: Value =
-                            serde_json::from_str(&tool_call_args[i]).unwrap_or_else(|_| json!({}));
+                        let args: Value = match serde_json::from_str(&tool_call_args[i]) {
+                            Ok(args) => args,
+                            Err(_) => {
+                                let _ = tx
+                                    .send(AgentEvent::Error {
+                                        message: "invalid tool arguments JSON".into(),
+                                    })
+                                    .await;
+                                return;
+                            }
+                        };
                         let _ = tx
                             .send(AgentEvent::ToolCall {
                                 call: ToolCall {
@@ -1406,7 +1424,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn parse_sse_stream_malformed_tool_arguments_becomes_empty_object() {
+    async fn parse_sse_stream_malformed_tool_arguments_stops_before_execution() {
         let mut server = mockito::Server::new_async().await;
         let stream_body = concat!(
             "data: {\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call_bad\",\"type\":\"function\",\"function\":{\"name\":\"bash\",\"arguments\":\"not valid json{\"}}]},\"finish_reason\":null}]}\n\n",
@@ -1445,15 +1463,14 @@ mod tests {
             }
         }
 
-        let call = tool_call.expect("malformed-args tool call should still be emitted");
-        assert_eq!(call.id, "call_bad");
-        assert_eq!(call.name, "bash");
-        assert_eq!(
-            call.input,
-            json!({}),
-            "malformed JSON arguments should degrade to empty object, not panic"
+        assert!(
+            tool_call.is_none(),
+            "malformed arguments must never reach execution"
         );
-        assert_eq!(stop_reason, Some(StopReason::ToolUse));
+        assert!(
+            stop_reason.is_none(),
+            "malformed arguments must not emit completion"
+        );
     }
 
     #[tokio::test]
