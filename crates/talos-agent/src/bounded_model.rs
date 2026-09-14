@@ -71,15 +71,16 @@ pub async fn invoke_text_bounded(
         Ok(())
         }) => result,
     };
-    if result.is_err() {
-        return BoundedDecision::Failure("bounded model deadline exceeded".to_owned());
-    }
-    if let Err(error) = result.expect("timeout result checked") {
-        return if error.contains("no output") {
-            BoundedDecision::Abstain(error)
-        } else {
-            BoundedDecision::Failure(error)
-        };
+    match result {
+        Err(_) => return BoundedDecision::Failure("bounded model deadline exceeded".to_owned()),
+        Ok(Err(error)) => {
+            return if error.contains("no output") {
+                BoundedDecision::Abstain(error)
+            } else {
+                BoundedDecision::Failure(error)
+            };
+        }
+        Ok(Ok(())) => {}
     }
     if output.trim().is_empty() {
         return BoundedDecision::Abstain("bounded model returned no output".to_owned());
