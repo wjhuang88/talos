@@ -16,7 +16,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| I273 Bounded Model Decisions | Active / Claimed (proposed) | [I273](iterations/I273-bounded-model-decisions.md) / #285 | #558 claim repair takes effect only on merge; #557 is not accepted; full local implementation, security/API review and cycle ledger closure remain. |
+| I273 Bounded Model Decisions | Review / Claimed | [I273](iterations/I273-bounded-model-decisions.md) / #285 | Implementation #559 merged as `e4173caf`; exact head `e4820e1e`, CI `34838903222` 5/5, independent Agent-role permission/security/API APPROVE. I273 closeout and #285 child-audit remain; no umbrella Complete claim. |
 | I262 OBeiBuddy Contract Clarification | Complete / Closed | [I262](iterations/I262-obeibuddy-contract-clarification.md) / [INTEGRATION-001](backlog/active/INTEGRATION-001-obeibuddy-upstream-contract-clarification.md) / #520 | Completion Commit `86a7ef76`; Request A clarified, Request B Deferred. |
 | I258 Bundle Migration Decision | Complete / Closed | [I258](iterations/I258-bundle-manifest-migration-contract.md) | #536 merged as `9994397b`; ADR-073 accepted by maintainer. BUNDLE implementation requires separate claim and review. |
 | I248 Dependency Governance | Complete / Closed | [DEPENDENCY-001](backlog/active/DEPENDENCY-001-dependency-upgrade-governance.md) / [I248](iterations/I248-dependency-governance-closed-loop.md) | #497 implementation `dbd847ec`; #498 merged as `a7d168ee`, acceptance head `5d2e4443`, CI `34074942674`, independent review `5564114577`. Full dependency upgrade remains I250. |
