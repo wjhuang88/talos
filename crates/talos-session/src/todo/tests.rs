@@ -313,6 +313,7 @@ fn legacy_schema_migrates_losslessly_and_keeps_backup() {
     assert!(graph.nodes.iter().all(|node| node.identity.revision == 1));
     assert_eq!(graph.edges.len(), 1);
     assert_eq!(graph.edges[0].identity.revision, 1);
+    // A failed migration still leaves the pre-migration backup for recovery.
     assert!(dir.path().join("todos.sqlite.pre-work-v1.bak").exists());
 }
 
