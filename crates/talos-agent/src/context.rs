@@ -134,7 +134,10 @@ impl ContextLoader {
             parts.push(self.format_section(&global_path, &content));
         }
 
-        // 2. Walk from workspace_root up to git root (or filesystem root)
+        // 2. Walk from workspace_root up to git root (or filesystem root).
+        // Collect nearest-first, then reverse below so the rendered order is
+        // broad-to-specific and recency reinforces the documented precedence.
+        let project_start = parts.len();
         let mut current: Option<&Path> = Some(&self.workspace_root);
         while let Some(dir) = current {
             let agents_path = dir.join(AGENTS_MD);
@@ -152,6 +155,7 @@ impl ContextLoader {
             current = dir.parent();
         }
 
+        parts[project_start..].reverse();
         let combined = parts.join("\n");
         Ok(Self::apply_size_limit(&combined))
     }
@@ -214,8 +218,7 @@ impl ContextLoader {
             .take(HEAD_SIZE)
             .rposition(|c| *c == '\n')
             .map(|index| index + 1)
-            .filter(|index| *index >= HEAD_SIZE / 2)
-            .unwrap_or(HEAD_SIZE);
+            .unwrap_or(0);
         result.extend(chars.iter().take(head_end));
 
         // Truncation indicator
@@ -233,8 +236,7 @@ impl ContextLoader {
             .skip(tail_start)
             .find(|(_, c)| **c == '\n')
             .map(|(index, _)| index + 1)
-            .filter(|index| *index <= char_count.saturating_sub(TAIL_SIZE / 2))
-            .unwrap_or(tail_start);
+            .unwrap_or(char_count);
         result.extend(chars.iter().skip(tail_start));
 
         result
@@ -286,10 +288,11 @@ mod tests {
 
         assert!(context.contains("# Root Rules"));
         assert!(context.contains("# Sub Rules"));
-        // Sub directory file should appear before root (walk order: sub -> root)
+        // Broad parent scope appears before the nearer scope so recency
+        // reinforces nearest-scope precedence.
         let sub_idx = context.find("# Sub Rules").expect("sub rules not found");
         let root_idx = context.find("# Root Rules").expect("root rules not found");
-        assert!(sub_idx < root_idx, "sub should appear before root");
+        assert!(root_idx < sub_idx, "root should appear before sub");
     }
 
     #[test]
@@ -302,7 +305,7 @@ mod tests {
 
         let context = ContextLoader::new(child).load().expect("load failed");
         assert!(context.contains("(nearest project scope wins)"));
-        assert!(context.find("child rule").unwrap() < context.find("root rule").unwrap());
+        assert!(context.find("root rule").unwrap() < context.find("child rule").unwrap());
     }
 
     #[test]
@@ -342,10 +345,10 @@ mod tests {
             char_count
         );
 
-        // The separator header shifts the start; verify head chars are present
-        assert!(context.contains(&"A".repeat(100)));
-        // Tail portion should be preserved
-        assert!(context.ends_with(&"B".repeat(100)));
+        // This is one indivisible oversized instruction: neither its beginning
+        // nor its ending may be presented as if it were a complete rule.
+        assert!(!context.contains(&"A".repeat(100)));
+        assert!(!context.contains(&"B".repeat(100)));
         // Truncation indicator should be present
         assert!(context.contains("\n...\n"));
     }
@@ -455,6 +458,10 @@ mod tests {
         // Should have head + tail + truncation indicator
         assert!(result.contains("..."));
         assert!(result.chars().count() < content.chars().count());
+        assert!(
+            !result.contains('X'),
+            "must not emit a partial single-line rule"
+        );
     }
 
     #[test]
