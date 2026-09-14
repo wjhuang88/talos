@@ -822,7 +822,7 @@ impl Agent {
 
             let (progress_tx, mut progress_rx) = mpsc::unbounded_channel();
             // The sealed plan is dispatched exactly once through the provider's
-            // protocol adapter (whose native fallback is stream_with_tools_and_progress).
+            // protocol adapter (whose native fallback is stream_with_tools_and_progress().
             let provider_request = self.provider.stream_with_protocol(
                 &plan.messages,
                 &plan.tool_definitions,
