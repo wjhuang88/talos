@@ -205,7 +205,11 @@ impl BashTool {
                 _ = &mut deadline => {
                     if completed_status.is_none() {
                         let _ = child.kill().await;
-                        let _ = child.wait().await;
+                        let _ = tokio::time::timeout(
+                            Duration::from_millis(100),
+                            child.wait(),
+                        )
+                        .await;
                     }
                     // Preserve output already received before the absolute deadline. Descendants
                     // can inherit stdout/stderr handles and outlive the direct shell child, so

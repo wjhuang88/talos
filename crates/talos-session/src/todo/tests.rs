@@ -317,7 +317,7 @@ fn legacy_schema_migrates_losslessly_and_keeps_backup() {
 }
 
 #[test]
-fn lossy_legacy_value_fails_before_migration_or_backup() {
+fn lossy_legacy_value_fails_after_safe_backup() {
     let dir = tempdir().expect("temp dir");
     let path = dir.path().join("todos.sqlite");
     let connection = rusqlite::Connection::open(&path).expect("legacy database");
@@ -338,7 +338,7 @@ fn lossy_legacy_value_fails_before_migration_or_backup() {
     drop(connection);
     let repo = TodoRepository::new(&path).expect("repo");
     assert!(matches!(repo.init_schema(), Err(TodoError::Migration(_))));
-    assert!(!dir.path().join("todos.sqlite.pre-work-v1.bak").exists());
+    assert!(dir.path().join("todos.sqlite.pre-work-v1.bak").exists());
 }
 
 #[test]
@@ -373,7 +373,7 @@ fn partial_schema_is_rejected_without_creating_the_missing_table() {
 }
 
 #[test]
-fn duplicate_current_edge_identity_is_rejected() {
+fn duplicate_current_edge_identity_is_deferred_to_session_scoped_validation() {
     let dir = tempdir().expect("temp dir");
     let path = dir.path().join("todos.sqlite");
     let connection = rusqlite::Connection::open(&path).expect("database");
@@ -426,7 +426,8 @@ fn duplicate_current_edge_identity_is_rejected() {
         .expect("edge");
     drop(connection);
     let repo = TodoRepository::new(&path).expect("repo");
-    assert!(matches!(repo.init_schema(), Err(TodoError::Migration(_))));
+    repo.init_schema()
+        .expect("current schema opens without global row scanning");
 }
 
 #[test]
