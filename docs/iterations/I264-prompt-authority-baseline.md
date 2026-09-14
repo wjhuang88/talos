@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Planned / Unclaimed |
+| Status | Complete / Closed |
 | Source | PROMPT-001 / Issue #285 |
 | Deliverable | Source-backed inventory and accepted authority/precedence decision boundary for prompt inputs; no semantic prompt rewrite. |
 | Depends On | ADR-033, current prompt/context/evolution/memory/plugin owners |
@@ -12,18 +12,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex |
+| Work Slice | Source-backed prompt contributor inventory and authority-boundary baseline only |
 | Source Issue | #285 |
-| Claimed At | Not applicable |
-| Governance Claim PR | #547 (pending merge; ineffective until merged) |
+| Claimed At | 2026-09-13 |
+| Governance Claim PR | #547 (merged) |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Claim-only architecture baseline; no prompt/runtime implementation authorized before merge. |
 | Last Updated | 2026-09-13 |
 | Handoff / Release Condition | Merge claim before implementation; accepted ADR and child slices required. |
-| Implementation PR | Not started |
+| Implementation PR | Governance/documentation commits `5fa65d6e`, `b0050456` |
 
 ## Acceptance
 
@@ -32,7 +32,13 @@
 - Decompose independently runnable authority, decomposition and behavior-harness children.
 - Preserve current prompt assembly and SDK compatibility until later implementation claims.
 
-Completion Commit: pending
+Completion Commit: `5fa65d6e`
+
+## Completion Checkpoint (2026-09-14)
+
+ADR-074 is accepted and claim PR #547 is present on `main`. The source-backed contributor
+inventory and decomposition baseline are complete at `5fa65d6e`; this closes I264's baseline
+deliverable only. Runtime semantic changes remain separately owned by I267, I270 and I272.
 
 ## Source-backed contributor inventory (2026-09-13)
 
