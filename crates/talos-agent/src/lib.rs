@@ -976,7 +976,7 @@ impl Agent {
                         blocks,
                     });
                 messages.push(Message::Assistant {
-                    content: talos_core::message::strip_tool_syntax(&turn_text),
+                    content: turn_text.clone(),
                     tool_calls: vec![],
                     reasoning,
                 });
