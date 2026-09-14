@@ -1108,6 +1108,23 @@ mod i168_terminal_outcome_tests {
             .expect("terminal error")
     }
 
+    #[tokio::test]
+    async fn malformed_native_tool_arguments_stop_before_tool_event() {
+        let body = format!(
+            "{}{}{}",
+            "event: content_block_start\ndata: {\"index\":0,\"content_block\":{\"type\":\"tool_use\",\"id\":\"call_bad\",\"name\":\"bash\",\"input\":{}}}\n\n",
+            "event: content_block_delta\ndata: {\"index\":0,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"not json{\"}}}\n\n",
+            "event: message_delta\ndata: {\"delta\":{\"stop_reason\":\"tool_use\"}}\n\n"
+        );
+        let events = parse_body(body).await;
+        assert!(events.iter().any(|event| matches!(event, AgentEvent::Error { message } if message == "invalid tool arguments JSON")));
+        assert!(
+            !events
+                .iter()
+                .any(|event| matches!(event, AgentEvent::ToolCall { .. }))
+        );
+    }
+
     fn text_event(text: &str) -> String {
         format!(
             "event: content_block_delta\ndata: {{\"index\":0,\"delta\":{{\"type\":\"text_delta\",\"text\":\"{text}\"}}}}\n\n"
