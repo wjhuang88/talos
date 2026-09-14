@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use talos_core::provider::ToolDefinition;
+use talos_core::provider::{LanguageModel, ToolDefinition};
 use talos_core::tool::{AgentTool, ToolPresentationPolicy, ToolProtocol, ToolRegistry};
 use talos_permission::{
     InteractionCapability, PermissionContext, PermissionEngine, PermissionMode,
@@ -394,6 +394,14 @@ impl Agent {
             ToolProtocol::Compat => builder.with_tool_format(prompt::TOOL_CALLING_FORMAT),
             ToolProtocol::Native => builder.with_tool_format(""),
         });
+    }
+
+    /// Selects a protocol from provider capability evidence without changing explicit overrides.
+    /// Unknown providers conservatively use the compatibility parser.
+    pub fn set_tool_protocol_auto(&mut self) -> ToolProtocol {
+        let protocol = self.provider.protocol_capabilities().select();
+        self.set_tool_protocol(protocol);
+        protocol
     }
 
     /// Sets the skill index for the system prompt builder.
