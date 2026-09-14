@@ -33,6 +33,7 @@ use talos_core::message::{AgentEvent, Message};
 use talos_core::provider::{
     LanguageModel, ProviderError, ProviderProgress, ProviderResult, ToolDefinition,
 };
+use talos_core::tool::{CapabilityProbe, ProtocolCapabilities};
 use tokio::sync::mpsc;
 
 use crate::retry::{RetryDecision, classify_retry_with_backoff};
@@ -298,6 +299,13 @@ fn status_to_error(status: reqwest::StatusCode, body: String) -> ProviderError {
 
 #[async_trait::async_trait]
 impl LanguageModel for AnthropicProvider {
+    fn protocol_capabilities(&self) -> CapabilityProbe {
+        CapabilityProbe::Known(ProtocolCapabilities {
+            native_tools: true,
+            compatibility: true,
+        })
+    }
+
     async fn stream(&self, messages: &[Message]) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
         let response = self.make_request(messages).await?;
         let (tx, rx) = mpsc::channel(32);
