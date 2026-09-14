@@ -6,7 +6,7 @@ use talos_plugin::{HookContext, HookEvent, HookOutcome, HookRegistry};
 use talos_skill::SkillIndex;
 
 use super::assets::{DEFAULT_IDENTITY, TOOL_CALLING_STRICT};
-use super::sections::{PromptSection, PromptSectionKind};
+use super::sections::{HarnessReport, PromptSection, PromptSectionKind, run_precedence_harness};
 use super::types::{ActivatedSkillContext, CacheMarker, CacheType, ContextFile, ToolDescription};
 
 /// Builder for assembling a system prompt from multiple components.
@@ -576,6 +576,13 @@ impl SystemPromptBuilder {
             first = false;
         }
         suffix
+    }
+
+    /// Validates the assembled sections against the runtime authority floor.
+    /// This provider-independent report is intended for diagnostics and tests.
+    #[must_use]
+    pub(super) fn precedence_report(&self) -> HarnessReport {
+        run_precedence_harness(&self.prompt_sections(), 80)
     }
 
     /// Assembles the system prompt with cache control markers.
