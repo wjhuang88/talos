@@ -73,6 +73,7 @@ use talos_core::message::{
     ToolCall,
 };
 use talos_core::provider::{LanguageModel, ProviderError};
+use talos_core::tool::{ProtocolFailureDisposition, classify_protocol_failure};
 use talos_core::tool::{ToolPresentationPolicy, ToolProvenance, ToolRegistry};
 use talos_plugin::{
     BudgetKind, HookContext, HookEvent, HookOutcome, HookRegistry, ToolObservation, TurnId,
@@ -786,9 +787,19 @@ impl Agent {
             let mut rx = match provider_result {
                 Ok(rx) => rx,
                 Err(error) => {
+                    let disposition = classify_protocol_failure(&error.to_string());
+                    let disposition_label = match disposition {
+                        ProtocolFailureDisposition::Fallback => "fallback",
+                        ProtocolFailureDisposition::Correct => "correction",
+                        ProtocolFailureDisposition::Stop => "stop",
+                        ProtocolFailureDisposition::HumanReview => "human-review",
+                    };
                     if let Some(ref tx) = event_tx {
                         let _ = tx.send(AgentEvent::Error {
-                            message: error.to_string(),
+                            message: format!(
+                                "{} (protocol disposition: {})",
+                                error, disposition_label
+                            ),
                         });
                     }
                     let _ = self
