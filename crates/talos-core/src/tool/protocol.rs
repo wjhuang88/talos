@@ -1,5 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
@@ -26,6 +28,42 @@ pub struct ProtocolCapabilities {
 pub enum CapabilityProbe {
     Known(ProtocolCapabilities),
     Unknown,
+}
+
+/// Request-scoped cache for endpoint/model capability evidence.
+///
+/// Keys are supplied by the caller and must include every configuration value that can
+/// affect protocol support (normally endpoint, provider and model). Entries are never
+/// persisted or shared across agents, preventing cross-endpoint capability leakage.
+#[derive(Clone, Default)]
+pub struct ProtocolCapabilityCache {
+    entries: Arc<RwLock<HashMap<String, CapabilityProbe>>>,
+}
+
+impl ProtocolCapabilityCache {
+    /// Creates an empty cache.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Returns cached evidence for an exact endpoint/model scope.
+    pub fn get(&self, scope: &str) -> Option<CapabilityProbe> {
+        self.entries.read().ok()?.get(scope).copied()
+    }
+
+    /// Stores evidence for an exact endpoint/model scope.
+    pub fn insert(&self, scope: impl Into<String>, probe: CapabilityProbe) {
+        if let Ok(mut entries) = self.entries.write() {
+            entries.insert(scope.into(), probe);
+        }
+    }
+
+    /// Removes all cached evidence.
+    pub fn clear(&self) {
+        if let Ok(mut entries) = self.entries.write() {
+            entries.clear();
+        }
+    }
 }
 
 /// Safe disposition after a provider protocol failure.
@@ -168,6 +206,15 @@ mod capability_tests {
         assert!(ExecutionOutcome::NotStarted.permits_retry());
         assert!(!ExecutionOutcome::Completed.permits_retry());
         assert!(!ExecutionOutcome::Unknown.permits_retry());
+    }
+
+    #[test]
+    fn capability_cache_is_scoped_and_can_cache_unknown() {
+        let cache = ProtocolCapabilityCache::new();
+        assert_eq!(cache.get("openai|gpt"), None);
+        cache.insert("openai|gpt", CapabilityProbe::Unknown);
+        assert_eq!(cache.get("openai|gpt"), Some(CapabilityProbe::Unknown));
+        assert_eq!(cache.get("other|gpt"), None);
     }
 }
 
