@@ -5,8 +5,8 @@
 | Story ID | LANG-003 |
 | Type | Language Provider migration policy |
 | Parent | CAP-001 / #466 |
-| Status | Refinement / Unclaimed |
-| Selected Iteration | None |
+| Status | Planned / Claimed (proposed; ineffective until claim merge) |
+| Selected Iteration | I274 |
 | Source Issue | [GitHub Issue #517](https://github.com/wjhuang88/talos/issues/517) |
 | Depends On | LANG-002; BUNDLE-001; DIST-001-A |
 
@@ -14,16 +14,16 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed (proposed) |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex unattended single-developer mode |
 | Work Slice | Remaining language migration and explicit default distribution decision. |
 | Claimed At | Not applicable |
 | Authorization Evidence | No effective claim; intake owner only. Implementation is not authorized. |
-| Governance Claim PR | Not applicable |
+| Governance Claim PR | Proposed; pending merge |
 | Implementation PR | Not started |
 | Authorization Mode | Not applicable |
-| Last Updated | 2026-09-09 |
+| Last Updated | 2026-09-15 |
 | Handoff / Release Condition | Requires a separate distribution and compatibility decision before changing defaults. |
 
 ## Required Reads
