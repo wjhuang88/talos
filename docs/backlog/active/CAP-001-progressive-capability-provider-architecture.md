@@ -14,7 +14,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Closed |
+| Claim State | Complete |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Not assigned |
 | Work Slice | Not assigned — children require separate non-overlapping claims |
