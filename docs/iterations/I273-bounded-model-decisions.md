@@ -63,6 +63,16 @@ existing implementation commit; a status-only commit is not evidence.
 - I273 remains `Review / Claimed` until closeout acceptance is audited; this checkpoint does not
   claim PROMPT-001/#285 completion or close I264/I267/I270/I272 residuals.
 
+## 2026-09-15 Automatic Protocol Selection Merge Checkpoint
+
+- Implementation PR #562 merged to `main` as `edc0b09a` from exact implementation head
+  `b4e5336e3202a488598c7acd01cbdb7a786b5aa0`.
+- Exact-head CI run `34918446844` passed all five jobs, including the Windows Rust workspace.
+- Independent Agent-role permission/security/API review approved the same exact head; shared
+  account constraints mean this records Agent-role separation, not natural-person separation.
+- This checkpoint records the capability-probe and automatic Native/Compat selection evidence only;
+  it does not claim protocol recovery, umbrella completion, or child closeout.
+
 ## 2026-09-14 Development-Cycle Convergence Checkpoint
 
 The maintainer requested that this development cycle close both its original work and the
