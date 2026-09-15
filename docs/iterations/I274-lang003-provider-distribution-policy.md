@@ -9,7 +9,13 @@
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex unattended single-developer mode |
 | Work Slice | Define and implement one additional language provider distribution path with explicit fallback and compatibility evidence; preserve current defaults. |
-| Implementation PR | Not started |
+| Implementation PR | #565 (Review / Claimed) |
+
+## Activation Checkpoint — 2026-09-15
+
+Claim PR #564 is effective after merge commit `6a4a2117` on `main` (exact claim head
+`0e7fe73d`, base `b3da1653`, CI run `34965337239`). Implementation must begin from this
+merged baseline; the published plan and exclusions remain unchanged.
 
 ## Scope
 

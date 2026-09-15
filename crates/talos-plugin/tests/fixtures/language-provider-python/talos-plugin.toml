@@ -1,0 +1,10 @@
+[plugin]
+name = "offline-python-language-provider"
+version = "0.1.0"
+carrier = "wasm"
+artifact = "provider.wat"
+digest = "sha256:938aa844757f2adc63d5262ee0fbbc456f4c87969e0d4ecf0c897db74639f02b"
+
+[language_provider]
+language = "python"
+artifact = "provider.wat"
