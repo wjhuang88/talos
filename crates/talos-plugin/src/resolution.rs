@@ -89,8 +89,8 @@ pub fn resolve_verified_bundle(
         });
     }
     let started = Instant::now();
-    let manifest_text = std::fs::read_to_string(source.join("manifest.toml"))
-        .map_err(|error| InstallError::Io(error))?;
+    let manifest_text =
+        std::fs::read_to_string(source.join("manifest.toml")).map_err(InstallError::Io)?;
     let expected =
         match parse_compatible_manifest(&manifest_text).map_err(InstallError::Manifest)? {
             CompatibleManifest::Bundle(bundle) => bundle,
