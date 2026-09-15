@@ -54,5 +54,8 @@ alternate permission authority.
 
 ## Validation And Documentation
 
+Validation includes bounded response handling and safe link-scheme filtering; DNS rebinding
+hardening remains a shared follow-up in the HTTP boundary.
+
 Read-only connector fixtures, redaction/security tests, permission/disclosure integration checks,
 network failure/cancellation tests and user-facing browser capability documentation.
