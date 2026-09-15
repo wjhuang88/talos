@@ -171,6 +171,9 @@ impl BrowserPageConnector for HttpBrowserPageConnector {
             .send()
             .await
             .map_err(|error| error.to_string())?;
+        if !response.status().is_success() {
+            return Err(format!("browser request returned {}", response.status()));
+        }
         let final_url = response.url().to_string();
         let final_base = response.url().clone();
         let max_response_bytes = (self.max_text_bytes as u64).saturating_mul(8);
@@ -204,7 +207,9 @@ impl BrowserPageConnector for HttpBrowserPageConnector {
         let mut links = Vec::new();
         for node in document.select(&link_selector).take(self.max_links) {
             if let Some(href) = node.value().attr("href") {
-                if let Ok(link_url) = Url::parse(href).or_else(|_| final_base.join(href)) {
+                if let Ok(link_url) = Url::parse(href).or_else(|_| final_base.join(href))
+                    && matches!(link_url.scheme(), "http" | "https")
+                {
                     let mut text = node.text().collect::<String>();
                     text.truncate(text.floor_char_boundary(512));
                     links.push(BrowserPageLink {
