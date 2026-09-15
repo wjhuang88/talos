@@ -20,7 +20,7 @@
 | Work Slice | One read-only Browser Provider connector behind the existing browser-page boundary. |
 | Claimed At | 2026-09-15 |
 | Authorization Evidence | Proposed atomic claim/activation; ineffective until merged to main. |
-| Governance Claim PR | Pending draft |
+| Governance Claim PR | #568 |
 | Implementation PR | Not started |
 | Authorization Mode | Single maintainer |
 | Last Updated | 2026-09-15 |
