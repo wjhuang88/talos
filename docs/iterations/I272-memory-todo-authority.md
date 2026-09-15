@@ -32,7 +32,8 @@
 
 ## Completion Evidence
 
-- Completion Commit: `face3b2a` (prompt precedence report integration) and existing session boundary implementation evidence.
+- Completion Commit: `f5cacdd7`, `d8c04a4f`, and `face3b2a` (advisory classification/rendering,
+  precedence report integration) plus existing session boundary implementation evidence.
 
 ## Execution Checkpoint
 
@@ -44,8 +45,8 @@
   preceding tool result, before the next response, without starting a second outer turn,
   and retains the original turn identity across cancellation/error paths.
 - This evidence confirms runtime ordering compatibility, but does not yet provide the
-  provider-independent prompt behavior harness required by I270; I272 remains Partial
-  until a focused runtime-rendering/resumability evidence checkpoint is recorded.
+  provider-independent prompt behavior harness is owned by I270; I272 remains Review pending
+  final umbrella reconciliation.
 - Focused prompt and session regression suites were re-run on `dev/prompt-285-convergence`; advisory Memory/Todo
   rendering remains dynamic and steering submissions preserve resumability without a second
   outer turn. No implementation change is claimed by this checkpoint.
