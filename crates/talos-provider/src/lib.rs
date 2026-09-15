@@ -372,6 +372,54 @@ fn status_to_error(status: reqwest::StatusCode, body: String) -> ProviderError {
 
 #[async_trait::async_trait]
 impl LanguageModel for AnthropicProvider {
+    async fn probe_protocol_capabilities(
+        &self,
+        tools: &[ToolDefinition],
+    ) -> talos_core::tool::CapabilityProbe {
+        if tools.is_empty() {
+            return talos_core::tool::CapabilityProbe::Unknown;
+        }
+        let probe = ToolDefinition::new(
+            "__talos_protocol_probe",
+            "Internal capability probe; do not execute",
+            json!({"type":"object","properties":{}}),
+        );
+        let mut body = anthropic_request::build_request_body(
+            &self.model,
+            &[Message::User {
+                content: "Respond with the probe tool call.".into(),
+            }],
+            &[probe],
+            None,
+            Some(8),
+        );
+        body["stream"] = json!(false);
+        let Ok(response) = self.send_request(&body, None).await else {
+            return talos_core::tool::CapabilityProbe::Unknown;
+        };
+        if !response.status().is_success() {
+            return talos_core::tool::CapabilityProbe::Unknown;
+        }
+        let Ok(value) = response.json::<Value>().await else {
+            return talos_core::tool::CapabilityProbe::Unknown;
+        };
+        let native = value
+            .get("content")
+            .and_then(Value::as_array)
+            .is_some_and(|items| {
+                items
+                    .iter()
+                    .any(|item| item.get("type").and_then(Value::as_str) == Some("tool_use"))
+            });
+        if native {
+            talos_core::tool::CapabilityProbe::Known(talos_core::tool::ProtocolCapabilities {
+                native_tools: true,
+                compatibility: true,
+            })
+        } else {
+            talos_core::tool::CapabilityProbe::Unknown
+        }
+    }
     async fn stream_decision(
         &self,
         messages: &[Message],

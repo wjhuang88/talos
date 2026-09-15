@@ -22,6 +22,7 @@ use talos_core::provider::{
     LanguageModel, ProviderError, ProviderProgress, ProviderResult, ToolDefinition,
 };
 use talos_core::tool::CapabilityProbe;
+use talos_core::tool::ProtocolCapabilities;
 use tokio::sync::mpsc;
 
 use crate::openai_request::{build_request_body, redact_secret};
@@ -303,6 +304,52 @@ fn status_to_error(status: reqwest::StatusCode, body: String) -> ProviderError {
 
 #[async_trait::async_trait]
 impl LanguageModel for OpenAIProvider {
+    async fn probe_protocol_capabilities(&self, tools: &[ToolDefinition]) -> CapabilityProbe {
+        if tools.is_empty() {
+            return CapabilityProbe::Unknown;
+        }
+        let probe = ToolDefinition::new(
+            "__talos_protocol_probe",
+            "Internal capability probe; do not execute",
+            serde_json::json!({"type":"object","properties":{}}),
+        );
+        let mut body = build_request_body(
+            &self.model,
+            &[Message::User {
+                content: "Respond with the probe tool call.".into(),
+            }],
+            &[probe],
+            self.reasoning.as_ref(),
+            Some(8),
+        );
+        body["stream"] = json!(false);
+        body["tool_choice"] = json!("required");
+        let Ok(response) = self.send_request(&body, None).await else {
+            return CapabilityProbe::Unknown;
+        };
+        if !response.status().is_success() {
+            return CapabilityProbe::Unknown;
+        }
+        let Ok(value) = response.json::<Value>().await else {
+            return CapabilityProbe::Unknown;
+        };
+        let native = value
+            .get("choices")
+            .and_then(Value::as_array)
+            .and_then(|c| c.first())
+            .and_then(|c| c.get("message"))
+            .and_then(|m| m.get("tool_calls"))
+            .and_then(Value::as_array)
+            .is_some_and(|calls| !calls.is_empty());
+        if native {
+            CapabilityProbe::Known(ProtocolCapabilities {
+                native_tools: true,
+                compatibility: true,
+            })
+        } else {
+            CapabilityProbe::Unknown
+        }
+    }
     async fn stream_decision(
         &self,
         messages: &[Message],
