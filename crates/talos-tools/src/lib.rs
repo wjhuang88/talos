@@ -87,6 +87,8 @@ pub mod web_search;
 #[cfg(feature = "shell")]
 pub use bash_tool::{BashError, BashInput, BashTool};
 #[cfg(feature = "network")]
+pub use browser_page::HttpBrowserPageConnector;
+#[cfg(feature = "network")]
 pub use browser_page::{
     BrowserPageConnector, BrowserPageLink, BrowserPageRecord, MockBrowserPageConnector,
 };
