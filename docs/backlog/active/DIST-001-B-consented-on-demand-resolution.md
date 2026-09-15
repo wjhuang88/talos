@@ -20,7 +20,7 @@
 | Work Slice | Explicitly consented on-demand Bundle resolution for a missing optional capability. |
 | Claimed At | 2026-09-15 |
 | Authorization Evidence | Pending governance claim merge; implementation remains unauthorized until target-branch activation. |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #566 |
 | Implementation PR | Not started |
 | Authorization Mode | Independent review |
 | Last Updated | 2026-09-15 |
