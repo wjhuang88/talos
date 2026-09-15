@@ -28,6 +28,9 @@
 
 ## Required Reads
 
+Remote reconciliation note: Issue #515 owner DIST-001-B was reconciled as Complete / Closed in
+comments after its implementation and closeout merged.
+
 - [CAP-001 parent](CAP-001-progressive-capability-provider-architecture.md), [ADR-072](../../decisions/072-capability-provider-bundle-boundary.md), and [WEB-005](WEB-005-browser-session-continuity-research.md).
 - [TOOL-014](TOOL-014-conditional-tool-backends.md) and the connector ADR/security gate. This read-only connector does not authorize frame-aware interaction requested by Issue #520.
 
