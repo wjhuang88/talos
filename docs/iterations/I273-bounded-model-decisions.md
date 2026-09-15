@@ -3,6 +3,8 @@
 > Document status: Complete / Closed (implementations #559/#562 merged)
 > Parent: PROMPT-001 / Issue #285
 
+Completion Commit: `e4173caf93bb970aa01a6d66bdb46eacb2d22704`, `edc0b09a5dcc6cf099cd18c50dada85691f3502f`
+
 ## Objective
 
 Deliver a tested bounded model-decision primitive and integrate it with automatic tool-protocol
