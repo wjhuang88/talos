@@ -15,13 +15,13 @@
 | Field | Value |
 |---|---|
 | Claim State | Closed |
-| Responsible Actor | Not assigned |
+| Responsible Actor | @wjhuang88 |
 | Executing Agent | Not assigned |
 | Work Slice | Not assigned — children require separate non-overlapping claims |
-| Claimed At | Not applicable |
+| Claimed At | 2026-09-15 |
 | Source Issue | #466 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
+| Governance Claim PR | Direct commit `9f1492d2` |
+| Authorization Mode | Independent review |
 | Authorization Evidence | Not applicable |
 | Implementation PR | None — Epic parents are not implementation units |
 | Last Updated | 2026-09-02 |

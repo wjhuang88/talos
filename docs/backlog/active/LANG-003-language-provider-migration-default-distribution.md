@@ -18,11 +18,11 @@
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex unattended single-developer mode |
 | Work Slice | Remaining language migration and explicit default distribution decision. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-09-15 |
 | Authorization Evidence | No effective claim; intake owner only. Implementation is not authorized. |
-| Governance Claim PR | Claim PR pending |
+| Governance Claim PR | #564 |
 | Implementation PR | Not started |
-| Authorization Mode | Not applicable |
+| Authorization Mode | Independent review |
 | Last Updated | 2026-09-15 |
 | Handoff / Release Condition | Requires a separate distribution and compatibility decision before changing defaults. |
 
