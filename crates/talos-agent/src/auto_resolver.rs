@@ -1485,7 +1485,7 @@ impl ApprovalResolver for AutoPermissionResolver {
             && response.request_digest == evaluator_request.request_digest
             && response.decision == AutoDecision::AllowOnce
             && shell_context.is_none_or(|context| {
-                    response.effect == AutoEffect::ReadOnly
+                response.effect == AutoEffect::ReadOnly
                     && !context.syntax.has_redirection
                     && !context.syntax.has_environment_assignment
                     && !context.command.contains(['$', '`'])
