@@ -19,6 +19,8 @@ pub enum InstallError {
     MissingArtifact(String),
     #[error("bundle artifact digest mismatch")]
     DigestMismatch,
+    #[error("bundle installation cancelled or timed out")]
+    Cancelled,
 }
 
 /// Validate and atomically install a manually supplied Bundle directory.
@@ -29,6 +31,15 @@ pub enum InstallError {
 /// failure. Installation copies files only; it never loads, activates,
 /// registers, resolves, or grants permissions to a Plugin.
 pub fn install_bundle(source: &Path, destination: &Path) -> Result<BundleManifest, InstallError> {
+    install_bundle_with_guard(source, destination, || false)
+}
+
+/// Install a Bundle while checking a caller-owned cancellation/deadline guard at I/O boundaries.
+pub fn install_bundle_with_guard(
+    source: &Path,
+    destination: &Path,
+    mut guard: impl FnMut() -> bool,
+) -> Result<BundleManifest, InstallError> {
     if !source.is_dir() {
         return Err(InstallError::NotDirectory);
     }
@@ -46,8 +57,23 @@ pub fn install_bundle(source: &Path, destination: &Path) -> Result<BundleManifes
         return Err(InstallError::MissingArtifact(manifest.bundle.artifact));
     }
     if let Some(expected) = manifest.bundle.digest.as_deref() {
-        let bytes = std::fs::read(&artifact)?;
-        let actual = format!("sha256:{:x}", Sha256::digest(bytes));
+        if guard() {
+            return Err(InstallError::Cancelled);
+        }
+        let mut file = std::fs::File::open(&artifact)?;
+        let mut hasher = Sha256::new();
+        let mut chunk = [0u8; 64 * 1024];
+        loop {
+            let count = std::io::Read::read(&mut file, &mut chunk)?;
+            if count == 0 {
+                break;
+            }
+            hasher.update(&chunk[..count]);
+            if guard() {
+                return Err(InstallError::Cancelled);
+            }
+        }
+        let actual = format!("sha256:{:x}", hasher.finalize());
         if actual != expected {
             return Err(InstallError::DigestMismatch);
         }
@@ -59,7 +85,7 @@ pub fn install_bundle(source: &Path, destination: &Path) -> Result<BundleManifes
     if stage.exists() {
         std::fs::remove_dir_all(&stage)?;
     }
-    copy_tree(source, &stage)?;
+    copy_tree(source, &stage, &mut guard)?;
     let backup = destination.with_extension("backup");
     if backup.exists() {
         std::fs::remove_dir_all(&backup)?;
@@ -82,7 +108,17 @@ pub fn install_bundle(source: &Path, destination: &Path) -> Result<BundleManifes
     Ok(manifest)
 }
 
-fn copy_tree(source: &Path, destination: &Path) -> Result<(), std::io::Error> {
+fn copy_tree(
+    source: &Path,
+    destination: &Path,
+    guard: &mut impl FnMut() -> bool,
+) -> Result<(), std::io::Error> {
+    if guard() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::Interrupted,
+            "cancelled",
+        ));
+    }
     std::fs::create_dir_all(destination)?;
     for entry in std::fs::read_dir(source)? {
         let entry = entry?;
@@ -95,9 +131,24 @@ fn copy_tree(source: &Path, destination: &Path) -> Result<(), std::io::Error> {
             ));
         }
         if file_type.is_dir() {
-            copy_tree(&entry.path(), &target)?;
+            copy_tree(&entry.path(), &target, guard)?;
         } else {
-            std::fs::copy(entry.path(), target)?;
+            let mut input = std::fs::File::open(entry.path())?;
+            let mut output = std::fs::File::create(target)?;
+            let mut buffer = [0u8; 64 * 1024];
+            loop {
+                let count = std::io::Read::read(&mut input, &mut buffer)?;
+                if count == 0 {
+                    break;
+                }
+                std::io::Write::write_all(&mut output, &buffer[..count])?;
+                if guard() {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::Interrupted,
+                        "cancelled",
+                    ));
+                }
+            }
         }
     }
     Ok(())
