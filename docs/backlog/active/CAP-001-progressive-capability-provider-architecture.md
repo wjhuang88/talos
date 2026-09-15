@@ -1,5 +1,7 @@
 # CAP-001: Progressive Capability Provider Architecture
 
+**Status**: Complete / Closed
+
 | Field | Value |
 |---|---|
 | Story ID | CAP-001 |
