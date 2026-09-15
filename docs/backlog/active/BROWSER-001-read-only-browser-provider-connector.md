@@ -22,7 +22,7 @@
 | Authorization Evidence | Proposed atomic claim/activation; ineffective until merged to main. |
 | Governance Claim PR | #568 |
 | Implementation PR | Not started |
-| Authorization Mode | Single maintainer |
+| Authorization Mode | Single-maintainer |
 | Last Updated | 2026-09-15 |
 | Handoff / Release Condition | Requires a connector ADR/security review and explicit overlap agreement with WEB-005/TOOL-014. |
 
