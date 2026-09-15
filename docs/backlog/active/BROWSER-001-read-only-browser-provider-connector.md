@@ -5,7 +5,7 @@
 | Story ID | BROWSER-001 |
 | Type | Browser capability implementation |
 | Parent | CAP-001 / #466; WEB-005 |
-| Status | Active / Claimed |
+| Status | Complete / Closed |
 | Selected Iteration | I276 |
 | Source Issue | [GitHub Issue #508](https://github.com/wjhuang88/talos/issues/508) |
 | Depends On | CAP-001-B/C; WEB-005 security/product semantics; TOOL-014 disclosure policy |
@@ -21,16 +21,25 @@
 | Claimed At | 2026-09-15 |
 | Authorization Evidence | Proposed atomic claim/activation; ineffective until merged to main. |
 | Governance Claim PR | #568 |
-| Implementation PR | Not started |
+| Implementation PR | #569 (merged) |
+| Completion Commit | ef19d9c4 |
 | Authorization Mode | Single-maintainer merge |
 | Last Updated | 2026-09-15 |
-| Handoff / Release Condition | Requires a connector ADR/security review and explicit overlap agreement with WEB-005/TOOL-014. |
+| Handoff / Release Condition | Handoff to browser capability maintenance; DNS rebinding hardening remains a shared follow-up. |
 
 ## Required Reads
 
 Remote reconciliation note: Issue #515 owner DIST-001-B was reconciled as Complete / Closed in
 comments after its implementation and closeout merged.
 Status reconciliation comment is recorded on Issue #515.
+
+## Completion Checkpoint — 2026-09-16
+
+Completion Commit: `ef19d9c4`
+
+Implementation PR #569 merged after exact-head CI `34993034407` and independent security/API
+approval bound to head `d0197b21` and base `ef83903c`. The connector is read-only, bounded,
+SSRF-checked, and does not execute scripts or access browser state.
 
 - [CAP-001 parent](CAP-001-progressive-capability-provider-architecture.md), [ADR-072](../../decisions/072-capability-provider-bundle-boundary.md), and [WEB-005](WEB-005-browser-session-continuity-research.md).
 - [TOOL-014](TOOL-014-conditional-tool-backends.md) and the connector ADR/security gate. This read-only connector does not authorize frame-aware interaction requested by Issue #520.
