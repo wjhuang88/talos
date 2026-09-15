@@ -1,5 +1,7 @@
 # CAP-001: Progressive Capability Provider Architecture
 
+**Status**: Complete / Closed
+
 | Field | Value |
 |---|---|
 | Story ID | CAP-001 |
@@ -15,17 +17,19 @@
 | Field | Value |
 |---|---|
 | Claim State | Closed |
-| Responsible Actor | Not assigned |
+| Responsible Actor | @wjhuang88 |
 | Executing Agent | Not assigned |
 | Work Slice | Not assigned — children require separate non-overlapping claims |
-| Claimed At | Not applicable |
+| Claimed At | 2026-09-15 |
 | Source Issue | #466 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
+| Governance Claim PR | #521 |
+| Authorization Mode | Independent review |
 | Authorization Evidence | Not applicable |
 | Implementation PR | None — Epic parents are not implementation units |
 | Last Updated | 2026-09-02 |
 | Handoff / Release Condition | Architecture convergence complete. Remaining implementation children retain independent owners, claims and acceptance gates. |
+
+Completion Commit: `0835afc4b982a5ed409ccfb55538bbeaf6fe5eab`, `80b6678b`, `9404c338`, `a1a215e02635a984c4ee3524d18f4c096eb83fa9`, `137da646`, `935c4b861c4bda75cb0d05383db110a50256afbe`.
 
 ## Identity / Goal / Value
 
