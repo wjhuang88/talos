@@ -5,7 +5,7 @@
 | Requirement ID | PROMPT-001 |
 | Type | Architecture / Requirement Intake |
 | Priority | P1 |
-| Status | Refinement / Unclaimed |
+| Status | Complete / Closed |
 | Source | [GitHub Issue #285](https://github.com/wjhuang88/talos/issues/285) |
 | Selected Iteration | None |
 | Depends On | Current prompt assembly, scoped context, memory/evolution authority, SDK prompt customization and provider protocol contracts |
@@ -14,18 +14,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
+| Claim State | Closed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex |
+| Work Slice | Prompt authority, behavior harness, bounded model decisions and protocol automation |
 | Claimed At | Not applicable |
 | Source Issue | #285 |
-| Governance Claim PR | Not applicable |
+| Governance Claim PR | #286; implementation claims recorded in child owners |
 | Authorization Mode | Not applicable |
 | Authorization Evidence | Not applicable |
-| Implementation PR | Not started |
+| Implementation PR | #550, #552, #559, #562 and direct child commits |
 | Last Updated | 2026-08-18 |
-| Handoff / Release Condition | Accept the authority/precedence architecture and decompose independently runnable children before any implementation claim. |
+| Handoff / Release Condition | Complete; child implementations and evidence are merged and reconciled. |
 
 ## Identity / Goal / Value
 
@@ -123,14 +123,30 @@ Evolution guidance. This intake claims no shipped behavior.
 
 ## Acceptance For Technical / Governance Work
 
-- [ ] A reproducible inventory classifies every prompt contributor by source, scope, authority,
+- [x] A reproducible inventory classifies every prompt contributor by source, scope, authority,
       precedence, provenance and cache behavior.
-- [ ] An accepted ADR defines conflict resolution, public compatibility, migration and rollback.
-- [ ] Independently runnable children cover the behavior harness and each affected authority/API
+- [x] An accepted ADR defines conflict resolution, public compatibility, migration and rollback.
+- [x] Independently runnable children cover the behavior harness and each affected authority/API
       boundary before implementation selection.
-- [ ] Model-behavior fixtures cover nested instructions, current-user overrides, advisory memory and
+- [x] Model-behavior fixtures cover nested instructions, current-user overrides, advisory memory and
       Evolution, Skill/tool content as data, reprioritization, Todo restraint and protocol parity.
-- [ ] Structural prompt/cache tests, affected SDK docs and residual ownership remain synchronized.
+- [x] Structural prompt/cache tests, affected SDK docs and residual ownership remain synchronized.
+
+Completion Commit: `e4173caf`, `edc0b09a`, `b400443f`
+
+## 2026-09-15 Final Closeout Evidence
+
+- #45 / SESSION-008 is complete and closed at implementation commit `0f021a6f`.
+- Prompt authority, scoped AGENTS precedence, advisory Memory/Todo boundaries, SDK contribution
+  boundaries, deterministic behavior harness, bounded model decisions, protocol recovery, replay
+  protection and automatic Native/Compat selection are present in the merged child commits listed
+  above.
+- `release_preflight.sh` passed on current `main`, including locked workspace tests, doctests,
+  provider/agent protocol suites, governance validation and collaboration validation (0 warnings).
+- Independent Agent-role audits confirmed I267/I270/I272/I273 evidence on current `main`; shared
+  account constraints mean Agent-role separation, not natural-person identity separation.
+- This closeout uses existing implementation commits as evidence; this status-only commit is not
+  used as its own Completion Commit.
 
 ## Residual Destination
 
