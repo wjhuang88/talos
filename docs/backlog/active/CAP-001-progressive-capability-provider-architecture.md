@@ -20,7 +20,7 @@
 | Work Slice | Not assigned — children require separate non-overlapping claims |
 | Claimed At | 2026-09-15 |
 | Source Issue | #466 |
-| Governance Claim PR | Direct commit `9f1492d2` |
+| Governance Claim PR | #521 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Not applicable |
 | Implementation PR | None — Epic parents are not implementation units |
