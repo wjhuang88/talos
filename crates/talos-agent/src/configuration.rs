@@ -398,7 +398,23 @@ impl Agent {
     /// Automatic selection is resolved here, before constructing any request prompt.
     /// The prompt and sealed request retain the same selection until reconfigured.
     pub fn set_tool_protocol(&mut self, protocol: ToolProtocol) {
-        let protocol = if protocol == ToolProtocol::Auto {
+        let protocol = self.resolve_tool_protocol(protocol);
+        self.tool_protocol = protocol;
+        self.update_prompt_builder(true, |builder| match protocol {
+            ToolProtocol::TalosStrict => builder.with_strict_tool_format(),
+            ToolProtocol::Compat => builder.with_tool_format(prompt::TOOL_CALLING_FORMAT),
+            ToolProtocol::Native => builder.with_tool_format(""),
+            ToolProtocol::Auto => builder.with_tool_format(prompt::TOOL_CALLING_FORMAT),
+        });
+    }
+
+    /// Resolves an automatic protocol selection against this agent's scoped capability cache.
+    ///
+    /// The returned value is always concrete (never [`ToolProtocol::Auto`]), so callers can
+    /// seal it into a request plan and use the same protocol for prompt, serialization and
+    /// response parsing. Unknown capability evidence deliberately falls back to compatibility.
+    pub(crate) fn resolve_tool_protocol(&self, protocol: ToolProtocol) -> ToolProtocol {
+        if protocol == ToolProtocol::Auto {
             let probe = if let Some(scope) = self.provider.protocol_capability_scope() {
                 if let Some(cached) = self.protocol_capability_cache.get(&scope) {
                     cached
@@ -413,14 +429,29 @@ impl Agent {
             probe.select()
         } else {
             protocol
+        }
+    }
+
+    pub(crate) async fn resolve_tool_protocol_for_definitions(
+        &self,
+        protocol: ToolProtocol,
+        definitions: &[talos_core::provider::ToolDefinition],
+    ) -> ToolProtocol {
+        if protocol != ToolProtocol::Auto {
+            return protocol;
+        }
+        let probe = if let Some(scope) = self.provider.protocol_capability_scope() {
+            if let Some(cached) = self.protocol_capability_cache.get(&scope) {
+                cached
+            } else {
+                let value = self.provider.probe_protocol_capabilities(definitions).await;
+                self.protocol_capability_cache.insert(scope, value);
+                value
+            }
+        } else {
+            self.provider.probe_protocol_capabilities(definitions).await
         };
-        self.tool_protocol = protocol;
-        self.update_prompt_builder(true, |builder| match protocol {
-            ToolProtocol::TalosStrict => builder.with_strict_tool_format(),
-            ToolProtocol::Compat => builder.with_tool_format(prompt::TOOL_CALLING_FORMAT),
-            ToolProtocol::Native => builder.with_tool_format(""),
-            ToolProtocol::Auto => builder.with_tool_format(prompt::TOOL_CALLING_FORMAT),
-        });
+        probe.select()
     }
 
     /// Sets the skill index for the system prompt builder.

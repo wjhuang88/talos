@@ -107,8 +107,24 @@ impl Agent {
         let turn_id = TurnId::new();
         let hook_ctx = HookContext::new(turn_id, self.workspace_root.clone());
 
+        let active_tool_presentation_policy = self.tool_presentation_policy.clone();
+        let (_, mut active_tool_definitions, mut active_presented_tool_names) =
+            describe_presented_tools(&self.tools, &active_tool_presentation_policy);
+        if !self.image_input_supported {
+            active_tool_definitions.retain(|definition| definition.name != "read_image");
+            active_presented_tool_names.retain(|name| name != "read_image");
+        }
+
+        let selected_protocol = self
+            .resolve_tool_protocol_for_definitions(self.tool_protocol, &active_tool_definitions)
+            .await;
         let (mut messages, persist_start) = match self
-            .build_provider_messages(memory_query, history, &hook_ctx)
+            .build_provider_messages_with_protocol(
+                memory_query,
+                history,
+                &hook_ctx,
+                selected_protocol,
+            )
             .await
         {
             Ok(messages) => messages,
@@ -119,14 +135,6 @@ impl Agent {
         };
         messages.pop();
         messages.extend(input_messages);
-
-        let active_tool_presentation_policy = self.tool_presentation_policy.clone();
-        let (_, mut active_tool_definitions, mut active_presented_tool_names) =
-            describe_presented_tools(&self.tools, &active_tool_presentation_policy);
-        if !self.image_input_supported {
-            active_tool_definitions.retain(|definition| definition.name != "read_image");
-            active_presented_tool_names.retain(|name| name != "read_image");
-        }
 
         if let Err(error) = self
             .run_hook(&hook_ctx, HookEvent::TurnStart { turn_id })
@@ -236,11 +244,15 @@ impl Agent {
             });
         }
 
+        // The plan is the request's single source of protocol truth. Configuration normally
+        // resolves `Auto` eagerly; resolve defensively here so a plan can never dispatch an
+        // ambiguous protocol if a caller constructed an agent before configuration settled.
+        let tool_protocol = self.resolve_tool_protocol(self.tool_protocol);
         Ok(ProviderRequestPlan {
             messages: owned_messages,
             tool_definitions,
             estimated_tokens,
-            tool_protocol: self.tool_protocol,
+            tool_protocol,
         })
     }
 }
