@@ -2,13 +2,19 @@
 
 | Field | Value |
 |---|---|
-| Status | Planned / Claimed |
+| Status | Active / Claimed |
 | Source | Issue #515 / CAP-001 / #466 |
-| Claim State | Claimed (pending governance merge) |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex unattended single-developer mode |
 | Work Slice | Explicit consent, bounded verified resolution and separate Bundle activation for one missing optional capability. |
-| Implementation PR | Not started |
+| Implementation PR | Local convergence; not pushed |
+
+## Activation Checkpoint — 2026-09-15
+
+Claim PR #566 (head `d5f58df8`, base `606f4d8f`, CI `34975543686`) merged as `2499b9b8`.
+The implementation branch starts from that merge commit; the scope and exclusions above remain
+in force.
 
 ## Scope
 
@@ -30,3 +36,9 @@ until existing activation and permission boundaries allow it.
 
 Offline/mock fixtures, network failure and cancellation tests, security review, documentation,
 locked checks, governance validators and exact changed-file inventory.
+
+## Implementation Checkpoint — 2026-09-15
+
+The local resolver now requires exact consent, checks Bundle identity after verified installation,
+honors cancellation/deadline bounds, rolls back mismatches, and never activates content. Network
+acquisition remains outside this resolver and is not implicit.

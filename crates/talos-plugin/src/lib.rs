@@ -9,6 +9,7 @@ pub mod install;
 pub mod lifecycle;
 pub mod manifest;
 pub mod registry;
+pub mod resolution;
 #[cfg(feature = "wasm")]
 pub mod wasm;
 
@@ -26,5 +27,9 @@ pub use manifest::{
     migrate_legacy_manifest, parse_compatible_manifest,
 };
 pub use registry::{HookOutcome, HookRegistration, HookRegistry};
+pub use resolution::{
+    ResolutionConsent, ResolutionError, ResolutionLimits, ResolutionRequest, ResolutionResult,
+    resolve_verified_bundle,
+};
 #[cfg(feature = "wasm")]
 pub use wasm::{LoadedLanguageProvider, WasmLanguageProvider, load_declared_language_provider};
