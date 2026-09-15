@@ -42,7 +42,7 @@ existing implementation commit; a status-only commit is not evidence.
 
 | Field | Value |
 |---|---|
-| Claim State | Closed |
+| Claim State | Released |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex |
 | Work Slice | Endpoint/model capability evidence and automatic Native/validated compatibility selection; typed isolated bounded model decisions; model-assisted protocol recovery with tool-execution replay protection; migration of the existing auto-permission consumer; tests and user/API documentation under ADR-075. |

@@ -6,7 +6,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Closed |
+| Claim State | Released |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | @wjhuang88 |
 | Work Slice | Memory, session Todo, and steering prompt authority boundary |

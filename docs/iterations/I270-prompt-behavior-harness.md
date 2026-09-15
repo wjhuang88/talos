@@ -6,7 +6,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Closed |
+| Claim State | Released |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | @wjhuang88 |
 | Work Slice | Deterministic model-behavior fixtures for prompt authority and protocol parity |

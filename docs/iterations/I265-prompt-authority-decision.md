@@ -12,14 +12,14 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Closed |
+| Claim State | Released |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex |
 | Work Slice | ADR-074 decision and migration boundary only |
 | Source Issue | #285 |
-| Governance Claim PR | Direct commit `e7d6ef8e` |
+| Governance Claim PR | Direct commit e7d6ef8e |
 | Claimed At | 2026-09-13 |
-| Authorization Mode | Single-maintainer merge |
+| Authorization Mode | Direct commit |
 | Authorization Evidence | Claim-only ADR acceptance; implementation remains unauthorized until merge. |
 | Last Updated | 2026-09-13 |
 | Handoff / Release Condition | Complete; ADR-074 accepted and child boundaries established. |
