@@ -14,7 +14,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Closed |
+| Claim State | Released |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex |
 | Work Slice | Prompt authority, behavior harness, bounded model decisions and protocol automation |
