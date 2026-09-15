@@ -5,8 +5,8 @@
 | Story ID | DIST-001-B |
 | Type | Distribution and resolution implementation |
 | Parent | CAP-001 / #466; DIST-001 |
-| Status | Refinement / Unclaimed |
-| Selected Iteration | None |
+| Status | Planned / Claimed |
+| Selected Iteration | I275 |
 | Source Issue | [GitHub Issue #515](https://github.com/wjhuang88/talos/issues/515) |
 | Depends On | DIST-001-A; CAP-001-B/C; BUNDLE-001 |
 
@@ -14,16 +14,16 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex unattended single-developer mode |
 | Work Slice | Explicitly consented on-demand Bundle resolution for a missing optional capability. |
-| Claimed At | Not applicable |
-| Authorization Evidence | No effective claim; intake owner only. Implementation is not authorized. |
-| Governance Claim PR | Not applicable |
+| Claimed At | 2026-09-15 |
+| Authorization Evidence | Pending governance claim merge; implementation remains unauthorized until target-branch activation. |
+| Governance Claim PR | #566 |
 | Implementation PR | Not started |
-| Authorization Mode | Not applicable |
-| Last Updated | 2026-09-09 |
+| Authorization Mode | Independent review |
+| Last Updated | 2026-09-15 |
 | Handoff / Release Condition | Requires manual installation evidence, consent UX/security decision and network policy owner. |
 
 ## Required Reads
