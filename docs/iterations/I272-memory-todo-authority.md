@@ -64,3 +64,9 @@
 - Focused prompt and session evidence passed locally: 1 rendered advisory test and 35 session
   boundary tests. This checkpoint records Review readiness; umbrella PROMPT-001 acceptance and
   independent review remain outstanding.
+
+### 2026-09-15 Current-main independent audit
+
+Agent-role audit against `main@c36165a3` confirmed advisory Memory/Session Todo rendering and
+session-boundary tests. Remaining umbrella reconciliation and final owner closeout are still
+required; this does not mark I272 Complete.

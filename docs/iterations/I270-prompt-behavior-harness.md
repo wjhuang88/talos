@@ -66,3 +66,9 @@
 - The rendered builder fixture is a positive default-order case; the negative case is an explicit
   `User -> Session Todos` conflict. Focused prompt module tests: 66 passed.
 - I270 remains Review pending independent review and broader I285 acceptance.
+
+### 2026-09-15 Current-main independent audit
+
+Agent-role independent audit against `main@c36165a3` confirmed the deterministic harness and
+rendered precedence diagnostics are present. I270 remains Review pending umbrella acceptance and
+cross-child reconciliation. Shared-account review is Agent-role separation only, not natural-person identity separation.
