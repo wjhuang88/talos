@@ -136,3 +136,29 @@ Evolution guidance. This intake claims no shipped behavior.
 
 Every implementation workstream remains in a separately claimed child Story/iteration. This intake
 stays Refinement until at least the architecture decision and first runnable child are ready.
+
+## 2026-09-15 Umbrella Acceptance Audit
+
+This is an evidence index, not a completion claim. Each item remains subject to the cited owner
+and exact implementation evidence.
+
+| Acceptance area | Current evidence | Result |
+|---|---|---|
+| Prompt contributor inventory | I264 baseline and I266/I269/I272 child records | Partial: umbrella reconciliation remains |
+| Authority and precedence ADR | ADR-074; I265 decision | Present; migration/umbrella closeout remains |
+| Independently runnable children | I264/I265/I266/I267/I268/I269/I270/I271/I272/I273 | Present; several owners remain Review |
+| Nested instructions and truncation | I267 commits and focused tests | Review |
+| Current-user precedence over advisory context | I266/I269/I270 prompt fixtures | Review |
+| Memory and Todo advisory boundary | I272 evidence and session tests | Review |
+| Skill/tool content treated as data | I270 protocol/capability fixtures | Review |
+| Reprioritization and interruption behavior | session boundary tests; I272 | Review |
+| Todo restraint/usefulness | I270 Todo fixtures | Review |
+| Native/TalosStrict/Compat parity | I273 provider and request-plan tests | Review |
+| Stable-prefix/cache behavior | prompt cache tests and I270 harness | Review |
+| SDK/extension documentation | I271 and Runtime SDK contract | Review |
+| Model-behavior harness | I270 deterministic harness | Review |
+| Residual ownership and derived views | child owner documents and indexes | Pending final owner-first synchronization |
+| Umbrella completion evidence | PROMPT-001 owner itself | Not met; no umbrella completion commit |
+
+The audit confirms that #45 is independently complete, while #285 remains open until the Review
+children and this umbrella record are reconciled and closed with existing implementation commits.
