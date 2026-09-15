@@ -5,8 +5,8 @@
 | Story ID | BROWSER-001 |
 | Type | Browser capability implementation |
 | Parent | CAP-001 / #466; WEB-005 |
-| Status | Refinement / Unclaimed |
-| Selected Iteration | None |
+| Status | Active / Claimed |
+| Selected Iteration | I276 |
 | Source Issue | [GitHub Issue #508](https://github.com/wjhuang88/talos/issues/508) |
 | Depends On | CAP-001-B/C; WEB-005 security/product semantics; TOOL-014 disclosure policy |
 
@@ -14,19 +14,23 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex unattended single-developer mode |
 | Work Slice | One read-only Browser Provider connector behind the existing browser-page boundary. |
-| Claimed At | Not applicable |
-| Authorization Evidence | No effective claim; intake owner only. Implementation is not authorized. |
-| Governance Claim PR | Not applicable |
+| Claimed At | 2026-09-15 |
+| Authorization Evidence | Proposed atomic claim/activation; ineffective until merged to main. |
+| Governance Claim PR | #568 |
 | Implementation PR | Not started |
-| Authorization Mode | Not applicable |
-| Last Updated | 2026-09-09 |
+| Authorization Mode | Single-maintainer merge |
+| Last Updated | 2026-09-15 |
 | Handoff / Release Condition | Requires a connector ADR/security review and explicit overlap agreement with WEB-005/TOOL-014. |
 
 ## Required Reads
+
+Remote reconciliation note: Issue #515 owner DIST-001-B was reconciled as Complete / Closed in
+comments after its implementation and closeout merged.
+Status reconciliation comment is recorded on Issue #515.
 
 - [CAP-001 parent](CAP-001-progressive-capability-provider-architecture.md), [ADR-072](../../decisions/072-capability-provider-bundle-boundary.md), and [WEB-005](WEB-005-browser-session-continuity-research.md).
 - [TOOL-014](TOOL-014-conditional-tool-backends.md) and the connector ADR/security gate. This read-only connector does not authorize frame-aware interaction requested by Issue #520.
