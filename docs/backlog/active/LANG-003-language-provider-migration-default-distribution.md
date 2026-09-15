@@ -19,12 +19,19 @@
 | Executing Agent | Codex unattended single-developer mode |
 | Work Slice | Remaining language migration and explicit default distribution decision. |
 | Claimed At | 2026-09-15 |
-| Authorization Evidence | No effective claim; intake owner only. Implementation is not authorized. |
+| Authorization Evidence | Claim PR #564 merged as 6a4a2117; implementation is authorized within the bounded Work Slice. |
 | Governance Claim PR | #564 |
 | Implementation PR | Not started |
 | Authorization Mode | Independent review |
 | Last Updated | 2026-09-15 |
 | Handoff / Release Condition | Requires a separate distribution and compatibility decision before changing defaults. |
+
+## Activation Checkpoint — 2026-09-15
+
+Claim PR #564 merged to `main` as `6a4a2117` (head `0e7fe73d`, base `b3da1653`).
+Exact-head CI run 34965337239 passed all applicable jobs; the Windows Rust workspace was
+correctly skipped by the documentation-only route. The claim is now effective. LANG-003
+implementation starts from `main@6a4a2117`; the published baseline above remains unchanged.
 
 ## Required Reads
 
