@@ -1511,7 +1511,7 @@ impl ApprovalResolver for AutoPermissionResolver {
                 reason: if shell_context.is_some() {
                     "shell_command"
                 } else {
-                    "bounded_workspace_text_create"
+                    "bounded_workspace_text_write"
                 }
                 .into(),
                 evaluator: self.assessor.identity().into(),
