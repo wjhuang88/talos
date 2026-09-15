@@ -15,8 +15,8 @@
 | Governance Claim PR | Direct commit 224f16bb |
 | Authorization Mode | Direct commit |
 | Authorization Evidence | User-authorized continuation; harness-only scope. |
-| Implementation PR | Not started |
-| Last Updated | 2026-09-13 |
+| Implementation PR | Direct commits `40658643`, `ee9a3ed7`, `2c58b52c`, `e04da18b`, `d96af6a9`, `18ad38b7`, `94e844b8`, `5d49525e`, `b400443f` |
+| Last Updated | 2026-09-15 |
 | Handoff / Release Condition | Excludes production prompt, Memory, Evolution, SDK, provider, UI, and release changes. |
 
 ## Scope
