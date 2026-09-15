@@ -113,7 +113,7 @@ impl ApprovalPrompt {
             }
         }
         eprintln!();
-        eprintln!("[y] Approve once  [a] Always approve  [n] Deny");
+        eprintln!("[1] Approve once  [2] Always approve  [3] Deny");
         eprint!("> ");
         io::stderr().flush().context("failed to flush stderr")?;
         Ok(())
@@ -135,10 +135,10 @@ impl ApprovalPrompt {
     ///
     /// Prints a formatted prompt to stderr showing the tool name, arguments,
     /// and available actions. Reads a single character from stdin:
-    /// - `y` — approve once, returns [`PermissionDecision::Allow`]
-    /// - `a` — always approve, installs an in-memory Session grant for all facets and returns
+    /// - `1` — approve once, returns [`PermissionDecision::Allow`]
+    /// - `2` — always approve, installs an in-memory Session grant for all facets and returns
     ///   [`PermissionDecision::Allow`]
-    /// - `n` — deny, returns [`PermissionDecision::Deny`]
+    /// - `3` — deny, returns [`PermissionDecision::Deny`]
     ///
     /// Invalid input causes the prompt to be re-displayed.
     ///
@@ -161,11 +161,11 @@ impl ApprovalPrompt {
                 .context("failed to read from stdin")?;
 
             match line.trim() {
-                "y" => return Ok(ApprovalChoice::ApproveOnce),
-                "a" => return Ok(ApprovalChoice::AlwaysApprove),
-                "n" => return Ok(ApprovalChoice::Deny),
+                "1" => return Ok(ApprovalChoice::ApproveOnce),
+                "2" => return Ok(ApprovalChoice::AlwaysApprove),
+                "3" => return Ok(ApprovalChoice::Deny),
                 _ => {
-                    eprintln!("Invalid input. Please enter y, a, or n.");
+                    eprintln!("Invalid input. Please enter 1, 2, or 3.");
                     continue;
                 }
             }

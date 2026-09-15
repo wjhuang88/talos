@@ -235,7 +235,7 @@ Acceptance criteria:
 - [ ] Multi-line input: `Enter` inserts newline when modified (`Shift+Enter`); `Enter` submits when not modified.
 - [ ] `@` triggers file search popup; typing after `@` filters; `↑`/`↓` selects; `Enter` inserts the mention; `Esc` cancels.
 - [ ] `$` triggers app-reference popup; same UX.
-- [ ] Approval overlay opens on `TuiApprovalRequest`; `y`/`a`/`n` selects; `Esc` denies.
+- [ ] Approval overlay opens on `TuiApprovalRequest`; `1`/`2`/`3` selects approve once / always approve / deny; `Esc` denies.
 
 ### Sub-slice D: slash command framework
 

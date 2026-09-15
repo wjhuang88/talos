@@ -15,7 +15,7 @@ use crate::theme::semantic;
 /// Renders a semi-transparent approval overlay on top of the chat viewport.
 ///
 /// Displays the tool name, arguments, risk level, and three options:
-/// `[y] Approve once`, `[a] Always approve`, `[n] Deny`.
+/// `[1] Approve once`, `[2] Always approve`, `[3] Deny`.
 /// The currently selected option is highlighted with nord8.
 pub struct ApprovalOverlay<'a> {
     /// Name of the tool requiring approval.
@@ -90,9 +90,9 @@ impl ratatui::widgets::Widget for ApprovalOverlay<'_> {
         lines.push(Line::from(""));
 
         let options = [
-            ("y", "Approve once", ApprovalChoice::ApproveOnce),
-            ("a", "Always approve", ApprovalChoice::AlwaysApprove),
-            ("n", "Deny", ApprovalChoice::Deny),
+            ("1", "Approve once", ApprovalChoice::ApproveOnce),
+            ("2", "Always approve", ApprovalChoice::AlwaysApprove),
+            ("3", "Deny", ApprovalChoice::Deny),
         ];
 
         for (key, label, choice) in options {

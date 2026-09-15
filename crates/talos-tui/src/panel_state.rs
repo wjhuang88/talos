@@ -579,7 +579,7 @@ impl BottomPanelState {
             }),
             items: vec![
                 PanelItem {
-                    label: "[y] approve".to_string(),
+                    label: "[1] approve".to_string(),
                     description: String::new(),
                     action: PanelItemAction::Select {
                         command: String::new(),
@@ -588,7 +588,7 @@ impl BottomPanelState {
                     is_current: false,
                 },
                 PanelItem {
-                    label: "[a] always approve".to_string(),
+                    label: "[2] always approve".to_string(),
                     description: String::new(),
                     action: PanelItemAction::Select {
                         command: String::new(),
@@ -597,7 +597,7 @@ impl BottomPanelState {
                     is_current: false,
                 },
                 PanelItem {
-                    label: "[n] deny".to_string(),
+                    label: "[3] deny".to_string(),
                     description: String::new(),
                     action: PanelItemAction::Select {
                         command: String::new(),

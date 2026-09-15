@@ -3478,7 +3478,7 @@ fn clipped_scope_cannot_resolve_always_approval() {
         Some("Write Path: /private/tmp/exact-file.txt".to_string()),
     );
 
-    tui.handle_pending_approval_input(KeyCode::Char('a'));
+    tui.handle_pending_approval_input(KeyCode::Char('2'));
 
     assert!(matches!(
         tui.state.approval_state,

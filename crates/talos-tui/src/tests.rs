@@ -1383,14 +1383,14 @@ mod tests {
             .join("\n");
         assert!(all.contains("bash"), "tool name must be visible");
         assert!(
-            all.contains("[y] approve"),
+            all.contains("[1] approve"),
             "approve option must be visible"
         );
         assert!(
-            all.contains("[a] always approve"),
+            all.contains("[2] always approve"),
             "always option must be visible"
         );
-        assert!(all.contains("[n] deny"), "deny option must be visible");
+        assert!(all.contains("[3] deny"), "deny option must be visible");
     }
 
     #[test]
@@ -1403,9 +1403,9 @@ mod tests {
             .join("\n");
         assert!(all.contains("Always approve scope:"));
         assert!(all.contains("/private/tmp/example/exact-file.txt"));
-        assert!(all.contains("[y] approve"));
-        assert!(all.contains("[a] always approve"));
-        assert!(all.contains("[n] deny"));
+        assert!(all.contains("[1] approve"));
+        assert!(all.contains("[2] always approve"));
+        assert!(all.contains("[3] deny"));
     }
 
     #[test]
@@ -1437,8 +1437,8 @@ mod tests {
 
         assert!(!approval_preview_fully_visible(40, h, scope));
         assert!(all.contains("[a] resize to review full scope"));
-        assert!(all.contains("[y] approve"));
-        assert!(all.contains("[n] deny"));
+        assert!(all.contains("[1] approve"));
+        assert!(all.contains("[3] deny"));
     }
 
     #[test]
@@ -1465,11 +1465,11 @@ mod tests {
             .join("\n");
         assert!(all.contains("bash"), "tool name must be visible at 40 cols");
         assert!(
-            all.contains("[y] approve"),
+            all.contains("[1] approve"),
             "approve option must be visible at 40 cols"
         );
         assert!(
-            all.contains("[n] deny"),
+            all.contains("[3] deny"),
             "deny option must be visible at 40 cols"
         );
     }
@@ -1483,8 +1483,8 @@ mod tests {
             .collect::<Vec<_>>()
             .join("\n");
         assert!(all.contains("write"));
-        assert!(all.contains("[y] approve"));
-        assert!(all.contains("[n] deny"));
+        assert!(all.contains("[1] approve"));
+        assert!(all.contains("[3] deny"));
     }
 
     #[test]
@@ -1493,11 +1493,11 @@ mod tests {
         let selected_line = buffer_line_content(&buf, 2, 80);
         let unselected_line = buffer_line_content(&buf, 3, 80);
         assert!(
-            selected_line.contains("[y] approve"),
+            selected_line.contains("[1] approve"),
             "first option should be selected: {selected_line}"
         );
         assert!(
-            unselected_line.contains("[a] always approve"),
+            unselected_line.contains("[2] always approve"),
             "second option should be unselected: {unselected_line}"
         );
         let selected_cell = &buf[(2, 2)];
@@ -1540,8 +1540,8 @@ mod tests {
             .collect::<Vec<_>>()
             .join("\n");
         assert!(all.contains("bash"), "tool name must be visible");
-        assert!(all.contains("[y] approve"), "options must be visible");
-        assert!(all.contains("[n] deny"));
+        assert!(all.contains("[1] approve"), "options must be visible");
+        assert!(all.contains("[3] deny"));
     }
 
     #[test]
@@ -1563,9 +1563,9 @@ mod tests {
             .collect::<Vec<_>>()
             .join("\n");
         assert!(all.contains("bash"), "tool name must survive clipping");
-        assert!(all.contains("[y] approve"), "options must survive clipping");
+        assert!(all.contains("[1] approve"), "options must survive clipping");
         assert!(
-            all.contains("[n] deny"),
+            all.contains("[3] deny"),
             "all 3 options should fit at height 5"
         );
     }
@@ -1633,10 +1633,10 @@ mod tests {
             .collect::<Vec<_>>()
             .join("\n");
         assert!(
-            all.contains("[y] approve"),
+            all.contains("[1] approve"),
             "options must be visible with CJK tool name"
         );
-        assert!(all.contains("[n] deny"));
+        assert!(all.contains("[3] deny"));
     }
 
     // ── Status bar redesign ────────────────────────────────────────────

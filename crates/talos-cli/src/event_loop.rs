@@ -706,9 +706,9 @@ fn resolve_displayed_approval(
         return ApprovalInputOutcome::Stale;
     }
     let choice = match input.trim() {
-        "y" | "Y" => talos_core::ApprovalChoice::ApproveOnce,
-        "a" | "A" => talos_core::ApprovalChoice::AlwaysApprove,
-        "n" | "N" => talos_core::ApprovalChoice::Deny,
+        "1" => talos_core::ApprovalChoice::ApproveOnce,
+        "2" => talos_core::ApprovalChoice::AlwaysApprove,
+        "3" => talos_core::ApprovalChoice::Deny,
         _ => return ApprovalInputOutcome::Invalid,
     };
     let request = queue.pop_front().expect("displayed request is present");
@@ -825,7 +825,7 @@ mod approval_queue_tests {
         assert_eq!(displayed, Some(current_id));
 
         assert!(matches!(
-            resolve_displayed_approval(&mut queue, &mut displayed, &mut rollover_barrier, "y"),
+            resolve_displayed_approval(&mut queue, &mut displayed, &mut rollover_barrier, "1"),
             ApprovalInputOutcome::Stale
         ));
         assert!(matches!(
@@ -834,7 +834,7 @@ mod approval_queue_tests {
         ));
 
         assert!(matches!(
-            resolve_displayed_approval(&mut queue, &mut displayed, &mut rollover_barrier, "y"),
+            resolve_displayed_approval(&mut queue, &mut displayed, &mut rollover_barrier, "1"),
             ApprovalInputOutcome::Resolved
         ));
         assert_eq!(
@@ -869,7 +869,7 @@ mod approval_queue_tests {
             &mut rollover_barrier,
         ));
         assert!(matches!(
-            resolve_displayed_approval(&mut queue, &mut displayed, &mut rollover_barrier, "y"),
+            resolve_displayed_approval(&mut queue, &mut displayed, &mut rollover_barrier, "1"),
             ApprovalInputOutcome::Stale
         ));
         assert!(matches!(
@@ -877,7 +877,7 @@ mod approval_queue_tests {
             Err(tokio::sync::oneshot::error::TryRecvError::Empty)
         ));
         assert!(matches!(
-            resolve_displayed_approval(&mut queue, &mut displayed, &mut rollover_barrier, "y"),
+            resolve_displayed_approval(&mut queue, &mut displayed, &mut rollover_barrier, "1"),
             ApprovalInputOutcome::Resolved
         ));
         assert_eq!(

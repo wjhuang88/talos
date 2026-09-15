@@ -98,7 +98,12 @@ impl Tui {
                 self.resolve_approval(ApprovalChoice::Deny);
             }
             KeyCode::Char(c) => {
-                if let Some(choice) = self.handle_approval_key(c) {
+                if let Some(choice) = match c {
+                    '1' => Some(ApprovalChoice::ApproveOnce),
+                    '2' => Some(ApprovalChoice::AlwaysApprove),
+                    '3' => Some(ApprovalChoice::Deny),
+                    _ => None,
+                } {
                     self.resolve_approval(choice);
                 }
             }

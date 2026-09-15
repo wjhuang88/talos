@@ -480,15 +480,15 @@ impl Tui {
         };
 
         match key {
-            'y' => {
+            '1' => {
                 *selected = ApprovalChoice::ApproveOnce;
                 Some(ApprovalChoice::ApproveOnce)
             }
-            'a' => {
+            '2' => {
                 *selected = ApprovalChoice::AlwaysApprove;
                 Some(ApprovalChoice::AlwaysApprove)
             }
-            'n' => {
+            '3' => {
                 *selected = ApprovalChoice::Deny;
                 Some(ApprovalChoice::Deny)
             }
