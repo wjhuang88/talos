@@ -18,13 +18,13 @@
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex |
 | Work Slice | Prompt authority, behavior harness, bounded model decisions and protocol automation |
-| Claimed At | Not applicable |
+| Claimed At | 2026-09-15 |
 | Source Issue | #285 |
-| Governance Claim PR | #286; implementation claims recorded in child owners |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #286 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Governance registration PR #286; child implementation and review evidence recorded in owner documents. |
 | Implementation PR | #550, #552, #559, #562 and direct child commits |
-| Last Updated | 2026-08-18 |
+| Last Updated | 2026-09-15 |
 | Handoff / Release Condition | Complete; child implementations and evidence are merged and reconciled. |
 
 ## Identity / Goal / Value
