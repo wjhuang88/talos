@@ -1,6 +1,6 @@
 # ADR-077: Consented On-Demand Bundle Resolution
 
-**Status:** Proposed (DIST-001-B / Issue #515)
+**Status:** Accepted (DIST-001-B / Issue #515; maintainer acceptance 2026-09-15)
 
 ## Decision (proposed)
 

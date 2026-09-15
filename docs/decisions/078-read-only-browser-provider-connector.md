@@ -1,6 +1,6 @@
 # ADR-078: Read-Only Browser Provider Connector
 
-**Status:** Proposed (BROWSER-001 / Issue #508)
+**Status:** Accepted (BROWSER-001 / Issue #508; maintainer acceptance 2026-09-15)
 
 ## Decision (proposed)
 

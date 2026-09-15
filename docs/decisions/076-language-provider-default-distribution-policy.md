@@ -1,6 +1,6 @@
 # ADR-076: Language Provider Default Distribution Policy
 
-**Status:** Proposed (LANG-003 / Issue #517)
+**Status:** Accepted (LANG-003 / Issue #517; maintainer acceptance 2026-09-15)
 
 ## Context
 
