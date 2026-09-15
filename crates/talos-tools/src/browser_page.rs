@@ -99,6 +99,11 @@ fn sanitize_url_for_record(url: &str) -> String {
     parsed.to_string()
 }
 
+#[cfg(feature = "network")]
+fn is_supported_link(url: &Url) -> bool {
+    matches!(url.scheme(), "http" | "https")
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BrowserPageLink {
     pub text: String,
@@ -208,7 +213,7 @@ impl BrowserPageConnector for HttpBrowserPageConnector {
         for node in document.select(&link_selector).take(self.max_links) {
             if let Some(href) = node.value().attr("href")
                 && let Ok(link_url) = Url::parse(href).or_else(|_| final_base.join(href))
-                && matches!(link_url.scheme(), "http" | "https")
+                && is_supported_link(&link_url)
             {
                 let mut text = node.text().collect::<String>();
                 text.truncate(text.floor_char_boundary(512));
@@ -398,5 +403,19 @@ mod tests {
                 "unexpected field '{key}' in BrowserPageRecord JSON"
             );
         }
+    }
+
+    #[cfg(feature = "network")]
+    #[test]
+    fn connector_link_filter_rejects_script_and_data_schemes() {
+        assert!(!is_supported_link(
+            &Url::parse("javascript:alert(1)").unwrap()
+        ));
+        assert!(!is_supported_link(
+            &Url::parse("data:text/plain,secret").unwrap()
+        ));
+        assert!(is_supported_link(
+            &Url::parse("https://example.com").unwrap()
+        ));
     }
 }
