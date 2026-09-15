@@ -117,6 +117,22 @@ async fn additional_python_provider_uses_verified_offline_bundle_and_plain_text_
     ));
     let _ = std::fs::remove_dir_all(destination);
 }
+
+#[test]
+fn python_bundle_corruption_is_rejected_before_activation() {
+    let source = python_language_fixture();
+    let root = std::env::temp_dir().join(format!("talos-lang003-corrupt-{}", std::process::id()));
+    std::fs::create_dir_all(&root).expect("temp root");
+    std::fs::copy(source.join("provider.wat"), root.join("provider.wat")).expect("copy artifact");
+    let mut manifest = std::fs::read_to_string(source.join("manifest.toml")).expect("manifest");
+    manifest = manifest.replace("938aa844", "00000000");
+    std::fs::write(root.join("manifest.toml"), manifest).expect("write corrupt manifest");
+    assert!(matches!(
+        talos_plugin::install_bundle(&root, &root.join("installed")),
+        Err(talos_plugin::InstallError::DigestMismatch)
+    ));
+    let _ = std::fs::remove_dir_all(root);
+}
 fn resolve(registry: &Mutex<CapabilityRegistry>) -> ResolutionResult {
     registry
         .lock()

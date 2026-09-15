@@ -21,7 +21,7 @@
 | Claimed At | 2026-09-15 |
 | Authorization Evidence | Claim PR #564 merged as 6a4a2117; implementation is authorized within the bounded Work Slice. |
 | Governance Claim PR | #564 |
-| Implementation PR | Not started |
+| Implementation PR | #565 (Review / Claimed) |
 | Authorization Mode | Independent review |
 | Last Updated | 2026-09-15 |
 | Handoff / Release Condition | Requires a separate distribution and compatibility decision before changing defaults. |

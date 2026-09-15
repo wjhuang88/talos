@@ -9,7 +9,7 @@
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex unattended single-developer mode |
 | Work Slice | Define and implement one additional language provider distribution path with explicit fallback and compatibility evidence; preserve current defaults. |
-| Implementation PR | Not started |
+| Implementation PR | #565 (Review / Claimed) |
 
 ## Activation Checkpoint — 2026-09-15
 
