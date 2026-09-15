@@ -125,7 +125,10 @@ fn python_bundle_corruption_is_rejected_before_activation() {
     std::fs::create_dir_all(&root).expect("temp root");
     std::fs::copy(source.join("provider.wat"), root.join("provider.wat")).expect("copy artifact");
     let mut manifest = std::fs::read_to_string(source.join("manifest.toml")).expect("manifest");
-    manifest = manifest.replace("938aa844", "00000000");
+    manifest = manifest.replace(
+        "\n[language_provider]",
+        "\ndigest = \"sha256:0000000000000000000000000000000000000000000000000000000000000000\"\n\n[language_provider]",
+    );
     std::fs::write(root.join("manifest.toml"), manifest).expect("write corrupt manifest");
     assert!(matches!(
         talos_plugin::install_bundle(&root, &root.join("installed")),
