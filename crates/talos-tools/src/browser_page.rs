@@ -206,17 +206,16 @@ impl BrowserPageConnector for HttpBrowserPageConnector {
             scraper::Selector::parse("a[href]").map_err(|error| error.to_string())?;
         let mut links = Vec::new();
         for node in document.select(&link_selector).take(self.max_links) {
-            if let Some(href) = node.value().attr("href") {
-                if let Ok(link_url) = Url::parse(href).or_else(|_| final_base.join(href))
-                    && matches!(link_url.scheme(), "http" | "https")
-                {
-                    let mut text = node.text().collect::<String>();
-                    text.truncate(text.floor_char_boundary(512));
-                    links.push(BrowserPageLink {
-                        text,
-                        url: sanitize_url_for_record(link_url.as_str()),
-                    });
-                }
+            if let Some(href) = node.value().attr("href")
+                && let Ok(link_url) = Url::parse(href).or_else(|_| final_base.join(href))
+                && matches!(link_url.scheme(), "http" | "https")
+            {
+                let mut text = node.text().collect::<String>();
+                text.truncate(text.floor_char_boundary(512));
+                links.push(BrowserPageLink {
+                    text,
+                    url: sanitize_url_for_record(link_url.as_str()),
+                });
             }
         }
         let mut record =
