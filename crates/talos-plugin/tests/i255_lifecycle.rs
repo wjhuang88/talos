@@ -17,6 +17,10 @@ fn fixture() -> PathBuf {
 fn language_fixture() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/language-provider")
 }
+fn python_language_fixture() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/language-provider-python")
+}
 
 #[tokio::test]
 async fn language_provider_publication_requires_activation_and_is_withdrawn_on_stop() {
@@ -82,6 +86,36 @@ async fn language_provider_fixture_has_safe_highlight_fallback() {
         provider.highlight(&language, "fn main() {}"),
         talos_text::HighlightResult::PlainText
     ));
+}
+
+#[tokio::test]
+async fn additional_python_provider_uses_verified_offline_bundle_and_plain_text_fallback() {
+    let source = python_language_fixture();
+    let destination = std::env::temp_dir().join(format!(
+        "talos-lang003-python-{}",
+        std::process::id()
+    ));
+    let installed = talos_plugin::install_bundle(&source, &destination)
+        .expect("verified offline bundle installs");
+    assert_eq!(
+        installed.language_provider.as_ref().map(|p| p.language.as_str()),
+        Some("python")
+    );
+    let registry = Arc::new(Mutex::new(CapabilityRegistry::default()));
+    let mut plugin = PluginLifecycle::new(registry);
+    plugin
+        .load(&destination)
+        .expect("python bundle manifest loads");
+    plugin.initialize(runtime()).expect("provider initializes");
+    plugin.activate().expect("activate python provider");
+    let provider = plugin.language_provider().expect("provider handle");
+    let language = talos_text::LanguageId::parse("python").expect("language");
+    assert!(provider.supports(&language));
+    assert!(matches!(
+        provider.highlight(&language, "def main():\n    return 1"),
+        talos_text::HighlightResult::PlainText
+    ));
+    let _ = std::fs::remove_dir_all(destination);
 }
 fn resolve(registry: &Mutex<CapabilityRegistry>) -> ResolutionResult {
     registry
