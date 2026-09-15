@@ -73,6 +73,17 @@ existing implementation commit; a status-only commit is not evidence.
 - This checkpoint records the capability-probe and automatic Native/Compat selection evidence only;
   it does not claim protocol recovery, umbrella completion, or child closeout.
 
+## 2026-09-15 Post-merge Acceptance Audit
+
+- Current `main` contains the bounded decision primitive, protocol-failure recovery path,
+  execution-ledger replay guard, and automatic capability selection. Focused bounded-model,
+  request-plan, capability-evidence, compatibility-frame, decision-limit, and stream-cancellation
+  suites pass on the merged tree.
+- The implementation evidence is now sufficient for the I273 code slice, but the owner remains
+  `Review / Claimed` because umbrella PROMPT-001 acceptance still requires requirement-by-
+  requirement reconciliation, user/API documentation review, and closeout of residual child
+  owners. This audit does not mark I273 or PROMPT-001 complete.
+
 ## 2026-09-14 Development-Cycle Convergence Checkpoint
 
 The maintainer requested that this development cycle close both its original work and the
