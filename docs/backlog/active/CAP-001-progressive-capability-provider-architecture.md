@@ -5,7 +5,7 @@
 | Story ID | CAP-001 |
 | Type | Architecture / Domain Epic |
 | Priority | P1 |
-| Status | Refinement / Unclaimed |
+| Status | Complete / Closed |
 | Source | [GitHub Issue #466](https://github.com/wjhuang88/talos/issues/466) |
 | Selected Iteration | None — Epic parents are not selected directly |
 | Depends On | ADR-027; ADR-029; PLUGIN-001; TOOL-008; TOOL-012; TOOL-014; DIST-001; WEB-005; current code-truth audit |
@@ -14,7 +14,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Closed |
 | Responsible Actor | Not assigned |
 | Executing Agent | Not assigned |
 | Work Slice | Not assigned — children require separate non-overlapping claims |
@@ -25,7 +25,7 @@
 | Authorization Evidence | Not applicable |
 | Implementation PR | None — Epic parents are not implementation units |
 | Last Updated | 2026-09-02 |
-| Handoff / Release Condition | Refine and accept the Capability/Provider/Plugin/Bundle/Carrier decision, then select only a bounded child with its own runnable iteration and effective claim. |
+| Handoff / Release Condition | Architecture convergence complete. Remaining implementation children retain independent owners, claims and acceptance gates. |
 
 ## Identity / Goal / Value
 
@@ -35,7 +35,15 @@ lifecycle, Bundles own installation/distribution, and Carriers describe executio
 This prevents language, browser, Tool and future Desktop consumers from creating incompatible
 registries, loading rules or package semantics.
 
-This Epic is an architecture and decomposition owner. It does not authorize implementation.
+This Epic is an architecture and decomposition owner. Its governance deliverable is complete; it
+does not authorize implementation of remaining child Stories.
+
+## Completion Evidence
+
+The architecture decision and decomposition are implemented and synchronized through the child
+completion records: ADR-072; CAP-001-A/B/C; TEXT-001; LANG-001/002; BUNDLE-001; and DIST-001-A.
+The remaining LANG-003, DIST-001-B and BROWSER-001 owners are intentionally left independent and
+unclaimed. This status record is not implementation evidence.
 
 ## Scope
 
