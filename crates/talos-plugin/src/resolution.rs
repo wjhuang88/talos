@@ -4,7 +4,8 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use crate::{
-    BundleManifest, CompatibleManifest, InstallError, install_bundle, parse_compatible_manifest,
+    BundleManifest, CompatibleManifest, InstallError, install_bundle_with_guard,
+    parse_compatible_manifest,
 };
 
 /// User consent required before resolving an optional Bundle.
@@ -98,18 +99,28 @@ pub fn resolve_verified_bundle(
                 return Err(ResolutionError::Install(InstallError::LegacyManifest));
             }
         };
+    let provider_matches = expected
+        .language_provider
+        .as_ref()
+        .map(|provider| format!("language.{}", provider.language) == request.capability)
+        .unwrap_or(false);
     if expected.bundle.name != request.bundle_name
         || expected.bundle.version != request.bundle_version
-        || expected
-            .language_provider
-            .as_ref()
-            .map(|provider| format!("language.{}", provider.language) != request.capability)
-            == Some(true)
+        || !provider_matches
     {
         return Err(ResolutionError::IdentityMismatch);
     }
     let staging = destination.with_extension("resolution-staging");
-    let manifest = install_bundle(source, &staging)?;
+    let manifest = install_bundle_with_guard(source, &staging, || {
+        cancelled() || started.elapsed() > limits.timeout
+    })
+    .map_err(|error| match error {
+        InstallError::Io(io) if io.kind() == std::io::ErrorKind::Interrupted => {
+            ResolutionError::Cancelled
+        }
+        InstallError::Cancelled => ResolutionError::Cancelled,
+        other => ResolutionError::Install(other),
+    })?;
     if started.elapsed() > limits.timeout || cancelled() {
         let _ = std::fs::remove_dir_all(&staging);
         return Err(ResolutionError::Cancelled);

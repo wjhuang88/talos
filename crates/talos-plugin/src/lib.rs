@@ -20,7 +20,7 @@ pub use event::{
     TurnId, TurnStatus,
 };
 pub use handler::{HookContext, HookHandler, HookResult};
-pub use install::{InstallError, install_bundle};
+pub use install::{InstallError, install_bundle, install_bundle_with_guard};
 pub use manifest::{
     BundleManifest, BundleMetadata, CompatibleManifest, LanguageProviderDeclaration, ManifestError,
     MigrationOptions, PluginHook, PluginManifest, PluginMetadata, PluginSkill, PluginTool,
