@@ -161,6 +161,10 @@ impl BrowserPageConnector for HttpBrowserPageConnector {
             "http" | "https" => {}
             scheme => return Err(format!("unsupported browser URL scheme: {scheme}")),
         }
+        let host = parsed
+            .host_str()
+            .ok_or_else(|| "browser URL has no host".to_string())?;
+        crate::http_request::check_ssrf_host(host).await?;
         let response = self
             .client
             .get(parsed)
