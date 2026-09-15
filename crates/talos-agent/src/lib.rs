@@ -610,6 +610,22 @@ impl Agent {
         history: Vec<Message>,
         hook_ctx: &HookContext,
     ) -> AgentResult<(Vec<Message>, usize)> {
+        self.build_provider_messages_with_protocol(
+            user_message,
+            history,
+            hook_ctx,
+            self.tool_protocol,
+        )
+        .await
+    }
+
+    pub(crate) async fn build_provider_messages_with_protocol(
+        &self,
+        user_message: String,
+        history: Vec<Message>,
+        hook_ctx: &HookContext,
+        protocol: talos_core::tool::ToolProtocol,
+    ) -> AgentResult<(Vec<Message>, usize)> {
         let mut prompt_builder = if let Some(ref mem_provider) = self.memory_provider {
             let memory_section = mem_provider(&user_message);
             self.prompt_builder
@@ -618,6 +634,11 @@ impl Agent {
         } else {
             self.prompt_builder.clone()
         };
+        prompt_builder = prompt_builder.with_tool_format(match protocol {
+            talos_core::tool::ToolProtocol::TalosStrict => prompt::TOOL_CALLING_STRICT,
+            talos_core::tool::ToolProtocol::Compat => prompt::TOOL_CALLING_FORMAT,
+            _ => "",
+        });
         if let Some(ref todo_provider) = self.todo_section_provider {
             prompt_builder = prompt_builder.with_todo_section(todo_provider());
         }

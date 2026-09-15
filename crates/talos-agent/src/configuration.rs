@@ -432,6 +432,28 @@ impl Agent {
         }
     }
 
+    pub(crate) async fn resolve_tool_protocol_for_definitions(
+        &self,
+        protocol: ToolProtocol,
+        definitions: &[talos_core::provider::ToolDefinition],
+    ) -> ToolProtocol {
+        if protocol != ToolProtocol::Auto {
+            return protocol;
+        }
+        let probe = if let Some(scope) = self.provider.protocol_capability_scope() {
+            if let Some(cached) = self.protocol_capability_cache.get(&scope) {
+                cached
+            } else {
+                let value = self.provider.probe_protocol_capabilities(definitions).await;
+                self.protocol_capability_cache.insert(scope, value);
+                value
+            }
+        } else {
+            self.provider.probe_protocol_capabilities(definitions).await
+        };
+        probe.select()
+    }
+
     /// Sets the skill index for the system prompt builder.
     ///
     /// Only Level 0 metadata (name, description, triggers) is included.
