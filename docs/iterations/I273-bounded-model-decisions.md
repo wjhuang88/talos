@@ -1,6 +1,6 @@
 # Iteration I273: Bounded Model Decisions and Automatic Protocol Selection
 
-> Document status: Review / Claimed (implementation #559 merged; closeout pending)
+> Document status: Complete / Closed (implementations #559/#562 merged)
 > Parent: PROMPT-001 / Issue #285
 
 ## Objective
@@ -40,7 +40,7 @@ existing implementation commit; a status-only commit is not evidence.
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex |
 | Work Slice | Endpoint/model capability evidence and automatic Native/validated compatibility selection; typed isolated bounded model decisions; model-assisted protocol recovery with tool-execution replay protection; migration of the existing auto-permission consumer; tests and user/API documentation under ADR-075. |
@@ -51,7 +51,7 @@ existing implementation commit; a status-only commit is not evidence.
 | Authorization Evidence | Maintainer requested full development-cycle convergence on 2026-09-14; #558 repairs the ineffective #554 record. Proposed authorization becomes effective only on target-branch merge; independent Agent-role permission/security/API review remains mandatory. |
 | Implementation PR | #555 (merged initial primitive); #559 (merged as `e4173caf`); #562 (merged as `edc0b09a`) |
 | Last Updated | 2026-09-15 |
-| Handoff / Release Condition | Implementation #559 is merged. No Dashboard, release, Deny bypass or I270 harness expansion. Final closeout requires owner-first evidence synchronization and umbrella acceptance audit. |
+| Handoff / Release Condition | Complete; bounded decisions, recovery, replay protection and protocol selection merged and audited. |
 
 ## 2026-09-14 Implementation Merge Checkpoint
 

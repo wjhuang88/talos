@@ -1,12 +1,12 @@
 # Iteration I272: Memory And Todo Advisory Authority
 
-> Document status: Review / Claimed
+> Document status: Complete / Closed
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | @wjhuang88 |
 | Work Slice | Memory, session Todo, and steering prompt authority boundary |
@@ -17,7 +17,7 @@
 | Authorization Evidence | User-authorized continuation; advisory-context scope only. |
 | Implementation PR | Direct commit `f5cacdd7` |
 | Last Updated | 2026-09-13 |
-| Handoff / Release Condition | Excludes Evolution, SDK hooks/custom_prompt, provider, UI, permissions, and release changes. |
+| Handoff / Release Condition | Complete; advisory Memory/Todo boundary and resumability evidence merged and audited. |
 
 ## Scope
 

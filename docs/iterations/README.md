@@ -30,7 +30,7 @@ That snapshot is historical evidence and not current activation authority.
 
 | ID | Codename | State | Activation / Completion Gate |
 |---|---|---|---|
-| I273 | Bounded Model Decisions and Automatic Protocol Selection | Review / Claimed | #559/#562 implementations merged (`e4173caf`/`edc0b09a`); final umbrella closeout remains. |
+| I273 | Bounded Model Decisions and Automatic Protocol Selection | Complete / Closed | #559/#562 implementations merged (`e4173caf`/`edc0b09a`); owner closeout recorded. |
 | I263 | Interrupted Transcript Projection | Complete / Closed | SESSION-008-C / Issue #45; Completion Commit `0f021a6f`; PR #546 merged `239a01cc`. |
 | I264 | Prompt Authority Architecture Baseline | Complete / Closed | PROMPT-001 / Issue #285; baseline and decision boundary recorded at `5fa65d6e`. |
 | I269 | Evolution Learned-Pattern Authority | Complete / Closed | PROMPT-001 / Issue #285; advisory boundary and provenance landed in `90970607`; 64 focused tests passed. |

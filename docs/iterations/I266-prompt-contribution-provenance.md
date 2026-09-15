@@ -12,7 +12,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex |
 | Work Slice | Typed prompt contribution metadata and compatibility tests |
@@ -22,7 +22,7 @@
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Claim #549 merged; implementation #550 merged. |
 | Last Updated | 2026-09-13 |
-| Handoff / Release Condition | Implementation merged; preserve rendered prompt output and continue with separately claimed authority children. |
+| Handoff / Release Condition | Complete; implementation and compatibility tests merged. |
 | Implementation PR | #550 (merged) |
 
 ## Acceptance
