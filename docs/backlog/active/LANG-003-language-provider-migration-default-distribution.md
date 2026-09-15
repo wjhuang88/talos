@@ -5,7 +5,7 @@
 | Story ID | LANG-003 |
 | Type | Language Provider migration policy |
 | Parent | CAP-001 / #466 |
-| Status | Active / Claimed |
+| Status | Complete / Closed |
 | Selected Iteration | I274 |
 | Source Issue | [GitHub Issue #517](https://github.com/wjhuang88/talos/issues/517) |
 | Depends On | LANG-002; BUNDLE-001; DIST-001-A |
@@ -21,10 +21,21 @@
 | Claimed At | 2026-09-15 |
 | Authorization Evidence | Claim PR #564 merged as 6a4a2117; implementation is authorized within the bounded Work Slice. |
 | Governance Claim PR | #564 |
-| Implementation PR | #565 (Review / Claimed) |
+| Implementation PR | #565 (merged as 59a90131) |
 | Authorization Mode | Independent review |
 | Last Updated | 2026-09-15 |
 | Handoff / Release Condition | Requires a separate distribution and compatibility decision before changing defaults. |
+
+## Completion Checkpoint — 2026-09-15
+
+Implementation PR #565 merged to `main` as `59a90131`. Exact-head CI run `34970671310` passed
+all five jobs, including the Windows Rust workspace. Independent review was bound to exact head
+`f8dd9261` after the governance and corruption-test fixes. The Python verified offline Bundle
+fixture, explicit activation, ABI boundary and plain-text fallback are covered by focused tests.
+No default feature, implicit network download, parser deletion, Dashboard, release or publication
+behavior changed.
+
+Completion Commit: 59a90131
 
 ## Activation Checkpoint — 2026-09-15
 

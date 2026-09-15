@@ -2,14 +2,14 @@
 
 | Field | Value |
 |---|---|
-| Status | Active / Claimed |
+| Status | Complete / Closed |
 | Source | Issue #517 / CAP-001 / #466 |
 | Depends On | LANG-002, BUNDLE-001, DIST-001-A, ADR-076 |
 | Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex unattended single-developer mode |
 | Work Slice | Define and implement one additional language provider distribution path with explicit fallback and compatibility evidence; preserve current defaults. |
-| Implementation PR | #565 (Review / Claimed) |
+| Implementation PR | #565 (merged as 59a90131) |
 
 ## Activation Checkpoint — 2026-09-15
 
