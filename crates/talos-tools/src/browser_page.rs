@@ -23,7 +23,7 @@ impl HttpBrowserPageConnector {
     /// Creates a connector with conservative bounded output and redirects.
     pub fn new() -> Result<Self, String> {
         let client = reqwest::Client::builder()
-            .redirect(reqwest::redirect::Policy::limited(3))
+            .redirect(reqwest::redirect::Policy::none())
             .timeout(std::time::Duration::from_secs(15))
             .build()
             .map_err(|error| format!("browser connector client: {error}"))?;
@@ -173,30 +173,42 @@ impl BrowserPageConnector for HttpBrowserPageConnector {
             .map_err(|error| error.to_string())?;
         let final_url = response.url().to_string();
         let final_base = response.url().clone();
+        let max_response_bytes = (self.max_text_bytes as u64).saturating_mul(8);
+        let Some(content_length) = response.content_length() else {
+            return Err("browser response has no bounded content length".to_string());
+        };
+        if content_length > max_response_bytes {
+            return Err("browser response exceeds bounded size".to_string());
+        }
         let body = response.text().await.map_err(|error| error.to_string())?;
         let document = scraper::Html::parse_document(&body);
         let title_selector =
             scraper::Selector::parse("title").map_err(|error| error.to_string())?;
-        let title = document
+        let mut title = document
             .select(&title_selector)
             .next()
             .map(|node| node.text().collect::<String>())
             .unwrap_or_default();
+        if title.len() > 1024 {
+            title.truncate(title.floor_char_boundary(1024));
+        }
         let text_selector = scraper::Selector::parse("body").map_err(|error| error.to_string())?;
         let mut visible = document
             .select(&text_selector)
             .next()
             .map(|node| node.text().collect::<Vec<_>>().join(" "))
             .unwrap_or_default();
-        visible.truncate(self.max_text_bytes);
+        visible.truncate(visible.floor_char_boundary(self.max_text_bytes.min(visible.len())));
         let link_selector =
             scraper::Selector::parse("a[href]").map_err(|error| error.to_string())?;
         let mut links = Vec::new();
         for node in document.select(&link_selector).take(self.max_links) {
             if let Some(href) = node.value().attr("href") {
                 if let Ok(link_url) = Url::parse(href).or_else(|_| final_base.join(href)) {
+                    let mut text = node.text().collect::<String>();
+                    text.truncate(text.floor_char_boundary(512));
                     links.push(BrowserPageLink {
-                        text: node.text().collect::<String>(),
+                        text,
                         url: sanitize_url_for_record(link_url.as_str()),
                     });
                 }
