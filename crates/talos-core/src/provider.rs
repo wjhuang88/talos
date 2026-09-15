@@ -139,6 +139,18 @@ pub trait LanguageModel: Send + Sync {
         crate::tool::CapabilityProbe::Unknown
     }
 
+    /// Performs a request-scoped native capability probe.
+    ///
+    /// Providers must return `Unknown` unless the response was validated as native
+    /// wire evidence for the configured endpoint and model. The conservative default
+    /// preserves compatibility for existing third-party implementations.
+    async fn probe_protocol_capabilities(
+        &self,
+        _tools: &[ToolDefinition],
+    ) -> crate::tool::CapabilityProbe {
+        crate::tool::CapabilityProbe::Unknown
+    }
+
     async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>>;
 
     async fn stream_with_tools(
