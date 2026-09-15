@@ -63,6 +63,7 @@
 | [#453](https://github.com/wjhuang88/talos/issues/453) | Unified `talos upgrade` coordinator | [REL-004](../backlog/active/REL-004-unified-upgrade-coordinator.md) | Intake / Unclaimed | Intake only; preserve REL-003 publication boundary and define planner/helper ownership before implementation. |
 | [#475](https://github.com/wjhuang88/talos/issues/475) | evolving durable memory through reflection, recall, and outcome-aware experience | [MEM-012](../backlog/active/MEM-012-evolving-memory-experience.md) | Intake / Unclaimed | Architecture intake only; preserve ADR-016 and defer schema/runtime changes to separately governed child slices. |
 | [#502](https://github.com/wjhuang88/talos/issues/502) | libc migration and dependency advisory evidence residuals | [DEPENDENCY-003](../backlog/active/DEPENDENCY-003-dependency-risk-evidence-residuals.md) | Refinement / Unclaimed | Post-I250 residual owner only; no dependency, native-boundary, audit or release implementation is authorized. |
+| [#563](https://github.com/wjhuang88/talos/issues/563) | extend auto review to higher-risk writes with diff and rollback gates | [PERM-007-G](../backlog/active/PERM-007-G-higher-risk-auto-writes.md) | Refinement / Unclaimed | Intake-only owner; higher-risk writes, rollback, and impact analysis remain unimplemented and unauthorized. |
 
 ## Synchronization Notes
 
