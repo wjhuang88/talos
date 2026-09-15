@@ -5,7 +5,7 @@
 | Story ID | DIST-001-B |
 | Type | Distribution and resolution implementation |
 | Parent | CAP-001 / #466; DIST-001 |
-| Status | Active / Claimed |
+| Status | Complete / Closed |
 | Selected Iteration | I275 |
 | Source Issue | [GitHub Issue #515](https://github.com/wjhuang88/talos/issues/515) |
 | Depends On | DIST-001-A; CAP-001-B/C; BUNDLE-001 |
@@ -21,10 +21,11 @@
 | Claimed At | 2026-09-15 |
 | Authorization Evidence | Claim PR #566 merged as 2499b9b8; implementation authorized within this Work Slice. |
 | Governance Claim PR | #566 |
-| Implementation PR | Not started |
+| Implementation PR | #567 (merged) |
+| Completion Commit | 8ec6c271 |
 | Authorization Mode | Independent review |
 | Last Updated | 2026-09-15 |
-| Handoff / Release Condition | Requires manual installation evidence, consent UX/security decision and network policy owner. |
+| Handoff / Release Condition | Handoff to distribution maintenance; no release or publication authorization implied. |
 
 ## Activation Checkpoint — 2026-09-15
 
@@ -57,3 +58,11 @@ or bypass of permission/sandbox policy.
 
 Mock/offline resolution fixtures, network-failure and cancellation tests, security review, consent
 documentation and exact changed-file/network authority inventory.
+
+## Completion Checkpoint — 2026-09-15
+
+Completion Commit: `8ec6c271`
+
+Implementation PR #567 merged as `8ec6c271` following exact-head CI `34984742102` and independent
+security review for `d9e9c4e0`. Guarded cancellation/timeout, identity validation, rollback and
+staging cleanup are covered; installed Bundles remain inactive until existing activation gates.
