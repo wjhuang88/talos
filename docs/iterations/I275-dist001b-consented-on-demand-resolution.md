@@ -28,8 +28,8 @@ from that merge or a later main commit.
 
 ## Acceptance
 
-Auditable request identity and consent; bounded download/quarantine and verification; rollback;
-fail-closed cancellation, timeout, stale metadata and denial; installed content remains inactive
+Auditable request identity and consent; bounded quarantine and verification; rollback;
+fail-closed pre/post-operation cancellation, timeout, stale metadata and denial; installed content remains inactive
 until existing activation and permission boundaries allow it.
 
 ## Validation
@@ -39,6 +39,7 @@ locked checks, governance validators and exact changed-file inventory.
 
 ## Implementation Checkpoint — 2026-09-15
 
-The local resolver now requires exact consent, checks Bundle identity after verified installation,
-honors cancellation/deadline bounds, rolls back mismatches, and never activates content. Network
-acquisition remains outside this resolver and is not implicit.
+The local resolver now requires exact consent, checks Bundle identity before installation, preserves
+existing installations on cancellation or mismatch, and never activates content. Network acquisition
+remains outside this resolver and is not implicit; synchronous installation is bounded by pre/post
+operation cancellation and timeout checks.

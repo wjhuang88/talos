@@ -3,7 +3,9 @@
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-use crate::{BundleManifest, InstallError, install_bundle};
+use crate::{
+    BundleManifest, CompatibleManifest, InstallError, install_bundle, parse_compatible_manifest,
+};
 
 /// User consent required before resolving an optional Bundle.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -87,16 +89,48 @@ pub fn resolve_verified_bundle(
         });
     }
     let started = Instant::now();
-    let manifest = install_bundle(source, destination)?;
+    let manifest_text = std::fs::read_to_string(source.join("manifest.toml"))
+        .map_err(|error| InstallError::Io(error))?;
+    let expected =
+        match parse_compatible_manifest(&manifest_text).map_err(InstallError::Manifest)? {
+            CompatibleManifest::Bundle(bundle) => bundle,
+            CompatibleManifest::Legacy(_) => {
+                return Err(ResolutionError::Install(InstallError::LegacyManifest));
+            }
+        };
+    if expected.bundle.name != request.bundle_name
+        || expected.bundle.version != request.bundle_version
+        || expected
+            .language_provider
+            .as_ref()
+            .map(|provider| format!("language.{}", provider.language) != request.capability)
+            == Some(true)
+    {
+        return Err(ResolutionError::IdentityMismatch);
+    }
+    let staging = destination.with_extension("resolution-staging");
+    let manifest = install_bundle(source, &staging)?;
     if started.elapsed() > limits.timeout || cancelled() {
-        let _ = std::fs::remove_dir_all(destination);
+        let _ = std::fs::remove_dir_all(&staging);
         return Err(ResolutionError::Cancelled);
     }
-    if manifest.bundle.name != request.bundle_name
-        || manifest.bundle.version != request.bundle_version
-    {
-        let _ = std::fs::remove_dir_all(destination);
-        return Err(ResolutionError::IdentityMismatch);
+    debug_assert_eq!(manifest.bundle.name, request.bundle_name);
+    let backup = destination.with_extension("resolution-backup");
+    if backup.exists() {
+        std::fs::remove_dir_all(&backup).map_err(InstallError::Io)?;
+    }
+    if destination.exists() {
+        std::fs::rename(destination, &backup).map_err(InstallError::Io)?;
+    }
+    if let Err(error) = std::fs::rename(&staging, destination) {
+        if backup.exists() && !destination.exists() {
+            let _ = std::fs::rename(&backup, destination);
+        }
+        let _ = std::fs::remove_dir_all(&staging);
+        return Err(ResolutionError::Install(InstallError::Io(error)));
+    }
+    if backup.exists() {
+        std::fs::remove_dir_all(&backup).map_err(InstallError::Io)?;
     }
     Ok(ResolutionResult {
         manifest,
@@ -115,7 +149,7 @@ mod tests {
         fs::write(source.join("provider.wat"), "(module)").unwrap();
         fs::write(
             source.join("manifest.toml"),
-            "schema_version=1\n[bundle]\nname=\"demo\"\nversion=\"1.0.0\"\ncarrier=\"wasm\"\nartifact=\"provider.wat\"",
+            "schema_version=1\n[bundle]\nname=\"demo\"\nversion=\"1.0.0\"\ncarrier=\"wasm\"\nartifact=\"provider.wat\"\n[language_provider]\nlanguage=\"python\"\nartifact=\"provider.wat\"",
         )
         .unwrap();
         source
@@ -168,6 +202,37 @@ mod tests {
             Err(ResolutionError::IdentityMismatch)
         ));
         assert!(!destination.exists());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn cancelled_resolution_preserves_existing_install() {
+        let root =
+            std::env::temp_dir().join(format!("talos-resolution-cancel-{}", std::process::id()));
+        let source = fixture(&root);
+        let destination = root.join("installed");
+        fs::create_dir_all(&destination).unwrap();
+        fs::write(destination.join("sentinel"), "old").unwrap();
+        let request = ResolutionRequest {
+            capability: "language.python".into(),
+            bundle_name: "demo".into(),
+            bundle_version: "1.0.0".into(),
+        };
+        assert!(matches!(
+            resolve_verified_bundle(
+                &request,
+                &source,
+                &destination,
+                ResolutionConsent::Granted,
+                ResolutionLimits::default(),
+                || true
+            ),
+            Err(ResolutionError::Cancelled)
+        ));
+        assert_eq!(
+            fs::read_to_string(destination.join("sentinel")).unwrap(),
+            "old"
+        );
         let _ = fs::remove_dir_all(root);
     }
 }
