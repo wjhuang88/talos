@@ -68,7 +68,7 @@ impl LanguageModel for LifecycleModel {
                             "background": true,
                             // Leave enough startup margin for a cold Windows runner while
                             // still timing out long before the fixture's 30-second children.
-                            "timeout_secs": if matches!(self.case, LifecycleCase::Timeout) { 5 } else { 30 },
+                            "timeout_secs": if matches!(self.case, LifecycleCase::Timeout) { 12 } else { 30 },
                         }),
                     },
                     provenance: Default::default(),
@@ -133,7 +133,8 @@ impl LanguageModel for LifecycleModel {
 }
 
 async fn wait_for_marker(marker: &Path) -> u32 {
-    tokio::time::timeout(Duration::from_secs(10), async {
+    // Cold Windows runners may need several seconds to spawn PowerShell.
+    tokio::time::timeout(Duration::from_secs(25), async {
         loop {
             if let Ok(value) = std::fs::read_to_string(marker)
                 && let Ok(pid) = value.trim().parse()
