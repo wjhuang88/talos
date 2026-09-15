@@ -17,6 +17,8 @@ Claim PR #564 is effective after merge commit `6a4a2117` on `main` (exact claim 
 `0e7fe73d`, base `b3da1653`, CI run `34965337239`). Implementation must begin from this
 merged baseline; the published plan and exclusions remain unchanged.
 
+Completion Commit: 59a90131
+
 ## Scope
 
 Implement only the first post-Rust language migration selected by the existing provider contract,
