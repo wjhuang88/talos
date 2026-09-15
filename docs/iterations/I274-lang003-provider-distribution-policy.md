@@ -2,10 +2,10 @@
 
 | Field | Value |
 |---|---|
-| Status | Planned / Claimed (proposed; ineffective until claim merge) |
+| Status | Active / Claimed |
 | Source | Issue #517 / CAP-001 / #466 |
 | Depends On | LANG-002, BUNDLE-001, DIST-001-A, ADR-076 |
-| Claim State | Claimed (proposed) |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex unattended single-developer mode |
 | Work Slice | Define and implement one additional language provider distribution path with explicit fallback and compatibility evidence; preserve current defaults. |
