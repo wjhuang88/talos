@@ -120,7 +120,14 @@ pub fn resolve_verified_bundle(
         }
         InstallError::Cancelled => ResolutionError::Cancelled,
         other => ResolutionError::Install(other),
-    })?;
+    });
+    let manifest = match manifest {
+        Ok(manifest) => manifest,
+        Err(error) => {
+            let _ = std::fs::remove_dir_all(&staging);
+            return Err(error);
+        }
+    };
     if started.elapsed() > limits.timeout || cancelled() {
         let _ = std::fs::remove_dir_all(&staging);
         return Err(ResolutionError::Cancelled);
