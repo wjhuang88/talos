@@ -4,7 +4,7 @@
 |---|---|
 | Story ID | DESKTOP-001-D3 |
 | Parent | DESKTOP-001 / #29 |
-| Status | Planned / Unclaimed |
+| Status | Active / Claimed |
 | Selected Iteration | I277 |
 | Work Slice | Mock-only Desktop visual surface with bilingual localization fixtures; no production runtime binding. |
 | Depends On | DESKTOP-001-D0 / I194; WORK-001 P0-P4; I276 browser boundary |
@@ -13,15 +13,15 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not authorized until an atomic claim+activation record merges. |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex unattended single-developer mode |
+| Work Slice | Mock-only Desktop visual surface and bilingual localization fixtures; no production runtime binding. |
+| Claimed At | 2026-09-16 |
 | Source Issue | #29 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | Pending draft |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Proposed atomic claim+activation; ineffective until merged to main. |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-16 |
 | Handoff / Release Condition | Requires D0 boundary confirmation, GPUI dependency decision, and overlap check with shared crates. |
