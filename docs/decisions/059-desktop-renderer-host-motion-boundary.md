@@ -120,3 +120,52 @@ candidate capability and risk facts, not Talos compatibility or authorization. R
 locked dependency closure, license/SBOM review, platform test evidence, panic containment and motion
 benchmarks remain open. This ADR therefore remains Proposed and no renderer/localization dependency
 or implementation is authorized.
+
+## 2026-09-16 Proposed Execution-Domain Clarification
+
+This addendum refines the proposal using the
+[release capability inventory](../reference/DESKTOP-I194-DEPENDENCY-SECURITY-MATRIX.md).
+The ADR remains Proposed. The maintainer's request to improve this plan is not acceptance of
+native dependencies or a change to the repository's Tokio-only rule.
+
+### Reuse Framework Scheduling, Preserve Business Authority
+
+Do not replace GPUI's scheduler merely to remove non-Tokio dependency names. Its foreground
+execution domain exists to preserve UI-thread affinity; background scheduling and task primitives
+are presentation infrastructure, not a replacement for Talos Runtime.
+
+| Domain | Proposed owner | Boundary |
+|---|---|---|
+| Window events, layout, drawing, focus and IME | GPUI foreground / native event loop | App/Entity/Window stay UI-local; no synchronous wait for business work. |
+| Presentation-only background work | GPUI background executor | No Agent, Session, permission, durable-work or provider authority. |
+| Agent, Session, provider/tool I/O and business deadlines | Existing Talos Tokio runtime | Retain existing admission, cancellation, persistence and shutdown contracts. |
+| Future Desktop/runtime adapter | Thin adapter to the existing runtime owner | Transfer bounded messages/results; never create a runtime per request or duplicate business authority. |
+
+The last two rows describe the later integration boundary, not I277 implementation scope.
+I277 remains fixture-backed and needs no Tokio bridge, business runtime or live network client.
+
+### Lifecycle And Failure Rules
+
+- Keep UI event processing nonblocking. Tokio-bound futures must run with their required Tokio
+  context; GPUI polling alone does not establish its reactor or timer driver.
+- UI-owned presentation tasks have retained handles and explicit cancellation lifetimes. Do not
+  detach work as a workaround for ownership errors.
+- Dropping a view may cancel its local observation or presentation task; it must not implicitly
+  cancel durable Talos work. Business cancellation remains an explicit runtime operation.
+- Any later bridge must distinguish observer cancellation, task abort request and confirmed
+  business shutdown. Blocking work and external effects are not undone by dropping a handle.
+- Catch recoverable Rust panics and report host errors at integration boundaries. Do not claim
+  that `catch_unwind` contains native faults, aborts or device failures; review these separately.
+
+### Decisions Still Required
+
+The recommended direction is a bounded renderer exception, not global relaxation: permit the
+reviewed framework-native integration and framework-internal scheduling/primitives only within the
+Desktop dependency boundary. Talos-authored business async remains Tokio-owned; application code
+must not introduce direct smol/async-std usage merely because GPUI depends on them.
+
+Acceptance still requires exact dependency/native/build-script review and an explicit record of
+the allowed exception. Latest stable GPUI must be rechecked at introduction; older constrained
+transitive versions require documented upstream reasons, not silent overrides. Preserve default
+CLI Cargo run/build behavior. Do not add `gpui_tokio`, fork GPUI, or copy Zed-main APIs without
+an actual authorized requirement and compatible-version evidence.
