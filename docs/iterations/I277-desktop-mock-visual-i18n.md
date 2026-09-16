@@ -14,7 +14,7 @@
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex unattended single-developer mode |
 | Work Slice | DESKTOP-001-D3 mock-only visual/i18n slice |
-| Claimed At | Not applicable |
+| Claimed At | 2026-09-16 |
 | Source Issue | #29 |
 | Governance Claim PR | #570 |
 | Authorization Mode | Single-maintainer merge |
