@@ -122,10 +122,7 @@ async fn wait_for_completions(
     wanted: usize,
 ) -> Vec<String> {
     let mut completed = Vec::with_capacity(wanted);
-    // Windows workspace runs can be heavily contended while the full suite is
-    // active; keep the assertion bounded but allow the actor enough time to
-    // drain the intentionally bursty queue.
-    tokio::time::timeout(Duration::from_secs(60), async {
+    tokio::time::timeout(Duration::from_secs(20), async {
         while completed.len() < wanted {
             let event = eq_rx
                 .recv()
