@@ -1,6 +1,6 @@
 # Iteration I277: Desktop Mock Visual and Localization Slice
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-09-16
 > Planned objective: Deliver a fixture-backed, mock-only Desktop visual surface with bilingual localization.
 > Baseline rule: preserve this scope; changed objectives use a new iteration ID.
@@ -10,15 +10,15 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex unattended single-developer mode |
 | Work Slice | DESKTOP-001-D3 mock-only visual/i18n slice |
-| Claimed At | Not applicable |
+| Claimed At | 2026-09-16 |
 | Source Issue | #29 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #570 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Proposed atomic claim+activation in #570; ineffective until merged to main. |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-16 |
 | Handoff / Release Condition | Atomic claim+activation required before code or Cargo changes. |
@@ -61,5 +61,5 @@
 
 ## Activation Gate
 
-This iteration remains Planned / Unclaimed. A governance-only PR must establish an effective claim
+This iteration is proposed Active / Claimed. A governance-only PR must establish an effective claim
 and activation before any implementation branch or Cargo/production change.
