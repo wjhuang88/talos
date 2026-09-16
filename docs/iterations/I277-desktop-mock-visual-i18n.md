@@ -16,9 +16,9 @@
 | Work Slice | DESKTOP-001-D3 mock-only visual/i18n slice |
 | Claimed At | Not applicable |
 | Source Issue | #29 |
-| Governance Claim PR | Pending draft |
+| Governance Claim PR | #570 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Proposed atomic claim+activation; ineffective until merged to main. |
+| Authorization Evidence | Proposed atomic claim+activation in #570; ineffective until merged to main. |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-16 |
 | Handoff / Release Condition | Atomic claim+activation required before code or Cargo changes. |

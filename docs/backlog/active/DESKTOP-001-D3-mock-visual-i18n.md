@@ -19,9 +19,9 @@
 | Work Slice | Mock-only Desktop visual surface and bilingual localization fixtures; no production runtime binding. |
 | Claimed At | 2026-09-16 |
 | Source Issue | #29 |
-| Governance Claim PR | Pending draft |
+| Governance Claim PR | #570 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Proposed atomic claim+activation; ineffective until merged to main. |
+| Authorization Evidence | Proposed atomic claim+activation in #570; ineffective until merged to main. |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-16 |
 | Handoff / Release Condition | Requires D0 boundary confirmation, GPUI dependency decision, and overlap check with shared crates. |
