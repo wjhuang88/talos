@@ -144,6 +144,7 @@ struct DesktopWindow {
     root_focus: FocusHandle,
     english_focus: FocusHandle,
     chinese_focus: FocusHandle,
+    language_menu_focus: FocusHandle,
     tab_focus: [FocusHandle; 5],
     model_focus: [FocusHandle; 3],
     model_choice_focus: [FocusHandle; 9],
@@ -244,6 +245,7 @@ impl DesktopWindow {
             }),
             english_focus: cx.focus_handle().tab_index(1).tab_stop(true),
             chinese_focus: cx.focus_handle().tab_index(2).tab_stop(true),
+            language_menu_focus: cx.focus_handle().tab_stop(true),
             tab_focus: std::array::from_fn(|index| {
                 cx.focus_handle()
                     .tab_index(index as isize + 4)
@@ -312,18 +314,9 @@ impl DesktopWindow {
                 }
             }
             Command::ToggleSettings => {
-                self.settings_open = !self.settings_open;
-                window.focus(
-                    if self.settings_open {
-                        match self.state.locale {
-                            Locale::English => &self.english_focus,
-                            Locale::Chinese => &self.chinese_focus,
-                        }
-                    } else {
-                        &self.settings_focus
-                    },
-                    cx,
-                );
+                self.settings_open = false;
+                self.state.page = Page::Presets;
+                window.focus(&self.root_focus, cx);
             }
             Command::NewPreset => {
                 self.state.begin_preset();
@@ -847,9 +840,9 @@ impl DesktopWindow {
 }
 
 impl Render for DesktopWindow {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let locale = self.state.locale;
-        let compact = _window.viewport_size().width < px(900.);
+        let compact = window.viewport_size().width < px(900.);
         self.input.update(cx, |input, cx| {
             if input.locale != locale {
                 input.locale = locale;
@@ -857,6 +850,12 @@ impl Render for DesktopWindow {
             }
         });
         let fixture = self.state.fixture();
+        let settings_bounds = *self.settings_bounds.borrow();
+        let settings_menu_position = if compact {
+            settings_bounds.bottom_left()
+        } else {
+            settings_bounds.top_right()
+        };
         for field in [&self.goal_input, &self.workspace_input]
             .into_iter()
             .chain(self.preset_fields.iter())
@@ -949,12 +948,6 @@ impl Render for DesktopWindow {
                             cx,
                         ))
                     })
-                    .child(self.command(
-                        "presets",
-                        locale.text(Text::Presets),
-                        Command::Presets,
-                        cx,
-                    ))
                     .when(!compact, |nav| nav.child(div().flex_1()))
                     .child(div().when(!compact, |footer| footer.border_t_1().border_color(rgb(0xd8dee9)).pt_4())
                         .on_children_prepainted({
@@ -986,122 +979,9 @@ impl Render for DesktopWindow {
                     .min_w_0()
                     .min_h_0()
                     .when(!compact, |content| content.h_full())
+                    .relative()
                     .flex()
                     .flex_col()
-                    .when(self.settings_open, |root| root.child(gpui::deferred(
-                        gpui::anchored()
-                        .anchor(if compact { gpui::Anchor::TopLeft } else { gpui::Anchor::BottomLeft })
-                        .position(if compact { self.settings_bounds.borrow().bottom_left() } else { self.settings_bounds.borrow().top_right() })
-                        .snap_to_window_with_margin(px(12.)).child(
-                        div()
-                            .id("language-menu")
-                            .occlude()
-                            .flex()
-                            .flex_col()
-                            .w(px(208.))
-                            .gap_2()
-                            .bg(rgb(0xffffff))
-                            .border_1().border_color(rgb(0xd8dee9)).rounded_md().shadow_lg()
-                            .px_3()
-                            .py_2()
-                            .on_mouse_down_out(cx.listener(|this, event: &gpui::MouseDownEvent, window, cx| {
-                                if this.settings_bounds.borrow().contains(&event.position) { return; }
-                                this.settings_open = false;
-                                this.restore_settings_focus = true;
-                                window.focus(&this.settings_focus, cx);
-                                cx.notify();
-                            }))
-                            .child(
-                                div()
-                                    .id("desktop-title")
-                                    .role(gpui::Role::Heading)
-                                    .aria_level(1)
-                                    .aria_label(locale.text(Text::Language))
-                                    .child(locale.text(Text::Language)),
-                            )
-                            .child(
-                                div()
-                                    .flex()
-                                    .flex_col()
-                                    .gap_2()
-                                    .child(
-                                        div()
-                                            .id("locale-en")
-                                            .role(gpui::Role::Button)
-                                            .aria_label("English")
-                                            .aria_toggled(if locale == Locale::English {
-                                                gpui::Toggled::True
-                                            } else {
-                                                gpui::Toggled::False
-                                            })
-                                            .track_focus(&self.english_focus)
-                                            .px_3().py_2().rounded_sm()
-                                            .border_1().border_color(gpui::transparent_black())
-                                            .when(locale == Locale::English, |style| style.bg(rgb(0xddeef8)))
-                                            .focus(|style| style.border_color(rgb(0x5e81ac)))
-                                            .on_key_down(cx.listener(
-                                                |this, event: &gpui::KeyDownEvent, window, cx| {
-                                                    if matches!(
-                                                        event.keystroke.key.as_str(),
-                                                        "enter" | "space"
-                                                    ) {
-                                                        this.state.set_locale("en-US");
-                                                        this.settings_open = false;
-                                                        window.focus(&this.settings_focus, cx);
-                                                        cx.stop_propagation();
-                                                        cx.notify();
-                                                    }
-                                                },
-                                            ))
-                                            .cursor_pointer()
-                                            .child("English")
-                                            .on_click(cx.listener(|this, _, window, cx| {
-                                                window.focus(&this.settings_focus, cx);
-                                                this.state.set_locale("en-US");
-                                                this.settings_open = false;
-                                                cx.notify();
-                                            })),
-                                    )
-                                    .child(
-                                        div()
-                                            .id("locale-zh")
-                                            .role(gpui::Role::Button)
-                                            .aria_label("简体中文")
-                                            .aria_toggled(if locale == Locale::Chinese {
-                                                gpui::Toggled::True
-                                            } else {
-                                                gpui::Toggled::False
-                                            })
-                                            .track_focus(&self.chinese_focus)
-                                            .px_3().py_2().rounded_sm()
-                                            .border_1().border_color(gpui::transparent_black())
-                                            .when(locale == Locale::Chinese, |style| style.bg(rgb(0xddeef8)))
-                                            .focus(|style| style.border_color(rgb(0x5e81ac)))
-                                            .on_key_down(cx.listener(
-                                                |this, event: &gpui::KeyDownEvent, window, cx| {
-                                                    if matches!(
-                                                        event.keystroke.key.as_str(),
-                                                        "enter" | "space"
-                                                    ) {
-                                                        this.state.set_locale("zh-CN");
-                                                        this.settings_open = false;
-                                                        window.focus(&this.settings_focus, cx);
-                                                        cx.stop_propagation();
-                                                        cx.notify();
-                                                    }
-                                                },
-                                            ))
-                                            .cursor_pointer()
-                                            .child("简体中文")
-                                            .on_click(cx.listener(|this, _, window, cx| {
-                                                window.focus(&this.settings_focus, cx);
-                                                this.state.set_locale("zh-CN");
-                                                this.settings_open = false;
-                                                cx.notify();
-                                            })),
-                                    ),
-                            ),
-                    ))))
                     .when(self.state.page == Page::Fixture, |root| root.child(
                         div().px_6().py_4().text_xl().child(fixture.title.text(locale))
                     ))
@@ -1122,7 +1002,7 @@ impl Render for DesktopWindow {
                                 .flex_1()
                                 .min_h_0()
                                 .overflow_y_scroll()
-                                .p(px(if _window.viewport_size().width < px(900.) { 24. } else { 48. }))
+                                .p(px(if window.viewport_size().width < px(900.) { 24. } else { 48. }))
                                 .flex()
                                 .flex_col()
                                 .child(
@@ -1134,7 +1014,7 @@ impl Render for DesktopWindow {
                                     .child(div().text_sm().text_color(rgb(0x5e81ac)).child(locale.text(Text::Goal)))
                                     .child(self.goal_input.clone())
                                     .child(div().mt_8().text_sm().text_color(rgb(0x5e81ac)).child(locale.text(Text::Preset)))
-                                    .child(self.preset_picker(_window, cx))
+                                    .child(self.preset_picker(window, cx))
                                     .child(div().mt_8().text_sm().text_color(rgb(0x5e81ac)).child(locale.text(Text::Workspace)))
                                     .child(div().flex().items_center().gap_2()
                                         .child(div().flex_1().min_w_0().child(self.workspace_input.clone()))
@@ -1160,7 +1040,7 @@ impl Render for DesktopWindow {
                                 .flex_1()
                                 .min_h_0()
                                 .overflow_y_scroll()
-                                .p(px(if _window.viewport_size().width < px(900.) { 24. } else { 40. }))
+                                .p(px(if window.viewport_size().width < px(900.) { 24. } else { 40. }))
                                 .flex()
                                 .flex_col()
                                 .gap(px(if compact { 12. } else { 24. }))
@@ -1169,6 +1049,31 @@ impl Render for DesktopWindow {
                                         .text_xl()
                                         .child(gpui::text!(locale.text(Text::Presets))),
                                 ).child(self.command("new-preset", locale.text(Text::NewPreset), Command::NewPreset, cx)))
+                                .child(div().mt_2().text_sm().text_color(rgb(0x5e81ac)).child(locale.text(Text::Language)))
+                                .child(
+                                    div().flex().gap_2().children([
+                                        ("settings-language-en", "English", Locale::English),
+                                        ("settings-language-zh", "简体中文", Locale::Chinese),
+                                    ].into_iter().map(|(id, label, choice)| {
+                                        div()
+                                            .id(id)
+                                            .role(gpui::Role::RadioButton)
+                                            .aria_label(label)
+                                            .aria_selected(locale == choice)
+                                            .track_focus(match choice { Locale::English => &self.english_focus, Locale::Chinese => &self.chinese_focus })
+                                            .px_3().py_2().rounded_sm()
+                                            .border_1().border_color(rgb(0xd8dee9))
+                                            .when(locale == choice, |item| item.bg(rgb(0xddeef8)))
+                                            .cursor_pointer()
+                                            .child(label)
+                                            .on_click(cx.listener(move |this, _, window, cx| {
+                                                this.state.set_locale(match choice { Locale::English => "en-US", Locale::Chinese => "zh-CN" });
+                                                window.focus(match choice { Locale::English => &this.english_focus, Locale::Chinese => &this.chinese_focus }, cx);
+                                                cx.notify();
+                                            }))
+                                            .into_any_element()
+                                    }))
+                                )
                                 .child(div().text_sm().text_color(rgb(0x5e81ac)).child(locale.text(Text::DefaultPreset)))
                                 .child(div().p_3().border_1().rounded_lg().bg(rgb(0xebf0f8)).border_color(rgb(0xd8dee9)).flex().items_center().gap_3()
                                     .child(div().size(px(40.)).flex_shrink_0().rounded_md().bg(rgb(0xe0e8f4)).flex().items_center().justify_center().child(icon(match self.state.default_preset { Preset::Coding => "code", Preset::Research => "search", _ => "message-square" })))
@@ -1291,7 +1196,7 @@ impl Render for DesktopWindow {
                                 .flex_1()
                                 .min_h_0()
                                 .overflow_y_scroll()
-                                .px(px(if _window.viewport_size().width < px(900.) { 24. } else { 48. }))
+                                .px(px(if window.viewport_size().width < px(900.) { 24. } else { 48. }))
                                 .py_4()
                                 .flex()
                                 .flex_col()
@@ -1479,7 +1384,7 @@ impl Render for DesktopWindow {
                                     .overflow_y_scroll()
                                     .flex_1()
                                     .min_h_0()
-                                    .p(px(if _window.viewport_size().width < px(900.) { 24. } else { 48. }))
+                                    .p(px(if window.viewport_size().width < px(900.) { 24. } else { 48. }))
                                     .flex()
                                     .flex_col()
                                     .gap_4()
@@ -1492,7 +1397,7 @@ impl Render for DesktopWindow {
                                         .child(div().text_size(px(22.)).font_weight(gpui::FontWeight::SEMIBOLD).child(fixture.work.text(locale))))
                                     .child(div().pl(px(30.)).text_color(rgb(0x68758c)).child(fixture.work_description.text(locale)))
                                     .child(div().mt_6().text_sm().text_color(rgb(0x5e6f8d)).child(locale.text(Text::MissionPosition)))
-                                    .child(div().flex().when(_window.viewport_size().width < px(1000.), |path| path.flex_col()).children(
+                                    .child(div().flex().when(window.viewport_size().width < px(1000.), |path| path.flex_col()).children(
                                         fixture.stages.iter().enumerate().map(|(index, stage)| {
                                             div()
                                                 .id(("mission-stage", index))
@@ -1617,6 +1522,130 @@ impl Render for DesktopWindow {
                         },
                     ),
             )
+            // Paint last, but keep the menu inside the Application accessibility tree.
+            .when(false, |root| root.child(
+                gpui::anchored()
+                    .anchor(if compact { gpui::Anchor::TopLeft } else { gpui::Anchor::BottomLeft })
+                    .position(settings_menu_position)
+                    .snap_to_window_with_margin(px(12.))
+                    .child(
+                        div()
+                            .id("language-menu")
+                            .accessibility_id("language-menu")
+                            .role(gpui::Role::Menu)
+                            .aria_label(locale.text(Text::Language))
+                            .track_focus(&self.language_menu_focus)
+                            .occlude()
+                            .flex()
+                            .flex_col()
+                            .w(px(208.))
+                            .gap_2()
+                            .bg(rgb(0xffffff))
+                            .border_1().border_color(rgb(0xd8dee9)).rounded_md().shadow_lg()
+                            .px_3()
+                            .py_2()
+                            .on_mouse_down_out(cx.listener(|this, event: &gpui::MouseDownEvent, window, cx| {
+                                if this.settings_bounds.borrow().contains(&event.position) { return; }
+                                this.settings_open = false;
+                                this.restore_settings_focus = true;
+                                window.focus(&this.settings_focus, cx);
+                                cx.notify();
+                            }))
+                            .child(
+                                div()
+                                    .id("desktop-title")
+                                    .role(gpui::Role::Heading)
+                                    .aria_level(1)
+                                    .aria_label(locale.text(Text::Language))
+                                    .child(locale.text(Text::Language)),
+                            )
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_col()
+                                    .gap_2()
+                                    .child(
+                                        div()
+                                            .id("locale-en")
+                                            .accessibility_id("locale-en")
+                                            .role(gpui::Role::MenuItemRadio)
+                                            .aria_label("English")
+                                            .aria_selected(locale == Locale::English)
+                                            .aria_toggled(if locale == Locale::English {
+                                                gpui::Toggled::True
+                                            } else {
+                                                gpui::Toggled::False
+                                            })
+                                            .track_focus(&self.english_focus)
+                                            .px_3().py_2().rounded_sm()
+                                            .border_1().border_color(gpui::transparent_black())
+                                            .when(locale == Locale::English, |style| style.bg(rgb(0xddeef8)))
+                                            .focus(|style| style.border_color(rgb(0x5e81ac)))
+                                            .on_key_down(cx.listener(
+                                                |this, event: &gpui::KeyDownEvent, window, cx| {
+                                                    if matches!(
+                                                        event.keystroke.key.as_str(),
+                                                        "enter" | "space"
+                                                    ) {
+                                                        this.state.set_locale("en-US");
+                                                        this.settings_open = false;
+                                                        window.focus(&this.settings_focus, cx);
+                                                        cx.stop_propagation();
+                                                        cx.notify();
+                                                    }
+                                                },
+                                            ))
+                                            .cursor_pointer()
+                                            .child("English")
+                                            .on_click(cx.listener(|this, _, window, cx| {
+                                                window.focus(&this.settings_focus, cx);
+                                                this.state.set_locale("en-US");
+                                                this.settings_open = false;
+                                                cx.notify();
+                                            })),
+                                    )
+                                    .child(
+                                        div()
+                                            .id("locale-zh")
+                                            .accessibility_id("locale-zh")
+                                            .role(gpui::Role::MenuItemRadio)
+                                            .aria_label("简体中文")
+                                            .aria_selected(locale == Locale::Chinese)
+                                            .aria_toggled(if locale == Locale::Chinese {
+                                                gpui::Toggled::True
+                                            } else {
+                                                gpui::Toggled::False
+                                            })
+                                            .track_focus(&self.chinese_focus)
+                                            .px_3().py_2().rounded_sm()
+                                            .border_1().border_color(gpui::transparent_black())
+                                            .when(locale == Locale::Chinese, |style| style.bg(rgb(0xddeef8)))
+                                            .focus(|style| style.border_color(rgb(0x5e81ac)))
+                                            .on_key_down(cx.listener(
+                                                |this, event: &gpui::KeyDownEvent, window, cx| {
+                                                    if matches!(
+                                                        event.keystroke.key.as_str(),
+                                                        "enter" | "space"
+                                                    ) {
+                                                        this.state.set_locale("zh-CN");
+                                                        this.settings_open = false;
+                                                        window.focus(&this.settings_focus, cx);
+                                                        cx.stop_propagation();
+                                                        cx.notify();
+                                                    }
+                                                },
+                                            ))
+                                            .cursor_pointer()
+                                            .child("简体中文")
+                                            .on_click(cx.listener(|this, _, window, cx| {
+                                                window.focus(&this.settings_focus, cx);
+                                                this.state.set_locale("zh-CN");
+                                                this.settings_open = false;
+                                                cx.notify();
+                                            })),
+                                    ),
+                            ),
+                    )))
     }
 }
 

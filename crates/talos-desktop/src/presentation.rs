@@ -98,8 +98,8 @@ impl Locale {
                 "Drag to reorder, or focus a row and press Alt+↑ / Alt+↓."
             }
             (Self::Chinese, Text::ReorderPresets) => "拖拽调整顺序，或聚焦条目后按 Alt+↑ / Alt+↓。",
-            (Self::English, Text::Settings) => "Display settings",
-            (Self::Chinese, Text::Settings) => "显示设置",
+            (Self::English, Text::Settings) => "Settings",
+            (Self::Chinese, Text::Settings) => "设置",
             (Self::English, Text::Language) => "Language",
             (Self::Chinese, Text::Language) => "语言",
             (Self::English, Text::LocalUser) => "Local preview user",

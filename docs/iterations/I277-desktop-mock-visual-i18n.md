@@ -820,3 +820,17 @@ non-blocking for this round by maintainer instruction, tracked in the existing #
 than new per-subtask issues. Do not repeat passed macOS input/popover acceptance. Cross-platform
 compilation/tests do not establish Windows/Linux native interaction or physical display latency.
 No real Runtime integration, release or next-iteration activation is implied.
+
+## 2026-09-18 Settings Page Decision
+
+The language popover is replaced by a dedicated settings-page path in the mock surface. The
+existing preset-management page is reused as the settings destination and now exposes the
+language choice as an in-page radio group. Preset creation, editing, duplication, deletion, and
+default selection remain on that page; the new-task preset picker remains unchanged. This
+removes deferred-popover accessibility and paint-order coupling without adding persistence,
+runtime binding, or new configuration authority. Acceptance now covers settings navigation,
+in-page locale selection, preset management, keyboard focus, and VoiceOver traversal.
+The navigation label is `Settings` / `设置`; there is no separate top-level Presets navigation item.
+
+The maintainer accepted the settings-page interaction in manual validation; the former popover
+path is no longer part of the active acceptance flow.

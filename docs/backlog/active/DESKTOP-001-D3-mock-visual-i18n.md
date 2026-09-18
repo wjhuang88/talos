@@ -131,3 +131,15 @@ independent Agent-role review and merge-time CAS; the full evidence is in I277. 
 delivered on main. Review / Claimed and Completion Commit: Pending remain because VoiceOver
 and reduced-motion are maintainer-deferred, unverified rows in #29. Prior candidate-pending
 checkpoints are historical. No release or live Runtime binding is claimed.
+
+## 2026-09-18 Settings Page Decision
+
+The language popover is superseded by an in-page settings path. The existing preset-management
+page is the settings destination and now contains the bilingual language radio group alongside
+preset controls. This keeps the slice mock-only and avoids deferred-popover accessibility and
+paint-order coupling. New-task preset selection remains unchanged; no persistence or Runtime
+binding is introduced.
+The navigation label is `Settings` / `设置`, and preset management is contained within that page
+without a separate top-level Presets menu item.
+The maintainer accepted this settings-page interaction in manual validation; the former popover
+path is no longer part of the active acceptance flow.
