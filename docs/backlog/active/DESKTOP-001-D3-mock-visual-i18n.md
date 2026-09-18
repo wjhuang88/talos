@@ -143,3 +143,13 @@ The navigation label is `Settings` / `设置`, and preset management is containe
 without a separate top-level Presets menu item.
 The maintainer accepted this settings-page interaction in manual validation; the former popover
 path is no longer part of the active acceptance flow.
+
+### 2026-09-18 Settings Regression Evidence
+
+Follow-up #573 is in local convergence: the old disabled popover is removed and Settings radio
+keyboard/checked-state behavior is exercised by the native harness. The updated 70-image bilingual,
+two-size capture batch passed, including a narrow-page scroll before clicking a preset editor.
+Forty-two Desktop tests, strict visual-test Clippy, locked build and formatting passed. Full
+candidate evidence is recorded in I277. Earlier #573 CI binds only head `4b6f13ea`; a new stable
+head requires fresh CI and independent review. Status remains Review / Claimed, with deferred
+VoiceOver/reduced-motion unverified; no new Complete or native screen-reader pass is claimed.

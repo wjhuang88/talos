@@ -14,6 +14,15 @@
 
 ## 1. Purpose
 
+### Settings Navigation Amendment (2026-09-18)
+
+The maintainer accepted a dedicated Settings page instead of the language popover. Global
+navigation has one `Settings` / `设置` entry, with language selection and preset management
+inside that page; there is no separate top-level Presets entry. The New Task preset picker
+remains. This supersedes the navigation arrangement in the original reference images and the
+dated confirmation below, while retaining their preset list/editor content and visual hierarchy.
+I277 remains mock-only; this change adds no persisted settings or runtime authority.
+
 ### Implementation Reference Confirmation (2026-09-16)
 
 The maintainer explicitly confirmed that actual Desktop implementation must follow the four

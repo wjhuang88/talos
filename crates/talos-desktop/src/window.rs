@@ -130,7 +130,7 @@ enum Command {
     ToggleEvidence,
     ViewChanges,
     NewPreset,
-    ToggleSettings,
+    Settings,
     ToggleTaskOption(usize),
     ChooseWorkspace,
 }
@@ -144,7 +144,6 @@ struct DesktopWindow {
     root_focus: FocusHandle,
     english_focus: FocusHandle,
     chinese_focus: FocusHandle,
-    language_menu_focus: FocusHandle,
     tab_focus: [FocusHandle; 5],
     model_focus: [FocusHandle; 3],
     model_choice_focus: [FocusHandle; 9],
@@ -154,10 +153,8 @@ struct DesktopWindow {
     preset_focus: FocusHandle,
     preset_trigger_bounds: std::rc::Rc<std::cell::RefCell<Bounds<gpui::Pixels>>>,
     evidence_open: bool,
-    settings_open: bool,
     settings_focus: FocusHandle,
-    settings_bounds: std::rc::Rc<std::cell::RefCell<Bounds<gpui::Pixels>>>,
-    restore_settings_focus: bool,
+    settings_scroll: gpui::ScrollHandle,
     preset_scroll: gpui::ScrollHandle,
     preset_menu_scroll: gpui::ScrollHandle,
     #[cfg(feature = "visual-test")]
@@ -190,10 +187,8 @@ impl DesktopWindow {
             preset_focus: cx.focus_handle().tab_stop(true),
             preset_trigger_bounds: Default::default(),
             evidence_open: false,
-            settings_open: false,
             settings_focus: cx.focus_handle().tab_stop(true),
-            settings_bounds: Default::default(),
-            restore_settings_focus: false,
+            settings_scroll: gpui::ScrollHandle::new(),
             preset_scroll: gpui::ScrollHandle::new(),
             preset_menu_scroll: gpui::ScrollHandle::new(),
             #[cfg(feature = "visual-test")]
@@ -245,7 +240,6 @@ impl DesktopWindow {
             }),
             english_focus: cx.focus_handle().tab_index(1).tab_stop(true),
             chinese_focus: cx.focus_handle().tab_index(2).tab_stop(true),
-            language_menu_focus: cx.focus_handle().tab_stop(true),
             tab_focus: std::array::from_fn(|index| {
                 cx.focus_handle()
                     .tab_index(index as isize + 4)
@@ -313,8 +307,7 @@ impl DesktopWindow {
                     *value = !*value;
                 }
             }
-            Command::ToggleSettings => {
-                self.settings_open = false;
+            Command::Settings => {
                 self.state.page = Page::Presets;
                 window.focus(&self.root_focus, cx);
             }
@@ -424,7 +417,6 @@ impl DesktopWindow {
             )
         {
             self.workspace_prompt_stale = true;
-            self.settings_open = false;
             self.open_model = None;
             self.preset_open = false;
             let focus = match self.state.page {
@@ -435,6 +427,16 @@ impl DesktopWindow {
             };
             window.focus(&focus, cx);
         }
+        cx.notify();
+    }
+
+    fn select_language(&mut self, locale: Locale, window: &mut Window, cx: &mut Context<Self>) {
+        let (locale_id, focus) = match locale {
+            Locale::English => ("en-US", &self.english_focus),
+            Locale::Chinese => ("zh-CN", &self.chinese_focus),
+        };
+        self.state.set_locale(locale_id);
+        window.focus(focus, cx);
         cx.notify();
     }
 
@@ -513,7 +515,7 @@ impl DesktopWindow {
                 Command::NewTask | Command::NewPreset => Some("plus"),
                 Command::Presets => Some("bookmark"),
                 Command::BackToPresets => Some("arrow-left"),
-                Command::ToggleSettings => Some("settings"),
+                Command::Settings => Some("settings"),
                 Command::ChooseWorkspace => Some("folder"),
                 Command::OpenFixture(1) => Some("wrench"),
                 Command::OpenFixture(2) => Some("globe"),
@@ -537,8 +539,8 @@ impl DesktopWindow {
                     control.track_focus(&self.model_choice_focus[role * 3 + choice])
                 } else { control }
             })
-            .when(matches!(command, Command::ToggleSettings), |control| {
-                control.aria_expanded(self.settings_open).track_focus(&self.settings_focus)
+            .when(matches!(command, Command::Settings), |control| {
+                control.track_focus(&self.settings_focus)
             })
             .px_3()
             .py_2()
@@ -571,7 +573,7 @@ impl DesktopWindow {
                 |button| button.text_color(rgb(0xbf616a)),
             )
             .when(
-                matches!(command, Command::Presets)
+                matches!(command, Command::Settings)
                     && matches!(self.state.page, Page::Presets | Page::PresetDetail),
                 |button| button.bg(rgb(0xe8edf5)).text_color(rgb(0x2e4f82)),
             )
@@ -850,12 +852,6 @@ impl Render for DesktopWindow {
             }
         });
         let fixture = self.state.fixture();
-        let settings_bounds = *self.settings_bounds.borrow();
-        let settings_menu_position = if compact {
-            settings_bounds.bottom_left()
-        } else {
-            settings_bounds.top_right()
-        };
         for field in [&self.goal_input, &self.workspace_input]
             .into_iter()
             .chain(self.preset_fields.iter())
@@ -873,10 +869,6 @@ impl Render for DesktopWindow {
             .aria_label(locale.text(Text::Title))
             .track_focus(&self.root_focus)
             .on_any_mouse_down(cx.listener(|this, _, window, cx| {
-                if std::mem::take(&mut this.restore_settings_focus) && !window.default_prevented() {
-                    window.focus(&this.settings_focus, cx);
-                    window.prevent_default();
-                }
                 if std::mem::take(&mut this.restore_preset_focus) && !window.default_prevented() {
                     // Child controls retain their own click focus; blank space returns to the picker.
                     window.focus(&this.preset_focus, cx);
@@ -894,11 +886,6 @@ impl Render for DesktopWindow {
                         cx.notify();
                     } else if let Some(role) = this.open_model.take() {
                         window.focus(&this.model_focus[role], cx);
-                        cx.stop_propagation();
-                        cx.notify();
-                    } else if this.settings_open {
-                        this.settings_open = false;
-                        window.focus(&this.settings_focus, cx);
                         cx.stop_propagation();
                         cx.notify();
                     }
@@ -950,20 +937,7 @@ impl Render for DesktopWindow {
                     })
                     .when(!compact, |nav| nav.child(div().flex_1()))
                     .child(div().when(!compact, |footer| footer.border_t_1().border_color(rgb(0xd8dee9)).pt_4())
-                        .on_children_prepainted({
-                            let bounds = self.settings_bounds.clone();
-                            let entity = cx.entity().downgrade();
-                            move |children, _, cx| {
-                                if let Some(trigger) = children.first()
-                                    && *bounds.borrow() != *trigger {
-                                    *bounds.borrow_mut() = *trigger;
-                                    let _ = entity.update(cx, |this, cx| {
-                                        if this.settings_open { cx.notify(); }
-                                    });
-                                }
-                            }
-                        })
-                        .child(self.command("settings", locale.text(Text::Settings), Command::ToggleSettings, cx)))
+                        .child(self.command("settings", locale.text(Text::Settings), Command::Settings, cx)))
                     .when(!compact, |nav| nav.child(
                         div()
                             .flex().items_center().gap_3()
@@ -1036,7 +1010,8 @@ impl Render for DesktopWindow {
                     .when(self.state.page == Page::Presets, |root| {
                         root.child(
                             div()
-                                .id("preset-list")
+                                .id("settings-page")
+                                .track_scroll(&self.settings_scroll)
                                 .flex_1()
                                 .min_h_0()
                                 .overflow_y_scroll()
@@ -1046,12 +1021,15 @@ impl Render for DesktopWindow {
                                 .gap(px(if compact { 12. } else { 24. }))
                                 .child(div().flex().justify_between().items_center().gap_3().child(
                                     div()
+                                        .id("settings-heading")
+                                        .role(gpui::Role::Heading)
+                                        .aria_level(1)
                                         .text_xl()
-                                        .child(gpui::text!(locale.text(Text::Presets))),
+                                        .child(gpui::text!(locale.text(Text::Settings))),
                                 ).child(self.command("new-preset", locale.text(Text::NewPreset), Command::NewPreset, cx)))
                                 .child(div().mt_2().text_sm().text_color(rgb(0x5e81ac)).child(locale.text(Text::Language)))
                                 .child(
-                                    div().flex().gap_2().children([
+                                    div().id("settings-language").role(gpui::Role::RadioGroup).aria_label(locale.text(Text::Language)).flex().gap_2().children([
                                         ("settings-language-en", "English", Locale::English),
                                         ("settings-language-zh", "简体中文", Locale::Chinese),
                                     ].into_iter().map(|(id, label, choice)| {
@@ -1060,16 +1038,28 @@ impl Render for DesktopWindow {
                                             .role(gpui::Role::RadioButton)
                                             .aria_label(label)
                                             .aria_selected(locale == choice)
+                                            .aria_toggled(if locale == choice { gpui::Toggled::True } else { gpui::Toggled::False })
                                             .track_focus(match choice { Locale::English => &self.english_focus, Locale::Chinese => &self.chinese_focus })
                                             .px_3().py_2().rounded_sm()
                                             .border_1().border_color(rgb(0xd8dee9))
                                             .when(locale == choice, |item| item.bg(rgb(0xddeef8)))
+                                            .focus(|item| item.border_color(rgb(0x5e81ac)))
+                                            .on_key_down(cx.listener(move |this, event: &gpui::KeyDownEvent, window, cx| {
+                                                let next = match event.keystroke.key.as_str() {
+                                                    "enter" | "space" => choice,
+                                                    "left" | "right" | "up" | "down" => match choice {
+                                                        Locale::English => Locale::Chinese,
+                                                        Locale::Chinese => Locale::English,
+                                                    },
+                                                    _ => return,
+                                                };
+                                                this.select_language(next, window, cx);
+                                                cx.stop_propagation();
+                                            }))
                                             .cursor_pointer()
                                             .child(label)
                                             .on_click(cx.listener(move |this, _, window, cx| {
-                                                this.state.set_locale(match choice { Locale::English => "en-US", Locale::Chinese => "zh-CN" });
-                                                window.focus(match choice { Locale::English => &this.english_focus, Locale::Chinese => &this.chinese_focus }, cx);
-                                                cx.notify();
+                                                this.select_language(choice, window, cx);
                                             }))
                                             .into_any_element()
                                     }))
@@ -1522,130 +1512,6 @@ impl Render for DesktopWindow {
                         },
                     ),
             )
-            // Paint last, but keep the menu inside the Application accessibility tree.
-            .when(false, |root| root.child(
-                gpui::anchored()
-                    .anchor(if compact { gpui::Anchor::TopLeft } else { gpui::Anchor::BottomLeft })
-                    .position(settings_menu_position)
-                    .snap_to_window_with_margin(px(12.))
-                    .child(
-                        div()
-                            .id("language-menu")
-                            .accessibility_id("language-menu")
-                            .role(gpui::Role::Menu)
-                            .aria_label(locale.text(Text::Language))
-                            .track_focus(&self.language_menu_focus)
-                            .occlude()
-                            .flex()
-                            .flex_col()
-                            .w(px(208.))
-                            .gap_2()
-                            .bg(rgb(0xffffff))
-                            .border_1().border_color(rgb(0xd8dee9)).rounded_md().shadow_lg()
-                            .px_3()
-                            .py_2()
-                            .on_mouse_down_out(cx.listener(|this, event: &gpui::MouseDownEvent, window, cx| {
-                                if this.settings_bounds.borrow().contains(&event.position) { return; }
-                                this.settings_open = false;
-                                this.restore_settings_focus = true;
-                                window.focus(&this.settings_focus, cx);
-                                cx.notify();
-                            }))
-                            .child(
-                                div()
-                                    .id("desktop-title")
-                                    .role(gpui::Role::Heading)
-                                    .aria_level(1)
-                                    .aria_label(locale.text(Text::Language))
-                                    .child(locale.text(Text::Language)),
-                            )
-                            .child(
-                                div()
-                                    .flex()
-                                    .flex_col()
-                                    .gap_2()
-                                    .child(
-                                        div()
-                                            .id("locale-en")
-                                            .accessibility_id("locale-en")
-                                            .role(gpui::Role::MenuItemRadio)
-                                            .aria_label("English")
-                                            .aria_selected(locale == Locale::English)
-                                            .aria_toggled(if locale == Locale::English {
-                                                gpui::Toggled::True
-                                            } else {
-                                                gpui::Toggled::False
-                                            })
-                                            .track_focus(&self.english_focus)
-                                            .px_3().py_2().rounded_sm()
-                                            .border_1().border_color(gpui::transparent_black())
-                                            .when(locale == Locale::English, |style| style.bg(rgb(0xddeef8)))
-                                            .focus(|style| style.border_color(rgb(0x5e81ac)))
-                                            .on_key_down(cx.listener(
-                                                |this, event: &gpui::KeyDownEvent, window, cx| {
-                                                    if matches!(
-                                                        event.keystroke.key.as_str(),
-                                                        "enter" | "space"
-                                                    ) {
-                                                        this.state.set_locale("en-US");
-                                                        this.settings_open = false;
-                                                        window.focus(&this.settings_focus, cx);
-                                                        cx.stop_propagation();
-                                                        cx.notify();
-                                                    }
-                                                },
-                                            ))
-                                            .cursor_pointer()
-                                            .child("English")
-                                            .on_click(cx.listener(|this, _, window, cx| {
-                                                window.focus(&this.settings_focus, cx);
-                                                this.state.set_locale("en-US");
-                                                this.settings_open = false;
-                                                cx.notify();
-                                            })),
-                                    )
-                                    .child(
-                                        div()
-                                            .id("locale-zh")
-                                            .accessibility_id("locale-zh")
-                                            .role(gpui::Role::MenuItemRadio)
-                                            .aria_label("简体中文")
-                                            .aria_selected(locale == Locale::Chinese)
-                                            .aria_toggled(if locale == Locale::Chinese {
-                                                gpui::Toggled::True
-                                            } else {
-                                                gpui::Toggled::False
-                                            })
-                                            .track_focus(&self.chinese_focus)
-                                            .px_3().py_2().rounded_sm()
-                                            .border_1().border_color(gpui::transparent_black())
-                                            .when(locale == Locale::Chinese, |style| style.bg(rgb(0xddeef8)))
-                                            .focus(|style| style.border_color(rgb(0x5e81ac)))
-                                            .on_key_down(cx.listener(
-                                                |this, event: &gpui::KeyDownEvent, window, cx| {
-                                                    if matches!(
-                                                        event.keystroke.key.as_str(),
-                                                        "enter" | "space"
-                                                    ) {
-                                                        this.state.set_locale("zh-CN");
-                                                        this.settings_open = false;
-                                                        window.focus(&this.settings_focus, cx);
-                                                        cx.stop_propagation();
-                                                        cx.notify();
-                                                    }
-                                                },
-                                            ))
-                                            .cursor_pointer()
-                                            .child("简体中文")
-                                            .on_click(cx.listener(|this, _, window, cx| {
-                                                window.focus(&this.settings_focus, cx);
-                                                this.state.set_locale("zh-CN");
-                                                this.settings_open = false;
-                                                cx.notify();
-                                            })),
-                                    ),
-                            ),
-                    )))
     }
 }
 
@@ -1911,6 +1777,11 @@ pub(crate) fn capture(directory: std::path::PathBuf) -> std::process::ExitCode {
                                         let view = root.clone().downcast::<DesktopWindow>()
                                             .map_err(|_| "Unexpected capture root".to_owned())?;
                                         let bounds = *view.read(cx).preset_edit_bounds.borrow();
+                                        if bounds.bottom() >= window.viewport_size().height {
+                                            view.read(cx).settings_scroll.set_offset(gpui::point(px(0.), window.viewport_size().height - bounds.bottom() - px(24.)));
+                                            let _ = window.draw(cx);
+                                        }
+                                        let bounds = *view.read(cx).preset_edit_bounds.borrow();
                                         // The lower half is the description, not the former name-only button.
                                         let target = bounds.origin + gpui::point(bounds.size.width / 2., bounds.size.height * 0.75);
                                         if target.y >= window.viewport_size().height {
@@ -2133,87 +2004,72 @@ pub(crate) fn capture(directory: std::path::PathBuf) -> std::process::ExitCode {
                                     if name == "settings" {
                                         let view = root.clone().downcast::<DesktopWindow>()
                                             .map_err(|_| "Unexpected capture root".to_owned())?;
-                                        let focus = view.read(cx).settings_focus.clone();
-                                        window.focus(&focus, cx);
-                                        let _ = window.draw(cx);
-                                        for key in ["enter", "escape", "space"] {
-                                            let keystroke = gpui::Keystroke::parse(key)
-                                                .map_err(|error| error.to_string())?;
-                                            window.dispatch_event(gpui::PlatformInput::KeyDown(gpui::KeyDownEvent {
-                                                keystroke, is_held: false, prefer_character_input: false,
-                                            }), cx);
-                                            let _ = window.draw(cx);
-                                            let state = view.read(cx);
-                                            let open = key != "escape";
-                                            let expected_focus = if !open {
-                                                &state.settings_focus
-                                            } else {
-                                                match state.state.locale {
-                                                    Locale::English => &state.english_focus,
-                                                    Locale::Chinese => &state.chinese_focus,
-                                                }
-                                            };
-                                            if state.settings_open != open || !expected_focus.is_focused(window) {
-                                                return Err(format!("Settings keyboard/focus failed after {key}"));
-                                            }
-                                        }
+                                        view.update(cx, |state, cx| {
+                                            state.goal_input.update(cx, |input, cx| input.set_text("Preserve this task draft / 保留任务草稿", cx));
+                                        });
                                         let original_locale = view.read(cx).state.locale;
                                         let original_goal = view.read(cx).goal_input.read(cx).text().to_owned();
-                                        for (locale_id, focus) in [
-                                            ("zh-CN", view.read(cx).chinese_focus.clone()),
-                                            ("en-US", view.read(cx).english_focus.clone()),
+                                        let original_default = view.read(cx).state.default_preset;
+                                        for key in ["enter", "space"] {
+                                            view.update(cx, |state, cx| state.execute(Command::NewTask, window, cx));
+                                            let focus = view.read(cx).settings_focus.clone();
+                                            window.focus(&focus, cx);
+                                            let _ = window.draw(cx);
+                                            window.dispatch_event(gpui::PlatformInput::KeyDown(gpui::KeyDownEvent {
+                                                keystroke: gpui::Keystroke::parse(key).map_err(|error| error.to_string())?,
+                                                is_held: false, prefer_character_input: false,
+                                            }), cx);
+                                            let _ = window.draw(cx);
+                                            if view.read(cx).state.page != Page::Presets {
+                                                return Err(format!("Settings page keyboard navigation failed after {key}"));
+                                            }
+                                        }
+                                        for (locale_id, focus, key) in [
+                                            ("zh-CN", view.read(cx).chinese_focus.clone(), "enter"),
+                                            ("en-US", view.read(cx).english_focus.clone(), "space"),
                                         ] {
                                             window.focus(&focus, cx);
+                                            let _ = window.draw(cx);
                                             window.dispatch_event(gpui::PlatformInput::KeyDown(gpui::KeyDownEvent {
-                                                keystroke: gpui::Keystroke::parse("enter").map_err(|error| error.to_string())?,
+                                                keystroke: gpui::Keystroke::parse(key).map_err(|error| error.to_string())?,
                                                 is_held: false, prefer_character_input: false,
                                             }), cx);
                                             let _ = window.draw(cx);
                                             let state = view.read(cx);
-                                            if state.settings_open || !state.settings_focus.is_focused(window)
+                                            if state.state.page != Page::Presets || !focus.is_focused(window)
                                                 || state.state.locale != Locale::resolve(locale_id)
-                                                || state.goal_input.read(cx).text() != original_goal {
-                                                return Err(format!("Language selection dismissal/draft/focus failed: {locale_id}"));
+                                                || state.goal_input.read(cx).text() != original_goal
+                                                || state.state.default_preset != original_default {
+                                                return Err(format!("Settings language/draft/focus preservation failed: {locale_id}"));
                                             }
-                                            view.update(cx, |state, cx| state.execute(Command::ToggleSettings, window, cx));
+                                        }
+                                        for (key, expected) in [
+                                            ("right", Locale::Chinese),
+                                            ("left", Locale::English),
+                                            ("down", Locale::Chinese),
+                                            ("up", Locale::English),
+                                        ] {
+                                            window.dispatch_event(gpui::PlatformInput::KeyDown(gpui::KeyDownEvent {
+                                                keystroke: gpui::Keystroke::parse(key).map_err(|error| error.to_string())?,
+                                                is_held: false, prefer_character_input: false,
+                                            }), cx);
                                             let _ = window.draw(cx);
-                                            if !focus.is_focused(window) {
-                                                return Err(format!("Reopened language menu did not focus current locale: {locale_id}"));
+                                            let state = view.read(cx);
+                                            let focus = match expected {
+                                                Locale::English => &state.english_focus,
+                                                Locale::Chinese => &state.chinese_focus,
+                                            };
+                                            if state.state.locale != expected || !focus.is_focused(window) {
+                                                return Err(format!("Settings language radio navigation failed after {key}"));
                                             }
-                                        }
-                                        let outside = gpui::point(window.viewport_size().width - px(8.), window.viewport_size().height - px(8.));
-                                        for event in [
-                                            gpui::PlatformInput::MouseDown(gpui::MouseDownEvent { button: gpui::MouseButton::Left, position: outside, modifiers: Default::default(), click_count: 1, first_mouse: false }),
-                                            gpui::PlatformInput::MouseUp(gpui::MouseUpEvent { button: gpui::MouseButton::Left, position: outside, modifiers: Default::default(), click_count: 1 }),
-                                        ] { window.dispatch_event(event, cx); }
-                                        let _ = window.draw(cx);
-                                        if view.read(cx).settings_open || !view.read(cx).settings_focus.is_focused(window) {
-                                            return Err("Language menu outside dismissal/focus failed".into());
-                                        }
-                                        view.update(cx, |state, cx| {
-                                            state.execute(Command::ToggleSettings, window, cx);
-                                        });
-                                        let _ = window.draw(cx);
-                                        if !view.read(cx).settings_open {
-                                            return Err("Navigation test requires an open language menu".into());
                                         }
                                         view.update(cx, |state, cx| state.execute(Command::OpenFixture(1), window, cx));
-                                        if view.read(cx).settings_open || !view.read(cx).tab_focus[0].is_focused(window) {
-                                            return Err("Same-page navigation left language menu/focus behind".into());
-                                        }
-                                        view.update(cx, |state, cx| state.execute(Command::ToggleSettings, window, cx));
-                                        view.update(cx, |state, cx| {
-                                            state.execute(Command::NewTask, window, cx);
-                                        });
-                                        if view.read(cx).settings_open {
-                                            return Err("Navigation left language menu open".into());
+                                        if view.read(cx).state.page != Page::Fixture || !view.read(cx).tab_focus[0].is_focused(window) {
+                                            return Err("Settings page did not yield focus to task navigation".into());
                                         }
                                         view.update(cx, |state, cx| {
-                                            state.execute(Command::Tasks, window, cx);
-                                            state.state.page = Page::Fixture;
-                                            state.execute(Command::OpenFixture(0), window, cx);
                                             state.state.locale = original_locale;
-                                            state.execute(Command::ToggleSettings, window, cx);
+                                            state.execute(Command::Settings, window, cx);
                                         });
                                         let _ = window.draw(cx);
                                     }

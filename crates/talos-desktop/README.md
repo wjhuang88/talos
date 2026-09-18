@@ -2,7 +2,8 @@
 
 I277 is a local, fixture-backed preview, not a live Talos Runtime client. The native window,
 design-based pages, locale controls and multiline input are implemented. The updated macOS
-input/folder walkthrough and language-popover recheck passed on 2026-09-17/18. Delivery remains
+input/folder walkthrough passed on 2026-09-17/18. The maintainer subsequently accepted replacing
+the language popover with a Settings page containing language and preset controls. Delivery remains
 in Review; VoiceOver and reduced-motion checks are explicitly deferred and unverified, and
 Windows/Linux native interaction acceptance remains outstanding.
 
@@ -45,13 +46,11 @@ These are presentation-only edits; creating or saving a preview does not write w
 files or call a model. Verify soft-wrap end clicks, cross-line dragging and IME candidate placement
 after scrolling, in addition to the basic input checks below.
 
-Start in each locale and at the minimum window size. Display settings opens a language popover
-beside its navigation button without shifting page content. Enter/Space toggles it. The popover
-opens with the current language highlighted and focused; keyboard focus uses a separate
-outline so tabbing does not change the selected-language background. Choosing a
-language or pressing Escape closes it and returns focus to the button. Clicking outside dismisses
-it, while clicked inputs retain their own focus. Navigation also dismisses the popover, including
-switching between task fixtures on the same page. Traverse English, Chinese and inputs with
+Start in each locale and at the minimum window size. Settings opens a full page containing
+language selection and preset management; there is no separate Presets navigation entry or
+language popover. The current language is selected independently of keyboard focus. Selecting
+a language keeps the Settings page open and preserves draft and fixture state. The New Task
+preset picker remains a separate control. Traverse English, Chinese and inputs with
 Tab/Shift-Tab; activate locale controls with Enter/Space. Enter mixed Chinese/Latin/emoji text,
 switch locale, and verify the same draft remains. With a real Chinese IME, verify composition,
 candidate positioning, commit, Escape cancellation and focus changes. Drag a long selection beyond
@@ -80,9 +79,10 @@ interaction failure; its trigger and impact remain unconfirmed. VoiceOver, physi
 and reduced-motion evidence remain open in the I277 owner.
 
 The CI workflow explicitly checks/tests desktop-ui on macOS, Windows and Linux for full-validation
-changes. Those steps are pending remote execution; native visual evidence remains outstanding.
+changes. The #571 implementation passed those checks; this establishes compilation/test evidence,
+not Windows/Linux native interaction or screen-reader acceptance of the subsequent Settings page.
 
-The in-progress accessibility integration exposes language-button roles, names and toggle state,
+The in-progress accessibility integration exposes language radio roles, names and checked state,
 and a localized draft input with value, selection and text-edit actions. Stable element identities
 survive locale changes. Real screen-reader validation remains required after this renderer migration;
 the earlier macOS walkthrough does not establish the new renderer's native acceptance.
