@@ -19,7 +19,7 @@
 | Governance Claim PR | #570 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Claim+activation effective through #570 merge 5f9dcf053ba2b3b31f76693f6bc8c97df36a1df6. |
-| Implementation PR | #571; native mock candidate locally converged, updated exact-head CI/review pending |
+| Implementation PR | #571 merged as 707b538eea0421333544f22b3e3e4a42687c87a1; six exact-head checks and independent Agent-role reviews passed |
 | Last Updated | 2026-09-18 |
 | Handoff / Release Condition | Atomic claim+activation required before code or Cargo changes. |
 
@@ -801,3 +801,22 @@ Local `cargo fetch --locked` and the complete `bash scripts/test_dependency_audi
 passed (76 complete Bash/PowerShell records). Both governance validators passed. The same fetch
 prerequisite covers Windows' offline audit; its misleading workspace-test-cache comment is
 corrected. No Rust source or dependency version changed in this CI follow-up.
+
+### 2026-09-18 Implementation Delivery and Deferred Acceptance
+
+Implementation merge: `707b538eea0421333544f22b3e3e4a42687c87a1` (#571).
+Exact head `ccf1bbd1d5f4bcf1a813f850bcb8f1806803eaa1` and base
+`5f9dcf053ba2b3b31f76693f6bc8c97df36a1df6` remained unchanged at merge-time CAS.
+All six checks in CI 35295546744 succeeded, including macOS, Windows and Linux Desktop feature
+validation. Independent Agent-role implementation and dependency/security/API reviews approved
+the exact head in comment 5723642620, with shared-account identity limits. MERGEABLE/CLEAN,
+no overlapping open PR and no blocking feedback were rechecked before expected-head squash merge.
+Issue #29 comment 5724493588 and PR comment 5724493593 retain the delivery evidence.
+
+This supersedes candidate-pending descriptions in earlier dated checkpoints. The implementation
+is delivered on main; Review / Claimed and Completion Commit: Pending remain truthful until
+deferred acceptance is resolved. VoiceOver and reduced-motion remain explicitly unverified and
+non-blocking for this round by maintainer instruction, tracked in the existing #29 queue rather
+than new per-subtask issues. Do not repeat passed macOS input/popover acceptance. Cross-platform
+compilation/tests do not establish Windows/Linux native interaction or physical display latency.
+No real Runtime integration, release or next-iteration activation is implied.
