@@ -2,6 +2,9 @@
 
 **Status**: Complete / Closed
 
+Open corrective intake: [2026-09-18 invalid model review](#2026-09-18-invalid-model-review-corrective-intake)
+is unresolved and unclaimed. Historical completion below does not close this new report.
+
 | Field | Value |
 |---|---|
 | Story ID | PERM-007-F |
@@ -154,3 +157,55 @@ validation tracker; `Completion Commit` remains unset until that evidence is rec
   bounded assessment without weakening deterministic deny or final admission.
 - The closed-string report mapping and conservative process-lifetime sandbox-health cache are
   accepted maintenance limits outside the completed I244 acceptance contract.
+
+## 2026-09-18 Invalid Model Review Corrective Intake
+
+Status: Open intake / Unclaimed; no corrective implementation or completion evidence yet.
+The maintainer requested recording this recurrence. Keep it in the existing Auto owner and
+source Issue #462 lineage; no per-diagnostic-step Issue is needed. It is separate from I277
+Desktop and does not replace the explicitly prioritized I278 Plugin-source cycle.
+
+### Observed Evidence
+
+- Talos UI reports v0.9.2; profile/model `minimax-cn-coding-plan / MiniMax-M3`.
+- User prompt: analyze the project. The first visible tool request is `bash`, command `ls -la`.
+- UI reports `Auto review: model returned an invalid review — human approval required`, then
+  shows the numeric approval panel. This is not a shell execution error or an explicit model
+  judgment that the command is unsafe.
+- Screenshot Dashboard port 62206 matches the local log startup at
+  `2026-09-18T10:14:02.583373Z`; session ID
+  `4f7b573b-9fae-4a49-8f19-6f9a02081d7f` matches the provider/model. Local screenshot and logs
+  are diagnostic pointers, not durable acceptance artifacts; no private transcript is copied here.
+
+### Confirmed Code Path And Evidence Limit
+
+`crates/talos-cli/src/mode_runners.rs` maps this wording to `malformed_output`.
+`crates/talos-agent/src/auto_resolver.rs` receives assessor text, fails
+`parse_auto_response`, discards the concrete error with `Err(_)`, and falls back to the human
+resolver. The report sink displays the message without persisting a diagnostic sufficient to
+reconstruct the failure. Existing parsing already tolerates a JSON fence/preamble.
+
+The configured OpenAI-compatible/native decision path does not enforce a provider JSON schema.
+That is a robustness concern, not proof of a MiniMax-specific defect. Neither raw review output
+nor the precise parse error was available in the inspected logs/session; missing fields, invalid
+enum values, malformed JSON and provider adaptation remain hypotheses. Do not label this
+intermittent, a timeout, fixed, or a known provider bug without evidence.
+
+### Required Corrective Work And Acceptance
+
+- Add bounded, redacted diagnostics: error category, line/column, response byte count and
+  correlation/model identity. Do not log credentials, raw prompts, review text or private commands.
+- Reproduce with the configured decision protocol and capture a safe failure fixture. Verify
+  structured-output support rather than assuming all OpenAI-compatible endpoints implement it.
+- Evaluate a bounded format-correction request for the isolated, tool-free assessment. Any repair
+  must fit the existing deadline/cancellation budget and revalidate the entire schema, digest,
+  current permission revision and final admission conditions; never infer missing approval fields.
+- Test valid auto-approval, malformed output, rejected/unsupported structured requests, correction
+  exhaustion, cancellation, stale identity and safe human fallback. The UI must distinguish model
+  judgment from technical failure. A live-model regression check complements deterministic tests.
+- Preserve fail-closed behavior and independent permission/security review. No `ls` special case,
+  general permission relaxation, duplicate tool execution or permanent grant may substitute for
+  repairing the decision path.
+
+Scheduling: retain as an open corrective item for triage at the next handoff; this record does
+not activate protected permission work or claim that the observed failure has been repaired.

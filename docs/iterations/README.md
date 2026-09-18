@@ -11,6 +11,11 @@ That snapshot is historical evidence and not current activation authority.
 
 ## Lifecycle
 
+Next-cycle priority (2026-09-18): [I278 root Plugin source delivery](I278-root-plugin-source-delivery.md)
+is Planned / Unclaimed, selected immediately after I277's implementation handoff. I277 retains
+its deferred human-validation rows; I249 stays Planned and I164 Paused. This is scheduling,
+not activation or a claim that I277 acceptance is complete.
+
 1. **Planned** — objective, selected stories, acceptance and activation gate are published.
 2. **Active** — explicitly activated work is in progress on a fresh current-main branch.
 3. **Review** — implementation exists and required evidence/review is pending.
