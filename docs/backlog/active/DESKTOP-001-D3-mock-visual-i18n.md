@@ -4,7 +4,7 @@
 |---|---|
 | Story ID | DESKTOP-001-D3 |
 | Parent | DESKTOP-001 / #29 |
-| Status | Review / Claimed |
+| Status | Review / Claimed — human acceptance Deferred |
 | Selected Iteration | I277 |
 | Work Slice | Mock-only Desktop visual surface with bilingual localization fixtures; no production runtime binding. |
 | Depends On | DESKTOP-001-D0 / I194; WORK-001 P0-P4; I276 browser boundary |
@@ -162,3 +162,8 @@ full local preflight and merge-time CAS. See I277 for exact identities and revie
 Settings replaces the language popover in subsequent acceptance. Review / Claimed and
 Completion Commit: Pending remain because deferred human rows are unverified, not failed or passed
 by inference. This checkpoint supersedes the preceding candidate-pending description.
+
+2026-09-18 maintainer instruction: remaining human/device acceptance is Deferred because current
+validation conditions are unavailable. This is a scheduling deferral, not failed acceptance or a
+blocker for I278. Resume when host/device and human conditions are available; preserve the merged
+implementation evidence and do not mark unverified rows passed.

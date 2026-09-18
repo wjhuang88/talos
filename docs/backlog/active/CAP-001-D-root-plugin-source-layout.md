@@ -15,7 +15,7 @@
 | Work Slice | Repository-root Plugin/Provider source, independent build and verified Bundle packaging |
 | Claimed At | Not applicable |
 | Source Issue | #466 |
-| Governance Claim PR | Not applicable |
+| Governance Claim PR | Pending |
 | Authorization Mode | Not applicable |
 | Authorization Evidence | Maintainer requested next-cycle priority on 2026-09-18; planning only |
 | Implementation PR | Not started |
@@ -76,6 +76,15 @@ governance validators and diff checks, not Rust compilation.
 Documentation targets: root plugin build/packaging guide, `crates/talos-plugin/README.md`,
 architecture layout section, ADR-072 clarification, I278, this owner and derived indexes.
 Any newly discovered implementation gap remains explicit in I278; do not silently narrow acceptance.
+
+### 2026-09-18 Implementation Readiness
+
+Read-only I278 inventory confirms Rust/Python WASM fixtures are no-op modules, not movable real
+implementations. I278 owns actual source delivery and the compatible guest-buffer integration
+needed to execute it. [ADR-079](../../decisions/079-rust-language-plugin-guest-buffer-boundary.md)
+is Proposed for that boundary; independent security/API decision review precedes acceptance and
+the effective claim. No implementation has begun. I277's remaining human/device checks are Deferred
+by the maintainer and do not block this slice.
 
 ## Required Reads
 

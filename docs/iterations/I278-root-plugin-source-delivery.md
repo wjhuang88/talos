@@ -16,7 +16,7 @@
 | Work Slice | CAP-001-D root Plugin source delivery only |
 | Claimed At | Not applicable |
 | Source Issue | #466 |
-| Governance Claim PR | Not applicable |
+| Governance Claim PR | Pending |
 | Authorization Mode | Not applicable |
 | Authorization Evidence | 2026-09-18 maintainer next-cycle scheduling instruction; not activation |
 | Implementation PR | Not started |
@@ -69,3 +69,46 @@ Desktop implementation commit/candidate. Reuse #466 as source; no per-subtask Is
 Evidence correction: I253's R1 `Satisfied` label explicitly excluded source delivery. Its cited
 ADR-072/architecture layout contract is not explicit in the current files. This plan owns both
 the missing contract clarification and implementation; the historical label is not acceptance.
+
+## 2026-09-18 Source And ABI Investigation
+
+Requested outcome: complete CAP-001-D source/build/package/install/real-consumer delivery.
+Preserve the Published Baseline, existing legacy fixtures, I277 deferral evidence and unrelated
+owners. Synchronize I278/CAP-001-D first, then parent/manifest/Board/indexes. Required evidence
+remains focused real-artifact tests, locked preflight, independent security/API review and CI.
+Any unresolved delivery gap remains owned here rather than creating per-subtask Issues.
+
+At `main@d6b566be`, no open PR overlaps this slice. I277 implementation #571/#573 is merged;
+remaining human/device acceptance is explicitly Deferred by the maintainer and non-blocking.
+I249 stays Planned/Unclaimed and I164 Paused. I278 remains Planned/Unclaimed pending its atomic
+claim and decision review; read-only investigation grants no implementation authority.
+
+| Existing artifact | Verified behavior | Disposition |
+|---|---|---|
+| `crates/talos-plugin/tests/fixtures/language-provider/provider.wat` | Constant zero response, plain-text fallback | Keep as a negative/empty-response compatibility fixture; not production Rust capability. |
+| `crates/talos-plugin/tests/fixtures/language-provider-python/provider.wat` | Same constant response | Keep as an installation/lifecycle fixture; not production Python capability. |
+| Inline WAT response fixtures in `crates/talos-plugin/src/wasm.rs` | Canned protocol responses | Preserve decoder tests; add separate real-artifact consumer evidence. |
+| Built-in `talos-text` language implementation | Actual statically linked source processing | Preserve current defaults; no broad parser migration. |
+| `crates/talos-plugin` | Host load/install/lifecycle/transport infrastructure | Keep in `crates/`; concrete optional sources belong under root `plugins/`. |
+
+The legacy host writes at guest address zero and lacks store memory/table limits in the language
+execution path; response copying also precedes its size check. These are verified integration gaps,
+not evidence of a deployed escape. Real Rust guest delivery requires an explicit buffer contract
+and bounded execution before claiming safety. [ADR-079](../decisions/079-rust-language-plugin-guest-buffer-boundary.md)
+proposes an additive allocator handshake and only guest symbol-export unsafe attributes; no raw
+pointer memory operations. Independent security/API review is required before acceptance.
+
+Actual consumer evidence must use the shared TUI highlight and symbol-tool paths. The current print
+registration path discards the language context, so it is not existing language-consumer evidence.
+The implementation must account for every affected path without presenting fixtures as real work.
+
+### Decision Review And Claim Preparation
+
+Independent Agent-role security/API review of ADR-079 initially requested two changes: bound
+admission/version probing as well as execution, and reject new guests on old hosts before any
+request memory write. The corrected proposal adds ABI v2 with mandatory allocation, retains
+new-host/v1 support, and explicitly covers public probe callers and artifact start/version rules.
+Reviewer `/root/i278_abi_decision_review` issued APPROVE against base `d6b566be25205a5abe1202dabeb0cee09ea81cce`
+and ADR content blob `1a6182b425741a0f6da0825b69c4ab8595241e72`. Shared workspace/account;
+Agent-role separation only. This is decision evidence, not implementation safety acceptance.
+The draft governance candidate will bind the actual claim PR before becoming reviewable.
