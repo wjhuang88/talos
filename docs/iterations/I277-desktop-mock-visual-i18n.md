@@ -770,6 +770,7 @@ No Dashboard, permission production, live Runtime implementation, version or rel
 - `docs/iterations/I277-desktop-mock-visual-i18n.md`
 - `docs/iterations/README.md`
 - `docs/reference/DESKTOP-I194-DEPENDENCY-SECURITY-MATRIX.md`
+- `scripts/test_dependency_windows.ps1` (offline cache prerequisite comment)
 
 Final local candidate validation: `env CARGO_BUILD_JOBS=2 CARGO_INCREMENTAL=0
 ./scripts/release_preflight.sh` exited zero, including workspace check, strict Clippy, tests and
@@ -781,3 +782,22 @@ review traced all 419 added lock identities to Desktop and found no old identity
 These are local-stage results, not a claim of new remote exact-head CI or approval. Upstream
 `block 0.1.6` future incompatibility remains visible. Final binary identity is recorded in the
 candidate PR; the earlier maintainer walkthrough remains bound to its recorded pre-clipboard hash.
+
+### 2026-09-18 First Stable Remote Candidate and Offline Cache Repair
+
+Candidate `08fc27c29a6e16d501b461c224f53e164506e988` was pushed to #571 after local convergence;
+two independent Agent-role reviews approved that exact head/base with shared-account limits
+disclosed in comment 5723492190. Issue #29 comment 5723500147 records the state and deferred rows.
+Linux Desktop CI passed. macOS release_preflight also passed, then its offline dependency parity
+step failed: all-feature metadata needed uncached accesskit 0.24.1, which default workspace
+validation intentionally does not fetch. This was a workflow prerequisite defect, not a failed
+Rust test or evidence of a network outage. The subsequent Desktop step was skipped, not passed.
+
+The local correction adds bounded `cargo fetch --locked` before offline all-feature auditing,
+preserving the audit's offline contract and locked versions. The next stable head requires fresh
+CI and incremental exact-head review; earlier approvals do not silently transfer across heads.
+
+Local `cargo fetch --locked` and the complete `bash scripts/test_dependency_audit.sh` suite
+passed (76 complete Bash/PowerShell records). Both governance validators passed. The same fetch
+prerequisite covers Windows' offline audit; its misleading workspace-test-cache comment is
+corrected. No Rust source or dependency version changed in this CI follow-up.

@@ -62,8 +62,18 @@ repeating known mistakes.
 | 50 | Governance / Long Task | 人工验证不可用时建立 Issue 批量跟踪，不能让未验项冒充通过或空转阻塞实现队列 | I200 / VALIDATION-002 |
 | 51 | TUI / Streaming | 最终 flush 必须消费源缓冲，不能把 transient preview 当作源文 | I256 / TEXT-001 |
 | 52 | Desktop / Testing | 当前选项和键盘焦点要分离；测试不能固化首项默认焦点 | I277 |
+| 53 | CI / Dependencies | 离线 all-feature 审计前须显式准备完整锁依赖，默认构建缓存不足 | I277 |
 
 ## Lessons
+
+## 2026-09-18 - Optional Dependencies Need Explicit Offline Preparation
+
+- Trigger: I277 macOS CI 的 workspace preflight 全绿，后续依赖审计缺少 accesskit 0.24.1。
+- Symptom: `cargo metadata --all-features --offline` 尝试下载并失败，后续 Desktop 步骤被跳过。
+- Root cause: 默认 workspace 不启用 Desktop，因此构建缓存不能满足全 feature、全 target 元数据消费。
+- Fix: 离线审计前单独运行带超时的 `cargo fetch --locked`，保留审计自身的离线契约。
+- Prevention: 分开声明依赖准备与离线验证；不把缓存命中视为前置能力，也不通过去掉 offline 隐藏缺口。
+- Promoted to rule/check: `.github/workflows/ci.yml` 的 locked dependency fetch 前置步骤。
 
 ## 2026-09-18 - Selected Value Is Not Keyboard Focus
 
