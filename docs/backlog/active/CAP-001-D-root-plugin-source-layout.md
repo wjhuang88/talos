@@ -1,6 +1,6 @@
 # CAP-001-D: Repository-Root Plugin Source Delivery
 
-**Status**: Ready / Unclaimed
+**Status**: In Progress / Claimed
 **Type**: Technical delivery Story
 **Parent Epic**: CAP-001 / #466
 **Selected Iteration**: I278
@@ -9,18 +9,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Repository-root Plugin/Provider source, independent build and verified Bundle packaging |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-6 |
+| Work Slice | CAP-001-D real root Rust/Python Plugin sources, independent build/package, compatible bounded language transport and real-consumer validation under ADR-079; no Desktop or default-distribution change |
+| Claimed At | 2026-09-18 |
 | Source Issue | #466 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Maintainer requested next-cycle priority on 2026-09-18; planning only |
+| Governance Claim PR | #575 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Maintainer I278 delivery goal and delegated Agent-role review; #575 exact-head security/API/governance approval and scoped CI required before merge; activation effective only on main |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-18 |
-| Handoff / Release Condition | First implementation cycle after I277's machine/review/merge gates; effective claim required before implementation |
+| Handoff / Release Condition | #575 target-branch merge before implementation; ADR-079 and full baseline acceptance apply; I277 deferred human/device checks do not block this slice |
 
 ## Goal And Scope
 
@@ -76,6 +76,20 @@ governance validators and diff checks, not Rust compilation.
 Documentation targets: root plugin build/packaging guide, `crates/talos-plugin/README.md`,
 architecture layout section, ADR-072 clarification, I278, this owner and derived indexes.
 Any newly discovered implementation gap remains explicit in I278; do not silently narrow acceptance.
+
+### 2026-09-18 Implementation Readiness
+
+Read-only I278 inventory confirms Rust/Python WASM fixtures are no-op modules, not movable real
+implementations. I278 owns actual source delivery and the compatible guest-buffer integration
+needed to execute it. [ADR-079](../../decisions/079-rust-language-plugin-guest-buffer-boundary.md)
+is Proposed for that boundary; independent security/API decision review precedes acceptance and
+the effective claim. No implementation has begun. I277's remaining human/device checks are Deferred
+by the maintainer and do not block this slice.
+
+PR #575 proposes this claim and activation atomically with ADR-079 acceptance after independent
+Agent-role security/API review. These changes become effective only on target-branch merge;
+no code has started. I278 records the full non-terminal inventory, predecessor evidence,
+expected changed-file boundaries and implementation/validation sequence.
 
 ## Required Reads
 

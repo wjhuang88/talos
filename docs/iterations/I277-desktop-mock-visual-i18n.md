@@ -1,6 +1,7 @@
 # Iteration I277: Desktop Mock Visual and Localization Slice
 
-> Document status: Review
+> Document status: Review — remaining human acceptance Deferred
+> Acceptance scheduling: Deferred by maintainer on 2026-09-18; validation conditions currently unavailable. Non-blocking for I278.
 > Published plan date: 2026-09-16
 > Planned objective: Deliver a fixture-backed, mock-only Desktop visual surface with bilingual localization.
 > Baseline rule: preserve this scope; changed objectives use a new iteration ID.
@@ -882,3 +883,14 @@ also remain unproven; compilation and software timestamps are not substitutes. T
 walkthrough must use the Settings page, never the removed language popover. Preserve earlier
 passed macOS IME/input/locale/preset confirmations. I278 may proceed separately after its own
 effective claim under the recorded deferred-validation scheduling rule.
+
+### 2026-09-18 Maintainer Acceptance Deferral
+
+The maintainer explicitly requested deferral because validation conditions are unavailable.
+Remaining VoiceOver, reduced-motion, cross-platform native interaction and physical display
+evidence are Deferred / Unverified, not a current development blocker. Implementation delivery
+through #571/#573 and its validation evidence remain valid. Preserve the acceptance baseline;
+resume only when the relevant host/device and human validation conditions become available.
+No repeated polling, rebuild or new implementation PR is required solely for this deferral.
+I278 remains the next selected cycle and does not wait for these deferred rows. Overall acceptance
+is not Complete; the iteration retains Review as its evidence state with Deferred scheduling.
