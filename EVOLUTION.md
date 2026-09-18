@@ -61,8 +61,18 @@ repeating known mistakes.
 | 49 | Governance / CI | 分支级 validator 本地复现必须显式绑定 PR base，不能依赖 `HEAD^` 回退 | I159 / PR #236 |
 | 50 | Governance / Long Task | 人工验证不可用时建立 Issue 批量跟踪，不能让未验项冒充通过或空转阻塞实现队列 | I200 / VALIDATION-002 |
 | 51 | TUI / Streaming | 最终 flush 必须消费源缓冲，不能把 transient preview 当作源文 | I256 / TEXT-001 |
+| 52 | Desktop / Testing | 当前选项和键盘焦点要分离；测试不能固化首项默认焦点 | I277 |
 
 ## Lessons
+
+## 2026-09-18 - Selected Value Is Not Keyboard Focus
+
+- Trigger: I277 人工验收发现中文界面打开语言菜单仍高亮 English。
+- Symptom: 切换成功，但每次重新打开菜单都像选中了英文。
+- Root cause: 打开动作固定聚焦首项，底色只表示焦点；自动化也断言首项，固化了错误行为。
+- Fix: 打开时聚焦当前 locale；选中底色与焦点边框分别渲染。
+- Prevention: 从当前值及切换后重新打开两个路径检查交互，不把实现默认值当作验收依据。
+- Promoted to rule/check: Desktop native capture 的 settings 场景按当前 locale 断言初始及重开焦点。
 
 ## 2026-09-10 - Stream finalization must not consume display previews
 

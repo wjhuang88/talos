@@ -1,46 +1,16 @@
-//! Fixture-backed, renderer-neutral Desktop visual prototype (I277).
-use serde::Deserialize;
+//! Fixture-backed Desktop window; no live Runtime or Session binding.
+mod input;
+mod presentation;
+mod window;
 
-#[derive(Debug, Deserialize)]
-struct Fixture {
-    title: String,
-    status: String,
-    goal: String,
-}
-
-fn catalog(locale: &str) -> (&'static str, &'static str, &'static str) {
-    match locale {
-        "zh-CN" => ("Talos 桌面预览", "模拟状态", "目标"),
-        _ => ("Talos Desktop Preview", "Mock status", "Goal"),
+fn main() -> std::process::ExitCode {
+    #[cfg(feature = "visual-test")]
+    if std::env::args().nth(1).as_deref() == Some("--capture") {
+        let Some(directory) = std::env::args_os().nth(2) else {
+            eprintln!("Usage: talos-desktop-mock --capture <new-output-directory>");
+            return std::process::ExitCode::FAILURE;
+        };
+        return window::capture(directory.into());
     }
-}
-
-fn main() {
-    let locale = std::env::args().nth(1).unwrap_or_else(|| "en-US".into());
-    let fixture: Fixture =
-        serde_json::from_str(r#"{"title":"Execution","status":"ready","goal":"Review fixture"}"#)
-            .expect("embedded fixture is valid");
-    let (title, status, goal) = catalog(&locale);
-    println!(
-        "{title}\n{status}: {}\n{goal}: {}\n{}",
-        fixture.status, fixture.goal, fixture.title
-    );
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn locales_only_change_labels() {
-        let fixture: Fixture = serde_json::from_str(
-            r#"{"title":"Execution","status":"ready","goal":"Review fixture"}"#,
-        )
-        .unwrap();
-        assert_eq!(fixture.status, "ready");
-        assert_ne!(catalog("en-US").0, catalog("zh-CN").0);
-    }
-    #[test]
-    fn unsupported_locale_falls_back_to_english() {
-        assert_eq!(catalog("fr-FR"), catalog("en-US"));
-    }
+    window::run(std::env::args().nth(1).unwrap_or_else(|| "en-US".into()))
 }

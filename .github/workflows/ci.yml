@@ -147,6 +147,19 @@ jobs:
         if: needs.classify-changes.result != 'success' || needs.classify-changes.outputs.full_validation != 'false'
         run: bash scripts/test_dependency_audit.sh
 
+      - name: Desktop explicit feature validation
+        if: needs.classify-changes.result != 'success' || needs.classify-changes.outputs.full_validation != 'false'
+        timeout-minutes: 20
+        shell: bash
+        env:
+          CARGO_PROFILE_DEV_DEBUG: '0'
+          CARGO_INCREMENTAL: '0'
+        run: |
+          set -euo pipefail
+          unset RXCB_EXPORT RING_PREGENERATE_ASM
+          cargo clippy -p talos-desktop --features desktop-ui --all-targets --locked -- -D warnings
+          cargo test -p talos-desktop --features desktop-ui --locked
+
   windows-rust:
     name: Windows Rust workspace
     needs: classify-changes
@@ -173,6 +186,20 @@ jobs:
 
       - name: Clippy workspace
         run: cargo clippy --workspace --locked -- -D warnings
+
+      - name: Desktop explicit feature validation
+        timeout-minutes: 20
+        shell: pwsh
+        env:
+          CARGO_PROFILE_DEV_DEBUG: '0'
+          CARGO_INCREMENTAL: '0'
+        run: |
+          Remove-Item Env:RXCB_EXPORT -ErrorAction SilentlyContinue
+          Remove-Item Env:RING_PREGENERATE_ASM -ErrorAction SilentlyContinue
+          cargo clippy -p talos-desktop --features desktop-ui --all-targets --locked -- -D warnings
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo test -p talos-desktop --features desktop-ui --locked
+          exit $LASTEXITCODE
 
       - name: Focused PowerShell process, permission, and timeout tests
         run: |
@@ -250,6 +277,37 @@ jobs:
 
       - name: Rebuilt CLI mock smoke
         run: cargo run -p talos-cli --locked -- --mock --print --no-init --no-context "windows shell portability smoke"
+
+  linux-desktop:
+    name: Linux Desktop explicit feature
+    needs: classify-changes
+    if: always() && (needs.classify-changes.result != 'success' || needs.classify-changes.outputs.full_validation != 'false')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_INCREMENTAL: '0'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.0
+      - uses: Swatinem/rust-cache@v2
+      - name: Native display and font development dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang libclang-dev pkg-config libfontconfig1-dev libfreetype6-dev \
+            libx11-dev libx11-xcb-dev libxcb1-dev libxcb-shape0-dev libxcb-xfixes0-dev \
+            libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libegl1-mesa-dev libvulkan-dev
+      - name: Desktop explicit feature validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          unset RXCB_EXPORT RING_PREGENERATE_ASM
+          cargo clippy -p talos-desktop --features desktop-ui --all-targets --locked -- -D warnings
+          cargo test -p talos-desktop --features desktop-ui --locked
 
   remote-governance-reconciliation:
     name: Remote issue / owner reconciliation

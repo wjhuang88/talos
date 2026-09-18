@@ -34,7 +34,7 @@ That snapshot is historical evidence and not current activation authority.
 | I263 | Interrupted Transcript Projection | Complete / Closed | SESSION-008-C / Issue #45; Completion Commit `0f021a6f`; PR #546 merged `239a01cc`. |
 | I264 | Prompt Authority Architecture Baseline | Complete / Closed | PROMPT-001 / Issue #285; baseline and decision boundary recorded at `5fa65d6e`. |
 | I269 | Evolution Learned-Pattern Authority | Complete / Closed | PROMPT-001 / Issue #285; advisory boundary and provenance landed in `90970607`; 64 focused tests passed. |
-| I277 | Desktop Mock Visual and Localization Slice | Planned / Unclaimed | [I277](I277-desktop-mock-visual-i18n.md) / DESKTOP-001-D3 / #29; claim+activation required before implementation. |
+| I277 | Desktop Mock Visual and Localization Slice | Review / Claimed | [I277](I277-desktop-mock-visual-i18n.md) / DESKTOP-001-D3 / #29; mock macOS walkthrough passed, stable #571 preparation; VoiceOver/reduced-motion deferred, unverified. |
 
 I158 and I171 completion evidence: `Completion Commit: 56f419f7` (source implementation/audit
 closeout evidence; status synchronization commits do not self-certify completion).
