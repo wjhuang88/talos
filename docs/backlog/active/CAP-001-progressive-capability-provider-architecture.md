@@ -44,6 +44,12 @@ does not authorize implementation of remaining child Stories.
 
 ## Completion Evidence
 
+2026-09-18 correction: the historical governance closure does not establish delivery of the
+root `plugins/` layout in #466. That implementation was not handed to a concrete child and is
+still missing. [CAP-001-D](CAP-001-D-root-plugin-source-layout.md) / I278 now owns it, with
+maintainer priority for the next cycle after I277. Preserve earlier implementation evidence;
+do not interpret this parent's Closed label as completion of that newly recovered residual.
+
 The architecture decision and decomposition are implemented and synchronized through the child
 completion records: ADR-072; CAP-001-A/B/C; TEXT-001; LANG-001/002; BUNDLE-001; and DIST-001-A.
 The remaining LANG-003, DIST-001-B and BROWSER-001 owners are intentionally left independent and
@@ -75,6 +81,7 @@ unclaimed. This status record is not implementation evidence.
 
 | Child | Outcome | Current State |
 |---|---|---|
+| [CAP-001-D](CAP-001-D-root-plugin-source-layout.md) / source #466 | Deliver omitted root `plugins/` implementation source and independent build/package path. | I278 Planned / Unclaimed; next cycle after I277 machine/review/merge handoff, prioritized by maintainer on 2026-09-18. |
 | [CAP-001-G](CAP-001-G-governance-convergence.md) / Issue #519 | Architecture governance audit and migration contract. | I253 Complete / Closed; Completion Commit `60851fb23128a151ecbd17e86ec4730ffebb3135` via PR #521 merge. No downstream implementation authority. |
 | CAP-001-P0 / Issue #467 | Characterize current behavior and prepare compatibility seams plus cross-lane ownership before capability implementation. | I246 Complete / Closed; Completion Commit `9a3c1d860408c1438ec1a7ad4b57860167d0cb01` via implementation PR #492 |
 | CAP-001-A / I252 | Stable Capability and Provider descriptor contracts. | Complete / Closed; Completion Commit `71cc03b322d80d19c3767e4ef2014fecb84c1994`, merged via PR #507 as `0835afc4b982a5ed409ccfb55538bbeaf6fe5eab` |

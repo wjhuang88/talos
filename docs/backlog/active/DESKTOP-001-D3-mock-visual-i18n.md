@@ -153,3 +153,12 @@ Forty-two Desktop tests, strict visual-test Clippy, locked build and formatting 
 candidate evidence is recorded in I277. Earlier #573 CI binds only head `4b6f13ea`; a new stable
 head requires fresh CI and independent review. Status remains Review / Claimed, with deferred
 VoiceOver/reduced-motion unverified; no new Complete or native screen-reader pass is claimed.
+
+### 2026-09-18 Settings Delivery
+
+PR #573 merged as `8caf2b3a7b1701080cf7bf7e7ea1dd0fdd86f035`; exact head `89417002`
+and base `b86db68d` passed six CI jobs in 35347139940, independent Agent-role APPROVE,
+full local preflight and merge-time CAS. See I277 for exact identities and review limitations.
+Settings replaces the language popover in subsequent acceptance. Review / Claimed and
+Completion Commit: Pending remain because deferred human rows are unverified, not failed or passed
+by inference. This checkpoint supersedes the preceding candidate-pending description.

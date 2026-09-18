@@ -11,6 +11,11 @@ That snapshot is historical evidence and not current activation authority.
 
 ## Lifecycle
 
+Next-cycle priority (2026-09-18): [I278 root Plugin source delivery](I278-root-plugin-source-delivery.md)
+is Planned / Unclaimed, selected immediately after I277's implementation handoff. I277 retains
+its deferred human-validation rows; I249 stays Planned and I164 Paused. This is scheduling,
+not activation or a claim that I277 acceptance is complete.
+
 1. **Planned** — objective, selected stories, acceptance and activation gate are published.
 2. **Active** — explicitly activated work is in progress on a fresh current-main branch.
 3. **Review** — implementation exists and required evidence/review is pending.
@@ -34,7 +39,7 @@ That snapshot is historical evidence and not current activation authority.
 | I263 | Interrupted Transcript Projection | Complete / Closed | SESSION-008-C / Issue #45; Completion Commit `0f021a6f`; PR #546 merged `239a01cc`. |
 | I264 | Prompt Authority Architecture Baseline | Complete / Closed | PROMPT-001 / Issue #285; baseline and decision boundary recorded at `5fa65d6e`. |
 | I269 | Evolution Learned-Pattern Authority | Complete / Closed | PROMPT-001 / Issue #285; advisory boundary and provenance landed in `90970607`; 64 focused tests passed. |
-| I277 | Desktop Mock Visual and Localization Slice | Review / Claimed | [I277](I277-desktop-mock-visual-i18n.md) / DESKTOP-001-D3 / #29; #571 merged as 707b538e, mock delivered; VoiceOver/reduced-motion deferred, unverified. |
+| I277 | Desktop Mock Visual and Localization Slice | Review / Claimed | [I277](I277-desktop-mock-visual-i18n.md) / DESKTOP-001-D3 / #29; #571 merged as 707b538e and Settings #573 as 8caf2b3a; implementation delivered; VoiceOver/reduced-motion deferred, unverified. |
 
 I158 and I171 completion evidence: `Completion Commit: 56f419f7` (source implementation/audit
 closeout evidence; status synchronization commits do not self-certify completion).
