@@ -33,7 +33,7 @@ tokio = { version = "1.53.1", features = ["rt", "sync", "time"] }
 talos-provider = { version = "0.9.2", path = "../talos-provider" }
 talos-tools = { version = "0.9.2", path = "../talos-tools", default-features = false, features = ["file-write"] }
 tempfile = "3"
-tokio = { version = "1.53.1", features = ["macros", "rt-multi-thread", "sync"] }
+tokio = { version = "1.53.1", features = ["macros", "rt-multi-thread", "sync", "test-util"] }
 
 [lints]
 workspace = true

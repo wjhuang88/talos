@@ -712,3 +712,117 @@ impl ShutdownCoordinator {
         self.changed.notify_waiters();
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::AtomicBool;
+
+    struct GatedFinalizer {
+        order: u16,
+        started: mpsc::UnboundedSender<u16>,
+        release: Arc<Notify>,
+        dropped: Arc<AtomicBool>,
+    }
+
+    impl RuntimeFinalizer for GatedFinalizer {
+        fn identifier(&self) -> ShutdownFinalizerId {
+            ShutdownFinalizerId::new(match self.order {
+                1 => "test.first",
+                2 => "test.consume-remaining",
+                _ => "test.not-run",
+            })
+        }
+
+        fn order(&self) -> u16 {
+            self.order
+        }
+
+        fn cap(&self) -> Duration {
+            Duration::from_secs(1)
+        }
+
+        fn finalize(&self) -> RuntimeFinalizerFuture {
+            let (order, started, release, dropped) = (
+                self.order,
+                self.started.clone(),
+                self.release.clone(),
+                self.dropped.clone(),
+            );
+            Box::pin(async move {
+                struct DropMarker(Arc<AtomicBool>);
+                impl Drop for DropMarker {
+                    fn drop(&mut self) {
+                        self.0.store(true, Ordering::SeqCst);
+                    }
+                }
+                let _marker = DropMarker(dropped);
+                started.send(order).expect("test observes finalizer starts");
+                release.notified().await;
+                Ok(())
+            })
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn finalizers_share_the_original_global_deadline_without_resetting_it() {
+        let (started, mut starts) = mpsc::unbounded_channel();
+        let release_first = Arc::new(Notify::new());
+        let cancelled = Arc::new(AtomicBool::new(false));
+        let entries = (1..=3)
+            .map(|order| {
+                Arc::new(GatedFinalizer {
+                    order,
+                    started: started.clone(),
+                    release: if order == 1 {
+                        release_first.clone()
+                    } else {
+                        Arc::new(Notify::new())
+                    },
+                    dropped: if order == 2 {
+                        cancelled.clone()
+                    } else {
+                        Arc::new(AtomicBool::new(false))
+                    },
+                }) as Arc<dyn RuntimeFinalizer>
+            })
+            .collect();
+        let (command_tx, _command_rx) = mpsc::channel(1);
+        let coordinator = ShutdownCoordinator::new(
+            RuntimeAdmissionControl::new(),
+            command_tx,
+            tokio::spawn(async {}),
+            Handle::current(),
+            RuntimeFinalizerRegistry::freeze(entries).expect("valid registry"),
+        );
+        // Exercise only the Tokio-clock stage; shutdown reports use the real std clock.
+        let accepted_at = tokio::time::Instant::now();
+        let deadline = accepted_at + Duration::from_millis(200);
+        let runner = tokio::spawn(async move { coordinator.run_finalizers(deadline).await });
+        assert_eq!(starts.recv().await, Some(1));
+        tokio::time::advance(Duration::from_millis(50)).await;
+        release_first.notify_one();
+        assert_eq!(starts.recv().await, Some(2));
+        assert!(!cancelled.load(Ordering::SeqCst));
+        // Cross the original deadline, including the timer's millisecond boundary.
+        tokio::time::advance(Duration::from_millis(151)).await;
+        let reports = runner.await.expect("finalizer runner joins");
+        assert!(accepted_at.elapsed() <= Duration::from_millis(201));
+        assert!(cancelled.load(Ordering::SeqCst));
+        assert_eq!(
+            reports
+                .iter()
+                .map(ShutdownFinalizerReport::outcome)
+                .collect::<Vec<_>>(),
+            vec![
+                ShutdownFinalizerOutcome::Completed,
+                ShutdownFinalizerOutcome::TimedOut,
+                ShutdownFinalizerOutcome::NotRunDeadline,
+            ]
+        );
+        assert!(matches!(
+            starts.try_recv(),
+            Err(mpsc::error::TryRecvError::Empty)
+        ));
+    }
+}
