@@ -19,7 +19,7 @@
 | Governance Claim PR | #570 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Claim+activation effective through #570 merge 5f9dcf053ba2b3b31f76693f6bc8c97df36a1df6. |
-| Implementation PR | #571 merged as 707b538eea0421333544f22b3e3e4a42687c87a1; settings-page follow-up #573 remains under local convergence |
+| Implementation PR | #571 merged as 707b538eea0421333544f22b3e3e4a42687c87a1; settings-page follow-up #573 merged as 8caf2b3a7b1701080cf7bf7e7ea1dd0fdd86f035 |
 | Last Updated | 2026-09-18 |
 | Handoff / Release Condition | Atomic claim+activation required before code or Cargo changes. |
 
@@ -857,3 +857,28 @@ they do not validate this substantive local correction. Fresh stable-head CI/rev
 Review / Claimed and Completion Commit: Pending remain. VoiceOver and reduced-motion rows remain
 explicitly deferred/unverified in #29; Windows/Linux compilation is not native interaction evidence.
 I278's separate Plugin-source plan and the Auto-review incident intake are not Desktop changes.
+
+### 2026-09-18 Settings Delivery And Remaining Acceptance
+
+PR #573 merged as `8caf2b3a7b1701080cf7bf7e7ea1dd0fdd86f035`. Its exact head
+`89417002159fce6752852747aa7ec7d774d66c54` and base
+`b86db68d30100d4f56745c597847d6bdf872ed5f` remained unchanged through merge-time CAS.
+CI 35347139940 passed all six jobs, including Windows Rust workspace and explicit Desktop
+feature validation on macOS/Linux/Windows. Local full locked release_preflight also exited zero
+after an authorized unsandboxed rerun: the initial sandbox run could not create the existing
+talos-skill fixture under the user's shared skill directory. No failing test was skipped.
+
+Independent Agent-role APPROVE was bound to that exact head/base. The reviewer independently
+ran 42 Desktop tests and inspected code, GPUI accessibility action wiring, bilingual captures
+and owner evidence. Shared-account/workspace role separation is disclosed; this was not an
+independent natural-person review. The PR description retains the approval and validation scope.
+Immediately before expected-head squash merge, all checks were green, merge state was CLEAN,
+no other PR was open, no blocking review existed and remote main/head matched the reviewed pair.
+
+This completes the settings-page implementation delivery, not all I277 acceptance. Keep
+Review / Claimed and Completion Commit: Pending until the explicitly deferred VoiceOver and
+reduced-motion rows are resolved. Cross-platform native interaction and physical display latency
+also remain unproven; compilation and software timestamps are not substitutes. The next human
+walkthrough must use the Settings page, never the removed language popover. Preserve earlier
+passed macOS IME/input/locale/preset confirmations. I278 may proceed separately after its own
+effective claim under the recorded deferred-validation scheduling rule.
