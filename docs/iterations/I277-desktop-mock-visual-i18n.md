@@ -19,7 +19,7 @@
 | Governance Claim PR | #570 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Claim+activation effective through #570 merge 5f9dcf053ba2b3b31f76693f6bc8c97df36a1df6. |
-| Implementation PR | #571 merged as 707b538eea0421333544f22b3e3e4a42687c87a1; six exact-head checks and independent Agent-role reviews passed |
+| Implementation PR | #571 merged as 707b538eea0421333544f22b3e3e4a42687c87a1; settings-page follow-up #573 remains under local convergence |
 | Last Updated | 2026-09-18 |
 | Handoff / Release Condition | Atomic claim+activation required before code or Cargo changes. |
 
@@ -820,3 +820,40 @@ non-blocking for this round by maintainer instruction, tracked in the existing #
 than new per-subtask issues. Do not repeat passed macOS input/popover acceptance. Cross-platform
 compilation/tests do not establish Windows/Linux native interaction or physical display latency.
 No real Runtime integration, release or next-iteration activation is implied.
+
+## 2026-09-18 Settings Page Decision
+
+The language popover is replaced by a dedicated settings-page path in the mock surface. The
+existing preset-management page is reused as the settings destination and now exposes the
+language choice as an in-page radio group. Preset creation, editing, duplication, deletion, and
+default selection remain on that page; the new-task preset picker remains unchanged. This
+removes deferred-popover accessibility and paint-order coupling without adding persistence,
+runtime binding, or new configuration authority. Acceptance now covers settings navigation,
+in-page locale selection, preset management, keyboard focus, and VoiceOver traversal.
+The navigation label is `Settings` / `设置`; there is no separate top-level Presets navigation item.
+
+The maintainer accepted the settings-page interaction in manual validation; the former popover
+path is no longer part of the active acceptance flow.
+
+### 2026-09-18 Settings Local Regression Checkpoint
+
+The local follow-up removes the disabled language-popover implementation and obsolete focus/open
+state. Settings now has a matching page heading and selected navigation entry. Language radios
+expose checked state and support Enter/Space and directional selection; preset management and
+the New Task preset picker remain available. The native capture harness now exercises the actual
+settings page instead of asserting the removed popover lifecycle.
+
+Forty-two Desktop tests, locked visual-test build, strict visual-test Clippy and formatting passed.
+The complete native capture run exited zero with 70 images covering both locales and both sizes
+at `/private/tmp/talos-i277-settings-native-final-20260918` (temporary diagnostic evidence).
+It dispatched real GPUI keyboard events for Settings navigation and radio selection, checked draft
+and preset retention, and exercised preset editing through pointer input. The first local run
+exposed an offscreen click assumption at narrow size after adding language controls; the corrected
+test scrolls the Settings content until the target is visible before clicking. No test is skipped.
+English/Chinese Settings captures were visually inspected. This is not OS screen-reader evidence.
+
+The existing six green #573 checks bind only `4b6f13eabe3485ceb88ace45504c980b30d5760c`;
+they do not validate this substantive local correction. Fresh stable-head CI/review are required.
+Review / Claimed and Completion Commit: Pending remain. VoiceOver and reduced-motion rows remain
+explicitly deferred/unverified in #29; Windows/Linux compilation is not native interaction evidence.
+I278's separate Plugin-source plan and the Auto-review incident intake are not Desktop changes.
