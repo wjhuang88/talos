@@ -1,6 +1,6 @@
 # Iteration I278: Repository-Root Plugin Source Delivery
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-09-18
 > Planned objective: Deliver the omitted repository-root plugins/ source and independent build/package path from #466.
 > Baseline rule: preserve this objective and acceptance; append execution facts.
@@ -10,18 +10,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | CAP-001-D root Plugin source delivery only |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-6 |
+| Work Slice | CAP-001-D real root Rust/Python Plugin sources, independent build/package, compatible bounded language transport and real-consumer validation under ADR-079; no Desktop or default-distribution change |
+| Claimed At | 2026-09-18 |
 | Source Issue | #466 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | 2026-09-18 maintainer next-cycle scheduling instruction; not activation |
+| Governance Claim PR | #575 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Maintainer I278 delivery goal and delegated Agent-role review; #575 exact-head security/API/governance approval and scoped CI required before merge; activation effective only on main |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-18 |
-| Handoff / Release Condition | Next after I277 local convergence, independent review and merge; deferred human rows remain with I277/#29 and do not count as passed |
+| Handoff / Release Condition | #575 target-branch merge before implementation; ADR-079 boundary and all baseline acceptance mandatory; I277/#29 human/device rows remain Deferred, non-blocking and unverified |
 
 ## Published Baseline
 
@@ -112,3 +112,26 @@ Reviewer `/root/i278_abi_decision_review` issued APPROVE against base `d6b566be2
 and ADR content blob `1a6182b425741a0f6da0825b69c4ab8595241e72`. Shared workspace/account;
 Agent-role separation only. This is decision evidence, not implementation safety acceptance.
 The draft governance candidate will bind the actual claim PR before becoming reviewable.
+
+### Atomic Claim Proposal — PR #575
+
+PR #575 proposes Active / Claimed and ADR-079 acceptance together. Neither is effective until
+the finalized candidate reaches `main` after exact-head CI, independent security/API/governance
+approval and merge-time CAS. Implementation must start from that merge or a later main commit.
+The maintainer's standing single-maintainer/unattended instruction delegates independent review
+to a separate Agent role; it does not waive protected review or claim a separate human identity.
+
+I277's #571/#573 machine/review/merge gates have passed; its remaining manual/device checks are
+Deferred and stay with I277/#29. I278 does not modify Desktop code, its runtime binding or its
+acceptance baseline. I249 remains Planned/Unclaimed; I164 remains Paused. Existing I277 local/
+remote branches are predecessor evidence, not competing Plugin claims. The PR list was empty
+before opening #575. Source #466 remains the closed architecture parent; CAP-001-D owns this
+recovered implementation requirement without reopening or broadening historical completion.
+
+Expected implementation inventory: root `plugins/` sources/build/package guide and lockfile;
+bounded language transport and tests in `crates/talos-plugin`; additive protocol support in
+`crates/talos-text`; real consumer integration tests in TUI/tools/runtime/CLI only as needed;
+scoped build/CI wiring; ADR-072/architecture/layout and owner evidence. Runtime default dependency
+expansion, native loading, permission policy, Desktop and new Browser capability are excluded.
+Any newly discovered incompatible public API or unsafe-memory need requires decision review,
+not an implementation-time exception. Local convergence precedes the stable implementation PR.

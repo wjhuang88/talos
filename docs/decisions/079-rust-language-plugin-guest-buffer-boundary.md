@@ -1,6 +1,6 @@
 # ADR-079: Rust Language Plugin Guest Buffer Boundary
 
-**Status:** Proposed — I278 / CAP-001-D; independent security/API review required before acceptance.
+**Status:** Accepted — I278 / CAP-001-D; PR #575 makes acceptance effective on target-branch merge.
 
 ## Context And Verified Evidence
 
@@ -54,7 +54,7 @@ For the new guest, each invocation uses a fresh isolated instance:
    initialized owned byte buffer and retains ownership until the invocation is discarded.
 3. Require a nonzero pointer and validate the complete request range against current guest
    memory after allocation. Copy the request through Wasmtime's checked safe memory API while
-guest execution is stopped and no guest Rust reference to the buffer is held across the call.
+   guest execution is stopped and no guest Rust reference to the buffer is held across the call.
 4. Invoke the existing `talos_language_run(ptr, len) -> i64` once. The guest checks that the
    arguments exactly match its own retained allocation before parsing. It accesses that owned
    buffer using safe Rust, rather than constructing a slice from arbitrary caller pointers.
@@ -83,7 +83,7 @@ cleanup; a timer/worker per request may not accumulate after completed invocatio
 
 ### Narrow Unsafe Authorization
 
-The proposed exception permits **only Rust 2024 unsafe symbol-export attributes**, such as
+The exception permits **only Rust 2024 unsafe symbol-export attributes**, such as
 `#[unsafe(export_name = "talos_language_alloc")]`, in the guest ABI modules under
 `plugins/languages/`, compiled only for `wasm32-unknown-unknown`. Each export must document its
 unique symbol, exact signature and confinement to a standalone guest module.
@@ -140,3 +140,13 @@ Revisit before implementation if the safe ownership scheme requires unchecked gu
 existing ABI-v1 compatibility cannot be preserved, per-invocation resource limits cannot be
 enforced, or language consumer fidelity would require scope beyond I278. No hidden fallback
 may turn unsupported behavior into a claimed successful language result.
+
+## Decision Evidence
+
+Independent Agent-role security/API reviewer `/root/i278_abi_decision_review` approved proposal
+blob `1a6182b425741a0f6da0825b69c4ab8595241e72` against base
+`d6b566be25205a5abe1202dabeb0cee09ea81cce` on 2026-09-18 after admission/probe and old-host/new-guest
+compatibility findings were corrected. The maintainer authorized unattended single-maintainer
+execution and independent subagent review. PR #575 binds final exact-head review, scoped CI and
+merge-time CAS; acceptance is ineffective until merge. Shared account/workspace, Agent-role
+separation only. This decision evidence does not substitute for implementation safety evidence.
