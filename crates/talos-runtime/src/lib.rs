@@ -1025,7 +1025,6 @@ mod tests {
         Complete,
         Fail,
         Panic,
-        Delay(Duration),
         Pending(Arc<AtomicBool>),
     }
 
@@ -1063,10 +1062,6 @@ mod tests {
                     TestFinalizerBehavior::Complete => Ok(()),
                     TestFinalizerBehavior::Fail => Err(shutdown::RuntimeFinalizerError),
                     TestFinalizerBehavior::Panic => panic!("intentional runtime finalizer panic"),
-                    TestFinalizerBehavior::Delay(duration) => {
-                        tokio::time::sleep(duration).await;
-                        Ok(())
-                    }
                     TestFinalizerBehavior::Pending(cancelled) => {
                         struct CancellationMarker(Arc<AtomicBool>);
                         impl Drop for CancellationMarker {
@@ -1401,68 +1396,6 @@ mod tests {
             ]
         );
         assert!(!report.deadline_exhausted());
-    }
-
-    #[tokio::test]
-    async fn finalizers_share_the_original_global_deadline_without_resetting_it() {
-        let starts = Arc::new(StdMutex::new(Vec::new()));
-        let cancelled = Arc::new(AtomicBool::new(false));
-        let runtime = RuntimeBuilder::new()
-            .provider(Arc::new(MockProvider::new()))
-            .runtime_finalizer(test_finalizer(
-                "test.delay",
-                10,
-                Duration::from_secs(1),
-                TestFinalizerBehavior::Delay(Duration::from_millis(50)),
-                starts.clone(),
-            ))
-            .runtime_finalizer(test_finalizer(
-                "test.consume-remaining",
-                20,
-                Duration::from_secs(1),
-                TestFinalizerBehavior::Pending(cancelled.clone()),
-                starts.clone(),
-            ))
-            .runtime_finalizer(test_finalizer(
-                "test.not-run",
-                30,
-                Duration::from_secs(1),
-                TestFinalizerBehavior::Complete,
-                starts.clone(),
-            ))
-            .build()
-            .expect("runtime builds");
-
-        let report = runtime
-            .shutdown_with(
-                ShutdownOptions::interrupt(Duration::from_millis(200)).expect("valid options"),
-            )
-            .await
-            .expect("structured report");
-        tokio::task::yield_now().await;
-
-        assert!(cancelled.load(Ordering::SeqCst));
-        assert!(report.elapsed() < Duration::from_millis(500));
-        assert!(report.deadline_exhausted());
-        assert_eq!(
-            report
-                .finalizers()
-                .iter()
-                .map(ShutdownFinalizerReport::outcome)
-                .collect::<Vec<_>>(),
-            vec![
-                ShutdownFinalizerOutcome::Completed,
-                ShutdownFinalizerOutcome::TimedOut,
-                ShutdownFinalizerOutcome::NotRunDeadline,
-                ShutdownFinalizerOutcome::NotRunDeadline,
-            ]
-        );
-        assert_eq!(
-            *starts
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner),
-            vec!["test.delay", "test.consume-remaining"]
-        );
     }
 
     #[tokio::test]

@@ -15,7 +15,7 @@ platform.
 
 These are immutable facts that every change must respect:
 
-1. **Rust first.** No arbitrary C/C++ bindings, Python FFI, or Node.js runtime. Approved exceptions are limited to ADR-recorded system/runtime dependencies: OS ABI access via `libc` (ADR-007), bundled SQLite for local storage via `rusqlite/bundled` (ADR-008), and tree-sitter for code analysis via `arborium` (ADR-020).
+1. **Rust first.** No arbitrary C/C++ bindings, Python FFI, or Node.js runtime. Approved exceptions are limited to ADR-recorded system/runtime dependencies: OS ABI access via `libc` (ADR-007), bundled SQLite for local storage via `rusqlite/bundled` (ADR-008), tree-sitter for code analysis via `arborium` (ADR-020), and reviewed GPUI-internal native integration isolated to Desktop (ADR-059). The Desktop exception does not authorize native dependencies in shared runtime crates or new Talos-authored unsafe code.
 2. **No `unsafe` without ADR.** Any use of `unsafe` requires a decision record in `docs/decisions/`.
 3. **No secrets in build, source, or distribution.** Hardcoded credentials must never be
    committed, baked into the binary, or shipped in default/sample config files. The user's
@@ -125,7 +125,7 @@ These are immutable facts that every change must respect:
 ## Rust-Specific Rules
 
 - **Error handling**: Use `thiserror` for library crates, `anyhow` for binary crates only. Never `unwrap()` in library code.
-- **Async**: All async via `tokio`. No `async-std`, no `smol`. Use `CancellationToken` for graceful shutdown.
+- **Async**: Talos-authored business async uses `tokio`; do not directly introduce `async-std` or `smol`. ADR-059 permits GPUI-internal scheduling and asynchronous primitives only in the isolated Desktop dependency boundary. Use GPUI scheduling for presentation-local work, and `CancellationToken` for Talos business shutdown; UI task disposal does not imply durable business cancellation.
 - **Traits**: Prefer `impl Trait` for arguments, `dyn Trait` only when dynamic dispatch is required (tool registry, provider abstraction).
 - **Types**: Use `serde` + `schemars` for all config/protocol types. JSON Schema validation on load.
 - **Crates**: Each crate has a single responsibility. No circular dependencies. `talos-core` depends on nothing; other crates depend on `talos-core`.

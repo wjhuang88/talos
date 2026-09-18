@@ -9,8 +9,34 @@
 > Internationalization baseline: [`I18N.md`](I18N.md)
 >
 > Reference image: [`reference-execution-light.webp`](reference-execution-light.webp)
+>
+> Four-surface design archive and source hashes: [REFERENCES.md](REFERENCES.md)
 
 ## 1. Purpose
+
+### Implementation Reference Confirmation (2026-09-16)
+
+The maintainer explicitly confirmed that actual Desktop implementation must follow the four
+design images in [Issue #29 comment 5340359578](https://github.com/wjhuang88/talos/issues/29#issuecomment-5340359578).
+These are the task overview, new task, preset list, and preset detail/edit surfaces. The existing
+renderer/input test window is infrastructure evidence, not fulfillment of this product design.
+
+- Global navigation: new task, recent tasks, presets, settings, and user. Do not use task phases
+  as global navigation.
+- Task-local navigation: overview, plan, changes, verification, delivery. The overview emphasizes
+  current goal, current work, mission position, recent activity, and changed-file/delivery evidence.
+- New task: goal entry, preset selection, explicit workspace selection, then start. Actual start
+  must use existing runtime/session authority, not fabricate execution in the presentation layer.
+- Presets: list/default selection and detail editing for basic information, instructions,
+  Default/Quick/Deep model roles, and user-facing capabilities. A preset is a creation template;
+  an instantiated environment is authoritative after creation.
+- Follow the images' light Nord-derived hierarchy, spacing and restrained controls. Example
+  people, model names, task names and paths are sample data, not required hardcoded product facts.
+
+Validate both visual correspondence and working behavior. Mock fixtures may support I277 visual
+validation but must not be reported as working session creation, execution, persistence or preset
+management. Real bindings must be tracked explicitly in the relevant Desktop implementation scope;
+the renderer decision does not create a second runtime, permission or session authority.
 
 This document defines the visual direction for Talos Desktop before GPUI implementation begins. It is intentionally narrower than a complete component library. The immediate goal is to establish a coherent visual language for the core execution experience so later Mission shaping, Evaluation, Artifact review, and Delivery surfaces inherit the same principles instead of evolving independently.
 

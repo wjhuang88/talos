@@ -38,7 +38,7 @@ try {
     }
     if ((Get-FileHash -LiteralPath $baseline).Hash -cne $before) { throw 'audit mutated accepted baseline' }
     if ($Workspace) {
-        # CI executes after locked workspace tests have populated Cargo's cache.
+        # CI explicitly runs cargo fetch --locked before this offline all-feature audit.
         $workspaceReport = (& $audit -Format json) | ConvertFrom-Json
         if ($workspaceReport.schema -cne 'talos.dependency-audit/v1' -or
             $workspaceReport.dependencies.Count -eq 0 -or
