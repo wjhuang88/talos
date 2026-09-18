@@ -22,7 +22,7 @@
 | Governance Claim PR | #570 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Claim+activation effective through #570 merge 5f9dcf053ba2b3b31f76693f6bc8c97df36a1df6. |
-| Implementation PR | #571; native mock candidate locally converged, updated exact-head CI/review pending |
+| Implementation PR | #571 merged as 707b538eea0421333544f22b3e3e4a42687c87a1; six exact-head checks and independent Agent-role reviews passed |
 | Last Updated | 2026-09-18 |
 | Handoff / Release Condition | Requires D0 boundary confirmation, GPUI dependency decision, and overlap check with shared crates. |
 
@@ -123,3 +123,11 @@ candidate submission continue in #571, followed by fresh exact-head CI and indep
 VoiceOver and reduced-motion remain explicitly deferred and unverified; cross-platform native
 interaction and physical display latency are not claimed. The real Runtime/client remains out
 of this mock-only slice.
+
+## 2026-09-18 Implementation Merged
+
+#571 merged as `707b538eea0421333544f22b3e3e4a42687c87a1` after six exact-head CI checks,
+independent Agent-role review and merge-time CAS; the full evidence is in I277. The mock is
+delivered on main. Review / Claimed and Completion Commit: Pending remain because VoiceOver
+and reduced-motion are maintainer-deferred, unverified rows in #29. Prior candidate-pending
+checkpoints are historical. No release or live Runtime binding is claimed.
