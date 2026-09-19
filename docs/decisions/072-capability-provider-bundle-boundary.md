@@ -41,6 +41,21 @@ terminology portion of ADR-029 is superseded by this ADR.
 
 ## Scope and gates
 
+### Repository layout clarification — I278 / CAP-001-D
+
+Concrete optional Plugin/Provider sources belong under repository-root
+`plugins/<domain>/<provider>/`. Host infrastructure remains in `crates/talos-plugin/`.
+Generated Bundle directories and installed package locations are not source ownership. I278
+delivers independently locked Rust/Python guest builds and explicit packaging under ADR-079;
+the root host dependency graph must not statically absorb those optional implementations.
+Shared source-only query modules may be reused from the full checkout without importing host
+UI/runtime dependencies. [Plugin build guide](../../plugins/README.md) records exact inputs.
+
+The original #466 TypeScript/Browser/tool-example tree is illustrative future domain ownership,
+not blanket implementation authority. No empty placeholder can serve as delivery evidence.
+I253's historical R1 governance satisfaction did not implement this source tree; CAP-001-D owns
+that recovered omission and I278 records executable acceptance separately.
+
 This ADR is architecture-only. It authorizes no runtime, Cargo, persistence, network, permission,
 Desktop, or Browser implementation. CAP-001-A/B/C and domain children require separate owner
 documents, runnable iterations, effective claims, and exact-head validation.

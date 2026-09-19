@@ -7,6 +7,78 @@ use talos_text::HighlightProvider;
 
 type LineSegments = Vec<(String, Option<CColor>)>;
 
+#[cfg(all(test, feature = "plugin-acceptance"))]
+mod installed_plugin_acceptance {
+    use super::*;
+    use std::sync::{Arc, Mutex};
+    use talos_core::capability::CapabilityRegistry;
+    use talos_plugin::{install_bundle, lifecycle::PluginLifecycle, wasm::WasmRuntime};
+
+    #[test]
+    fn real_installed_language_plugins_drive_tui_segments() {
+        let bundles = std::path::PathBuf::from(std::env::var_os("TALOS_LANGUAGE_BUNDLE_ROOT")
+            .expect("plugin-acceptance requires TALOS_LANGUAGE_BUNDLE_ROOT containing rust/ and python/ real Bundles"));
+        let temp = tempfile::tempdir().expect("owned installation directory");
+        for (language, sources) in [
+            ("rust", ["fn first() {}", "// 注释\nfn second() {}"]),
+            (
+                "python",
+                ["def first():\n    pass", "# 注释\ndef second():\n    pass"],
+            ),
+        ] {
+            let root = temp.path().join(language);
+            install_bundle(&bundles.join(language), &root).expect("digest verified install");
+            let mut lifecycle =
+                PluginLifecycle::new(Arc::new(Mutex::new(CapabilityRegistry::default())));
+            lifecycle.load(&root).expect("load");
+            lifecycle
+                .initialize(Arc::new(WasmRuntime::new(100_000, 250).expect("runtime")))
+                .expect("initialize");
+            lifecycle.activate().expect("explicit activation");
+            let provider = lifecycle
+                .take_language_provider_context()
+                .expect("active context")
+                .expect("provider");
+            let mut engine = HighlightEngine::with_provider(Box::new(provider));
+            for source in sources {
+                let lines = engine
+                    .highlight(language, source)
+                    .expect("plugin supplied highlights");
+                let reconstructed = lines
+                    .iter()
+                    .map(|line| {
+                        line.iter()
+                            .map(|(text, _)| text.as_str())
+                            .collect::<String>()
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                assert_eq!(
+                    reconstructed, source,
+                    "rendering must not duplicate or drop source bytes"
+                );
+                assert!(
+                    lines.iter().flatten().any(|(_, color)| color.is_some()),
+                    "real captures must reach TUI colors"
+                );
+                assert!(
+                    lines
+                        .iter()
+                        .flatten()
+                        .any(|(text, color)| (text == "fn" || text == "def")
+                            && *color == capture_color("keyword")),
+                    "keyword palette must be preserved"
+                );
+            }
+            lifecycle.stop().expect("stop");
+            assert!(
+                engine.highlight(language, sources[0]).is_none(),
+                "stopped plugin must use TUI fallback"
+            );
+        }
+    }
+}
+
 pub(crate) struct HighlightEngine {
     highlighter: Box<dyn HighlightProvider>,
 }

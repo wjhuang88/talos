@@ -22,6 +22,23 @@ The system operates as a stateful turn loop. It processes user input by orchestr
 
 ## Cargo Workspace Structure
 
+### Optional Plugin Source Boundary (I278 / ADR-072 / ADR-079)
+
+Repository-root `plugins/<domain>/<provider>/` owns concrete optional Plugin sources.
+`plugins/languages/rust/` and `plugins/languages/python/` compile independent WASM artifacts;
+`plugins/languages/guest/` contains their shared transport, and `plugins/package/` builds verified
+Bundle directories. See [build and packaging instructions](../../plugins/README.md).
+This nested Cargo workspace has its own lockfile and is not a member/dependency of the default
+host workspace. Its builds require the complete checkout because source-only symbol queries are
+reused from `crates/talos-text/src/`. Host loading, lifecycle and sandbox custody stay in
+`crates/talos-plugin/`; no renderer is a guest dependency.
+
+Source directories, generated Bundle artifacts and installed `.talos/plugins/` packages are
+different objects. Installation copies verified files; activation and permission remain explicit.
+Original illustrative TypeScript, Browser/CDP and tool-example paths are future domain work, not
+capabilities delivered merely by establishing this layout. Existing host WAT fixtures remain
+test fixtures. I278 owns delivery and acceptance; its owner records current completion state.
+
 The root `Cargo.toml` is the source of truth for workspace membership. It currently contains 21
 members. The tables describe each member's current responsibility; the origin column preserves the
 historical iteration or decision that introduced the boundary.

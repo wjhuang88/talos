@@ -1,6 +1,6 @@
 # Iteration I278: Repository-Root Plugin Source Delivery
 
-> Document status: Active
+> Document status: Review
 > Published plan date: 2026-09-18
 > Planned objective: Deliver the omitted repository-root plugins/ source and independent build/package path from #466.
 > Baseline rule: preserve this objective and acceptance; append execution facts.
@@ -18,10 +18,10 @@
 | Source Issue | #466 |
 | Governance Claim PR | #575 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Maintainer I278 delivery goal and delegated Agent-role review; #575 exact-head security/API/governance approval and scoped CI required before merge; activation effective only on main |
+| Authorization Evidence | #575 merged as 2d4e064f; exact head dbddf44a / base d6b566be; CI 35359610144 passed scoped checks; independent security/API/governance APPROVE 5731895048 and CAS 5731908465 |
 | Implementation PR | Not started |
-| Last Updated | 2026-09-18 |
-| Handoff / Release Condition | #575 target-branch merge before implementation; ADR-079 boundary and all baseline acceptance mandatory; I277/#29 human/device rows remain Deferred, non-blocking and unverified |
+| Last Updated | 2026-09-19 |
+| Handoff / Release Condition | Effective claim #575 / 2d4e064f; ADR-079 and all baseline acceptance mandatory before closure; I277/#29 human/device rows remain Deferred, non-blocking and unverified |
 
 ## Published Baseline
 
@@ -135,3 +135,164 @@ scoped build/CI wiring; ADR-072/architecture/layout and owner evidence. Runtime 
 expansion, native loading, permission policy, Desktop and new Browser capability are excluded.
 Any newly discovered incompatible public API or unsafe-memory need requires decision review,
 not an implementation-time exception. Local convergence precedes the stable implementation PR.
+
+### Activation Checkpoint — 2026-09-18
+
+PR #575 merged at `2d4e064f94a7c54d65444dde195c3069a8509ddd` after exact head
+`dbddf44abf3908639ff1cc971c2d1c8c1b870d68` / base
+`d6b566be25205a5abe1202dabeb0cee09ea81cce`, CI `35359610144` (four successful checks,
+Windows Rust/Linux Desktop skipped under verified docs-only routing), independent Agent-role
+APPROVE [5731895048](https://github.com/wjhuang88/talos/pull/575#issuecomment-5731895048), and
+merge-time CAS [5731908465](https://github.com/wjhuang88/talos/pull/575#issuecomment-5731908465).
+Both governance validators passed with zero warnings. ADR-079 and the claim are now effective;
+earlier proposal wording records the pre-merge phase, not current authority.
+The sole implementation branch `impl/i278-root-plugin-sources` starts exactly at that merge.
+No implementation PR is open. Converge locally before pushing a stable candidate.
+
+### Local Implementation Checkpoint — 2026-09-18
+
+First host transport changes are local only: ABI-v2 allocation with v1 compatibility, bounded
+admission/start/version/allocator/run, memory/table ceilings, copy-before-limit ordering corrected,
+guest Unicode span validation, dependency compilation panic containment and per-store deadline
+custody. Independent early audit found a lost-final-epoch-tick race; the timer now repeats its tick
+after expiration until completion, with an explicit regression that absorbs its first tick.
+Generic Tool execution shares this guard because its engine may be shared with language calls;
+retain its fuel-to-Timeout mapping and verify the newly enforced memory/table ceilings.
+
+Validation so far: locked Plugin check passed; 71 Plugin unit tests passed with both wasm-only and
+wasm/code-intelligence features; strict library Clippy passed. Strict all-target Clippy exposed
+30 pre-existing test `unwrap()` diagnostics in `install.rs` and `resolution.rs`; these are not
+waived and remain to fix within local convergence before final checks. Later code edits require
+fresh focused validation; these results do not certify the final candidate.
+
+Rust 1.97.0 `wasm32-unknown-unknown` standard library is installed. Current package discovery found
+`syn` 3.0.6 and `rustpython-parser` 0.4.0; no new dependency or guest source has yet been added.
+Real Rust/Python sources, independently locked builds, packaging, installed-artifact consumer
+tests, path/reference docs, final preflight/security/API review and implementation/closure remain
+unfinished. Resume in this sole implementation branch; do not create another claim or subtask PR.
+Disk remains constrained after safe removal of incremental caches and six obsolete test/build
+executables; preserve standalone CLI/Desktop acceptance binaries and avoid duplicate target trees.
+
+### Parser Reuse Correction — 2026-09-19
+
+The first uncommitted guest experiment chose syn/RustPython without proving that the existing
+Tree-sitter stack could not build for WASM. The maintainer challenged this substitution. Arborium
+2.18.2 explicitly supports WASM; both Rust/Python guests now compile with the original grammars,
+and symbol visitors are compiled directly from the existing talos-text source-only modules.
+No parser replacement is required. The standalone lockfile no longer includes RustPython;
+syn remains only as a transitive procedural-macro build dependency. The guest uses the host's
+fuel/epoch deadline rather than unavailable wasm32-unknown-unknown wall-clock APIs.
+
+Locked WASM release builds passed; four reused native symbol-query tests passed. Actual host ABI
+execution rejects both guests at the existing 1,000,000 fuel budget. An explicit diagnostic
+1,000,000,000 budget permits Rust highlight and Unicode/comment-sensitive symbol operations;
+Python then exposes overlapping Arborium captures rejected by the stricter guest span check.
+These are unresolved delivery gaps, not a reason to replace Tree-sitter or claim completion.
+Measure initialization/request costs and reconcile captures with the actual shared renderer
+semantics before installed-consumer acceptance. Global production budgets remain unchanged.
+The local verify_language_guests example reproduces this evidence; it is not yet package/install
+or full consumer acceptance. No implementation candidate has been pushed.
+
+### Real Artifact / Installation Checkpoint — 2026-09-19
+
+Independent local resource-policy review confirmed finite language fuel adjustment fits ADR-079,
+but found that first-capture deduplication lost Arborium's pattern priority. The guest now calls
+Arborium's own `spans_to_flat_tokens`, preserving pattern metadata through normalization and
+mapping its canonical theme tags to wire captures. Native tests assert function-name styling,
+nested strings, Unicode boundaries and comment-excluded Python symbols. Six guest tests pass.
+
+Cold Wasmtime measurements on this macOS host: Rust tiny highlight ~897M fuel / 56ms;
+13KiB/1,000 declarations ~1.054B / 73ms; Python 22KiB/1,000 declarations ~260M / 25ms.
+All four symbol operations passed those fixtures. Near-256KiB comment-heavy inputs exercise
+bounded response fallback and fuel exhaustion in reference/import traversal; these cases are
+not claimed as successful full analysis. Language default fuel is now 2B, with the same 500ms
+deadline and explicit smaller-limit behavior; generic Tool fuel is unchanged. Host regression
+coverage includes an infinite run with u64::MAX fuel terminated by the real wall deadline.
+The wasm/code-intelligence Plugin library suite passed 73 tests after this change.
+
+The independent Rust packager uses current sha2 0.11.0 / wasmparser 0.259.0, validates no imports,
+no start section and constant ABI-v2 version, and writes actual SHA-256 plus matching versioned
+Bundle and legacy activation descriptors. It refuses an existing output directory. Real Rust
+and Python packages were installed through `install_bundle`, explicitly loaded/initialized/
+activated, then exercised through SharedLanguageProvider with two different inputs each.
+Pre-activation access was rejected, caller-supplied symbol file labels were preserved, and stop
+revoked retained contexts. Verification-owned temporary installation directories were removed.
+
+Commands: `verify_language_guests` (explicit 2B diagnostic budget),
+`verify_installed_languages` (production default budget), and the locked Plugin library suite.
+These prove real transport and installed shared-context behavior, not yet TUI-renderer or
+AgentTool invocation acceptance. Remaining: real consumer integration, complete fault/package
+tests, separate-per-language rebuild/repackage under the finalized lockfile, CI routing/default
+dependency isolation, architecture/I253/layout docs, strict all-target Clippy cleanup, preflight,
+final independent security/API review, stable candidate and owner-first closeout. No PR pushed.
+
+### Consumer Acceptance Checkpoint — 2026-09-19
+
+`bash scripts/validate_language_plugins.sh` passed its complete pipeline: separate locked
+Rust/Python WASM builds, six guest tests, strict standalone-workspace Clippy, verified packaging,
+real transport matrix, installed lifecycle, TUI segment/color reconstruction and all four actual
+symbol AgentTools. Consumers check two distinct source states, comments/Unicode, canonical
+keyword color, caller path attribution and post-stop rejection. The optional acceptance features
+require real Bundle input and fail if it is absent; ordinary workspace tests do not silently
+pretend those artifacts exist. CI runs this pipeline on the full-code route. New classifier
+tests retain reduced validation for the two build-guide README files while source/lock/query
+changes remain full-code; all 11 classifier tests passed.
+
+Independent early review then requested narrower guest target cfg and stronger static package
+checks. These now reject WASI exports, component encoding, memory64/shared memory, wrong ABI
+signatures, imports, starts and nonconstant/incompatible version. The package input read itself
+is bounded and incomplete writes produce an explicit recoverable error. The negative package
+matrix and strict standalone Clippy passed after those edits. The installed diagnostic now also
+checks missing/corrupt replacement preserves the existing installation; rerun this changed path.
+
+Standard locked preflight completed check/Clippy and progressed through workspace tests, but
+`talos-skill::tests::test_dedup_project_shadows_shared` hit sandbox OS PermissionDenied. The same
+standard command is rerunning with explicit sandbox escalation; do not waive or call it green.
+Log: `/private/tmp/talos-i278-preflight.log` (temporary observation, not durable evidence).
+
+Disk exhaustion during TUI test compilation was resolved by preserving `target/debug/talos` and
+`target/debug/talos-desktop-mock`, cleaning 12.5GiB of rebuildable root cache, restoring both
+binaries and rebuilding with debug info/incremental disabled. TUI acceptance then passed; later
+verification must use consistent local profile environment to avoid duplicate caches.
+
+Architecture and ADR-072 now state the root source boundary; I253 has an appended R1 evidence
+correction. Remaining work includes finalized-artifact rerun after packaging edits, permission/
+failure evidence review, strict host all-target checks, successful preflight and final independent
+exact-head review/candidate/merge/closeout. Print/inline still discard loaded language contexts:
+do not claim those modes use the guest based on TUI/AgentTool acceptance. Review this affected
+consumer disposition before final handoff. No remote implementation candidate is open.
+
+### Stable Local Candidate — 2026-09-19
+
+Standard locked `release_preflight.sh` completed successfully after rerunning outside the
+filesystem sandbox; no test was waived. The finalized standalone build/package/installed-consumer
+script passed, including missing/corrupt replacement preservation. Host all-target strict Clippy
+passed. The subsequent CLI acceptance addition passed its focused test and strict Clippy: both
+real installed language guests execute under production Agent Allow, while explicit Deny returns
+an error and invokes the tool zero times. The counting delegate retains the tool's permission
+profile, read-only property and family; it does not implement permission decisions. Production
+error presentation normalizes the deny reason to `Permission denied: approval denied`.
+
+Public usage documentation explicitly preserves the existing print/inline language-context
+limitation. TUI/shared-context and four symbol tools have real installed-artifact evidence; no
+all-mode or semantic name-resolution support is claimed. Local implementation is now Review /
+Claimed pending stable-head independent permission/security/API review, remote CI and merge.
+
+Changed-file inventory (all within the effective I278 slice):
+
+- `plugins/`: independent locked guest/package workspace, real Rust/Python grammars, shared
+  existing symbol queries, negative package matrix, source/build/usage guide and artifact ignores.
+- `crates/talos-plugin/`: bounded ABI-v2/v1 host and regression tests, diagnostic examples,
+  host guide, example dependencies and test-only unwrap cleanup needed by strict Clippy.
+- `crates/talos-text/src/wasm_provider.rs`: compatible bounded language wire representation.
+- `crates/talos-tools/`, `crates/talos-tui/`, `crates/talos-cli/`: opt-in real consumer tests and
+  their manifests only (TUI test appended to highlight module); no production permission change.
+- Root `Cargo.lock`, `.github/workflows/ci.yml`, language acceptance script and CI classifier/tests:
+  optional test dependency links and source-aware acceptance routing.
+- I278/CAP-001-D, CAP-001 parent, I253 appended correction, ADR-072/079 and decision index,
+  Architecture, manifest, Board, Backlog and iteration index: owner-first delivery/layout evidence.
+
+No Desktop source, I277 owner, default guest dependency, release/version/publication or new
+permission policy is included. Generated WASM/Bundle/target outputs stay ignored. Remaining work:
+stage/secret review, commit and exact-head independent review, stable candidate CI/CAS/merge,
+then completion evidence and source-Issue handoff. No Completion Commit exists yet.

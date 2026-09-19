@@ -38,6 +38,7 @@ class ClassifierTests(unittest.TestCase):
     def test_allowlisted_documentation_is_reduced(self) -> None:
         self.assert_reduced(("M", "README.md"), ("A", "docs/reference/new-guide.md"))
         self.assert_reduced(("M", "docs/backlog/active/GOV-005-change-aware-ci-routing.md"))
+        self.assert_reduced(("M", "plugins/README.md"), ("M", "crates/talos-plugin/README.md"))
 
     def test_code_dependencies_and_runtime_control_files_are_full(self) -> None:
         for path in (
@@ -48,6 +49,10 @@ class ClassifierTests(unittest.TestCase):
             "scripts/fixtures/case.json",
             "docs/reference/policy.json",
             "target/generated.bin",
+            "plugins/languages/rust/src/lib.rs",
+            "plugins/Cargo.lock",
+            "crates/talos-text/src/symbol.rs",
+            "crates/talos-text/src/symbol_queries.rs",
         ):
             with self.subTest(path=path):
                 self.assert_full(payload(("M", path)))

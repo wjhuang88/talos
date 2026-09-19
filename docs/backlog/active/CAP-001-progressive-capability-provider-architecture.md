@@ -81,7 +81,7 @@ unclaimed. This status record is not implementation evidence.
 
 | Child | Outcome | Current State |
 |---|---|---|
-| [CAP-001-D](CAP-001-D-root-plugin-source-layout.md) / source #466 | Deliver omitted root `plugins/` implementation source and independent build/package path. | I278 Active / Claimed proposed in #575; effective on merge after decision/security/API review and CI. I277 human acceptance Deferred, non-blocking. |
+| [CAP-001-D](CAP-001-D-root-plugin-source-layout.md) / source #466 | Deliver omitted root `plugins/` implementation source and independent build/package path. | I278 Review / Claimed; claim effective at #575 merge 2d4e064f. Local implementation/acceptance/preflight passed; stable-head implementation gates pending. I277 human acceptance Deferred, non-blocking. |
 | [CAP-001-G](CAP-001-G-governance-convergence.md) / Issue #519 | Architecture governance audit and migration contract. | I253 Complete / Closed; Completion Commit `60851fb23128a151ecbd17e86ec4730ffebb3135` via PR #521 merge. No downstream implementation authority. |
 | CAP-001-P0 / Issue #467 | Characterize current behavior and prepare compatibility seams plus cross-lane ownership before capability implementation. | I246 Complete / Closed; Completion Commit `9a3c1d860408c1438ec1a7ad4b57860167d0cb01` via implementation PR #492 |
 | CAP-001-A / I252 | Stable Capability and Provider descriptor contracts. | Complete / Closed; Completion Commit `71cc03b322d80d19c3767e4ef2014fecb84c1994`, merged via PR #507 as `0835afc4b982a5ed409ccfb55538bbeaf6fe5eab` |

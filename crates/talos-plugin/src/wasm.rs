@@ -7,8 +7,6 @@
 
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
-use std::sync::mpsc;
-use std::thread;
 use std::time::Duration;
 
 use async_trait::async_trait;
@@ -28,6 +26,10 @@ use talos_text::wasm_provider::{
     validate_memory_range,
 };
 use talos_text::wasm_provider::{WASM_LANGUAGE_ABI_EXPORT, validate_abi_version};
+use talos_text::wasm_provider::{WASM_LANGUAGE_ALLOC_EXPORT, WASM_LANGUAGE_ALLOCATED_ABI_VERSION};
+
+mod language_execution;
+use language_execution::Invocation;
 
 const MAX_PLUGIN_TOOL_OUTPUT: usize = 2_000;
 /// Manifest filename for an explicitly selected local plugin package.
@@ -137,8 +139,8 @@ impl talos_text::SymbolProvider for LoadedLanguageProvider {
         &mut self,
         language: &str,
         source: &str,
-        _root: &std::path::Path,
-        _path: &std::path::Path,
+        root: &std::path::Path,
+        path: &std::path::Path,
         name: &str,
     ) -> Option<talos_text::symbol_queries::SymbolResult> {
         let request = SymbolRequest {
@@ -153,6 +155,16 @@ impl talos_text::SymbolProvider for LoadedLanguageProvider {
             .execute_symbol(&self.module, &request)
             .ok()
             .and_then(|r| talos_text::decode_symbol_value(r).ok())
+            .map(|mut result: talos_text::symbol_queries::SymbolResult| {
+                let file = path.strip_prefix(root).unwrap_or(path).to_string_lossy();
+                if let Some(definition) = &mut result.definition {
+                    definition.file = file.to_string();
+                }
+                for reference in &mut result.references {
+                    reference.file = file.to_string();
+                }
+                result
+            })
     }
     fn find_references(
         &mut self,
@@ -174,11 +186,8 @@ impl talos_text::SymbolProvider for LoadedLanguageProvider {
             .map_err(|e| e.to_string())
             .and_then(|r| talos_text::decode_symbol_value(r).map_err(str::to_owned))
             .map(|mut v: Vec<_>| {
-                let _ = path;
                 v.iter_mut().for_each(|l: &mut talos_text::SourceLocation| {
-                    if l.file.is_empty() {
-                        l.file = path.to_string_lossy().into_owned();
-                    }
+                    l.file = path.to_string_lossy().into_owned();
                 });
                 v
             })
@@ -187,7 +196,7 @@ impl talos_text::SymbolProvider for LoadedLanguageProvider {
         &mut self,
         language: &str,
         source: &str,
-        _file: &str,
+        file: &str,
         kind: Option<&str>,
     ) -> Result<Vec<talos_text::SymbolInfo>, String> {
         let request = SymbolRequest {
@@ -202,6 +211,12 @@ impl talos_text::SymbolProvider for LoadedLanguageProvider {
             .execute_symbol(&self.module, &request)
             .map_err(|e| e.to_string())
             .and_then(|r| talos_text::decode_symbol_value(r).map_err(str::to_owned))
+            .map(|mut symbols: Vec<talos_text::SymbolInfo>| {
+                for symbol in &mut symbols {
+                    symbol.file = file.to_owned();
+                }
+                symbols
+            })
     }
     fn list_imports(
         &mut self,
@@ -222,9 +237,7 @@ impl talos_text::SymbolProvider for LoadedLanguageProvider {
             .map(|mut v: Vec<_>| {
                 v.iter_mut()
                     .for_each(|i: &mut talos_text::symbol_queries::ImportInfo| {
-                        if i.file.is_empty() {
-                            i.file = path.to_string_lossy().into_owned();
-                        }
+                        i.file = path.to_string_lossy().into_owned();
                     });
                 v
             })
@@ -261,7 +274,10 @@ impl WasmLanguageProvider {
                 "language providers cannot import host functions".into(),
             ));
         }
-        validate_language_provider_abi(module)?;
+        let version = probe_language_provider_abi(module, self.limits)?;
+        if version == WASM_LANGUAGE_ALLOCATED_ABI_VERSION {
+            validate_allocator_export(module)?;
+        }
         if !matches!(
             module.module.get_export("memory"),
             Some(wasmtime::ExternType::Memory(_))
@@ -346,7 +362,7 @@ impl WasmLanguageProvider {
 
     /// Execute one bounded language-provider request against a validated module.
     ///
-    /// The request is written at guest offset zero and the guest returns a packed
+    /// The request uses legacy offset zero or a version-two guest-owned buffer and returns a packed
     /// `(pointer, length)` pair in the upper and lower 32 bits of its `i64` result.
     /// No imports are admitted, and every memory range is checked before access.
     pub fn execute_highlight(
@@ -362,7 +378,7 @@ impl WasmLanguageProvider {
             ));
         }
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            self.execute_highlight_inner(module, &request_bytes, request.source.len())
+            self.execute_highlight_inner(module, &request_bytes, &request.source)
         }));
         match result {
             Ok(result) => result,
@@ -376,14 +392,18 @@ impl WasmLanguageProvider {
         &self,
         module: &WasmModule,
         request_bytes: &[u8],
-        source_len: usize,
+        source: &str,
     ) -> Result<talos_text::HighlightResult, WasmError> {
         let response = self.execute_payload(module, request_bytes)?;
-        Ok(decode_highlight(
-            &response,
-            self.limits.max_source_bytes,
-            source_len,
-        ))
+        let highlight = decode_highlight(&response, self.limits.max_source_bytes, source.len());
+        if let talos_text::HighlightResult::Spans(spans) = &highlight
+            && spans.iter().any(|span| {
+                !source.is_char_boundary(span.start) || !source.is_char_boundary(span.end)
+            })
+        {
+            return Ok(talos_text::HighlightResult::PlainText);
+        }
+        Ok(highlight)
     }
 
     /// Execute a bounded guest request and return its validated response bytes.
@@ -392,6 +412,33 @@ impl WasmLanguageProvider {
         module: &WasmModule,
         request_bytes: &[u8],
     ) -> Result<Vec<u8>, WasmError> {
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            self.execute_payload_inner(module, request_bytes)
+        }))
+        .unwrap_or_else(|_| {
+            Err(WasmError::Trap(
+                "host panic during language execution".into(),
+            ))
+        })
+    }
+
+    fn execute_payload_inner(
+        &self,
+        module: &WasmModule,
+        request_bytes: &[u8],
+    ) -> Result<Vec<u8>, WasmError> {
+        // JSON escaping can expand a source byte sixfold. Bound the entire encoded envelope
+        // (including language and query names), independently from the source-only limit.
+        let encoded_limit = self
+            .limits
+            .max_source_bytes
+            .saturating_mul(6)
+            .saturating_add(4096);
+        if request_bytes.len() > encoded_limit || request_bytes.len() > i32::MAX as usize {
+            return Err(WasmError::Instantiate(
+                "encoded provider request exceeds limit".into(),
+            ));
+        }
         if module.module.imports().next().is_some() {
             return Err(WasmError::Instantiate(
                 "language providers cannot import host functions".into(),
@@ -415,51 +462,77 @@ impl WasmLanguageProvider {
             return Err(WasmError::MissingLanguageProviderExport);
         }
 
-        let engine = module.runtime.engine.clone();
-        let mut store = wasmtime::Store::new(&engine, ());
-        store
-            .set_fuel(self.limits.fuel)
-            .map_err(|error| WasmError::Instantiate(error.to_string()))?;
-        store.epoch_deadline_trap();
-        store.set_epoch_deadline(1);
-        let instance = wasmtime::Instance::new(&mut store, &module.module, &[])
-            .map_err(|error| WasmError::Instantiate(error.to_string()))?;
-        let memory = instance
-            .get_memory(&mut store, "memory")
+        let mut invocation = Invocation::new(module, self.limits.fuel, self.limits.timeout)?;
+        let memory = invocation
+            .instance
+            .get_memory(&mut invocation.store, "memory")
             .ok_or_else(|| WasmError::Instantiate("language provider must export memory".into()))?;
-        let request_range =
-            validate_memory_range(0, request_bytes.len() as u32, memory.data_size(&store))
-                .map_err(|error| WasmError::Instantiate(error.into()))?;
-        memory.data_mut(&mut store)[request_range].copy_from_slice(request_bytes);
-
-        let (done_tx, done_rx) = mpsc::channel();
-        let timeout = self.limits.timeout;
-        let engine_for_timeout = engine.clone();
-        thread::spawn(move || {
-            thread::sleep(timeout);
-            if done_tx.send(()).is_ok() {
-                engine_for_timeout.increment_epoch();
+        let version = invocation.version()?;
+        let request_offset = if version == WASM_LANGUAGE_ALLOCATED_ABI_VERSION {
+            validate_allocator_export(module)?;
+            let allocate = invocation
+                .instance
+                .get_typed_func::<i32, i32>(&mut invocation.store, WASM_LANGUAGE_ALLOC_EXPORT)
+                .map_err(|_| WasmError::MissingLanguageProviderExport)?;
+            invocation.check_deadline()?;
+            let offset = allocate
+                .call(&mut invocation.store, request_bytes.len() as i32)
+                .map_err(|error| classify_execution_error(error, self.limits.timeout))?
+                as u32;
+            if offset == 0 {
+                return Err(WasmError::Instantiate(
+                    "provider allocator returned null".into(),
+                ));
             }
-        });
-        let run = instance
-            .get_typed_func::<(i32, i32), i64>(&mut store, WASM_LANGUAGE_RUN_EXPORT)
+            offset
+        } else {
+            0
+        };
+        invocation.check_deadline()?;
+        let request_range = validate_memory_range(
+            request_offset,
+            request_bytes.len() as u32,
+            memory.data_size(&invocation.store),
+        )
+        .map_err(|error| WasmError::Instantiate(error.into()))?;
+        memory.data_mut(&mut invocation.store)[request_range].copy_from_slice(request_bytes);
+        invocation.check_deadline()?;
+        let run = invocation
+            .instance
+            .get_typed_func::<(i32, i32), i64>(&mut invocation.store, WASM_LANGUAGE_RUN_EXPORT)
             .map_err(|_| WasmError::MissingLanguageProviderExport)?;
         let packed = run
-            .call(&mut store, (0, request_bytes.len() as i32))
-            .map_err(|error| classify_execution_error(error, timeout))?;
-        drop(done_rx);
+            .call(
+                &mut invocation.store,
+                (request_offset as i32, request_bytes.len() as i32),
+            )
+            .map_err(|error| classify_execution_error(error, self.limits.timeout))?;
+        invocation.check_deadline()?;
 
         let response_offset = (packed as u64 >> 32) as u32;
         let response_len = packed as u32;
-        let response_range =
-            validate_memory_range(response_offset, response_len, memory.data_size(&store))
-                .map_err(|error| WasmError::Instantiate(error.into()))?;
-        let response = memory.data(&store)[response_range].to_vec();
-        if response.len() > self.limits.max_source_bytes {
+        if response_len as usize > self.limits.max_source_bytes {
             return Err(WasmError::Instantiate(
                 "provider response exceeds limit".into(),
             ));
         }
+        let response_range = validate_memory_range(
+            response_offset,
+            response_len,
+            memory.data_size(&invocation.store),
+        )
+        .map_err(|error| WasmError::Instantiate(error.into()))?;
+        let response = memory.data(&invocation.store)[response_range].to_vec();
+        tracing::debug!(
+            fuel_used = self
+                .limits
+                .fuel
+                .saturating_sub(invocation.store.get_fuel().unwrap_or(0)),
+            request_bytes = request_bytes.len(),
+            response_bytes = response.len(),
+            "language provider invocation completed"
+        );
+        invocation.check_deadline()?;
         Ok(response)
     }
 
@@ -479,13 +552,16 @@ impl WasmLanguageProvider {
 }
 
 fn classify_execution_error(error: wasmtime::Error, timeout: Duration) -> WasmError {
-    let message = error.to_string();
-    if message.contains("epoch") || message.contains("interrupt") {
+    let message = format!("{error:#}");
+    if message.contains("epoch")
+        || message.contains("interrupt")
+        || message.contains("deadline exceeded")
+    {
         WasmError::Timeout {
             timeout_ms: timeout.as_millis() as u64,
         }
     } else if message.contains("fuel") {
-        WasmError::Trap("language provider fuel exhausted".into())
+        WasmError::Trap("plugin fuel exhausted".into())
     } else {
         WasmError::Trap(message)
     }
@@ -496,8 +572,11 @@ impl WasmRuntime {
         let mut config = wasmtime::Config::new();
         config.consume_fuel(true);
         config.epoch_interruption(true);
-        let engine =
-            wasmtime::Engine::new(&config).map_err(|e| WasmError::Compile(e.to_string()))?;
+        let engine = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            wasmtime::Engine::new(&config)
+        }))
+        .map_err(|_| WasmError::Compile("host panic during engine initialization".into()))?
+        .map_err(|e| WasmError::Compile(e.to_string()))?;
         Ok(Self {
             engine: Arc::new(engine),
             fuel,
@@ -517,14 +596,20 @@ pub struct WasmModule {
 
 impl WasmModule {
     pub fn from_wat(runtime: Arc<WasmRuntime>, wat: &str) -> Result<Self, WasmError> {
-        let module = wasmtime::Module::new(&runtime.engine, wat)
-            .map_err(|e| WasmError::Compile(e.to_string()))?;
+        let module = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            wasmtime::Module::new(&runtime.engine, wat)
+        }))
+        .map_err(|_| WasmError::Compile("host panic during module compilation".into()))?
+        .map_err(|e| WasmError::Compile(e.to_string()))?;
         Ok(Self { module, runtime })
     }
 
     pub fn from_bytes(runtime: Arc<WasmRuntime>, bytes: &[u8]) -> Result<Self, WasmError> {
-        let module = wasmtime::Module::from_binary(&runtime.engine, bytes)
-            .map_err(|e| WasmError::Compile(e.to_string()))?;
+        let module = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            wasmtime::Module::from_binary(&runtime.engine, bytes)
+        }))
+        .map_err(|_| WasmError::Compile("host panic during module compilation".into()))?
+        .map_err(|e| WasmError::Compile(e.to_string()))?;
         Ok(Self { module, runtime })
     }
 
@@ -538,48 +623,25 @@ impl WasmModule {
     }
 
     fn execute_inner(&self) -> Result<i32, WasmError> {
-        let engine = self.runtime.engine.clone();
-        let mut store = wasmtime::Store::new(&engine, ());
-        store
-            .set_fuel(self.runtime.fuel)
-            .map_err(|e| WasmError::Instantiate(e.to_string()))?;
-
-        store.epoch_deadline_trap();
-        store.set_epoch_deadline(1);
-
-        let (completion_tx, completion_rx) = mpsc::channel();
-        let engine_for_timeout = engine.clone();
-        let timeout = self.runtime.timeout;
-        thread::spawn(move || {
-            thread::sleep(timeout);
-            if completion_tx.send(()).is_ok() {
-                engine_for_timeout.increment_epoch();
-            }
-        });
-
-        let instance = wasmtime::Instance::new(&mut store, &self.module, &[])
-            .map_err(|e| WasmError::Instantiate(e.to_string()))?;
-
-        let func = instance
-            .get_typed_func::<(), i32>(&mut store, "run")
+        // Tools can share an engine with language providers. Use the same per-store deadline
+        // custody so another provider's epoch tick cannot cancel an unrelated tool invocation.
+        let mut invocation = Invocation::new(self, self.runtime.fuel, self.runtime.timeout)?;
+        let func = invocation
+            .instance
+            .get_typed_func::<(), i32>(&mut invocation.store, "run")
             .map_err(|_| WasmError::MissingExport)?;
-
-        let result = func.call(&mut store, ());
-        drop(completion_rx);
-
-        match result {
-            Ok(val) => Ok(val),
-            Err(e) => {
-                let msg = e.to_string();
-                if msg.contains("epoch") || msg.contains("interrupt") || msg.contains("fuel") {
-                    Err(WasmError::Timeout {
-                        timeout_ms: self.runtime.timeout.as_millis() as u64,
-                    })
-                } else {
-                    Err(WasmError::Trap(msg))
+        let value = func.call(&mut invocation.store, ()).map_err(|error| {
+            // Preserve the existing public generic-tool fuel error category.
+            if error.downcast_ref::<wasmtime::Trap>() == Some(&wasmtime::Trap::OutOfFuel) {
+                WasmError::Timeout {
+                    timeout_ms: self.runtime.timeout.as_millis() as u64,
                 }
+            } else {
+                classify_execution_error(error, self.runtime.timeout)
             }
-        }
+        })?;
+        invocation.check_deadline()?;
+        Ok(value)
     }
 }
 
@@ -653,34 +715,56 @@ impl WasmPluginTool {
     }
 }
 
-/// Validate the versioned language-provider ABI export without invoking guest code.
+/// Validate the language-provider version in a resource-bounded, isolated invocation.
+/// This executes guest start/version code; discovery must not call it implicitly.
 pub fn validate_language_provider_abi(module: &WasmModule) -> Result<(), WasmError> {
+    let defaults = WasmProviderLimits::default();
+    probe_language_provider_abi(
+        module,
+        WasmProviderLimits {
+            fuel: module.runtime.fuel.min(defaults.fuel),
+            timeout: module.runtime.timeout.min(defaults.timeout),
+            ..defaults
+        },
+    )
+    .map(|_| ())
+}
+
+fn probe_language_provider_abi(
+    module: &WasmModule,
+    limits: WasmProviderLimits,
+) -> Result<u32, WasmError> {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let mut invocation = Invocation::new(module, limits.fuel, limits.timeout)?;
+        let version = invocation.version()?;
+        if version == WASM_LANGUAGE_ALLOCATED_ABI_VERSION {
+            validate_allocator_export(module)?;
+        }
+        Ok(version)
+    }))
+    .unwrap_or_else(|_| {
+        Err(WasmError::Trap(
+            "host panic during language admission".into(),
+        ))
+    })
+}
+
+fn validate_allocator_export(module: &WasmModule) -> Result<(), WasmError> {
     let Some(wasmtime::ExternType::Func(function)) =
-        module.module.get_export(WASM_LANGUAGE_ABI_EXPORT)
+        module.module.get_export(WASM_LANGUAGE_ALLOC_EXPORT)
     else {
-        return Err(WasmError::MissingExport);
+        return Err(WasmError::MissingLanguageProviderExport);
     };
-    if function.params().len() != 0
-        || !matches!(
-            function.results().collect::<Vec<_>>().as_slice(),
-            [wasmtime::ValType::I32]
-        )
-    {
-        return Err(WasmError::MissingExport);
+    if !matches!(
+        function.params().collect::<Vec<_>>().as_slice(),
+        [wasmtime::ValType::I32]
+    ) || !matches!(
+        function.results().collect::<Vec<_>>().as_slice(),
+        [wasmtime::ValType::I32]
+    ) {
+        return Err(WasmError::MissingLanguageProviderExport);
     }
-    let mut store = wasmtime::Store::new(&module.runtime.engine, ());
-    store
-        .set_fuel(module.runtime.fuel)
-        .map_err(|e| WasmError::Instantiate(e.to_string()))?;
-    store.set_epoch_deadline(u64::MAX);
-    let instance = wasmtime::Instance::new(&mut store, &module.module, &[])
-        .map_err(|e| WasmError::Instantiate(e.to_string()))?;
-    let version = instance
-        .get_typed_func::<(), i32>(&mut store, WASM_LANGUAGE_ABI_EXPORT)
-        .map_err(|_| WasmError::MissingExport)?
-        .call(&mut store, ())
-        .map_err(|e| WasmError::Instantiate(e.to_string()))?;
-    validate_abi_version(version as u32).map_err(|error| WasmError::Instantiate(error.into()))
+    Ok(())
 }
 
 #[async_trait]
@@ -971,6 +1055,7 @@ mod tests {
             runtime(),
             r#"(module
                 (memory (export "memory") 1)
+                (func (export "talos_language_abi_version") (result i32) i32.const 1)
                 (func (export "talos_language_run") (param i32 i32) (result i64)
                     ;; Offset 65536 is one byte past the one-page memory.
                     i64.const 281474976710657))"#,
@@ -1018,6 +1103,7 @@ mod tests {
             runtime(),
             &format!(
                 r#"(module (memory (export "memory") 1)
+                    (func (export "talos_language_abi_version") (result i32) i32.const 1)
                     (data (i32.const {offset}) "{wat_payload}")
                     (func (export "talos_language_run") (param i32 i32) (result i64)
                         i64.const {packed}))"#,
@@ -1042,6 +1128,7 @@ mod tests {
             runtime(),
             r#"(module
                 (memory (export "memory") 1)
+                (func (export "talos_language_abi_version") (result i32) i32.const 1)
                 (func (export "talos_language_run") (param i32 i32) (result i64)
                     ;; A zero-length response is intentionally decoded as safe plain text.
                     i64.const 0))"#,
@@ -1064,6 +1151,7 @@ mod tests {
             runtime(),
             r#"(module
                 (memory (export "memory") 1)
+                (func (export "talos_language_abi_version") (result i32) i32.const 1)
                 (data (i32.const 64) "PlainText")
                 (func (export "talos_language_run") (param i32 i32) (result i64)
                     i64.const 274877906953))"#,

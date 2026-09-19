@@ -164,17 +164,17 @@ mod tests {
         let root = std::env::temp_dir().join(format!("talos-i260-{}", std::process::id()));
         let source = root.join("source");
         let destination = root.join("installed");
-        fs::create_dir_all(&source).unwrap();
-        fs::create_dir_all(&destination).unwrap();
-        fs::write(destination.join("sentinel"), "old").unwrap();
-        fs::write(source.join("bundle.wasm"), "actual").unwrap();
-        fs::write(source.join("manifest.toml"), "schema_version=1\n[bundle]\nname=\"b\"\nversion=\"1.0.0\"\ncarrier=\"wasm\"\nartifact=\"bundle.wasm\"\ndigest=\"sha256:0000000000000000000000000000000000000000000000000000000000000000\"").unwrap();
+        fs::create_dir_all(&source).expect("test fixture operation");
+        fs::create_dir_all(&destination).expect("test fixture operation");
+        fs::write(destination.join("sentinel"), "old").expect("test fixture operation");
+        fs::write(source.join("bundle.wasm"), "actual").expect("test fixture operation");
+        fs::write(source.join("manifest.toml"), "schema_version=1\n[bundle]\nname=\"b\"\nversion=\"1.0.0\"\ncarrier=\"wasm\"\nartifact=\"bundle.wasm\"\ndigest=\"sha256:0000000000000000000000000000000000000000000000000000000000000000\"").expect("test fixture operation");
         assert!(matches!(
             install_bundle(&source, &destination),
             Err(InstallError::DigestMismatch)
         ));
         assert_eq!(
-            fs::read_to_string(destination.join("sentinel")).unwrap(),
+            fs::read_to_string(destination.join("sentinel")).expect("test fixture operation"),
             "old"
         );
         let _ = fs::remove_dir_all(root);
@@ -186,11 +186,17 @@ mod tests {
             std::env::temp_dir().join(format!("talos-provider-install-{}", std::process::id()));
         let source = root.join("source");
         let destination = root.join("installed");
-        fs::create_dir_all(&source).unwrap();
-        fs::write(source.join("provider.wasm"), b"wasm").unwrap();
-        fs::write(source.join("manifest.toml"), "schema_version=1\n[bundle]\nname=\"b\"\nversion=\"1.0.0\"\ncarrier=\"wasm\"\nartifact=\"provider.wasm\"\n[language_provider]\nlanguage=\"rust\"\nartifact=\"provider.wasm\"").unwrap();
-        let installed = install_bundle(&source, &destination).unwrap();
-        assert_eq!(installed.language_provider.unwrap().language, "rust");
+        fs::create_dir_all(&source).expect("test fixture operation");
+        fs::write(source.join("provider.wasm"), b"wasm").expect("test fixture operation");
+        fs::write(source.join("manifest.toml"), "schema_version=1\n[bundle]\nname=\"b\"\nversion=\"1.0.0\"\ncarrier=\"wasm\"\nartifact=\"provider.wasm\"\n[language_provider]\nlanguage=\"rust\"\nartifact=\"provider.wasm\"").expect("test fixture operation");
+        let installed = install_bundle(&source, &destination).expect("test fixture operation");
+        assert_eq!(
+            installed
+                .language_provider
+                .expect("test fixture operation")
+                .language,
+            "rust"
+        );
         assert!(destination.join("manifest.toml").is_file());
         let _ = fs::remove_dir_all(root);
     }
@@ -200,16 +206,16 @@ mod tests {
         let root = std::env::temp_dir().join(format!("talos-i260-ok-{}", std::process::id()));
         let source = root.join("source");
         let destination = root.join("installed");
-        fs::create_dir_all(source.join("artifacts")).unwrap();
-        fs::write(source.join("artifacts/main.wasm"), b"wasm").unwrap();
-        fs::write(source.join("manifest.toml"), "schema_version=1\n[bundle]\nname=\"b\"\nversion=\"1.0.0\"\ncarrier=\"wasm\"\nartifact=\"artifacts/main.wasm\"").unwrap();
-        let first = install_bundle(&source, &destination).unwrap();
+        fs::create_dir_all(source.join("artifacts")).expect("test fixture operation");
+        fs::write(source.join("artifacts/main.wasm"), b"wasm").expect("test fixture operation");
+        fs::write(source.join("manifest.toml"), "schema_version=1\n[bundle]\nname=\"b\"\nversion=\"1.0.0\"\ncarrier=\"wasm\"\nartifact=\"artifacts/main.wasm\"").expect("test fixture operation");
+        let first = install_bundle(&source, &destination).expect("test fixture operation");
         assert_eq!(first.bundle.name, "b");
         assert_eq!(
-            fs::read(destination.join("artifacts/main.wasm")).unwrap(),
+            fs::read(destination.join("artifacts/main.wasm")).expect("test fixture operation"),
             b"wasm"
         );
-        let second = install_bundle(&source, &destination).unwrap();
+        let second = install_bundle(&source, &destination).expect("test fixture operation");
         assert_eq!(second.bundle.version, first.bundle.version);
         let _ = fs::remove_dir_all(root);
     }
@@ -220,18 +226,19 @@ mod tests {
         let root = std::env::temp_dir().join(format!("talos-i260-link-{}", std::process::id()));
         let source = root.join("source");
         let destination = root.join("installed");
-        fs::create_dir_all(&source).unwrap();
-        fs::create_dir_all(&destination).unwrap();
-        fs::write(destination.join("sentinel"), "old").unwrap();
-        fs::write(source.join("bundle.wasm"), b"wasm").unwrap();
-        fs::write(source.join("manifest.toml"), "schema_version=1\n[bundle]\nname=\"b\"\nversion=\"1.0.0\"\ncarrier=\"wasm\"\nartifact=\"bundle.wasm\"").unwrap();
-        std::os::unix::fs::symlink(destination.join("sentinel"), source.join("escape")).unwrap();
+        fs::create_dir_all(&source).expect("test fixture operation");
+        fs::create_dir_all(&destination).expect("test fixture operation");
+        fs::write(destination.join("sentinel"), "old").expect("test fixture operation");
+        fs::write(source.join("bundle.wasm"), b"wasm").expect("test fixture operation");
+        fs::write(source.join("manifest.toml"), "schema_version=1\n[bundle]\nname=\"b\"\nversion=\"1.0.0\"\ncarrier=\"wasm\"\nartifact=\"bundle.wasm\"").expect("test fixture operation");
+        std::os::unix::fs::symlink(destination.join("sentinel"), source.join("escape"))
+            .expect("test fixture operation");
         assert!(matches!(
             install_bundle(&source, &destination),
             Err(InstallError::Io(_))
         ));
         assert_eq!(
-            fs::read_to_string(destination.join("sentinel")).unwrap(),
+            fs::read_to_string(destination.join("sentinel")).expect("test fixture operation"),
             "old"
         );
         let _ = fs::remove_dir_all(root);
