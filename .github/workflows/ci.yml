@@ -151,6 +151,12 @@ jobs:
           set -euo pipefail
           rustup target add wasm32-unknown-unknown
           rustup component add llvm-tools-preview
+          if ! brew list --versions llvm >/dev/null 2>&1; then
+            brew install llvm
+          fi
+          wasm_llvm_prefix=$(brew --prefix llvm)
+          export CC_wasm32_unknown_unknown="$wasm_llvm_prefix/bin/clang"
+          export AR_wasm32_unknown_unknown="$wasm_llvm_prefix/bin/llvm-ar"
           bash scripts/validate_language_plugins.sh
 
       - name: Fetch locked dependencies for offline all-feature audit

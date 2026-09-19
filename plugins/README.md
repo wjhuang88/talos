@@ -19,6 +19,18 @@ internals into the isolated WASM artifact; it does not load native grammar libra
 On macOS, `llvm-ar` must be available (the bundled Rust LLVM tools or LLVM on PATH); BSD `ar`
 cannot archive WASM objects. Missing tools fail the build, without a host-execution fallback.
 
+Apple's bundled Clang does not provide a WASM backend. On macOS, install upstream LLVM and
+select it for the WASM target only (native host builds retain their normal compiler):
+
+```sh
+brew install llvm
+export CC_wasm32_unknown_unknown="$(brew --prefix llvm)/bin/clang"
+export AR_wasm32_unknown_unknown="$(brew --prefix llvm)/bin/llvm-ar"
+```
+
+The acceptance script checks the selected compiler's WASM target before building. CI explicitly
+provisions/selects LLVM; installing Rust's WASM standard library alone is insufficient.
+
 Run from the repository root:
 
 ```sh

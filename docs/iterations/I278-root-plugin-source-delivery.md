@@ -296,3 +296,26 @@ No Desktop source, I277 owner, default guest dependency, release/version/publica
 permission policy is included. Generated WASM/Bundle/target outputs stay ignored. Remaining work:
 stage/secret review, commit and exact-head independent review, stable candidate CI/CAS/merge,
 then completion evidence and source-Issue handoff. No Completion Commit exists yet.
+
+### Remote Compiler Selection Correction — 2026-09-19
+
+First implementation candidate #576 (`74b29e37`) passed remote standard preflight, but its
+optional guest stage failed because runner Apple Clang lacks a WASM backend. Local PATH had
+Homebrew LLVM, masking this prerequisite. CI now explicitly selects upstream LLVM for the WASM
+target only; the acceptance script checks target support before building, and the guide names
+the macOS setup commands. This is a build-environment defect, not an intermittent test failure.
+
+Independent historical-host supplement [5738280453](https://github.com/wjhuang88/talos/pull/576#issuecomment-5738280453)
+also closes ADR-079's executable old-host proof: unchanged `2d4e064f` accepts actual v1 fixture,
+rejects both actual v2 guests with `unsupported provider ABI version` before request writes.
+Temporary checkout removed. Initial low-fuel rejection was not counted; the historical public
+constructor's explicit 2B budget reached the version check. Artifact hashes and commands are in
+that record. Candidate changes require fresh exact-head CI/review before merge.
+
+The corrected optional acceptance script passed end-to-end with explicit LLVM CC/AR, including
+the production Agent permission test; both governance validators remained at zero warnings.
+Apple Clang is rejected immediately by the new precheck. Historical checkout verification had
+left stale same-version host build artifacts in the shared target: only talos-text/talos-plugin
+caches were cleaned before rebuilding current sources. Future cross-revision verification must
+isolate those package artifacts. A running-script edit also invalidated one local shell run;
+the final script was rerun unchanged to completion. Neither failed run is counted as acceptance.

@@ -4,6 +4,15 @@ set -euo pipefail
 root=$(cd "$(dirname "$0")/.." && pwd)
 cd "$root"
 
+# Apple Clang lacks the WASM backend. Check the actual target compiler, not the
+# host compiler; keep native workspace builds on their existing toolchain.
+wasm_cc=${CC_wasm32_unknown_unknown:-clang}
+if ! "$wasm_cc" --print-targets | grep 'wasm32' >/dev/null; then
+  echo "WASM-capable Clang required: set CC_wasm32_unknown_unknown to LLVM clang (see plugins/README.md)" >&2
+  exit 1
+fi
+export CC_wasm32_unknown_unknown="$wasm_cc"
+
 # Prevent root workspace feature unification from bundling both language grammars.
 for language in rust python; do
   cargo build --manifest-path plugins/Cargo.toml --locked --release \
