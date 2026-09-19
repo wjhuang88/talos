@@ -1,6 +1,13 @@
 # ADR-079: Rust Language Plugin Guest Buffer Boundary
 
-**Status:** Accepted — I278 / CAP-001-D; PR #575 makes acceptance effective on target-branch merge.
+**Status:** Accepted — I278 / CAP-001-D; effective through PR #575 merge `2d4e064f`.
+
+Implementation note (2026-09-19): language-provider default fuel is 2,000,000,000, separately
+bounded by the existing 500ms wall deadline and 64MiB instance memory ceiling. Cold Arborium
+Rust query initialization measured ~897M fuel; a 13KiB input measured ~1.054B. The former 1M
+fixture budget could not execute real grammars. Explicit caller budgets and generic Tool fuel
+are unchanged. The I278 owner records measurement scope and near-limit safe-fallback behavior;
+these figures are not portable latency guarantees or permission grants.
 
 ## Context And Verified Evidence
 
@@ -150,3 +157,7 @@ compatibility findings were corrected. The maintainer authorized unattended sing
 execution and independent subagent review. PR #575 binds final exact-head review, scoped CI and
 merge-time CAS; acceptance is ineffective until merge. Shared account/workspace, Agent-role
 separation only. This decision evidence does not substitute for implementation safety evidence.
+
+2026-09-18 activation: #575 merged as `2d4e064f94a7c54d65444dde195c3069a8509ddd` after exact-head
+CI `35359610144`, independent APPROVE `5731895048` and CAS `5731908465`. Acceptance is effective;
+the preceding pre-merge checkpoint remains historical evidence.

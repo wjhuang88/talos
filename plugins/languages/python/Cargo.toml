@@ -1,0 +1,15 @@
+[package]
+name = "talos-language-python"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+talos-language-guest = { workspace = true, features = ["python"] }
+
+[dev-dependencies]
+serde_json.workspace = true

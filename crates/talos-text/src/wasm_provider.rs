@@ -2,6 +2,10 @@
 
 /// Versioned guest ABI identifier. Providers must expose this contract before loading.
 pub const WASM_LANGUAGE_ABI_VERSION: u32 = 1;
+/// Guest-owned buffer transport introduced by ADR-079. Legacy version one stays supported.
+pub const WASM_LANGUAGE_ALLOCATED_ABI_VERSION: u32 = 2;
+/// Required allocator export for version-two guests; signature `(i32) -> i32`.
+pub const WASM_LANGUAGE_ALLOC_EXPORT: &str = "talos_language_alloc";
 /// Required guest export for provider probing (must not be called during discovery).
 pub const WASM_LANGUAGE_ABI_EXPORT: &str = "talos_language_abi_version";
 /// Required guest export for a provider invocation. It receives a pointer/length pair
@@ -155,9 +159,12 @@ pub struct ProviderRequest {
 
 /// Validate the declared ABI version without executing a provider.
 pub fn validate_abi_version(version: u32) -> Result<(), &'static str> {
-    (version == WASM_LANGUAGE_ABI_VERSION)
-        .then_some(())
-        .ok_or("unsupported provider ABI version")
+    matches!(
+        version,
+        WASM_LANGUAGE_ABI_VERSION | WASM_LANGUAGE_ALLOCATED_ABI_VERSION
+    )
+    .then_some(())
+    .ok_or("unsupported provider ABI version")
 }
 
 /// Safe result returned when a provider is unavailable or fails.
@@ -361,7 +368,11 @@ mod tests {
 impl Default for WasmProviderLimits {
     fn default() -> Self {
         Self {
-            fuel: 1_000_000,
+            // Cold Tree-sitter Rust query compilation alone costs ~897M Wasmtime
+            // fuel; a 13KiB source costs ~1.054B. Keep a finite language-only
+            // budget while the independent 500ms deadline bounds CPU custody.
+            // Explicit caller limits and generic Tool runtime fuel are unchanged.
+            fuel: 2_000_000_000,
             timeout: Duration::from_millis(500),
             max_source_bytes: 1_000_000,
         }

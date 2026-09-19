@@ -1,0 +1,13 @@
+[package]
+name = "talos-plugin-package"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+sha2 = "0.11.0"
+wasmparser = "0.259.0"
+
+[dev-dependencies]
+wat = "1.259.0"

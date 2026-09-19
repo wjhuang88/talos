@@ -9,6 +9,7 @@ homepage.workspace = true
 rust-version.workspace = true
 
 [features]
+plugin-acceptance = ["code-intelligence"]
 default = ["file-read", "search"]
 file-read = ["dep:sha2", "dep:uuid", "dep:walkdir", "tokio/fs"]
 file-write = ["file-read", "dep:cap-std", "tokio/fs"]
@@ -101,9 +102,14 @@ windows-sys = { version = "0.61.2", optional = true, features = [
 ] }
 
 [dev-dependencies]
+talos-plugin = { version = "0.9.2", path = "../talos-plugin", features = ["wasm", "code-intelligence"] }
 talos-permission = { version = "0.9.2", path = "../talos-permission" }
 tempfile = "3"
 tokio = { version = "1.53.1", features = ["fs", "macros", "rt", "rt-multi-thread"] }
+
+[[test]]
+name = "installed_language_plugins"
+required-features = ["plugin-acceptance"]
 
 [[test]]
 name = "document_boundaries"

@@ -12,8 +12,9 @@ That snapshot is historical evidence and not current activation authority.
 ## Lifecycle
 
 Next-cycle priority (2026-09-18): [I278 root Plugin source delivery](I278-root-plugin-source-delivery.md)
-is proposed Active / Claimed in #575, effective only after that PR merges with ADR-079 and
-independent review/CI. I277 retains deferred human/device validation; I249 stays Planned and
+is Review / Claimed through #575 merge `2d4e064f`, with ADR-079 effective. Local implementation,
+consumer/permission acceptance and preflight passed; stable-head implementation review/CI/merge
+remain pending. I277 retains deferred human/device validation; I249 stays Planned and
 I164 Paused. I277 implementation handoff is complete; its overall acceptance is not Complete.
 
 1. **Planned** — objective, selected stories, acceptance and activation gate are published.

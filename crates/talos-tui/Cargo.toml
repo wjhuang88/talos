@@ -25,6 +25,11 @@ talos-text = { version = "0.9.2", path = "../talos-text", features = ["code-inte
 
 [dev-dependencies]
 tempfile = "3"
+talos-plugin = { version = "0.9.2", path = "../talos-plugin", features = ["wasm", "code-intelligence"] }
+
+[features]
+# Explicit acceptance invocation requires independently built real Bundles.
+plugin-acceptance = []
 
 [lints]
 workspace = true

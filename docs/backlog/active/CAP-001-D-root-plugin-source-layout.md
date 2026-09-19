@@ -1,6 +1,6 @@
 # CAP-001-D: Repository-Root Plugin Source Delivery
 
-**Status**: In Progress / Claimed
+**Status**: Review / Claimed
 **Type**: Technical delivery Story
 **Parent Epic**: CAP-001 / #466
 **Selected Iteration**: I278
@@ -17,10 +17,10 @@
 | Source Issue | #466 |
 | Governance Claim PR | #575 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Maintainer I278 delivery goal and delegated Agent-role review; #575 exact-head security/API/governance approval and scoped CI required before merge; activation effective only on main |
+| Authorization Evidence | #575 merged as 2d4e064f; exact head dbddf44a / base d6b566be; CI 35359610144 passed scoped checks; independent security/API/governance APPROVE 5731895048 and CAS 5731908465 |
 | Implementation PR | Not started |
-| Last Updated | 2026-09-18 |
-| Handoff / Release Condition | #575 target-branch merge before implementation; ADR-079 and full baseline acceptance apply; I277 deferred human/device checks do not block this slice |
+| Last Updated | 2026-09-19 |
+| Handoff / Release Condition | Effective claim #575 / 2d4e064f; ADR-079 and full baseline acceptance apply; I277 deferred human/device checks do not block this slice |
 
 ## Goal And Scope
 
@@ -91,7 +91,16 @@ Agent-role security/API review. These changes become effective only on target-br
 no code has started. I278 records the full non-terminal inventory, predecessor evidence,
 expected changed-file boundaries and implementation/validation sequence.
 
+Activation checkpoint 2026-09-18: #575 merged as `2d4e064f94a7c54d65444dde195c3069a8509ddd`.
+ADR-079 and this In Progress / Claimed state are effective. I278 records exact head/base, CI,
+independent review and CAS. Implementation branch begins at that merge; no completion is claimed.
+
 ## Required Reads
+
+Review checkpoint 2026-09-19: local source/build/package/install, real TUI/symbol consumers,
+production Agent Allow/Deny, failure tests, strict Clippy and standard locked preflight passed.
+I278 records the complete changed-file inventory and preserved print/inline limitation. Stable-head
+independent security/API review, CI, merge and completion evidence remain pending.
 
 - [Parent CAP-001](CAP-001-progressive-capability-provider-architecture.md) and Issue #466.
 - [I278](../../iterations/I278-root-plugin-source-delivery.md) and I253 acceptance row R1.
