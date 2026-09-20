@@ -16,22 +16,22 @@ language-provider = ["dep:talos-text", "talos-text/code-intelligence", "talos-pl
 [dependencies]
 async-trait = "0.1.92"
 serde_json = "1.0.151"
-talos-agent = { version = "0.9.2", path = "../talos-agent" }
-talos-core = { version = "0.9.2", path = "../talos-core" }
-talos-permission = { version = "0.9.2", path = "../talos-permission" }
-talos-plugin = { version = "0.9.2", path = "../talos-plugin" }
-talos-sandbox = { version = "0.9.2", path = "../talos-sandbox" }
-talos-session = { version = "0.9.2", path = "../talos-session" }
-talos-skill = { version = "0.9.2", path = "../talos-skill" }
-talos-text = { version = "0.9.2", path = "../talos-text", optional = true }
-talos-tools = { version = "0.9.2", path = "../talos-tools", optional = true, features = ["coding"] }
+talos-agent = { version = "0.10.0", path = "../talos-agent" }
+talos-core = { version = "0.10.0", path = "../talos-core" }
+talos-permission = { version = "0.10.0", path = "../talos-permission" }
+talos-plugin = { version = "0.10.0", path = "../talos-plugin" }
+talos-sandbox = { version = "0.10.0", path = "../talos-sandbox" }
+talos-session = { version = "0.10.0", path = "../talos-session" }
+talos-skill = { version = "0.10.0", path = "../talos-skill" }
+talos-text = { version = "0.10.0", path = "../talos-text", optional = true }
+talos-tools = { version = "0.10.0", path = "../talos-tools", optional = true, features = ["coding"] }
 
 thiserror = "2.0.20"
 tokio = { version = "1.53.1", features = ["rt", "sync", "time"] }
 
 [dev-dependencies]
-talos-provider = { version = "0.9.2", path = "../talos-provider" }
-talos-tools = { version = "0.9.2", path = "../talos-tools", default-features = false, features = ["file-write"] }
+talos-provider = { version = "0.10.0", path = "../talos-provider" }
+talos-tools = { version = "0.10.0", path = "../talos-tools", default-features = false, features = ["file-write"] }
 tempfile = "3"
 tokio = { version = "1.53.1", features = ["macros", "rt-multi-thread", "sync", "test-util"] }
 

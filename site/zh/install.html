@@ -40,9 +40,9 @@
       <header class="talos-lead">
         <h1>安装</h1>
         <p>
-          请选择与你平台匹配的安装方式。对于 v0.9.2，官方安装器和
-          release 压缩包是受支持的二进制入口。crates.io 上的 Cargo install
-          形态已经规划，但尚未发布。
+          请选择与你平台匹配的安装方式。对于 v0.10.0，官方安装器和
+          release 压缩包是受支持的二进制入口。也可以从 crates.io 使用 Cargo install；
+          每个新版本的 registry 发布在 GitHub release 之后进行。
         </p>
       </header>
 
@@ -66,18 +66,18 @@
         </p>
         <div class="talos-codeblock">
           <pre><code>curl -fsSL https://raw.githubusercontent.com/wjhuang88/talos/main/install/install.sh \
-  | TALOS_VERSION=v0.9.2 sh
+  | TALOS_VERSION=v0.10.0 sh
 ~/.talos/bin/talos --version</code></pre>
         </div>
         <p>Windows x86_64 PowerShell：</p>
         <div class="talos-codeblock">
-          <pre><code>$env:TALOS_VERSION = 'v0.9.2'
+          <pre><code>$env:TALOS_VERSION = 'v0.10.0'
 iex (irm https://raw.githubusercontent.com/wjhuang88/talos/main/install/install.ps1)
 &amp; "$env:USERPROFILE\.talos\bin\talos.exe" --version
 Remove-Item Env:TALOS_VERSION</code></pre>
         </div>
         <p>
-          请将 <code>v0.9.2</code> 替换为需要的 release tag。安装器会覆盖目标
+          请将 <code>v0.10.0</code> 替换为需要的 release tag。安装器会覆盖目标
           安装目录中的二进制文件，但不会回退配置或会话数据。Talos 仍处于
           pre-1.0；运行旧版本前建议备份 <code>~/.talos</code>，也可以设置
           <code>TALOS_INSTALL_DIR</code>，在隔离目录中试用旧版本。需要恢复到
@@ -197,8 +197,10 @@ talos --config-set providers.anthropic.api_key_env=ANTHROPIC_API_KEY</code></pre
         <div class="talos-callout talos-callout--info">
           <p>
             <strong>Cargo install 状态：</strong>
-            <code>cargo install talos-cli --bin talos</code> 是计划中的
-            crates.io 二进制安装形态，但仍被发布门禁阻塞。本地源码测试可使用
+            <code>cargo install talos-cli --bin talos --locked</code> 安装
+            registry 当前可用版本。0.9.2 已发布；固定更新版本前，请用
+            <code>cargo info talos-cli</code> 查询。仅有 GitHub tag 不代表 registry
+            版本已经可用。本地源码测试可使用
             <code>cargo install --path crates/talos-cli --bin talos --locked</code>。
           </p>
         </div>

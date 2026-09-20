@@ -138,6 +138,9 @@ fields, any lower confidence, injection indicators or request-digest mismatch be
 
 ### 5. Deadline, cost and circuit breaker
 
+The original fixed timing policy below is superseded for Auto assessment by the accepted
+2026-09-20 amendment at the end of this record; other security boundaries remain applicable.
+
 Each Ask permits at most one evaluator request and no automatic retry. The default deadline is
 eight seconds and configuration may not exceed thirty seconds. Timeout, provider error, malformed
 output or validator failure becomes human confirmation when available and Deny otherwise.
@@ -239,3 +242,24 @@ result replay, policy bypass, cross-surface divergence, unacceptable false appro
 to distinguish user/parallel-session changes. Any proposal to admit modification, Execute,
 Network, external paths, sandbox fallback, persistent grants or unmanaged workspaces requires a
 fresh decision and independent security review.
+
+## 2026-09-20 Accepted Auto Review Timing Amendment
+
+The maintainer accepted request-local GLM-5.3 low-effort reasoning and removal of the fixed
+eight-second Auto review timer. The thirty-second resolver clamp is also removed, not substituted
+for the eight-second timer. Auto uses the enclosing permission request's remaining deadline;
+an SDK caller may still supply a smaller assessment cap. Provider transport/idle limits, cancellation,
+bounded output, no automatic retry, stale-context rejection and final admission remain unchanged.
+This is a timing-policy change, not an expansion of permission authority.
+
+[Zhipu's thinking documentation](https://docs.bigmodel.cn/cn/guide/capabilities/thinking), checked
+2026-09-20, states that GLM-5.3 rejects `thinking.type = disabled` and supports
+`reasoning_effort = low`. Only its Auto review request opts into `thinking.type = enabled` with
+low effort. Normal conversation and other auxiliary requests preserve their existing settings.
+Unknown models do not receive speculative GLM parameters. The additive provider trait entrypoint
+defaults to the existing isolated decision method, preserving existing adapter implementations.
+
+Local evidence motivating this amendment: session `75ed4f7e-dff6-43b3-a24b-51242d25966a`
+timed out after 8003 ms against an 8000 ms budget, with 1961 reasoning bytes and 16 text bytes,
+below its 16384-byte budget. This establishes a deadline failure, not a model safety rejection.
+Local corrective implementation and tests are not a merged-delivery or live acceptance claim.

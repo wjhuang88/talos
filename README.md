@@ -13,7 +13,7 @@ session history, built-in coding tools, explicit permissions, runtime Skills, MC
 and project-governance support while keeping the default core local and auditable.
 
 Talos has published its first stable pre-1.0 release line. The current release version in this
-workspace is `v0.9.2`. It is usable for local coding workflows, but still pre-1.0: APIs, command
+workspace is `v0.10.0`. It is usable for local coding workflows, but still pre-1.0: APIs, command
 surfaces, and storage formats may change as the product hardens. This README describes shipped
 user-facing behavior; research tracks such as web control expansion beyond the read-only loopback
 dashboard, broader dotagents compatibility, plugin carriers, and advanced document ingestion are tracked separately under
@@ -37,7 +37,7 @@ dashboard, broader dotagents compatibility, plugin carriers, and advanced docume
 - **Progressive context**: runtime Skill discovery plus explicit Skill body/reference activation without dumping hidden content into visible history.
 - **Extensible surface**: MCP tools, hooks, JSON-RPC, governance-aware project status, and explicit local read-only WASM packages are implemented; remote plugin distribution and browser control remain bounded separately.
 
-### TUI thinking and activity (source development)
+### TUI thinking and activity
 
 Completed displayable thinking appears as a collapsed `Thinking` title in history.
 Click the title to expand or collapse that entry; dragging selects text without
@@ -57,9 +57,9 @@ output stream. Tool history remains separate from these transient status rows.
 After a result enters history, its transient activity keeps only the status/count
 title; the completed result body is not repeated below it.
 
-These I279 source changes passed native-terminal acceptance; release remains separate.
+These I279 changes passed native-terminal acceptance and are included in v0.10.0.
 
-### Shared text semantics (source development)
+### Shared text semantics
 
 `talos-text` exposes renderer-independent language IDs, highlight spans and streaming Markdown
 block classification. The TUI consumes the shared classifier while retaining its own colors,
@@ -73,12 +73,12 @@ Embedders can use `talos_text::stream::StreamBlockClassifier` with complete UTF-
 `HighlightResult::validated_spans(source)` to validate source ranges before rendering. Callers
 assemble incoming chunks and render the resulting semantic decisions. Default `talos-text`
 does not load parsers or import TUI/Desktop types; the existing optional `code-intelligence`
-adapter remains unchanged. This is not dynamic LanguageProvider loading or Bundle installation,
-and does not claim these source changes are in an already-published release.
+adapter remains unchanged. These shared semantics are included in v0.10.0; this API
+does not itself perform dynamic LanguageProvider loading or Bundle installation.
 
 ## Current Release Boundary
 
-`v0.9.2` is suitable for local developer use where the operator reviews tool actions and keeps
+`v0.10.0` is suitable for local developer use where the operator reviews tool actions and keeps
 configuration local. It is not yet a remote multi-user service, marketplace runtime, browser
 automation surface, or autonomous background daemon.
 
@@ -144,18 +144,18 @@ Install or roll back to a specific release by using its complete Git tag:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/wjhuang88/talos/main/install/install.sh \
-  | TALOS_VERSION=v0.9.2 sh
+  | TALOS_VERSION=v0.10.0 sh
 ~/.talos/bin/talos --version
 ```
 
 ```powershell
-$env:TALOS_VERSION = 'v0.9.2'
+$env:TALOS_VERSION = 'v0.10.0'
 iex (irm https://raw.githubusercontent.com/wjhuang88/talos/main/install/install.ps1)
 & "$env:USERPROFILE\.talos\bin\talos.exe" --version
 Remove-Item Env:TALOS_VERSION
 ```
 
-Replace `v0.9.2` with a tag listed on
+Replace `v0.10.0` with a tag listed on
 [GitHub Releases](https://github.com/wjhuang88/talos/releases). The installer overwrites the Talos
 binary in the selected install directory; it does not roll back configuration or session data.
 Because Talos is pre-1.0, back up `~/.talos` before running an older binary, or test it in an
@@ -190,10 +190,16 @@ Windows ARM64 artifacts are not published yet.
 
 ### Cargo Install Status
 
-`cargo install talos-cli --bin talos` is the planned crates.io binary-install shape, but it is not
-published yet. For now, use the release installers/archives above or build from source with
-`cargo build --release -p talos-cli`. A local source checkout can be installed with Cargo for
-testing:
+`talos-cli` is available on crates.io, including version `0.9.2`. Each new release
+publishes GitHub archives first, then registry crates; a GitHub tag alone does not
+confirm Cargo availability. Check `cargo info talos-cli` before pinning a new version.
+Install the latest available registry version with:
+
+```bash
+cargo install talos-cli --bin talos --locked
+```
+
+For a local source checkout:
 
 ```bash
 cargo install --path crates/talos-cli --bin talos --locked
@@ -253,6 +259,21 @@ may admit that one invocation only. Mutating, network, privileged, ambiguous, se
 malformed, timed-out, or stale requests remain human-required or denied by the authoritative
 permission and sandbox gates. The assessor has no tools, never sees raw environment values or
 secret-like assignments, and cannot create a permanent grant.
+
+Auto review failures distinguish timeout, request/stream failure, incomplete response and byte-limit
+exhaustion in the TUI. Local logs retain session/request correlation, safe failure categories and
+timing; bounded-response failures include byte counters, while invalid JSON includes category and
+line/column, never the raw review, prompt, command or provider error. The provider's 4096-token
+generation limit is separate from the local review's 16 KiB combined text/reasoning byte budget.
+Failures still require human approval; diagnostics do not authorize execution.
+
+GLM-5.3 Auto reviews explicitly request `thinking.type = enabled` and `reasoning_effort = low`:
+this model cannot disable thinking. This request-local setting does not change conversation
+reasoning or other auxiliary decisions. Interactive CLI/TUI Auto reviews no longer impose an
+eight-second timer or a thirty-second resolver ceiling; they use the enclosing permission
+request's remaining budget. Provider transport/idle limits, cancellation, output limits and
+final permission validation still apply. Other models retain their existing bounded-decision
+request shape; GLM-specific parameters are not sent to them.
 
 Auto assistance is available only when the active surface supplies an interactive approval
 resolver (Goal and interactive CLI/TUI). Headless CLI, embedded Runtime and standalone MCP keep
@@ -869,10 +890,11 @@ This is not a stable 1.0 SDK guarantee yet. The public embedding surface is `tal
 plus the protocol and trait types it re-exports from `talos-core`; lower-level `talos-agent`
 constructors remain implementation surface unless documented otherwise.
 
-`talos-runtime` is not yet published as an SDK crate in the current release gate. It remains
-manifest-ready but blocked by dependency closure; see
+`talos-runtime` is available on crates.io, including version `0.9.2`. Check
+`cargo info talos-runtime` for available versions before updating an SDK dependency.
+New registry versions follow GitHub release publication. See
 [RUNTIME-SDK-CONTRACT](docs/reference/RUNTIME-SDK-CONTRACT.md) and the
-[publish gate packet](docs/reference/PUBLISH-GATE-PACKET-2026-07-02.md).
+[historical publish gate packet](docs/reference/PUBLISH-GATE-PACKET-2026-07-02.md).
 
 Direct source consumers of `talos-tools` get local `file-read` and `search` capabilities by
 default. Enable individual Cargo features for write, document, shell, Git, network, image, or code
@@ -977,7 +999,7 @@ Release tags drive the GitHub release workflow:
 Before creating a tag, run the same preflight used by CI and the release workflow:
 
 ```bash
-./scripts/release_preflight.sh v0.9.2
+./scripts/release_preflight.sh v0.10.0
 ```
 
 The repository pins the Rust/Clippy toolchain in `rust-toolchain.toml`; do not tag a release from
@@ -987,7 +1009,7 @@ The release workflow builds Linux, macOS, and Windows artifacts from a macOS run
 
 The post-v0.2.0 hardening notes that fed the pre-0.3 release line are collected in
 [RELEASE-NOTES-DRAFT-2026-07-02](docs/reference/RELEASE-NOTES-DRAFT-2026-07-02.md). GitHub Releases
-is the source of truth for the published `v0.9.2` release announcement and downloads.
+is the source of truth for the published `v0.10.0` release announcement and downloads.
 
 ## Project Status
 

@@ -43,7 +43,11 @@ impl BoundedDecisionContext {
 }
 
 /// Invoke a model with no tools and a strict output/deadline boundary.
-pub async fn invoke_text(
+///
+/// The provider receives a 4096-token generation budget. `max_output_bytes`
+/// independently bounds UTF-8 text plus reasoning (including opaque signatures).
+#[cfg(test)]
+async fn invoke_text(
     provider: &dyn LanguageModel,
     messages: &[Message],
     deadline: Duration,
@@ -63,6 +67,32 @@ pub async fn invoke_text(
     }
 }
 
+/// Invoke a tool-free Auto review using the adapter's request-local reasoning policy.
+pub(crate) async fn invoke_auto_review(
+    provider: &dyn LanguageModel,
+    messages: &[Message],
+    deadline: Duration,
+    max_output_bytes: usize,
+) -> Result<String, String> {
+    match invoke_text_bounded_with_limits(
+        provider,
+        messages,
+        deadline,
+        talos_core::provider::DecisionRequestLimits {
+            max_output_tokens: 4096,
+            max_retries: 0,
+        },
+        max_output_bytes,
+        CancellationToken::new(),
+        true,
+    )
+    .await
+    {
+        BoundedDecision::Decision(output) => Ok(output),
+        BoundedDecision::Abstain(reason) | BoundedDecision::Failure(reason) => Err(reason),
+    }
+}
+
 /// Invoke a bounded decision with an explicit isolation and provenance contract.
 pub async fn invoke_text_with_context(
     provider: &dyn LanguageModel,
@@ -73,9 +103,7 @@ pub async fn invoke_text_with_context(
     cancellation: CancellationToken,
 ) -> BoundedDecision {
     let limits = talos_core::provider::DecisionRequestLimits {
-        max_output_tokens: u32::try_from(max_output_bytes)
-            .unwrap_or(u32::MAX)
-            .min(4096),
+        max_output_tokens: 4096,
         max_retries: context.max_retries,
     };
     // The provider receives only caller-supplied messages; session history and tools are
@@ -88,11 +116,21 @@ pub async fn invoke_text_with_context(
             "bounded decision dedicated tools are not enabled for this caller".to_owned(),
         );
     }
-    invoke_text_bounded_with_limits(provider, messages, deadline, limits, cancellation).await
+    invoke_text_bounded_with_limits(
+        provider,
+        messages,
+        deadline,
+        limits,
+        max_output_bytes,
+        cancellation,
+        false,
+    )
+    .await
 }
 
 /// Invoke a model with explicit cancellation and a typed, fail-closed outcome.
-pub async fn invoke_text_bounded(
+#[cfg(test)]
+async fn invoke_text_bounded(
     provider: &dyn LanguageModel,
     messages: &[Message],
     deadline: Duration,
@@ -104,12 +142,12 @@ pub async fn invoke_text_bounded(
         messages,
         deadline,
         talos_core::provider::DecisionRequestLimits {
-            max_output_tokens: u32::try_from(max_output_bytes)
-                .unwrap_or(u32::MAX)
-                .min(4096),
+            max_output_tokens: 4096,
             max_retries: 0,
         },
+        max_output_bytes,
         cancellation,
+        false,
     )
     .await
 }
@@ -119,9 +157,12 @@ async fn invoke_text_bounded_with_limits(
     messages: &[Message],
     deadline: Duration,
     limits: talos_core::provider::DecisionRequestLimits,
+    max_output_bytes: usize,
     cancellation: CancellationToken,
+    auto_review: bool,
 ) -> BoundedDecision {
     let mut output = String::new();
+    let mut text_bytes = 0usize;
     let mut thinking_bytes = 0usize;
     let mut reasoning_bytes = 0usize;
     let result = tokio::select! {
@@ -133,12 +174,15 @@ async fn invoke_text_bounded_with_limits(
         // Catch both construction and polling panics from third-party implementations.
         // Never expose panic payloads or retry a request whose dispatch state is unknown.
         let mut events = std::panic::AssertUnwindSafe(async {
-            provider.stream_decision(messages, limits).await
+            if auto_review {
+                provider.stream_auto_review(messages, limits).await
+            } else {
+                provider.stream_decision(messages, limits).await
+            }
         }).catch_unwind().await
             .map_err(|_| "bounded model provider panicked".to_owned())?
             .map_err(|_| "bounded model dispatch failed".to_owned())?;
         while let Some(event) = events.recv().await {
-            let mut text_bytes = output.len();
             match &event {
                 AgentEvent::TextDelta { delta } => text_bytes = text_bytes.saturating_add(delta.len()),
                 AgentEvent::ThinkingDelta { delta } => thinking_bytes = thinking_bytes.saturating_add(delta.len()),
@@ -157,7 +201,7 @@ async fn invoke_text_bounded_with_limits(
             // Thinking deltas and their completed replay blocks describe the same output.
             // Count the larger representation, including signatures and opaque payloads.
             if text_bytes.saturating_add(thinking_bytes.max(reasoning_bytes))
-                > limits.max_output_tokens as usize
+                > max_output_bytes
             {
                 return Err("bounded model output exceeded limit".to_owned());
             }
@@ -178,8 +222,23 @@ async fn invoke_text_bounded_with_limits(
         }) => result,
     };
     match result {
-        Err(_) => return BoundedDecision::Failure("bounded model deadline exceeded".to_owned()),
-        Ok(Err(error)) => return BoundedDecision::Failure(error),
+        Err(_) => {
+            tracing::warn!(
+                reason = "deadline",
+                text_bytes,
+                thinking_bytes,
+                reasoning_bytes,
+                max_output_bytes,
+                max_output_tokens = limits.max_output_tokens,
+                "Bounded decision failed"
+            );
+            return BoundedDecision::Failure("bounded model deadline exceeded".to_owned());
+        }
+        Ok(Err(error)) => {
+            // `error` is constructed locally from fixed strings, never provider text.
+            tracing::warn!(reason = %error, text_bytes, thinking_bytes, reasoning_bytes, max_output_bytes, max_output_tokens = limits.max_output_tokens, "Bounded decision failed");
+            return BoundedDecision::Failure(error);
+        }
         Ok(Ok(())) => {}
     }
     if output.trim().is_empty() {
@@ -194,6 +253,89 @@ mod tests {
     use talos_core::provider::{ProviderResult, Receiver};
 
     struct ResponseModel(Vec<AgentEvent>);
+
+    struct AutoOnlyModel;
+
+    #[async_trait::async_trait]
+    impl LanguageModel for AutoOnlyModel {
+        async fn stream(&self, _: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+            panic!("Auto must not call unrestricted stream")
+        }
+
+        async fn stream_auto_review(
+            &self,
+            _: &[Message],
+            limits: talos_core::provider::DecisionRequestLimits,
+        ) -> ProviderResult<Receiver<AgentEvent>> {
+            assert_eq!(limits.max_retries, 0);
+            assert_eq!(limits.max_output_tokens, 4096);
+            ResponseModel(vec![
+                AgentEvent::TextDelta {
+                    delta: "auto decision".into(),
+                },
+                AgentEvent::TurnEnd {
+                    stop_reason: StopReason::EndTurn,
+                    usage: Default::default(),
+                },
+            ])
+            .stream(&[])
+            .await
+        }
+    }
+
+    #[tokio::test]
+    async fn auto_review_dispatch_is_distinct_from_generic_decisions() {
+        assert_eq!(
+            invoke_auto_review(&AutoOnlyModel, &[], Duration::from_secs(1), 128).await,
+            Ok("auto decision".into())
+        );
+        assert_eq!(
+            invoke_text(&AutoOnlyModel, &[], Duration::from_secs(1), 128).await,
+            Err("bounded model dispatch failed".into())
+        );
+    }
+
+    #[tokio::test]
+    async fn utf8_byte_budget_is_independent_of_provider_token_limit() {
+        // 6 KiB of UTF-8 is valid under an 8 KiB byte budget, even though
+        // the provider token budget is 4096. Reasoning replay is not counted twice.
+        let model = ResponseModel(vec![
+            AgentEvent::ThinkingDelta {
+                delta: "思".repeat(2048),
+            },
+            AgentEvent::ReasoningComplete {
+                blocks: vec![ReasoningBlock::Plain {
+                    text: "思".repeat(2048),
+                }],
+            },
+            AgentEvent::TextDelta { delta: "ok".into() },
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::EndTurn,
+                usage: Default::default(),
+            },
+        ]);
+        assert_eq!(
+            invoke_text(&model, &[], Duration::from_secs(1), 8192).await,
+            Ok("ok".into())
+        );
+        assert_eq!(
+            invoke_text(&model, &[], Duration::from_secs(1), 6145).await,
+            Err("bounded model output exceeded limit".into())
+        );
+        let context = BoundedDecisionContext::new("test-request", "permission-review");
+        assert_eq!(
+            invoke_text_with_context(
+                &model,
+                &[],
+                &context,
+                Duration::from_secs(1),
+                8192,
+                CancellationToken::new()
+            )
+            .await,
+            BoundedDecision::Decision("ok".into())
+        );
+    }
 
     #[async_trait::async_trait]
     impl LanguageModel for ResponseModel {

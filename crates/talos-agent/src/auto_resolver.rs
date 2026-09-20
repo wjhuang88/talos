@@ -506,7 +506,7 @@ impl ProviderAutoPermissionAssessor {
                 content: format!("Assess this redacted request and return JSON only:\n{payload}"),
             },
         ];
-        crate::bounded_model::invoke_text(
+        crate::bounded_model::invoke_auto_review(
             self.provider.as_ref(),
             &messages,
             remaining,
@@ -600,7 +600,8 @@ pub struct AutoPermissionResolver {
 }
 
 impl AutoPermissionResolver {
-    /// Builds a resolver. Deadlines are clamped to ADR-064's eight/ thirty second bounds.
+    /// Builds a resolver with an optional caller-supplied assessment cap.
+    /// Pass `Duration::MAX` to use only the enclosing permission request's remaining budget.
     #[must_use]
     pub fn new(
         assessor: Arc<dyn AutoPermissionAssessor>,
@@ -617,7 +618,7 @@ impl AutoPermissionResolver {
             last_report: Mutex::new(None),
             observed_reset_epoch: AtomicU64::new(control.reset_epoch()),
             control,
-            deadline: deadline.clamp(Duration::from_millis(1), Duration::from_secs(30)),
+            deadline: deadline.max(Duration::from_millis(1)),
             report_sink: None,
         }
     }
@@ -1417,13 +1418,48 @@ impl ApprovalResolver for AutoPermissionResolver {
                     .await
             }
         };
+        let assessment = tracing::Instrument::instrument(
+            assessment,
+            tracing::info_span!(
+                "auto_permission_review",
+                session_id = %request.binding.session_id,
+                request_digest = %evaluator_request.request_digest,
+            ),
+        );
         let raw = match tokio::time::timeout(budget, assessment).await {
             Ok(Ok(raw)) => raw,
-            _ => {
+            failure => {
+                // Never persist arbitrary assessor/provider errors: they may contain
+                // credentials or prompt data. Keep only known, content-free categories.
+                let reason = match &failure {
+                    Err(_) => "review_timeout",
+                    Ok(Err(error)) => match error.as_str() {
+                        "bounded model deadline exceeded" => "review_timeout",
+                        "bounded model dispatch failed" => "review_dispatch_failed",
+                        "bounded model stream failed" => "review_stream_failed",
+                        "bounded model stream closed before completion" => "review_stream_closed",
+                        "bounded model response incomplete" => "review_incomplete",
+                        "bounded model output exceeded limit" => "review_output_limit",
+                        "bounded model provider panicked" => "review_provider_panicked",
+                        "bounded model invocation cancelled" => "review_cancelled",
+                        "bounded model returned no output" => "review_empty_output",
+                        "tool use is forbidden in auto assessment" => "review_tool_use",
+                        _ => "technical_failure",
+                    },
+                    _ => "technical_failure",
+                };
+                tracing::warn!(
+                    session_id = %request.binding.session_id,
+                    request_digest = %evaluator_request.request_digest,
+                    reason,
+                    elapsed_ms = started.elapsed().as_millis() as u64,
+                    budget_ms = budget.as_millis() as u64,
+                    "Auto permission review failed; falling back to human approval"
+                );
                 self.record_failure();
                 self.report(AutoDecisionReport {
                     outcome: "human_required".into(),
-                    reason: "technical_failure".into(),
+                    reason: reason.into(),
                     evaluator: self.assessor.identity().into(),
                     request_digest: evaluator_request.request_digest.clone(),
                 });
@@ -1463,7 +1499,16 @@ impl ApprovalResolver for AutoPermissionResolver {
         }
         let response: AutoPermissionWireResponse = match parse_auto_response(&raw) {
             Ok(value) => value,
-            Err(_) => {
+            Err(error) => {
+                tracing::warn!(
+                    session_id = %request.binding.session_id,
+                    request_digest = %evaluator_request.request_digest,
+                    category = ?error.classify(),
+                    line = error.line(), column = error.column(),
+                    response_bytes = raw.len(),
+                    elapsed_ms = started.elapsed().as_millis() as u64,
+                    "Auto permission review returned invalid JSON; falling back to human approval"
+                );
                 self.record_failure();
                 self.report(AutoDecisionReport {
                     outcome: "human_required".into(),
@@ -2446,6 +2491,46 @@ mod tests {
     }
 
     #[tokio::test(start_paused = true)]
+    async fn caller_budget_is_not_replaced_by_eight_or_thirty_second_cap() {
+        for seconds in [5, 45] {
+            let root = tempfile::tempdir().expect("root");
+            let state = PermissionSessionState::new(PermissionEngine::with_workspace_root(
+                root.path().to_path_buf(),
+            ));
+            let resolver = AutoPermissionResolver::new(
+                Arc::new(SlowAssessor),
+                Arc::new(DenyFallback),
+                ManagedWorkspaceLease::new(
+                    root.path(),
+                    state.session_id().expect("session id").stable_id(),
+                )
+                .expect("lease"),
+                Duration::MAX,
+                AutoPermissionControl::new(true),
+            );
+            let request = shell_approval_request(root.path(), &state, "ls -la");
+            let started = tokio::time::Instant::now();
+            assert_eq!(
+                resolver
+                    .resolve_with_auto_assessment(
+                        request,
+                        Duration::from_secs(seconds),
+                        true,
+                        Some("inspect the workspace")
+                    )
+                    .await
+                    .expect("fallback"),
+                ApprovalChoice::Deny
+            );
+            assert_eq!(started.elapsed(), Duration::from_secs(seconds));
+            assert_eq!(
+                resolver.last_report().expect("report").reason,
+                "review_timeout"
+            );
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
     async fn assessor_timeout_falls_back_without_auto_authority() {
         let root = tempfile::tempdir().expect("root");
         let state = PermissionSessionState::new(PermissionEngine::with_workspace_root(
@@ -2478,7 +2563,7 @@ mod tests {
         );
         let report = resolver.last_report().expect("timeout report");
         assert_eq!(report.outcome, "human_required");
-        assert_eq!(report.reason, "technical_failure");
+        assert_eq!(report.reason, "review_timeout");
     }
 
     #[tokio::test]

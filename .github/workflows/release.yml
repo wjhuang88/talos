@@ -48,7 +48,7 @@ jobs:
         with:
           key: aarch64-apple-darwin
       - name: Build
-        run: cargo build --release --target aarch64-apple-darwin -p talos-cli
+        run: cargo build --locked --release --target aarch64-apple-darwin -p talos-cli
       - name: Package
         run: |
           cd target/aarch64-apple-darwin/release
@@ -73,7 +73,7 @@ jobs:
         with:
           key: x86_64-apple-darwin
       - name: Build
-        run: cargo build --release --target x86_64-apple-darwin -p talos-cli
+        run: cargo build --locked --release --target x86_64-apple-darwin -p talos-cli
       - name: Package
         run: |
           cd target/x86_64-apple-darwin/release
@@ -102,7 +102,7 @@ jobs:
       - name: Build
         env:
           CC_x86_64_unknown_linux_musl: musl-gcc
-        run: cargo build --release --target x86_64-unknown-linux-musl -p talos-cli
+        run: cargo build --locked --release --target x86_64-unknown-linux-musl -p talos-cli
       - name: Package
         run: |
           cd target/x86_64-unknown-linux-musl/release
@@ -131,7 +131,7 @@ jobs:
       - name: Build
         env:
           CC_aarch64_unknown_linux_musl: musl-gcc
-        run: cargo build --release --target aarch64-unknown-linux-musl -p talos-cli
+        run: cargo build --locked --release --target aarch64-unknown-linux-musl -p talos-cli
       - name: Package
         run: |
           cd target/aarch64-unknown-linux-musl/release
@@ -155,7 +155,7 @@ jobs:
         with:
           key: x86_64-pc-windows-msvc
       - name: Build
-        run: cargo build --release -p talos-cli
+        run: cargo build --locked --release -p talos-cli
       - name: Package
         shell: pwsh
         run: |

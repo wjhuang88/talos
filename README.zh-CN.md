@@ -11,7 +11,7 @@ Talos 是一个 Rust 原生的本地编码 Agent，面向希望在自己机器�
 运行时的开发者。它提供终端 UI、模型提供商适配、会话历史、内置编码工具、显式权限控制、
 运行时 Skills、MCP/RPC 集成和项目治理支持，同时保持默认本地、边界清晰、可审计。
 
-Talos 已发布第一条稳定的 pre-1.0 release 线。当前工作区版本是 `v0.9.2`。它已经可以用于
+Talos 已发布第一条稳定的 pre-1.0 release 线。当前工作区版本是 `v0.10.0`。它已经可以用于
 本地编码工作流，但仍然处于 1.0 之前：API、命令界面和存储格式仍可能随着产品化加固继续演进。
 本 README 只描述已经发布或当前已实现的用户可见能力；只读 loopback dashboard 之外的 Web
 控制面扩展、超出已发布 shared Skills 目录的 dotagents 兼容、更广泛的插件载体和高级文档解析等研究方向请查看[项目状态](#项目状态)。
@@ -32,7 +32,7 @@ Talos 已发布第一条稳定的 pre-1.0 release 线。当前工作区版本是
 
 ## 当前 Release 边界
 
-`v0.9.2` 适合本地开发者在自己机器上使用，并由操作者审查工具动作和配置。它还不是远程多用户服务、
+`v0.10.0` 适合本地开发者在自己机器上使用，并由操作者审查工具动作和配置。它还不是远程多用户服务、
 插件市场、浏览器自动化控制面或自主后台守护进程。
 
 当前已发布/已实现：
@@ -94,18 +94,18 @@ iex (irm https://raw.githubusercontent.com/wjhuang88/talos/main/install/install.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/wjhuang88/talos/main/install/install.sh \
-  | TALOS_VERSION=v0.9.2 sh
+  | TALOS_VERSION=v0.10.0 sh
 ~/.talos/bin/talos --version
 ```
 
 ```powershell
-$env:TALOS_VERSION = 'v0.9.2'
+$env:TALOS_VERSION = 'v0.10.0'
 iex (irm https://raw.githubusercontent.com/wjhuang88/talos/main/install/install.ps1)
 & "$env:USERPROFILE\.talos\bin\talos.exe" --version
 Remove-Item Env:TALOS_VERSION
 ```
 
-请将 `v0.9.2` 替换为
+请将 `v0.10.0` 替换为
 [GitHub Releases](https://github.com/wjhuang88/talos/releases) 中存在的 tag。安装器会覆盖目标
 安装目录中的 Talos 二进制文件，但不会回退配置或会话数据。Talos 仍处于 pre-1.0；运行旧版本前
 建议备份 `~/.talos`，也可以同时设置 `TALOS_INSTALL_DIR`，在隔离目录中试用旧版本。需要恢复到
@@ -137,9 +137,15 @@ Windows ARM64 产物暂未发布。
 
 ### Cargo Install 状态
 
-`cargo install talos-cli --bin talos` 是计划中的 crates.io 二进制安装形态，但目前尚未发布。
-当前请使用上面的 release 安装器/压缩包，或通过 `cargo build --release -p talos-cli` 从源码构建。
-本地源码 checkout 可用于测试 Cargo 安装：
+`talos-cli` 已在 crates.io 发布，包括 `0.9.2`。每个新版本先发布 GitHub 压缩包，
+再发布 registry crates；仅有 GitHub tag 不代表 Cargo 版本已经可用。
+固定新版本前，请用 `cargo info talos-cli` 查询。安装 registry 当前可用版本：
+
+```bash
+cargo install talos-cli --bin talos --locked
+```
+
+本地源码 checkout 可使用：
 
 ```bash
 cargo install --path crates/talos-cli --bin talos --locked
@@ -558,9 +564,10 @@ Success、Error 或 Cancelled 终态原子落盘；若已完成的安全工具�
 `talos-core` 重新导出的协议和 trait 类型；低层 `talos-agent` 构造器仍视为实现表面，
 除非文档另行声明。
 
-当前 release gate 尚未发布 `talos-runtime` SDK crate。它处于 manifest-ready 状态，但仍被
-依赖闭包阻塞；详见 [RUNTIME-SDK-CONTRACT](docs/reference/RUNTIME-SDK-CONTRACT.md) 和
-[publish gate packet](docs/reference/PUBLISH-GATE-PACKET-2026-07-02.md)。
+`talos-runtime` 已在 crates.io 发布，包括 `0.9.2`。更新 SDK 依赖前，请用
+`cargo info talos-runtime` 查询可用版本；新 registry 版本在 GitHub release 之后发布。
+详见 [RUNTIME-SDK-CONTRACT](docs/reference/RUNTIME-SDK-CONTRACT.md) 和
+[历史 publish gate packet](docs/reference/PUBLISH-GATE-PACKET-2026-07-02.md)。
 
 直接从源码依赖 `talos-tools` 时，默认只启用本地 `file-read` 和 `search` 能力。写文件、
 文档提取、Shell、Git、网络、图片和代码智能需要显式选择对应 Cargo feature。Talos CLI
@@ -574,6 +581,16 @@ Success、Error 或 Cancelled 终态原子落盘；若已完成的安全工具�
 - 工具展示优先显示工具定义声明的关键参数，而不是原始 JSON。
 - 本地密钥应放在环境变量或私有配置文件中，不应进入源码。
 - Talos 不会自动提交代码。Git 提交只会在用户或工具显式请求时发生。
+
+### Auto 审核边界
+
+Auto 审核失败会区分超时、请求/流失败、响应不完整和字节上限；日志只记录安全的
+失败类别、会话关联、耗时及字节计数，不记录原始审核内容、命令或提供商错误。
+提供商的 4096-token 生成上限与本地文本/推理合计 16 KiB 字节上限相互独立。
+GLM-5.3 的 Auto 请求使用 `thinking.type = enabled` 与 `reasoning_effort = low`，
+不改变普通会话、其他辅助请求或其他模型的请求设置。交互式 CLI/TUI 不再采用固定
+8 秒计时或 30 秒上限，而使用外层权限请求的剩余时限。传输/空闲超时、取消、
+输出限制与最终权限校验仍然生效；审核失败不产生执行授权。
 
 ## 贡献与本地检查
 
@@ -604,7 +621,7 @@ GitHub Release 工作流由 tag 触发：
 创建 tag 前，请运行与 CI 和 Release workflow 相同的预检：
 
 ```bash
-./scripts/release_preflight.sh v0.9.2
+./scripts/release_preflight.sh v0.10.0
 ```
 
 仓库通过 `rust-toolchain.toml` 固定 Rust/Clippy 工具链；不要使用其他工具链直接发布。
@@ -613,7 +630,7 @@ Release 工作流在 macOS runner 上构建 Linux、macOS 和 Windows 产物。
 
 post-v0.2.0 加固素材集中在
 [RELEASE-NOTES-DRAFT-2026-07-02](docs/reference/RELEASE-NOTES-DRAFT-2026-07-02.md)。已发布的
-`v0.9.2` release 公告和下载以 GitHub Releases 为准。
+`v0.10.0` release 公告和下载以 GitHub Releases 为准。
 
 ## 项目状态
 

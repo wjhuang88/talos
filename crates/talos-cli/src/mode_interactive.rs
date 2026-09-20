@@ -127,7 +127,7 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
                     Arc::new(ProviderAutoPermissionAssessor::new(provider.clone())),
                     fallback.clone(),
                     lease,
-                    std::time::Duration::from_secs(8),
+                    std::time::Duration::MAX,
                     auto_control,
                 )) as Arc<dyn talos_agent::permission_pipeline::ApprovalResolver>
             })
