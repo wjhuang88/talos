@@ -1,6 +1,6 @@
 # Iteration I279: History Reasoning And Live Activity Presentation
 
-> Document status: Planned
+> Document status: Active — proposed by #579; ineffective until merge
 > Published plan date: 2026-09-20
 > Planned objective: Deliver #334 history continuation padding, #298 collapsible reasoning history, and #310 live activity status/count headers as one locally converged TUI stage.
 > MVP deliverable: Runnable TUI with stable padded history, independently collapsible thinking entries, and truthful live thinking/tool titles and display-row counts.
@@ -9,18 +9,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-6 |
 | Work Slice | Proposed TUI-061 / TUI-056 / TUI-057 presentation, projection, interaction, tests and documentation only. Excludes Auto permission/provider fixes, Desktop, release, dependencies and session schema. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-09-20 |
 | Source Issue | #298 / #310 / #334 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Maintainer requested development and closure of all three Issues on 2026-09-20; effective target-branch claim still required. |
+| Governance Claim PR | #579 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Maintainer requested all three Issues on 2026-09-20 under standing single-maintainer mode; independent Agent review and exact-head checks required before merge. |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-20 |
-| Handoff / Release Condition | Finalize atomic claim on main before committed implementation; converge all three requirements locally before implementation PR. |
+| Handoff / Release Condition | Claim and activation are ineffective until #579 merges. I279 owns shared refinement/acceptance decisions; implement only after effective target-branch claim. |
 
 ## Published Baseline
 
@@ -97,3 +97,10 @@ Rollback removes presentation changes without migrating or altering persisted co
 - 2026-09-20: read all three remote Issue bodies/comments and local owners. Confirmed existing
   history projection wraps at column zero and transcript lacks a typed reasoning block.
 - Planning only: claim, implementation, tests and native acceptance remain pending.
+
+## 2026-09-20 Unified Delivery Selection
+
+I279 selects #298/#310/#334 as one locally converged TUI stage. PR #579 proposes this claim;
+no implementation authority exists before merge. Historical intake text above remains provenance;
+I279's explicit projection-only, per-entry, line-count and acceptance decisions govern execution.
+Existing I277 deferred acceptance, I249 Planned and I164 Paused dispositions are preserved.

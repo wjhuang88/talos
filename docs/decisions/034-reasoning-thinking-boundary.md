@@ -711,6 +711,20 @@ Minimum implementation evidence:
 
 ## Reversal Trigger
 
+### I279 Presentation Amendment (proposed by #579)
+
+The maintainer requested #298/#310/#334 together on 2026-09-20. On merge of #579,
+this amendment supersedes only v4 item 3's static-only history restriction and its static
+rendering acceptance rows. Under the already accepted ADR-054 application-owned renderer,
+completed display-safe reasoning becomes a typed presentation entry, collapsed by default,
+with an independent Thinking title and click-to-toggle body beneath it. Expansion state is
+per-entry and process-local; resume defaults collapsed. No session schema, provider replay,
+filtering, signature/redaction, default copy/export or explicit include-thinking export changes
+are authorized. Drag selection must not toggle; logical scroll anchors and Unicode reflow remain
+stable. I279 specifies shared continuation padding and live title/count presentation separately.
+Acceptance requires projection/mouse/security-sentinel tests and actual terminal evidence.
+Until #579 merges this is a proposal, not an effective amendment or implementation authorization.
+
 Revisit if:
 
 - A Gemini-native or OpenAI Responses adapter is added (both need new block variants/mappings).
