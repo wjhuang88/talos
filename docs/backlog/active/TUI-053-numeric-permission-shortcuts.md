@@ -5,9 +5,11 @@
 | Story ID | TUI-053 |
 | Type | TUI / Permission Interaction Story |
 | Priority | P1 |
-| Status | Partial / Unclaimed — implementation merged; acceptance reconciliation pending |
+| Status | Complete — existing implementation reconciled; historical claim gap disclosed |
 | Source Issue | #268 |
 | Selected Iteration | None |
+
+Completion Commit: 1647f9d84e039cf6e53b8bdf11315bd7f358878b
 
 ## Collaboration Claim
 
@@ -24,7 +26,7 @@
 | Authorization Evidence | Not applicable |
 | Implementation PR | None — existing commit 1647f9d84e039cf6e53b8bdf11315bd7f358878b is on main; no associated PR returned by API |
 | Last Updated | 2026-09-20 |
-| Handoff / Release Condition | Reconcile existing implementation evidence and complete remaining acceptance below; do not invent retroactive claim authority or repeat the implementation. New permission-surface code changes require an effective claim. |
+| Handoff / Release Condition | Acceptance complete by maintainer confirmation and automated tests below. Historical Unclaimed fields are retained as an audit gap, not current implementation work or retroactive claim authority. |
 
 ## Identity / Goal / Value
 
@@ -85,3 +87,24 @@ talos-tui approval --lib` and `cargo test --locked -p talos-cli approval_queue_t
 These close the previously missing invalid-digit/sequential-event evidence, but do not simulate
 an operating-system IME. Physical IME acceptance remains pending user confirmation; no Complete
 claim or Issue closure is justified until that final evidence is supplied.
+
+### Maintainer Acceptance And Closure — 2026-09-20
+
+In direct response to the explicit question whether keeping Chinese IME enabled allows 1/2/3
+to immediately select Once/Session/Deny without Enter or switching to English, the maintainer
+confirmed: “这个我已经验证过了,符合预期的”. This is the previously missing physical-IME
+acceptance, not a synthetic event test. Terminal name, IME product and tested binary SHA were
+not supplied; do not invent them or claim universal compatibility across IMEs.
+
+The existing main implementation above plus this confirmation and the 38 TUI / two CLI tests
+complete #268's acceptance. Numeric mappings and invalid/repeat/sequential routing are covered
+by `numeric_approval_routes_once_and_rejects_invalid_or_repeated_input`; existing render, Esc,
+scope-preview and expired-request tests remain green. Arrow/Enter routing and permission policy
+are unchanged by the original mapping-only diff. TUI-045 owns layout and is not reopened.
+
+This reconciliation is explicitly authorized by the maintainer's “正确闭环” and “完成一下#268的闭环吧”.
+It changes no production code, permission policy or grant scope. The original implementation was
+misattributed to #285 and lacked a synchronized TUI-053 claim; leaving that historical metadata
+Unclaimed discloses the gap rather than manufacturing a prior claim. No new iteration or claim
+cycle is necessary to repeat already delivered behavior. Source #268 closes only after this
+evidence repair and regression test are merged with applicable CI and independent review.
