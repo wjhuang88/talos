@@ -36,12 +36,9 @@
 | [#269](https://github.com/wjhuang88/talos/issues/269) | Native key-repeat routing | [TUI-054](../backlog/active/TUI-054-native-key-repeat-routing.md) | Intake | Inventory repeat-safe and one-shot actions before selection. |
 | [#280](https://github.com/wjhuang88/talos/issues/280) | Narrow Markdown table layout integrity | [TUI-055](../backlog/active/TUI-055-narrow-markdown-table-layout.md) | Intake / Unclaimed | Characterize renderer ownership and choose a deterministic narrow-width strategy before iteration selection. |
 | [#285](https://github.com/wjhuang88/talos/issues/285) | Prompt authority architecture and model-behavior harness | [PROMPT-001](../backlog/active/PROMPT-001-prompt-authority-architecture.md) | Refinement / Unclaimed | Accept authority/precedence architecture and decompose children before implementation. |
-| [#298](https://github.com/wjhuang88/talos/issues/298) | Collapsible reasoning history | [TUI-056](../backlog/active/TUI-056-collapsible-reasoning-history.md) | I279 proposed Active / Claimed | Unified claim #579 is ineffective until merge; I279 owns presentation decisions and acceptance. |
 | [#308](https://github.com/wjhuang88/talos/issues/308) | Presets as global Session Environment templates | [DESKTOP-002](../backlog/active/DESKTOP-002-preset-session-environment-templates.md) | Blocked / Unclaimed | MODEL-012/#146 and shared Session authority must resolve before decomposition. |
-| [#310](https://github.com/wjhuang88/talos/issues/310) | Dynamic line counts for live thinking and tool activity | [TUI-057](../backlog/active/TUI-057-live-activity-status-headers.md) | I279 proposed Active / Claimed | Unified claim #579 is ineffective until merge; I279 owns presentation decisions and acceptance. |
 | [#316](https://github.com/wjhuang88/talos/issues/316) | Isolate process HOME mutations in parallel tests | [TEST-001](../backlog/active/TEST-001-process-home-test-isolation.md) | Ready / Unclaimed | Select a test-infrastructure iteration before changing shared environment handling. |
 | [#317](https://github.com/wjhuang88/talos/issues/317) | Progressive workspace intelligence from Tree-sitter queries | [CODE-003](../backlog/active/CODE-003-tree-sitter-usage-pattern-analysis.md) | Refinement / Unclaimed | Contract characterization is runnable; later children remain unclaimed. |
-| [#334](https://github.com/wjhuang88/talos/issues/334) | History continuation padding regression | [TUI-061](../backlog/active/TUI-061-history-continuation-padding-regression.md) | I279 proposed Active / Claimed | Unified claim #579 is ineffective until merge; I279 owns presentation decisions and acceptance. |
 | [#360](https://github.com/wjhuang88/talos/issues/360) | server remote relational persistence profile | [SERVER-002](../backlog/active/SERVER-002-remote-relational-persistence-profile.md) | Intake / Unclaimed | Separate refinement/ADR/iteration/claim required. |
 | [#361](https://github.com/wjhuang88/talos/issues/361) | standalone `talos-server` host composition | [SERVER-001-C](../backlog/active/SERVER-001-C-standalone-server-host-composition.md) | Intake / Unclaimed | Reuse existing runtime authorities; no implementation before separate governance. |
 | [#362](https://github.com/wjhuang88/talos/issues/362) | optional S3-compatible object-storage workspace | [TOOL-027](../backlog/active/TOOL-027-s3-object-workspace-backend.md) | Intake / Unclaimed | Optional object-workspace tools only; no implementation claim. |
@@ -65,6 +62,12 @@
 | [#563](https://github.com/wjhuang88/talos/issues/563) | extend auto review to higher-risk writes with diff and rollback gates | [PERM-007-G](../backlog/active/PERM-007-G-higher-risk-auto-writes.md) | Refinement / Unclaimed | Intake-only owner; higher-risk writes, rollback, and impact analysis remain unimplemented and unauthorized. |
 
 ## Synchronization Notes
+
+2026-09-20: removed closed #298/#310/#334 from the active matrix after verifying
+their GitHub closure and TUI-056/TUI-057/TUI-061 owner completion. Their prior
+rows described the proposed #579 claim; implementation #580 merged as
+`52276f552496b160e064fd54ed7471bc84d3f559` and closeout #581 as `f92a99c0`.
+Historical claim and acceptance evidence remain in the owners and I279.
 
 This current matrix supersedes the 2026-08-30 open-Issue matrix for reconciliation only; that
 dated snapshot remains historical evidence and is not modified. Closed Issue #188 remains recorded
