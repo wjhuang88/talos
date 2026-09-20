@@ -73,3 +73,15 @@ enabled and no active composition, use three separate harmless permission reques
 approves once, 2 grants only the displayed reusable scope, 3 denies. On another prompt verify 0/4/9
 do not approve, then arrow/Enter and Esc. Confirm a queued second request is not approved by the
 first key's repeat. Record terminal/IME/build SHA and observations, including failures.
+
+### Automated Acceptance Follow-up — 2026-09-20
+
+Maintainer requested closure of #268. Added only a regression test against the existing production
+input entrypoint, without changing permission behavior: sequential 1/2/3 replies use their own
+response channels; 0/4/9, legacy letters and a Chinese character leave the request unanswered;
+Repeat/Release events cannot resolve the next prompt. TUI approval-focused suite passed 38 tests;
+CLI expired-request/rollover barrier suite passed both tests. Commands: `cargo test --locked -p
+talos-tui approval --lib` and `cargo test --locked -p talos-cli approval_queue_tests`.
+These close the previously missing invalid-digit/sequential-event evidence, but do not simulate
+an operating-system IME. Physical IME acceptance remains pending user confirmation; no Complete
+claim or Issue closure is justified until that final evidence is supplied.
