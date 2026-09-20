@@ -369,3 +369,13 @@ This iteration is Complete / Closed. The completion commit above predates this o
 closeout; this status/documentation change is not completion evidence. CAP-001 / #466 remains an
 open architecture Epic. CAP-001-B / #512 is the next dependency-ready child but has no active
 iteration, claim, or implementation authority.
+
+### 2026-09-19 R1 Source-Delivery Evidence Correction (I278)
+
+R1's historical `Satisfied` classification established governance intent, not a delivered root
+Plugin source tree. The corresponding layout contract was not explicit enough in the then-current
+ADR-072/architecture files, and real Rust/Python root sources were absent. CAP-001-D / I278 owns
+this recovered omission; its separate effective claim is #575 / `2d4e064f`. I278 now records
+independent Tree-sitter WASM sources, packaging and executable acceptance work. This appended
+correction preserves I253's published matrix/checkpoints and does not backdate implementation
+evidence or claim I278 complete. Current child state is authoritative in the I278/CAP-001-D owners.

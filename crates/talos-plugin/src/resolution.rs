@@ -163,13 +163,13 @@ mod tests {
 
     fn fixture(root: &Path) -> PathBuf {
         let source = root.join("source");
-        fs::create_dir_all(&source).unwrap();
-        fs::write(source.join("provider.wat"), "(module)").unwrap();
+        fs::create_dir_all(&source).expect("test fixture operation");
+        fs::write(source.join("provider.wat"), "(module)").expect("test fixture operation");
         fs::write(
             source.join("manifest.toml"),
             "schema_version=1\n[bundle]\nname=\"demo\"\nversion=\"1.0.0\"\ncarrier=\"wasm\"\nartifact=\"provider.wat\"\n[language_provider]\nlanguage=\"python\"\nartifact=\"provider.wat\"",
         )
-        .unwrap();
+        .expect("test fixture operation");
         source
     }
 
@@ -229,8 +229,8 @@ mod tests {
             std::env::temp_dir().join(format!("talos-resolution-cancel-{}", std::process::id()));
         let source = fixture(&root);
         let destination = root.join("installed");
-        fs::create_dir_all(&destination).unwrap();
-        fs::write(destination.join("sentinel"), "old").unwrap();
+        fs::create_dir_all(&destination).expect("test fixture operation");
+        fs::write(destination.join("sentinel"), "old").expect("test fixture operation");
         let request = ResolutionRequest {
             capability: "language.python".into(),
             bundle_name: "demo".into(),
@@ -248,7 +248,7 @@ mod tests {
             Err(ResolutionError::Cancelled)
         ));
         assert_eq!(
-            fs::read_to_string(destination.join("sentinel")).unwrap(),
+            fs::read_to_string(destination.join("sentinel")).expect("test fixture operation"),
             "old"
         );
         let _ = fs::remove_dir_all(root);

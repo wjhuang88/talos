@@ -34,3 +34,11 @@ tracing-subscriber = { version = "0.3", features = ["fmt"] }
 
 [lints]
 workspace = true
+
+[[example]]
+name = "verify_language_guests"
+required-features = ["wasm"]
+
+[[example]]
+name = "verify_installed_languages"
+required-features = ["wasm", "code-intelligence"]

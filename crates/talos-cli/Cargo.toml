@@ -12,6 +12,9 @@ rust-version.workspace = true
 name = "talos"
 path = "src/main.rs"
 
+[features]
+plugin-acceptance = []
+
 [dependencies]
 talos-core = { version = "0.9.2", path = "../talos-core" }
 talos-config = { version = "0.9.2", path = "../talos-config" }
