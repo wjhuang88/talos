@@ -63,6 +63,8 @@ impl HistoryScrollState {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct RenderedHistoryRow {
+    pub(crate) reasoning_header: bool,
+    pub(crate) synthetic_prefix: usize,
     pub(crate) start_anchor: LogicalContentAnchor,
     pub(crate) end_anchor: LogicalContentAnchor,
     pub(crate) is_last_row_of_logical_line: bool,
@@ -129,12 +131,26 @@ impl HistoryProjectionCache {
 }
 
 impl HistoryProjection {
+    pub(crate) fn reasoning_header_at(&self, row: usize) -> Option<TranscriptEntryId> {
+        self.all_rows
+            .get(row)
+            .filter(|row| row.reasoning_header)
+            .map(|row| row.start_anchor.entry_id)
+    }
     pub(crate) fn selection_point(
         &self,
         row_index: usize,
         column: u16,
     ) -> Option<HistorySelectionPoint> {
         let row = self.all_rows.get(row_index)?;
+        if usize::from(column) < row.synthetic_prefix {
+            // A padding hit is a logical boundary, not a terminal-only selection.
+            // Otherwise a drag starting here copies rendered wrap/padding bytes.
+            return Some(HistorySelectionPoint {
+                anchor: row.start_anchor,
+                scalar_end: row.start_anchor.scalar_offset,
+            });
+        }
         let rendered = row
             .line
             .segments
@@ -142,6 +158,8 @@ impl HistoryProjection {
             .map(|segment| segment.text.as_str())
             .collect::<String>();
         let (scalar_start, scalar_end) = scalar_span_at_display_cell(&rendered, column);
+        let scalar_start = scalar_start.saturating_sub(row.synthetic_prefix);
+        let scalar_end = scalar_end.saturating_sub(row.synthetic_prefix);
         let semantic_len = row
             .end_anchor
             .scalar_offset
@@ -250,13 +268,19 @@ impl HistoryProjection {
                 .map(|segment| segment.text.as_str())
                 .collect::<String>();
             let start_col = if key == start_key {
-                display_column_for_scalar(&rendered, selected_start.saturating_sub(row_start))
+                display_column_for_scalar(
+                    &rendered,
+                    selected_start.saturating_sub(row_start) + row.synthetic_prefix,
+                )
             } else {
                 0
             };
             let end_col = if key == end_key {
-                display_column_for_scalar(&rendered, selected_end.saturating_sub(row_start))
-                    .saturating_sub(1)
+                display_column_for_scalar(
+                    &rendered,
+                    selected_end.saturating_sub(row_start) + row.synthetic_prefix,
+                )
+                .saturating_sub(1)
             } else {
                 usize::from(area.width.saturating_sub(1))
             };
@@ -391,13 +415,22 @@ fn project_all_history(
                     .map(|segment| segment.text.as_str())
                     .collect(),
             ));
-            let chunks = project_line_chunks(&line, width);
+            let reasoning_header =
+                matches!(entry.block, TranscriptBlock::Reasoning { .. }) && logical_line == 0;
+            let mut chunks = project_line_chunks(&line, width);
+            // A collapsed entry remains one hit target even in a narrow viewport.
+            // Keep the full semantic title above so resizing can restore it.
+            if reasoning_header {
+                chunks.truncate(1);
+            }
             let last = chunks.len().saturating_sub(1);
             all.extend(
                 chunks
                     .into_iter()
                     .enumerate()
                     .map(|(index, chunk)| RenderedHistoryRow {
+                        reasoning_header,
+                        synthetic_prefix: chunk.synthetic_prefix,
                         start_anchor: LogicalContentAnchor {
                             entry_id: entry.id,
                             logical_line,
@@ -471,6 +504,52 @@ fn row_contains_anchor(row: &RenderedHistoryRow, anchor: LogicalContentAnchor) -
 /// unbounded width; only `project_line` performs current-viewport wrapping.
 fn logical_lines(block: &TranscriptBlock) -> Vec<ScrollbackLine> {
     match block {
+        TranscriptBlock::Reasoning { text, expanded } => {
+            let color = crate::tool_display::secondary_result_color();
+            let mut lines = vec![ScrollbackLine::styled(
+                vec![
+                    HistorySegment::styled(
+                        crate::scrollback::stream_padding_for(
+                            Some(&talos_conversation::MessageSource::Reasoning),
+                            0,
+                        ),
+                        crate::scrollback::prefix_color_for(
+                            Some(&talos_conversation::MessageSource::Reasoning),
+                            0,
+                        ),
+                        crate::inline_terminal::HistoryAttrs {
+                            bold: true,
+                            ..Default::default()
+                        },
+                    ),
+                    HistorySegment::styled(
+                        if *expanded {
+                            "Thinking ▾"
+                        } else {
+                            "Thinking ▸"
+                        },
+                        color,
+                        Default::default(),
+                    ),
+                ],
+                None,
+            )];
+            if *expanded {
+                lines.extend(text.lines().map(|text| {
+                    let mut line = ScrollbackLine::styled(
+                        vec![HistorySegment::styled(
+                            format!("   {text}"),
+                            color,
+                            Default::default(),
+                        )],
+                        None,
+                    );
+                    line.continuation_indent = 3;
+                    line
+                }));
+            }
+            lines
+        }
         TranscriptBlock::StyledLine(line) => vec![line.clone()],
         TranscriptBlock::ToolCall(display) => {
             crate::tool_display::build_tool_call_scrollback_lines(display, u16::MAX)
@@ -488,6 +567,7 @@ fn logical_lines(block: &TranscriptBlock) -> Vec<ScrollbackLine> {
 }
 
 struct ProjectedLineChunk {
+    synthetic_prefix: usize,
     line: ScrollbackLine,
     logical_start: usize,
     logical_end: usize,
@@ -500,6 +580,7 @@ fn project_line_chunks(line: &ScrollbackLine, width: u16) -> Vec<ProjectedLineCh
     let mut used = 0usize;
     let mut logical_offset = 0usize;
     let mut row_start = 0usize;
+    let mut synthetic_prefix = 0usize;
 
     for segment in &line.segments {
         for ch in segment.text.chars() {
@@ -509,13 +590,16 @@ fn project_line_chunks(line: &ScrollbackLine, width: u16) -> Vec<ProjectedLineCh
             if char_width > capacity {
                 if !current.is_empty() {
                     rows.push(ProjectedLineChunk {
+                        synthetic_prefix,
                         line: ScrollbackLine::styled(std::mem::take(&mut current), line.bg),
                         logical_start: row_start,
                         logical_end: logical_offset,
                     });
                     used = 0;
+                    synthetic_prefix = 0;
                 }
                 rows.push(ProjectedLineChunk {
+                    synthetic_prefix: 0,
                     line: ScrollbackLine::plain("…", line.bg),
                     logical_start: logical_offset,
                     logical_end: logical_offset + 1,
@@ -526,11 +610,19 @@ fn project_line_chunks(line: &ScrollbackLine, width: u16) -> Vec<ProjectedLineCh
             }
             if used > 0 && used.saturating_add(char_width) > capacity {
                 rows.push(ProjectedLineChunk {
+                    synthetic_prefix,
                     line: ScrollbackLine::styled(std::mem::take(&mut current), line.bg),
                     logical_start: row_start,
                     logical_end: logical_offset,
                 });
-                used = 0;
+                // Leave enough room for the next scalar even in a tiny viewport.
+                synthetic_prefix = line
+                    .continuation_indent
+                    .min(capacity.saturating_sub(char_width.max(1)));
+                used = synthetic_prefix;
+                if synthetic_prefix > 0 {
+                    current.push(HistorySegment::raw(" ".repeat(synthetic_prefix)));
+                }
                 row_start = logical_offset;
             }
             if let Some(last) = current.last_mut()
@@ -551,6 +643,7 @@ fn project_line_chunks(line: &ScrollbackLine, width: u16) -> Vec<ProjectedLineCh
     }
     if !current.is_empty() {
         rows.push(ProjectedLineChunk {
+            synthetic_prefix,
             line: ScrollbackLine::styled(current, line.bg),
             logical_start: row_start,
             logical_end: logical_offset,
@@ -558,6 +651,7 @@ fn project_line_chunks(line: &ScrollbackLine, width: u16) -> Vec<ProjectedLineCh
     }
     if rows.is_empty() && line.fill.is_none() {
         return vec![ProjectedLineChunk {
+            synthetic_prefix: 0,
             line: line.clone(),
             logical_start: 0,
             logical_end: logical_offset,
@@ -565,6 +659,7 @@ fn project_line_chunks(line: &ScrollbackLine, width: u16) -> Vec<ProjectedLineCh
     }
     if rows.is_empty() {
         rows.push(ProjectedLineChunk {
+            synthetic_prefix: 0,
             line: ScrollbackLine::styled(Vec::new(), line.bg),
             logical_start: 0,
             logical_end: 0,
@@ -849,6 +944,162 @@ mod tests {
     }
 
     #[test]
+    fn reasoning_header_stays_one_row_across_narrow_resize() {
+        let mut transcript = TranscriptStore::default();
+        let id = transcript.append(TranscriptBlock::Reasoning {
+            text: "中文思考内容".into(),
+            expanded: false,
+        });
+        let scroll = HistoryScrollState::follow_tail();
+        for width in [40, 8, 3, 1, 8, 40] {
+            let projection = project_history(&transcript, width, 20, &scroll);
+            assert_eq!(projection.total_rows, 1, "width={width}");
+            assert_eq!(projection.reasoning_header_at(0), Some(id));
+            assert!(projection.rows[0].line.text.width() <= usize::from(width));
+            if width == 40 {
+                assert_eq!(projection.rows[0].line.text, " ◇ Thinking ▸");
+                let segments = &projection.rows[0].line.segments;
+                assert_eq!(segments[0].text, " ◇ ");
+                assert_eq!(
+                    segments[0].fg,
+                    crate::scrollback::prefix_color_for(
+                        Some(&talos_conversation::MessageSource::Reasoning),
+                        0,
+                    )
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn folding_reasoning_preserves_an_anchor_in_a_later_entry() {
+        let mut transcript = TranscriptStore::default();
+        let reasoning = transcript.append(TranscriptBlock::Reasoning {
+            text: "long reasoning text with 中文 and multiple wrapped rows".into(),
+            expanded: true,
+        });
+        let answer = transcript.append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
+            "answer anchor",
+            None,
+        )));
+        for _ in 0..12 {
+            transcript.append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
+                "later", None,
+            )));
+        }
+        let anchor = LogicalContentAnchor {
+            entry_id: answer,
+            logical_line: 0,
+            scalar_offset: 0,
+        };
+        let mut scroll = HistoryScrollState::follow_tail();
+        scroll.anchor(anchor, 0);
+        let mut cache = HistoryProjectionCache::default();
+        for width in [12, 30, 8, 30] {
+            for _ in 0..2 {
+                let projection = cache.project(&transcript, width, 4, &scroll);
+                assert_eq!(projection.rows[0].start_anchor, anchor);
+                assert!(transcript.toggle_reasoning(reasoning));
+            }
+        }
+        let tail = cache.project(&transcript, 30, 4, &HistoryScrollState::follow_tail());
+        assert_eq!(tail.visible_start + tail.rows.len(), tail.total_rows);
+        assert!(transcript.toggle_reasoning(reasoning));
+        let tail = cache.project(&transcript, 30, 4, &HistoryScrollState::follow_tail());
+        assert_eq!(tail.visible_start + tail.rows.len(), tail.total_rows);
+    }
+
+    #[test]
+    fn reasoning_entries_default_collapsed_and_toggle_independently() {
+        let mut transcript = TranscriptStore::default();
+        let first = transcript.append(TranscriptBlock::Reasoning {
+            text: "first reasoning body".into(),
+            expanded: false,
+        });
+        let second = transcript.append(TranscriptBlock::Reasoning {
+            text: "second reasoning body".into(),
+            expanded: false,
+        });
+        let scroll = HistoryScrollState::follow_tail();
+        let collapsed = project_history(&transcript, 40, 20, &scroll);
+        assert_eq!(collapsed.total_rows, 2);
+        assert_eq!(collapsed.reasoning_header_at(0), Some(first));
+        assert_eq!(collapsed.reasoning_header_at(1), Some(second));
+        let revision = transcript.revision();
+        assert!(transcript.toggle_reasoning(first));
+        assert!(transcript.revision() > revision);
+        let expanded = project_history(&transcript, 40, 20, &scroll);
+        assert_eq!(expanded.total_rows, 3);
+        assert_eq!(expanded.rows[1].line.text, "   first reasoning body");
+        assert_eq!(expanded.reasoning_header_at(1), None);
+        assert!(
+            !expanded
+                .rows
+                .iter()
+                .any(|row| row.line.text.contains("second reasoning body"))
+        );
+        assert!(transcript.toggle_reasoning(first));
+        assert_eq!(project_history(&transcript, 40, 20, &scroll).total_rows, 2);
+    }
+
+    #[test]
+    fn ordinary_history_continuations_keep_prefix_without_copying_synthetic_spaces() {
+        for source in [
+            talos_conversation::MessageSource::User,
+            talos_conversation::MessageSource::Assistant,
+            talos_conversation::MessageSource::Reasoning,
+        ] {
+            for text in [
+                "abcdefghijklmnopqrstuv",
+                "中文历史续行需要保留空白前缀并正确复制",
+            ] {
+                let mut transcript = TranscriptStore::default();
+                let mut stream_count = 0;
+                for line in crate::scrollback::render_history_message(
+                    &mut stream_count,
+                    source.clone(),
+                    text,
+                ) {
+                    transcript.append(TranscriptBlock::StyledLine(line));
+                }
+                for width in [12, 8, 20, 8] {
+                    let projection = project_history(
+                        &transcript,
+                        width,
+                        100,
+                        &HistoryScrollState::follow_tail(),
+                    );
+                    let continuation = projection
+                        .all_rows
+                        .iter()
+                        .enumerate()
+                        .find(|(_, row)| row.start_anchor.scalar_offset > 0)
+                        .expect("wrapped row");
+                    assert!(
+                        continuation.1.line.text.starts_with("   "),
+                        "{source:?} width {width}: {:?}",
+                        continuation.1.line.text
+                    );
+                    let padding = projection
+                        .selection_point(continuation.0, 0)
+                        .expect("synthetic prefix maps to a logical boundary");
+                    assert_eq!(padding.anchor, continuation.1.start_anchor);
+                    assert_eq!(projection.selected_text(padding, padding), "");
+                    let point = projection
+                        .selection_point(continuation.0, 3)
+                        .expect("first content cell");
+                    assert_eq!(point.anchor, continuation.1.start_anchor);
+                    assert!(!projection.selected_text(point, point).starts_with(' '));
+                    assert_eq!(
+                        projection.selected_text(padding, point),
+                        projection.selected_text(point, point)
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
     fn empty_line_anchor_resolves_deterministically() {
         let mut transcript = TranscriptStore::default();
         let first = transcript.append(TranscriptBlock::StyledLine(ScrollbackLine::plain("", None)));
@@ -862,6 +1113,61 @@ mod tests {
         scroll.anchor(anchor, 0);
         let projection = project_history(&transcript, 10, 2, &scroll);
         assert_eq!(projection.rows[0].start_anchor, anchor);
+    }
+
+    #[test]
+    fn tiny_padded_history_preserves_unicode_payload_and_width_bound() {
+        for text in ["abcdef", "中文🙂a中文", "e\u{301}中a"] {
+            let mut transcript = TranscriptStore::default();
+            let mut line = ScrollbackLine::plain(text, None);
+            line.continuation_indent = 3;
+            transcript.append(TranscriptBlock::StyledLine(line));
+            for width in 1..=7 {
+                let projection =
+                    project_history(&transcript, width, 100, &HistoryScrollState::follow_tail());
+                for row in &projection.rows {
+                    assert!(
+                        row.line.text.width() <= usize::from(width),
+                        "width={width}: {:?}",
+                        row.line.text
+                    );
+                }
+                let first = projection.selection_point(0, 0).expect("first cell");
+                let last_index = projection.total_rows - 1;
+                let last = &projection.rows[last_index];
+                let last_column = last.line.text.width().saturating_sub(1) as u16;
+                let end = projection
+                    .selection_point(last_index, last_column)
+                    .expect("last cell");
+                assert_eq!(projection.selected_text(first, end), text, "width={width}");
+            }
+        }
+    }
+
+    #[test]
+    fn wrapped_markdown_preserves_styles_and_synthetic_padding() {
+        let mut stream_count = 0;
+        let lines = crate::scrollback::render_history_message(
+            &mut stream_count,
+            talos_conversation::MessageSource::Assistant,
+            "**abcdefghijklmnopqrstuv**\n",
+        );
+        let mut transcript = TranscriptStore::default();
+        for line in lines {
+            transcript.append(TranscriptBlock::StyledLine(line));
+        }
+        let projection = project_history(&transcript, 10, 100, &HistoryScrollState::follow_tail());
+        assert!(projection.rows.len() > 1);
+        for row in &projection.rows {
+            if row.synthetic_prefix > 0 {
+                assert!(row.line.text.starts_with("   "));
+            }
+            for segment in &row.line.segments {
+                if segment.text.chars().any(|ch| ch.is_ascii_alphabetic()) {
+                    assert!(segment.attrs.bold, "Markdown emphasis lost across wrap");
+                }
+            }
+        }
     }
 
     #[test]

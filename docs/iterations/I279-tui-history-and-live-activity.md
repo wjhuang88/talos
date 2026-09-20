@@ -1,6 +1,6 @@
 # Iteration I279: History Reasoning And Live Activity Presentation
 
-> Document status: Active — proposed by #579; ineffective until merge
+> Document status: Review — claim effective through #579 merge 9fa4ae52
 > Published plan date: 2026-09-20
 > Planned objective: Deliver #334 history continuation padding, #298 collapsible reasoning history, and #310 live activity status/count headers as one locally converged TUI stage.
 > MVP deliverable: Runnable TUI with stable padded history, independently collapsible thinking entries, and truthful live thinking/tool titles and display-row counts.
@@ -12,7 +12,7 @@
 | Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
-| Work Slice | Proposed TUI-061 / TUI-056 / TUI-057 presentation, projection, interaction, tests and documentation only. Excludes Auto permission/provider fixes, Desktop, release, dependencies and session schema. |
+| Work Slice | TUI-061 / TUI-056 / TUI-057 presentation, projection, interaction, tests and documentation; maintainer accepted correlated UI events and migration in ADR-080. Excludes Auto permission/provider fixes, Desktop, release, dependencies and session schema. |
 | Claimed At | 2026-09-20 |
 | Source Issue | #298 / #310 / #334 |
 | Governance Claim PR | #579 |
@@ -20,7 +20,7 @@
 | Authorization Evidence | Maintainer requested all three Issues on 2026-09-20 under standing single-maintainer mode; independent Agent review and exact-head checks required before merge. |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-20 |
-| Handoff / Release Condition | Claim and activation are ineffective until #579 merges. I279 owns shared refinement/acceptance decisions; implement only after effective target-branch claim. |
+| Handoff / Release Condition | Claim effective through #579 merge 9fa4ae52. Converge locally, obtain exact-head CI and independent Agent review, and complete native-terminal acceptance before closure. |
 
 ## Published Baseline
 
@@ -93,6 +93,180 @@ Update README TUI guidance, the three Story owners, iteration index and Board af
 Rollback removes presentation changes without migrating or altering persisted conversations.
 
 ## Execution Evidence
+
+### 2026-09-20 Activation And Local Implementation Checkpoint
+
+- Claim PR #579 merged as `9fa4ae527f50930f4dcd3645d016c395ed7b8461`;
+  reviewed head `66a7d51d013f33c6a9037659897fd1ec0e3d64f9`, base
+  `62976ed5ccafe5f007728479255908f5284d065f`, CI `35494347309`, independent
+  Agent review `5748142859`, merge-time CAS record `5748147897`.
+- Implementation worktree `/private/tmp/talos-i279` starts from this effective merge.
+  Main-workspace Auto and animation changes remain separate and preserved.
+- Local reasoning folding, history continuation prefixes, logical selection and thinking
+  counts implemented; correlated tool activity layout remains in progress. No implementation
+  PR or completion evidence exists yet; native-terminal acceptance remains pending.
+- Locked TUI library tests: 584 passed. Conversation library tests: 176 passed.
+  CLI locked check and TUI/conversation Clippy with `-D warnings` passed on the local
+  pre-tool-layout candidate. These are not final-candidate or manual acceptance evidence.
+- Maintainer accepted the public event addition and migration plan recorded in
+  [ADR-080](../decisions/080-correlated-tool-activity-presentation.md). Existing display
+  events remain; no runtime execution, permission or persistence changes are authorized.
+
+### Local Candidate Inventory And Verification (2026-09-20)
+
+- `talos-conversation` types/lib/engine/tests: correlated display-only activity events,
+  response-scoped IDs, preserved legacy output and migration coverage.
+- `talos-tui` transcript/history_projection/app_stream: collapsed reasoning, padded
+  Unicode reflow and logical copy/anchor mapping. Existing Markdown styling preserved.
+- `talos-tui` app/input/output/frame/state tests and tool_activity module: click/drag,
+  resume filtering, live title/count/body presentation, FIFO lifecycle cleanup and
+  cached tool layout. No tool execution or permission decisions are introduced.
+- README, ADR-080/index, I279/three Story owners and derived Board/Backlog/iteration
+  index/manifest: usage, accepted API migration, activation facts and pending acceptance.
+- No Dashboard, provider, Auto, session schema, dependencies, release or version changes.
+  Main-workspace animation remains deliberately separate, not silently integrated.
+- Independent Agent-role snapshot review found continuation-padding selection and
+  response-ID reuse defects; both were corrected with regression tests. The final
+  snapshot re-review found no blocking defect. This is not exact-head merge approval.
+- Locked focused tests passed: TUI 591 and conversation 176. Workspace check and
+  strict workspace Clippy passed. First workspace test compilation exhausted disk;
+  preflight is being rerun using the shared target, no incremental cache and two jobs.
+  Workspace tests, final candidate review/CI and native acceptance are still pending.
+
+### Validation Follow-up (2026-09-20)
+
+- Full `release_preflight.sh` passed outside the execution sandbox with shared target,
+  `CARGO_INCREMENTAL=0` and `CARGO_BUILD_JOBS=2`: governance, formatting, workspace
+  check, strict Clippy, workspace tests and doctests all exited successfully.
+  The earlier targeted-interrupt SQLite disk-I/O failure did not recur in this run;
+  its precise environmental cause remains unproven.
+- A subsequently added copy/export sentinel test found a pre-existing omission:
+  both plain and Markdown default projections emitted Reasoning. Both now filter it;
+  explicit include-thinking remains available. The targeted regression passed and
+  independent Agent-role incremental review approved this correction. This production
+  correction postdates the full preflight and requires final-candidate validation.
+- This expands the changed-file inventory by conversation `engine/projection.rs`
+  (the selected #298 default export safety acceptance) and the offline TUI acceptance
+  example (reproducible presentation checks, no execution or permission claims).
+- Human observations, stable-candidate commit/CI, exact-head review, merge and Issue
+  closure remain pending. No Complete claim is made.
+
+### Final Local Preflight And Incident Interruption (2026-09-20)
+
+- Final `release_preflight.sh` execution (local process handle `4589`) exited 0
+  after the plain/Markdown export correction: `release preflight: passed`.
+  The run used the shared target, `CARGO_INCREMENTAL=0`, `CARGO_BUILD_JOBS=2`
+  and the pinned toolchain outside the execution sandbox. Workspace checks,
+  strict Clippy, tests and doctests passed; both governance validators reported
+  zero warnings. No production edits followed this run before this checkpoint.
+- Native presentation acceptance remains pending; no user observation has been
+  received for the offline fixture. Automated checks do not substitute for it.
+- The maintainer reported an urgent, separate submission durability incident in
+  session `9b395880-3051-41f1-94fb-9d641721d284`. Read-only inspection found the
+  transcript and journal present, SQLite quick-check `ok`, nine committed records
+  and no pending record. The failed process was no longer available for inspection.
+  The root cause and recovery of the two displayed unpersisted inputs remain
+  unproven. Do not treat this incident as fixed or expand I279's presentation-only
+  authority into storage changes. Follow-up needs the launch/reproduction details.
+- Maintainer subsequently confirmed normal `cargo run --bin talos` startup and
+  process exit. Independent Agent-role inspection found RAII journal connections,
+  not proven connection accumulation. A disposable Python/system-SQLite process
+  with exhausted file descriptors reproduced CANTOPEN (14), recovering after
+  descriptor release; this is a possible mechanism, not a proven incident cause.
+  Resume observation is pending. During diagnosis free disk fell to 116 MiB and
+  an owner-note write failed; unused built example executables were removed,
+  preserving the current acceptance binary and sources. Free space then measured
+  3.4 GiB. This later pressure does not prove the original incident's cause.
+- Resume I279 at native acceptance and stable-candidate review, preserving the
+  main workspace's unrelated Auto/animation changes. No implementation PR,
+  exact-head approval, merge or Issue closure is claimed by this checkpoint.
+- Final fixture rebuild completed successfully from the corrected source
+  (`cargo build --locked -p talos-tui --example i279_activity_acceptance`, shared
+  target, incremental disabled, two jobs). A subsequent independent Agent-role
+  read-only review approved the complete working snapshot, including the new
+  activity module and fixture: no remaining blocker was reported. The reviewer
+  relied on the recorded build/preflight results and did not rerun builds. This
+  remains snapshot review, not exact committed-head approval or human acceptance.
+- Both repository governance validators subsequently passed with zero warnings;
+  `git diff --check` passed. The remaining changes after preflight are evidence
+  notes only and do not require repeating Rust compilation.
+- Incident recovery observation: the maintainer resumed the same session using
+  `cargo run --bin talos -- --session 9b395880-3051-41f1-94fb-9d641721d284`
+  and reported a successful no-tool request without error. Live PID `91256` had
+  21 numbered descriptors (0 through 20) when inspected; the journal now contained
+  ten committed records, up from nine. This verifies that the recovery submission
+  persisted, not the original two rejected inputs. No source fix or proven cause
+  is claimed. Available disk was 1.9 GiB at that observation.
+
+### Native Acceptance Checklist (Passed)
+
+Final corrective acceptance: screenshot `ScreenShot_2026-09-20_172244_250@2x.png`
+shows completed #1 succeeded and #2 failed titles with 18-line counts, without
+duplicate preview bodies and without input overlap. The maintainer confirmed
+exit afterward. Together with the observations below, native presentation
+acceptance is passed. TUI library tests passed (591); independent Agent-role
+snapshot review approved the visual and duplicate-preview corrections. Final
+candidate CI, exact-head review and merge remain pending; not Complete.
+
+2026-09-20 native acceptance results (maintainer observations and screenshots):
+restored colors/prefix, independent fold/unfold, drag without toggling, CJK
+wide/narrow continuation padding, anchored scrolling, live title/count/ten-body
+rows, same-name requested calls, reverse succeeded/failed identity, next-response
+ID reuse, completion cleanup and Esc followed by successful quit all passed.
+Screenshots at 17:05:19, 17:07:13, 17:08:13 and 17:09:02 support the activity
+and lifecycle observations. These are offline presentation results, not permission
+or real-provider execution evidence. Result-body duplication between history and
+preview was found; local correction retains completed status/count titles only.
+That correction still requires focused validation and independent review before
+delivery. Earlier accepted interaction cases need not be repeated.
+
+2026-09-20 partial acceptance: maintainer confirmed expansion, collapse and
+independent entries. Visual acceptance was rejected: preserve the existing
+theme and prefix. Restore the themed diamond prefix and muted reasoning body;
+place disclosure metadata after the title, not instead of the existing prefix.
+Maintainer explicitly requested preserving the main-workspace outward-only
+gray/accent animation, so its scrollback function, theme token and regression
+test are now integrated into I279. Main-workspace originals remain untouched;
+Auto changes remain excluded. This supersedes the earlier animation-separation
+disposition for these three TUI files only. Add `theme.rs` to changed-file inventory.
+Previous exact-head approval does not cover this correction; re-review and
+updated visual acceptance remain required. No remote candidate was pushed.
+
+The offline presentation example was built successfully with:
+
+```bash
+CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=2 cargo build --locked -p talos-tui --example i279_activity_acceptance --target-dir /Users/GHuang/WorkSpace/RustProjects/talos/target
+```
+
+Run `target/debug/examples/i279_activity_acceptance` from the main workspace.
+It drives the actual TUI and conversation projection with fixed display-only events;
+it performs no tool execution or model request. Enter `next` for stable inspection
+stages, `quit` to exit. This fixture supports reproducible layout checks, not proof
+of permissions or live provider behavior. Human observations remain pending.
+
+Use a binary built from this worktree's final local candidate, not an existing main
+binary. Do not record any row as passed from unit tests alone.
+
+1. Generate displayable thinking, wait for the answer: only an independent Thinking
+   title remains in history. Click to expand, click again to collapse; two entries
+   toggle independently. No same-line Thinking/body label appears.
+2. Drag across the title/body, including dragging away and back before releasing:
+   selection must not toggle. Copy a wrapped ASCII/CJK line starting inside its
+   continuation padding: no synthetic spaces or visual-wrap newlines are copied.
+3. Resize wide/narrow with long user, assistant and expanded thinking text: wrapped
+   rows retain three blank columns where space permits; Markdown styles remain.
+4. Scroll away from the tail and toggle an earlier visible thinking entry: keep the
+   anchored content stable. At the tail, new content and toggles remain at the tail.
+5. Observe live thinking: independent title, total display-row count changes with
+   wrapping, at most ten body rows scroll below it. Resize does not overlap input.
+6. Observe sequential and same-name tool calls: separate titles, complete arguments
+   then returned-result bodies; truthful requested/succeeded/failed states and counts.
+   No fake running/timeout state, no duplicate finalized tool history.
+7. End/cancel a turn and start another, then resume the session: no stale live tool
+   activity; resumed reasoning defaults collapsed. Ordinary copy/export remains
+   reasoning-free; explicit include-thinking export remains unchanged.
+
+### Original Planning Evidence
 
 - 2026-09-20: read all three remote Issue bodies/comments and local owners. Confirmed existing
   history projection wraps at column zero and transcript lacks a typed reasoning block.

@@ -37,6 +37,28 @@ dashboard, broader dotagents compatibility, plugin carriers, and advanced docume
 - **Progressive context**: runtime Skill discovery plus explicit Skill body/reference activation without dumping hidden content into visible history.
 - **Extensible surface**: MCP tools, hooks, JSON-RPC, governance-aware project status, and explicit local read-only WASM packages are implemented; remote plugin distribution and browser control remain bounded separately.
 
+### TUI thinking and activity (source development)
+
+Completed displayable thinking appears as a collapsed `Thinking` title in history.
+Click the title to expand or collapse that entry; dragging selects text without
+toggling it. Restored sessions start collapsed, and expansion does not change
+stored messages or add reasoning to ordinary copy/export commands.
+
+Live thinking shows a separate title and the total number of body display rows at
+the current terminal width, with up to ten newest body rows below it. Resizing can
+change the count without new model output. Wrapped ordinary and thinking history
+retain the shared three-column continuation padding whenever width permits.
+
+Tool activity is correlated by invocation ID, including concurrent same-name calls.
+`requested` means complete arguments arrived, not that permission was granted or
+execution began. `succeeded` and `failed` reflect structured results, not parsed
+output text. Activity counts describe available arguments/results, not a process
+output stream. Tool history remains separate from these transient status rows.
+After a result enters history, its transient activity keeps only the status/count
+title; the completed result body is not repeated below it.
+
+These I279 source changes passed native-terminal acceptance; release remains separate.
+
 ### Shared text semantics (source development)
 
 `talos-text` exposes renderer-independent language IDs, highlight spans and streaming Markdown

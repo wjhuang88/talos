@@ -15,11 +15,15 @@ pub(crate) struct ScrollbackLine {
     pub(crate) segments: Vec<HistorySegment>,
     pub(crate) bg: Option<CColor>,
     pub(crate) fill: Option<HistorySegment>,
+    pub(crate) continuation_indent: usize,
 }
 
 impl PartialEq for ScrollbackLine {
     fn eq(&self, other: &Self) -> bool {
-        self.text == other.text && self.bg == other.bg && self.fill == other.fill
+        self.text == other.text
+            && self.bg == other.bg
+            && self.fill == other.fill
+            && self.continuation_indent == other.continuation_indent
     }
 }
 
@@ -31,6 +35,7 @@ impl ScrollbackLine {
             text,
             bg,
             fill: None,
+            continuation_indent: 0,
         }
     }
 
@@ -52,6 +57,7 @@ impl ScrollbackLine {
             segments,
             bg,
             fill,
+            continuation_indent: 0,
         }
     }
 }
@@ -258,24 +264,21 @@ impl StreamRenderState {
 
     fn render_reasoning_line(&self, line_index: usize, line: &str) -> ScrollbackLine {
         let padding = crate::scrollback::stream_padding_for(self.source(), line_index);
-        ScrollbackLine::styled(
-            vec![
-                HistorySegment::styled(
-                    padding,
-                    crate::scrollback::prefix_color_for(self.source(), line_index),
-                    HistoryAttrs {
-                        bold: line_index == 0,
-                        ..HistoryAttrs::default()
-                    },
-                ),
-                HistorySegment::styled(
-                    line,
-                    crate::tool_display::secondary_result_color(),
-                    HistoryAttrs::default(),
-                ),
-            ],
-            self.bg(),
-        )
+        self.styled_line(vec![
+            HistorySegment::styled(
+                padding,
+                crate::scrollback::prefix_color_for(self.source(), line_index),
+                HistoryAttrs {
+                    bold: line_index == 0,
+                    ..HistoryAttrs::default()
+                },
+            ),
+            HistorySegment::styled(
+                line,
+                crate::tool_display::secondary_result_color(),
+                HistoryAttrs::default(),
+            ),
+        ])
     }
 
     fn render_block_lines(
@@ -450,7 +453,9 @@ impl StreamRenderState {
     fn styled_line(&self, segments: Vec<HistorySegment>) -> ScrollbackLine {
         let bg = self.bg();
         let fill = bg.map(|_| HistorySegment::raw(" "));
-        ScrollbackLine::styled_with_fill(segments, bg, fill)
+        let mut line = ScrollbackLine::styled_with_fill(segments, bg, fill);
+        line.continuation_indent = 3;
+        line
     }
 
     fn should_skip_leading_empty_line(&self, line: &str) -> bool {

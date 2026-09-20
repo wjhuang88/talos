@@ -50,7 +50,7 @@ pub use types::{
     SessionDeleteRequest, SessionForkRequest, SessionNewRequest, SessionPickerItem,
     SessionResumeRequest, SkillCommandRequest, SkillDiagnostic, StatusSnapshot, SteeringQueueEntry,
     SteeringQueueSnapshot, StreamMessage, TipKind, TodoCommandAction, TodoCommandRequest,
-    TodoExportFormat, TodoPanelData, TodoPanelRow, ToolCallDisplay, ToolCallInfo,
+    TodoExportFormat, TodoPanelData, TodoPanelRow, ToolActivity, ToolCallDisplay, ToolCallInfo,
     ToolResultDisplay, TurnPhase, UiOutput, UserInput,
 };
 pub use validation::{

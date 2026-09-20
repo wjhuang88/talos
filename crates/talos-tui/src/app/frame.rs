@@ -63,6 +63,12 @@ impl Tui {
             self.stream_render.preview(),
             self.processing_frame,
         );
+        let tool_preview_active = status.is_processing
+            && hold_status.is_none()
+            && self.state.thinking_preview.is_none()
+            && self.stream_render.preview().is_empty()
+            && self.tool_activities.has_activity();
+        let mut tool_preview = self.tool_activities.component();
         let preview_text_color = hold_status
             .as_ref()
             .map(|_| crate::scrollback::hold_preview_color(self.processing_frame));
@@ -78,7 +84,7 @@ impl Tui {
             spinner_color,
             text_color: preview_text_color,
             thinking_label_frame,
-            max_height: crate::scrollback::MAX_PREVIEW_LINES,
+            max_height: crate::scrollback::MAX_ACTIVITY_HEIGHT,
         };
         let tips = crate::scrollback::TipsComponent {
             tip: state.tip.as_ref(),
@@ -149,6 +155,8 @@ impl Tui {
 
         let preview_natural = if is_startup {
             0
+        } else if tool_preview_active {
+            tool_preview.height_hint(width)
         } else {
             preview.height_hint(width)
         };
@@ -183,6 +191,7 @@ impl Tui {
         );
         bottom_panel.max_height = compressed.panel_max_height;
         preview.max_height = compressed.preview_max_height;
+        tool_preview.max_height = compressed.preview_max_height;
         self.approval_preview_fully_visible = match &state.slash_menu.kind {
             Some(crate::state::PanelKind::Approval { preview, .. }) => {
                 crate::scrollback::approval_preview_fully_visible(
@@ -205,7 +214,11 @@ impl Tui {
         };
 
         let actual_input_h = input.height_hint(width);
-        let preview_h = preview.height_hint(width);
+        let preview_h = if tool_preview_active {
+            tool_preview.height_hint(width)
+        } else {
+            preview.height_hint(width)
+        };
         // `bottom_panel_placement` adds its third argument itself, so this base
         // deliberately excludes the panel height. Preview is also excluded so
         // token-by-token growth cannot flip an open panel between placements.
@@ -323,7 +336,11 @@ impl Tui {
                 frame.render_widget(Paragraph::new(history_text), area);
             }
             if let Some(area) = app_layout.preview {
-                preview.render(frame, area);
+                if tool_preview_active {
+                    tool_preview.render(frame, area);
+                } else {
+                    preview.render(frame, area);
+                }
             }
             if let Some(area) = app_layout.queue {
                 queue.render(frame, area);

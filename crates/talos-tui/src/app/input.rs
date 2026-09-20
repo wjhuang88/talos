@@ -1,6 +1,28 @@
 use super::*;
 
 impl Tui {
+    fn toggle_reasoning_at_screen(&mut self, column: u16, row: u16) -> bool {
+        let Some(area) = self.last_history_area else {
+            return false;
+        };
+        if !area.contains(ratatui::layout::Position::new(column, row)) {
+            return false;
+        }
+        let frame_row = self
+            .last_frame_history_start
+            .saturating_add(usize::from(row.saturating_sub(area.y)));
+        let Some(history_row) = frame_row.checked_sub(self.last_history_prefix_row_count) else {
+            return false;
+        };
+        let Some(id) = self
+            .last_history_projection
+            .reasoning_header_at(history_row)
+        else {
+            return false;
+        };
+        self.transcript.toggle_reasoning(id)
+    }
+
     pub(super) fn history_selection_point_at_screen(
         &self,
         column: u16,
@@ -451,6 +473,7 @@ impl Tui {
                         anchor: (mouse.column, mouse.row),
                         focus: (mouse.column, mouse.row),
                         dragging: true,
+                        moved: false,
                         edge: 0,
                         history_anchor: history_point,
                         history_focus: history_point,
@@ -472,6 +495,7 @@ impl Tui {
                         area.contains(ratatui::layout::Position::new(mouse.column, mouse.row))
                     });
                     if let Some(selection) = self.selection.as_mut() {
+                        selection.moved = true;
                         selection.focus = (mouse.column, mouse.row);
                         selection.edge = edge;
                         selection.update_history_focus(history_focus, inside_history || edge != 0);
@@ -491,6 +515,9 @@ impl Tui {
                         );
                         if selection.anchor == selection.focus {
                             self.selection = None;
+                            if !selection.moved {
+                                self.toggle_reasoning_at_screen(mouse.column, mouse.row);
+                            }
                             return false;
                         }
                         selection.dragging = false;

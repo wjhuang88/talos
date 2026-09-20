@@ -123,6 +123,157 @@ pub(crate) struct PreviewComponent<'a> {
 }
 
 pub(crate) const MAX_PREVIEW_LINES: u16 = 10;
+pub(crate) const MAX_ACTIVITY_HEIGHT: u16 = MAX_PREVIEW_LINES + 1;
+
+#[derive(Default)]
+pub(crate) struct ToolActivityLayoutCache {
+    plan: std::cell::RefCell<Option<(u16, PreviewLayoutPlan)>>,
+    #[cfg(test)]
+    builds: std::cell::Cell<usize>,
+}
+
+impl ToolActivityLayoutCache {
+    #[cfg(test)]
+    pub(crate) fn builds(&self) -> usize {
+        self.builds.get()
+    }
+
+    fn plan(&self, width: u16, prefix: &str, title: &str, body: &str) -> PreviewLayoutPlan {
+        let mut cached = self.plan.borrow_mut();
+        if cached
+            .as_ref()
+            .is_none_or(|(cached_width, _)| *cached_width != width)
+        {
+            let plan = activity_preview_plan(
+                prefix,
+                prefix,
+                title,
+                body,
+                usize::from(width).saturating_sub(prefix.len()),
+                usize::from(MAX_ACTIVITY_HEIGHT),
+            );
+            *cached = Some((width, plan));
+            #[cfg(test)]
+            self.builds.set(self.builds.get() + 1);
+        }
+        cached
+            .as_ref()
+            .map(|(_, plan)| plan.clone())
+            .unwrap_or_default()
+    }
+}
+
+pub(crate) struct ToolActivityComponent<'a> {
+    pub(crate) entries: Vec<(String, &'a str, &'a ToolActivityLayoutCache, bool)>,
+    pub(crate) max_height: u16,
+}
+
+impl ToolActivityComponent<'_> {
+    pub(crate) fn plan(&self, width: u16) -> PreviewLayoutPlan {
+        // Titles are outside the shared ten-row body allowance. Terminal
+        // compression may reduce either, retaining the newest calls first.
+        let capacity = usize::from(self.max_height).min(
+            self.entries
+                .len()
+                .saturating_add(usize::from(MAX_PREVIEW_LINES)),
+        );
+        if width == 0 || capacity == 0 {
+            return PreviewLayoutPlan::default();
+        }
+        let prefix = " ".repeat(usize::from(width.min(3)));
+        let content_width = usize::from(width).saturating_sub(prefix.len());
+        let start = self.entries.len().saturating_sub(capacity);
+        let entries = &self.entries[start..];
+        let mut remaining_body = capacity.saturating_sub(entries.len());
+        let mut plans = Vec::new();
+        for (title, body, cache, finished) in entries.iter().rev() {
+            let plan = if content_width == 0 {
+                PreviewLayoutPlan {
+                    rows: vec![PreviewLayoutRow {
+                        prefix: prefix.clone(),
+                        content: String::new(),
+                        semantic_first: true,
+                        clipped_marker: false,
+                    }],
+                    natural_height: 1,
+                    clipped_before: !body.is_empty(),
+                }
+            } else {
+                let mut plan = cache.plan(width, &prefix, title, body);
+                // Finished results already have their canonical history body.
+                // Retain the correlated status/count, without repeating that body.
+                if *finished {
+                    plan.rows.truncate(1);
+                    plan.natural_height = 1;
+                    plan.clipped_before = false;
+                }
+                let body_rows = plan.rows.len().saturating_sub(1);
+                if body_rows > remaining_body {
+                    plan.rows.drain(1..1 + body_rows - remaining_body);
+                    plan.clipped_before = true;
+                    if let Some(row) = plan.rows.get_mut(1) {
+                        row.content = clipped_tail(&row.content, content_width);
+                        row.clipped_marker = true;
+                    }
+                }
+                plan
+            };
+            remaining_body = remaining_body.saturating_sub(plan.rows.len().saturating_sub(1));
+            plans.push(plan);
+        }
+        let mut combined = PreviewLayoutPlan {
+            clipped_before: start > 0,
+            ..Default::default()
+        };
+        for plan in plans.into_iter().rev() {
+            combined.natural_height = combined.natural_height.saturating_add(plan.natural_height);
+            combined.clipped_before |= plan.clipped_before;
+            combined.rows.extend(plan.rows);
+        }
+        combined
+    }
+}
+
+impl ViewportComponent for ToolActivityComponent<'_> {
+    fn height_hint(&self, width: u16) -> u16 {
+        self.plan(width).rows.len() as u16
+    }
+
+    fn render(&self, frame: &mut InlineFrame, area: Rect) {
+        let lines: Vec<_> = self
+            .plan(area.width)
+            .rows
+            .into_iter()
+            .map(|row| {
+                let style = Style::default().fg(semantic::PREVIEW_FG);
+                if row.clipped_marker {
+                    let mut spans = clipped_marker_prefix_spans(&row.prefix, semantic::PREVIEW_FG);
+                    spans.push(Span::styled(
+                        row.content
+                            .strip_prefix('…')
+                            .unwrap_or(&row.content)
+                            .to_owned(),
+                        style,
+                    ));
+                    Line::from(spans)
+                } else {
+                    Line::from(vec![
+                        Span::raw(row.prefix),
+                        Span::styled(
+                            row.content,
+                            if row.semantic_first {
+                                style.add_modifier(Modifier::BOLD)
+                            } else {
+                                style
+                            },
+                        ),
+                    ])
+                }
+            })
+            .collect();
+        frame.render_widget(Paragraph::new(lines), area);
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct PreviewLayoutRow {
@@ -143,7 +294,14 @@ impl PreviewComponent<'_> {
     pub(crate) fn plan(&self, width: u16) -> PreviewLayoutPlan {
         use unicode_width::UnicodeWidthStr;
 
-        let max_height = self.max_height.min(MAX_PREVIEW_LINES);
+        let thinking_content = self
+            .thinking_label_frame
+            .and_then(|_| self.text.strip_prefix("thinking: "));
+        let max_height = self.max_height.min(if thinking_content.is_some() {
+            MAX_ACTIVITY_HEIGHT
+        } else {
+            MAX_PREVIEW_LINES
+        });
         let active = !self.text.is_empty() || self.spinner_color.is_some();
         if !active || width == 0 || max_height == 0 {
             return PreviewLayoutPlan::default();
@@ -171,9 +329,6 @@ impl PreviewComponent<'_> {
             };
         }
 
-        let thinking_content = self
-            .thinking_label_frame
-            .and_then(|_| self.text.strip_prefix("thinking: "));
         if let Some(thinking_content) = thinking_content {
             return thinking_preview_plan(
                 &prefix,
@@ -219,12 +374,35 @@ fn thinking_preview_plan(
     content_width: usize,
     max_rows: usize,
 ) -> PreviewLayoutPlan {
+    activity_preview_plan(
+        prefix,
+        continuation_prefix,
+        "thinking",
+        content,
+        content_width,
+        max_rows,
+    )
+}
+
+/// Shared title/body layout; counts come from the exact body wrap used below.
+pub(crate) fn activity_preview_plan(
+    prefix: &str,
+    continuation_prefix: &str,
+    title: &str,
+    content: &str,
+    content_width: usize,
+    max_rows: usize,
+) -> PreviewLayoutPlan {
+    if content_width == 0 || max_rows == 0 {
+        return PreviewLayoutPlan::default();
+    }
     let content_rows = if content.is_empty() {
         Vec::new()
     } else {
         preview_visual_rows(content, content_width)
     };
-    let natural_rows = 1usize.saturating_add(content_rows.len());
+    let total_body_rows = content_rows.len();
+    let natural_rows = 1usize.saturating_add(total_body_rows);
     let visible_content_capacity = max_rows.saturating_sub(1);
     let clipped_before = content_rows.len() > visible_content_capacity;
     let visible_content = if clipped_before {
@@ -247,7 +425,7 @@ fn thinking_preview_plan(
     let mut rows = Vec::with_capacity(1 + visible_content.len());
     rows.push(PreviewLayoutRow {
         prefix: prefix.to_string(),
-        content: "thinking".to_string(),
+        content: take_display_prefix(&format!("{title} · {total_body_rows} lines"), content_width),
         semantic_first: true,
         clipped_marker: false,
     });
@@ -497,25 +675,42 @@ pub(crate) fn preview_spinner_padding(processing_frame: usize) -> (String, usize
     (format!(" {} ", SPINNER_FRAMES[frame_idx]), frame_idx)
 }
 
-fn thinking_ripple_spans(frame: usize) -> [Span<'static>; 3] {
+fn thinking_ripple_spans(frame: usize) -> Vec<Span<'static>> {
     const LABEL: &str = "thinking";
-    const ACTIVE_WIDTHS: [usize; 4] = [2, 4, 6, 4];
-
-    let active_width = ACTIVE_WIDTHS[frame % ACTIVE_WIDTHS.len()];
-    let left_width = (LABEL.len() - active_width) / 2;
-    let right_start = left_width + active_width;
-    let secondary = Style::default()
-        .fg(semantic::THINKING_RIPPLE_SECONDARY)
-        .add_modifier(Modifier::BOLD);
-    let primary = Style::default()
-        .fg(semantic::THINKING_RIPPLE_PRIMARY)
-        .add_modifier(Modifier::BOLD);
-
-    [
-        Span::styled(LABEL[..left_width].to_string(), secondary),
-        Span::styled(LABEL[left_width..right_start].to_string(), primary),
-        Span::styled(LABEL[right_start..].to_string(), secondary),
-    ]
+    // 24 processing ticks at 150 ms: a gentle 3.6-second wave. Modulo before
+    // conversion keeps the phase stable even in long-running sessions.
+    const PERIOD: usize = 24;
+    LABEL
+        .chars()
+        .enumerate()
+        .map(|(index, ch)| {
+            // Each symmetric pair pulses once, center first. All letters are
+            // back at the base color before the next outward wave starts.
+            let distance = index.abs_diff(LABEL.len() - 1 - index) / 2;
+            let local_tick = (frame % PERIOD) as f64 - distance as f64 * 4.0;
+            let blend = if (0.0..=10.0).contains(&local_tick) {
+                (1.0 - (local_tick / 10.0 * std::f64::consts::TAU).cos()) / 2.0
+            } else {
+                0.0
+            };
+            let color = match (
+                semantic::THINKING_RIPPLE_SECONDARY,
+                semantic::THINKING_RIPPLE_PRIMARY,
+            ) {
+                (Color::Rgb(r0, g0, b0), Color::Rgb(r1, g1, b1)) => {
+                    let mix = |a: u8, b: u8| {
+                        (f64::from(a) + (f64::from(b) - f64::from(a)) * blend).round() as u8
+                    };
+                    Color::Rgb(mix(r0, r1), mix(g0, g1), mix(b0, b1))
+                }
+                (secondary, _) => secondary,
+            };
+            Span::styled(
+                ch.to_string(),
+                Style::default().fg(color).add_modifier(Modifier::BOLD),
+            )
+        })
+        .collect()
 }
 
 pub(crate) struct QueuePreviewComponent<'a> {

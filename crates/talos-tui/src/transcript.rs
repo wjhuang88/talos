@@ -14,6 +14,7 @@ pub(crate) struct TranscriptEntryId(u64);
 /// current-frame history projection.
 #[derive(Clone, Debug)]
 pub(crate) enum TranscriptBlock {
+    Reasoning { text: String, expanded: bool },
     StyledLine(ScrollbackLine),
     ToolCall(ToolCallDisplay),
     ToolResult(ToolResultDisplay),
@@ -29,6 +30,7 @@ pub(crate) struct TranscriptEntry {
 pub(crate) struct TranscriptStore {
     entries: Vec<TranscriptEntry>,
     next_id: u64,
+    revision: u64,
 }
 
 impl TranscriptStore {
@@ -36,6 +38,7 @@ impl TranscriptStore {
         let id = TranscriptEntryId(self.next_id);
         self.next_id = self.next_id.saturating_add(1);
         self.entries.push(TranscriptEntry { id, block });
+        self.revision = self.revision.saturating_add(1);
         id
     }
 
@@ -44,7 +47,19 @@ impl TranscriptStore {
     }
 
     pub(crate) const fn revision(&self) -> u64 {
-        self.next_id
+        self.revision
+    }
+
+    pub(crate) fn toggle_reasoning(&mut self, id: TranscriptEntryId) -> bool {
+        let Some(entry) = self.entries.iter_mut().find(|entry| entry.id == id) else {
+            return false;
+        };
+        let TranscriptBlock::Reasoning { expanded, .. } = &mut entry.block else {
+            return false;
+        };
+        *expanded = !*expanded;
+        self.revision = self.revision.saturating_add(1);
+        true
     }
 }
 

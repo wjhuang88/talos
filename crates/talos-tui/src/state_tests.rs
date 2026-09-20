@@ -1238,7 +1238,16 @@ fn thinking_preview_keeps_title_fixed_and_rolls_content_below_it() {
     assert_eq!(
         content,
         [
-            "thinking", "…row2", "row3", "row4", "row5", "row6", "row7", "row8", "row9", "row10"
+            "thinking · 11 lin",
+            "…row2",
+            "row3",
+            "row4",
+            "row5",
+            "row6",
+            "row7",
+            "row8",
+            "row9",
+            "row10"
         ]
     );
     assert!(plan.clipped_before);
@@ -1284,7 +1293,7 @@ fn thinking_preview_compresses_to_title_before_hiding_it() {
 
     assert_eq!(plan.natural_height, 2);
     assert_eq!(plan.rows.len(), 1);
-    assert_eq!(plan.rows[0].content, "thinking");
+    assert_eq!(plan.rows[0].content, "thinking · 1 line");
     assert!(plan.clipped_before);
 }
 
@@ -1302,7 +1311,7 @@ fn thinking_preview_with_empty_content_does_not_create_a_blank_body_row() {
 
     assert_eq!(plan.natural_height, 1);
     assert_eq!(plan.rows.len(), 1);
-    assert_eq!(plan.rows[0].content, "thinking");
+    assert_eq!(plan.rows[0].content, "thinking · 0 line");
     assert!(!plan.clipped_before);
 }
 
