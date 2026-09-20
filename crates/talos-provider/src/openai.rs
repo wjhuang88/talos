@@ -46,6 +46,42 @@ pub struct OpenAIProvider {
 }
 
 impl OpenAIProvider {
+    async fn isolated_decision(
+        &self,
+        messages: &[Message],
+        limits: talos_core::provider::DecisionRequestLimits,
+        auto_review: bool,
+    ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
+        crate::validate_decision_messages(messages, limits)?;
+        let mut isolated = self.clone();
+        isolated.timeout_config.max_attempts =
+            limits.max_retries.min(self.timeout_config.max_attempts);
+        let mut body = build_request_body(
+            &self.model,
+            messages,
+            &[],
+            None,
+            Some(limits.max_output_tokens),
+        );
+        body["max_completion_tokens"] = json!(limits.max_output_tokens);
+        // GLM-5.3 requires thinking; disabling it is an API error. Keep this
+        // documented model capability local to Auto, never infer it for other models.
+        if auto_review && self.model.eq_ignore_ascii_case("glm-5.3") {
+            body["thinking"] = json!({"type": "enabled"});
+            body["reasoning_effort"] = json!("low");
+        }
+        let response = isolated.send_request(&body, None).await?;
+        let (tx, rx) = mpsc::channel(32);
+        tokio::spawn(crate::openai_sse::parse_sse_stream_with_mode(
+            response,
+            tx,
+            Duration::from_secs(self.timeout_config.first_packet_timeout_secs),
+            Duration::from_secs(self.timeout_config.stream_idle_timeout_secs),
+            talos_core::tool::ToolProtocol::Native,
+        ));
+        Ok(rx)
+    }
+
     /// Create a new OpenAI provider.
     ///
     /// # Arguments
@@ -355,28 +391,15 @@ impl LanguageModel for OpenAIProvider {
         messages: &[Message],
         limits: talos_core::provider::DecisionRequestLimits,
     ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
-        crate::validate_decision_messages(messages, limits)?;
-        let mut isolated = self.clone();
-        isolated.timeout_config.max_attempts =
-            limits.max_retries.min(self.timeout_config.max_attempts);
-        let mut body = build_request_body(
-            &self.model,
-            messages,
-            &[],
-            None,
-            Some(limits.max_output_tokens),
-        );
-        body["max_completion_tokens"] = json!(limits.max_output_tokens);
-        let response = isolated.send_request(&body, None).await?;
-        let (tx, rx) = mpsc::channel(32);
-        tokio::spawn(crate::openai_sse::parse_sse_stream_with_mode(
-            response,
-            tx,
-            Duration::from_secs(self.timeout_config.first_packet_timeout_secs),
-            Duration::from_secs(self.timeout_config.stream_idle_timeout_secs),
-            talos_core::tool::ToolProtocol::Native,
-        ));
-        Ok(rx)
+        self.isolated_decision(messages, limits, false).await
+    }
+
+    async fn stream_auto_review(
+        &self,
+        messages: &[Message],
+        limits: talos_core::provider::DecisionRequestLimits,
+    ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
+        self.isolated_decision(messages, limits, true).await
     }
 
     fn protocol_capability_scope(&self) -> Option<String> {

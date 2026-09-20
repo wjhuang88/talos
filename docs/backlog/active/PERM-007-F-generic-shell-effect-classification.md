@@ -209,3 +209,27 @@ intermittent, a timeout, fixed, or a known provider bug without evidence.
 
 Scheduling: retain as an open corrective item for triage at the next handoff; this record does
 not activate protected permission work or claim that the observed failure has been repaired.
+
+### 2026-09-20 Local Diagnostic And Timing Correction
+
+The maintainer requested local repair and accepted ADR-064's appended timing amendment.
+The September 18 invalid-output report remains unresolved; do not conflate it with the newly
+diagnosed GLM-5.3 timeout in session `75ed4f7e-dff6-43b3-a24b-51242d25966a`.
+
+Local changes retain redacted failure categories, correlation, timing and byte counters; separate
+4096 provider tokens from the 16 KiB review byte budget; request GLM-5.3 low effort only for Auto;
+and replace fixed Auto deadlines with the caller's remaining permission budget. No relaxation
+of permission decisions, no automatic retry and no claim of recovered historical diagnostics.
+
+Validation targets: real HTTP request-shape isolation, success/failure parsing, caller deadlines
+below eight and above thirty seconds, cancellation and fail-closed behavior. Live GLM latency
+and decision quality still require a new session observation; remote gates and delivery remain
+pending. Existing historical completion/claim records are unchanged; this local checkpoint is
+not a new effective claim or completion record.
+
+Local verification: Agent library 386/386 passed before the additional Auto-dispatch fixture;
+the final bounded-model group passed 9/9 including that fixture. Provider HTTP decision tests
+passed 3/3 (Auto versus generic/main request isolation and no retry). Both repository governance
+validators passed with zero warnings. Independent Agent-role static security/API review found
+no blocker; this is shared-account role separation, not independent natural-person approval or
+exact-head remote evidence. CLI rebuild and live-model observation are separate from these tests.

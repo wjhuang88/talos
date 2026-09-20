@@ -254,6 +254,21 @@ malformed, timed-out, or stale requests remain human-required or denied by the a
 permission and sandbox gates. The assessor has no tools, never sees raw environment values or
 secret-like assignments, and cannot create a permanent grant.
 
+Auto review failures distinguish timeout, request/stream failure, incomplete response and byte-limit
+exhaustion in the TUI. Local logs retain session/request correlation, safe failure categories and
+timing; bounded-response failures include byte counters, while invalid JSON includes category and
+line/column, never the raw review, prompt, command or provider error. The provider's 4096-token
+generation limit is separate from the local review's 16 KiB combined text/reasoning byte budget.
+Failures still require human approval; diagnostics do not authorize execution.
+
+GLM-5.3 Auto reviews explicitly request `thinking.type = enabled` and `reasoning_effort = low`:
+this model cannot disable thinking. This request-local setting does not change conversation
+reasoning or other auxiliary decisions. Interactive CLI/TUI Auto reviews no longer impose an
+eight-second timer or a thirty-second resolver ceiling; they use the enclosing permission
+request's remaining budget. Provider transport/idle limits, cancellation, output limits and
+final permission validation still apply. Other models retain their existing bounded-decision
+request shape; GLM-specific parameters are not sent to them.
+
 Auto assistance is available only when the active surface supplies an interactive approval
 resolver (Goal and interactive CLI/TUI). Headless CLI, embedded Runtime and standalone MCP keep
 their existing fail-closed behavior for unresolved `Ask` decisions; enabling `auto` in config does

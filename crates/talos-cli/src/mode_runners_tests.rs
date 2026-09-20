@@ -35,6 +35,28 @@ fn auto_review_report_distinguishes_model_decision_from_classifier_bypass() {
 #[derive(Clone, Default)]
 struct DashboardLogBuffer(Arc<StdMutex<Vec<u8>>>);
 
+#[test]
+fn auto_review_failure_categories_are_visible_without_raw_errors() {
+    for (reason, expected) in [
+        ("review_timeout", "timed out"),
+        ("review_dispatch_failed", "request failed"),
+        ("review_stream_closed", "stream failed"),
+        ("review_output_limit", "byte limit"),
+        ("review_incomplete", "incomplete"),
+    ] {
+        let report = talos_agent::auto_resolver::AutoDecisionReport {
+            outcome: "human_required".into(),
+            reason: reason.into(),
+            evaluator: "secret-marker".into(),
+            request_digest: "sha256:test".into(),
+        };
+        let text = super::format_auto_review_report(&report);
+        assert!(text.contains(expected));
+        assert!(text.contains("human approval required"));
+        assert!(!text.contains("secret-marker"));
+    }
+}
+
 impl<'a> MakeWriter<'a> for DashboardLogBuffer {
     type Writer = DashboardLogWriter;
 

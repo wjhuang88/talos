@@ -218,6 +218,13 @@ impl TuiRuntimeBuilder {
             )
             .ok()
             .map(|lease| {
+                tracing::info!(
+                    session_id = %session.id,
+                    permission_session_id = %lease.session_id(),
+                    provider = %runtime_config.provider,
+                    model = %runtime_config.model,
+                    "Auto review session binding"
+                );
                 let lease = atomic_create_capability
                     .clone()
                     .map_or(lease.clone(), |capability| {
@@ -227,7 +234,7 @@ impl TuiRuntimeBuilder {
                     Arc::new(ProviderAutoPermissionAssessor::new(provider.clone())),
                     fallback.clone(),
                     lease,
-                    std::time::Duration::from_secs(8),
+                    std::time::Duration::MAX,
                     auto_control,
                 );
                 let resolver = if let Some(sink) = self.auto_report_sink.as_ref() {

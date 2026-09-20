@@ -76,6 +76,31 @@ fn format_auto_review_report(report: &talos_agent::auto_resolver::AutoDecisionRe
             "model not consulted — automatic review temporarily unavailable"
         }
         ("human_required", "technical_failure") => "model review failed — human approval required",
+        ("human_required", "review_timeout") => "model review timed out — human approval required",
+        ("human_required", "review_dispatch_failed") => {
+            "model review request failed — human approval required"
+        }
+        ("human_required", "review_stream_failed" | "review_stream_closed") => {
+            "model review stream failed — human approval required"
+        }
+        ("human_required", "review_output_limit") => {
+            "model review exceeded byte limit — human approval required"
+        }
+        ("human_required", "review_incomplete") => {
+            "model review response incomplete — human approval required"
+        }
+        ("human_required", "review_empty_output") => {
+            "model review returned no text — human approval required"
+        }
+        ("human_required", "review_cancelled") => {
+            "model review cancelled — human approval required"
+        }
+        ("human_required", "review_tool_use") => {
+            "model review attempted tool use — human approval required"
+        }
+        ("human_required", "review_provider_panicked") => {
+            "model review provider failed — human approval required"
+        }
         ("human_required", "malformed_output") => {
             "model returned an invalid review — human approval required"
         }

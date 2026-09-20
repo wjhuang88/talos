@@ -124,6 +124,18 @@ pub trait LanguageModel: Send + Sync {
             "provider does not support bounded decisions".into(),
         ))
     }
+    /// Dispatches an isolated Auto permission review with provider-supported low-latency reasoning.
+    ///
+    /// The default retains bounded-decision isolation. Adapters may override reasoning
+    /// only for models with a known request contract, without mutating conversation settings.
+    async fn stream_auto_review(
+        &self,
+        messages: &[Message],
+        limits: DecisionRequestLimits,
+    ) -> ProviderResult<Receiver<AgentEvent>> {
+        self.stream_decision(messages, limits).await
+    }
+
     /// Returns a stable, non-secret scope for capability evidence caching.
     /// `None` disables caching when the provider cannot describe its endpoint/model safely.
     fn protocol_capability_scope(&self) -> Option<String> {
