@@ -1,6 +1,7 @@
 # CAP-001-D: Repository-Root Plugin Source Delivery
 
-**Status**: Review / Claimed
+**Status**: Complete / Closed
+Completion Commit: 1e5a8592a2b14cfb0279837c1c5f2137ddc4a4c7
 **Type**: Technical delivery Story
 **Parent Epic**: CAP-001 / #466
 **Selected Iteration**: I278
@@ -9,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | CAP-001-D real root Rust/Python Plugin sources, independent build/package, compatible bounded language transport and real-consumer validation under ADR-079; no Desktop or default-distribution change |
@@ -18,8 +19,8 @@
 | Governance Claim PR | #575 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | #575 merged as 2d4e064f; exact head dbddf44a / base d6b566be; CI 35359610144 passed scoped checks; independent security/API/governance APPROVE 5731895048 and CAS 5731908465 |
-| Implementation PR | Not started |
-| Last Updated | 2026-09-19 |
+| Implementation PR | #576 |
+| Last Updated | 2026-09-20 |
 | Handoff / Release Condition | Effective claim #575 / 2d4e064f; ADR-079 and full baseline acceptance apply; I277 deferred human/device checks do not block this slice |
 
 ## Goal And Scope
@@ -96,6 +97,12 @@ ADR-079 and this In Progress / Claimed state are effective. I278 records exact h
 independent review and CAS. Implementation branch begins at that merge; no completion is claimed.
 
 ## Required Reads
+
+Completion checkpoint 2026-09-20: #576 merged as `1e5a8592a2b14cfb0279837c1c5f2137ddc4a4c7`.
+I278's completion ledger maps every acceptance item to implementation/tests/docs, CI `35414187535`
+(six successful jobs), independent exact-head approval `5738425090`, historical-host supplement
+`5738280453` and CAS `5746490831`. No in-scope residual remains. Print/inline context retention and
+future illustrative Browser/TypeScript/tool capabilities are explicitly not claimed by this slice.
 
 Review checkpoint 2026-09-19: local source/build/package/install, real TUI/symbol consumers,
 production Agent Allow/Deny, failure tests, strict Clippy and standard locked preflight passed.

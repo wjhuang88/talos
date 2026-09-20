@@ -11,10 +11,10 @@ That snapshot is historical evidence and not current activation authority.
 
 ## Lifecycle
 
-Next-cycle priority (2026-09-18): [I278 root Plugin source delivery](I278-root-plugin-source-delivery.md)
-is Review / Claimed through #575 merge `2d4e064f`, with ADR-079 effective. Local implementation,
-consumer/permission acceptance and preflight passed; stable-head implementation review/CI/merge
-remain pending. I277 retains deferred human/device validation; I249 stays Planned and
+Completed cycle (2026-09-20): [I278 root Plugin source delivery](I278-root-plugin-source-delivery.md)
+is Complete / Closed through #576 merge `1e5a8592`, with exact-head CI, independent review and
+merge-time CAS recorded in its acceptance ledger. No next iteration is activated.
+I277 retains deferred human/device validation; I249 stays Planned and
 I164 Paused. I277 implementation handoff is complete; its overall acceptance is not Complete.
 
 1. **Planned** — objective, selected stories, acceptance and activation gate are published.
