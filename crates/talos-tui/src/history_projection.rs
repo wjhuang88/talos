@@ -507,11 +507,31 @@ fn logical_lines(block: &TranscriptBlock) -> Vec<ScrollbackLine> {
         TranscriptBlock::Reasoning { text, expanded } => {
             let color = crate::tool_display::secondary_result_color();
             let mut lines = vec![ScrollbackLine::styled(
-                vec![HistorySegment::raw(if *expanded {
-                    " ▾ Thinking"
-                } else {
-                    " ▸ Thinking"
-                })],
+                vec![
+                    HistorySegment::styled(
+                        crate::scrollback::stream_padding_for(
+                            Some(&talos_conversation::MessageSource::Reasoning),
+                            0,
+                        ),
+                        crate::scrollback::prefix_color_for(
+                            Some(&talos_conversation::MessageSource::Reasoning),
+                            0,
+                        ),
+                        crate::inline_terminal::HistoryAttrs {
+                            bold: true,
+                            ..Default::default()
+                        },
+                    ),
+                    HistorySegment::styled(
+                        if *expanded {
+                            "Thinking ▾"
+                        } else {
+                            "Thinking ▸"
+                        },
+                        color,
+                        Default::default(),
+                    ),
+                ],
                 None,
             )];
             if *expanded {
@@ -937,7 +957,16 @@ mod tests {
             assert_eq!(projection.reasoning_header_at(0), Some(id));
             assert!(projection.rows[0].line.text.width() <= usize::from(width));
             if width == 40 {
-                assert_eq!(projection.rows[0].line.text, " ▸ Thinking");
+                assert_eq!(projection.rows[0].line.text, " ◇ Thinking ▸");
+                let segments = &projection.rows[0].line.segments;
+                assert_eq!(segments[0].text, " ◇ ");
+                assert_eq!(
+                    segments[0].fg,
+                    crate::scrollback::prefix_color_for(
+                        Some(&talos_conversation::MessageSource::Reasoning),
+                        0,
+                    )
+                );
             }
         }
     }

@@ -30,6 +30,8 @@ must not be guessed from a matching name.
 Keep existing ToolCall and ToolResult outputs as the history path; the new event
 is transient presentation metadata, not another tool execution or persisted
 message. No provider, permission, storage or scheduling behavior changes.
+Once Finished arrives, the TUI retains the correlated status/count title but
+does not repeat the result body already emitted through the legacy history path.
 
 ## Migration And Compatibility
 

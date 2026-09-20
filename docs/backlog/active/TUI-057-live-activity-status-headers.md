@@ -5,7 +5,7 @@
 | Story ID | TUI-057 |
 | Type | TUI / Product Story |
 | Priority | P2 |
-| Status | In Progress — I279 claim effective through #579 merge 9fa4ae52 |
+| Status | Review — native presentation acceptance passed; I279 claim effective through #579 merge 9fa4ae52 |
 | Source | [GitHub Issue #310](https://github.com/wjhuang88/talos/issues/310) |
 | Selected Iteration | I279 |
 | Depends On | TUI-041 live-thinking layout; TUI-043 placeholder suppression; typed tool lifecycle events; ADR-034; ADR-054 |

@@ -94,6 +94,7 @@ impl ToolActivities {
                         format!("{} #{} · {state}", call.name, index + 1),
                         call.body.as_str(),
                         &call.layout,
+                        call.result.is_some(),
                     )
                 })
                 .collect(),
@@ -132,7 +133,7 @@ mod tests {
         });
         let result = calls.component().plan(60);
         assert!(result.rows[0].content.contains("succeeded · 1 lines"));
-        assert_eq!(result.rows[1].content, "new result");
+        assert_eq!(result.rows.len(), 1);
         assert_eq!(calls.calls[0].layout.builds(), 1);
     }
 
@@ -210,15 +211,14 @@ mod tests {
                 .join("\n"),
         });
         let rolling = calls.component().plan(60);
-        assert_eq!(rolling.rows.len(), 12);
+        assert_eq!(rolling.rows.len(), 3);
         assert!(rolling.rows[0].content.contains("#1 · requested · 1 lines"));
         assert!(
-            rolling.rows[1]
+            rolling.rows[2]
                 .content
                 .contains("#2 · succeeded · 20 lines")
         );
-        assert_eq!(rolling.rows.last().expect("tail").content, "row19");
-        assert!(rolling.rows[2].clipped_marker);
+        assert!(!rolling.rows.iter().any(|row| row.content.contains("row19")));
         let mut tiny = calls.component();
         tiny.max_height = 1;
         assert!(tiny.plan(60).rows[0].content.contains("#2 · succeeded"));
@@ -287,6 +287,6 @@ mod tests {
         });
         let plan = calls.component().plan(80);
         assert!(plan.rows[0].content.contains("failed · 1 lines"));
-        assert_eq!(plan.rows[1].content, "error");
+        assert_eq!(plan.rows.len(), 1);
     }
 }

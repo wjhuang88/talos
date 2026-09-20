@@ -5,7 +5,7 @@
 | Story ID | TUI-056 |
 | Type | TUI / History Interaction Story |
 | Priority | P2 |
-| Status | In Progress — I279 claim effective through #579 merge 9fa4ae52 |
+| Status | Review — native presentation acceptance passed; I279 claim effective through #579 merge 9fa4ae52 |
 | Source | [GitHub Issue #298](https://github.com/wjhuang88/talos/issues/298) |
 | Selected Iteration | I279 |
 | Depends On | TUI-029 reasoning history archive; ADR-034 reasoning boundary; ADR-054 renderer |

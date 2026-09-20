@@ -1,4 +1,5 @@
 use crossterm::style::Color as CColor;
+use ratatui::style::Color;
 use talos_conversation::{
     MessageSource, TodoPanelData, TodoPanelRow, ToolResultDisplay, UserInput,
 };
@@ -459,39 +460,61 @@ fn preview_spinner_uses_single_block() {
 }
 
 #[test]
-fn thinking_preview_uses_two_color_three_segment_ripple() {
+fn thinking_preview_uses_smooth_slow_color_wave() {
+    assert_eq!(semantic::THINKING_RIPPLE_SECONDARY, semantic::DIM_TEXT);
     let spans =
         scrollback::preview_line_spans("", "thinking: draft", None, semantic::PREVIEW_FG, Some(0));
 
-    assert_eq!(spans.len(), 4);
-    let label: String = spans[..3]
+    assert_eq!(spans.len(), 9);
+    let label: String = spans[..8]
         .iter()
         .map(|span| span.content.as_ref())
         .collect();
     assert_eq!(label, "thinking");
     assert_eq!(spans[0].style.fg, Some(semantic::THINKING_RIPPLE_SECONDARY));
-    assert_eq!(spans[1].style.fg, Some(semantic::THINKING_RIPPLE_PRIMARY));
-    assert_eq!(spans[2].style.fg, Some(semantic::THINKING_RIPPLE_SECONDARY));
-    assert_eq!(spans[1].content.as_ref(), "nk");
-    assert_eq!(spans[3].content.as_ref(), ": draft");
-    assert_eq!(spans[3].style.fg, Some(semantic::PREVIEW_FG));
-
-    let expanded =
-        scrollback::preview_line_spans("", "thinking: draft", None, semantic::PREVIEW_FG, Some(2));
-    assert_eq!(expanded.len(), 4);
-    assert_eq!(expanded[1].content.as_ref(), "hinkin");
+    assert_eq!(spans[8].content.as_ref(), ": draft");
+    assert_eq!(spans[8].style.fg, Some(semantic::PREVIEW_FG));
+    let render = |frame| {
+        scrollback::preview_line_spans(
+            "",
+            "thinking: draft",
+            None,
+            semantic::PREVIEW_FG,
+            Some(frame),
+        )
+    };
+    assert_eq!(spans, render(24));
     assert_eq!(
-        expanded[0].style.fg,
-        Some(semantic::THINKING_RIPPLE_SECONDARY)
-    );
-    assert_eq!(
-        expanded[1].style.fg,
+        render(17)[0].style.fg,
         Some(semantic::THINKING_RIPPLE_PRIMARY)
     );
-    assert_eq!(
-        expanded[2].style.fg,
-        Some(semantic::THINKING_RIPPLE_SECONDARY)
-    );
+    // Check every transition, including the cycle seam, for abrupt RGB jumps.
+    for frame in 0..24 {
+        for (before, after) in render(frame).iter().zip(render(frame + 1)) {
+            if let (Some(Color::Rgb(r0, g0, b0)), Some(Color::Rgb(r1, g1, b1))) =
+                (before.style.fg, after.style.fg)
+            {
+                assert!(r0.abs_diff(r1) <= 35 && g0.abs_diff(g1) <= 35 && b0.abs_diff(b1) <= 35);
+            }
+        }
+    }
+    for (distance, index) in [3, 2, 1, 0].into_iter().enumerate() {
+        let peak = 5 + distance * 4;
+        assert_eq!(
+            render(peak)[index].style.fg,
+            Some(semantic::THINKING_RIPPLE_PRIMARY)
+        );
+        assert_eq!(
+            render(peak)[7 - index].style.fg,
+            render(peak)[index].style.fg
+        );
+        for frame in (peak + 5)..24 {
+            assert_eq!(
+                render(frame)[index].style.fg,
+                Some(semantic::THINKING_RIPPLE_SECONDARY)
+            );
+        }
+    }
 }
 
 #[test]

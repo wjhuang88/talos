@@ -1,6 +1,6 @@
 # Iteration I279: History Reasoning And Live Activity Presentation
 
-> Document status: Active — claim effective through #579 merge 9fa4ae52
+> Document status: Review — claim effective through #579 merge 9fa4ae52
 > Published plan date: 2026-09-20
 > Planned objective: Deliver #334 history continuation padding, #298 collapsible reasoning history, and #310 live activity status/count headers as one locally converged TUI stage.
 > MVP deliverable: Runnable TUI with stable padded history, independently collapsible thinking entries, and truthful live thinking/tool titles and display-row counts.
@@ -190,8 +190,47 @@ Rollback removes presentation changes without migrating or altering persisted co
 - Both repository governance validators subsequently passed with zero warnings;
   `git diff --check` passed. The remaining changes after preflight are evidence
   notes only and do not require repeating Rust compilation.
+- Incident recovery observation: the maintainer resumed the same session using
+  `cargo run --bin talos -- --session 9b395880-3051-41f1-94fb-9d641721d284`
+  and reported a successful no-tool request without error. Live PID `91256` had
+  21 numbered descriptors (0 through 20) when inspected; the journal now contained
+  ten committed records, up from nine. This verifies that the recovery submission
+  persisted, not the original two rejected inputs. No source fix or proven cause
+  is claimed. Available disk was 1.9 GiB at that observation.
 
-### Native Acceptance Checklist (Pending)
+### Native Acceptance Checklist (Passed)
+
+Final corrective acceptance: screenshot `ScreenShot_2026-09-20_172244_250@2x.png`
+shows completed #1 succeeded and #2 failed titles with 18-line counts, without
+duplicate preview bodies and without input overlap. The maintainer confirmed
+exit afterward. Together with the observations below, native presentation
+acceptance is passed. TUI library tests passed (591); independent Agent-role
+snapshot review approved the visual and duplicate-preview corrections. Final
+candidate CI, exact-head review and merge remain pending; not Complete.
+
+2026-09-20 native acceptance results (maintainer observations and screenshots):
+restored colors/prefix, independent fold/unfold, drag without toggling, CJK
+wide/narrow continuation padding, anchored scrolling, live title/count/ten-body
+rows, same-name requested calls, reverse succeeded/failed identity, next-response
+ID reuse, completion cleanup and Esc followed by successful quit all passed.
+Screenshots at 17:05:19, 17:07:13, 17:08:13 and 17:09:02 support the activity
+and lifecycle observations. These are offline presentation results, not permission
+or real-provider execution evidence. Result-body duplication between history and
+preview was found; local correction retains completed status/count titles only.
+That correction still requires focused validation and independent review before
+delivery. Earlier accepted interaction cases need not be repeated.
+
+2026-09-20 partial acceptance: maintainer confirmed expansion, collapse and
+independent entries. Visual acceptance was rejected: preserve the existing
+theme and prefix. Restore the themed diamond prefix and muted reasoning body;
+place disclosure metadata after the title, not instead of the existing prefix.
+Maintainer explicitly requested preserving the main-workspace outward-only
+gray/accent animation, so its scrollback function, theme token and regression
+test are now integrated into I279. Main-workspace originals remain untouched;
+Auto changes remain excluded. This supersedes the earlier animation-separation
+disposition for these three TUI files only. Add `theme.rs` to changed-file inventory.
+Previous exact-head approval does not cover this correction; re-review and
+updated visual acceptance remain required. No remote candidate was pushed.
 
 The offline presentation example was built successfully with:
 

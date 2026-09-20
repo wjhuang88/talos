@@ -54,8 +54,10 @@ Tool activity is correlated by invocation ID, including concurrent same-name cal
 execution began. `succeeded` and `failed` reflect structured results, not parsed
 output text. Activity counts describe available arguments/results, not a process
 output stream. Tool history remains separate from these transient status rows.
+After a result enters history, its transient activity keeps only the status/count
+title; the completed result body is not repeated below it.
 
-These I279 source changes still require release and native-terminal acceptance.
+These I279 source changes passed native-terminal acceptance; release remains separate.
 
 ### Shared text semantics (source development)
 

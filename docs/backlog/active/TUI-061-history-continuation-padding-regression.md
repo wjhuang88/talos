@@ -5,7 +5,7 @@
 | Story ID | TUI-061 |
 | Type | Bug / TUI Layout Correctness Story |
 | Priority | P1 corrective residual from I211 |
-| Status | In Progress — I279 claim effective through #579 merge 9fa4ae52 |
+| Status | Review — native presentation acceptance passed; I279 claim effective through #579 merge 9fa4ae52 |
 | Source | [GitHub Issue #334](https://github.com/wjhuang88/talos/issues/334) |
 | Selected Iteration | I279 |
 | Depends On | I023/I142 three-column history continuation contract; I200 resize/reflow evidence |

@@ -164,7 +164,7 @@ impl ToolActivityLayoutCache {
 }
 
 pub(crate) struct ToolActivityComponent<'a> {
-    pub(crate) entries: Vec<(String, &'a str, &'a ToolActivityLayoutCache)>,
+    pub(crate) entries: Vec<(String, &'a str, &'a ToolActivityLayoutCache, bool)>,
     pub(crate) max_height: u16,
 }
 
@@ -186,7 +186,7 @@ impl ToolActivityComponent<'_> {
         let entries = &self.entries[start..];
         let mut remaining_body = capacity.saturating_sub(entries.len());
         let mut plans = Vec::new();
-        for (title, body, cache) in entries.iter().rev() {
+        for (title, body, cache, finished) in entries.iter().rev() {
             let plan = if content_width == 0 {
                 PreviewLayoutPlan {
                     rows: vec![PreviewLayoutRow {
@@ -200,6 +200,13 @@ impl ToolActivityComponent<'_> {
                 }
             } else {
                 let mut plan = cache.plan(width, &prefix, title, body);
+                // Finished results already have their canonical history body.
+                // Retain the correlated status/count, without repeating that body.
+                if *finished {
+                    plan.rows.truncate(1);
+                    plan.natural_height = 1;
+                    plan.clipped_before = false;
+                }
                 let body_rows = plan.rows.len().saturating_sub(1);
                 if body_rows > remaining_body {
                     plan.rows.drain(1..1 + body_rows - remaining_body);
@@ -668,25 +675,42 @@ pub(crate) fn preview_spinner_padding(processing_frame: usize) -> (String, usize
     (format!(" {} ", SPINNER_FRAMES[frame_idx]), frame_idx)
 }
 
-fn thinking_ripple_spans(frame: usize) -> [Span<'static>; 3] {
+fn thinking_ripple_spans(frame: usize) -> Vec<Span<'static>> {
     const LABEL: &str = "thinking";
-    const ACTIVE_WIDTHS: [usize; 4] = [2, 4, 6, 4];
-
-    let active_width = ACTIVE_WIDTHS[frame % ACTIVE_WIDTHS.len()];
-    let left_width = (LABEL.len() - active_width) / 2;
-    let right_start = left_width + active_width;
-    let secondary = Style::default()
-        .fg(semantic::THINKING_RIPPLE_SECONDARY)
-        .add_modifier(Modifier::BOLD);
-    let primary = Style::default()
-        .fg(semantic::THINKING_RIPPLE_PRIMARY)
-        .add_modifier(Modifier::BOLD);
-
-    [
-        Span::styled(LABEL[..left_width].to_string(), secondary),
-        Span::styled(LABEL[left_width..right_start].to_string(), primary),
-        Span::styled(LABEL[right_start..].to_string(), secondary),
-    ]
+    // 24 processing ticks at 150 ms: a gentle 3.6-second wave. Modulo before
+    // conversion keeps the phase stable even in long-running sessions.
+    const PERIOD: usize = 24;
+    LABEL
+        .chars()
+        .enumerate()
+        .map(|(index, ch)| {
+            // Each symmetric pair pulses once, center first. All letters are
+            // back at the base color before the next outward wave starts.
+            let distance = index.abs_diff(LABEL.len() - 1 - index) / 2;
+            let local_tick = (frame % PERIOD) as f64 - distance as f64 * 4.0;
+            let blend = if (0.0..=10.0).contains(&local_tick) {
+                (1.0 - (local_tick / 10.0 * std::f64::consts::TAU).cos()) / 2.0
+            } else {
+                0.0
+            };
+            let color = match (
+                semantic::THINKING_RIPPLE_SECONDARY,
+                semantic::THINKING_RIPPLE_PRIMARY,
+            ) {
+                (Color::Rgb(r0, g0, b0), Color::Rgb(r1, g1, b1)) => {
+                    let mix = |a: u8, b: u8| {
+                        (f64::from(a) + (f64::from(b) - f64::from(a)) * blend).round() as u8
+                    };
+                    Color::Rgb(mix(r0, r1), mix(g0, g1), mix(b0, b1))
+                }
+                (secondary, _) => secondary,
+            };
+            Span::styled(
+                ch.to_string(),
+                Style::default().fg(color).add_modifier(Modifier::BOLD),
+            )
+        })
+        .collect()
 }
 
 pub(crate) struct QueuePreviewComponent<'a> {
