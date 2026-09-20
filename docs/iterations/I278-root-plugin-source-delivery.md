@@ -1,6 +1,7 @@
 # Iteration I278: Repository-Root Plugin Source Delivery
 
-> Document status: Review
+> Document status: Complete
+> Completion Commit: 1e5a8592a2b14cfb0279837c1c5f2137ddc4a4c7
 > Published plan date: 2026-09-18
 > Planned objective: Deliver the omitted repository-root plugins/ source and independent build/package path from #466.
 > Baseline rule: preserve this objective and acceptance; append execution facts.
@@ -10,7 +11,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | CAP-001-D real root Rust/Python Plugin sources, independent build/package, compatible bounded language transport and real-consumer validation under ADR-079; no Desktop or default-distribution change |
@@ -19,8 +20,8 @@
 | Governance Claim PR | #575 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | #575 merged as 2d4e064f; exact head dbddf44a / base d6b566be; CI 35359610144 passed scoped checks; independent security/API/governance APPROVE 5731895048 and CAS 5731908465 |
-| Implementation PR | Not started |
-| Last Updated | 2026-09-19 |
+| Implementation PR | #576 |
+| Last Updated | 2026-09-20 |
 | Handoff / Release Condition | Effective claim #575 / 2d4e064f; ADR-079 and all baseline acceptance mandatory before closure; I277/#29 human/device rows remain Deferred, non-blocking and unverified |
 
 ## Published Baseline
@@ -319,3 +320,36 @@ left stale same-version host build artifacts in the shared target: only talos-te
 caches were cleaned before rebuilding current sources. Future cross-revision verification must
 isolate those package artifacts. A running-script edit also invalidated one local shell run;
 the final script was rerun unchanged to completion. Neither failed run is counted as acceptance.
+
+### Completion And Acceptance Ledger — 2026-09-20
+
+Requested outcome: close CAP-001-D source delivery without activating another iteration.
+Implementation #576 merged as `1e5a8592a2b14cfb0279837c1c5f2137ddc4a4c7`, already on main.
+Exact head `64074ad1ac85c2f0c3b620f1090bf54ab622707d` / base
+`2d4e064f94a7c54d65444dde195c3069a8509ddd`; CI `35414187535` completed all six jobs
+successfully, including real optional guest acceptance and Windows workspace tests.
+Independent permission/security/API APPROVE: [5738425090](https://github.com/wjhuang88/talos/pull/576#issuecomment-5738425090).
+Historical-host executable supplement: [5738280453](https://github.com/wjhuang88/talos/pull/576#issuecomment-5738280453).
+Merge-time CAS: [5746490831](https://github.com/wjhuang88/talos/pull/576#issuecomment-5746490831).
+Review is independent Agent-role under a shared account, not separate natural-person identity.
+
+| Published requirement | Delivered evidence |
+|---|---|
+| Actual root source, independent locked builds | `plugins/languages/rust`, `plugins/languages/python`, shared guest and independent Cargo.lock; CI builds each grammar separately. |
+| Package, verify, install, explicitly activate | Rust package verifier and matching manifests; installed diagnostic checks digest, pre-activation refusal, changed-source results and stop revocation. |
+| Real consumers, not canned fixtures | TUI segment/color reconstruction, all four symbol AgentTools, production Agent Allow/Deny test with zero execution on denial. |
+| Missing/corrupt/incompatible and sandbox boundaries | Failed replacement preserves installed artifact; negative package matrix; bounded no-import ABI tests; actual historical v1/v2 admission supplement. |
+| Default dependency isolation | Separate guest workspace; normal Runtime dependency tree excludes language guests and packager; only optional acceptance dev links added. |
+| Inventory and layout disposition | Source/fixture inventory above and plugins guide preserve negative WAT fixtures; TypeScript/Browser/tool illustrative examples remain explicitly outside I278. |
+| References and user/contributor documentation | Plugin/host guides, Architecture, ADR-072/079 and appended I253 correction shipped in implementation. |
+
+No remaining in-scope implementation or manual acceptance is required. Preserved limitations:
+print/inline do not retain language contexts; queries are syntactic, not semantic name resolution;
+near-budget inputs can fall back safely. These are documented in the plugin guide and are not
+claimed as new capabilities. I277/#29 deferred human/device acceptance remains with its existing
+owner; I249 stays Planned, I164 Paused. No release or next iteration activation is authorized here.
+
+Closure updates this owner first, then CAP-001-D, parent/Board/Backlog/index/manifest and #466.
+Published Baseline and dated historical checkpoints remain unchanged. The closure candidate uses
+documentation validation and independent evidence review; its status-only commit is not its own
+Completion Commit.
