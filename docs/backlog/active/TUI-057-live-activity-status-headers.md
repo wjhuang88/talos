@@ -5,27 +5,27 @@
 | Story ID | TUI-057 |
 | Type | TUI / Product Story |
 | Priority | P2 |
-| Status | Refinement / Unclaimed |
+| Status | In Progress — proposed by #579; ineffective until merge |
 | Source | [GitHub Issue #310](https://github.com/wjhuang88/talos/issues/310) |
-| Selected Iteration | None |
+| Selected Iteration | I279 |
 | Depends On | TUI-041 live-thinking layout; TUI-043 placeholder suppression; typed tool lifecycle events; ADR-034; ADR-054 |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-6 |
+| Work Slice | I279 presentation-only delivery of this Story; no permission, provider, persistence or execution changes. |
+| Claimed At | 2026-09-20 |
 | Source Issue | #310 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #579 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Maintainer requested all three Issues on 2026-09-20 under standing single-maintainer mode; independent Agent review and exact-head checks required before merge. |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-19 |
-| Handoff / Release Condition | Resolve counter semantics and the typed tool-state projection, then select one runnable iteration through a separate effective claim. This intake grants no implementation authority. |
+| Last Updated | 2026-09-20 |
+| Handoff / Release Condition | Claim and activation are ineffective until #579 merges. I279 owns shared refinement/acceptance decisions; implement only after effective target-branch claim. |
 
 ## Identity / Goal / Value
 
@@ -91,3 +91,10 @@ ships. This intake changes no runtime behavior.
 - `docs/backlog/active/PROVIDER-006-bounded-retry-progress-contract.md`
 - `docs/decisions/034-reasoning-thinking-boundary.md`
 - `docs/decisions/054-alternate-screen-app-owned-transcript-rendering.md`
+
+## 2026-09-20 Unified Delivery Selection
+
+I279 selects #298/#310/#334 as one locally converged TUI stage. PR #579 proposes this claim;
+no implementation authority exists before merge. Historical intake text above remains provenance;
+I279's explicit projection-only, per-entry, line-count and acceptance decisions govern execution.
+Existing I277 deferred acceptance, I249 Planned and I164 Paused dispositions are preserved.
