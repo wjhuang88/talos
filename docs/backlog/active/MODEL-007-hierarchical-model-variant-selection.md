@@ -157,3 +157,48 @@ do not change public APIs or config meaning under this owner.
   ADR plus migration story.
 - Runtime provider capability expansion: MODEL-003 / provider-specific owner.
 - Status-bar presentation of the selected variant: TUI-031.
+
+## 2026-09-20 Follow-up: Reasoning Variant Catalog Coverage
+
+Status: Refinement / Unclaimed; maintainer requested remediation. This follow-up
+does not rewrite prior picker acceptance or activate implementation under I279.
+
+Scheduling decision (2026-09-20): the maintainer selected this follow-up as the
+next task immediately after I279 closes #298/#310/#334. Finish current acceptance
+and delivery first, then refine verified capability sources and activate a new
+iteration for this scope. This ordering does not grant an effective implementation
+claim, bypass API decisions, or activate other backlog items.
+
+Observed defect: `talos-config/build.rs` initializes imported variants to an empty
+list and only restores previous declarations for an exact provider/model pair.
+The checked-in catalog has five presets across three models. Updating general
+model metadata therefore does not fill missing reasoning-effort choices.
+Support for configuring effort is not evidence of complete picker coverage.
+
+Required outcome:
+
+- Establish verified per-provider/model supported reasoning controls and their
+  sources. Start with OpenAI coverage; inspect current official model/API evidence
+  before declaring specific supported values. A reasoning boolean alone must not
+  produce a universal low/medium/high list.
+- Generate usable named choices from that capability information, including
+  medium when explicitly supported. Distinguish an omitted/default parameter
+  from an explicit effort value; preserve ADR-048 identity and fallback behavior.
+- Preserve verified overrides through catalog regeneration, and define precedence
+  and stale/deleted-model handling. Do not depend on manually editing generated
+  TOML for each update.
+- Define custom-provider/alias behavior explicitly: do not assume a compatible
+  protocol or matching model name guarantees identical supported controls.
+- Verify selected choices reach the actual provider request, survive model switch
+  and resume, and do not silently fall back to another effort.
+
+Acceptance: given a verified supported model, the picker exposes its declared
+choices and mock request assertions prove the selected value; given unknown or
+unsupported capabilities, no unverified choice is advertised; after catalog
+regeneration the verified choices remain. Add importer, resolution, picker and
+request tests and update README model-selection/configuration guidance.
+
+Before implementation, inventory upstream metadata and provider request mappings,
+resolve any ADR-048/API/schema migration needs, and select a separately authorized
+work slice. This entry owns the residual until that handoff; no new remote Issue
+or implementation claim has been created.
