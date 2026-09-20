@@ -34,6 +34,9 @@ impl ConversationEngine {
     }
 
     pub fn append_message_plain(out: &mut String, msg: &ChatMessage) {
+        if msg.role == MessageRole::Reasoning {
+            return;
+        }
         if !msg.content.is_empty() {
             out.push_str(&msg.content);
             if !msg.content.ends_with('\n') {
@@ -57,6 +60,9 @@ impl ConversationEngine {
     }
 
     fn append_message_markdown(out: &mut String, msg: &ChatMessage) {
+        if msg.role == MessageRole::Reasoning {
+            return;
+        }
         if !msg.content.is_empty() {
             out.push_str(&msg.content);
             if !msg.content.ends_with('\n') {

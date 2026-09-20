@@ -22,7 +22,70 @@ use crate::transcript::TranscriptBlock;
 use talos_conversation::{TipKind, TurnPhase};
 
 fn state_line(text: &str) -> ScrollbackLine {
-    ScrollbackLine::plain(text, None)
+    let mut line = ScrollbackLine::plain(text, None);
+    line.continuation_indent = 3;
+    line
+}
+
+#[test]
+fn reasoning_click_toggles_but_drag_back_to_origin_does_not() {
+    use crossterm::event::MouseButton;
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    let id = tui.transcript.append(TranscriptBlock::Reasoning {
+        text: "reasoning body".into(),
+        expanded: false,
+    });
+    tui.last_history_projection =
+        project_history(&tui.transcript, 40, 10, &HistoryScrollState::follow_tail());
+    tui.last_history_area = Some(ratatui::layout::Rect::new(0, 0, 40, 10));
+    tui.last_history_prefix_row_count = 0;
+    tui.last_frame_history_start = 0;
+    for kind in [
+        MouseEventKind::Down(MouseButton::Left),
+        MouseEventKind::Up(MouseButton::Left),
+    ] {
+        tui.handle_input_event(&mouse(kind, 3, 0));
+    }
+    assert!(tui.selection.is_none());
+    assert!(matches!(
+        tui.transcript.entries()[0].block,
+        TranscriptBlock::Reasoning { expanded: true, .. }
+    ));
+    tui.last_history_projection =
+        project_history(&tui.transcript, 40, 10, &HistoryScrollState::follow_tail());
+    assert_eq!(tui.last_history_projection.reasoning_header_at(0), Some(id));
+    tui.handle_input_event(&mouse(MouseEventKind::Down(MouseButton::Left), 3, 0));
+    tui.handle_input_event(&mouse(MouseEventKind::Drag(MouseButton::Left), 7, 0));
+    tui.handle_input_event(&mouse(MouseEventKind::Drag(MouseButton::Left), 3, 0));
+    tui.handle_input_event(&mouse(MouseEventKind::Up(MouseButton::Left), 3, 0));
+    assert!(tui.selection.is_none());
+    assert!(matches!(
+        tui.transcript.entries()[0].block,
+        TranscriptBlock::Reasoning { expanded: true, .. }
+    ));
+}
+
+#[test]
+fn dragging_from_continuation_padding_keeps_logical_selection_after_resize() {
+    use crossterm::event::MouseButton;
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    let mut line = ScrollbackLine::plain("abcdefghijklmnopqrstuv", None);
+    line.continuation_indent = 3;
+    tui.transcript.append(TranscriptBlock::StyledLine(line));
+    tui.last_history_projection =
+        project_history(&tui.transcript, 8, 10, &HistoryScrollState::follow_tail());
+    tui.last_history_area = Some(ratatui::layout::Rect::new(0, 0, 8, 10));
+    tui.last_history_prefix_row_count = 0;
+    tui.last_frame_history_start = 0;
+    tui.handle_input_event(&mouse(MouseEventKind::Down(MouseButton::Left), 0, 1));
+    tui.handle_input_event(&mouse(MouseEventKind::Drag(MouseButton::Left), 5, 2));
+    let selection = tui.selection.expect("active logical drag");
+    assert!(selection.history_anchor.is_some());
+    assert!(selection.history_focus.is_some());
+    assert_eq!(tui.selected_text_for(selection), "ijklmnop");
+    tui.last_history_projection =
+        project_history(&tui.transcript, 20, 10, &HistoryScrollState::follow_tail());
+    assert_eq!(tui.selected_text_for(selection), "ijklmnop");
 }
 
 #[test]
@@ -693,6 +756,73 @@ fn hydrate_history_preserves_prefixes_and_stream_count() {
 // --- tool result summarization tests ---
 
 #[test]
+fn resumed_reasoning_is_collapsed_and_never_projects_opaque_payloads() {
+    use talos_core::message::{AssistantReasoning, ReasoningBlock};
+    let history = vec![Message::Assistant {
+        content: "visible answer".into(),
+        tool_calls: vec![],
+        reasoning: Some(AssistantReasoning {
+            provider: "test".into(),
+            model: "test".into(),
+            blocks: vec![
+                ReasoningBlock::Thinking {
+                    text: "displayable thought".into(),
+                    signature: Some("SIGNATURE_SENTINEL".into()),
+                },
+                ReasoningBlock::Redacted {
+                    data: "REDACTED_SENTINEL".into(),
+                },
+                ReasoningBlock::Plain {
+                    text: "plain thought".into(),
+                },
+            ],
+        }),
+    }];
+    let original = history.clone();
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.hydrate_history(&history);
+    for block in std::mem::take(&mut tui.pending_transcript) {
+        tui.transcript.append(block);
+    }
+    let id = tui
+        .transcript
+        .entries()
+        .iter()
+        .find_map(|entry| {
+            matches!(
+                entry.block,
+                TranscriptBlock::Reasoning {
+                    expanded: false,
+                    ..
+                }
+            )
+            .then_some(entry.id)
+        })
+        .expect("collapsed reasoning entry");
+    let render = |tui: &crate::app::Tui| {
+        project_history(&tui.transcript, 80, 100, &HistoryScrollState::follow_tail())
+            .rows
+            .iter()
+            .map(|row| row.line.text.clone())
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    let collapsed = render(&tui);
+    assert!(collapsed.contains("Thinking"));
+    assert!(collapsed.contains("visible answer"));
+    assert!(!collapsed.contains("displayable thought"));
+    assert!(tui.transcript.toggle_reasoning(id));
+    let expanded = render(&tui);
+    assert!(expanded.contains("displayable thought"));
+    assert!(expanded.contains("plain thought"));
+    for text in [&collapsed, &expanded] {
+        assert!(!text.contains("SIGNATURE_SENTINEL"));
+        assert!(!text.contains("REDACTED_SENTINEL"));
+    }
+    assert_eq!(history, original);
+}
+
+#[test]
 fn read_always_summarized() {
     let display = ToolResultDisplay {
         tool_name: Some("read".to_string()),
@@ -1191,12 +1321,57 @@ fn model_generated_heading_does_not_hide_newer_thinking_content() {
     };
     assert_eq!(component.height_hint(80), 6);
     let plan = component.plan(80);
-    assert_eq!(plan.rows[0].content, "thinking");
+    assert_eq!(plan.rows[0].content, "thinking · 5 lines");
     assert_eq!(plan.rows[1].content, "raw details");
     assert_eq!(plan.rows[5].content, "newest detail");
 }
 
 // --- TUI-028: Stale preview clear ---
+
+#[test]
+fn thinking_count_uses_wrapped_body_rows_not_visible_window() {
+    let component = crate::scrollback::PreviewComponent {
+        padding: "   ",
+        text: "thinking: 中文中文中文中文中文中文\nlatest",
+        spinner_color: None,
+        text_color: None,
+        thinking_label_frame: Some(0),
+        max_height: 2,
+    };
+    let wide = component.plan(40);
+    assert_eq!(wide.rows[0].content, "thinking · 2 lines");
+    assert_eq!(wide.natural_height, 3);
+    assert_eq!(wide.rows.len(), 2);
+    let narrow = component.plan(23);
+    assert_eq!(narrow.rows[0].content, "thinking · 3 lines");
+    assert_eq!(narrow.natural_height, 4);
+    assert_eq!(narrow.rows.len(), 2);
+    assert!(narrow.clipped_before);
+}
+
+#[test]
+fn thinking_title_does_not_consume_the_ten_body_rows() {
+    let text = format!(
+        "thinking: {}",
+        (0..12)
+            .map(|i| format!("row {i}"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
+    let component = crate::scrollback::PreviewComponent {
+        padding: "   ",
+        text: &text,
+        spinner_color: None,
+        text_color: None,
+        thinking_label_frame: Some(0),
+        max_height: crate::scrollback::MAX_ACTIVITY_HEIGHT,
+    };
+    let plan = component.plan(40);
+    assert_eq!(plan.rows[0].content, "thinking · 12 lines");
+    assert_eq!(plan.rows.len(), 11);
+    assert_eq!(plan.rows.last().expect("latest body row").content, "row 11");
+    assert!(plan.rows[1].content.ends_with("row 2"));
+}
 
 #[test]
 fn preview_clears_after_stream_reset() {
@@ -1504,6 +1679,7 @@ fn logo_prefix_keeps_accumulated_history_range() {
         anchor: (0, 3),
         focus: (0, 2),
         dragging: true,
+        moved: true,
         edge: -1,
         history_anchor: Some(history_anchor),
         history_focus: Some(history_focus),
@@ -1560,6 +1736,7 @@ fn selection_edge_tick_autoscrolls_only_while_dragging() {
         anchor: (3, 5),
         focus: (3, 0),
         dragging: true,
+        moved: true,
         edge: -1,
         history_anchor: Some(history_anchor),
         history_focus: Some(history_focus),
@@ -1590,6 +1767,7 @@ fn selection_edge_tick_enters_logo_prefix_one_row_at_a_time() {
         anchor: (3, 5),
         focus: (3, 0),
         dragging: true,
+        moved: true,
         edge: -1,
         history_anchor: Some(history_anchor),
         history_focus: Some(history_anchor),
@@ -1668,6 +1846,7 @@ fn completed_history_highlight_moves_with_scrolled_content() {
         anchor: (2, row),
         focus: (5, row),
         dragging: false,
+        moved: true,
         edge: 0,
         history_anchor: Some(anchor),
         history_focus: Some(focus),

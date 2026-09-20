@@ -421,6 +421,7 @@ impl ConversationEngine {
 
         match event {
             AgentEvent::TurnStart => {
+                outputs.push(UiOutput::ToolActivity(crate::ToolActivity::ResponseStarted));
                 self.pending_tool_calls.clear();
                 self.is_processing = true;
                 if !matches!(self.current_phase, Some(TurnPhase::Reconnecting { .. })) {
@@ -525,6 +526,12 @@ impl ConversationEngine {
                 });
                 self.pending_tool_calls
                     .push((call.id.clone(), message_index));
+                outputs.push(UiOutput::ToolActivity(crate::ToolActivity::Requested {
+                    call_id: call.id.clone(),
+                    name: call.name.clone(),
+                    body: serde_json::to_string_pretty(&call.input)
+                        .unwrap_or_else(|_| call.input.to_string()),
+                }));
                 outputs.push(UiOutput::ToolCall(ToolCallDisplay {
                     tool_name: call.name.clone(),
                     arguments: call.input.clone(),
@@ -536,6 +543,11 @@ impl ConversationEngine {
             AgentEvent::ToolResult { result } => {
                 self.close_content(&mut outputs);
                 let tool_name = self.set_tool_result(result);
+                outputs.push(UiOutput::ToolActivity(crate::ToolActivity::Finished {
+                    call_id: result.tool_use_id.clone(),
+                    is_error: result.is_error,
+                    body: result.content.clone(),
+                }));
                 outputs.push(UiOutput::ToolResult(ToolResultDisplay {
                     tool_name,
                     is_error: result.is_error,

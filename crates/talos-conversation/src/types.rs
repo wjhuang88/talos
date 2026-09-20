@@ -236,6 +236,32 @@ pub enum ContentOutput {
     Block { source: MessageSource, text: String },
 }
 
+/// Correlated facts for a transient tool activity title, never execution authority.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ToolActivity {
+    /// Begin a provider response's invocation namespace; call IDs may be reused
+    /// by a later response. This is not completion of the enclosing user turn.
+    ResponseStarted,
+    /// Complete arguments have been received; execution is not yet established.
+    Requested {
+        /// Provider-issued invocation identity within the current turn.
+        call_id: String,
+        /// Tool name for display, not correlation.
+        name: String,
+        /// Displayable arguments, matching the existing tool history payload.
+        body: String,
+    },
+    /// A result has arrived for this invocation.
+    Finished {
+        /// Identity copied from the structured result's tool_use_id.
+        call_id: String,
+        /// Whether the result reports an error; no error-text classification.
+        is_error: bool,
+        /// Displayable result, matching the existing tool history payload.
+        body: String,
+    },
+}
+
 pub enum UiOutput {
     /// Canonical FIFO content path. All in-tree live runtime output uses this
     /// variant so text cannot race lifecycle/tool outputs on a nested channel.
@@ -261,6 +287,9 @@ pub enum UiOutput {
     },
     ToolCall(ToolCallDisplay),
     ToolResult(ToolResultDisplay),
+    /// Presentation-only invocation identity and observed lifecycle facts.
+    /// Legacy ToolCall/ToolResult events remain the durable display path.
+    ToolActivity(ToolActivity),
     /// Replace or clear transient thinking preview text.
     ThinkingPreview {
         /// Current thinking preview text; `None` clears it.

@@ -35,6 +35,7 @@ pub(crate) use crate::app_stream::{SPINNER_FRAMES, ScrollbackLine, StreamRenderS
 mod frame;
 mod input;
 mod output;
+mod tool_activity;
 
 fn history_line(row: &crate::history_projection::RenderedHistoryRow) -> Line<'static> {
     let mut style = Style::default();
@@ -151,6 +152,7 @@ pub struct Tui {
     stream_opening_pending: bool,
     pending_stream_opening: Vec<ScrollbackLine>,
     tool_placeholder_gate: crate::app::output::ToolPlaceholderGate,
+    tool_activities: tool_activity::ToolActivities,
     text_filter: ToolSyntaxFilter,
     processing_frame: usize,
     stream_count: usize,
@@ -176,6 +178,7 @@ struct SelectionState {
     anchor: (u16, u16),
     focus: (u16, u16),
     dragging: bool,
+    moved: bool,
     edge: i8,
     history_anchor: Option<HistorySelectionPoint>,
     history_focus: Option<HistorySelectionPoint>,
@@ -243,6 +246,7 @@ impl Tui {
             stream_opening_pending: false,
             pending_stream_opening: Vec::new(),
             tool_placeholder_gate: crate::app::output::ToolPlaceholderGate::default(),
+            tool_activities: tool_activity::ToolActivities::default(),
             text_filter: ToolSyntaxFilter::new(),
             processing_frame: 0,
             stream_count: 0,
@@ -288,6 +292,7 @@ impl Tui {
             stream_opening_pending: false,
             pending_stream_opening: Vec::new(),
             tool_placeholder_gate: crate::app::output::ToolPlaceholderGate::default(),
+            tool_activities: tool_activity::ToolActivities::default(),
             text_filter: ToolSyntaxFilter::default(),
             processing_frame: 0,
             stream_count: 0,
@@ -373,11 +378,7 @@ impl Tui {
                     if let Some(ar) = reasoning
                         && let Some(text) = talos_core::message::project_displayable_reasoning(ar)
                     {
-                        let display_text = format!("Thinking: {text}\n");
-                        self.handle_ui_output(UiOutput::Content(ContentOutput::Block {
-                            source: talos_conversation::MessageSource::Reasoning,
-                            text: display_text,
-                        }));
+                        self.handle_ui_output(UiOutput::Reasoning(text));
                     }
 
                     let tool_calls_in_text =

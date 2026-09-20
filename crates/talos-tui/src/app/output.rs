@@ -283,6 +283,25 @@ mod tests {
     }
 
     #[test]
+    fn live_and_resumed_reasoning_keep_the_same_raw_body_collapsed() {
+        let body = "Thinking: literal body label\n中文第二行\n";
+        let mut live = Tui::for_test(TuiState::new(), None);
+        live.handle_ui_output(UiOutput::Content(ContentOutput::Block {
+            source: MessageSource::Reasoning,
+            text: format!("Thinking: {body}\n"),
+        }));
+        let mut resumed = Tui::for_test(TuiState::new(), None);
+        resumed.handle_ui_output(UiOutput::Reasoning(body.into()));
+        for tui in [&live, &resumed] {
+            assert_eq!(tui.pending_transcript.len(), 1);
+            assert!(matches!(
+                &tui.pending_transcript[0],
+                TranscriptBlock::Reasoning { text, expanded: false } if text == body
+            ));
+        }
+    }
+
+    #[test]
     fn tool_call_started_without_confirmed_call_does_not_suppress_marker() {
         let mut tui = Tui::for_test(TuiState::new(), None);
         tui.handle_ui_output(UiOutput::Content(ContentOutput::Start {
@@ -635,6 +654,21 @@ impl Tui {
                         self.finalize_active_stream();
                     }
                     self.finalize_ordered_content();
+                    if source == talos_conversation::MessageSource::Reasoning {
+                        // ConversationEngine's compatibility block wraps the raw body
+                        // for text consumers. TUI owns a separate title; remove exactly
+                        // that envelope, not a label from typed resume reasoning.
+                        let text = text
+                            .strip_prefix("Thinking: ")
+                            .and_then(|body| body.strip_suffix('\n'))
+                            .unwrap_or(&text)
+                            .to_owned();
+                        self.pending_transcript.push(TranscriptBlock::Reasoning {
+                            text,
+                            expanded: false,
+                        });
+                        return false;
+                    }
                     let lines = crate::scrollback::render_history_message(
                         &mut self.stream_count,
                         source,
@@ -653,12 +687,14 @@ impl Tui {
                 self.active_stream = Some(msg.stream);
             }
             UiOutput::Reasoning(text) => {
-                let lines = crate::scrollback::render_history_message(
-                    &mut self.stream_count,
-                    talos_conversation::MessageSource::Reasoning,
-                    &text,
-                );
-                self.append_styled_lines(lines);
+                self.finalize_ordered_content();
+                self.pending_transcript.push(TranscriptBlock::Reasoning {
+                    text,
+                    expanded: false,
+                });
+            }
+            UiOutput::ToolActivity(activity) => {
+                self.tool_activities.update(activity);
             }
             UiOutput::ToolCallStarted { .. } => {
                 if !self.tool_placeholder_gate.is_pending() {
@@ -720,11 +756,15 @@ impl Tui {
             }
             UiOutput::Status(snapshot) => {
                 if !snapshot.is_processing {
+                    self.tool_activities.clear();
                     self.finalize_ordered_content();
                 }
                 self.handle_status_snapshot(snapshot, Instant::now());
             }
             UiOutput::SessionIdentity { id } => {
+                if self.session_id.as_ref() != Some(&id) {
+                    self.tool_activities.clear();
+                }
                 self.session_id = Some(id);
             }
             UiOutput::Tip { text, kind } => {

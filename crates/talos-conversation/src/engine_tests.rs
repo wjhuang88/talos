@@ -17,6 +17,59 @@ fn new_engine() -> ConversationEngine {
 }
 
 #[test]
+fn reasoning_presentation_does_not_change_copy_and_export_defaults() {
+    let mut engine = new_engine();
+    engine.handle_agent_event(&AgentEvent::TurnStart);
+    engine.handle_agent_event(&AgentEvent::ThinkingDelta {
+        delta: "DISPLAYABLE_REASONING_SENTINEL".into(),
+    });
+    engine.handle_agent_event(&AgentEvent::TextDelta {
+        delta: "visible answer".into(),
+    });
+    engine.handle_agent_event(&AgentEvent::TurnEnd {
+        stop_reason: StopReason::EndTurn,
+        usage: Usage::default(),
+    });
+    let copy = engine.handle_slash_command("/copy all");
+    let copied = copy
+        .iter()
+        .find_map(|output| match output {
+            UiOutput::CopyToClipboard { text, .. } => Some(text),
+            _ => None,
+        })
+        .expect("copy payload");
+    assert!(copied.contains("visible answer"));
+    assert!(!copied.contains("DISPLAYABLE_REASONING_SENTINEL"));
+    assert!(
+        !engine
+            .transcript_markdown()
+            .contains("DISPLAYABLE_REASONING_SENTINEL")
+    );
+    let last = engine.handle_slash_command("/copy last");
+    assert!(last.iter().any(|output| matches!(output,
+        UiOutput::CopyToClipboard { text, .. } if text == "visible answer"
+    )));
+    for (command, includes_reasoning) in [
+        ("/export fixture.md", false),
+        ("/export fixture.md --include-thinking", true),
+    ] {
+        let outputs = engine.handle_slash_command(command);
+        let content = outputs
+            .iter()
+            .find_map(|output| match output {
+                UiOutput::ExportToFile { content, .. } => Some(content),
+                _ => None,
+            })
+            .expect("export payload only; no file is written");
+        assert!(content.contains("visible answer"));
+        assert_eq!(
+            content.contains("DISPLAYABLE_REASONING_SENTINEL"),
+            includes_reasoning
+        );
+    }
+}
+
+#[test]
 fn mission_gate_projection_uses_the_canonical_ui_output_path() {
     let mission = talos_core::work::WorkIdentity {
         id: uuid::Uuid::new_v4(),
@@ -54,6 +107,63 @@ fn make_tool_result(content: &str, is_error: bool) -> MessageToolResult {
         tool_use_id: "tc-1".to_string(),
         content: content.to_string(),
         is_error,
+    }
+}
+
+#[test]
+fn activity_preserves_same_name_call_ids_and_reverse_result_order() {
+    use crate::ToolActivity;
+    let mut engine = new_engine();
+    for id in ["first", "second"] {
+        let outputs = engine.handle_agent_event(&AgentEvent::ToolCall {
+            call: ToolCall {
+                id: id.into(),
+                name: "bash".into(),
+                input: serde_json::json!({}),
+            },
+            provenance: ToolProvenance::Native,
+            summary_fields: vec![],
+        });
+        assert!(
+            matches!(&outputs[0], UiOutput::ToolActivity(ToolActivity::Requested { call_id, name, body }) if call_id == id && name == "bash" && body == "{}")
+        );
+        assert_eq!(
+            outputs
+                .iter()
+                .filter(|event| matches!(event, UiOutput::ToolCall(_)))
+                .count(),
+            1
+        );
+    }
+    for (id, is_error) in [("second", true), ("first", false)] {
+        let outputs = engine.handle_agent_event(&AgentEvent::ToolResult {
+            result: MessageToolResult {
+                tool_use_id: id.into(),
+                content: id.into(),
+                is_error,
+            },
+        });
+        assert!(
+            matches!(&outputs[0], UiOutput::ToolActivity(ToolActivity::Finished { call_id, is_error: failed, body }) if call_id == id && *failed == is_error && body == id)
+        );
+        assert_eq!(
+            outputs
+                .iter()
+                .filter(|event| matches!(event, UiOutput::ToolResult(_)))
+                .count(),
+            1
+        );
+    }
+    for (index, id) in ["first", "second"].iter().enumerate() {
+        let result = engine.messages[index]
+            .tool_call
+            .as_ref()
+            .expect("call")
+            .result
+            .as_ref()
+            .expect("result");
+        assert_eq!(&result.tool_use_id, id);
+        assert_eq!(&result.content, id);
     }
 }
 
@@ -118,8 +228,12 @@ fn turn_start_creates_status_and_defers_content_until_delta() {
 
     let outputs = engine.handle_agent_event(&AgentEvent::TurnStart);
 
-    assert_eq!(outputs.len(), 1);
-    assert!(matches!(&outputs[0], UiOutput::Status(_)));
+    assert_eq!(outputs.len(), 2);
+    assert!(matches!(
+        &outputs[0],
+        UiOutput::ToolActivity(crate::ToolActivity::ResponseStarted)
+    ));
+    assert!(matches!(&outputs[1], UiOutput::Status(_)));
 
     assert!(engine.current_turn_text.is_empty());
     assert!(engine.is_processing);
@@ -262,7 +376,10 @@ async fn tool_call_produces_stream_and_message() {
         summary_fields: vec![],
     });
 
-    assert_eq!(outputs.len(), 2);
+    assert_eq!(outputs.len(), 3);
+    assert!(
+        matches!(&outputs[0], UiOutput::ToolActivity(crate::ToolActivity::Requested { name, .. }) if name == "bash")
+    );
     let display = find_tool_call(&outputs).expect("operation should succeed");
     assert_eq!(display.tool_name, "bash");
     assert_eq!(display.provenance, ToolProvenance::Native);
@@ -302,7 +419,7 @@ async fn tool_call_closes_previous_stream() {
     });
 
     assert!(matches!(outputs[0], UiOutput::Content(ContentOutput::End)));
-    assert_eq!(outputs.len(), 3);
+    assert_eq!(outputs.len(), 4);
     let display = find_tool_call(&outputs).expect("operation should succeed");
     assert!(matches!(display.provenance, ToolProvenance::Native));
 }
@@ -325,7 +442,14 @@ async fn tool_result_produces_stream_and_updates_message() {
         result: make_tool_result("file contents", false),
     });
 
-    assert_eq!(outputs.len(), 2);
+    assert_eq!(outputs.len(), 3);
+    assert!(matches!(
+        &outputs[0],
+        UiOutput::ToolActivity(crate::ToolActivity::Finished {
+            is_error: false,
+            ..
+        })
+    ));
     let display = find_tool_result(&outputs).expect("operation should succeed");
     assert_eq!(display.tool_name.as_deref(), Some("read_file"));
     assert!(!display.is_error);

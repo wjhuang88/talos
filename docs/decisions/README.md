@@ -23,6 +23,7 @@ silently rewrite the reason or boundary that governed an earlier implementation.
 
 | ADR | State | Current Boundary / Gate |
 |---|---|---|
+| [080: Correlated Tool Activity Presentation](080-correlated-tool-activity-presentation.md) | Accepted by maintainer; I279 implementation pending | FIFO invocation identity and display body; preserve legacy history events, no execution authority; external exhaustive-match migration requires a pre-1.0 minor release. |
 | [079: Rust Language Plugin Guest Buffer Boundary](079-rust-language-plugin-guest-buffer-boundary.md) | **Accepted / I278; #575 merged 2d4e064f** | Versioned guest-owned request buffer handshake; guest-only unsafe export attributes, no unsafe memory operations; bounded admission/execution and independent implementation review required. |
 | [072: Capability, Provider, Plugin And Bundle Boundary](072-capability-provider-bundle-boundary.md) | **Accepted / I253 governance** | Supersedes ADR-029 package terminology only; separates executable Plugin from distributable Bundle. Runtime, API/schema and installation changes require separately claimed children. |
 | [076: Language Provider Default Distribution Policy](076-language-provider-default-distribution-policy.md) | **Accepted / LANG-003** | Preserves current defaults and requires explicit verified Bundle distribution, per-language fallback and measured compatibility evidence. |

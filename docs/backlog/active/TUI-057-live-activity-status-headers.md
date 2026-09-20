@@ -5,7 +5,7 @@
 | Story ID | TUI-057 |
 | Type | TUI / Product Story |
 | Priority | P2 |
-| Status | In Progress — proposed by #579; ineffective until merge |
+| Status | In Progress — I279 claim effective through #579 merge 9fa4ae52 |
 | Source | [GitHub Issue #310](https://github.com/wjhuang88/talos/issues/310) |
 | Selected Iteration | I279 |
 | Depends On | TUI-041 live-thinking layout; TUI-043 placeholder suppression; typed tool lifecycle events; ADR-034; ADR-054 |
@@ -25,7 +25,7 @@
 | Authorization Evidence | Maintainer requested all three Issues on 2026-09-20 under standing single-maintainer mode; independent Agent review and exact-head checks required before merge. |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-20 |
-| Handoff / Release Condition | Claim and activation are ineffective until #579 merges. I279 owns shared refinement/acceptance decisions; implement only after effective target-branch claim. |
+| Handoff / Release Condition | Claim effective through #579 merge 9fa4ae52. I279 owns local convergence, exact-head CI/review and native-terminal acceptance before closure. |
 
 ## Identity / Goal / Value
 
