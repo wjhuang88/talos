@@ -3494,6 +3494,50 @@ fn clipped_scope_cannot_resolve_always_approval() {
 }
 
 #[test]
+fn numeric_approval_routes_once_and_rejects_invalid_or_repeated_input() {
+    use crossterm::event::{Event, KeyEvent, KeyEventKind, KeyModifiers};
+
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    for (digit, expected) in [
+        ('1', ApprovalChoice::ApproveOnce),
+        ('2', ApprovalChoice::AlwaysApprove),
+        ('3', ApprovalChoice::Deny),
+    ] {
+        let (tx, mut rx) = tokio::sync::oneshot::channel();
+        tui.state.pending_approval_response = Some(tx);
+        tui.show_approval("test_tool", "harmless fixture");
+        for invalid in ['0', '4', '9', 'y', 'a', 'n', '中'] {
+            tui.handle_input_event(&Event::Key(KeyEvent::new(
+                KeyCode::Char(invalid),
+                KeyModifiers::NONE,
+            )));
+            assert!(matches!(
+                rx.try_recv(),
+                Err(tokio::sync::oneshot::error::TryRecvError::Empty)
+            ));
+        }
+        // Repeat/release from the previous request must not answer this new request.
+        for kind in [KeyEventKind::Repeat, KeyEventKind::Release] {
+            tui.handle_input_event(&Event::Key(KeyEvent::new_with_kind(
+                KeyCode::Char('1'),
+                KeyModifiers::NONE,
+                kind,
+            )));
+            assert!(matches!(
+                rx.try_recv(),
+                Err(tokio::sync::oneshot::error::TryRecvError::Empty)
+            ));
+        }
+        tui.handle_input_event(&Event::Key(KeyEvent::new(
+            KeyCode::Char(digit),
+            KeyModifiers::NONE,
+        )));
+        assert_eq!(rx.try_recv().expect("immediate numeric decision"), expected);
+        assert!(matches!(tui.state.approval_state, ApprovalState::Hidden));
+    }
+}
+
+#[test]
 fn entry_point_ctrl_c_active_draft_clears_without_cancel_or_exit() {
     let (tx, mut rx) = mpsc::unbounded_channel();
     let mut state = TuiState::new();
