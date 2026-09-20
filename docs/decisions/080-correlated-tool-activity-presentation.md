@@ -4,7 +4,8 @@
 
 Accepted by the maintainer on 2026-09-20 during I279: add invocation-identified
 tool events and migration documentation while preserving existing events.
-Implementation, independent review and delivery remain pending.
+Implemented through PR #580, merge `52276f55`, with independent Agent API review
+and exact-head CI passed. Release remains separate under the migration boundary below.
 
 ## Decision
 

@@ -1,11 +1,13 @@
 # TUI-057: Dynamic Live Activity Status Headers
 
+> Document status: Complete
+
 | Field | Value |
 |---|---|
 | Story ID | TUI-057 |
 | Type | TUI / Product Story |
 | Priority | P2 |
-| Status | Review — native presentation acceptance passed; I279 claim effective through #579 merge 9fa4ae52 |
+| Status | Complete |
 | Source | [GitHub Issue #310](https://github.com/wjhuang88/talos/issues/310) |
 | Selected Iteration | I279 |
 | Depends On | TUI-041 live-thinking layout; TUI-043 placeholder suppression; typed tool lifecycle events; ADR-034; ADR-054 |
@@ -14,7 +16,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | I279 presentation-only delivery of this Story; no permission, provider, persistence or execution changes. |
@@ -23,9 +25,22 @@
 | Governance Claim PR | #579 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer requested all three Issues on 2026-09-20 under standing single-maintainer mode; independent Agent review and exact-head checks required before merge. |
-| Implementation PR | Not started |
+| Implementation PR | #580 |
 | Last Updated | 2026-09-20 |
-| Handoff / Release Condition | Claim effective through #579 merge 9fa4ae52. I279 owns local convergence, exact-head CI/review and native-terminal acceptance before closure. |
+| Handoff / Release Condition | Complete through #580; I279 final delivery ledger records passing acceptance, exact-head CI and independent Agent review. |
+
+## Completion Evidence (2026-09-20)
+
+Completion Commit: 52276f552496b160e064fd54ed7471bc84d3f559
+
+PR #580 delivered this Story on main. Full local release preflight and all six
+exact-head CI checks (35502971132) passed; independent Agent review 5749013208
+and merge-time CAS 5749088682 bind the implementation candidate. Maintainer native
+acceptance passed, including the final completed-tool-body dedup correction.
+See [I279 final delivery ledger](../../iterations/I279-tui-history-and-live-activity.md)
+for requirement-specific tests, observations, identity limits and ADR-080 migration.
+No remaining acceptance in this Story. The original intake and dated selection
+below are preserved as historical provenance, not unfulfilled activation gates.
 
 ## Identity / Goal / Value
 

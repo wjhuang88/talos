@@ -14,7 +14,8 @@ That snapshot is historical evidence and not current activation authority.
 Completed cycle (2026-09-20): [I278 root Plugin source delivery](I278-root-plugin-source-delivery.md)
 is Complete / Closed through #576 merge `1e5a8592`, with exact-head CI, independent review and
 merge-time CAS recorded in its acceptance ledger. [I279](I279-tui-history-and-live-activity.md)
-is Review / Claimed after #579 merge `9fa4ae52`; the unified TUI implementation passed native acceptance.
+is Complete / Closed through #580 merge `52276f55`; native acceptance, exact-head CI
+and independent Agent review passed, with completion evidence in its owner.
 I277 retains deferred human/device validation; I249 stays Planned and
 I164 Paused. I277 implementation handoff is complete; its overall acceptance is not Complete.
 
