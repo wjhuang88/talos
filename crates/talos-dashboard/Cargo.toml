@@ -15,7 +15,7 @@ tokio = { version = "1.53.1", features = ["net", "rt", "macros"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1.0.151"
 schemars = "1.2.2"
-talos-core = { version = "0.9.2", path = "../talos-core" }
+talos-core = { version = "0.10.0", path = "../talos-core" }
 thiserror = "2"
 uuid = { version = "1.26.0", features = ["v4"] }
 

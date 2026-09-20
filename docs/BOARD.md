@@ -16,6 +16,7 @@ acceptance criteria, verification evidence, or iteration state.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
+| v0.10.0 consolidation and publication | Active; not published | [Release task](tasks/2026-09-20-v0100-publication.md) | Maintainer-authorized consolidation, independent security/release review, exact-head CI, merged-main versioned preflight; GitHub before crates.io. |
 | I273 Bounded Model Decisions | Complete / Closed | [I273](iterations/I273-bounded-model-decisions.md) / #285 | Implementations #559/#562 merged as `e4173caf`/`edc0b09a`; exact-head CI runs `34838903222`/`34918446844` 5/5; owner closeout recorded. |
 | I277 Desktop Mock Visual and Localization Slice | Implementation delivered; acceptance Deferred | [I277](iterations/I277-desktop-mock-visual-i18n.md) / [DESKTOP-001-D3](backlog/active/DESKTOP-001-D3-mock-visual-i18n.md) / #29 | #571/#573 merged as 707b538e/8caf2b3a. Maintainer defers remaining human/device checks because conditions are unavailable; resume when available, non-blocking for I278. Owner evidence state remains Review / Claimed. |
 | I262 OBeiBuddy Contract Clarification | Complete / Closed | [I262](iterations/I262-obeibuddy-contract-clarification.md) / [INTEGRATION-001](backlog/active/INTEGRATION-001-obeibuddy-upstream-contract-clarification.md) / #520 | Completion Commit `86a7ef76`; Request A clarified, Request B Deferred. |
@@ -78,6 +79,11 @@ acceptance criteria, verification evidence, or iteration state.
 | I011 S2 Provider Plugin Architecture | Paused | [PROV-001 Provider Schema](backlog/active/PROV-001-provider-schema.md) | Resume as I015 schema-only work under ADR-013 |
 
 ## Next
+
+Maintainer scheduling decision (2026-09-20): immediately after I279 closes
+#298/#310/#334, take the [MODEL-007 reasoning variant catalog follow-up](backlog/active/MODEL-007-hierarchical-model-variant-selection.md#2026-09-20-follow-up-reasoning-variant-catalog-coverage).
+It remains Refinement / Unclaimed until its own iteration activation; this does
+not reopen prior picker acceptance or expand I279.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
