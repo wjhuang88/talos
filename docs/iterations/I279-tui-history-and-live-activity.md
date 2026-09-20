@@ -1,6 +1,7 @@
 # Iteration I279: History Reasoning And Live Activity Presentation
 
-> Document status: Review — claim effective through #579 merge 9fa4ae52
+> Document status: Complete
+> Completion Commit: 52276f552496b160e064fd54ed7471bc84d3f559
 > Published plan date: 2026-09-20
 > Planned objective: Deliver #334 history continuation padding, #298 collapsible reasoning history, and #310 live activity status/count headers as one locally converged TUI stage.
 > MVP deliverable: Runnable TUI with stable padded history, independently collapsible thinking entries, and truthful live thinking/tool titles and display-row counts.
@@ -9,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | TUI-061 / TUI-056 / TUI-057 presentation, projection, interaction, tests and documentation; maintainer accepted correlated UI events and migration in ADR-080. Excludes Auto permission/provider fixes, Desktop, release, dependencies and session schema. |
@@ -18,9 +19,9 @@
 | Governance Claim PR | #579 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer requested all three Issues on 2026-09-20 under standing single-maintainer mode; independent Agent review and exact-head checks required before merge. |
-| Implementation PR | Not started |
+| Implementation PR | #580 |
 | Last Updated | 2026-09-20 |
-| Handoff / Release Condition | Claim effective through #579 merge 9fa4ae52. Converge locally, obtain exact-head CI and independent Agent review, and complete native-terminal acceptance before closure. |
+| Handoff / Release Condition | Completed through #580; acceptance and delivery evidence below. ADR-080 migration applies to the next pre-1.0 minor release; no release authorized here. |
 
 ## Published Baseline
 
@@ -93,6 +94,37 @@ Update README TUI guidance, the three Story owners, iteration index and Board af
 Rollback removes presentation changes without migrating or altering persisted conversations.
 
 ## Execution Evidence
+
+### 2026-09-20 Final Delivery And Closure
+
+- Implementation PR #580 merged as `52276f552496b160e064fd54ed7471bc84d3f559`.
+  Exact head `ff6a6ea044b15d56f6858823e1287812f7e0996c`, base
+  `9fa4ae527f50930f4dcd3645d016c395ed7b8461`; all six checks in CI
+  `35502971132` passed. Local `release_preflight.sh` also exited 0, including
+  locked workspace tests, Clippy and doctests; both governance validators: 0 warnings.
+- Independent Agent-role APPROVE: #580 comment `5749013208`; merge-time CAS:
+  `5749088682`. Reviewer disclosed shared-account role separation, not human
+  independence, and relied on maintainer observations for native screenshots.
+- Maintainer completed native acceptance including folding, independent entries,
+  restored theme/prefix, click versus drag, ASCII/CJK reflow/padding, anchored
+  scrolling, live counts and outward animation, same-name reverse tool results,
+  response ID reuse, completion and Esc cleanup. Final dedup screenshot
+  `ScreenShot_2026-09-20_172244_250@2x.png` confirmed completed result bodies
+  appear only in history; maintainer then exited the fixture.
+- #298: typed reasoning defaults collapsed, independent click toggles, resume
+  filtering, unchanged stored payload and default export safety. Covered by
+  history projection, app mouse/resume and conversation export regressions.
+- #334: three-column continuation padding and logical selection offsets verified
+  across ASCII/CJK/narrow resize without changing Markdown styles or anchors.
+- #310: independent title, width-aware body count, ten thinking body rows and
+  per-call typed activity. Available facts are requested/succeeded/failed;
+  missing correlated approval/retry/timeout facts are not invented. Legacy history
+  remains exactly once. Turn/session cleanup and response-scoped IDs are tested.
+- README and ADR-080 document behavior and exhaustive-match migration. No release,
+  provider, permission, persistence or Desktop change is part of this delivery.
+- No outstanding acceptance within I279. I277 deferred acceptance, I249 Planned,
+  I164 Paused and main-workspace Auto/model-catalog follow-up remain separate.
+  Earlier checkpoints below are historical, not current execution instructions.
 
 ### 2026-09-20 Activation And Local Implementation Checkpoint
 
