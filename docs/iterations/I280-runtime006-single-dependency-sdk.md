@@ -129,8 +129,19 @@
 - Quickstart executed successfully. Runtime rustdoc built with broken intra-doc links denied.
 - Independent Agent API/security review approved that implementation head in #584 comment
   `5754547935`; shared-account Agent-role separation only, not independent human identity.
- - Delivery is Complete/Closed. Completion Commit: `007ca29df62fe63da9e8dda07865284b09f67bc6`.
-   Closeout merge: `ade0b68cf5bc37cff81dabe10ab47b3994d484ca`.
+- Delivery remains Review/Claimed pending final applicable CI, merge-time CAS and merge evidence.
+
+## Completion Checkpoint (2026-09-21)
+
+Completion Commit: `007ca29df62fe63da9e8dda07865284b09f67bc6`.
+
+- Implementation #584 merged after exact-head CI `35551716705` passed all six jobs
+  on its completed retry and independent API/security approval `5754547935`.
+- Evidence synchronization #585 merged as `ade0b68cf5bc37cff81dabe10ab47b3994d484ca`.
+  This checkpoint closes delivery and claim using the already-existing implementation SHA.
+- All #234 acceptance is satisfied by the external default/coding fixtures, locked preflight,
+  runtime quickstart, rustdoc validation, migration documentation and effective #583 claim.
+- Windows I226 timing repair remains deferred as recorded above; a passing retry is not a fix.
 
 ## Implementation Changed-File Inventory
 

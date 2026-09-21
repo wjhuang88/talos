@@ -29,8 +29,9 @@ Third-party Rust embedders should be able to declare `talos-runtime` as their on
 dependency and still implement or inject the provider, tool, message/event, permission and sandbox
 types required by the supported runtime composition surface.
 
-Today that is not true. `RuntimeBuilder` and `RuntimeHandle` expose types from `talos-core`,
-`talos-permission` and `talos-sandbox`, and the quickstart documents those direct dependencies.
+Original intake problem: `RuntimeBuilder` and `RuntimeHandle` exposed types requiring direct
+dependencies on `talos-core`, `talos-permission` and `talos-sandbox`. Implementation #584 resolves
+this through canonical runtime re-exports and a verified single-dependency external fixture.
 
 ## Scope
 
@@ -110,12 +111,15 @@ permission/sandbox behavior and full turn lifecycle. No workspace dev-dependency
 
 ## Acceptance For Technical/Governance Work
 
-- [ ] The external fixture has exactly one direct Talos dependency.
-- [ ] Public rustdoc and the SDK contract name supported facade paths and compatibility policy.
-- [ ] Provider, tool, message/event, permission and sandbox composition paths are exercised.
-- [ ] Existing imports receive documented pre-1.0 migration or compatibility treatment.
-- [ ] Locked workspace validation and the external fixture pass.
-- [ ] A separate iteration and effective Collaboration Claim exist before implementation.
+- [x] The external fixture has exactly one direct Talos dependency.
+- [x] Public rustdoc and the SDK contract name supported facade paths and compatibility policy.
+- [x] Provider, tool, message/event, permission and sandbox composition paths are exercised.
+- [x] Existing imports receive documented pre-1.0 migration or compatibility treatment.
+- [x] Locked workspace validation and the external fixture pass.
+- [x] A separate iteration and effective Collaboration Claim exist before implementation.
+
+Evidence: I280 completion checkpoint; implementation #584, exact-head CI `35551716705`,
+independent API/security review `5754547935`, and the independent default/coding fixture runs.
 
 ## Residual Destination
 
