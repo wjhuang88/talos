@@ -61,7 +61,10 @@ fn directory_identity(path: &std::path::Path) -> Option<String> {
     if !metadata.is_dir() {
         return None;
     }
+    #[cfg(unix)]
     let mut value = canonical.to_string_lossy().into_owned();
+    #[cfg(not(unix))]
+    let value = canonical.to_string_lossy().into_owned();
     #[cfg(unix)]
     {
         use std::os::unix::fs::MetadataExt;

@@ -62,7 +62,7 @@ fn execution_directory_identity(path: &Path) -> Option<String> {
         // Windows does not expose a stable file-id in std.  Include metadata
         // that changes on replacement as a conservative fallback.
         hasher.update(metadata.len().to_le_bytes());
-        hasher.update(metadata.file_type().is_dir().to_le_bytes());
+        hasher.update([metadata.file_type().is_dir() as u8]);
         if let Ok(modified) = metadata.modified() {
             if let Ok(duration) = modified.duration_since(std::time::UNIX_EPOCH) {
                 hasher.update(duration.as_nanos().to_le_bytes());
