@@ -9,6 +9,11 @@ That snapshot is historical evidence, not current activation authority.
 
 ## Current Priorities
 
+Next cycle selected 2026-09-21: [I281](../iterations/I281-auto-shell-review-and-windows-timing.md)
+is proposed Active/Claimed in #587 (ineffective until merge) and owns shell Ask model review
+under accepted ADR-081 plus Windows I226 timing repair together.
+MODEL-007 follows this cycle; it is deferred, not cancelled.
+
 | Priority | Focus | Current State / Gate | Required Reads |
 |---|---|---|---|
 | 0 | Auto review invalid-output recurrence (2026-09-18) | Open corrective intake / Unclaimed. MiniMax-M3 `ls -la` review fails parsing and falls back to human approval; precise response unavailable. Add redacted diagnostics and evidence-backed repair; preserve permission gates. | [PERM-007-F corrective intake](active/PERM-007-F-generic-shell-effect-classification.md#2026-09-18-invalid-model-review-corrective-intake); ADR-070; source #462 |

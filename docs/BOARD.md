@@ -14,6 +14,10 @@ acceptance criteria, verification evidence, or iteration state.
 
 ## Now
 
+Next selected cycle: [I281](iterations/I281-auto-shell-review-and-windows-timing.md),
+proposed Active/Claimed in #587, ineffective until merge. Shell Ask model review and Windows
+timing repair precede MODEL-007; ADR-081 accepted, effective claim required before implementation.
+
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
 | v0.10.0 consolidation and publication | Complete / Released | [Release task](tasks/2026-09-20-v0100-publication.md) | Completion Commit `227d735f`; tag `v0.10.0`; GitHub workflow `35520769399` published five verified archives; 21 registry-enabled crates published after GitHub. |
