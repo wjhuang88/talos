@@ -1,6 +1,6 @@
 # Iteration I281: Model-First Shell Approval And Windows Lifecycle Tests
 
-> Document status: Planned
+> Document status: Active (proposed; effective only after #587 merges)
 > Planned objective: Model assessment for all Auto-mode shell Ask requests, and reliable Windows lifecycle tests.
 > MVP deliverable: Runnable bash/PowerShell approval with actionable human decision points and real Windows process-tree cleanup acceptance.
 
@@ -8,18 +8,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | None |
-| Executing Agent | None |
-| Claimed At | Not applicable |
-| Governance Claim PR | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 |
+| Claimed At | 2026-09-21 |
+| Governance Claim PR | #587 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Maintainer selected planning on 2026-09-21; no implementation activation. |
+| Authorization Evidence | Maintainer requested I281 development and closure and accepted ADR-081 on 2026-09-21; independent Agent security/API review required. Claim and activation effective only after #587 merges. |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-21 |
-| Handoff / Release Condition | Decision reconciliation and effective claim required before implementation. |
+| Handoff / Release Condition | ADR-081 accepted; #587 merge required before implementation. Local convergence then independent security/API review and exact-head CI before merge. |
 | Source Issue | Maintainer request 2026-09-21; related #188, #563 and #234 CI residual |
-| Work Slice | I281-A shell Ask review; I281-B Windows lifecycle test reliability. Planning only. |
+| Work Slice | I281-A bash/PowerShell Ask model assessment, script context and bound admission, actionable human escalation; I281-B Windows lifecycle test reliability. No release, Desktop or unrelated higher-risk-write roadmap. |
 
 ## Published Baseline
 
@@ -103,6 +103,10 @@
   upgrades or wholesale #563 implementation. Residuals remain in this owner until explicit handoff.
 
 ## Planning Record
+
+- 2026-09-21: #587 proposes atomic Claimed/Active status. This record has no target-branch
+  authority until merge. Start implementation from that merge or later; preserve this proposal
+  as historical evidence and append the actual activation checkpoint.
 
 - 2026-09-21 acceptance checkpoint: maintainer explicitly accepted ADR-081. The prior decision
   wait below is historical and resolved. Next step: atomic governance claim and activation;
