@@ -36,9 +36,10 @@ I164 Paused. I277 implementation handoff is complete; its overall acceptance is 
 
 ## Current Operating Set
 
-Next selected cycle: [I281](I281-auto-shell-review-and-windows-timing.md), proposed Active/Claimed
-in #587 (ineffective until merge):
-model-first shell Ask review and Windows I226 timing repair. MODEL-007 follows this cycle.
+Current cycle: [I281](I281-auto-shell-review-and-windows-timing.md), Review/Claimed.
+Model-first shell Ask review and Windows I226 timing repair merged in #588 as `a1cb869b`,
+with exact-head CI and independent Agent security/API approval. Human UX acceptance remains
+pending. MODEL-007 follows this cycle.
 
 I280 / RUNTIME-006 / #234 is Complete/Closed at implementation merge `007ca29d`; closeout `ade0b68c`.
 The maintainer selects this SDK slice before unclaimed MODEL-007; I277 deferred acceptance,

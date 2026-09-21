@@ -14,9 +14,9 @@ acceptance criteria, verification evidence, or iteration state.
 
 ## Now
 
-Next selected cycle: [I281](iterations/I281-auto-shell-review-and-windows-timing.md),
-proposed Active/Claimed in #587, ineffective until merge. Shell Ask model review and Windows
-timing repair precede MODEL-007; ADR-081 accepted, effective claim required before implementation.
+Current cycle: [I281](iterations/I281-auto-shell-review-and-windows-timing.md),
+Review/Claimed. Implementation #588 merged as `a1cb869b`; exact-head CI and independent
+Agent security/API review passed. Human UX acceptance remains pending; MODEL-007 follows.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
