@@ -5,8 +5,7 @@ edition = "2024"
 publish = false
 
 # This manifest is intentionally an independent Cargo root. The path dependencies are the
-# explicit local-workspace mode used by the fixture; a future registry-mode copy can replace
-# these paths with published versions without relying on parent workspace discovery.
+# explicit local-source mode used by the fixture; no other Talos direct dependency is allowed.
 [workspace]
 
 [features]
@@ -17,11 +16,6 @@ coding = ["talos-runtime/shared-composition"]
 anyhow = "1"
 async-trait = "0.1"
 serde_json = "1"
-talos-core = { version = "0.9.0", path = "../../../crates/talos-core" }
-talos-permission = { version = "0.9.0", path = "../../../crates/talos-permission" }
-talos-provider = { version = "0.9.0", path = "../../../crates/talos-provider" }
-talos-runtime = { version = "0.9.0", path = "../../../crates/talos-runtime" }
-talos-sandbox = { version = "0.9.0", path = "../../../crates/talos-sandbox" }
-talos-session = { version = "0.9.0", path = "../../../crates/talos-session" }
+talos-runtime = { version = "0.10.0", path = "../../../crates/talos-runtime" }
 tempfile = "3"
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"] }

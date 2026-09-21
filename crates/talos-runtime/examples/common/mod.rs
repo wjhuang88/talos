@@ -4,9 +4,7 @@
 
 pub use talos_provider::mock::MockProvider;
 
-use talos_core::message::AgentEvent;
-use talos_core::provider::LanguageModel;
-use talos_core::session::SessionEvent;
+use talos_runtime::{AgentEvent, LanguageModel, SessionEvent, TurnEventPayload};
 use talos_runtime::{RuntimeBuilder, RuntimeHandle, RuntimeTurnCompletionStatus};
 
 pub fn mock_provider(response: &str) -> std::sync::Arc<dyn LanguageModel> {
@@ -36,7 +34,7 @@ pub async fn run_turn(runtime: &mut RuntimeHandle, message: &str) -> RuntimeTurn
     while let Some(event) = runtime.next_event().await {
         print_event(&event);
         if let SessionEvent::TurnEvent {
-            payload: talos_core::session::TurnEventPayload::Completed { status },
+            payload: TurnEventPayload::Completed { status },
             ..
         } = event
         {
@@ -53,7 +51,7 @@ pub fn print_event(event: &SessionEvent) {
         SessionEvent::TurnEvent {
             turn_id: _,
             sequence: _,
-            payload: talos_core::session::TurnEventPayload::Progress { event },
+            payload: TurnEventPayload::Progress { event },
             ..
         } => match event {
             AgentEvent::TurnStart => println!("  [TurnStart]"),
@@ -78,13 +76,13 @@ pub fn print_event(event: &SessionEvent) {
         SessionEvent::TurnEvent {
             turn_id,
             sequence,
-            payload: talos_core::session::TurnEventPayload::Started,
+            payload: TurnEventPayload::Started,
             ..
         } => println!("  [TurnStarted] id={turn_id} seq={sequence}"),
         SessionEvent::TurnEvent {
             turn_id,
             sequence,
-            payload: talos_core::session::TurnEventPayload::Completed { status },
+            payload: TurnEventPayload::Completed { status },
             ..
         } => {
             println!("  [TurnCompleted] id={turn_id} seq={sequence} status={status:?}")

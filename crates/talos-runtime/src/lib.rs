@@ -2,6 +2,24 @@
 //!
 //! This crate is the SDK-style entrypoint for Rust projects that want to reuse
 //! Talos's agent turn loop without depending on the Talos CLI or TUI crates.
+//!
+//! # Single direct Talos dependency
+//!
+//! Implement [`LanguageModel`], [`AgentTool`] and [`SandboxProvider`] using the canonical
+//! types explicitly re-exported here. No other direct `talos-*` dependency is required
+//! for core provider/tool/message/event/permission/sandbox composition. A built-in
+//! provider from `talos-provider` is optional, not part of this requirement.
+//!
+//! Re-exports preserve the original type identity and source-crate imports. The SDK
+//! remains pre-1.0 and semver-bound; these additive I280 paths are not in published
+//! v0.10.0. Existing experimental feature and subsystem support boundaries are not
+//! expanded into an unrestricted facade. In particular, runtime internals and arbitrary
+//! session-management, hook and evaluator APIs are not promised by the core contract.
+//!
+//! Build with [`RuntimeBuilder`], await [`RuntimeHandle::submit`], consume
+//! [`SessionEvent`] values and await bounded shutdown. Importing facade types never
+//! grants permission: unresolved approvals and unavailable sandbox isolation remain
+//! fail-closed by default.
 
 #[cfg(feature = "shared-composition")]
 use std::collections::HashSet;
@@ -16,27 +34,16 @@ use talos_agent::permission_pipeline::{
     ApprovalResolver, ApprovalResolverError, PermissionApprovalRequest,
 };
 use talos_agent::session::{AppServerSession, RuntimeAdmissionControl};
-use talos_agent::{Agent, AgentError, SandboxFallbackHandler};
-use talos_core::ApprovalChoice;
-use talos_core::message::Message;
-use talos_core::provider::LanguageModel;
-use talos_core::session::{
-    RuntimePolicy, SessionConfig, SessionEvent, SessionOp, TurnCompletionStatus,
-};
-use talos_core::tool::{AgentTool, ToolRegistry};
+use talos_agent::{Agent, SandboxFallbackHandler};
+use talos_core::session::{RuntimePolicy, SessionConfig, SessionOp};
+use talos_core::tool::ToolRegistry;
 #[cfg(test)]
-use talos_core::tool::{
-    ToolExecutionAuthorization, ToolExecutionOutput, ToolPermissionFacet, ToolResult,
-};
+use talos_permission::PermissionRequest;
 use talos_permission::{
-    GrantPreview, GrantSource, InteractionCapability, PermissionContext, PermissionEngine,
-    PermissionMode, PermissionRule, PermissionSessionState,
+    GrantSource, InteractionCapability, PermissionContext, PermissionEngine, PermissionMode,
+    PermissionSessionState,
 };
-#[cfg(test)]
-use talos_permission::{GrantScope, PermissionDecision, PermissionRequest};
 use talos_plugin::HookRegistry;
-use talos_sandbox::SandboxProvider;
-use talos_session::{DurableSession, PersistencePolicy};
 use talos_skill::SkillIndex;
 use thiserror::Error;
 use tokio::sync::mpsc;
@@ -131,12 +138,44 @@ pub use talos_agent::evaluator::{
     EvaluatorRequest, IndependentEvaluator, ProviderEvaluatorAssessor, ValidationEvidence,
     ValidationEvidenceStatus,
 };
-pub use talos_agent::{SandboxFallbackContext, SandboxFallbackDecision, SandboxFallbackPolicy};
-pub use talos_core::message::{AgentEvent, MessageToolResult, StopReason, ToolCall, Usage};
-pub use talos_core::provider::{ProviderError, ToolDefinition};
+pub use talos_agent::{
+    AgentError, SandboxFallbackContext, SandboxFallbackDecision, SandboxFallbackPolicy,
+};
+pub use talos_core::ApprovalChoice;
+pub use talos_core::background_job::{
+    BackgroundCleanupOutcome, BackgroundJobId, BackgroundJobLauncher, BackgroundJobPermit,
+    BackgroundJobRequest, BackgroundJobState, BackgroundJobTerminalSummary, BackgroundOutputChunk,
+    BackgroundOutputStream, BackgroundProcessControl, BackgroundProcessEvent,
+    BackgroundProcessExit, LaunchedBackgroundJob, ToolExecutionAdmission,
+};
+pub use talos_core::message::{
+    AgentEvent, AssistantReasoning, ContentDigest, ContentPart, Message, MessageToolResult,
+    ReasoningBlock, StopReason, SystemCacheMarker, SystemCacheType, ToolCall, Usage,
+};
+pub use talos_core::provider::{
+    DecisionRequestLimits, LanguageModel, ProviderError, ProviderProgress, ProviderResult,
+    Receiver, ToolDefinition,
+};
 pub use talos_core::session::TurnCompletionStatus as RuntimeTurnCompletionStatus;
-pub use talos_core::tool::{ToolNature, ToolProvenance};
+pub use talos_core::session::{SessionEvent, TurnCompletionStatus, TurnEventPayload};
+pub use talos_core::submission::{
+    PendingSubmissionState, StructuredSubmission, SubmissionItem, SubmissionKind,
+    SubmissionReceiptDisposition, SubmissionRejectionReason, SubmissionSource,
+};
+pub use talos_core::tool::{
+    AgentTool, AtomicCreateCapability, CapabilityProbe, ProtocolCapabilities,
+    SharedAtomicCreateCapability, ToolAuthorizationScope, ToolBackend, ToolContinuation,
+    ToolExecutionAuthorization, ToolExecutionOutput, ToolFamily, ToolNature, ToolPermissionFacet,
+    ToolProtocol, ToolProvenance, ToolResourceKind, ToolResult, ToolResultProjection,
+};
+pub use talos_permission::{
+    GrantPreview, GrantPreviewFacet, GrantScope, PermissionDecision, PermissionRule, ResourceKind,
+};
 pub use talos_plugin::HookRegistry as RuntimeHookRegistry;
+pub use talos_sandbox::{
+    SandboxConfig, SandboxError, SandboxProvider, SandboxResult, create_sandbox,
+};
+pub use talos_session::{DurableSession, PersistencePolicy, SessionError, SessionManager};
 pub use talos_skill::SkillIndex as RuntimeSkillIndex;
 
 /// Explicit built-in capability preset for embedded runtimes.

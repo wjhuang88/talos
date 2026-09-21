@@ -14,7 +14,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde_json::Value;
-use talos_core::tool::{AgentTool, ToolNature, ToolResult};
+use talos_runtime::{AgentTool, ToolNature, ToolResult};
 use talos_runtime::{RuntimeBuilder, RuntimeTurnCompletionStatus, collect_until_turn_completed};
 
 /// A simple read-only tool that returns a greeting for a given name.

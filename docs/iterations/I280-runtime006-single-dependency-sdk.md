@@ -1,6 +1,6 @@
 # Iteration I280: Single-Direct-Dependency Runtime SDK
 
-> Document status: Active (proposed; effective only after #583 merges)
+> Document status: Active
 > Published plan date: 2026-09-21
 > Planned objective: Complete RUNTIME-006 / #234 without requiring another direct Talos dependency.
 > MVP deliverable: An independent Cargo consumer implements a provider and tool, configures permissions and sandbox, submits a turn, consumes typed events and shuts down using only talos-runtime Talos imports.
@@ -20,7 +20,7 @@
 | Authorization Evidence | Maintainer requested full #234 development closure on 2026-09-21; standing single-maintainer mode with independent Agent API/security review. |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-21 |
-| Handoff / Release Condition | Finalize claim reference, applicable exact-head CI and independent Agent review before merge; implementation begins only after effective target-branch claim. |
+| Handoff / Release Condition | Claim #583 effective; complete local implementation, external fixture and preflight, then exact-head CI and independent API/security review before implementation merge. |
 
 ## Published Baseline
 
@@ -80,11 +80,61 @@
 ## Actual Activation And Execution
 
 - 2026-09-21: Prepared governance-only claim proposal; not effective until finalized claim merges.
+- 2026-09-21: #583 merged as `b553b9933c4bb9c20526168d25758c2c0694cc96`.
+  Exact head `b9747bd99f89d06adf9a74f59b742f9c9158b4a5`, base
+  `1915857d68b783c321b83c36613ad61723e68c81`; CI `35548998972` passed applicable
+  docs jobs, independent Agent approval `5754011166`, merge-time CAS `5754026580`.
+  Claim now effective; implementation branch starts at this merge. Existing external SDK fixture
+  is multi-dependency and stale at 0.9.0; migrate it while retaining durability/shutdown coverage.
 
 ## Verification Evidence
 
-- Pending claim validation and implementation acceptance; no implementation completion claimed.
+- `cargo check --locked -p talos-runtime`: passed after initial explicit exports.
+- `cargo check --locked -p talos-runtime --examples`: passed after facade import migration.
+- Independent external default fixture: passed including typed tool-result/lifecycle assertions,
+  permission/sandbox counter matrix and scoped-approval versus fallback separation. Later durability
+  reopen and coding read assertions are included in the pending final preflight.
+- External coding build exposed a missing `dep:talos-text` edge in `shared-composition`; fixed the
+  existing optional-dependency feature declaration. Workspace lockfile unchanged. Fixture lockfile
+  updated for its independent 0.10.0 local-source resolution; no production dependency upgrade.
+- First full preflight reached test linking but failed with disk exhaustion (`os error 28`), not a
+  passing test result. After all compiler processes exited, removed rebuildable incremental cache;
+  retry uses `CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=2 ./scripts/release_preflight.sh`.
+- The retry also exhausted disk at test linking. With no live compiler processes, cleaned only
+  rebuildable `target/debug` through `cargo clean --profile dev` (24.7 GiB). Final full-scope retry
+  uses `CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0
+  CARGO_PROFILE_TEST_DEBUG=0 ./scripts/release_preflight.sh`; this disables debug symbols, not
+  tests, debug assertions, permission checks or locked dependency validation.
+- The debug-symbol-free run completed compilation and reached workspace tests, then the existing
+  `talos-skill::tests::test_dedup_project_shadows_shared` was denied access to its HOME-based test
+  directory by the execution sandbox. The same full preflight is being rerun with approved
+  unrestricted execution; no test is ignored or weakened and the failure is not counted as a pass.
+- Pre-submit API/security inspection by independent Agent `/root/durability_diagnosis` found no
+  blocking defect. This is not exact-head approval; stable-commit review and remote CI remain required.
+- Implementation remains local and incomplete until full preflight, final fixture modes and
+  exact-head review/CI pass. No implementation completion claimed.
 
 ## Residuals
 
 - Unrelated MODEL-007 and I277 deferred acceptance remain with their existing owners.
+
+## Implementation Changed-File Inventory
+
+- SDK implementation: `crates/talos-runtime/src/lib.rs` (explicit canonical exports/rustdoc),
+  `crates/talos-runtime/Cargo.toml` (existing optional text dependency enabled by its consumer feature).
+- SDK examples: `crates/talos-runtime/examples/quickstart.rs`,
+  `crates/talos-runtime/examples/custom_tool.rs`, `crates/talos-runtime/examples/approval.rs`,
+  `crates/talos-runtime/examples/common/mod.rs` (facade paths; self-contained quickstart provider).
+- Independent acceptance: `tests/fixtures/runtime-sdk-external/Cargo.toml`,
+  `tests/fixtures/runtime-sdk-external/Cargo.lock`, `tests/fixtures/runtime-sdk-external/src/main.rs`,
+  `tests/fixtures/runtime-sdk-external/src/provider.rs`,
+  `tests/fixtures/runtime-sdk-external/src/safety.rs`,
+  `tests/fixtures/runtime-sdk-external/src/api_surface.rs`.
+- Regression entrypoint: `scripts/validate_runtime_sdk_fixture.py`, `scripts/release_preflight.sh`.
+- User/API documentation: `README.md`, `README.zh-CN.md`,
+  `docs/reference/RUNTIME-SDK-CONTRACT.md`, `docs/reference/I280-RUNTIME-FACADE-MIGRATION.md`.
+- Owner-first execution records: this iteration, `docs/backlog/active/RUNTIME-006-single-dependency-sdk-facade.md`,
+  `docs/backlog/PRODUCT-BACKLOG.md`, `docs/iterations/README.md`, `docs/BOARD.md`,
+  `.agent-governance/manifest.yaml`.
+- No permission/sandbox implementation, CLI/TUI/Desktop production behavior, main workspace lockfile,
+  release version or tag changes. Fixture-local dependency resolution is independent by design.

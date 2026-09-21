@@ -534,6 +534,12 @@ MCP 请求也有超时上限。TUI 中可使用 `/mcp` 查看启动连接快照�
 
 ## 在 Rust 中嵌入 Talos
 
+I280 源码开发新增单一直接 Talos 依赖的 SDK：自定义 provider、工具、权限规则、sandbox
+适配器与类型化事件所需的规范类型可从 `talos_runtime` 导入。这些新增路径尚不在已发布的
+`0.10.0` 中。源码 `quickstart` 仅通过 facade 实现本地 provider；其他示例可以选用
+`talos-provider` 的 mock 辅助功能。原始 crate 导入路径保持兼容，详见
+[I280 迁移说明](docs/reference/I280-RUNTIME-FACADE-MIGRATION.md)。
+
 Rust 应用可以依赖 `talos-runtime` crate，在不链接 Talos CLI 或 TUI crate 的情况下嵌入
 核心 Agent 循环。当前 pre-1.0 初始 facade 提供 `RuntimeBuilder` 和 `RuntimeHandle`，
 用于注入 provider/tool、接收类型化事件流、中断、关闭和显式 request preview。
