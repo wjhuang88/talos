@@ -1,6 +1,6 @@
 # Iteration I280: Single-Direct-Dependency Runtime SDK
 
-> Document status: Active
+> Document status: Review
 > Published plan date: 2026-09-21
 > Planned objective: Complete RUNTIME-006 / #234 without requiring another direct Talos dependency.
 > MVP deliverable: An independent Cargo consumer implements a provider and tool, configures permissions and sandbox, submits a turn, consumes typed events and shuts down using only talos-runtime Talos imports.
@@ -18,7 +18,7 @@
 | Governance Claim PR | #583 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer requested full #234 development closure on 2026-09-21; standing single-maintainer mode with independent Agent API/security review. |
-| Implementation PR | Not started |
+| Implementation PR | #584 |
 | Last Updated | 2026-09-21 |
 | Handoff / Release Condition | Claim #583 effective; complete local implementation, external fixture and preflight, then exact-head CI and independent API/security review before implementation merge. |
 
@@ -117,6 +117,19 @@
 ## Residuals
 
 - Unrelated MODEL-007 and I277 deferred acceptance remain with their existing owners.
+- Existing Windows I226 marker-readiness timing defect is deferred by the maintainer to the
+  next requirement on 2026-09-21. A CI retry is not evidence that this defect is repaired.
+
+## Stable Candidate Checkpoint (2026-09-21)
+
+- Implementation #584: `dfe63ea65e2ca1cf18c460ba7843920aff42ce07`, base
+  `b553b9933c4bb9c20526168d25758c2c0694cc96`. Earlier pending/local statements above
+  describe intermediate execution; the full unrestricted preflight subsequently exited 0,
+  including locked workspace validation and independent default/coding fixture execution.
+- Quickstart executed successfully. Runtime rustdoc built with broken intra-doc links denied.
+- Independent Agent API/security review approved that implementation head in #584 comment
+  `5754547935`; shared-account Agent-role separation only, not independent human identity.
+- Delivery remains Review/Claimed pending final applicable CI, merge-time CAS and merge evidence.
 
 ## Implementation Changed-File Inventory
 
