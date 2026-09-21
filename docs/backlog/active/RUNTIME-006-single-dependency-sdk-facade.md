@@ -1,6 +1,6 @@
 # RUNTIME-006: Single-Direct-Dependency Runtime SDK Facade
 
-**Status**: In Progress
+**Status**: Review
 **Selected Iteration**: I280
 **Type**: Public API / SDK Story
 **Parent Epic**: ARCH-031
@@ -18,9 +18,9 @@
 | Governance Claim PR | #583 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer requested #234 development closure on 2026-09-21; independent Agent API/security review and exact-head checks required. |
-| Implementation PR | Not started |
+| Implementation PR | #584 |
 | Last Updated | 2026-09-21 |
-| Handoff / Release Condition | I280 implements the complete facade and external acceptance after #583 establishes effective claim; close only after implementation evidence and review. |
+| Handoff / Release Condition | Effective claim #583; implementation #584 passed local preflight and external acceptance. Await final CI, merge-time CAS and existing merge evidence before closure. |
 
 ## Identity / Goal / Value
 
