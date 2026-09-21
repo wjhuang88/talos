@@ -184,6 +184,25 @@ impl ApprovalResolver for TuiApprovalHandler {
         request: PermissionApprovalRequest,
         _remaining: std::time::Duration,
     ) -> Result<ApprovalChoice, ApprovalResolverError> {
+        self.resolve_presented(request, None).await
+    }
+
+    async fn resolve_with_explanation(
+        &self,
+        request: PermissionApprovalRequest,
+        _remaining: std::time::Duration,
+        explanation: &str,
+    ) -> Result<ApprovalChoice, ApprovalResolverError> {
+        self.resolve_presented(request, Some(explanation)).await
+    }
+}
+
+impl TuiApprovalHandler {
+    async fn resolve_presented(
+        &self,
+        request: PermissionApprovalRequest,
+        explanation: Option<&str>,
+    ) -> Result<ApprovalChoice, ApprovalResolverError> {
         let (response_tx, response_rx) = tokio::sync::oneshot::channel();
         if self
             .ui_output_tx
@@ -191,7 +210,10 @@ impl ApprovalResolver for TuiApprovalHandler {
                 tool_name: request.tool_name,
                 arguments: request.arguments,
                 summary_fields: request.summary_fields,
-                preview: Some(crate::approval::format_grant_preview(&request.preview)),
+                preview: Some(crate::approval::format_explained_grant_preview(
+                    &request.preview,
+                    explanation,
+                )),
                 response: response_tx,
             })
             .is_err()
@@ -226,6 +248,10 @@ pub(crate) struct TuiPermissionAwareTool {
 #[async_trait]
 #[cfg(test)]
 impl AgentTool for TuiPermissionAwareTool {
+    fn execution_working_directory(&self) -> Option<std::path::PathBuf> {
+        self.inner.execution_working_directory()
+    }
+
     fn name(&self) -> &str {
         self.inner.name()
     }
@@ -430,6 +456,10 @@ impl PermissionAwareTool {
 #[async_trait]
 #[cfg(test)]
 impl AgentTool for PermissionAwareTool {
+    fn execution_working_directory(&self) -> Option<std::path::PathBuf> {
+        self.inner.execution_working_directory()
+    }
+
     fn name(&self) -> &str {
         self.inner.name()
     }
@@ -913,6 +943,35 @@ mod tests {
     struct NamedReadTool {
         name: &'static str,
         description: &'static str,
+    }
+
+    #[test]
+    fn permission_wrappers_forward_execution_working_directory() {
+        let directory = PathBuf::from("configured-shell-directory");
+        let inner: Arc<dyn AgentTool> = Arc::new(talos_tools::BashTool::new(directory.clone()));
+        let print = PermissionAwareTool {
+            inner: inner.clone(),
+            approval: Arc::new(Mutex::new(ApprovalPrompt::new(PermissionEngine::new()))),
+            print_mode: true,
+        };
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let tui = TuiPermissionAwareTool {
+            inner,
+            approval: Arc::new(TuiApprovalHandler::new(
+                tx,
+                PathBuf::from("different-workspace"),
+            )),
+        };
+        assert_eq!(print.execution_working_directory(), Some(directory.clone()));
+        assert_eq!(tui.execution_working_directory(), Some(directory));
+        assert_eq!(
+            NamedReadTool {
+                name: "unknown",
+                description: "unknown cwd"
+            }
+            .execution_working_directory(),
+            None
+        );
     }
 
     #[async_trait]

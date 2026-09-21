@@ -51,7 +51,26 @@ pub struct BashInput {
 /// Output is captured from both stdout and stderr.
 pub struct BashTool {
     working_dir: PathBuf,
+    working_dir_identity: Option<String>,
     timeout: Duration,
+}
+
+fn directory_identity(path: &std::path::Path) -> Option<String> {
+    let canonical = path.canonicalize().ok()?;
+    let metadata = std::fs::metadata(&canonical).ok()?;
+    if !metadata.is_dir() {
+        return None;
+    }
+    #[cfg(unix)]
+    let mut value = canonical.to_string_lossy().into_owned();
+    #[cfg(not(unix))]
+    let value = canonical.to_string_lossy().into_owned();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        value.push_str(&format!(":{}:{}", metadata.dev(), metadata.ino()));
+    }
+    Some(value)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -108,6 +127,7 @@ impl BashTool {
     /// The default timeout is 120 seconds.
     pub fn new(working_dir: PathBuf) -> Self {
         Self {
+            working_dir_identity: directory_identity(&working_dir),
             working_dir,
             timeout: Duration::from_secs(120),
         }
@@ -135,6 +155,13 @@ impl BashTool {
     }
 
     async fn run_command(&self, command: &str, timeout_duration: Duration) -> ToolResult {
+        if self.working_dir_identity.is_none()
+            || directory_identity(&self.working_dir) != self.working_dir_identity
+        {
+            return ToolResult::error(
+                "working directory changed or is unavailable; refusing to execute",
+            );
+        }
         let mut cmd = platform_shell_command(command);
         cmd.current_dir(&self.working_dir)
             .stdout(Stdio::piped())
@@ -244,6 +271,10 @@ impl BashTool {
 
 #[async_trait]
 impl AgentTool for BashTool {
+    fn execution_working_directory(&self) -> Option<PathBuf> {
+        Some(self.working_dir.clone())
+    }
+
     fn name(&self) -> &str {
         SHELL_TOOL_NAME
     }
@@ -793,6 +824,13 @@ mod tests {
 
     fn test_dir() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+    }
+
+    #[test]
+    fn execution_working_directory_is_tool_owned() {
+        let directory = test_dir();
+        let tool: Box<dyn AgentTool> = Box::new(BashTool::new(directory.clone()));
+        assert_eq!(tool.execution_working_directory(), Some(directory));
     }
 
     fn resource_prefix(class: &str, kind: &str) -> String {

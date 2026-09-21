@@ -180,6 +180,16 @@ pub trait AgentTool: Send + Sync {
         vec![ToolPermissionFacet::new(self.nature())]
     }
 
+    /// Returns the tool-owned working directory used for execution, when known.
+    ///
+    /// This is trusted implementation metadata, not a caller-supplied argument or a
+    /// permission grant. Wrappers must forward it without substituting a workspace
+    /// default. Consumers must still validate and bind the directory before admission;
+    /// `None` means that no execution-directory guarantee is available.
+    fn execution_working_directory(&self) -> Option<std::path::PathBuf> {
+        None
+    }
+
     fn summary_fields(&self) -> &'static [&'static str] {
         &[]
     }

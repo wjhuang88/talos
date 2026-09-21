@@ -536,25 +536,37 @@ impl Agent {
                 }
             }
 
-            let authorization = pipeline
-                .authorize_with_user_intent(
-                    PermissionAuthorizationRequest {
-                        tool_name: &call.name,
-                        provenance: tool.provenance(),
-                        profile: &permission_profile,
-                        input: &call.input,
-                        presentation_input: tool.project_input(&call.input),
-                        summary_fields: tool
-                            .summary_fields()
-                            .iter()
-                            .map(|field| (*field).to_string())
-                            .collect(),
-                        deadline: permission_deadline_at
-                            .saturating_duration_since(tokio::time::Instant::now()),
-                    },
-                    user_intent,
-                )
-                .await;
+            let working_directory = tool.execution_working_directory();
+            let authorization_request = PermissionAuthorizationRequest {
+                tool_name: &call.name,
+                provenance: tool.provenance(),
+                profile: &permission_profile,
+                input: &call.input,
+                presentation_input: tool.project_input(&call.input),
+                summary_fields: tool
+                    .summary_fields()
+                    .iter()
+                    .map(|field| (*field).to_string())
+                    .collect(),
+                deadline: permission_deadline_at
+                    .saturating_duration_since(tokio::time::Instant::now()),
+            };
+            let authorization = if matches!(call.name.as_str(), "bash" | "powershell")
+                && working_directory.is_some()
+            {
+                let working_directory = working_directory.as_deref().expect("checked above");
+                pipeline
+                    .authorize_with_execution_context(
+                        authorization_request,
+                        user_intent,
+                        Some(working_directory),
+                    )
+                    .await
+            } else {
+                pipeline
+                    .authorize_with_user_intent(authorization_request, user_intent)
+                    .await
+            };
             let decision = authorization
                 .as_ref()
                 .err()

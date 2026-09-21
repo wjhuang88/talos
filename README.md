@@ -251,14 +251,20 @@ The `[auto] enabled` setting defaults to `true` as an attempted bounded-assistan
 unconditional permission. `/auto`, `/auto on`, and `/auto off` inspect or override the active
 session without writing configuration or transcript state.
 
-When auto assistance evaluates a foreground shell request, the configured model receives a bounded
+When auto assistance evaluates a shell approval request, the configured model receives a bounded
 copy of the exact command as untrusted data plus structural risk facts, the current user instruction,
 canonical workspace/cwd bindings, environment variable names and an opaque environment digest. A
-configured or explicit `Ask` rule bypasses the assessor. A valid high-confidence `read_only` result
+configured or explicit `Ask` rule retains human confirmation even after model assessment. A valid high-confidence `read_only` result
 may admit that one invocation only. Mutating, network, privileged, ambiguous, secret-bearing,
 malformed, timed-out, or stale requests remain human-required or denied by the authoritative
 permission and sandbox gates. The assessor has no tools, never sees raw environment values or
 secret-like assignments, and cannot create a permanent grant.
+
+Referenced local scripts can contribute complete bounded snapshots from the managed workspace;
+missing, oversized, sensitive or unresolved dependencies are identified rather than silently
+truncated. Mutable file snapshots do not authorize later execution. Such requests remain human-owned,
+even if the model suggests approval. Approval panels show bounded model-reported effects and decision
+points when available; failed or invalid assessment is explicitly distinguished from a risk verdict.
 
 Auto review failures distinguish timeout, request/stream failure, incomplete response and byte-limit
 exhaustion in the TUI. Local logs retain session/request correlation, safe failure categories and

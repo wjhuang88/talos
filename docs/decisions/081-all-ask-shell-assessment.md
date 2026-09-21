@@ -45,6 +45,10 @@ assessment coverage and granting execution authority are distinct changes.
   exactly-once execution remain authoritative; no persistent model-created grants.
 - If public assessment/event schemas require changes, document additive paths and external
   exhaustive-match impact before implementation; do not silently break SDK consumers.
+- The implementation keeps script evidence on the additive assessor method rather than adding a
+  required field to `AutoPermissionAssessmentContext`; existing struct literals remain source
+  compatible. Assessors that want script-aware policy should implement
+  `assess_with_script_evidence`; the default adapter fails closed for collected script evidence.
 - Security matrix must include both shells, scripts/compound commands, writes, network/secret
   effects, prompt injection, unresolved code, content mutation, stale revision, cancellation,
   invalid response, Auto off, configured Ask and valid grants.
