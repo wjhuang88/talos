@@ -1,6 +1,6 @@
 # RUNTIME-006: Single-Direct-Dependency Runtime SDK Facade
 
-**Status**: In Progress (proposed; effective only after #583 merges)
+**Status**: In Progress
 **Selected Iteration**: I280
 **Type**: Public API / SDK Story
 **Parent Epic**: ARCH-031
@@ -53,7 +53,7 @@ Today that is not true. `RuntimeBuilder` and `RuntimeHandle` expose types from `
 - ADR-024 and ADR-052 remain the SDK/composition boundary.
 - ARCH-031 owns the crate publication architecture.
 - Provider and compatibility choices are resolved below under ADR-024/ADR-052; #583 claim merge
-  remains required before implementation.
+  is effective at `b553b9933c4bb9c20526168d25758c2c0694cc96`.
 - v0.8.0 may publish the current documented multi-direct-dependency SDK contract; this stronger
   facade requirement is a separately claimed follow-up and is not a hidden release gate.
 

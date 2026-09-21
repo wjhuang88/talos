@@ -8,11 +8,12 @@ pre-1.0 contract: the surface is usable but not yet semver-stable. REL-002 gates
 ## Supported Embedding Surface
 
 Embedders should depend on **`talos-runtime`**. This contract covers `talos-runtime`'s own public
-API plus the types it explicitly `pub use`-re-exports. Lower-level crate types that appear in
-builder signatures but are NOT re-exported by the facade require a direct dependency on their
-origin crate and are governed by that crate's own independent pre-1.0 support boundary (see
-"Lower-level extension types requiring direct dependencies" below). Using a type from an external
-project does not imply it is exported by the runtime facade.
+API plus the types it explicitly `pub use`-re-exports. I280 source development exposes the
+provider, tool, permission, sandbox and session-event signature types through this facade,
+so custom implementations need only one direct Talos dependency. These additive imports are
+not included in published v0.10.0. Origin-crate paths remain compatible; optional built-in
+providers may still come from `talos-provider`. Unlisted lower-level APIs retain their own
+support boundaries. See [I280 migration](I280-RUNTIME-FACADE-MIGRATION.md).
 
 ### Builder and Handle (defined in `talos-runtime`)
 
@@ -31,7 +32,7 @@ project does not imply it is exported by the runtime facade.
 
 ### Re-exported Protocol Types (actual `pub use` in `talos-runtime`)
 
-These are the types `talos-runtime` currently re-exports. The list is the public re-export set;
+These are selected types `talos-runtime` re-exports. For the complete named export set,
 verify against `crates/talos-runtime/src/lib.rs` if the surface may have changed.
 
 | Re-exported name | Source | Purpose |
@@ -43,33 +44,52 @@ verify against `crates/talos-runtime/src/lib.rs` if the surface may have changed
 | `Usage` | `talos_core::message` | Token usage statistics |
 | `ProviderError` | `talos_core::provider` | Provider error type |
 | `ToolDefinition` | `talos_core::provider` | Provider-facing tool schema |
-| `RuntimeTurnCompletionStatus` | `talos_core::session::TurnCompletionStatus` (re-exported under this alias) | Turn outcome: `Success`, `Cancelled`, or `Error`. NOTE: the public name is `RuntimeTurnCompletionStatus`; the underlying `TurnCompletionStatus` is not re-exported under that bare name. |
+| `RuntimeTurnCompletionStatus` / `TurnCompletionStatus` | `talos_core::session::TurnCompletionStatus` | The existing alias and new I280 bare name denote the same turn outcome type. |
 | `ToolNature` | `talos_core::tool` | Risk classification: Read / Write / Execute / Network |
 | `ToolProvenance` | `talos_core::tool` | Tool origin: `Native`, `McpRemote { server }`, or `Plugin { name, version, carrier }` (ADR-028) |
 | `RuntimeHookRegistry` | `talos_plugin::HookRegistry` (re-exported under this alias) | Hook registry used by `RuntimeBuilder::hook_registry` |
 | `RuntimeSkillIndex` | `talos_skill::SkillIndex` (re-exported under this alias) | Skill index used by `RuntimeBuilder::skill_index` |
 
-### Lower-level extension types requiring direct dependencies
+### I280 facade signature closure (source development)
 
-These types appear in `RuntimeBuilder`/`ApprovalHandler` signatures but are **NOT** re-exported by
-`talos-runtime`. An embedder who implements or constructs them must add a direct dependency on the
-origin crate; that crate's own pre-1.0 support boundary applies, not this runtime SDK contract.
+These canonical types are explicitly exported at the `talos_runtime` root in I280.
+Their origin crates need not be direct dependencies for these embedding operations.
 
-| Type / Trait | Direct crate dependency | Runtime SDK contract coverage |
+| Type / Trait | Canonical origin | Runtime SDK contract coverage |
 |---|---|---|
-| `LanguageModel` | `talos-core` | Trait; accepted by `RuntimeBuilder::provider`; not re-exported by the facade |
-| `AgentTool` | `talos-core` | Trait; accepted by `RuntimeBuilder::tool`; not re-exported by the facade |
-| `Message` | `talos-core` | Used by `RuntimeBuilder::initial_history`; not re-exported unless later added |
-| `ApprovalChoice` | `talos-core` | Enum returned by `ApprovalHandler::request_approval`; not re-exported |
+| `LanguageModel`, `ProviderResult`, `Receiver`, `DecisionRequestLimits`, `ProviderProgress` | `talos-core` | Custom provider implementation and bounded request signatures |
+| `AgentTool`, `ToolResult`, `ToolExecutionOutput`, `ToolExecutionAuthorization`, `ToolPermissionFacet` | `talos-core` | Custom tool execution and authoritative permission profiles |
+| `Message`, `ContentPart`, `AssistantReasoning`, `ReasoningBlock` | `talos-core` | Initial history and typed message contents |
+| `SessionEvent`, `TurnEventPayload` | `talos-core` | Typed progress and completion consumption |
+| `ApprovalChoice` | `talos-core` | Enum returned by `ApprovalHandler::request_approval` |
 | `PermissionRule` | `talos-permission` | A rule type (not a trait); accepted by `RuntimeBuilder::permission_rule` |
-| `GrantPreview` | `talos-permission` | Bounded exact scope passed to `ApprovalHandler::request_scoped_approval`; not re-exported |
-| `SandboxProvider` | `talos-sandbox` | Trait; accepted by `RuntimeBuilder::sandbox` |
+| `PermissionDecision`, `ResourceKind`, `GrantPreview` | `talos-permission` | Rule construction and bounded scoped approval preview |
+| `SandboxProvider`, `SandboxConfig`, `SandboxResult`, `SandboxError`, `create_sandbox` | `talos-sandbox` | Custom sandbox implementation or canonical platform factory |
+| `DurableSession`, `PersistencePolicy`, `SessionManager` | `talos-session` | Supported durable-session builder composition |
+| `AgentError`, `SessionError` | `talos-agent`, `talos-session` | Canonical errors in runtime construction and durable-session signatures |
+| `GrantPreviewFacet`, `GrantScope` | `talos-permission` | Inspect compiled scoped approval previews without reconstructing authority |
+| `ToolContinuation` | `talos-core` | Typed continuation of an admitted tool execution |
+| `StructuredSubmission`, `SubmissionItem`, `SubmissionKind`, `SubmissionSource`, `PendingSubmissionState`, `SubmissionReceiptDisposition`, `SubmissionRejectionReason` | `talos-core` | Structured submission and typed session queue projections |
+| `BackgroundJobId`, `BackgroundJobState`, `BackgroundJobRequest`, `BackgroundJobPermit`, `BackgroundJobLauncher`, `LaunchedBackgroundJob`, `ToolExecutionAdmission` | `talos-core` | Background-job signature types for admitted tool execution |
+| `BackgroundCleanupOutcome`, `BackgroundJobTerminalSummary`, `BackgroundOutputChunk`, `BackgroundOutputStream`, `BackgroundProcessControl`, `BackgroundProcessEvent`, `BackgroundProcessExit` | `talos-core` | Typed background-process control, output and terminal outcomes |
+
+The single-direct-dependency promise covers custom provider/tool/approval/sandbox implementations,
+typed event consumption and runtime composition. For durable sessions it covers
+`SessionManager::with_dir`, `SessionManager::create_or_open_session`, `DurableSession`
+composition and `DurableSession::read_messages`. Other management methods reachable through
+`SessionManager` retain the original session crate's independent contract; their presence on
+the canonical type does not promise a complete facade dependency closure.
+
+Likewise, language-provider, hook and evaluator extension APIs are not claimed as complete
+single-dependency extension ecosystems. Existing named exports remain available, but adapters
+using those broader extension surfaces may need their origin crates. Re-exported admission,
+grant and background-job types do not grant execution authority or bypass permission checks.
 
 ### Extension types and traits used by embedders
 
 Embedders typically implement or supply the following. Only `ApprovalHandler` is defined in
-`talos-runtime` itself; the rest are lower-level types listed for orientation and require the direct
-dependencies above.
+`talos-runtime` itself; the canonical lower-level types below are available through its
+explicit facade exports in I280.
 
 | Type / Trait | Defined in | Supplied via |
 |---|---|---|
@@ -104,19 +124,16 @@ If an embedder has a compelling reason to use `talos-agent` directly (bypassing 
    `talos-runtime` with a proper API. File an issue before depending on an internal constructor.
 4. **Permission boundary.** Direct `talos-agent` use bypasses the `RuntimeBuilder` permission
    wrapping. The embedder is responsible for installing permission rules and approval handlers.
-5. **Publication gate.** `talos-agent` is a gate-before-publish crate (see the `talos-agent` entry
-   in [CRATE-PUBLICATION-MATRIX](CRATE-PUBLICATION-MATRIX.md)). It is not on crates.io and may not
-   be published until sandbox/tools dependency gates clear. Per
-   [ADR-052](../decisions/052-sdk-publication-and-composition-boundary.md) it will be published as
-   an **implementation dependency only** (route A: `talos-sandbox` → `talos-tools` → `talos-agent`
-   → `talos-runtime`), never promoted to a second supported SDK entrypoint.
+5. **Publication does not establish SDK support.** `talos-agent` is published as an
+   implementation dependency. Under [ADR-052](../decisions/052-sdk-publication-and-composition-boundary.md),
+   registry availability does not promote it to a second supported SDK entrypoint.
 
 ## Embedding Patterns
 
 ### Pattern 1: Minimal Turn Loop
 
 ```rust,ignore
-use talos_runtime::RuntimeBuilder;
+use talos_runtime::{RuntimeBuilder, SessionEvent, TurnEventPayload};
 // provider: Arc<dyn LanguageModel>
 
 let mut handle = RuntimeBuilder::new()
@@ -124,11 +141,13 @@ let mut handle = RuntimeBuilder::new()
     .workspace_root(".")
     .build()?;
 
-handle.submit("Hello, what can you do?")?;
+handle.submit("Hello, what can you do?").await?;
 while let Some(event) = handle.next_event().await {
-    // inspect event
+    if matches!(event, SessionEvent::TurnEvent {
+        payload: TurnEventPayload::Completed { .. }, ..
+    }) { break; }
 }
-handle.shutdown()?;
+handle.shutdown().await?;
 ```
 
 `submit` returning success means the command crossed the SDK admission fence and entered the
@@ -231,8 +250,8 @@ let mut handle = RuntimeBuilder::new()
 ```
 
 The feature is not a coding preset: it selects tool instances only. Approval, permission rules,
-sandbox selection, and caller overrides remain runtime concerns. `RuntimePreset::coding()` and
-`SandboxFallbackPolicy` remain separate ARCH-031-C/I161 work.
+sandbox selection, and caller overrides remain runtime concerns. The existing
+`RuntimePreset::coding()` and `SandboxFallbackPolicy` provide separate composition controls.
 
 For the Talos snapshot-aware file-tool set, construct one shared registry-backed group and register
 all four tools so writes and deletes invalidate read snapshots consistently:
@@ -307,17 +326,14 @@ Direct consumers that need to construct or inspect first-class grant state must 
 [I219 Scoped Grant Migration](I219-PERM006B-SCOPED-GRANT-MIGRATION.md) for the v0.9+ source and
 schema migration.
 
-## Planned Additions (ADR-052 — Not Yet Implemented)
+## Explicit Composition And Sandbox Policy (ADR-052)
 
-[ADR-052](../decisions/052-sdk-publication-and-composition-boundary.md) decided the following SDK
-surface additions. They are **design commitments, not shipped APIs**; this section is a forward
-contract and MUST NOT be read as "already available." Each lands through ARCH-031 slices under
-iteration governance, and this document is updated to the "Supported" tables above only when the
-implementation commit exists.
+[ADR-052](../decisions/052-sdk-publication-and-composition-boundary.md) defines these existing
+composition APIs. I280 changes their import closure, not their execution or authorization policy.
 
 ### Caller-selected sandbox fallback
 
-When sandbox isolation is unavailable, the SDK will expose an explicit, caller-selected policy
+When sandbox isolation is unavailable, the SDK exposes an explicit, caller-selected policy
 instead of silently choosing a product default:
 
 ```rust,ignore
@@ -343,7 +359,7 @@ pub enum SandboxFallbackPolicy {
 
 ### Official coding preset
 
-`RuntimeBuilder::new()` stays minimal and composition-first; an explicit, overridable preset will
+`RuntimeBuilder::new()` stays minimal and composition-first; an explicit, overridable preset can
 reproduce Talos-owned coding defaults without copying internal registry construction:
 
 ```rust,ignore
@@ -374,7 +390,7 @@ Talos CLI. These Cargo features make code available but grant no runtime permiss
 
 Direct `talos-tools` consumers that relied on the former broad implicit default must select the
 needed capability features, or `coding` when the full product-oriented set is intentional. The
-future `RuntimePreset::coding()` remains owned by ARCH-031-C/I161 and is not implemented by I159.
+`RuntimePreset::coding()` is a separate opt-in composition API, not an implicit tool default.
 
 ## Pre-1.0 Change Policy
 

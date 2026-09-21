@@ -36,4 +36,5 @@ cargo fmt --all -- --check
 cargo check --locked --workspace
 cargo clippy --locked --workspace -- -D warnings
 cargo test --locked --workspace
+python3 ./scripts/validate_runtime_sdk_fixture.py
 echo "release preflight: passed"

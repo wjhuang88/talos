@@ -6,33 +6,58 @@
 //! - Streaming events and printing text deltas
 //! - Graceful shutdown
 //!
-//! Run with: `cargo run --example quickstart -p talos-runtime`
+//! Run with: `cargo run --locked --example quickstart -p talos-runtime`
 
-mod common;
+use async_trait::async_trait;
+use std::sync::Arc;
+use talos_runtime::{
+    AgentEvent, LanguageModel, Message, ProviderResult, Receiver, RuntimeBuilder, SessionEvent,
+    StopReason, TurnEventPayload, Usage,
+};
 
-use talos_core::message::AgentEvent;
-use talos_core::session::SessionEvent;
-use talos_runtime::RuntimeBuilder;
+struct LocalProvider;
+
+#[async_trait]
+impl LanguageModel for LocalProvider {
+    async fn stream(&self, _messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+        let (tx, rx) = tokio::sync::mpsc::channel(3);
+        tokio::spawn(async move {
+            for event in [
+                AgentEvent::TurnStart,
+                AgentEvent::TextDelta {
+                    delta: "Hello from a local custom provider!".into(),
+                },
+                AgentEvent::TurnEnd {
+                    stop_reason: StopReason::EndTurn,
+                    usage: Usage::default(),
+                },
+            ] {
+                if tx.send(event).await.is_err() {
+                    break;
+                }
+            }
+        });
+        Ok(rx)
+    }
+}
 
 #[tokio::main]
-async fn main() {
+async fn main() -> talos_runtime::RuntimeResult<()> {
     println!("=== Talos Runtime Quickstart ===\n");
 
     // Step 1: Create a mock provider that streams a response.
-    let provider =
-        common::mock_provider("Hello from the Talos runtime! I am a mock LLM running locally.");
+    let provider = Arc::new(LocalProvider);
 
     // Step 2: Build the runtime with the provider.
     let mut runtime = RuntimeBuilder::new()
         .provider(provider)
         .workspace_root(".")
-        .build()
-        .expect("runtime builds with a provider");
+        .build()?;
 
     println!("Runtime built successfully.\n");
 
     // Step 3: Submit a user message to start a turn.
-    runtime.submit("Say hello!").await.expect("submit succeeds");
+    runtime.submit("Say hello!").await?;
 
     println!("Message submitted. Streaming events:\n");
 
@@ -40,7 +65,7 @@ async fn main() {
     while let Some(event) = runtime.next_event().await {
         match &event {
             SessionEvent::TurnEvent {
-                payload: talos_core::session::TurnEventPayload::Progress { event },
+                payload: TurnEventPayload::Progress { event },
                 ..
             } => match event {
                 AgentEvent::TurnStart => println!("  ▶ Turn started"),
@@ -52,14 +77,14 @@ async fn main() {
             },
             SessionEvent::TurnEvent {
                 turn_id,
-                payload: talos_core::session::TurnEventPayload::Started,
+                payload: TurnEventPayload::Started,
                 ..
             } => {
                 println!("  [turn] {turn_id} started");
             }
             SessionEvent::TurnEvent {
                 turn_id,
-                payload: talos_core::session::TurnEventPayload::Completed { status },
+                payload: TurnEventPayload::Completed { status },
                 ..
             } => {
                 println!("  [turn] {turn_id} completed: {status:?}");
@@ -75,6 +100,7 @@ async fn main() {
 
     // Step 5: Graceful shutdown.
     println!("\nShutting down runtime...");
-    runtime.shutdown().await.expect("shutdown succeeds");
+    runtime.shutdown().await?;
     println!("Runtime shut down cleanly.");
+    Ok(())
 }

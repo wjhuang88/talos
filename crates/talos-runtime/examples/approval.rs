@@ -14,12 +14,11 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde_json::Value;
-use talos_core::approval::ApprovalChoice;
-use talos_core::tool::{AgentTool, ToolNature, ToolResult};
-use talos_permission::{PermissionDecision, PermissionRule};
+use talos_runtime::{AgentTool, ApprovalChoice, ToolNature, ToolResult};
 use talos_runtime::{
     ApprovalHandler, RuntimeBuilder, RuntimeTurnCompletionStatus, collect_until_turn_completed,
 };
+use talos_runtime::{PermissionDecision, PermissionRule};
 
 /// A write tool that would modify a file (requires approval).
 struct WriteFileTool;
@@ -147,7 +146,7 @@ async fn main() {
         .permission_rule(PermissionRule::new_nature(
             ToolNature::Write,
             Some("output.txt".to_string()),
-            Some(talos_permission::ResourceKind::Path),
+            Some(talos_runtime::ResourceKind::Path),
             PermissionDecision::Allow,
         ))
         .approval_handler(Arc::new(AutoApprovalHandler))

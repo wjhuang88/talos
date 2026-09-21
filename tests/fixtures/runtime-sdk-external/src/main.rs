@@ -4,16 +4,16 @@ use std::time::Duration;
 use anyhow::Result;
 use async_trait::async_trait;
 use serde_json::Value;
-use talos_core::approval::ApprovalChoice;
-use talos_core::provider::LanguageModel;
-use talos_core::tool::{AgentTool, ToolNature, ToolResult};
-use talos_permission::PermissionDecision;
-use talos_provider::mock::MockProvider;
+mod api_surface;
+mod provider;
+mod safety;
+use provider::FixtureProvider as MockProvider;
 use talos_runtime::{
-    ApprovalHandler, RuntimeBuilder, RuntimeError, RuntimeTurnCompletionStatus,
-    SandboxFallbackPolicy, ShutdownOptions, collect_until_turn_completed,
+    AgentTool, ApprovalChoice, ApprovalHandler, LanguageModel, PermissionDecision, PermissionRule,
+    RuntimeBuilder, RuntimeError, RuntimeTurnCompletionStatus, SandboxFallbackPolicy,
+    SessionManager, ShutdownOptions, ToolNature, ToolResult, collect_until_turn_completed,
+    create_sandbox,
 };
-use talos_session::SessionManager;
 
 struct ReadOnlyGreeting;
 
@@ -80,8 +80,8 @@ async fn run_minimal_runtime() -> Result<()> {
         .workspace_root(".")
         .tool(Arc::new(ReadOnlyGreeting))
         .approval_handler(Arc::new(DenyApproval))
-        .sandbox(talos_sandbox::create_sandbox())
-        .permission_rule(talos_permission::PermissionRule::new_nature(
+        .sandbox(create_sandbox())
+        .permission_rule(PermissionRule::new_nature(
             ToolNature::Read,
             None,
             None,
@@ -93,13 +93,20 @@ async fn run_minimal_runtime() -> Result<()> {
     let status = collect_until_turn_completed(&mut runtime)
         .await
         .ok_or_else(|| anyhow::anyhow!("fixture runtime ended before completion"))?;
-    assert!(matches!(status, RuntimeTurnCompletionStatus::Success { .. }));
+    assert!(matches!(
+        status,
+        RuntimeTurnCompletionStatus::Success { .. }
+    ));
     let report = runtime
         .shutdown_controller()
         .shutdown(ShutdownOptions::interrupt(Duration::from_secs(1))?)
         .await?;
     assert!(report.is_complete());
-    assert!(report.finalizers().is_empty());
+    assert_eq!(report.finalizers().len(), 1);
+    assert_eq!(
+        report.finalizers()[0].identifier().as_str(),
+        "background_jobs"
+    );
     assert_eq!(
         classify_runtime_error(&RuntimeError::RuntimeClosing),
         "closing"
@@ -120,7 +127,40 @@ async fn run_durable_session() -> Result<()> {
     let status = collect_until_turn_completed(&mut runtime)
         .await
         .ok_or_else(|| anyhow::anyhow!("durable fixture ended before completion"))?;
-    assert!(matches!(status, RuntimeTurnCompletionStatus::Success { .. }));
+    assert!(matches!(
+        status,
+        RuntimeTurnCompletionStatus::Success { .. }
+    ));
+    runtime.shutdown().await?;
+    let reopened = manager.create_or_open_session("fixture:durable")?;
+    let messages = reopened.read_messages()?;
+    assert!(serde_json::to_string(&messages)?.contains("durable fixture turn"));
+    Ok(())
+}
+
+#[cfg(feature = "coding")]
+async fn run_coding_preset() -> Result<()> {
+    let directory = tempfile::tempdir()?;
+    std::fs::write(directory.path().join("note.txt"), "sdk-coding-sentinel")?;
+    let mut runtime = RuntimeBuilder::new()
+        .workspace_root(directory.path())
+        .coding_preset()
+        .provider(Arc::new(
+            MockProvider::new()
+                .with_tool_call("read", serde_json::json!({"path":"note.txt"}))
+                .with_response("coding done"),
+        ))
+        .build()?;
+    runtime.submit("read the fixture file").await?;
+    let status = collect_until_turn_completed(&mut runtime)
+        .await
+        .ok_or_else(|| anyhow::anyhow!("coding fixture ended early"))?;
+    match status {
+        RuntimeTurnCompletionStatus::Success { new_messages, .. } => {
+            assert!(serde_json::to_string(&new_messages)?.contains("sdk-coding-sentinel"));
+        }
+        other => anyhow::bail!("coding fixture failed: {other:?}"),
+    }
     runtime.shutdown().await?;
     Ok(())
 }
@@ -142,9 +182,18 @@ fn validate_fallback_policies() {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    tokio::time::timeout(Duration::from_secs(30), run()).await??;
+    Ok(())
+}
+
+async fn run() -> Result<()> {
+    api_surface::verify();
     run_minimal_runtime().await?;
     run_durable_session().await?;
+    #[cfg(feature = "coding")]
+    run_coding_preset().await?;
     validate_fallback_policies();
+    safety::run().await?;
     println!("talos-runtime external fixture passed");
     Ok(())
 }

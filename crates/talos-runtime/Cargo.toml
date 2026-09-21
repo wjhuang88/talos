@@ -10,7 +10,7 @@ rust-version.workspace = true
 
 [features]
 default = []
-shared-composition = ["dep:talos-tools"]
+shared-composition = ["dep:talos-tools", "dep:talos-text"]
 language-provider = ["dep:talos-text", "talos-text/code-intelligence", "talos-plugin/wasm", "talos-plugin/code-intelligence"]
 
 [dependencies]

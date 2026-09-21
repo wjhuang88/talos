@@ -863,6 +863,13 @@ yet supported.
 
 ## Embedding Talos In Rust
 
+I280 source development adds a single-direct-Talos-dependency SDK: custom providers,
+tools, permission rules, sandbox adapters and typed events can import their canonical
+types from `talos_runtime`. These additive paths are not in published `0.10.0`.
+The source `quickstart` example implements a local provider using only the facade;
+other examples may use optional `talos-provider` mock conveniences. Existing origin-crate
+imports remain compatible. See [I280 migration](docs/reference/I280-RUNTIME-FACADE-MIGRATION.md).
+
 Rust applications can depend on the `talos-runtime` crate to embed the core agent loop without
 linking Talos CLI or TUI crates. The initial pre-1.0 facade exposes `RuntimeBuilder` and
 `RuntimeHandle` for provider/tool injection, typed event streaming, interruption, shutdown, and
