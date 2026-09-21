@@ -36,7 +36,7 @@ I164 Paused. I277 implementation handoff is complete; its overall acceptance is 
 
 ## Current Operating Set
 
-I280 / RUNTIME-006 / #234 is Review/Claimed in #584 through #583 merge `b553b993`.
+I280 / RUNTIME-006 / #234 is Complete/Closed at implementation merge `007ca29d`; closeout `ade0b68c`.
 The maintainer selects this SDK slice before unclaimed MODEL-007; I277 deferred acceptance,
 I249 Planned and I164 Paused remain unchanged.
 

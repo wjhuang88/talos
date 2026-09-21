@@ -1,15 +1,16 @@
 # RUNTIME-006: Single-Direct-Dependency Runtime SDK Facade
 
-**Status**: Review
+**Status**: Complete
 **Selected Iteration**: I280
 **Type**: Public API / SDK Story
 **Parent Epic**: ARCH-031
+Completion Commit: `007ca29df62fe63da9e8dda07865284b09f67bc6`
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 |
 | Work Slice | Define and implement a supported `talos-runtime` facade that lets third-party consumers use the core runtime with no other direct Talos dependency. |
@@ -20,7 +21,7 @@
 | Authorization Evidence | Maintainer requested #234 development closure on 2026-09-21; independent Agent API/security review and exact-head checks required. |
 | Implementation PR | #584 |
 | Last Updated | 2026-09-21 |
-| Handoff / Release Condition | Effective claim #583; implementation #584 passed local preflight and external acceptance. Await final CI, merge-time CAS and existing merge evidence before closure. |
+| Handoff / Release Condition | Complete; Completion Commit `007ca29df62fe63da9e8dda07865284b09f67bc6`; closeout merge `ade0b68cf5bc37cff81dabe10ab47b3994d484ca`. |
 
 ## Identity / Goal / Value
 
@@ -28,8 +29,9 @@ Third-party Rust embedders should be able to declare `talos-runtime` as their on
 dependency and still implement or inject the provider, tool, message/event, permission and sandbox
 types required by the supported runtime composition surface.
 
-Today that is not true. `RuntimeBuilder` and `RuntimeHandle` expose types from `talos-core`,
-`talos-permission` and `talos-sandbox`, and the quickstart documents those direct dependencies.
+Original intake problem: `RuntimeBuilder` and `RuntimeHandle` exposed types requiring direct
+dependencies on `talos-core`, `talos-permission` and `talos-sandbox`. Implementation #584 resolves
+this through canonical runtime re-exports and a verified single-dependency external fixture.
 
 ## Scope
 
@@ -109,12 +111,15 @@ permission/sandbox behavior and full turn lifecycle. No workspace dev-dependency
 
 ## Acceptance For Technical/Governance Work
 
-- [ ] The external fixture has exactly one direct Talos dependency.
-- [ ] Public rustdoc and the SDK contract name supported facade paths and compatibility policy.
-- [ ] Provider, tool, message/event, permission and sandbox composition paths are exercised.
-- [ ] Existing imports receive documented pre-1.0 migration or compatibility treatment.
-- [ ] Locked workspace validation and the external fixture pass.
-- [ ] A separate iteration and effective Collaboration Claim exist before implementation.
+- [x] The external fixture has exactly one direct Talos dependency.
+- [x] Public rustdoc and the SDK contract name supported facade paths and compatibility policy.
+- [x] Provider, tool, message/event, permission and sandbox composition paths are exercised.
+- [x] Existing imports receive documented pre-1.0 migration or compatibility treatment.
+- [x] Locked workspace validation and the external fixture pass.
+- [x] A separate iteration and effective Collaboration Claim exist before implementation.
+
+Evidence: I280 completion checkpoint; implementation #584, exact-head CI `35551716705`,
+independent API/security review `5754547935`, and the independent default/coding fixture runs.
 
 ## Residual Destination
 
