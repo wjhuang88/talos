@@ -1,6 +1,6 @@
 # Iteration I280: Single-Direct-Dependency Runtime SDK
 
-> Document status: Planned
+> Document status: Active (proposed; effective only after #583 merges)
 > Published plan date: 2026-09-21
 > Planned objective: Complete RUNTIME-006 / #234 without requiring another direct Talos dependency.
 > MVP deliverable: An independent Cargo consumer implements a provider and tool, configures permissions and sandbox, submits a turn, consumes typed events and shuts down using only talos-runtime Talos imports.
@@ -9,13 +9,13 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 |
 | Work Slice | RUNTIME-006 / #234 curated runtime SDK exports, external fixture, compatibility and user documentation. No execution-policy change. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-09-21 |
 | Source Issue | #234 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #583 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer requested full #234 development closure on 2026-09-21; standing single-maintainer mode with independent Agent API/security review. |
 | Implementation PR | Not started |

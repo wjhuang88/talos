@@ -1,6 +1,7 @@
 # RUNTIME-006: Single-Direct-Dependency Runtime SDK Facade
 
-**Status**: Refinement
+**Status**: In Progress (proposed; effective only after #583 merges)
+**Selected Iteration**: I280
 **Type**: Public API / SDK Story
 **Parent Epic**: ARCH-031
 
@@ -8,18 +9,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-5 |
 | Work Slice | Define and implement a supported `talos-runtime` facade that lets third-party consumers use the core runtime with no other direct Talos dependency. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-09-21 |
 | Source Issue | #234 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #583 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Maintainer requested #234 development closure on 2026-09-21; independent Agent API/security review and exact-head checks required. |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-14 |
-| Handoff / Release Condition | Refine the provider strategy and pre-1.0 compatibility treatment, create a new runnable iteration, and establish its own effective claim before API implementation. |
+| Last Updated | 2026-09-21 |
+| Handoff / Release Condition | I280 implements the complete facade and external acceptance after #583 establishes effective claim; close only after implementation evidence and review. |
 
 ## Identity / Goal / Value
 
@@ -51,7 +52,8 @@ Today that is not true. `RuntimeBuilder` and `RuntimeHandle` expose types from `
 
 - ADR-024 and ADR-052 remain the SDK/composition boundary.
 - ARCH-031 owns the crate publication architecture.
-- The provider integration strategy and migration treatment must be resolved before Ready.
+- Provider and compatibility choices are resolved below under ADR-024/ADR-052; #583 claim merge
+  remains required before implementation.
 - v0.8.0 may publish the current documented multi-direct-dependency SDK contract; this stronger
   facade requirement is a separately claimed follow-up and is not a hidden release gate.
 
@@ -67,17 +69,18 @@ and, if it changes the accepted public boundary, an ADR amendment before impleme
 
 ## Uncertainty And Validation Path
 
-The unresolved question is whether provider construction belongs entirely behind facade re-exports
-or whether `talos-provider` is documented as an optional convenience package while custom providers
-use facade-owned traits. Resolve that choice in requirement refinement and prove it with the external
-fixture before moving this Story to Ready.
+2026-09-21 refinement: custom providers implement the canonical trait re-exported through runtime;
+`talos-provider` remains an optional convenience package. Add explicit curated exports without
+replacing canonical types or removing old imports. This follows ADR-024/ADR-052; no breaking
+replacement is authorized. I280's independent fixture proves the complete associated-type closure,
+permission/sandbox behavior and full turn lifecycle. No workspace dev-dependency leakage is allowed.
 
 ## State/Status Owners
 
 - Story truth: this file.
 - External intake: GitHub Issue #234.
 - Parent publication architecture: ARCH-031.
-- Iteration: none selected.
+- Iteration: `docs/iterations/I280-runtime006-single-dependency-sdk.md`.
 - Derived views: Product Backlog and Board.
 
 ## User-Facing Documentation

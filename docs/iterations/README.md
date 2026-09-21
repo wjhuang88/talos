@@ -36,6 +36,10 @@ I164 Paused. I277 implementation handoff is complete; its overall acceptance is 
 
 ## Current Operating Set
 
+I280 / RUNTIME-006 / #234 is proposed Active/Claimed in #583, effective only after merge.
+The maintainer selects this SDK slice before unclaimed MODEL-007; I277 deferred acceptance,
+I249 Planned and I164 Paused remain unchanged.
+
 | ID | Codename | State | Activation / Completion Gate |
 |---|---|---|---|
 | I273 | Bounded Model Decisions and Automatic Protocol Selection | Complete / Closed | #559/#562 implementations merged (`e4173caf`/`edc0b09a`); owner closeout recorded. |
