@@ -68,6 +68,18 @@ fn format_auto_review_report(report: &talos_agent::auto_resolver::AutoDecisionRe
         ("human_required", "classifier_not_eligible") => {
             "model not consulted — request outside automatic review scope"
         }
+        ("human_required", "execution_context_unavailable") => {
+            "model not consulted — trusted execution directory unavailable"
+        }
+        ("human_required", "review_input_limit") => {
+            "model not consulted — complete command exceeds review input limit"
+        }
+        ("human_required", "review_sensitive_input") => {
+            "model not consulted — potentially sensitive command withheld"
+        }
+        ("human_required", "review_context_unavailable") => {
+            "model not consulted — trusted review context unavailable"
+        }
         ("human_required", "explicit_human_checkpoint") => {
             "human approval required — explicit permission rule"
         }
@@ -105,6 +117,9 @@ fn format_auto_review_report(report: &talos_agent::auto_resolver::AutoDecisionRe
             "model returned an invalid review — human approval required"
         }
         ("human_required", "human_required") => "model requested human approval",
+        ("human_required", "effect_requires_human") => {
+            "model reviewed the request — its effects require human approval"
+        }
         ("human_required", _) => "model could not allow — human approval required",
         _ => "automatic review completed",
     };

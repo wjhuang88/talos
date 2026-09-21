@@ -111,6 +111,8 @@ pub trait ApprovalResolver: Send + Sync {
     /// Existing human-only resolvers can rely on this default. Automatic resolvers override it so
     /// a configured or explicit `Ask` remains a human checkpoint without extending the public
     /// [`PermissionApprovalRequest`] data contract.
+    /// A false eligibility flag prohibits automatic approval. ADR-081 allows shell
+    /// resolvers to assess advisably before retaining the required human checkpoint.
     async fn resolve_with_auto_assessment(
         &self,
         request: PermissionApprovalRequest,
@@ -119,6 +121,57 @@ pub trait ApprovalResolver: Send + Sync {
         user_intent: Option<&str>,
     ) -> Result<ApprovalChoice, ApprovalResolverError> {
         let _ = (auto_assessment_allowed, user_intent);
+        self.resolve(request, remaining).await
+    }
+
+    /// Resolves with the exact normalized execution input, separately from display arguments.
+    ///
+    /// The input is untrusted and may contain secrets. Implementors must redact and bound it
+    /// before sending it to a model or diagnostic sink. Existing adapters retain their display
+    /// projection and behavior through this compatibility default. A false eligibility flag
+    /// still forbids automatic approval, even when advisory assessment is performed.
+    async fn resolve_with_execution_input(
+        &self,
+        request: PermissionApprovalRequest,
+        execution_input: &serde_json::Value,
+        remaining: Duration,
+        auto_assessment_allowed: bool,
+        user_intent: Option<&str>,
+    ) -> Result<ApprovalChoice, ApprovalResolverError> {
+        let _ = execution_input;
+        self.resolve_with_auto_assessment(request, remaining, auto_assessment_allowed, user_intent)
+            .await
+    }
+
+    /// Resolves with a working directory supplied by the registered tool, never caller JSON.
+    /// Missing context is unknown, not an implicit workspace-root assertion.
+    async fn resolve_with_execution_context(
+        &self,
+        request: PermissionApprovalRequest,
+        execution_input: &serde_json::Value,
+        _working_directory: Option<&std::path::Path>,
+        remaining: Duration,
+        auto_assessment_allowed: bool,
+        user_intent: Option<&str>,
+    ) -> Result<ApprovalChoice, ApprovalResolverError> {
+        self.resolve_with_execution_input(
+            request,
+            execution_input,
+            remaining,
+            auto_assessment_allowed,
+            user_intent,
+        )
+        .await
+    }
+
+    /// Resolves with a bounded, sanitized advisory explanation for the human surface.
+    /// This text carries no execution or grant authority. Older adapters retain their behavior.
+    async fn resolve_with_explanation(
+        &self,
+        request: PermissionApprovalRequest,
+        remaining: Duration,
+        _explanation: &str,
+    ) -> Result<ApprovalChoice, ApprovalResolverError> {
         self.resolve(request, remaining).await
     }
 
@@ -224,7 +277,7 @@ impl PermissionPipeline {
         &self,
         authorization: PermissionAuthorizationRequest<'_>,
     ) -> Result<Vec<ToolExecutionAuthorization>, PermissionPipelineError> {
-        self.authorize_inner(authorization, None).await
+        self.authorize_inner(authorization, None, None).await
     }
 
     /// Evaluates, resolves and admits one request with bounded current-turn intent available to
@@ -234,13 +287,25 @@ impl PermissionPipeline {
         authorization: PermissionAuthorizationRequest<'_>,
         user_intent: Option<&str>,
     ) -> Result<Vec<ToolExecutionAuthorization>, PermissionPipelineError> {
-        self.authorize_inner(authorization, user_intent).await
+        self.authorize_inner(authorization, user_intent, None).await
+    }
+
+    /// Evaluates a request with trusted execution context supplied by its registered tool.
+    pub async fn authorize_with_execution_context(
+        &self,
+        authorization: PermissionAuthorizationRequest<'_>,
+        user_intent: Option<&str>,
+        working_directory: Option<&std::path::Path>,
+    ) -> Result<Vec<ToolExecutionAuthorization>, PermissionPipelineError> {
+        self.authorize_inner(authorization, user_intent, working_directory)
+            .await
     }
 
     async fn authorize_inner(
         &self,
         authorization: PermissionAuthorizationRequest<'_>,
         user_intent: Option<&str>,
+        working_directory: Option<&std::path::Path>,
     ) -> Result<Vec<ToolExecutionAuthorization>, PermissionPipelineError> {
         let PermissionAuthorizationRequest {
             tool_name,
@@ -301,14 +366,25 @@ impl PermissionPipeline {
                     },
                 };
                 let remaining = deadline_at.saturating_duration_since(Instant::now());
-                let resolver_future =
+                let resolver_future = if matches!(tool_name, "bash" | "powershell") {
+                    std::panic::AssertUnwindSafe(resolver.resolve_with_execution_context(
+                        approval,
+                        input,
+                        working_directory,
+                        remaining,
+                        auto_assessment_allowed,
+                        user_intent,
+                    ))
+                    .catch_unwind()
+                } else {
                     std::panic::AssertUnwindSafe(resolver.resolve_with_auto_assessment(
                         approval,
                         remaining,
                         auto_assessment_allowed,
                         user_intent,
                     ))
-                    .catch_unwind();
+                    .catch_unwind()
+                };
                 let choice = timeout_at(deadline_at, resolver_future)
                     .await
                     .map_err(|_| PermissionPipelineError::DeadlineExceeded)?
@@ -459,6 +535,16 @@ mod tests {
 
     #[async_trait]
     impl AutoPermissionAssessor for ShellMatrixAssessor {
+        async fn assess_with_script_evidence(
+            &self,
+            request: AutoPermissionRequest,
+            context: crate::auto_resolver::AutoPermissionAssessmentContext,
+            _evidence: crate::auto_resolver::AutoScriptEvidence,
+            remaining: Duration,
+        ) -> Result<String, String> {
+            self.assess_with_context(request, context, remaining).await
+        }
+
         async fn assess(
             &self,
             _request: AutoPermissionRequest,
@@ -904,7 +990,7 @@ mod tests {
             let pipeline = PermissionPipeline::new(state.clone(), surface.context(), resolver);
             let input = shell_input(command);
             let result = pipeline
-                .authorize_with_user_intent(
+                .authorize_with_execution_context(
                     PermissionAuthorizationRequest {
                         tool_name: "bash",
                         provenance: surface.provenance(),
@@ -917,6 +1003,7 @@ mod tests {
                     surface
                         .has_interaction()
                         .then_some("inspect this workspace"),
+                    Some(root.path()),
                 )
                 .await;
 
@@ -1009,7 +1096,7 @@ mod tests {
         );
         let input = shell_input(command);
         let result = pipeline
-            .authorize_with_user_intent(
+            .authorize_with_execution_context(
                 PermissionAuthorizationRequest {
                     tool_name: "bash",
                     provenance: ToolProvenance::Native,
@@ -1020,15 +1107,44 @@ mod tests {
                     deadline: Duration::from_secs(1),
                 },
                 Some("inspect this workspace"),
+                Some(root.path()),
             )
             .await;
 
         assert!(result.is_ok());
         assert_eq!(calls.load(Ordering::Acquire), 1);
+
+        // A caller-supplied cwd cannot substitute for tool-owned execution metadata.
+        let mut spoofed_input = input.clone();
+        spoofed_input["cwd"] = serde_json::json!(".");
+        let unknown_cwd = pipeline
+            .authorize_with_execution_context(
+                PermissionAuthorizationRequest {
+                    tool_name: "bash",
+                    provenance: ToolProvenance::Native,
+                    profile: &shell_profile(command),
+                    input: &spoofed_input,
+                    presentation_input: spoofed_input.clone(),
+                    summary_fields: vec!["command".to_owned()],
+                    deadline: Duration::from_secs(1),
+                },
+                Some("inspect this workspace"),
+                None,
+            )
+            .await;
+        assert!(matches!(
+            unknown_cwd,
+            Err(PermissionPipelineError::Denied(PermissionDecision::Deny(_)))
+        ));
+        assert_eq!(
+            calls.load(Ordering::Acquire),
+            1,
+            "unknown cwd must not read scripts using attacker-supplied paths"
+        );
     }
 
     #[tokio::test]
-    async fn i244_explicit_ask_bypasses_model_assessment() {
+    async fn i281_explicit_ask_is_assessed_but_retains_human_authority() {
         let root = tempfile::tempdir().expect("tempdir");
         let command = "ls -la";
         let mut engine = PermissionEngine::empty();
@@ -1064,7 +1180,7 @@ mod tests {
         );
         let input = shell_input(command);
         let result = pipeline
-            .authorize_with_user_intent(
+            .authorize_with_execution_context(
                 PermissionAuthorizationRequest {
                     tool_name: "bash",
                     provenance: ToolProvenance::Native,
@@ -1075,6 +1191,7 @@ mod tests {
                     deadline: Duration::from_secs(1),
                 },
                 Some("inspect this workspace"),
+                Some(root.path()),
             )
             .await;
 
@@ -1082,7 +1199,7 @@ mod tests {
             result,
             Err(PermissionPipelineError::Denied(PermissionDecision::Deny(_)))
         ));
-        assert_eq!(calls.load(Ordering::Acquire), 0);
+        assert_eq!(calls.load(Ordering::Acquire), 1);
     }
 
     #[tokio::test]
@@ -1117,7 +1234,7 @@ mod tests {
         );
         let input = shell_input(command);
         pipeline
-            .authorize_with_user_intent(
+            .authorize_with_execution_context(
                 PermissionAuthorizationRequest {
                     tool_name: "bash",
                     provenance: ToolProvenance::Native,
@@ -1128,6 +1245,7 @@ mod tests {
                     deadline: Duration::from_secs(1),
                 },
                 Some("inspect this workspace"),
+                Some(root.path()),
             )
             .await
             .expect("one exact shell invocation is admitted");
@@ -1168,7 +1286,7 @@ mod tests {
         );
         let input = shell_input(command);
         let result = pipeline
-            .authorize_with_user_intent(
+            .authorize_with_execution_context(
                 PermissionAuthorizationRequest {
                     tool_name: "bash",
                     provenance: ToolProvenance::Native,
@@ -1179,6 +1297,7 @@ mod tests {
                     deadline: Duration::from_secs(1),
                 },
                 Some("inspect this workspace"),
+                Some(root.path()),
             )
             .await;
 

@@ -73,6 +73,20 @@ pub(crate) fn terminal_approval_channel() -> (
 
 #[async_trait]
 impl ApprovalResolver for TerminalApprovalResolver {
+    async fn resolve_with_explanation(
+        &self,
+        request: PermissionApprovalRequest,
+        remaining: Duration,
+        explanation: &str,
+    ) -> Result<ApprovalChoice, ApprovalResolverError> {
+        // Display separately so argument truncation cannot hide the decision points.
+        // The resolver supplies bounded, sanitized text; this is never execution input.
+        if !explanation.is_empty() {
+            eprintln!("Auto review:\n{explanation}");
+        }
+        self.resolve(request, remaining).await
+    }
+
     async fn resolve(
         &self,
         request: PermissionApprovalRequest,
@@ -227,6 +241,17 @@ pub(crate) fn format_grant_preview(preview: &GrantPreview) -> String {
         .join("\n")
 }
 
+pub(crate) fn format_explained_grant_preview(
+    preview: &GrantPreview,
+    explanation: Option<&str>,
+) -> String {
+    let scope = format_grant_preview(preview);
+    match explanation.filter(|text| !text.is_empty()) {
+        Some(text) => format!("Auto review:\n{text}\n\nPermission scope:\n{scope}"),
+        None => scope,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -279,6 +304,57 @@ mod tests {
                 interaction: context.interaction(),
             },
         }
+    }
+
+    #[test]
+    fn explanation_precedes_scope_without_changing_scope() {
+        let request = approval_request();
+        let scope = format_grant_preview(&request.preview);
+        let explanation = "Writes a report. Confirm whether to replace the existing report.";
+        let displayed = format_explained_grant_preview(&request.preview, Some(explanation));
+        assert!(displayed.starts_with(&format!("Auto review:\n{explanation}")));
+        assert!(displayed.ends_with(&scope));
+        assert_eq!(
+            format_explained_grant_preview(&request.preview, None),
+            scope
+        );
+    }
+
+    #[tokio::test]
+    async fn tui_explanation_is_in_panel_and_preserves_request() {
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        let handler = crate::registry::TuiApprovalHandler::new(tx, std::path::PathBuf::from("."));
+        let request = approval_request();
+        let arguments = request.arguments.clone();
+        let task = tokio::spawn(async move {
+            handler
+                .resolve_with_explanation(
+                    request,
+                    Duration::from_secs(5),
+                    "Confirm overwrite of the report.",
+                )
+                .await
+        });
+        let talos_conversation::UiOutput::ToolApprovalRequest {
+            arguments: displayed,
+            preview,
+            response,
+            ..
+        } = rx.recv().await.expect("panel request")
+        else {
+            panic!("expected permission panel");
+        };
+        assert_eq!(displayed, arguments);
+        assert!(
+            preview
+                .expect("preview")
+                .starts_with("Auto review:\nConfirm overwrite")
+        );
+        response.send(ApprovalChoice::Deny).expect("reply");
+        assert_eq!(
+            task.await.expect("join").expect("resolution"),
+            ApprovalChoice::Deny
+        );
     }
 
     #[test]

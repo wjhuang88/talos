@@ -1,6 +1,6 @@
 # Iteration I281: Model-First Shell Approval And Windows Lifecycle Tests
 
-> Document status: Active (proposed; effective only after #587 merges)
+> Document status: Active
 > Planned objective: Model assessment for all Auto-mode shell Ask requests, and reliable Windows lifecycle tests.
 > MVP deliverable: Runnable bash/PowerShell approval with actionable human decision points and real Windows process-tree cleanup acceptance.
 
@@ -17,7 +17,7 @@
 | Authorization Evidence | Maintainer requested I281 development and closure and accepted ADR-081 on 2026-09-21; independent Agent security/API review required. Claim and activation effective only after #587 merges. |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-21 |
-| Handoff / Release Condition | ADR-081 accepted; #587 merge required before implementation. Local convergence then independent security/API review and exact-head CI before merge. |
+| Handoff / Release Condition | ADR-081 accepted; claim #587 effective at cb00524d. Local convergence then independent security/API review and exact-head CI before merge. |
 | Source Issue | Maintainer request 2026-09-21; related #188, #563 and #234 CI residual |
 | Work Slice | I281-A bash/PowerShell Ask model assessment, script context and bound admission, actionable human escalation; I281-B Windows lifecycle test reliability. No release, Desktop or unrelated higher-risk-write roadmap. |
 
@@ -104,6 +104,31 @@
 
 ## Planning Record
 
+- 2026-09-21 correction to the local checkpoint below: the implementation is not a stable
+  candidate. Independent local review found missing script-evidence admission checks, an unsafe
+  unknown-cwd compatibility path, and a public-context struct-literal compatibility break.
+  These are being corrected locally. Remaining work includes all-Ask assessment coverage,
+  actionable human escalation, full acceptance tests, user/API documentation and Windows CI.
+  Workspace testing stopped at the `talos-skill` fixture attempting to create
+  `~/.agents/skills/dedup-test`; tests after that failure were not proven by that run.
+  Standard preflight subsequently failed during linking with `No space left on device`.
+  Cargo build artifacts (18.5GiB) were cleaned; source changes remain local and uncommitted.
+
+- 2026-09-21 local convergence checkpoint: authoritative normalized execution input is now passed
+  separately from the redacted approval projection; registered shell tools provide their actual
+  execution directory; capability-confined bounded script evidence is included in the contextual
+  assessor payload without claiming execution-byte binding. Windows readiness tests align frozen
+  Tokio time with real `std::time::Instant` deadlines. Focused Auto resolver tests (37) and locked
+  workspace check pass. Full workspace tests are otherwise passing except the pre-existing
+  `talos-skill` permission fixture failure (`Operation not permitted`) in the restricted host.
+
+- 2026-09-21 actual activation: #587 merged as
+  `cb00524dd7f4dd7698a47d08670457f76f372ed1`, exact head
+  `7290815f6d924d7abc6f81c999036e6991810ce6`, base
+  `be7231dfbbb91c6d2ea1a8d0ff1dfc2e0461e29f`. CI `35566243501` passed applicable
+  jobs; independent security/API governance review `5756018598`, CAS `5756035516`.
+  Implementation branch starts at that merge. Claim is now effective.
+
 - 2026-09-21: #587 proposes atomic Claimed/Active status. This record has no target-branch
   authority until merge. Start implementation from that merge or later; preserve this proposal
   as historical evidence and append the actual activation checkpoint.
@@ -118,3 +143,11 @@
 
 - 2026-09-21: Maintainer requested both items for the next cycle. Recorded locally as
   Planned/Unclaimed; no implementation, new remote subtask Issues or PRs started.
+
+- 2026-09-21 local validation update: `cargo check --locked -p talos-agent`, `cargo test
+  --locked -p talos-agent --lib` (404/404), `git diff --check`, both governance validators,
+  the full workspace test phase, and the ordinary runtime SDK fixture passed. The coding-feature
+  fixture reached external `aws-lc-sys` compilation but the host ran out of disk space while
+  clang created temporary files; this is an environment limitation, not a Rust assertion failure.
+  The fixture lockfile was synchronized and the 22.4GiB Cargo target was cleaned afterward.
+  Windows-native lifecycle evidence remains pending GitHub Actions validation.

@@ -275,6 +275,22 @@ pub trait ApprovalHandler: Send + Sync {
             .await
     }
 
+    /// Requests scoped approval with bounded, sanitized model decision points.
+    ///
+    /// Hosts can render the explanation alongside the scope. Existing handlers retain
+    /// their behavior through this default; the explanation does not change authority.
+    async fn request_scoped_approval_with_explanation(
+        &self,
+        tool_name: &str,
+        arguments: &Value,
+        summary_fields: &[String],
+        preview: &GrantPreview,
+        _explanation: &str,
+    ) -> ApprovalChoice {
+        self.request_scoped_approval(tool_name, arguments, summary_fields, preview)
+            .await
+    }
+
     /// Requests a one-invocation approval to continue without sandbox
     /// isolation. This is distinct from normal tool permission approval and
     /// defaults to denial; `AlwaysApprove` is never accepted for fallback.
@@ -296,6 +312,24 @@ struct RuntimeApprovalResolver {
 
 #[async_trait]
 impl ApprovalResolver for RuntimeApprovalResolver {
+    async fn resolve_with_explanation(
+        &self,
+        request: PermissionApprovalRequest,
+        _remaining: std::time::Duration,
+        explanation: &str,
+    ) -> Result<ApprovalChoice, ApprovalResolverError> {
+        Ok(self
+            .inner
+            .request_scoped_approval_with_explanation(
+                &request.tool_name,
+                &request.arguments,
+                &request.summary_fields,
+                &request.preview,
+                explanation,
+            )
+            .await)
+    }
+
     async fn resolve(
         &self,
         request: PermissionApprovalRequest,
@@ -937,6 +971,10 @@ fn permission_denied(reason: &str) -> ToolResult {
 #[async_trait]
 #[cfg(test)]
 impl AgentTool for RuntimePermissionAwareTool {
+    fn execution_working_directory(&self) -> Option<std::path::PathBuf> {
+        self.inner.execution_working_directory()
+    }
+
     fn name(&self) -> &str {
         self.inner.name()
     }
@@ -1041,6 +1079,18 @@ mod tests {
     use tokio::sync::Notify;
 
     use super::*;
+
+    #[cfg(feature = "shared-composition")]
+    #[test]
+    fn permission_wrapper_forwards_execution_working_directory() {
+        let directory = PathBuf::from("configured-shell-directory");
+        let tool = RuntimePermissionAwareTool {
+            inner: Arc::new(talos_tools::BashTool::new(directory.clone())),
+            permission_state: Arc::new(PermissionSessionState::new(PermissionEngine::new())),
+            approval_handler: None,
+        };
+        assert_eq!(tool.execution_working_directory(), Some(directory));
+    }
 
     struct RecordingWriteTool {
         executions: Arc<AtomicUsize>,
@@ -1988,6 +2038,53 @@ mod tests {
         fn new(choice: ApprovalChoice, records: Arc<StdMutex<Vec<ApprovalRecord>>>) -> Self {
             Self { choice, records }
         }
+    }
+
+    #[tokio::test]
+    async fn approval_explanation_default_preserves_existing_host_contract() {
+        let workspace = tempfile::tempdir().expect("workspace");
+        let records = Arc::new(StdMutex::new(Vec::new()));
+        let handler = RecordingApprovalHandler::new(ApprovalChoice::Deny, records.clone());
+        let input = serde_json::json!({"message": "unchanged"});
+        let profile = [ToolPermissionFacet::with_resource(
+            ToolNature::Write,
+            workspace
+                .path()
+                .join("report.txt")
+                .to_string_lossy()
+                .into_owned(),
+            ToolResourceKind::Path,
+        )];
+        let state = PermissionSessionState::new(PermissionEngine::with_workspace_root(
+            workspace.path().to_path_buf(),
+        ));
+        let request = PermissionRequest::new(
+            "write",
+            talos_core::tool::ToolProvenance::Native,
+            &profile,
+            &input,
+        );
+        let context = PermissionContext::new(
+            PermissionMode::Interactive,
+            InteractionCapability::Available,
+        );
+        let talos_permission::PermissionInvocation::Ask { session, .. } = state
+            .begin_invocation(&request, &context)
+            .expect("proposal")
+        else {
+            panic!("write requires approval");
+        };
+        let choice = handler
+            .request_scoped_approval_with_explanation(
+                "write",
+                &input,
+                &["message".into()],
+                session.preview(),
+                "Confirm this write.",
+            )
+            .await;
+        assert_eq!(choice, ApprovalChoice::Deny);
+        assert_eq!(records.lock().expect("records")[0].arguments, input);
     }
 
     #[async_trait]
