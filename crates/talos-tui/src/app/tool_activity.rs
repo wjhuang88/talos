@@ -78,7 +78,15 @@ impl ToolActivities {
         )
     }
 
-    pub(super) fn component(&self) -> crate::scrollback::ToolActivityComponent<'_> {
+    #[cfg(test)]
+    fn component(&self) -> crate::scrollback::ToolActivityComponent<'_> {
+        self.component_for_approval(false)
+    }
+
+    pub(super) fn component_for_approval(
+        &self,
+        approval_visible: bool,
+    ) -> crate::scrollback::ToolActivityComponent<'_> {
         crate::scrollback::ToolActivityComponent {
             entries: self
                 .calls
@@ -94,7 +102,7 @@ impl ToolActivities {
                         format!("{} #{} · {state}", call.name, index + 1),
                         call.body.as_str(),
                         &call.layout,
-                        call.result.is_some(),
+                        call.result.is_some() || approval_visible,
                     )
                 })
                 .collect(),
@@ -106,6 +114,49 @@ impl ToolActivities {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn approval_collapses_requested_arguments_without_losing_call_state() {
+        let mut calls = ToolActivities::default();
+        for id in ["a", "b"] {
+            calls.update(ToolActivity::Requested {
+                call_id: id.into(),
+                name: "bash".into(),
+                body: "{\n  \"command\": \"pwd\"\n}".into(),
+            });
+        }
+        let before = calls.component().plan(80);
+        assert!(
+            before
+                .rows
+                .iter()
+                .any(|row| row.content.contains("command"))
+        );
+        let approval = calls.component_for_approval(true).plan(80);
+        assert_eq!(approval.rows.len(), 2);
+        assert!(approval.rows[0].content.contains("#1 · requested"));
+        assert!(approval.rows[1].content.contains("#2 · requested"));
+        assert!(!approval.rows.iter().any(|row| row.content.contains('{')));
+        let restored = calls.component_for_approval(false).plan(80);
+        assert_eq!(restored.rows.len(), before.rows.len());
+        assert!(
+            restored
+                .rows
+                .iter()
+                .any(|row| row.content.contains("command"))
+        );
+
+        calls.update(ToolActivity::Finished {
+            call_id: "b".into(),
+            is_error: false,
+            body: "real execution output".into(),
+        });
+        let approval = calls.component_for_approval(true).plan(80);
+        assert!(approval.rows[0].content.contains("#1 · requested"));
+        assert!(approval.rows[1].content.contains("#2 · succeeded"));
+        assert_eq!(calls.calls[1].body, "real execution output");
+        assert_eq!(calls.calls[0].result, None);
+    }
 
     #[test]
     fn unchanged_body_wraps_once_across_frames_and_compression() {

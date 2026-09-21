@@ -68,7 +68,10 @@ impl Tui {
             && self.state.thinking_preview.is_none()
             && self.stream_render.preview().is_empty()
             && self.tool_activities.has_activity();
-        let mut tool_preview = self.tool_activities.component();
+        let mut tool_preview = self.tool_activities.component_for_approval(matches!(
+            state.approval_state,
+            ApprovalState::Visible { .. }
+        ));
         let preview_text_color = hold_status
             .as_ref()
             .map(|_| crate::scrollback::hold_preview_color(self.processing_frame));

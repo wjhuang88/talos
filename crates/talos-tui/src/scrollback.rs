@@ -186,7 +186,7 @@ impl ToolActivityComponent<'_> {
         let entries = &self.entries[start..];
         let mut remaining_body = capacity.saturating_sub(entries.len());
         let mut plans = Vec::new();
-        for (title, body, cache, finished) in entries.iter().rev() {
+        for (title, body, cache, collapsed) in entries.iter().rev() {
             let plan = if content_width == 0 {
                 PreviewLayoutPlan {
                     rows: vec![PreviewLayoutRow {
@@ -200,9 +200,9 @@ impl ToolActivityComponent<'_> {
                 }
             } else {
                 let mut plan = cache.plan(width, &prefix, title, body);
-                // Finished results already have their canonical history body.
-                // Retain the correlated status/count, without repeating that body.
-                if *finished {
+                // Results live in history; pending arguments live in the approval
+                // panel while it is open. Keep correlated titles in either case.
+                if *collapsed {
                     plan.rows.truncate(1);
                     plan.natural_height = 1;
                     plan.clipped_before = false;
