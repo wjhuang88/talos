@@ -1,15 +1,16 @@
 # RUNTIME-006: Single-Direct-Dependency Runtime SDK Facade
 
-**Status**: Review
+**Status**: Complete
 **Selected Iteration**: I280
 **Type**: Public API / SDK Story
 **Parent Epic**: ARCH-031
+Completion Commit: `007ca29df62fe63da9e8dda07865284b09f67bc6`
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 |
 | Work Slice | Define and implement a supported `talos-runtime` facade that lets third-party consumers use the core runtime with no other direct Talos dependency. |
@@ -20,7 +21,7 @@
 | Authorization Evidence | Maintainer requested #234 development closure on 2026-09-21; independent Agent API/security review and exact-head checks required. |
 | Implementation PR | #584 |
 | Last Updated | 2026-09-21 |
-| Handoff / Release Condition | Effective claim #583; implementation #584 passed local preflight and external acceptance. Await final CI, merge-time CAS and existing merge evidence before closure. |
+| Handoff / Release Condition | Complete; Completion Commit `007ca29df62fe63da9e8dda07865284b09f67bc6`; closeout merge `ade0b68cf5bc37cff81dabe10ab47b3994d484ca`. |
 
 ## Identity / Goal / Value
 

@@ -1,6 +1,6 @@
 # Iteration I280: Single-Direct-Dependency Runtime SDK
 
-> Document status: Review
+> Document status: Complete
 > Published plan date: 2026-09-21
 > Planned objective: Complete RUNTIME-006 / #234 without requiring another direct Talos dependency.
 > MVP deliverable: An independent Cargo consumer implements a provider and tool, configures permissions and sandbox, submits a turn, consumes typed events and shuts down using only talos-runtime Talos imports.
@@ -9,7 +9,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 |
 | Work Slice | RUNTIME-006 / #234 curated runtime SDK exports, external fixture, compatibility and user documentation. No execution-policy change. |
@@ -20,7 +20,7 @@
 | Authorization Evidence | Maintainer requested full #234 development closure on 2026-09-21; standing single-maintainer mode with independent Agent API/security review. |
 | Implementation PR | #584 |
 | Last Updated | 2026-09-21 |
-| Handoff / Release Condition | Claim #583 effective; complete local implementation, external fixture and preflight, then exact-head CI and independent API/security review before implementation merge. |
+| Handoff / Release Condition | Complete at implementation merge `007ca29d`; closeout `ade0b68c` records owner synchronization. |
 
 ## Published Baseline
 
@@ -129,7 +129,8 @@
 - Quickstart executed successfully. Runtime rustdoc built with broken intra-doc links denied.
 - Independent Agent API/security review approved that implementation head in #584 comment
   `5754547935`; shared-account Agent-role separation only, not independent human identity.
-- Delivery remains Review/Claimed pending final applicable CI, merge-time CAS and merge evidence.
+ - Delivery is Complete/Closed. Completion Commit: `007ca29df62fe63da9e8dda07865284b09f67bc6`.
+   Closeout merge: `ade0b68cf5bc37cff81dabe10ab47b3994d484ca`.
 
 ## Implementation Changed-File Inventory
 
