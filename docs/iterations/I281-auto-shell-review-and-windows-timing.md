@@ -1,6 +1,6 @@
 # Iteration I281: Model-First Shell Approval And Windows Lifecycle Tests
 
-> Document status: Active
+> Document status: Review
 > Planned objective: Model assessment for all Auto-mode shell Ask requests, and reliable Windows lifecycle tests.
 > MVP deliverable: Runnable bash/PowerShell approval with actionable human decision points and real Windows process-tree cleanup acceptance.
 
@@ -14,10 +14,10 @@
 | Claimed At | 2026-09-21 |
 | Governance Claim PR | #587 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Maintainer requested I281 development and closure and accepted ADR-081 on 2026-09-21; independent Agent security/API review required. Claim and activation effective only after #587 merges. |
-| Implementation PR | Not started |
+| Authorization Evidence | Maintainer requested I281 development and closure and accepted ADR-081 on 2026-09-21; claim #587 effective at cb00524d. Independent Agent security/API approval for #588 recorded in comment 5762107014. |
+| Implementation PR | #588 (merged as a1cb869b) |
 | Last Updated | 2026-09-21 |
-| Handoff / Release Condition | ADR-081 accepted; claim #587 effective at cb00524d. Local convergence then independent security/API review and exact-head CI before merge. |
+| Handoff / Release Condition | Implementation #588 merged with exact-head CI and independent Agent security/API review. Remain Review/Claimed until human UX acceptance below passes; no release authorization. |
 | Source Issue | Maintainer request 2026-09-21; related #188, #563 and #234 CI residual |
 | Work Slice | I281-A bash/PowerShell Ask model assessment, script context and bound admission, actionable human escalation; I281-B Windows lifecycle test reliability. No release, Desktop or unrelated higher-risk-write roadmap. |
 
@@ -103,6 +103,25 @@
   upgrades or wholesale #563 implementation. Residuals remain in this owner until explicit handoff.
 
 ## Planning Record
+
+- 2026-09-21 implementation acceptance checkpoint: #588 merged as
+  `a1cb869bde965abc5676121362def594e3c20927`, exact head
+  `8abf342d0e717dabee851145b9c23e461a105974`, base
+  `cb00524dd7f4dd7698a47d08670457f76f372ed1`. CI `35609119644` passed all six
+  jobs, including full release preflight and Windows workspace tests, PowerShell focused tests,
+  direct walkthrough, governance validators and CLI smoke. Independent Agent security/API
+  APPROVE is recorded in PR comment `5762107014`; this is Agent-role separation, not separate
+  human identity. Merge-time checks confirmed unchanged head/base, CLEAN/MERGEABLE, no other
+  open PR and no blocking feedback; merge used the exact-head match guard. Earlier Windows
+  bool-byte compilation and nested-if Clippy failures were corrected before this passing head.
+- Current state: Review/Claimed, implementation delivered; no Complete claim and no release.
+  This checkpoint supersedes historical proposed/unstarted descriptions without rewriting them.
+- Remaining human UX acceptance (not yet verified): with Auto on, an intent-aligned read-only
+  shell request shows the model assessment and executes once; an uncertain/script request shows
+  actionable effects and decision points before human choice; cancelling that choice performs no
+  tool effect. With Auto off, permission requests still use human approval. Record observed UI
+  outcomes and tested build here before final closeout. Do not use automated tests as evidence
+  that a natural person completed this walkthrough. MODEL-007 remains unactivated.
 
 - 2026-09-21 correction to the local checkpoint below: the implementation is not a stable
   candidate. Independent local review found missing script-evidence admission checks, an unsafe

@@ -9,9 +9,10 @@ That snapshot is historical evidence, not current activation authority.
 
 ## Current Priorities
 
-Next cycle selected 2026-09-21: [I281](../iterations/I281-auto-shell-review-and-windows-timing.md)
-is proposed Active/Claimed in #587 (ineffective until merge) and owns shell Ask model review
-under accepted ADR-081 plus Windows I226 timing repair together.
+Current cycle selected 2026-09-21: [I281](../iterations/I281-auto-shell-review-and-windows-timing.md)
+is Review/Claimed: shell Ask model review under ADR-081 and Windows I226 timing repair merged
+in #588 as `a1cb869b`, with exact-head CI and independent Agent security/API approval.
+Human UX acceptance remains pending in the iteration owner.
 MODEL-007 follows this cycle; it is deferred, not cancelled.
 
 | Priority | Focus | Current State / Gate | Required Reads |
