@@ -63,10 +63,10 @@ fn execution_directory_identity(path: &Path) -> Option<String> {
         // that changes on replacement as a conservative fallback.
         hasher.update(metadata.len().to_le_bytes());
         hasher.update([metadata.file_type().is_dir() as u8]);
-        if let Ok(modified) = metadata.modified() {
-            if let Ok(duration) = modified.duration_since(std::time::UNIX_EPOCH) {
-                hasher.update(duration.as_nanos().to_le_bytes());
-            }
+        if let Ok(modified) = metadata.modified()
+            && let Ok(duration) = modified.duration_since(std::time::UNIX_EPOCH)
+        {
+            hasher.update(duration.as_nanos().to_le_bytes());
         }
     }
     let digest = hasher.finalize();
