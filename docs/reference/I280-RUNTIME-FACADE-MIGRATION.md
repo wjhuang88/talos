@@ -1,13 +1,14 @@
 # I280 Runtime Facade Migration
 
-Status: source development; these additive exports are not included in published v0.10.0.
-No release or version bump is authorized by I280.
+Release target: v0.10.1 includes these additive exports; exact v0.10.0 does not.
+Publication is authorized and tracked by the separate v0.10.1 release task, not I280.
 
 The supported embedding entrypoint is `talos-runtime`. A custom provider/tool consumer
 needs no other direct Talos dependency. Third-party dependencies such as `async-trait`,
-`tokio` and `serde_json` remain explicit in the consumer's manifest. Use a checkout
-containing I280 until a release explicitly includes it; `talos-runtime = "0.10.0"`
-does not provide the new paths.
+`tokio` and `serde_json` remain explicit in the consumer's manifest. Declare
+`talos-runtime = "0.10.1"` as the minimum compatible version for these paths.
+An existing lockfile pinned to 0.10.0 must be updated; a caret requirement alone
+does not update an already locked dependency.
 
 | Previous origin import | Facade import |
 |---|---|
