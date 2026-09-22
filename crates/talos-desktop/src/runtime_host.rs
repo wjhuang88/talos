@@ -247,17 +247,17 @@ async fn run_host(
             command = commands.recv() => {
                 match command {
                     Some(RuntimeCommand::Submit(message)) => {
-                        if let Err(error) = handle.submit(message).await {
-                            if pending.push(RuntimeOutput::Error(error.to_string())).is_err() {
-                                return overflow_host(handle).await;
-                            }
+                        if let Err(error) = handle.submit(message).await
+                            && pending.push(RuntimeOutput::Error(error.to_string())).is_err()
+                        {
+                            return overflow_host(handle).await;
                         }
                     }
                     Some(RuntimeCommand::Interrupt) => {
-                        if let Err(error) = handle.interrupt().await {
-                            if pending.push(RuntimeOutput::Error(error.to_string())).is_err() {
-                                return overflow_host(handle).await;
-                            }
+                        if let Err(error) = handle.interrupt().await
+                            && pending.push(RuntimeOutput::Error(error.to_string())).is_err()
+                        {
+                            return overflow_host(handle).await;
                         }
                     }
                     Some(RuntimeCommand::Shutdown) | None => {
@@ -269,10 +269,10 @@ async fn run_host(
                 let Some(event) = event else {
                     return stop_host(handle).await;
                 };
-                if let Some(output) = project_event(event) {
-                    if pending.push(output).is_err() {
-                        return overflow_host(handle).await;
-                    }
+                if let Some(output) = project_event(event)
+                    && pending.push(output).is_err()
+                {
+                    return overflow_host(handle).await;
                 }
             }
         }

@@ -64,7 +64,7 @@ mod tests {
         config.variant = Some("high-reasoning".into());
         config.providers.entry("openai".into()).or_default().api_key =
             Some("test-only-fixture".into());
-        let provider = configured_provider(&config).ok().expect("provider builds");
+        let provider = configured_provider(&config).expect("provider builds");
         let preview = provider
             .request_preview(&[talos_runtime::Message::User {
                 content: "probe".into(),

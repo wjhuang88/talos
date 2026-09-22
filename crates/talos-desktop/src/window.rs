@@ -350,16 +350,16 @@ impl DesktopWindow {
             Command::LiveLocale(locale) => self.select_language(locale, window, cx),
             Command::SubmitLive => self.submit_live(cx),
             Command::CancelLive => {
-                if let Some(live) = &mut self.live {
-                    if let Some(commands) = &live.commands {
-                        if commands
-                            .try_send(crate::runtime_host::RuntimeCommand::Interrupt)
-                            .is_ok()
-                        {
-                            live.status = LiveStatus::Cancelling;
-                        } else {
-                            live.status = LiveStatus::CancelFailed;
-                        }
+                if let Some(live) = &mut self.live
+                    && let Some(commands) = &live.commands
+                {
+                    if commands
+                        .try_send(crate::runtime_host::RuntimeCommand::Interrupt)
+                        .is_ok()
+                    {
+                        live.status = LiveStatus::Cancelling;
+                    } else {
+                        live.status = LiveStatus::CancelFailed;
                     }
                 }
             }
