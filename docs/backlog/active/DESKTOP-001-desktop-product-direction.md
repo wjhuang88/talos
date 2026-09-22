@@ -5,9 +5,9 @@
 | Story ID | DESKTOP-001 |
 | Type | Product / Architecture Spike |
 | Priority | P3 |
-| Status | Deferred — refined design baseline retained; no implementation iteration selected |
+| Status | Planned — four-week live Desktop child plan; no new implementation activated |
 | Source | [GitHub Issue #29](https://github.com/wjhuang88/talos/issues/29) |
-| Selected Iteration | None |
+| Selected Iteration | Parent not directly activated; planned children I282-I285 |
 | Depends On | RUNTIME-001 reusable runtime API; Work Graph/evaluation prerequisite; SESSION-009 for later multi-client behavior; permission and distribution decisions |
 
 ## Collaboration Claim
@@ -24,10 +24,27 @@
 | Authorization Mode | Not applicable |
 | Authorization Evidence | Not applicable |
 | Implementation PR | Not started |
-| Last Updated | 2026-08-12 |
+| Last Updated | 2026-09-22 |
 | Handoff / Release Condition | Establish an effective claim and select the prerequisite/desktop iterations before implementation. |
 
-## Identity / Goal / Value
+## 2026-09-22 Four-Week Child Plan
+
+The maintainer requested resuming Desktop and planning approximately four weeks. The
+[long task](../../tasks/2026-09-22-desktop-four-week-delivery.md) now owns current scheduling.
+The earlier Deferred narrative below is preserved design history, not evidence that no Desktop
+work exists. I277 delivered the mock; WORK-001 P0-P4 is complete. This plan creates no active claim.
+
+| Child | Outcome | State | Dependency | Iteration |
+|---|---|---|---|---|
+| [D4](DESKTOP-001-D4-live-runtime-host.md) | Live provider task, streaming and cancellation | Planned / Unclaimed | I280, WORK-001, ADR-059 and host readiness map | I282 |
+| [D5](DESKTOP-001-D5-live-tools-and-approval.md) | Tools, existing Auto visibility and scoped approval | Planned / Unclaimed | I282 merged technical stage | I283 |
+| [D6](DESKTOP-001-D6-durable-task-and-evidence.md) | Session resume, real work/evaluation and change evidence | Planned / Unclaimed | I283 and persistence/projection mapping | I284 |
+| [D7](DESKTOP-001-D7-desktop-integrated-acceptance.md) | Integrated candidate and consolidated acceptance | Planned / Unclaimed | I282-I284 merged technical stages | I285 |
+
+Existing #29 remains the product/validation tracker. #308 real presets and remaining Desktop
+product scope stay separate; this cycle does not close the entire parent or authorize release.
+
+## Identity / Goal / Value — Preserved Product Direction
 
 Preserve and refine the Desktop product direction without implying that Desktop or its prerequisite
 runtime/domain changes are authorized for implementation.

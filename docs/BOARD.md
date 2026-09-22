@@ -17,7 +17,9 @@ acceptance criteria, verification evidence, or iteration state.
 Current cycle: [I281](iterations/I281-auto-shell-review-and-windows-timing.md),
 Complete/Closed. Implementations #588/#591 merged as `a1cb869b`/`bfdf8b67`;
 exact-head code CI, independent review and composed UI/test/execution-boundary acceptance passed.
-MODEL-007 follows, not activated. Locale follow-up #590 remains Refinement/Unclaimed.
+Next selected plan: [four-week Desktop cycle](tasks/2026-09-22-desktop-four-week-delivery.md),
+I282-I285 Planned / Unclaimed; no new implementation activated. MODEL-007 is deferred behind
+Desktop. Locale follow-up #590 remains Refinement/Unclaimed.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
@@ -86,10 +88,16 @@ MODEL-007 follows, not activated. Locale follow-up #590 remains Refinement/Uncla
 
 ## Next
 
-Maintainer scheduling decision (2026-09-20): immediately after I279 closes
-#298/#310/#334, take the [MODEL-007 reasoning variant catalog follow-up](backlog/active/MODEL-007-hierarchical-model-variant-selection.md#2026-09-20-follow-up-reasoning-variant-catalog-coverage).
-It remains Refinement / Unclaimed until its own iteration activation; this does
-not reopen prior picker acceptance or expand I279.
+Maintainer scheduling decision (2026-09-22): take the four-week Desktop cycle first.
+The prior MODEL-007 follow-up remains Refinement / Unclaimed, deferred rather than cancelled.
+I277's deferred acceptance stays recorded; it does not reactivate mock development.
+
+| Item | State | Owner Doc | Gate |
+|---|---|---|---|
+| Week 1: real Desktop task | Planned / Unclaimed | [I282](iterations/I282-live-runtime-host.md) | API readiness map and atomic claim/activation |
+| Week 2: tools and approval | Planned / Unclaimed | [I283](iterations/I283-live-tools-and-approval.md) | I282 merged technical delivery and protected approval review |
+| Week 3: resume and evidence | Planned / Unclaimed | [I284](iterations/I284-durable-task-and-evidence.md) | I283 technical delivery and persistence/projection contract |
+| Week 4: integrated acceptance | Planned / Unclaimed | [I285](iterations/I285-desktop-integrated-acceptance.md) | Integrated candidate, required #29 rows and evidence closure |
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|

@@ -6,7 +6,18 @@ Each iteration is a **vertical slice**: it adds end-to-end functionality and pro
 testable `talos` binary. No iteration leaves the project in a "foundation-only" state. Every
 iteration delivers something a user can actually run and verify.
 
-## Current v0.6 Runtime Productization Program (2026-07-26)
+## Current Desktop Four-Week Plan (2026-09-22)
+
+[Execution task](../tasks/2026-09-22-desktop-four-week-delivery.md): Sep 22-Oct 19 target,
+I282 live Runtime host → I283 tools/approval → I284 durable tasks/evidence → I285 integrated
+candidate and acceptance. All are Planned / Unclaimed. Deliver a usable single-client candidate;
+full presets, multi-client, signed distribution and release remain outside this cycle.
+The task owns dependency gates, validation, weekly fallback and #29 deferred acceptance.
+
+## Historical v0.6 Runtime Productization Program (2026-07-26)
+
+The dated selection below is preserved historical context, not current activation state.
+I159-I162 have since completed; current status is in their owners and the Board.
 
 The current execution owner is:
 
