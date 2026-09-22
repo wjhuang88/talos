@@ -1,6 +1,6 @@
 # DESKTOP-001-D5: Desktop Tools Approval And Cancellation
 
-> Document status: Active — Claim/activation proposed; effective after merge
+> Document status: Planned
 
 | Field | Value |
 |---|---|
@@ -8,7 +8,7 @@
 | Parent Epic | DESKTOP-001 |
 | Type | Desktop integration / behavior Story |
 | Priority | P1 |
-| Status | Active / Claimed — activation proposed |
+| Status | Planned / Unclaimed |
 | Selected Iteration | I283 |
 | Source | #29; four-week Desktop task |
 | Depends On | I282 implementation merged and technical gates passed; deferred human rows tracked; current permission/Auto contracts |
@@ -17,18 +17,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed / activation proposed |
-| Responsible Actor | @wjhuang88 |
-| Executing Agent | Codex / GPT-6 |
-| Work Slice | DESKTOP-001-D5 / I283: Desktop Tools Approval And Cancellation |
-| Claimed At | 2026-09-22 |
+| Claim State | Unclaimed |
+| Responsible Actor | Not assigned |
+| Executing Agent | Not assigned |
+| Work Slice | DESKTOP-001-D5 / I283: Desktop Tools Approval And Cancellation; planned scope only |
+| Claimed At | Not applicable |
 | Source Issue | #29 |
-| Governance Claim PR | Activation PR pending creation |
-| Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | I282 implementation merged as `aaa4c015`; user authorized continued single-maintainer execution; exact-head CI, governance validators and protected review remain required |
-| Implementation PR | Not started until activation reaches `main` |
+| Governance Claim PR | Not applicable until activation is effective |
+| Authorization Mode | Not applicable |
+| Authorization Evidence | I282 implementation merged as `aaa4c015`; activation remains proposed in #601 |
+| Implementation PR | Not started |
 | Last Updated | 2026-09-22 |
-| Handoff / Release Condition | Effective only after activation record reaches `main`; no release or new permission authority |
+| Handoff / Release Condition | Establish an effective serial child claim before implementation; no release or new permission authority |
 
 ## Outcome
 

@@ -1,6 +1,6 @@
 # Iteration I283: Desktop Tools Approval And Cancellation
 
-> Document status: Active — Claim/activation proposed; effective after merge
+> Document status: Planned
 > Plan date: 2026-09-22
 > Target window: 2026-09-29 to 2026-10-05
 > Planned objective: A Desktop user can execute real file/shell work, understand Auto decisions, allow or deny exact requests, and cancel safely.
@@ -11,18 +11,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed / activation proposed |
-| Responsible Actor | @wjhuang88 |
-| Executing Agent | Codex / GPT-6 |
-| Work Slice | DESKTOP-001-D5 / I283: Desktop Tools Approval And Cancellation |
-| Claimed At | 2026-09-22 |
+| Claim State | Unclaimed |
+| Responsible Actor | Not assigned |
+| Executing Agent | Not assigned |
+| Work Slice | DESKTOP-001-D5 / I283: Desktop Tools Approval And Cancellation; planned scope only |
+| Claimed At | Not applicable |
 | Source Issue | #29 |
-| Governance Claim PR | Activation PR pending creation |
-| Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | I282 implementation merged as `aaa4c015`; user authorized continued single-maintainer execution; exact-head CI, governance validators and protected review remain required |
-| Implementation PR | Not started until activation reaches `main` |
+| Governance Claim PR | Not applicable until activation is effective |
+| Authorization Mode | Not applicable |
+| Authorization Evidence | I282 implementation merged as `aaa4c015`; activation remains proposed in #601 |
+| Implementation PR | Not started |
 | Last Updated | 2026-09-22 |
-| Handoff / Release Condition | Effective only after activation record reaches `main`; no release or new permission authority |
+| Handoff / Release Condition | Establish an effective serial child claim before implementation; no release or new permission authority |
 
 ## Published Baseline
 
@@ -78,8 +78,8 @@ safety. Roll back only the failing slice; no destructive cleanup of user session
 
 ## Actual Activation And Execution
 
-2026-09-22: activation prepared after I282 implementation merge `aaa4c015`; this proposed claim
-is ineffective until its activation PR reaches `main`.
+2026-09-22: activation proposal prepared after I282 implementation merge `aaa4c015`; owner
+remains Unclaimed until the governance PR reaches `main`.
 
 ## Verification Evidence
 
