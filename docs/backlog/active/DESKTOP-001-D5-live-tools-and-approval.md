@@ -1,6 +1,6 @@
 # DESKTOP-001-D5: Desktop Tools Approval And Cancellation
 
-> Document status: Planned
+> Document status: Active — Claimed
 
 | Field | Value |
 |---|---|
@@ -8,7 +8,7 @@
 | Parent Epic | DESKTOP-001 |
 | Type | Desktop integration / behavior Story |
 | Priority | P1 |
-| Status | Planned / Unclaimed |
+| Status | Active / Claimed — local convergence |
 | Selected Iteration | I283 |
 | Source | #29; four-week Desktop task |
 | Depends On | I282 implementation merged and technical gates passed; deferred human rows tracked; current permission/Auto contracts |
@@ -17,18 +17,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | DESKTOP-001-D5 / I283: Desktop Tools Approval And Cancellation; planned scope only |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-6 |
+| Work Slice | DESKTOP-001-D5 / I283: Desktop Tools Approval And Cancellation |
+| Claimed At | 2026-09-22 |
 | Source Issue | #29 |
-| Governance Claim PR | Not applicable until activation is effective |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | I282 implementation merged as `aaa4c015`; activation remains proposed in #601 |
-| Implementation PR | Not started |
+| Governance Claim PR | #601 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Activation #601 merged as `538cbfef`; I282 implementation merged as `aaa4c015`; exact-head CI and protected review required for implementation |
+| Implementation PR | Not started; local convergence begins from `main@538cbfef` |
 | Last Updated | 2026-09-22 |
-| Handoff / Release Condition | Establish an effective serial child claim before implementation; no release or new permission authority |
+| Handoff / Release Condition | Keep I283 as the sole tools/approval authority; no release or new permission authority |
 
 ## Outcome
 

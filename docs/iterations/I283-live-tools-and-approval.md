@@ -1,6 +1,6 @@
 # Iteration I283: Desktop Tools Approval And Cancellation
 
-> Document status: Planned
+> Document status: Active — Claimed
 > Plan date: 2026-09-22
 > Target window: 2026-09-29 to 2026-10-05
 > Planned objective: A Desktop user can execute real file/shell work, understand Auto decisions, allow or deny exact requests, and cancel safely.
@@ -11,18 +11,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | DESKTOP-001-D5 / I283: Desktop Tools Approval And Cancellation; planned scope only |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-6 |
+| Work Slice | DESKTOP-001-D5 / I283: Desktop Tools Approval And Cancellation |
+| Claimed At | 2026-09-22 |
 | Source Issue | #29 |
-| Governance Claim PR | Not applicable until activation is effective |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | I282 implementation merged as `aaa4c015`; activation remains proposed in #601 |
-| Implementation PR | Not started |
+| Governance Claim PR | #601 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Activation #601 merged as `538cbfef`; I282 implementation merged as `aaa4c015`; exact-head CI and protected review required for implementation |
+| Implementation PR | Not started; local convergence begins from `main@538cbfef` |
 | Last Updated | 2026-09-22 |
-| Handoff / Release Condition | Establish an effective serial child claim before implementation; no release or new permission authority |
+| Handoff / Release Condition | Keep I283 as the sole tools/approval authority; no release or new permission authority |
 
 ## Published Baseline
 
@@ -78,8 +78,8 @@ safety. Roll back only the failing slice; no destructive cleanup of user session
 
 ## Actual Activation And Execution
 
-2026-09-22: activation proposal prepared after I282 implementation merge `aaa4c015`; owner
-remains Unclaimed until the governance PR reaches `main`.
+2026-09-22: activation #601 reached `main` as `538cbfef` after I282 implementation merge
+`aaa4c015`; I283 is now effective and local implementation may begin.
 
 ## Verification Evidence
 
