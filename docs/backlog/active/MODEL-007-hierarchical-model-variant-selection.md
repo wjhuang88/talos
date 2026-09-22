@@ -202,3 +202,10 @@ Before implementation, inventory upstream metadata and provider request mappings
 resolve any ADR-048/API/schema migration needs, and select a separately authorized
 work slice. This entry owns the residual until that handoff; no new remote Issue
 or implementation claim has been created.
+
+### 2026-09-22 Scheduling Update
+
+The maintainer selected a [four-week Desktop cycle](../../tasks/2026-09-22-desktop-four-week-delivery.md)
+ahead of this unclaimed follow-up. Preserve all requirements and prior acceptance; catalog
+coverage remains Refinement / Unclaimed and deferred, not cancelled. Revisit after the Desktop
+cycle or an explicit reprioritization; a single configured model does not require this expansion.

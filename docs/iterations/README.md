@@ -11,6 +11,18 @@ That snapshot is historical evidence and not current activation authority.
 
 ## Lifecycle
 
+Current planned cycle (2026-09-22): [four-week Desktop delivery](../tasks/2026-09-22-desktop-four-week-delivery.md),
+I282-I285 serial and Planned / Unclaimed. No new implementation is active. The task records the
+non-terminal inventory: I277 remains Review with deferred checks in #29, I249 stays deferred Planned,
+I164 stays Paused; I162's recorded review outcome is terminal. MODEL-007 is deferred behind Desktop.
+
+| Iteration | Target | State / activation gate |
+|---|---|---|
+| [I282](I282-live-runtime-host.md) | Sep 22-28: real model task and host lifecycle | Planned; API map and effective claim |
+| [I283](I283-live-tools-and-approval.md) | Sep 29-Oct 5: tools and scoped approvals | Planned; I282 merged technical stage and effective claim |
+| [I284](I284-durable-task-and-evidence.md) | Oct 6-12: resume and evidence | Planned; I283 merged technical stage and persistence/projection map |
+| [I285](I285-desktop-integrated-acceptance.md) | Oct 13-19: integrated candidate and acceptance | Planned; predecessors merged, #29 ledger and effective claim |
+
 Completed cycle (2026-09-20): [I278 root Plugin source delivery](I278-root-plugin-source-delivery.md)
 is Complete / Closed through #576 merge `1e5a8592`, with exact-head CI, independent review and
 merge-time CAS recorded in its acceptance ledger. [I279](I279-tui-history-and-live-activity.md)
@@ -39,7 +51,7 @@ I164 Paused. I277 implementation handoff is complete; its overall acceptance is 
 Current cycle: [I281](I281-auto-shell-review-and-windows-timing.md), Complete/Closed.
 Model-first shell Ask review, Windows I226 timing repair and UX follow-up merged in
 #588/#591 as `a1cb869b`/`bfdf8b67`; code CI, independent Agent security/API review and
-composed UI/test/execution-boundary acceptance passed. MODEL-007 follows, not activated;
+composed UI/test/execution-boundary acceptance passed. MODEL-007 was next; Desktop now precedes it;
 #590 is separate intake.
 
 I280 / RUNTIME-006 / #234 is Complete/Closed at implementation merge `007ca29d`; closeout `ade0b68c`.

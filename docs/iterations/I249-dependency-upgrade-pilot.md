@@ -84,3 +84,8 @@
 ## Retrospective
 
 - Outcome: pending
+
+## 2026-09-22 Scheduling Disposition
+
+Remain Planned / Unclaimed and deferred during the four-week Desktop cycle. #502 is handed to
+separate research; this does not activate a dependency upgrade or rewrite this pilot's baseline.
