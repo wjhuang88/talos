@@ -1,6 +1,6 @@
 # Iteration I283: Desktop Tools Approval And Cancellation
 
-> Document status: Planned
+> Document status: Active — Claim/activation proposed; effective after merge
 > Plan date: 2026-09-22
 > Target window: 2026-09-29 to 2026-10-05
 > Planned objective: A Desktop user can execute real file/shell work, understand Auto decisions, allow or deny exact requests, and cancel safely.
@@ -11,18 +11,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | DESKTOP-001-D5 / I283: Desktop Tools Approval And Cancellation; planned scope only |
-| Claimed At | Not applicable |
+| Claim State | Claimed / activation proposed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-6 |
+| Work Slice | DESKTOP-001-D5 / I283: Desktop Tools Approval And Cancellation |
+| Claimed At | 2026-09-22 |
 | Source Issue | #29 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Maintainer requested four-week Desktop planning on 2026-09-22; no implementation activation yet |
-| Implementation PR | Not started |
+| Governance Claim PR | Activation PR pending creation |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | I282 implementation merged as `aaa4c015`; user authorized continued single-maintainer execution; exact-head CI, governance validators and protected review remain required |
+| Implementation PR | Not started until activation reaches `main` |
 | Last Updated | 2026-09-22 |
-| Handoff / Release Condition | Resolve readiness and establish effective serial child claim before implementation; no release |
+| Handoff / Release Condition | Effective only after activation record reaches `main`; no release or new permission authority |
 
 ## Published Baseline
 
@@ -78,11 +78,12 @@ safety. Roll back only the failing slice; no destructive cleanup of user session
 
 ## Actual Activation And Execution
 
-2026-09-22: planning only. Claim, implementation PR and remote evidence not yet established.
+2026-09-22: activation prepared after I282 implementation merge `aaa4c015`; this proposed claim
+is ineffective until its activation PR reaches `main`.
 
 ## Verification Evidence
 
-Implementation checks: not run; no implementation exists for this child.
+Implementation checks: not run; activation only, no implementation exists for this child.
 Planning checks are recorded centrally in the four-week task.
 
 ## Completion Evidence

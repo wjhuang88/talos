@@ -1,6 +1,6 @@
 # DESKTOP-001-D5: Desktop Tools Approval And Cancellation
 
-> Document status: Planned
+> Document status: Active — Claim/activation proposed; effective after merge
 
 | Field | Value |
 |---|---|
@@ -8,7 +8,7 @@
 | Parent Epic | DESKTOP-001 |
 | Type | Desktop integration / behavior Story |
 | Priority | P1 |
-| Status | Planned / Unclaimed |
+| Status | Active / Claimed — activation proposed |
 | Selected Iteration | I283 |
 | Source | #29; four-week Desktop task |
 | Depends On | I282 implementation merged and technical gates passed; deferred human rows tracked; current permission/Auto contracts |
@@ -17,18 +17,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | DESKTOP-001-D5 / I283: Desktop Tools Approval And Cancellation; planned scope only |
-| Claimed At | Not applicable |
+| Claim State | Claimed / activation proposed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-6 |
+| Work Slice | DESKTOP-001-D5 / I283: Desktop Tools Approval And Cancellation |
+| Claimed At | 2026-09-22 |
 | Source Issue | #29 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Maintainer requested four-week Desktop planning on 2026-09-22; no implementation activation yet |
-| Implementation PR | Not started |
+| Governance Claim PR | Activation PR pending creation |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | I282 implementation merged as `aaa4c015`; user authorized continued single-maintainer execution; exact-head CI, governance validators and protected review remain required |
+| Implementation PR | Not started until activation reaches `main` |
 | Last Updated | 2026-09-22 |
-| Handoff / Release Condition | Resolve readiness and establish effective serial child claim before implementation; no release |
+| Handoff / Release Condition | Effective only after activation record reaches `main`; no release or new permission authority |
 
 ## Outcome
 
