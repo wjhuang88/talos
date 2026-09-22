@@ -41,6 +41,8 @@ def _is_allowlisted_document(path: str) -> bool:
         return True
     if path.startswith("docs/") and path.endswith(".md"):
         return True
+    if path.startswith("site/") and path.endswith(".html"):
+        return True
     return path.startswith(".github/workflows/") and path.endswith((".yml", ".yaml"))
 
 
