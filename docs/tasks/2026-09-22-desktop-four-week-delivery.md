@@ -216,13 +216,13 @@ Unclaimed and are not activated. Local I282 now has the live Runtime host, confi
 adapter, typed output/completion/error handling, bounded presentation buffering, explicit no-tools
 behavior, shutdown receipts, and cancellation during provider-backed history compaction.
 Focused evidence: Desktop binary tests 61 passed; Runtime interrupt tests 2 passed. The stable
-candidate has not been pushed. H1/H5 native rows remain deferred in #29.
-Next item: complete local code/document convergence and preflight, then obtain independent review
-and push one stable I282 implementation candidate.
+candidate is submitted as implementation PR #599. H1/H5 native rows remain deferred in #29.
+Next item: obtain exact-head CI and independent review for #599, then perform merge-time CAS
+without activating I283 early.
 Resume: read this task and I282, retain the current branch/worktree, inspect the full diff, and
 preserve I277 deferred rows.
-Validation: focused checks above passed; full release preflight, governance validators, exact-head
-CI and implementation review remain pending.
+Validation: workspace tests, affected checks, release preflight and governance validators passed;
+PR #599 exact-head CI and implementation review remain pending.
 Independent Agent-role planning review approved after H1-H6 numbering was added; this is not a
 natural-person review, implementation security approval or proof of the four-week estimate.
 No Rust tests were run for this governance-only activation candidate. Implementation remains
