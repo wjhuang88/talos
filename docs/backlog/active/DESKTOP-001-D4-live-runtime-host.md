@@ -1,6 +1,6 @@
 # DESKTOP-001-D4: Live Runtime Desktop Host
 
-> Document status: Active — claim/activation proposed; effective only after merge
+> Document status: Active — Claimed
 
 | Field | Value |
 |---|---|
@@ -8,7 +8,7 @@
 | Parent Epic | DESKTOP-001 |
 | Type | Desktop integration / behavior Story |
 | Priority | P1 |
-| Status | Active / Claimed — implementation starts after activation merge |
+| Status | Active / Claimed — local implementation convergence |
 | Selected Iteration | I282 |
 | Source | #29; four-week Desktop task |
 | Depends On | WORK-001 P0-P4 and I280 complete; ADR-059; explicit host/API readiness map |
@@ -26,7 +26,7 @@
 | Governance Claim PR | #598 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | User authorized continuation; exact-head CI, governance validators and merge-time CAS required; no independent natural-person reviewer available |
-| Implementation PR | Not started until activation merge |
+| Implementation PR | #599 (`2dfe13b1`, `0bd6a7bc`); exact-head CI/review pending |
 | Last Updated | 2026-09-22 |
 | Handoff / Release Condition | Effective only after #598 reaches main; implementation starts from its merge or later main; no release |
 
@@ -71,6 +71,16 @@ A facade ownership gap may require a bounded decision before coding. Keep mock l
 Update the Desktop crate README (created in I282), bilingual user-facing instructions as behavior
 lands, and this owner before derived views. Preserve #29 and the four-week task acceptance ledger.
 Tool execution/approval integration (I283), durable navigation (I284), new Runtime engine, full presets, new permissions or release.
+
+## Execution Checkpoint — 2026-09-23
+
+The effective activation is #598 (head `6fb3895611a1ad75eff0ec990607737a75c5f49a`), merged at
+`d323ce5d184df57d554f9646cf4a4e639de81995`. Local implementation now contains the live Runtime
+host, configured provider adapter, bounded presentation queue, typed completion/error states,
+no-tools disclosure, shutdown receipts, and cancellation during provider-backed history
+compaction. Focused evidence is 61 Desktop tests and 2 Runtime interrupt tests passing. The
+candidate is submitted as #599 after local preflight and governance checks. Exact-head CI and
+independent review remain pending. H1/H5 native acceptance remains deferred in #29.
 
 ## Completion Evidence
 

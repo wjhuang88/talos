@@ -1,6 +1,6 @@
 [package]
 name = "talos-desktop"
-description = "Fixture-backed Desktop visual prototype"
+description = "Desktop application host for the Talos Runtime"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -20,6 +20,13 @@ path = "src/main.rs"
 required-features = ["desktop-ui"]
 
 [dependencies]
+talos-runtime = { version = "0.10.1", path = "../talos-runtime" }
+talos-config = { version = "0.10.1", path = "../talos-config" }
+talos-provider = { version = "0.10.1", path = "../talos-provider" }
+tokio = { version = "1.53.1", features = ["rt", "sync", "time"] }
 gpui = { git = "https://github.com/zed-industries/zed", rev = "ac5af8b9e1ea3f7922fbabefe409c05b8766135c", optional = true }
 gpui_platform = { git = "https://github.com/zed-industries/zed", rev = "ac5af8b9e1ea3f7922fbabefe409c05b8766135c", optional = true, features = ["runtime_shaders", "font-kit", "wayland", "x11"] }
 unicode-segmentation = { version = "1.13.3", optional = true }
+
+[dev-dependencies]
+async-trait = "0.1.92"

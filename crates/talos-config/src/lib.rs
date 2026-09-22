@@ -6,6 +6,7 @@
 pub mod agents;
 pub mod model;
 pub mod opencode;
+pub mod variant;
 
 mod atomic_file;
 mod builtin;
