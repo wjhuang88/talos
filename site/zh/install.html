@@ -176,6 +176,13 @@ talos --config-set providers.anthropic.api_key_env=ANTHROPIC_API_KEY</code></pre
       </section>
 
       <section>
+        <h2>使用 Cargo 安装</h2>
+        <p>crates.io 已发布 0.10.1。此方式会在本机编译，需要 Rust 工具链和平台构建工具；不想编译可使用发布压缩包。仓库采用 Rust 1.97.0。</p>
+        <div class="talos-codeblock"><pre><code>cargo install talos-cli --version 0.10.1 --bin talos --locked
+talos --version</code></pre></div>
+        <p>Cargo 默认安装到 <code>~/.cargo/bin</code>，请确保该目录在 PATH 中。若启动了其他安装版本，可在 Windows 用 <code>where.exe talos</code>、Unix 用 <code>command -v talos</code> 检查。</p>
+      </section>
+      <section>
         <h2>从源码构建</h2>
         <p>环境要求：</p>
         <ul>
@@ -198,7 +205,7 @@ talos --config-set providers.anthropic.api_key_env=ANTHROPIC_API_KEY</code></pre
           <p>
             <strong>Cargo install 状态：</strong>
             <code>cargo install talos-cli --bin talos --locked</code> 安装
-            registry 当前可用版本。0.9.2 已发布；固定更新版本前，请用
+            registry 当前可用版本。0.10.1 已发布；固定更新版本前，请用
             <code>cargo info talos-cli</code> 查询。仅有 GitHub tag 不代表 registry
             版本已经可用。本地源码测试可使用
             <code>cargo install --path crates/talos-cli --bin talos --locked</code>。

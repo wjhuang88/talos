@@ -74,6 +74,11 @@
         <ul>
           <li>
             <span class="talos-pill talos-pill--shipped">已发布</span>
+            已验证的 crates.io 安装路径：<code>cargo install talos-cli --bin talos --locked</code>。
+            当前发布的 CLI 为 v0.10.1；源码 checkout 可使用 <code>--path</code>。
+          </li>
+          <li>
+            <span class="talos-pill talos-pill--shipped">已发布</span>
             TUI、inline 和 print 执行模式。
           </li>
           <li>
@@ -105,7 +110,7 @@
           </li>
           <li>
             <span class="talos-pill talos-pill--shipped">已发布</span>
-            MCP stdio 工具与 JSON-RPC 基础设施。
+            支持 stdio、传统 SSE 和 Streamable HTTP 的 MCP 工具与 JSON-RPC 基础设施。
           </li>
           <li>
             <span class="talos-pill talos-pill--shipped">已发布</span>
@@ -134,18 +139,6 @@
           以下事项已纳入范围但尚未发布。下述顺序表示优先序偏好，不代表发布时间承诺。
         </p>
         <ul>
-          <li>
-            <span class="talos-pill talos-pill--planned">计划中</span>
-            将 <code>cargo install talos-cli --bin talos</code> 作为已验证的
-            Cargo 安装路径。当前 <code>--path</code> 源码安装可用；
-            crates.io 发布仍受
-            <a
-              href="https://github.com/wjhuang88/talos/blob/main/docs/reference/CRATE-PUBLICATION-MATRIX.md"
-              rel="noopener"
-              >发布矩阵</a
-            >
-            约束，并且需要维护者显式批准。
-          </li>
           <li>
             <span class="talos-pill talos-pill--planned">计划中</span>
             为 <code>talos-runtime</code> facade 提供稳定 1.0 SDK 保证。

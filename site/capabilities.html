@@ -138,7 +138,9 @@
             <tr><td><code>/help</code></td><td>Show available commands</td></tr>
             <tr><td><code>/quit</code>, <code>/exit</code></td><td>Exit Talos</td></tr>
             <tr><td><code>/status</code></td><td>Show session info (model, token usage)</td></tr>
-            <tr><td><code>/plugins</code></td><td>List observed tool provenance and MCP server status</td></tr>
+            <tr><td><code>/auto</code>, <code>/auto on</code>, <code>/auto off</code></td><td>Inspect or change bounded Auto assistance for this session; see <a href="docs.html#modes">Auto behavior and limits</a></td></tr>
+            <tr><td><code>/plugins</code></td><td>List explicitly loaded local plugin packages and capabilities</td></tr>
+            <tr><td><code>/mcp</code></td><td>List MCP server status and observed tool provenance</td></tr>
             <tr><td><code>/skills</code></td><td>List available runtime skills and active state</td></tr>
             <tr><td><code>/skills activate &lt;name&gt;</code></td><td>Activate one Skill body for subsequent provider requests</td></tr>
             <tr><td><code>/skills reference &lt;path&gt;</code></td><td>Load a bounded reference file for the active Skill</td></tr>
@@ -212,7 +214,7 @@ env = {}</code></pre>
           normal approval path and are denied when interactive approval is
           unavailable. Startup failures are reported without aborting the
           session, and each MCP request has a bounded timeout. Use
-          <code>/plugins</code> in the TUI to inspect the startup connection
+          <code>/mcp</code> in the TUI to inspect the startup connection
           snapshot and observed tool provenance.
         </p>
         <div class="talos-callout talos-callout--info">
@@ -220,14 +222,18 @@ env = {}</code></pre>
             <strong>Stability:</strong> the MCP tool set is fixed for the
             lifetime of a session so the model-visible tool definitions and
             prompt cache prefix remain stable. Restart the session after
-            changing MCP configuration. Only local stdio transport is
-            currently supported.
+            changing MCP configuration. The shipped transports are stdio,
+            legacy SSE, and Streamable HTTP; all remain permission-gated.
           </p>
         </div>
       </section>
 
       <section>
         <h2>Embedding Talos in Rust</h2>
+        <p>Add the published facade as your only direct Talos dependency:</p>
+        <div class="talos-codeblock"><pre><code>[dependencies]
+talos-runtime = "0.10.1"</code></pre></div>
+        <p>Use <a href="https://github.com/wjhuang88/talos/blob/v0.10.1/crates/talos-runtime/examples/quickstart.rs" rel="noopener">the quickstart example</a> for a custom provider and <a href="https://github.com/wjhuang88/talos/blob/v0.10.1/docs/reference/I280-RUNTIME-FACADE-MIGRATION.md" rel="noopener">the facade migration guide</a> for re-exported types. This remains a pre-1.0 API.</p>
         <p>
           Rust applications can depend on the <code>talos-runtime</code>
           crate to embed the core agent loop without linking Talos CLI or

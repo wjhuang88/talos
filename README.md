@@ -190,7 +190,7 @@ Windows ARM64 artifacts are not published yet.
 
 ### Cargo Install Status
 
-`talos-cli` is available on crates.io, including version `0.9.2`. Each new release
+`talos-cli` is available on crates.io, including version `0.10.1`. Each new release
 publishes GitHub archives first, then registry crates; a GitHub tag alone does not
 confirm Cargo availability. Check `cargo info talos-cli` before pinning a new version.
 Install the latest available registry version with:
@@ -903,7 +903,7 @@ This is not a stable 1.0 SDK guarantee yet. The public embedding surface is `tal
 plus the protocol and trait types it re-exports from `talos-core`; lower-level `talos-agent`
 constructors remain implementation surface unless documented otherwise.
 
-`talos-runtime` is available on crates.io, including version `0.9.2`. Check
+`talos-runtime` is available on crates.io, including version `0.10.1`. Check
 `cargo info talos-runtime` for available versions before updating an SDK dependency.
 New registry versions follow GitHub release publication. See
 [RUNTIME-SDK-CONTRACT](docs/reference/RUNTIME-SDK-CONTRACT.md) and the
@@ -975,7 +975,7 @@ RUST_LOG=talos=debug talos
 
 - Pre-1.0: APIs, command surfaces, and storage formats may change.
 - No remote multi-user service, marketplace, or browser automation.
-- No WASM plugin runtime or PDF/Office document extraction.
+- No remote plugin marketplace or PDF/Office document extraction; explicitly loaded local read-only WASM plugins are supported.
 - Self-bootstrap qualification (REL-002) is not yet met; `v1.0` is not claimable.
 - Scheduled follow-ups (`delay`, `schedule`, `list_scheduled_tasks`, `cancel_scheduled_task`) are
   session-scoped only: tasks die when the process exits, are never persisted, and cannot survive a

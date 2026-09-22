@@ -137,7 +137,7 @@ Windows ARM64 产物暂未发布。
 
 ### Cargo Install 状态
 
-`talos-cli` 已在 crates.io 发布，包括 `0.9.2`。每个新版本先发布 GitHub 压缩包，
+`talos-cli` 已在 crates.io 发布，包括 `0.10.1`。每个新版本先发布 GitHub 压缩包，
 再发布 registry crates；仅有 GitHub tag 不代表 Cargo 版本已经可用。
 固定新版本前，请用 `cargo info talos-cli` 查询。安装 registry 当前可用版本：
 
@@ -530,7 +530,8 @@ MCP 请求也有超时上限。TUI 中可使用 `/mcp` 查看启动连接快照�
 工具来源。
 
 会话期间 MCP 工具集保持不变，以维持模型可见工具定义和提示词缓存前缀稳定。修改 MCP
-配置后需要重启会话。当前仅支持本地 stdio transport。
+配置后需要重启会话。当前已支持 stdio、传统 SSE 和 Streamable HTTP transport；
+所有 transport 仍受权限控制。
 
 ## 在 Rust 中嵌入 Talos
 
@@ -570,7 +571,7 @@ Success、Error 或 Cancelled 终态原子落盘；若已完成的安全工具�
 `talos-core` 重新导出的协议和 trait 类型；低层 `talos-agent` 构造器仍视为实现表面，
 除非文档另行声明。
 
-`talos-runtime` 已在 crates.io 发布，包括 `0.9.2`。更新 SDK 依赖前，请用
+`talos-runtime` 已在 crates.io 发布，包括 `0.10.1`。更新 SDK 依赖前，请用
 `cargo info talos-runtime` 查询可用版本；新 registry 版本在 GitHub release 之后发布。
 详见 [RUNTIME-SDK-CONTRACT](docs/reference/RUNTIME-SDK-CONTRACT.md) 和
 [历史 publish gate packet](docs/reference/PUBLISH-GATE-PACKET-2026-07-02.md)。

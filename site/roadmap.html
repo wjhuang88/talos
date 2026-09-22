@@ -77,6 +77,11 @@
         <ul>
           <li>
             <span class="talos-pill talos-pill--shipped">Shipped</span>
+            A verified crates.io installation path: <code>cargo install talos-cli --bin talos --locked</code>.
+            The current published CLI is v0.10.1; source checkouts can use <code>--path</code>.
+          </li>
+          <li>
+            <span class="talos-pill talos-pill--shipped">Shipped</span>
             TUI, inline, and print execution modes.
           </li>
           <li>
@@ -109,7 +114,7 @@
           </li>
           <li>
             <span class="talos-pill talos-pill--shipped">Shipped</span>
-            MCP stdio tools and JSON-RPC infrastructure.
+            MCP tools over stdio, legacy SSE and Streamable HTTP, plus JSON-RPC infrastructure.
           </li>
           <li>
             <span class="talos-pill talos-pill--shipped">Shipped</span>
@@ -141,18 +146,6 @@
           a sequencing preference, not a release-date commitment.
         </p>
         <ul>
-          <li>
-            <span class="talos-pill talos-pill--planned">Planned</span>
-            <code>cargo install talos-cli --bin talos</code> as a validated
-            Cargo install path. The <code>--path</code> source install works
-            today; crates.io publication is separately gated by the
-            <a
-              href="https://github.com/wjhuang88/talos/blob/main/docs/reference/CRATE-PUBLICATION-MATRIX.md"
-              rel="noopener"
-              >publication matrix</a
-            >
-            and requires explicit maintainer approval.
-          </li>
           <li>
             <span class="talos-pill talos-pill--planned">Planned</span>
             Stable 1.0 SDK guarantee for the
