@@ -15,8 +15,8 @@ acceptance criteria, verification evidence, or iteration state.
 ## Now
 
 Current cycle: [I281](iterations/I281-auto-shell-review-and-windows-timing.md),
-Complete/Closed. Implementations #588/#591 merged as `a1cb869b`/`bfdf8b67`;
-exact-head code CI, independent Agent security/API review and human UX acceptance passed.
+Review/Claimed. Implementations #588/#591 merged as `a1cb869b`/`bfdf8b67`;
+exact-head code CI and independent Agent security/API review passed. Human UX evidence is partial; filesystem no-effect proof for timeout/Esc cancellation remains before Complete.
 MODEL-007 follows, not activated. Locale follow-up #590 remains Refinement/Unclaimed.
 
 | Item | State | Owner Doc | Gate |

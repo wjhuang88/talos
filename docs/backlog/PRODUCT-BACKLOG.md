@@ -10,9 +10,9 @@ That snapshot is historical evidence, not current activation authority.
 ## Current Priorities
 
 Current cycle selected 2026-09-21: [I281](../iterations/I281-auto-shell-review-and-windows-timing.md)
-is Complete/Closed: shell Ask model review under ADR-081, Windows I226 timing repair and
+is Review/Claimed: shell Ask model review under ADR-081, Windows I226 timing repair and
 UX follow-up merged in #588/#591 as `a1cb869b`/`bfdf8b67`, with exact-head code CI,
-independent Agent security/API approval and human UX acceptance recorded in the owner.
+independent Agent security/API approval and partial human UX acceptance recorded in the owner; filesystem no-effect evidence for timeout/Esc cancellation remains.
 MODEL-007 follows this cycle; it is deferred, not cancelled.
 
 | Priority | Focus | Current State / Gate | Required Reads |

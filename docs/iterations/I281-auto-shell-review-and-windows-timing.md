@@ -1,7 +1,6 @@
 # Iteration I281: Model-First Shell Approval And Windows Lifecycle Tests
 
-> Document status: Complete
-> Completion Commit: a1cb869bde965abc5676121362def594e3c20927, bfdf8b67f666602d3d39e2c5949adb646f46e01e
+> Document status: Review
 > Planned objective: Model assessment for all Auto-mode shell Ask requests, and reliable Windows lifecycle tests.
 > MVP deliverable: Runnable bash/PowerShell approval with actionable human decision points and real Windows process-tree cleanup acceptance.
 
@@ -9,7 +8,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Closed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 |
 | Claimed At | 2026-09-21 |
@@ -18,7 +17,7 @@
 | Authorization Evidence | Maintainer requested I281 development and closure and accepted ADR-081 on 2026-09-21; claim #587 effective at cb00524d. Independent Agent security/API approval for #588 recorded in comment 5762107014. |
 | Implementation PR | #588 (merged as a1cb869b), #591 (merged as bfdf8b67) |
 | Last Updated | 2026-09-22 |
-| Handoff / Release Condition | Implementation and corrective follow-up merged; human UX acceptance completed below. No release authorization. MODEL-007 remains unactivated. |
+| Handoff / Release Condition | Implementation and corrective follow-up merged; filesystem no-effect evidence for timeout/Esc cancellation is still required before Complete. No release authorization. MODEL-007 remains unactivated. |
 | Source Issue | Maintainer request 2026-09-21; related #188, #563 and #234 CI residual |
 | Work Slice | I281-A bash/PowerShell Ask model assessment, script context and bound admission, actionable human escalation; I281-B Windows lifecycle test reliability. No release, Desktop or unrelated higher-risk-write roadmap. |
 
@@ -114,8 +113,9 @@
   merge succeeded. Global Issue reconciliation failed only on new #590 and was advisory
   under ADR-071; this closeout registers its separate AUTO-UX-001 owner and matrix row.
   Local corrective validation: formatting, TUI 592 tests, agent 408 tests and diff check passed.
-  Human observations below complete the UX walkthrough; automated permission tests separately
-  cover fail-closed decisions. Complete/Closed supersedes earlier pending checkpoints.
+  Human observations below partially cover the UX walkthrough; automated permission tests separately
+  cover fail-closed decisions. Filesystem no-effect evidence for timeout/Esc remains outstanding, so
+  this owner stays Review/Claimed.
   Locale UX remains #590; original-provider dispatch root cause is not proven by changing
   models or by diagnostic categories and remains an explicit residual in this owner.
 
