@@ -75,6 +75,7 @@ struct LiveTask {
     running: bool,
     closing: bool,
     workspace: Option<String>,
+    pending_approval: Option<(u64, String, String, String)>,
 }
 
 impl LiveTask {
@@ -222,6 +223,9 @@ enum Command {
     Settings,
     ToggleTaskOption(usize),
     ChooseWorkspace,
+    ApproveOnce(u64),
+    ApproveSession(u64),
+    DenyApproval(u64),
 }
 
 struct DesktopWindow {
@@ -358,8 +362,38 @@ impl DesktopWindow {
                         .is_ok()
                     {
                         live.status = LiveStatus::Cancelling;
+                        live.pending_approval = None;
                     } else {
                         live.status = LiveStatus::CancelFailed;
+                    }
+                }
+            }
+            Command::ApproveOnce(request_id)
+            | Command::ApproveSession(request_id)
+            | Command::DenyApproval(request_id) => {
+                if let Some(live) = &mut self.live
+                    && live.running
+                    && !live.closing
+                    && live
+                        .pending_approval
+                        .as_ref()
+                        .is_some_and(|approval| approval.0 == request_id)
+                    && let Some(commands) = &live.commands
+                {
+                    let choice = match command {
+                        Command::ApproveOnce(_) => talos_runtime::ApprovalChoice::ApproveOnce,
+                        Command::ApproveSession(_) => talos_runtime::ApprovalChoice::AlwaysApprove,
+                        Command::DenyApproval(_) => talos_runtime::ApprovalChoice::Deny,
+                        _ => unreachable!(),
+                    };
+                    if commands
+                        .try_send(crate::runtime_host::RuntimeCommand::ApprovalResponse {
+                            request_id,
+                            choice,
+                        })
+                        .is_ok()
+                    {
+                        live.pending_approval = None;
                     }
                 }
             }
@@ -1678,9 +1712,46 @@ impl DesktopWindow {
                         .update(cx, |this, cx| {
                             if let Some(live) = &mut this.live {
                                 match event {
-                                    RuntimeOutput::ToolUnavailable(name) => {
-                                        if !live.unavailable_tools.contains(&name) {
-                                            live.unavailable_tools.push(name);
+                                    RuntimeOutput::ToolStarted { call_id, name } => {
+                                        live.status = LiveStatus::Streaming;
+                                        live.output.push_str(&format!("\n→ {name} [{call_id}]\n"));
+                                    }
+                                    RuntimeOutput::ToolResult {
+                                        call_id,
+                                        content,
+                                        is_error,
+                                    } => {
+                                        live.output.push_str(&format!(
+                                            "\n[{} {call_id}]\n{content}\n",
+                                            if is_error { "✗" } else { "✓" }
+                                        ));
+                                    }
+                                    RuntimeOutput::ApprovalRequested {
+                                        request_id,
+                                        tool_name,
+                                        scope,
+                                        explanation,
+                                    } => {
+                                        live.pending_approval =
+                                            Some((request_id, tool_name, scope, explanation));
+                                        live.status = LiveStatus::Streaming;
+                                    }
+                                    RuntimeOutput::AutoDecision {
+                                        outcome,
+                                        reason,
+                                        evaluator,
+                                    } => {
+                                        live.output.push_str(&format!(
+                                            "\n[Auto review: {outcome} — {reason} ({evaluator})]\n"
+                                        ));
+                                    }
+                                    RuntimeOutput::ApprovalClosed { request_id } => {
+                                        if live
+                                            .pending_approval
+                                            .as_ref()
+                                            .is_some_and(|approval| approval.0 == request_id)
+                                        {
+                                            live.pending_approval = None;
                                         }
                                     }
                                     RuntimeOutput::Started { turn_id } => {
@@ -1692,6 +1763,7 @@ impl DesktopWindow {
                                         live.output.push_str(&text);
                                     }
                                     RuntimeOutput::Completed { status } => {
+                                        live.pending_approval = None;
                                         live.running = false;
                                         live.status = match status {
                                             TerminalStatus::Success => LiveStatus::Finished,
@@ -1702,6 +1774,7 @@ impl DesktopWindow {
                                         };
                                     }
                                     RuntimeOutput::Error(error) => {
+                                        live.pending_approval = None;
                                         live.status = LiveStatus::Error(error);
                                         live.running = false;
                                         live.closing = false;
@@ -1808,11 +1881,59 @@ impl DesktopWindow {
                     )),
             )
             .child(div().child(if locale == Locale::Chinese {
-                "本阶段未启用工具；对话暂不持久化。"
+                "工具遵循 Runtime 权限门禁；对话暂不持久化。"
             } else {
-                "Tools are unavailable in this stage; conversation is not yet persisted."
+                "Tools use the Runtime permission gate; conversation is not yet persisted."
             }))
             .child(div().child(live.status.label(locale).to_owned()))
+            .when_some(live.pending_approval.as_ref(), |view, approval| {
+                view.child(div().p_3().rounded_md().bg(rgb(0xe5e9f0)).child(format!(
+                    "{}: {} [{}] {}",
+                    if locale == Locale::Chinese {
+                        "需要审批"
+                    } else {
+                        "Approval required"
+                    },
+                    approval.1,
+                    approval.2,
+                    approval.3
+                )))
+                .child(
+                    div()
+                        .flex()
+                        .gap_2()
+                        .child(self.command(
+                            "approval-once",
+                            if locale == Locale::Chinese {
+                                "本次允许"
+                            } else {
+                                "Allow once"
+                            },
+                            Command::ApproveOnce(approval.0),
+                            cx,
+                        ))
+                        .child(self.command(
+                            "approval-session",
+                            if locale == Locale::Chinese {
+                                "会话允许"
+                            } else {
+                                "Allow session"
+                            },
+                            Command::ApproveSession(approval.0),
+                            cx,
+                        ))
+                        .child(self.command(
+                            "approval-deny",
+                            if locale == Locale::Chinese {
+                                "拒绝"
+                            } else {
+                                "Deny"
+                            },
+                            Command::DenyApproval(approval.0),
+                            cx,
+                        )),
+                )
+            })
             .children(live.unavailable_tools.iter().map(|name| {
                 div().text_color(rgb(0xa34c42)).child(match locale {
                     Locale::English => format!("Tool unavailable; not executed: {name}"),

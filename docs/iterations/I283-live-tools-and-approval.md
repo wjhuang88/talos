@@ -81,9 +81,25 @@ safety. Roll back only the failing slice; no destructive cleanup of user session
 2026-09-22: activation #601 reached `main` as `538cbfef` after I282 implementation merge
 `aaa4c015`; I283 is now effective and local implementation may begin.
 
+## Local Execution Checkpoint — 2026-09-23
+
+Local implementation is converging on `chore/i283-activation-closeout`. The Desktop host now
+composes the existing shared Runtime tools, projects tool start/result events, exposes exact
+request-scoped approval controls, and installs the existing provider-backed Auto resolver through
+an additive RuntimeBuilder boundary. Auto reports are redacted before reaching the UI; permission
+policy and execution authority remain Runtime-owned. Approval responses carry request IDs, reject
+stale or duplicate IDs, and pending requests fail closed when cancelled, closed, or disconnected.
+
+`cargo check -p talos-runtime -p talos-desktop --features talos-desktop/desktop-ui --locked`
+passed. Desktop mock tests: 61 passed. This is not yet a stable candidate: full workspace
+validation, release preflight, governance validators, implementation PR and independent review
+remain pending.
+
 ## Verification Evidence
 
-Implementation checks: not run; activation only, no implementation exists for this child.
+Implementation checks: focused locked checks passed (`cargo check` for Runtime/Desktop, Desktop
+mock suite 61/61, and the exact-once approval response test). Full workspace validation, release
+preflight, governance validators, implementation PR and independent review remain pending.
 Planning checks are recorded centrally in the four-week task.
 
 ## Completion Evidence

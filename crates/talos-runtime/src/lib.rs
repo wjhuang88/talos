@@ -30,6 +30,10 @@ use std::sync::Arc;
 use crate::composition::SharedToolProfile;
 use async_trait::async_trait;
 use serde_json::Value;
+use talos_agent::auto_resolver::{
+    AutoPermissionControl, AutoPermissionResolver, ManagedWorkspaceLease,
+    ProviderAutoPermissionAssessor,
+};
 use talos_agent::permission_pipeline::{
     ApprovalResolver, ApprovalResolverError, PermissionApprovalRequest,
 };
@@ -133,6 +137,7 @@ impl RuntimeFinalizer for BackgroundJobsRuntimeFinalizer {
 #[doc(hidden)]
 pub mod composition;
 
+pub use talos_agent::auto_resolver::AutoDecisionReport;
 pub use talos_agent::evaluator::{
     EvaluatorAdmission, EvaluatorAssessor, EvaluatorError, EvaluatorFailure, EvaluatorOutcome,
     EvaluatorRequest, IndependentEvaluator, ProviderEvaluatorAssessor, ValidationEvidence,
@@ -384,6 +389,8 @@ pub struct RuntimeBuilder {
     initial_history: Vec<Message>,
     model_context_limit: u32,
     approval_handler: Option<Arc<dyn ApprovalHandler>>,
+    auto_assistance: bool,
+    auto_report_sink: Option<Arc<dyn Fn(AutoDecisionReport) + Send + Sync>>,
     custom_prompt: Option<String>,
     append_prompt: Option<String>,
     hook_registry: Option<Arc<HookRegistry>>,
@@ -410,6 +417,8 @@ impl RuntimeBuilder {
             initial_history: Vec::new(),
             model_context_limit: 128_000,
             approval_handler: None,
+            auto_assistance: false,
+            auto_report_sink: None,
             custom_prompt: None,
             append_prompt: None,
             hook_registry: None,
@@ -544,6 +553,21 @@ impl RuntimeBuilder {
         self
     }
 
+    /// Enables the existing bounded Auto permission resolver for this runtime.
+    /// Auto remains advisory and fail-closed; explicit policy and human Ask gates retain authority.
+    #[must_use]
+    pub fn auto_assistance(mut self, enabled: bool) -> Self {
+        self.auto_assistance = enabled;
+        self
+    }
+
+    /// Receives redacted reports from the existing Auto resolver.
+    #[must_use]
+    pub fn auto_report_sink(mut self, sink: Arc<dyn Fn(AutoDecisionReport) + Send + Sync>) -> Self {
+        self.auto_report_sink = Some(sink);
+        self
+    }
+
     /// Replaces the default Talos identity/system prompt.
     ///
     /// This is intended for embedders that reuse the runtime in a product with
@@ -662,6 +686,7 @@ impl RuntimeBuilder {
                 inner: handler.clone(),
             }) as Arc<dyn SandboxFallbackHandler>
         });
+        let provider_for_auto = provider.clone();
         let mut agent = if let Some(hooks) = self.hook_registry {
             Agent::with_security_and_hooks_and_sandbox_fallback(
                 provider,
@@ -684,11 +709,37 @@ impl RuntimeBuilder {
                 fallback_handler,
             )
         };
-        let resolver = approval_handler.map(|handler| {
+        let permission_state = Arc::new(PermissionSessionState::new((*agent_engine).clone()));
+        let fallback_resolver = approval_handler.clone().map(|handler| {
             Arc::new(RuntimeApprovalResolver { inner: handler }) as Arc<dyn ApprovalResolver>
         });
+        let resolver = if self.auto_assistance {
+            fallback_resolver.clone().and_then(|fallback| {
+                ManagedWorkspaceLease::for_permission_session(
+                    self.workspace_root.clone(),
+                    permission_state.clone(),
+                )
+                .ok()
+                .map(|lease| {
+                    let resolver = AutoPermissionResolver::new(
+                        Arc::new(ProviderAutoPermissionAssessor::new(provider_for_auto)),
+                        fallback,
+                        lease,
+                        std::time::Duration::MAX,
+                        AutoPermissionControl::new(true),
+                    );
+                    let resolver = match self.auto_report_sink.clone() {
+                        Some(sink) => resolver.with_report_sink(sink),
+                        None => resolver,
+                    };
+                    Arc::new(resolver) as Arc<dyn ApprovalResolver>
+                })
+            })
+        } else {
+            fallback_resolver
+        };
         agent = agent.with_permission_pipeline(
-            Arc::new(PermissionSessionState::new((*agent_engine).clone())),
+            permission_state,
             PermissionContext::new(
                 PermissionMode::Headless,
                 if resolver.is_some() {

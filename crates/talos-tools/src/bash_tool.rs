@@ -1,6 +1,7 @@
 //! Bash tool for shell command execution.
 
 use std::path::PathBuf;
+#[cfg(not(windows))]
 use std::process::Stdio;
 use std::time::Duration;
 use std::{
@@ -14,13 +15,17 @@ use serde::Deserialize;
 use serde_json::Value;
 #[cfg(any(unix, windows))]
 use talos_core::background_job::BackgroundJobRequest;
+#[cfg(windows)]
+use talos_core::background_job::{BackgroundJobLauncher, BackgroundProcessEvent};
 use talos_core::background_job::{BackgroundJobPermit, ToolExecutionAdmission};
 use talos_core::tool::{
     AgentTool, ToolExecutionAuthorization, ToolExecutionOutput, ToolFamily, ToolNature,
     ToolPermissionFacet, ToolResourceKind, ToolResult,
 };
 use thiserror::Error;
+#[cfg(not(windows))]
 use tokio::io::{AsyncBufReadExt, BufReader};
+#[cfg(not(windows))]
 use tokio::process::Command;
 
 /// Errors that can occur during bash tool execution.
@@ -87,6 +92,7 @@ const SHELL_TOOL_NAME: &str = "powershell";
 #[cfg(not(windows))]
 const SHELL_TOOL_NAME: &str = "bash";
 
+#[cfg(not(windows))]
 fn platform_shell_command(command: &str) -> Command {
     #[cfg(windows)]
     let mut cmd = {
@@ -162,6 +168,16 @@ impl BashTool {
                 "working directory changed or is unavailable; refusing to execute",
             );
         }
+        #[cfg(windows)]
+        {
+            self.run_command_windows(command, timeout_duration).await
+        }
+        #[cfg(not(windows))]
+        self.run_command_unix(command, timeout_duration).await
+    }
+
+    #[cfg(not(windows))]
+    async fn run_command_unix(&self, command: &str, timeout_duration: Duration) -> ToolResult {
         let mut cmd = platform_shell_command(command);
         cmd.current_dir(&self.working_dir)
             .stdout(Stdio::piped())
@@ -265,6 +281,58 @@ impl BashTool {
             content: output,
             is_error,
             continuations: Vec::new(),
+        }
+    }
+
+    /// Runs the Windows foreground shell inside a Job Object so timeout cleanup
+    /// terminates descendants that inherited the output pipes as well.
+    #[cfg(windows)]
+    async fn run_command_windows(&self, command: &str, timeout_duration: Duration) -> ToolResult {
+        let launcher = crate::process_boundary::WindowsBackgroundLauncher::new(
+            "powershell.exe".to_owned(),
+            vec![
+                "-NoLogo".to_owned(),
+                "-NoProfile".to_owned(),
+                "-NonInteractive".to_owned(),
+                "-Command".to_owned(),
+                command.to_owned(),
+            ],
+            self.working_dir.clone(),
+            std::collections::BTreeMap::new(),
+        );
+        let mut launched = match Box::new(launcher).launch().await {
+            Ok(job) => job,
+            Err(error) => return ToolResult::error(format!("failed to spawn shell: {error}")),
+        };
+        let mut output = format!("$ {command}\n");
+        let deadline = tokio::time::sleep(timeout_duration);
+        tokio::pin!(deadline);
+        loop {
+            tokio::select! {
+                event = launched.events.recv() => match event {
+                    Some(BackgroundProcessEvent::Output(chunk)) => {
+                        output.push_str(&String::from_utf8_lossy(&chunk.bytes));
+                    }
+                    Some(BackgroundProcessEvent::Exited(exit)) => {
+                        let code = exit.code.unwrap_or(-1);
+                        output.push_str(&format!("[exit {code}]"));
+                        return if is_expected_exit_code(command, code) {
+                            ToolResult::success(output)
+                        } else {
+                            ToolResult::error(output)
+                        };
+                    }
+                    Some(BackgroundProcessEvent::SupervisionFailed(error)) => {
+                        return ToolResult::error(format!("{output}[supervision error: {error}]"));
+                    }
+                    None => return ToolResult::error(format!("{output}[supervision closed]")),
+                },
+                _ = &mut deadline => {
+                    let _ = launched.control.force_terminate().await;
+                    output.push_str("[timeout]");
+                    return ToolResult::error(output);
+                }
+            }
         }
     }
 }
