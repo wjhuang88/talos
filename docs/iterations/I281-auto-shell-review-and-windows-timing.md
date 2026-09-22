@@ -123,6 +123,15 @@
   outcomes and tested build here before final closeout. Do not use automated tests as evidence
   that a natural person completed this walkthrough. MODEL-007 remains unactivated.
 
+- 2026-09-22 human UX acceptance completed on the local build: Auto-on bounded read-only
+  compound command showed `model allowed once` and executed exactly once; Auto-off preserved the
+  human approval path; an out-of-workspace write produced `model requested human approval` with
+  concrete effects and decision points; approval timeout and explicit `Esc` cancellation both
+  denied execution without a file effect; an explicit later authorization created a fresh review
+  but still required the final permission approval. The walkthrough also confirmed that pending
+  tool arguments no longer flash a duplicate JSON projection during model assessment. These are
+  natural-person UI observations, not automated-test evidence.
+
 - 2026-09-21 correction to the local checkpoint below: the implementation is not a stable
   candidate. Independent local review found missing script-evidence admission checks, an unsafe
   unknown-cwd compatibility path, and a public-context struct-literal compatibility break.

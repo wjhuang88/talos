@@ -68,7 +68,10 @@ impl Tui {
             && self.state.thinking_preview.is_none()
             && self.stream_render.preview().is_empty()
             && self.tool_activities.has_activity();
-        let mut tool_preview = self.tool_activities.component();
+        // Pending tool arguments are already rendered by the request/approval surface. Keep
+        // them collapsed for the whole pending lifecycle, including model assessment, so the
+        // activity preview never flashes a second JSON representation before the panel opens.
+        let mut tool_preview = self.tool_activities.component_for_approval(true);
         let preview_text_color = hold_status
             .as_ref()
             .map(|_| crate::scrollback::hold_preview_color(self.processing_frame));

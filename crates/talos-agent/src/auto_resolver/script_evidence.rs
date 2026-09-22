@@ -79,6 +79,7 @@ pub(super) fn collect(
         },
         seen: HashSet::new(),
         bytes: 0,
+        powershell: tool == "powershell",
         cwd,
         root,
         sensitive,
@@ -112,6 +113,7 @@ struct Collector<'a, F> {
     evidence: ScriptEvidence,
     seen: HashSet<PathBuf>,
     bytes: usize,
+    powershell: bool,
     cwd: &'a Path,
     root: &'a cap_std::fs::Dir,
     sensitive: F,
@@ -131,32 +133,41 @@ impl<F: Fn(&str) -> bool> Collector<'_, F> {
     }
 
     fn scan(&mut self, source: &str, depth: usize) {
-        for line in source.lines() {
-            let line = line.trim();
-            if line.is_empty() || line.starts_with('#') {
-                continue;
-            }
-            if line.contains(['$', '`', '<', '>', '(', ')', '{', '}', '\\', '\'', '"']) {
-                self.unknown("dynamic_or_compound_dependency_unresolved");
-                continue;
-            }
-            // Only literal finite separators are recognized. A lone ampersand may
-            // launch a background job (or invoke a PowerShell expression).
-            if line.replace("&&", "").contains('&') {
-                self.unknown("dynamic_or_compound_dependency_unresolved");
-                continue;
-            }
-            for segment in line.split([';', '|', '&']) {
-                let segment = segment.trim();
-                if !segment.is_empty() {
-                    self.scan_literal(segment, depth);
+        if self.powershell && source.contains(['\'', '"']) {
+            // PowerShell quote concatenation and doubled single quotes are not
+            // Bash word semantics. Do not use this literal lexer as its parser.
+            self.unknown("powershell_quoted_arguments_unresolved");
+            return;
+        }
+        match literal_segments(source) {
+            Some(segments) => {
+                for words in segments {
+                    self.scan_literal(&words, depth);
                 }
             }
+            None => self.unknown("dynamic_or_compound_dependency_unresolved"),
         }
     }
 
-    fn scan_literal(&mut self, line: &str, depth: usize) {
-        let words: Vec<_> = line.split_whitespace().collect();
+    fn scan_literal(&mut self, tokens: &[String], depth: usize) {
+        let words: Vec<_> = tokens.iter().map(String::as_str).collect();
+        // Wrappers can alter lookup, quoting and argument semantics (including
+        // `command -v`, `env VAR=...`, and `exec -a`). Never infer the script
+        // byte stream through them; retain a human checkpoint instead.
+        if words.first().is_some_and(|program| {
+            matches!(
+                program
+                    .rsplit(['/', '\\'])
+                    .next()
+                    .unwrap_or(program)
+                    .to_ascii_lowercase()
+                    .as_str(),
+                "command" | "env" | "exec" | "xargs" | "nohup" | "sudo" | "doas" | "start-process"
+            )
+        }) {
+            self.unknown("execution_wrapper_arguments_unresolved");
+            return;
+        }
         let interpreter = words.first().is_some_and(|program| {
             let name = program
                 .rsplit(['/', '\\'])
@@ -287,6 +298,78 @@ impl<F: Fn(&str) -> bool> Collector<'_, F> {
     }
 }
 
+// A deliberately limited literal lexer, not a shell parser. It never resolves
+// expansion or evaluates code; unsupported constructs retain advisory-only status.
+fn literal_segments(source: &str) -> Option<Vec<Vec<String>>> {
+    let mut segments = Vec::new();
+    let mut words = Vec::new();
+    let mut word = String::new();
+    let mut started = false;
+    let mut quote = None;
+    let mut chars = source.chars().peekable();
+    while let Some(ch) = chars.next() {
+        if let Some(delimiter) = quote {
+            if ch == delimiter {
+                quote = None;
+            } else if delimiter == '"' && matches!(ch, '$' | '`' | '\\') {
+                return None;
+            } else {
+                word.push(ch);
+            }
+            continue;
+        }
+        match ch {
+            '\'' | '"' => {
+                quote = Some(ch);
+                started = true;
+            }
+            '$' | '`' | '<' | '>' | '(' | ')' | '{' | '}' | '\\' | '*' | '?' | '[' | ']' => {
+                return None;
+            }
+            '#' if !started => {
+                while chars.peek().is_some_and(|c| *c != '\n') {
+                    chars.next();
+                }
+            }
+            ';' | '|' | '&' | '\n' => {
+                if ch == '&' && chars.next() != Some('&') {
+                    return None;
+                }
+                if ch == '|' && chars.peek() == Some(&'|') {
+                    chars.next();
+                }
+                if started {
+                    words.push(std::mem::take(&mut word));
+                    started = false;
+                }
+                if !words.is_empty() {
+                    segments.push(std::mem::take(&mut words));
+                }
+            }
+            c if c.is_whitespace() => {
+                if started {
+                    words.push(std::mem::take(&mut word));
+                    started = false;
+                }
+            }
+            _ => {
+                word.push(ch);
+                started = true;
+            }
+        }
+    }
+    if quote.is_some() {
+        return None;
+    }
+    if started {
+        words.push(word);
+    }
+    if !words.is_empty() {
+        segments.push(words);
+    }
+    Some(segments)
+}
+
 fn open_script(root: &cap_std::fs::Dir, path: &Path) -> Result<cap_std::fs::File, &'static str> {
     use cap_fs_ext::{DirExt, FollowSymlinks, MetadataExt, OpenOptionsFollowExt};
     let parts: Vec<_> = path
@@ -329,6 +412,69 @@ fn open_script(root: &cap_std::fs::Dir, path: &Path) -> Result<cap_std::fs::File
 mod tests {
     use super::*;
     use std::fs;
+
+    #[test]
+    fn quoted_literals_do_not_hide_compound_script_dependencies() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path().canonicalize().expect("root");
+        for command in [
+            "pwd && printf 'I281_READONLY_OK\\n'",
+            "printf 'literal ; | && $HOME `text`'",
+            "pwd && printf \"literal value\"",
+        ] {
+            assert!(
+                !collect(command, "bash", &root, &root, |_| false).requires_human_review,
+                "{command}"
+            );
+        }
+        for command in [
+            "command 'bash' 'missing.sh'",
+            "env 'bash' 'missing.sh'",
+            "pwd && 'bash' 'missing.sh'",
+            "ba\"sh\" missing.sh",
+            "printf \"$(touch bad)\"",
+            "printf $HOME",
+            "printf 'unterminated",
+            "printf x > out",
+            "pwd & ls",
+            "printf x\\;bash missing.sh",
+        ] {
+            assert!(
+                collect(command, "bash", &root, &root, |_| false).requires_human_review,
+                "{command}"
+            );
+        }
+        assert!(
+            collect("Write-Output 'a''b'", "powershell", &root, &root, |_| false)
+                .requires_human_review
+        );
+    }
+
+    #[test]
+    fn execution_wrappers_never_hide_script_dependencies() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path().canonicalize().expect("root");
+        for command in [
+            "command bash missing.sh",
+            "env bash missing.sh",
+            "env FOO=bar ./missing.sh",
+            "exec bash missing.sh",
+            "xargs bash missing.sh",
+            "nohup bash missing.sh",
+            "sudo bash missing.sh",
+            "Start-Process pwsh -File missing.ps1",
+        ] {
+            let evidence = collect(command, "bash", &root, &root, |_| false);
+            assert!(evidence.requires_human_review, "{command}");
+            assert!(
+                evidence
+                    .uncertainties
+                    .iter()
+                    .any(|item| item == "execution_wrapper_arguments_unresolved"),
+                "{command}"
+            );
+        }
+    }
 
     fn collect(
         command: &str,

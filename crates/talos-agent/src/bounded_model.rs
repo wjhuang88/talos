@@ -6,6 +6,17 @@ use talos_core::message::{AgentEvent, Message, ReasoningBlock, StopReason};
 use talos_core::provider::LanguageModel;
 use tokio_util::sync::CancellationToken;
 
+fn dispatch_error_category(error: &talos_core::provider::ProviderError) -> &'static str {
+    use talos_core::provider::ProviderError;
+    match error {
+        ProviderError::AuthenticationFailed(_) => "authentication",
+        ProviderError::RateLimited(_) => "rate_limited",
+        ProviderError::ServerError(_) => "server",
+        ProviderError::NetworkError(_) => "network",
+        ProviderError::InvalidResponse(_) => "invalid_response",
+    }
+}
+
 /// Outcome of an isolated bounded model decision.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BoundedDecision {
@@ -181,7 +192,14 @@ async fn invoke_text_bounded_with_limits(
             }
         }).catch_unwind().await
             .map_err(|_| "bounded model provider panicked".to_owned())?
-            .map_err(|_| "bounded model dispatch failed".to_owned())?;
+            .map_err(|error| {
+                // Provider error text can contain URLs, credentials or response bodies.
+                tracing::warn!(
+                    category = dispatch_error_category(&error),
+                    "Bounded model provider dispatch failed"
+                );
+                "bounded model dispatch failed".to_owned()
+            })?;
         while let Some(event) = events.recv().await {
             match &event {
                 AgentEvent::TextDelta { delta } => text_bytes = text_bytes.saturating_add(delta.len()),
@@ -249,6 +267,31 @@ async fn invoke_text_bounded_with_limits(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn dispatch_categories_never_include_provider_error_payloads() {
+        use talos_core::provider::ProviderError;
+        for (error, expected) in [
+            (
+                ProviderError::AuthenticationFailed("token=secret".into()),
+                "authentication",
+            ),
+            (
+                ProviderError::RateLimited("token=secret".into()),
+                "rate_limited",
+            ),
+            (ProviderError::ServerError("token=secret".into()), "server"),
+            (
+                ProviderError::NetworkError("token=secret".into()),
+                "network",
+            ),
+            (
+                ProviderError::InvalidResponse("token=secret".into()),
+                "invalid_response",
+            ),
+        ] {
+            assert_eq!(super::dispatch_error_category(&error), expected);
+        }
+    }
     use super::*;
     use talos_core::provider::{ProviderResult, Receiver};
 
