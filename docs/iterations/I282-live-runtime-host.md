@@ -20,7 +20,7 @@
 | Governance Claim PR | #598 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | User authorized continuation; exact-head CI, governance validators and merge-time CAS required; no independent natural-person reviewer available |
-| Implementation PR | #599 (`2dfe13b1`); exact-head CI/review pending |
+| Implementation PR | #599 (`2dfe13b1`, `0bd6a7bc`); exact-head CI/review pending |
 | Last Updated | 2026-09-22 |
 | Handoff / Release Condition | Effective only after #598 reaches main; implementation starts from its merge or later main; no release |
 
@@ -82,7 +82,7 @@ safety. Roll back only the failing slice; no destructive cleanup of user session
 `6fb3895611a1ad75eff0ec990607737a75c5f49a` reached `main` at activation merge
 `d323ce5d184df57d554f9646cf4a4e639de81995`; implementation proceeds from that effective base.
 
-2026-09-23 checkpoint: I282 implementation PR #599 at `2dfe13b1` adds the live Runtime host, configured provider
+2026-09-23 checkpoint: I282 implementation PR #599 at `2dfe13b1` plus lint fix `0bd6a7bc` adds the live Runtime host, configured provider
 construction, bounded presentation buffering, typed terminal outcomes, no-tools disclosure,
 shutdown receipts, and cancellation through provider-backed history compaction. Focused Desktop
 tests: 61 passed; Runtime interrupt tests: 2 passed. Remaining gates are exact-head CI,

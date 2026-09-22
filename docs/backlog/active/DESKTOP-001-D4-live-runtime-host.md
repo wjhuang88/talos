@@ -26,7 +26,7 @@
 | Governance Claim PR | #598 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | User authorized continuation; exact-head CI, governance validators and merge-time CAS required; no independent natural-person reviewer available |
-| Implementation PR | #599 (`2dfe13b1`); exact-head CI/review pending |
+| Implementation PR | #599 (`2dfe13b1`, `0bd6a7bc`); exact-head CI/review pending |
 | Last Updated | 2026-09-22 |
 | Handoff / Release Condition | Effective only after #598 reaches main; implementation starts from its merge or later main; no release |
 
