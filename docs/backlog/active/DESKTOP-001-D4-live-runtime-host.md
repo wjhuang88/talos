@@ -1,6 +1,6 @@
 # DESKTOP-001-D4: Live Runtime Desktop Host
 
-> Document status: Active — Claimed
+> Document status: Review — Claimed; implementation merged, human acceptance outstanding
 
 | Field | Value |
 |---|---|
@@ -8,7 +8,7 @@
 | Parent Epic | DESKTOP-001 |
 | Type | Desktop integration / behavior Story |
 | Priority | P1 |
-| Status | Active / Claimed — local implementation convergence |
+| Status | Review / Claimed — implementation merged; H1/H5 outstanding |
 | Selected Iteration | I282 |
 | Source | #29; four-week Desktop task |
 | Depends On | WORK-001 P0-P4 and I280 complete; ADR-059; explicit host/API readiness map |
@@ -26,9 +26,9 @@
 | Governance Claim PR | #598 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | User authorized continuation; exact-head CI, governance validators and merge-time CAS required; no independent natural-person reviewer available |
-| Implementation PR | #599 (`2dfe13b1`, `0bd6a7bc`); exact-head CI/review pending |
+| Implementation PR | #599 (`2dfe13b1`, `0bd6a7bc`); merged as `aaa4c015` |
 | Last Updated | 2026-09-22 |
-| Handoff / Release Condition | Effective only after #598 reaches main; implementation starts from its merge or later main; no release |
+| Handoff / Release Condition | H1/H5 native acceptance remains in #29; no release authority |
 
 ## Outcome
 
@@ -79,10 +79,10 @@ The effective activation is #598 (head `6fb3895611a1ad75eff0ec990607737a75c5f49a
 host, configured provider adapter, bounded presentation queue, typed completion/error states,
 no-tools disclosure, shutdown receipts, and cancellation during provider-backed history
 compaction. Focused evidence is 61 Desktop tests and 2 Runtime interrupt tests passing. The
-candidate is submitted as #599 after local preflight and governance checks. Exact-head CI and
-independent review remain pending. H1/H5 native acceptance remains deferred in #29.
+candidate #599 passed exact-head CI `35766202595` and merged to `main` as `aaa4c015`.
+Independent Agent-role review found no technical/API/security blocker. H1/H5 native acceptance
+remains deferred in #29.
 
 ## Completion Evidence
 
-Completion Commit: pending.
-No implementation or acceptance evidence exists for this planned child.
+Completion Commit: `aaa4c015` (implementation merge; owner remains Review pending H1/H5).

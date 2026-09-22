@@ -211,18 +211,21 @@ No unrelated cleanup, automatic dependency upgrade, new per-subtask Issue or rel
 ## Execution Checkpoint — 2026-09-23
 
 Completed task items: none; I282 implementation is locally converging.
-Current state: I282/D4 claim/activation is effective after #598 merged. I283-I285 remain Planned /
-Unclaimed and are not activated. Local I282 now has the live Runtime host, configured provider
+Current state: I282/D4 implementation is merged to `main` as `aaa4c015` through #599. I282/D4
+remain Review because H1/H5 native acceptance is outstanding in #29. I283-I285 remain Planned /
+Unclaimed and are not activated. I282 now has the live Runtime host, configured provider
 adapter, typed output/completion/error handling, bounded presentation buffering, explicit no-tools
 behavior, shutdown receipts, and cancellation during provider-backed history compaction.
 Focused evidence: Desktop binary tests 61 passed; Runtime interrupt tests 2 passed. The stable
-candidate is submitted as implementation PR #599. H1/H5 native rows remain deferred in #29.
-Next item: obtain exact-head CI and independent review for #599, then perform merge-time CAS
-without activating I283 early.
+candidate #599 passed exact-head CI `35766202595`, independent Agent-role review found no
+technical/API/security blocker, and merge-time CAS produced `aaa4c015`. H1/H5 native rows remain
+deferred in #29.
+Next item: record this owner-first Review closeout, then activate I283 only through its own
+effective claim; do not mark the four-week task complete yet.
 Resume: read this task and I282, retain the current branch/worktree, inspect the full diff, and
 preserve I277 deferred rows.
-Validation: workspace tests, affected checks, release preflight and governance validators passed;
-PR #599 exact-head CI and implementation review remain pending.
+Validation: workspace tests, affected checks, release preflight, governance validators and
+PR #599 exact-head CI passed. Human H1/H5 acceptance remains pending.
 Independent Agent-role planning review approved after H1-H6 numbering was added; this is not a
 natural-person review, implementation security approval or proof of the four-week estimate.
 No Rust tests were run for this governance-only activation candidate. Implementation remains

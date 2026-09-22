@@ -1,6 +1,6 @@
 # Iteration I282: Live Runtime Desktop Host
 
-> Document status: Active — Claimed
+> Document status: Review — Claimed; implementation merged, human acceptance outstanding
 > Plan date: 2026-09-22
 > Target window: 2026-09-22 to 2026-09-28
 > Planned objective: A runnable live Desktop task streams real configured-provider output and can be cancelled without blocking the UI.
@@ -20,9 +20,9 @@
 | Governance Claim PR | #598 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | User authorized continuation; exact-head CI, governance validators and merge-time CAS required; no independent natural-person reviewer available |
-| Implementation PR | #599 (`2dfe13b1`, `0bd6a7bc`); exact-head CI/review pending |
+| Implementation PR | #599 (`2dfe13b1`, `0bd6a7bc`); merged as `aaa4c015` |
 | Last Updated | 2026-09-22 |
-| Handoff / Release Condition | Effective only after #598 reaches main; implementation starts from its merge or later main; no release |
+| Handoff / Release Condition | H1/H5 native acceptance remains in #29; no release authority |
 
 ## Published Baseline
 
@@ -85,21 +85,24 @@ safety. Roll back only the failing slice; no destructive cleanup of user session
 2026-09-23 checkpoint: I282 implementation PR #599 at `2dfe13b1` plus lint fix `0bd6a7bc` adds the live Runtime host, configured provider
 construction, bounded presentation buffering, typed terminal outcomes, no-tools disclosure,
 shutdown receipts, and cancellation through provider-backed history compaction. Focused Desktop
-tests: 61 passed; Runtime interrupt tests: 2 passed. Remaining gates are exact-head CI,
-independent technical/security review, and deferred native rows H1/H5 in #29.
+tests: 61 passed; Runtime interrupt tests: 2 passed. Exact-head CI `35766202595` passed and
+the implementation merged to `main` as `aaa4c015`; independent Agent-role review found no
+technical/API/security blocker. H1/H5 native rows remain in Review in #29.
 
 ## Verification Evidence
 
 Implementation checks: `cargo test -p talos-desktop --locked --features desktop-ui --bin
 talos-desktop-mock` (61 passed); `cargo test -p talos-runtime --locked interrupt` (2 passed).
-Planning checks are recorded centrally in the four-week task. Full preflight and stable-candidate
-remote evidence remain pending.
+Workspace tests, affected checks, release preflight and governance validators passed. Exact-head
+CI: run `35766202595`, all jobs passed; implementation merge commit: `aaa4c015`.
 
 ## Completion Evidence
 
-Completion Commit: pending.
+Completion Commit: `aaa4c015` (implementation merge; owner remains Review pending H1/H5).
 Only already-existing implementation/evidence commits may close this iteration.
 
 ## Variance And Residuals
 
-None yet. Carry eligible human rows to #29 / I285 without transferring protected security gates.
+Human rows H1/H5 remain open in #29; carry them to I285 without transferring protected security
+gates. I283 may be activated only through its own effective claim and after this owner-first
+review state is recorded.
