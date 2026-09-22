@@ -1,6 +1,7 @@
 # Iteration I281: Model-First Shell Approval And Windows Lifecycle Tests
 
-> Document status: Review
+> Document status: Complete
+> Completion Commit: bfdf8b67f666602d3d39e2c5949adb646f46e01e
 > Planned objective: Model assessment for all Auto-mode shell Ask requests, and reliable Windows lifecycle tests.
 > MVP deliverable: Runnable bash/PowerShell approval with actionable human decision points and real Windows process-tree cleanup acceptance.
 
@@ -8,7 +9,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-5 |
 | Claimed At | 2026-09-21 |
@@ -17,7 +18,7 @@
 | Authorization Evidence | Maintainer requested I281 development and closure and accepted ADR-081 on 2026-09-21; claim #587 effective at cb00524d. Independent Agent security/API approval for #588 recorded in comment 5762107014. |
 | Implementation PR | #588 (merged as a1cb869b), #591 (merged as bfdf8b67) |
 | Last Updated | 2026-09-22 |
-| Handoff / Release Condition | Implementation and corrective follow-up merged; filesystem no-effect evidence for timeout/Esc cancellation is still required before Complete. No release authorization. MODEL-007 remains unactivated. |
+| Handoff / Release Condition | Implementation, corrective follow-up and combined acceptance evidence complete. No release authorization. MODEL-007 remains unactivated. |
 | Source Issue | Maintainer request 2026-09-21; related #188, #563 and #234 CI residual |
 | Work Slice | I281-A bash/PowerShell Ask model assessment, script context and bound admission, actionable human escalation; I281-B Windows lifecycle test reliability. No release, Desktop or unrelated higher-risk-write roadmap. |
 
@@ -103,6 +104,21 @@
   upgrades or wholesale #563 implementation. Residuals remain in this owner until explicit handoff.
 
 ## Planning Record
+
+- 2026-09-22 final evidence correction: independent reviewer withdrew the requirement for
+  a repeated human filesystem check after examining the composed execution boundary.
+  Human observations establish the timeout/Esc UI behavior. Three locked agent library tests
+  were rerun individually and passed: `resolver_timeout_fails_closed_without_resetting_budget`,
+  `i281_explicit_ask_is_assessed_but_retains_human_authority`, and
+  `agent_pipeline_no_resolver_emits_one_final_deny_and_executes_nothing`.
+  These respectively prove timeout becomes Deny, model assessment cannot override human Deny,
+  and the agent denial path executes zero tools. Source review of TUI input maps Esc to Deny;
+  `tool_execution.rs` returns authorization errors before execution reservation and dispatch.
+  Together these establish no tool effect on the observed refusal paths. This is composed
+  test/source/UI evidence, not a single end-to-end timeout/Esc test or a screenshot-based disk
+  inspection. The earlier no-effect evidence blocker is resolved; I281 is Complete/Closed.
+  Existing implementation merge `bfdf8b67` includes prior implementation `a1cb869b`.
+  #590 locale intake and unproven original-provider dispatch diagnosis remain separate residuals.
 
 - 2026-09-22 closeout: #591 merged as `bfdf8b67f666602d3d39e2c5949adb646f46e01e`.
   Exact head `1fc3afd3fa9e1f3ec3ed9eb75017287b77117b9b`, base
