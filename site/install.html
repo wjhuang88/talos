@@ -181,6 +181,13 @@ talos --config-set providers.anthropic.api_key_env=ANTHROPIC_API_KEY</code></pre
       </section>
 
       <section>
+        <h2>Install with Cargo</h2>
+        <p>Version 0.10.1 is available on crates.io. This compiles locally and requires a Rust toolchain and platform build tools; use the release archives to avoid compilation. The repository uses Rust 1.97.0.</p>
+        <div class="talos-codeblock"><pre><code>cargo install talos-cli --version 0.10.1 --bin talos --locked
+talos --version</code></pre></div>
+        <p>Cargo installs into <code>~/.cargo/bin</code> by default. Ensure it is on PATH; use <code>where.exe talos</code> on Windows or <code>command -v talos</code> on Unix if another installation is selected.</p>
+      </section>
+      <section>
         <h2>Build from source</h2>
         <p>Requirements:</p>
         <ul>
@@ -203,7 +210,7 @@ talos --config-set providers.anthropic.api_key_env=ANTHROPIC_API_KEY</code></pre
           <p>
             <strong>Cargo install status:</strong>
             <code>cargo install talos-cli --bin talos --locked</code> installs
-            the latest available registry version. Version 0.9.2 is published;
+            the latest available registry version. Version 0.10.1 is published;
             check <code>cargo info talos-cli</code> before pinning a newer version.
             A GitHub tag alone does not confirm registry availability.
             For local source testing, use

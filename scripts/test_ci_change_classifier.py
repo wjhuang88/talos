@@ -53,9 +53,21 @@ class ClassifierTests(unittest.TestCase):
             "plugins/Cargo.lock",
             "crates/talos-text/src/symbol.rs",
             "crates/talos-text/src/symbol_queries.rs",
+            "site/install.sh",
+            "site/install.ps1",
+            "site/app.js",
+            "site/styles.css",
+            "site/data.json",
         ):
             with self.subTest(path=path):
                 self.assert_full(payload(("M", path)))
+
+    def test_site_html_is_reduced_but_mixed_code_is_full(self) -> None:
+        self.assert_reduced(("M", "site/install.html"), ("A", "site/zh/install.html"))
+        self.assert_full(payload(("M", "site/install.html"), ("M", "site/install.sh")))
+        self.assert_full(payload(("M", "site/zh/docs.html"), ("M", "Cargo.toml")))
+        self.assert_full(payload(("D", "site/install.html")))
+        self.assert_full(payload(("M", "site/../other.html")))
 
     def test_governance_and_workflow_prose_are_reduced(self) -> None:
         for path in (
@@ -129,6 +141,20 @@ class ClassifierTests(unittest.TestCase):
             git("commit", "--quiet", "-am", "docs update")
             docs_head = git("rev-parse", "HEAD")
             self.assertFalse(MODULE.classify_repository(repo, base, docs_head).full_validation)
+
+            (repo / "site" / "zh").mkdir(parents=True)
+            page = repo / "site" / "zh" / "install.html"
+            page.write_text("<!doctype html><title>安装</title>\n", encoding="utf-8")
+            git("add", ".")
+            git("commit", "--quiet", "-m", "add site documentation")
+            site_head = git("rev-parse", "HEAD")
+            self.assertFalse(MODULE.classify_repository(repo, docs_head, site_head).full_validation)
+
+            page.write_bytes(b"html\0binary")
+            git("commit", "--quiet", "-am", "binary site content")
+            self.assertTrue(
+                MODULE.classify_repository(repo, site_head, git("rev-parse", "HEAD")).full_validation
+            )
 
             git("mv", "docs/reference/guide.md", "docs/reference/renamed.md")
             git("commit", "--quiet", "-m", "rename docs")

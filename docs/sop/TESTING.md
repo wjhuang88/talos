@@ -91,14 +91,15 @@ scripts/assess_project_scale.sh .
 
 ## Pull Request CI Routing
 
-Pull requests containing only `README.md`, `README.zh-CN.md`, `CHANGELOG.md`, Markdown beneath
-`docs/` outside `docs/sop/`, or the plain-text `.agent-governance/manifest.yaml` use the reduced
+Pull requests containing only `README.md`, `README.zh-CN.md`, `CHANGELOG.md`, `AGENTS.md`, Markdown
+beneath `docs/` (including SOPs), `plugins/README.md`, `crates/talos-plugin/README.md`, HTML beneath
+`site/` (including `site/zh/`), workflow YAML, or the plain-text `.agent-governance/manifest.yaml` use the reduced
 documentation route. That route keeps whitespace,
 public-site, governance, Collaboration Claim, remote Issue-owner, and Windows installer checks,
 while the Unix and Windows Rust workspace steps are skipped.
 
 Every other path or change type uses full validation. This includes Rust and Cargo files,
-workflows, `AGENTS.md`, SOPs, scripts, schemas, fixtures, generated or binary assets, mixed changes,
+scripts (including site installers and JavaScript), stylesheets, schemas, fixtures, generated or binary assets, mixed code/document changes,
 renames, copies, deletions, type changes, and any missing or malformed comparison input. The
 workflow loads `scripts/classify_ci_changes.py` from the pull request base commit so a change cannot
 relax its own route. Reproduce the classifier fixture matrix with:
