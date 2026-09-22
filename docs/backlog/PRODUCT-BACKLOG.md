@@ -10,13 +10,14 @@ That snapshot is historical evidence, not current activation authority.
 ## Current Priorities
 
 Current cycle selected 2026-09-21: [I281](../iterations/I281-auto-shell-review-and-windows-timing.md)
-is Review/Claimed: shell Ask model review under ADR-081 and Windows I226 timing repair merged
-in #588 as `a1cb869b`, with exact-head CI and independent Agent security/API approval.
-Human UX acceptance remains pending in the iteration owner.
+is Complete/Closed: shell Ask model review under ADR-081, Windows I226 timing repair and
+UX follow-up merged in #588/#591 as `a1cb869b`/`bfdf8b67`, with exact-head code CI,
+independent Agent security/API approval and human UX acceptance recorded in the owner.
 MODEL-007 follows this cycle; it is deferred, not cancelled.
 
 | Priority | Focus | Current State / Gate | Required Reads |
 |---|---|---|---|
+| 2 | Conversation-language Auto explanations / #590 | Refinement / Unclaimed; multilingual selection, uncertainty fallback and measured overhead remain to refine. Not activated. | [AUTO-UX-001](active/AUTO-UX-001-review-language.md) |
 | 0 | Auto review invalid-output recurrence (2026-09-18) | Open corrective intake / Unclaimed. MiniMax-M3 `ls -la` review fails parsing and falls back to human approval; precise response unavailable. Add redacted diagnostics and evidence-backed repair; preserve permission gates. | [PERM-007-F corrective intake](active/PERM-007-F-generic-shell-effect-classification.md#2026-09-18-invalid-model-review-corrective-intake); ADR-070; source #462 |
 | 0 | Completed cycle: omitted root Plugin source layout | CAP-001-D and I278 Complete/Closed; #576 merged as 1e5a8592 with exact-head CI/review/CAS and full acceptance ledger. I277 manual acceptance remains Deferred. | [CAP-001-D](active/CAP-001-D-root-plugin-source-layout.md); [I278](../iterations/I278-root-plugin-source-delivery.md); CAP-001/#466; ADR-027/072/073/079 |
 | 1 | Dependency baseline and upgrade governance / #474 | DEPENDENCY-001 / I248 Complete/Closed; #498 merged as `a7d168ee` (head `5d2e4443`, CI `34074942674`, review `5564114577`). Full upgrade is DEPENDENCY-002 / I250 Review/Claimed after #500 merge `ea9a4c37`; I249 remains an unselected one-package pilot. | `docs/backlog/active/DEPENDENCY-001-dependency-upgrade-governance.md`; `docs/iterations/I248-dependency-governance-closed-loop.md`; `docs/backlog/active/DEPENDENCY-002-full-workspace-dependency-upgrade.md`; `docs/iterations/I250-full-workspace-dependency-upgrade.md`; Issue #474 |
