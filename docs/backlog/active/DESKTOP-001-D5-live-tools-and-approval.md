@@ -23,12 +23,12 @@
 | Work Slice | DESKTOP-001-D5 / I283: Desktop Tools Approval And Cancellation; planned scope only |
 | Claimed At | Not applicable |
 | Source Issue | #29 |
-| Governance Claim PR | Not applicable |
+| Governance Claim PR | Not applicable until activation is effective |
 | Authorization Mode | Not applicable |
-| Authorization Evidence | Maintainer requested four-week Desktop planning on 2026-09-22; no implementation activation yet |
+| Authorization Evidence | I282 implementation merged as `aaa4c015`; activation remains proposed in #601 |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-22 |
-| Handoff / Release Condition | Resolve readiness and establish effective serial child claim before implementation; no release |
+| Handoff / Release Condition | Establish an effective serial child claim before implementation; no release or new permission authority |
 
 ## Outcome
 
