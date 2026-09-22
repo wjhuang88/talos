@@ -17,7 +17,7 @@
 | Work Slice | DESKTOP-001-D4 / I282: live Desktop Runtime host, provider output, cancellation and host lifecycle; no tools |
 | Claimed At | 2026-09-22 |
 | Source Issue | #29 |
-| Governance Claim PR | #598 (atomic claim/activation PR) |
+| Governance Claim PR | #598 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | User authorized continuation; exact-head CI, governance validators and merge-time CAS required; no independent natural-person reviewer available |
 | Implementation PR | Not started until activation merge |
