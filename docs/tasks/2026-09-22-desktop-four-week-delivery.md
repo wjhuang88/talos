@@ -208,15 +208,21 @@ and keep optional features out. #29 and owning child retain Desktop gaps; #308 o
 #502 owns dependency research; MODEL-007 and #590 retain their existing owners.
 No unrelated cleanup, automatic dependency upgrade, new per-subtask Issue or release.
 
-## Execution Checkpoint — 2026-09-22
+## Execution Checkpoint — 2026-09-23
 
-Completed task items: none; planning baseline created.
-Current state: I282/D4 claim/activation proposed in #598; I283-I285 remain Planned / Unclaimed. No implementation has started; activation is ineffective until merge.
-Next item: merge #598 after exact-head gates, then create the I282 implementation branch from its merge.
-Resume: read this task and I282, fetch current main, inventory owners/PRs, retain I277 deferred rows.
-Validation: repository governance and Collaboration Claim validators passed with 0 warnings;
-the skill governance validator also passed with 0 warnings. Scale assessment retained high-risk /
-release-managed / on-demand worktrees; no workflow profile change. Diff whitespace checks passed.
+Completed task items: none; I282 implementation is locally converging.
+Current state: I282/D4 claim/activation is effective after #598 merged. I283-I285 remain Planned /
+Unclaimed and are not activated. Local I282 now has the live Runtime host, configured provider
+adapter, typed output/completion/error handling, bounded presentation buffering, explicit no-tools
+behavior, shutdown receipts, and cancellation during provider-backed history compaction.
+Focused evidence: Desktop binary tests 61 passed; Runtime interrupt tests 2 passed. The stable
+candidate has not been pushed. H1/H5 native rows remain deferred in #29.
+Next item: complete local code/document convergence and preflight, then obtain independent review
+and push one stable I282 implementation candidate.
+Resume: read this task and I282, retain the current branch/worktree, inspect the full diff, and
+preserve I277 deferred rows.
+Validation: focused checks above passed; full release preflight, governance validators, exact-head
+CI and implementation review remain pending.
 Independent Agent-role planning review approved after H1-H6 numbering was added; this is not a
 natural-person review, implementation security approval or proof of the four-week estimate.
 No Rust tests were run for this governance-only activation candidate. Implementation remains

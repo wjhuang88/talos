@@ -1,6 +1,6 @@
 # Iteration I282: Live Runtime Desktop Host
 
-> Document status: Active — claim/activation proposed; effective only after merge
+> Document status: Active — Claimed
 > Plan date: 2026-09-22
 > Target window: 2026-09-22 to 2026-09-28
 > Planned objective: A runnable live Desktop task streams real configured-provider output and can be cancelled without blocking the UI.
@@ -20,7 +20,7 @@
 | Governance Claim PR | #598 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | User authorized continuation; exact-head CI, governance validators and merge-time CAS required; no independent natural-person reviewer available |
-| Implementation PR | Not started until activation merge |
+| Implementation PR | Local convergence in progress; stable candidate not pushed |
 | Last Updated | 2026-09-22 |
 | Handoff / Release Condition | Effective only after #598 reaches main; implementation starts from its merge or later main; no release |
 
@@ -78,12 +78,23 @@ safety. Roll back only the failing slice; no destructive cleanup of user session
 
 ## Actual Activation And Execution
 
-2026-09-22: atomic claim/activation proposed in #598. Implementation starts only from its merge or later main.
+2026-09-22: atomic claim/activation merged through #598. Claim PR #598 head
+`6fb3895611a1ad75eff0ec990607737a75c5f49a` reached `main` at activation merge
+`d323ce5d184df57d554f9646cf4a4e639de81995`; implementation proceeds from that effective base.
+
+2026-09-23 checkpoint: local I282 implementation adds the live Runtime host, configured provider
+construction, bounded presentation buffering, typed terminal outcomes, no-tools disclosure,
+shutdown receipts, and cancellation through provider-backed history compaction. Focused Desktop
+tests: 61 passed; Runtime interrupt tests: 2 passed. The stable implementation candidate is not
+yet pushed. Remaining gates are full local preflight, governance synchronization, independent
+technical/security review, exact-head CI, and deferred native rows H1/H5 in #29.
 
 ## Verification Evidence
 
-Implementation checks: not run; no implementation exists for this child.
-Planning checks are recorded centrally in the four-week task.
+Implementation checks: `cargo test -p talos-desktop --locked --features desktop-ui --bin
+talos-desktop-mock` (61 passed); `cargo test -p talos-runtime --locked interrupt` (2 passed).
+Planning checks are recorded centrally in the four-week task. Full preflight and stable-candidate
+remote evidence remain pending.
 
 ## Completion Evidence
 

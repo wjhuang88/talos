@@ -208,6 +208,14 @@ impl RuntimeAdmissionControl {
 
     /// Cancels the start-committed turn, if any, without waiting.
     pub fn interrupt_active(&self) {
+        self.try_interrupt_active();
+    }
+
+    /// Cancels the observed start-committed turn and reports whether one existed.
+    ///
+    /// The cloned token belongs only to that turn. Callers that observe `true`
+    /// must not also enqueue an untargeted interrupt for a subsequent turn.
+    pub fn try_interrupt_active(&self) -> bool {
         let token = {
             let mut state = self.lock();
             state.active.as_mut().map(|active| {
@@ -217,6 +225,9 @@ impl RuntimeAdmissionControl {
         };
         if let Some(token) = token {
             token.cancel();
+            true
+        } else {
+            false
         }
     }
 

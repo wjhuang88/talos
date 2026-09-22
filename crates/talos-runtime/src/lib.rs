@@ -817,6 +817,12 @@ impl RuntimeHandle {
 
     /// Interrupts the active turn, if any.
     pub async fn interrupt(&self) -> RuntimeResult<()> {
+        // Startup can await provider-backed history compaction before the actor
+        // polls commands again. Cancel its committed token directly and do not
+        // leave a duplicate interrupt queued for a later turn.
+        if self.coordinator.try_interrupt_active() {
+            return Ok(());
+        }
         self.command_tx
             .send(SessionOp::Interrupt)
             .await

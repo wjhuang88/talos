@@ -14,6 +14,91 @@ use std::sync::{
 
 actions!(desktop, [NextFocus, PreviousFocus]);
 
+#[derive(Default, Debug, PartialEq, Eq)]
+enum LiveStatus {
+    #[default]
+    Ready,
+    Connecting,
+    Streaming,
+    Cancelling,
+    Closing,
+    Finished,
+    Cancelled,
+    Stopped,
+    MissingInput,
+    WorkspaceChanged,
+    HostBusy,
+    CancelFailed,
+    CloseFailed,
+    Error(String),
+}
+
+impl LiveStatus {
+    fn label(&self, locale: Locale) -> &str {
+        let (en, zh) = match self {
+            Self::Ready => ("Ready", "就绪"),
+            Self::Connecting => ("Connecting", "正在连接"),
+            Self::Streaming => ("Streaming", "正在输出"),
+            Self::Cancelling => ("Cancelling", "正在取消"),
+            Self::Closing => ("Stopping before closing", "正在停止，完成后关闭"),
+            Self::Finished => ("Finished", "已完成"),
+            Self::Cancelled => ("Cancelled", "已取消"),
+            Self::Stopped => ("Stopped", "已停止"),
+            Self::MissingInput => ("Enter a task and workspace", "请填写任务和工作区"),
+            Self::WorkspaceChanged => (
+                "Restart live mode to change workspace",
+                "更换工作区请重新启动",
+            ),
+            Self::HostBusy => ("Host unavailable or busy", "执行服务未就绪或繁忙"),
+            Self::CancelFailed => ("Cancellation could not be queued", "无法提交取消请求"),
+            Self::CloseFailed => (
+                "Could not request shutdown; retry closing",
+                "关闭请求未提交，请重试",
+            ),
+            Self::Error(error) => return error,
+        };
+        match locale {
+            Locale::English => en,
+            Locale::Chinese => zh,
+        }
+    }
+}
+
+#[derive(Default)]
+struct LiveTask {
+    commands: Option<tokio::sync::mpsc::Sender<crate::runtime_host::RuntimeCommand>>,
+    observer: Option<gpui::Task<()>>,
+    output: String,
+    status: LiveStatus,
+    turn_id: Option<String>,
+    unavailable_tools: Vec<String>,
+    running: bool,
+    closing: bool,
+    workspace: Option<String>,
+}
+
+impl LiveTask {
+    // The window stays alive until a successful Runtime shutdown result arrives.
+    fn request_close(&mut self) -> bool {
+        let Some(commands) = &self.commands else {
+            return true;
+        };
+        if self.closing {
+            return false;
+        }
+        match commands.try_send(crate::runtime_host::RuntimeCommand::Shutdown) {
+            Ok(()) => {
+                self.closing = true;
+                self.status = LiveStatus::Closing;
+            }
+            Err(_) => {
+                self.status = LiveStatus::CloseFailed;
+            }
+        }
+        false
+    }
+}
+
 const MODEL_CHOICES: [&str; 3] = ["fixture/default", "fixture/quick", "fixture/deep"];
 
 struct DesktopAssets;
@@ -110,6 +195,10 @@ impl Render for PresetDrag {
 
 #[derive(Clone, Copy)]
 enum Command {
+    OpenLive,
+    LiveLocale(Locale),
+    SubmitLive,
+    CancelLive,
     Tasks,
     OpenFixture(usize),
     NewTask,
@@ -136,6 +225,9 @@ enum Command {
 }
 
 struct DesktopWindow {
+    live_form_scroll: gpui::ScrollHandle,
+    host_exits: std::rc::Rc<std::cell::RefCell<Vec<crate::runtime_host::HostExit>>>,
+    live: Option<LiveTask>,
     state: Presentation,
     input: gpui::Entity<TextInput>,
     goal_input: gpui::Entity<TextInput>,
@@ -179,6 +271,9 @@ impl DesktopWindow {
         let root_focus = cx.focus_handle();
         window.focus(&root_focus, cx);
         Self {
+            live_form_scroll: gpui::ScrollHandle::new(),
+            host_exits: Default::default(),
+            live: None,
             model_focus: std::array::from_fn(|_| cx.focus_handle().tab_stop(true)),
             model_choice_focus: std::array::from_fn(|_| cx.focus_handle().tab_stop(true)),
             open_model: None,
@@ -251,6 +346,23 @@ impl DesktopWindow {
     fn execute(&mut self, command: Command, window: &mut Window, cx: &mut Context<Self>) {
         let previous_page = self.state.page;
         match command {
+            Command::OpenLive => self.state.page = Page::NewTask,
+            Command::LiveLocale(locale) => self.select_language(locale, window, cx),
+            Command::SubmitLive => self.submit_live(cx),
+            Command::CancelLive => {
+                if let Some(live) = &mut self.live {
+                    if let Some(commands) = &live.commands {
+                        if commands
+                            .try_send(crate::runtime_host::RuntimeCommand::Interrupt)
+                            .is_ok()
+                        {
+                            live.status = LiveStatus::Cancelling;
+                        } else {
+                            live.status = LiveStatus::CancelFailed;
+                        }
+                    }
+                }
+            }
             Command::Tasks => self.state.page = Page::Tasks,
             Command::OpenFixture(index) => {
                 if self.state.open_fixture(index) {
@@ -469,7 +581,7 @@ impl DesktopWindow {
             .id(id)
             .role(if matches!(command, Command::ToggleTaskOption(_)) {
                 gpui::Role::CheckBox
-            } else if matches!(command, Command::SelectPreset(_) | Command::ChooseModel(_, _)) {
+            } else if matches!(command, Command::SelectPreset(_) | Command::ChooseModel(_, _) | Command::LiveLocale(_)) {
                 gpui::Role::RadioButton
             } else {
                 gpui::Role::Button
@@ -509,6 +621,12 @@ impl DesktopWindow {
             })
             .focusable()
             .tab_stop(true)
+            .when(matches!(command, Command::LiveLocale(_)), |control| {
+                let choice = match command { Command::LiveLocale(choice) => choice, _ => self.state.locale };
+                control.track_focus(match choice { Locale::English => &self.english_focus, Locale::Chinese => &self.chinese_focus })
+                    .aria_toggled(if choice == self.state.locale { gpui::Toggled::True } else { gpui::Toggled::False })
+                    .when(choice == self.state.locale, |item| item.bg(rgb(0xddeef8)))
+            })
             .flex().items_center().gap_2()
             .when(matches!(command, Command::OpenFixture(0)), |button| button.child(div().size(px(12.)).flex_shrink_0().rounded_full().bg(rgb(0x487bc3))))
             .when_some(match command {
@@ -862,6 +980,9 @@ impl Render for DesktopWindow {
                     cx.notify();
                 }
             });
+        }
+        if self.live.is_some() {
+            return self.render_live(window, cx).into_any_element();
         }
         div()
             .id("desktop-root")
@@ -1511,6 +1632,322 @@ impl Render for DesktopWindow {
                             )
                         },
                     ),
+            ).into_any_element()
+    }
+}
+
+impl DesktopWindow {
+    fn submit_live(&mut self, cx: &mut Context<Self>) {
+        use crate::runtime_host::{RuntimeCommand, RuntimeHost, RuntimeOutput, TerminalStatus};
+        let prompt = self.goal_input.read(cx).text().to_owned();
+        let workspace = self.workspace_input.read(cx).text().to_owned();
+        let Some(live) = &mut self.live else {
+            return;
+        };
+        if live.running || live.closing {
+            return;
+        }
+        if prompt.trim().is_empty() || workspace.trim().is_empty() {
+            live.status = LiveStatus::MissingInput;
+            return;
+        }
+        if live
+            .workspace
+            .as_ref()
+            .is_some_and(|previous| previous != &workspace)
+        {
+            live.status = LiveStatus::WorkspaceChanged;
+            return;
+        }
+        if live.commands.is_none() {
+            let mut host = match RuntimeHost::configured(workspace.clone()) {
+                Ok(host) => host,
+                Err(error) => {
+                    live.status = LiveStatus::Error(error);
+                    return;
+                }
+            };
+            live.commands = Some(host.command_sender());
+            if let Some(exit) = host.take_exit() {
+                self.host_exits.borrow_mut().push(exit);
+            }
+            live.workspace = Some(workspace);
+            live.observer = Some(cx.spawn(async move |this, cx| {
+                while let Some(event) = host.recv().await {
+                    if this
+                        .update(cx, |this, cx| {
+                            if let Some(live) = &mut this.live {
+                                match event {
+                                    RuntimeOutput::ToolUnavailable(name) => {
+                                        if !live.unavailable_tools.contains(&name) {
+                                            live.unavailable_tools.push(name);
+                                        }
+                                    }
+                                    RuntimeOutput::Started { turn_id } => {
+                                        live.turn_id = Some(turn_id);
+                                        live.status = LiveStatus::Connecting
+                                    }
+                                    RuntimeOutput::Text(text) => {
+                                        live.status = LiveStatus::Streaming;
+                                        live.output.push_str(&text);
+                                    }
+                                    RuntimeOutput::Completed { status } => {
+                                        live.running = false;
+                                        live.status = match status {
+                                            TerminalStatus::Success => LiveStatus::Finished,
+                                            TerminalStatus::Cancelled => LiveStatus::Cancelled,
+                                            TerminalStatus::Error(error) => {
+                                                LiveStatus::Error(error)
+                                            }
+                                        };
+                                    }
+                                    RuntimeOutput::Error(error) => {
+                                        live.status = LiveStatus::Error(error);
+                                        live.running = false;
+                                        live.closing = false;
+                                    }
+                                    RuntimeOutput::Stopped => {
+                                        live.status = LiveStatus::Stopped;
+                                        live.running = false;
+                                        if live.closing {
+                                            cx.quit();
+                                        }
+                                    }
+                                }
+                            }
+                            cx.notify();
+                        })
+                        .is_err()
+                    {
+                        break;
+                    }
+                }
+                let _ = this.update(cx, |this, cx| {
+                    if let Some(live) = &mut this.live {
+                        live.commands = None;
+                        live.running = false;
+                    }
+                    cx.notify();
+                });
+            }));
+        }
+        if live
+            .commands
+            .as_ref()
+            .is_some_and(|commands| commands.try_send(RuntimeCommand::Submit(prompt)).is_ok())
+        {
+            live.running = true;
+            live.output.clear();
+            live.turn_id = None;
+            live.unavailable_tools.clear();
+            live.status = LiveStatus::Connecting;
+        } else {
+            live.status = LiveStatus::HostBusy;
+        }
+    }
+
+    fn render_live(&self, window: &Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let locale = self.state.locale;
+        let compact = window.viewport_size().width < px(900.);
+        let live = self
+            .live
+            .as_ref()
+            .expect("live rendering requires live state");
+        let content = div()
+            .id("live-task")
+            .when(compact, |content| {
+                content
+                    .overflow_y_scroll()
+                    .track_scroll(&self.live_form_scroll)
+            })
+            .size_full()
+            .flex()
+            .flex_col()
+            .gap_3()
+            .p_6()
+            .bg(rgb(0xf8f9fc))
+            .text_color(rgb(0x2e3440))
+            .child(div().text_xl().child(if locale == Locale::Chinese {
+                "当前任务"
+            } else {
+                "Current task"
+            }))
+            .child(div().child(locale.text(Text::Workspace)))
+            .child(self.workspace_input.clone())
+            .child(self.command(
+                "live-workspace",
+                locale.text(Text::ChooseWorkspace),
+                Command::ChooseWorkspace,
+                cx,
+            ))
+            .child(div().child(locale.text(Text::Goal)))
+            .child(self.goal_input.clone())
+            .child(
+                div()
+                    .flex()
+                    .gap_3()
+                    .child(self.command(
+                        "live-submit",
+                        if locale == Locale::Chinese {
+                            "发送"
+                        } else {
+                            "Send"
+                        },
+                        Command::SubmitLive,
+                        cx,
+                    ))
+                    .child(self.command(
+                        "live-cancel",
+                        if locale == Locale::Chinese {
+                            "取消"
+                        } else {
+                            "Cancel"
+                        },
+                        Command::CancelLive,
+                        cx,
+                    )),
+            )
+            .child(div().child(if locale == Locale::Chinese {
+                "本阶段未启用工具；对话暂不持久化。"
+            } else {
+                "Tools are unavailable in this stage; conversation is not yet persisted."
+            }))
+            .child(div().child(live.status.label(locale).to_owned()))
+            .children(live.unavailable_tools.iter().map(|name| {
+                div().text_color(rgb(0xa34c42)).child(match locale {
+                    Locale::English => format!("Tool unavailable; not executed: {name}"),
+                    Locale::Chinese => format!("工具不可用，未执行：{name}"),
+                })
+            }))
+            .when_some(live.turn_id.as_ref(), |view, turn_id| {
+                view.child(div().text_sm().child(turn_id.clone()))
+            })
+            .child(
+                div()
+                    .id("live-output")
+                    .flex_1()
+                    .min_h_0()
+                    .when(compact, |output| output.min_h(px(200.)).flex_shrink_0())
+                    .overflow_y_scroll()
+                    .track_scroll(&self.task_scroll)
+                    .p_4()
+                    .rounded_lg()
+                    .bg(rgb(0xffffff))
+                    .border_1()
+                    .border_color(rgb(0xd8dee9))
+                    .child(live.output.clone()),
+            );
+        let settings = div()
+            .id("live-settings-page")
+            .size_full()
+            .p_6()
+            .flex()
+            .flex_col()
+            .gap_6()
+            .child(div().text_xl().child(locale.text(Text::Settings)))
+            .child(
+                div()
+                    .text_sm()
+                    .text_color(rgb(0x5e81ac))
+                    .child(locale.text(Text::Language)),
+            )
+            .child(
+                div().flex().gap_3().children(
+                    [
+                        ("live-en", "English", Locale::English),
+                        ("live-zh", "简体中文", Locale::Chinese),
+                    ]
+                    .into_iter()
+                    .map(|(id, label, choice)| {
+                        self.command(id, label, Command::LiveLocale(choice), cx)
+                            .into_any_element()
+                    }),
+                ),
+            );
+        div()
+            .id("live-root")
+            .role(gpui::Role::Application)
+            .track_focus(&self.root_focus)
+            .on_action(cx.listener(|_, _: &NextFocus, window, cx| window.focus_next(cx)))
+            .on_action(cx.listener(|_, _: &PreviousFocus, window, cx| window.focus_prev(cx)))
+            .size_full()
+            .flex()
+            .when(compact, |root| root.flex_col())
+            .bg(rgb(0xf8f9fc))
+            .text_color(rgb(0x2e3440))
+            .text_size(px(15.))
+            .child(
+                div()
+                    .id("live-navigation")
+                    .role(gpui::Role::Navigation)
+                    .flex()
+                    .flex_shrink_0()
+                    .when(compact, |nav| {
+                        nav.w_full()
+                            .flex_wrap()
+                            .items_center()
+                            .gap_2()
+                            .p_2()
+                            .border_b_1()
+                    })
+                    .when(!compact, |nav| {
+                        nav.w(px(274.))
+                            .h_full()
+                            .flex_col()
+                            .gap_6()
+                            .p_6()
+                            .border_r_1()
+                    })
+                    .bg(rgb(0xf3f5fa))
+                    .border_color(rgb(0xd8dee9))
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap_3()
+                            .child(
+                                div()
+                                    .size(px(40.))
+                                    .rounded_md()
+                                    .bg(rgb(0x2e4f82))
+                                    .text_color(rgb(0xffffff))
+                                    .flex()
+                                    .items_center()
+                                    .justify_center()
+                                    .text_xl()
+                                    .child("T"),
+                            )
+                            .child(div().text_size(px(17.)).child("Talos Desktop")),
+                    )
+                    .child(self.command(
+                        "live-current-task",
+                        if locale == Locale::Chinese {
+                            "当前任务"
+                        } else {
+                            "Current task"
+                        },
+                        Command::OpenLive,
+                        cx,
+                    ))
+                    .when(!compact, |nav| nav.child(div().flex_1()))
+                    .child(self.command(
+                        "live-settings",
+                        locale.text(Text::Settings),
+                        Command::Settings,
+                        cx,
+                    )),
+            )
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .min_h_0()
+                    .when(!compact, |body| body.h_full())
+                    .child(if self.state.page == Page::Presets {
+                        settings.into_any_element()
+                    } else {
+                        content.into_any_element()
+                    }),
             )
     }
 }
@@ -1556,7 +1993,7 @@ fn print_performance_report(window: &Window) {
     );
 }
 
-pub(crate) fn run(locale: String) -> std::process::ExitCode {
+pub(crate) fn run(locale: String, live: bool) -> std::process::ExitCode {
     #[cfg(target_os = "linux")]
     if !has_display(
         std::env::var_os("DISPLAY").as_deref(),
@@ -1567,6 +2004,10 @@ pub(crate) fn run(locale: String) -> std::process::ExitCode {
     }
     let failed = Arc::new(AtomicBool::new(false));
     let launch_failed = failed.clone();
+    let host_exits = std::rc::Rc::new(std::cell::RefCell::new(
+        Vec::<crate::runtime_host::HostExit>::new(),
+    ));
+    let window_exits = host_exits.clone();
     // Contains ordinary Rust startup panics, not native faults or ABI aborts.
     let result = catch_unwind(AssertUnwindSafe(|| {
         gpui_platform::application()
@@ -1602,7 +2043,30 @@ pub(crate) fn run(locale: String) -> std::process::ExitCode {
                                 }
                                 true
                             });
-                            cx.new(|cx| DesktopWindow::new(&locale, window, cx))
+                            let view = cx.new(|cx| {
+                                let mut view = DesktopWindow::new(&locale, window, cx);
+                                view.host_exits = window_exits.clone();
+                                if live {
+                                    view.live = Some(LiveTask::default());
+                                    view.state.page = Page::NewTask;
+                                }
+                                view
+                            });
+                            if live {
+                                let weak = view.downgrade();
+                                window.on_window_should_close(cx, move |_, cx| {
+                                    weak.update(cx, |view, cx| {
+                                        let Some(live) = &mut view.live else {
+                                            return true;
+                                        };
+                                        let allow_close = live.request_close();
+                                        cx.notify();
+                                        allow_close
+                                    })
+                                    .unwrap_or(true)
+                                });
+                            }
+                            view
                         },
                     )
                 }));
@@ -1621,6 +2085,15 @@ pub(crate) fn run(locale: String) -> std::process::ExitCode {
                 }
             });
     }));
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(35);
+    for exit in host_exits.borrow_mut().drain(..) {
+        if let Err(error) =
+            exit.finish(deadline.saturating_duration_since(std::time::Instant::now()))
+        {
+            eprintln!("Desktop runtime cleanup failed: {error}");
+            failed.store(true, Ordering::Relaxed);
+        }
+    }
     if result.is_err() || failed.load(Ordering::Relaxed) {
         eprintln!("Desktop unavailable: renderer initialization failed");
         std::process::ExitCode::FAILURE
@@ -1651,7 +2124,7 @@ fn save_capture(window: &mut Window, path: &std::path::Path) -> Result<(), Strin
 }
 
 #[cfg(feature = "visual-test")]
-pub(crate) fn capture(directory: std::path::PathBuf) -> std::process::ExitCode {
+pub(crate) fn capture(directory: std::path::PathBuf, live_only: bool) -> std::process::ExitCode {
     // A fresh directory avoids silently replacing prior visual evidence.
     if let Err(error) = std::fs::create_dir(&directory) {
         eprintln!("Cannot create capture directory: {error}");
@@ -1665,6 +2138,9 @@ pub(crate) fn capture(directory: std::path::PathBuf) -> std::process::ExitCode {
                 for locale in ["en-US", "zh-CN"] {
                     for (width, height) in [(1448., 1086.), (640., 480.)] {
                         for (name, page) in [
+                            ("live-task", Page::NewTask),
+                            ("live-task-bottom", Page::NewTask),
+                            ("live-settings", Page::Presets),
                             ("overview", Page::Fixture),
                             ("task-navigation", Page::Fixture),
                             ("tasks", Page::Tasks),
@@ -1682,6 +2158,7 @@ pub(crate) fn capture(directory: std::path::PathBuf) -> std::process::ExitCode {
                             ("settings", Page::Fixture),
                             ("preset-drag", Page::Presets),
                         ] {
+                            if live_only && !name.starts_with("live-") { continue; }
                             if name == "preset-drag" && width < 900. { continue; }
                             let handle = cx
                                 .open_window(
@@ -1697,6 +2174,16 @@ pub(crate) fn capture(directory: std::path::PathBuf) -> std::process::ExitCode {
                                     |window, cx| {
                                         cx.new(|cx| {
                                             let mut view = DesktopWindow::new(locale, window, cx);
+                                            if name.starts_with("live-") {
+                                                view.live = Some(LiveTask {
+                                                    output: "Local visual fixture — no provider request.\n本地渲染样例，未发送模型请求。\n".repeat(12),
+                                                    status: LiveStatus::Streaming,
+                                                    turn_id: Some("visual-fixture-i282".into()),
+                                                    ..Default::default()
+                                                });
+                                                view.goal_input.update(cx, |input, cx| input.set_text("Explain this workspace / 介绍此工作区", cx));
+                                                view.workspace_input.update(cx, |input, cx| input.set_text("/tmp/i282-visual-fixture", cx));
+                                            }
                                             match page {
                                                 Page::NewTask => {
                                                     view.execute(Command::NewTask, window, cx)
@@ -2081,6 +2568,12 @@ pub(crate) fn capture(directory: std::path::PathBuf) -> std::process::ExitCode {
                                             return Err("Unfocused preset description scrolled away from its beginning".into());
                                         }
                                     }
+                                    if name == "live-task-bottom" {
+                                        let view = root.clone().downcast::<DesktopWindow>()
+                                            .map_err(|_| "Unexpected capture root".to_owned())?;
+                                        view.read(cx).live_form_scroll.scroll_to_bottom();
+                                        let _ = window.draw(cx);
+                                    }
                                     save_capture(window, &path)?;
                                     window.remove_window();
                                     Ok(())
@@ -2127,6 +2620,48 @@ fn has_display(x11: Option<&std::ffi::OsStr>, wayland: Option<&std::ffi::OsStr>)
 mod tests {
     use super::{has_display, selected_workspace_path};
     use std::ffi::OsStr;
+
+    #[test]
+    fn live_status_localization_keeps_state_and_raw_error_intact() {
+        use super::{LiveStatus, Locale};
+        let status = LiveStatus::Cancelling;
+        assert_eq!(status.label(Locale::English), "Cancelling");
+        assert_eq!(status.label(Locale::Chinese), "正在取消");
+        assert_eq!(status, LiveStatus::Cancelling);
+        let error = LiveStatus::Error("fixture transport error".into());
+        assert_eq!(error.label(Locale::English), error.label(Locale::Chinese));
+    }
+
+    #[test]
+    fn live_close_waits_for_shutdown_and_does_not_duplicate_requests() {
+        use crate::runtime_host::RuntimeCommand;
+        let (commands, mut receiver) = tokio::sync::mpsc::channel(1);
+        let mut live = super::LiveTask {
+            commands: Some(commands),
+            ..Default::default()
+        };
+        assert!(!live.request_close());
+        assert!(live.closing);
+        assert!(matches!(receiver.try_recv(), Ok(RuntimeCommand::Shutdown)));
+        assert!(!live.request_close());
+        assert!(receiver.try_recv().is_err());
+    }
+
+    #[test]
+    fn full_queue_does_not_pretend_close_was_requested() {
+        use crate::runtime_host::RuntimeCommand;
+        let (commands, _receiver) = tokio::sync::mpsc::channel(1);
+        commands
+            .try_send(RuntimeCommand::Interrupt)
+            .expect("fill queue");
+        let mut live = super::LiveTask {
+            commands: Some(commands),
+            ..Default::default()
+        };
+        assert!(!live.request_close());
+        assert!(!live.closing);
+        assert!(super::LiveTask::default().request_close());
+    }
 
     #[test]
     fn workspace_selection_preserves_cancel_and_rejects_ambiguous_paths() {

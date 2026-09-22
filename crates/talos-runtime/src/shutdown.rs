@@ -494,6 +494,10 @@ impl ShutdownCoordinator {
         self.admission.commit_reserved(permit, op)
     }
 
+    pub(crate) fn try_interrupt_active(&self) -> bool {
+        self.admission.try_interrupt_active()
+    }
+
     pub(crate) fn is_admission_open(&self) -> bool {
         self.admission.is_open()
     }

@@ -9421,8 +9421,13 @@ dependencies = [
 name = "talos-desktop"
 version = "0.10.1"
 dependencies = [
+ "async-trait",
  "gpui",
  "gpui_platform",
+ "talos-config",
+ "talos-provider",
+ "talos-runtime",
+ "tokio",
  "unicode-segmentation",
 ]
 
