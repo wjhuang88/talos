@@ -1,13 +1,13 @@
 # DEPENDENCY-003: Dependency Risk Evidence Residuals
 
-> Document status: Refinement / Unclaimed
+> Document status: Active / Claimed
 
 | Field | Value |
 |---|---|
 | Story ID | DEPENDENCY-003 |
 | Type | Dependency Governance / Security Evidence Story |
 | Priority | P2 |
-| Status | Refinement / Unclaimed |
+| Status | Active / Claimed |
 | Source | [GitHub Issue #502](https://github.com/wjhuang88/talos/issues/502) |
 | Selected Iteration | None |
 | Depends On | I250 final disposition; ADR-007; ARCH-034-R04; DEPENDENCY-001 |
@@ -16,13 +16,13 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | `@wjhuang88` |
 | Executing Agent | GPT-5.6 Sol / talos开发 session |
 | Work Slice | Produce and land the #502 `libc` version-route research/evidence report: upstream route, historical selection evidence, Talos call-site/ABI/platform matrix, dependency-resolution implications, three-path comparison, validation/rollback plan and maintainer recommendation. No dependency, lockfile, runtime, sandbox or process-hardening implementation is authorized. |
-| Claimed At | Not applicable until claim merge |
+| Claimed At | 2026-09-22 |
 | Source Issue | #502 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #596 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Repository maintainer requested completion of the 2026-09-22 research handoff in Issue #502. No distinct reviewer is attached to this governance-only research claim; exact-head CI, both governance validators and merge-time CAS are required before merge. Any later `libc` version or security-boundary implementation still requires separately governed ADR-007/escape-vector review. |
 | Implementation PR | Not started |
