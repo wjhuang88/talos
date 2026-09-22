@@ -17,7 +17,7 @@
 | Field | Value |
 |---|---|
 | Claim State | Claimed |
-| Responsible Actor | `@wjhuang88` |
+| Responsible Actor | @wjhuang88 |
 | Executing Agent | GPT-5.6 Sol / talos开发 session |
 | Work Slice | Produce and land the #502 `libc` version-route research/evidence report: upstream route, historical selection evidence, Talos call-site/ABI/platform matrix, dependency-resolution implications, three-path comparison, validation/rollback plan and maintainer recommendation. No dependency, lockfile, runtime, sandbox or process-hardening implementation is authorized. |
 | Claimed At | 2026-09-22 |
