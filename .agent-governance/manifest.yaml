@@ -1,5 +1,5 @@
 schema_version: "1"
-next_selected_iteration: "I281 Review/Claimed: implementation #588 merged as a1cb869b with exact-head CI and independent Agent security/API approval. Human UX acceptance pending in owner. MODEL-007 follows, not cancelled."
+next_selected_iteration: "I281 Review/Claimed: implementations #588/#591 merged as a1cb869b/bfdf8b67; exact-head code CI and independent Agent security/API review passed. Human UX evidence is partial; filesystem no-effect proof for timeout/Esc cancellation remains before Complete. MODEL-007 follows, not activated. Locale follow-up #590 Refinement/Unclaimed."
 managed_by: "agent-project-governance"
 i280_execution_note: "I280 / RUNTIME-006 / #234 Complete/Closed at implementation merge 007ca29d; owner closeout merge ade0b68c. Local full preflight, external fixtures, exact-head CI and API/security review passed. No execution-policy or release change."
 i279_execution_note: "I279 Complete/Closed through #580 merge 52276f552496b160e064fd54ed7471bc84d3f559: #298/#310/#334 native acceptance, local preflight, exact-head CI 35502971132 and independent Agent review 5749013208 passed. ADR-080 release migration remains separate. I277 deferred acceptance, I249 Planned and I164 Paused unchanged. No release authorized."

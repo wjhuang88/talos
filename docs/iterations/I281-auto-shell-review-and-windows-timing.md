@@ -15,9 +15,9 @@
 | Governance Claim PR | #587 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer requested I281 development and closure and accepted ADR-081 on 2026-09-21; claim #587 effective at cb00524d. Independent Agent security/API approval for #588 recorded in comment 5762107014. |
-| Implementation PR | #588 (merged as a1cb869b) |
-| Last Updated | 2026-09-21 |
-| Handoff / Release Condition | Implementation #588 merged with exact-head CI and independent Agent security/API review. Remain Review/Claimed until human UX acceptance below passes; no release authorization. |
+| Implementation PR | #588 (merged as a1cb869b), #591 (merged as bfdf8b67) |
+| Last Updated | 2026-09-22 |
+| Handoff / Release Condition | Implementation and corrective follow-up merged; filesystem no-effect evidence for timeout/Esc cancellation is still required before Complete. No release authorization. MODEL-007 remains unactivated. |
 | Source Issue | Maintainer request 2026-09-21; related #188, #563 and #234 CI residual |
 | Work Slice | I281-A bash/PowerShell Ask model assessment, script context and bound admission, actionable human escalation; I281-B Windows lifecycle test reliability. No release, Desktop or unrelated higher-risk-write roadmap. |
 
@@ -104,6 +104,21 @@
 
 ## Planning Record
 
+- 2026-09-22 closeout: #591 merged as `bfdf8b67f666602d3d39e2c5949adb646f46e01e`.
+  Exact head `1fc3afd3fa9e1f3ec3ed9eb75017287b77117b9b`, base
+  `368e4fb403940ee6858e00db7f2395ed2b9855e1`; CI `35676188615` passed all five
+  applicable code/platform jobs, including full preflight and Windows workspace.
+  Independent Agent security/API APPROVE and identity limits: comment `5770036176`.
+  CAS confirmed unchanged head/base, no other open PR, and MERGEABLE; exact-head guarded
+  merge succeeded. Global Issue reconciliation failed only on new #590 and was advisory
+  under ADR-071; this closeout registers its separate AUTO-UX-001 owner and matrix row.
+  Local corrective validation: formatting, TUI 592 tests, agent 408 tests and diff check passed.
+  Human observations below partially cover the UX walkthrough; automated permission tests separately
+  cover fail-closed decisions. Filesystem no-effect evidence for timeout/Esc remains outstanding, so
+  this owner stays Review/Claimed.
+  Locale UX remains #590; original-provider dispatch root cause is not proven by changing
+  models or by diagnostic categories and remains an explicit residual in this owner.
+
 - 2026-09-21 implementation acceptance checkpoint: #588 merged as
   `a1cb869bde965abc5676121362def594e3c20927`, exact head
   `8abf342d0e717dabee851145b9c23e461a105974`, base
@@ -127,7 +142,8 @@
   compound command showed `model allowed once` and executed exactly once; Auto-off preserved the
   human approval path; an out-of-workspace write produced `model requested human approval` with
   concrete effects and decision points; approval timeout and explicit `Esc` cancellation both
-  denied execution without a file effect; an explicit later authorization created a fresh review
+  displayed denial and restored input (filesystem effects were not separately inspected);
+  an explicit later authorization created a fresh review
   but still required the final permission approval. The walkthrough also confirmed that pending
   tool arguments no longer flash a duplicate JSON projection during model assessment. These are
   natural-person UI observations, not automated-test evidence.
