@@ -1,6 +1,6 @@
 # Iteration I282: Live Runtime Desktop Host
 
-> Document status: Planned
+> Document status: Active — claim/activation proposed; effective only after merge
 > Plan date: 2026-09-22
 > Target window: 2026-09-22 to 2026-09-28
 > Planned objective: A runnable live Desktop task streams real configured-provider output and can be cancelled without blocking the UI.
@@ -11,25 +11,25 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | DESKTOP-001-D4 / I282: Live Runtime Desktop Host; planned scope only |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-6 |
+| Work Slice | DESKTOP-001-D4 / I282: live Desktop Runtime host, provider output, cancellation and host lifecycle; no tools |
+| Claimed At | 2026-09-22 |
 | Source Issue | #29 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Maintainer requested four-week Desktop planning on 2026-09-22; no implementation activation yet |
-| Implementation PR | Not started |
+| Governance Claim PR | #598 (atomic claim/activation PR) |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | User authorized continuation; exact-head CI, governance validators and merge-time CAS required; no independent natural-person reviewer available |
+| Implementation PR | Not started until activation merge |
 | Last Updated | 2026-09-22 |
-| Handoff / Release Condition | Resolve readiness and establish effective serial child claim before implementation; no release |
+| Handoff / Release Condition | Effective only after #598 reaches main; implementation starts from its merge or later main; no release |
 
 ## Published Baseline
 
 ### Selected Story And Dependencies
 
 [DESKTOP-001-D4](../backlog/active/DESKTOP-001-D4-live-runtime-host.md), parent DESKTOP-001;
-Planned / Unclaimed, not yet Ready or activated.
+Claimed / Active proposed in #598; both states remain ineffective until merge.
 Prerequisites: WORK-001 P0-P4 and I280 complete; ADR-059; explicit host/API readiness map.
 Follow [the four-week task](../tasks/2026-09-22-desktop-four-week-delivery.md) for
 serial scheduling, inventory, resource limits, authorization and deferred acceptance. Dates do not
@@ -78,7 +78,7 @@ safety. Roll back only the failing slice; no destructive cleanup of user session
 
 ## Actual Activation And Execution
 
-2026-09-22: planning only. Claim, implementation PR and remote evidence not yet established.
+2026-09-22: atomic claim/activation proposed in #598. Implementation starts only from its merge or later main.
 
 ## Verification Evidence
 

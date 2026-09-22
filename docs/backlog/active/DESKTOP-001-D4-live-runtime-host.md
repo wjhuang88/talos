@@ -1,6 +1,6 @@
 # DESKTOP-001-D4: Live Runtime Desktop Host
 
-> Document status: Planned
+> Document status: Active — claim/activation proposed; effective only after merge
 
 | Field | Value |
 |---|---|
@@ -8,7 +8,7 @@
 | Parent Epic | DESKTOP-001 |
 | Type | Desktop integration / behavior Story |
 | Priority | P1 |
-| Status | Planned / Unclaimed |
+| Status | Active / Claimed — implementation starts after activation merge |
 | Selected Iteration | I282 |
 | Source | #29; four-week Desktop task |
 | Depends On | WORK-001 P0-P4 and I280 complete; ADR-059; explicit host/API readiness map |
@@ -17,18 +17,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | DESKTOP-001-D4 / I282: Live Runtime Desktop Host; planned scope only |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-6 |
+| Work Slice | DESKTOP-001-D4 / I282: live Desktop Runtime host, provider output, cancellation and host lifecycle; no tools |
+| Claimed At | 2026-09-22 |
 | Source Issue | #29 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Maintainer requested four-week Desktop planning on 2026-09-22; no implementation activation yet |
-| Implementation PR | Not started |
+| Governance Claim PR | #598 (atomic claim/activation PR) |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | User authorized continuation; exact-head CI, governance validators and merge-time CAS required; no independent natural-person reviewer available |
+| Implementation PR | Not started until activation merge |
 | Last Updated | 2026-09-22 |
-| Handoff / Release Condition | Resolve readiness and establish effective serial child claim before implementation; no release |
+| Handoff / Release Condition | Effective only after #598 reaches main; implementation starts from its merge or later main; no release |
 
 ## Outcome
 
