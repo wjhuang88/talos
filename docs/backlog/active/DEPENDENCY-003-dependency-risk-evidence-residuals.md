@@ -17,17 +17,17 @@
 | Field | Value |
 |---|---|
 | Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Own the post-I250 `libc` migration and dependency advisory/deprecation evidence residuals; no implementation is authorized |
-| Claimed At | Not applicable |
+| Responsible Actor | `@wjhuang88` |
+| Executing Agent | GPT-5.6 Sol / talos开发 session |
+| Work Slice | Produce and land the #502 `libc` version-route research/evidence report: upstream route, historical selection evidence, Talos call-site/ABI/platform matrix, dependency-resolution implications, three-path comparison, validation/rollback plan and maintainer recommendation. No dependency, lockfile, runtime, sandbox or process-hardening implementation is authorized. |
+| Claimed At | Not applicable until claim merge |
 | Source Issue | #502 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | Pending |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Repository maintainer requested completion of the 2026-09-22 research handoff in Issue #502. No distinct reviewer is attached to this governance-only research claim; exact-head CI, both governance validators and merge-time CAS are required before merge. Any later `libc` version or security-boundary implementation still requires separately governed ADR-007/escape-vector review. |
 | Implementation PR | Not started |
-| Last Updated | 2026-09-07 |
-| Handoff / Release Condition | Revisit by 2026-12-07 or the next workspace dependency upgrade, whichever is earlier; select separately protected implementation slices before changing native/security boundaries or audit semantics |
+| Last Updated | 2026-09-22 |
+| Handoff / Release Condition | Merge this research-only claim before committing the evidence report. The report may recommend a migration candidate but must not change manifests/lockfiles or authorize protected implementation; advisory/deprecation evidence remains a separate residual. |
 
 ## Scope
 
