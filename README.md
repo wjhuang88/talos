@@ -13,7 +13,7 @@ session history, built-in coding tools, explicit permissions, runtime Skills, MC
 and project-governance support while keeping the default core local and auditable.
 
 Talos has published its first stable pre-1.0 release line. The current release version in this
-workspace is `v0.10.0`. It is usable for local coding workflows, but still pre-1.0: APIs, command
+workspace is `v0.10.1`. It is usable for local coding workflows, but still pre-1.0: APIs, command
 surfaces, and storage formats may change as the product hardens. This README describes shipped
 user-facing behavior; research tracks such as web control expansion beyond the read-only loopback
 dashboard, broader dotagents compatibility, plugin carriers, and advanced document ingestion are tracked separately under
@@ -57,7 +57,7 @@ output stream. Tool history remains separate from these transient status rows.
 After a result enters history, its transient activity keeps only the status/count
 title; the completed result body is not repeated below it.
 
-These I279 changes passed native-terminal acceptance and are included in v0.10.0.
+These I279 changes passed native-terminal acceptance and first shipped in v0.10.0.
 
 ### Shared text semantics
 
@@ -73,12 +73,12 @@ Embedders can use `talos_text::stream::StreamBlockClassifier` with complete UTF-
 `HighlightResult::validated_spans(source)` to validate source ranges before rendering. Callers
 assemble incoming chunks and render the resulting semantic decisions. Default `talos-text`
 does not load parsers or import TUI/Desktop types; the existing optional `code-intelligence`
-adapter remains unchanged. These shared semantics are included in v0.10.0; this API
+adapter remains unchanged. These shared semantics first shipped in v0.10.0; this API
 does not itself perform dynamic LanguageProvider loading or Bundle installation.
 
 ## Current Release Boundary
 
-`v0.10.0` is suitable for local developer use where the operator reviews tool actions and keeps
+`v0.10.1` is suitable for local developer use where the operator reviews tool actions and keeps
 configuration local. It is not yet a remote multi-user service, marketplace runtime, browser
 automation surface, or autonomous background daemon.
 
@@ -144,18 +144,18 @@ Install or roll back to a specific release by using its complete Git tag:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/wjhuang88/talos/main/install/install.sh \
-  | TALOS_VERSION=v0.10.0 sh
+  | TALOS_VERSION=v0.10.1 sh
 ~/.talos/bin/talos --version
 ```
 
 ```powershell
-$env:TALOS_VERSION = 'v0.10.0'
+$env:TALOS_VERSION = 'v0.10.1'
 iex (irm https://raw.githubusercontent.com/wjhuang88/talos/main/install/install.ps1)
 & "$env:USERPROFILE\.talos\bin\talos.exe" --version
 Remove-Item Env:TALOS_VERSION
 ```
 
-Replace `v0.10.0` with a tag listed on
+Replace `v0.10.1` with a tag listed on
 [GitHub Releases](https://github.com/wjhuang88/talos/releases). The installer overwrites the Talos
 binary in the selected install directory; it does not roll back configuration or session data.
 Because Talos is pre-1.0, back up `~/.talos` before running an older binary, or test it in an
@@ -869,9 +869,9 @@ yet supported.
 
 ## Embedding Talos In Rust
 
-I280 source development adds a single-direct-Talos-dependency SDK: custom providers,
+Version 0.10.1 adds a single-direct-Talos-dependency SDK: custom providers,
 tools, permission rules, sandbox adapters and typed events can import their canonical
-types from `talos_runtime`. These additive paths are not in published `0.10.0`.
+types from `talos_runtime`. These additive paths first ship in `0.10.1`.
 The source `quickstart` example implements a local provider using only the facade;
 other examples may use optional `talos-provider` mock conveniences. Existing origin-crate
 imports remain compatible. See [I280 migration](docs/reference/I280-RUNTIME-FACADE-MIGRATION.md).
@@ -1012,7 +1012,7 @@ Release tags drive the GitHub release workflow:
 Before creating a tag, run the same preflight used by CI and the release workflow:
 
 ```bash
-./scripts/release_preflight.sh v0.10.0
+./scripts/release_preflight.sh v0.10.1
 ```
 
 The repository pins the Rust/Clippy toolchain in `rust-toolchain.toml`; do not tag a release from
@@ -1022,7 +1022,7 @@ The release workflow builds Linux, macOS, and Windows artifacts from a macOS run
 
 The post-v0.2.0 hardening notes that fed the pre-0.3 release line are collected in
 [RELEASE-NOTES-DRAFT-2026-07-02](docs/reference/RELEASE-NOTES-DRAFT-2026-07-02.md). GitHub Releases
-is the source of truth for the published `v0.10.0` release announcement and downloads.
+is the source of truth for the published `v0.10.1` release announcement and downloads.
 
 ## Project Status
 
