@@ -95,7 +95,7 @@ remain owned residuals and prevent claims of universal accessibility/platform ac
 
 | ID | Window / iteration | Expected output | Depends on | Completion gate | Fallback | Status |
 |---|---|---|---|---|---|---|
-| T1 | Week 1, Sep 22-28 / I282 | Launch a live Desktop task using configured provider; responsive streaming, errors and cancellation; tools unavailable in this initial slice | WORK-001 P0-P4, I280, ADR-059; API map and effective claim | Mock-provider E2E plus real-provider native row; no UI blocking or fictitious results | Keep existing mock explicitly separate; unresolved facade contract becomes a named blocker, never a copied engine | Planned |
+| T1 | Week 1, Sep 22-28 / I282 | Launch a live Desktop task using configured provider; responsive streaming, errors and cancellation; tools unavailable in this initial slice | WORK-001 P0-P4, I280, ADR-059; API map and effective claim | Mock-provider E2E plus real-provider native row; no UI blocking or fictitious results | Keep existing mock explicitly separate; unresolved facade contract becomes a named blocker, never a copied engine | In Progress — claim/activation PR #598 |
 | T2 | Week 2, Sep 29-Oct 5 / I283 | Real file/shell activity, visible existing Auto review, scoped approval and safe cancellation | T1 merged and technical gates passed | Allow/Deny/Once/Session, stale approval, cancel and shutdown matrix; independent security/API review | Tool execution remains disabled until gates pass; do not ship an auto-allow workaround | Planned |
 | T3 | Week 3, Oct 6-12 / I284 | Recent tasks, durable transcript resume, actual work/evaluation and read-only change/evidence views | T2 merged; storage/projection compatibility verified | Restart and session-isolation tests; revision/staleness/Delivery gates; no tool replay | Preserve transcript-only recovery if richer projection cannot persist; explicitly show unavailable evidence and keep unmet acceptance open | Planned |
 | T4 | Week 4, Oct 13-19 / I285 | Reproducible integrated candidate, fixes, user guide and consolidated acceptance report | T1-T3 merged with technical gates passed | Integrated E2E, current-head CI/review, required native rows, documented residuals and clean handoff | Deliver Partial with exact remaining blockers; no fake Complete or unrequested release | Planned |
@@ -211,16 +211,16 @@ No unrelated cleanup, automatic dependency upgrade, new per-subtask Issue or rel
 ## Execution Checkpoint — 2026-09-22
 
 Completed task items: none; planning baseline created.
-Current state: all four iterations Planned / Unclaimed. No implementation or remote activation.
-Next item: I282 API/composition readiness map, then one atomic claim/activation once ready.
+Current state: I282/D4 claim/activation proposed in #598; I283-I285 remain Planned / Unclaimed. No implementation has started; activation is ineffective until merge.
+Next item: merge #598 after exact-head gates, then create the I282 implementation branch from its merge.
 Resume: read this task and I282, fetch current main, inventory owners/PRs, retain I277 deferred rows.
 Validation: repository governance and Collaboration Claim validators passed with 0 warnings;
 the skill governance validator also passed with 0 warnings. Scale assessment retained high-risk /
 release-managed / on-demand worktrees; no workflow profile change. Diff whitespace checks passed.
 Independent Agent-role planning review approved after H1-H6 numbering was added; this is not a
 natural-person review, implementation security approval or proof of the four-week estimate.
-No Rust tests were run for this documentation-only plan. Planning delivered locally; no commit,
-push, new Issue or implementation activation in this planning step.
+No Rust tests were run for this governance-only activation candidate. Implementation remains
+unstarted until #598 reaches main.
 Completion Commit: pending.
 
 ## Submission Checkpoint — 2026-09-22
