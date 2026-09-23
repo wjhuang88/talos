@@ -4,11 +4,19 @@
 //! authoritative session events to the presentation layer. It deliberately
 //! does not create tools, permissions, storage, or a second execution engine.
 
+use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{
+    Arc, Mutex,
+    atomic::{AtomicU64, Ordering},
+};
 
-use talos_runtime::{AgentEvent, LanguageModel, RuntimeBuilder, RuntimeHandle, SessionEvent};
-use tokio::sync::mpsc;
+use async_trait::async_trait;
+use talos_runtime::{
+    AgentEvent, ApprovalChoice, ApprovalHandler, GrantPreview, LanguageModel, RuntimeBuilder,
+    RuntimeHandle, SessionEvent,
+};
+use tokio::sync::{mpsc, oneshot};
 
 const COMMAND_CAPACITY: usize = 16;
 const EVENT_CAPACITY: usize = 128;
@@ -42,9 +50,22 @@ impl PendingOutput {
 
 fn output_bytes(output: &RuntimeOutput) -> usize {
     match output {
-        RuntimeOutput::Text(text)
-        | RuntimeOutput::Error(text)
-        | RuntimeOutput::ToolUnavailable(text) => text.len(),
+        RuntimeOutput::Text(text) | RuntimeOutput::Error(text) => text.len(),
+        RuntimeOutput::ToolStarted { call_id, name } => call_id.len() + name.len(),
+        RuntimeOutput::ToolResult {
+            call_id, content, ..
+        } => call_id.len() + content.len(),
+        RuntimeOutput::ApprovalRequested {
+            tool_name,
+            scope,
+            explanation,
+            ..
+        } => tool_name.len() + scope.len() + explanation.len(),
+        RuntimeOutput::AutoDecision {
+            outcome,
+            reason,
+            evaluator,
+        } => outcome.len() + reason.len() + evaluator.len(),
         RuntimeOutput::Started { turn_id } => turn_id.len(),
         RuntimeOutput::Completed {
             status: TerminalStatus::Error(error),
@@ -62,13 +83,39 @@ pub(crate) enum RuntimeCommand {
     Interrupt,
     /// Request bounded Runtime shutdown.
     Shutdown,
+    /// Resolve one exact pending approval request.
+    ApprovalResponse {
+        request_id: u64,
+        choice: ApprovalChoice,
+    },
 }
 
 /// Presentation-safe projection of an authoritative Runtime event.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum RuntimeOutput {
-    /// A tool was requested but this host has no executable tools registered.
-    ToolUnavailable(String),
+    /// A tool call was requested; this does not imply successful execution.
+    ToolStarted { call_id: String, name: String },
+    /// A tool result projected from the Runtime.
+    ToolResult {
+        call_id: String,
+        content: String,
+        is_error: bool,
+    },
+    /// Redacted result of the existing Auto evaluator.
+    AutoDecision {
+        outcome: String,
+        reason: String,
+        evaluator: String,
+    },
+    /// A permission-gated request awaiting the user.
+    ApprovalRequested {
+        request_id: u64,
+        tool_name: String,
+        scope: String,
+        explanation: String,
+    },
+    /// The request lifetime ended; any old UI controls must be discarded.
+    ApprovalClosed { request_id: u64 },
     /// A model text fragment.
     Text(String),
     /// A turn began.
@@ -87,6 +134,168 @@ pub(crate) enum TerminalStatus {
     Success,
     Cancelled,
     Error(String),
+}
+
+struct DesktopApprovalHandler {
+    events: mpsc::Sender<RuntimeOutput>,
+    output_overflow: tokio::sync::Notify,
+    pending: Arc<Mutex<HashMap<u64, oneshot::Sender<ApprovalChoice>>>>,
+    workspace_root: PathBuf,
+}
+
+static NEXT_APPROVAL_ID: AtomicU64 = AtomicU64::new(1);
+
+struct ApprovalLifetime<'a> {
+    handler: &'a DesktopApprovalHandler,
+    request_id: u64,
+}
+
+impl Drop for ApprovalLifetime<'_> {
+    fn drop(&mut self) {
+        if let Ok(mut pending) = self.handler.pending.lock() {
+            pending.remove(&self.request_id);
+        }
+        self.handler.publish(RuntimeOutput::ApprovalClosed {
+            request_id: self.request_id,
+        });
+    }
+}
+
+impl DesktopApprovalHandler {
+    fn new(events: mpsc::Sender<RuntimeOutput>, workspace_root: PathBuf) -> Self {
+        Self {
+            events,
+            output_overflow: tokio::sync::Notify::new(),
+            pending: Arc::new(Mutex::new(HashMap::new())),
+            workspace_root,
+        }
+    }
+
+    async fn resolve(&self, request_id: u64, choice: ApprovalChoice) -> bool {
+        self.pending
+            .lock()
+            .ok()
+            .and_then(|mut pending| pending.remove(&request_id))
+            .map(|sender| sender.send(choice).is_ok())
+            .unwrap_or(false)
+    }
+
+    // Synchronous observers cannot await channel space. Overflow stops the host
+    // through its independent terminal receipt instead of losing approval facts.
+    fn publish(&self, output: RuntimeOutput) {
+        if self.events.try_send(output).is_err() {
+            self.output_overflow.notify_one();
+        }
+    }
+}
+
+#[async_trait]
+impl ApprovalHandler for DesktopApprovalHandler {
+    async fn request_approval(
+        &self,
+        _tool_name: &str,
+        _arguments: &serde_json::Value,
+        _summary_fields: &[String],
+    ) -> ApprovalChoice {
+        // No compiler-derived scope means there is nothing safe to offer for approval.
+        ApprovalChoice::Deny
+    }
+
+    async fn request_scoped_approval(
+        &self,
+        tool_name: &str,
+        arguments: &serde_json::Value,
+        summary_fields: &[String],
+        preview: &GrantPreview,
+    ) -> ApprovalChoice {
+        self.request_scoped_approval_with_explanation(
+            tool_name,
+            arguments,
+            summary_fields,
+            preview,
+            "",
+        )
+        .await
+    }
+
+    async fn request_scoped_approval_with_explanation(
+        &self,
+        tool_name: &str,
+        _arguments: &serde_json::Value,
+        _summary_fields: &[String],
+        preview: &GrantPreview,
+        explanation: &str,
+    ) -> ApprovalChoice {
+        let scope = preview
+            .facets()
+            .iter()
+            .map(|facet| {
+                format!(
+                    "{:?} {:?}: {}",
+                    facet.nature, facet.resource_kind, facet.normalized_scope
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        let scope = self.redact_scope(&scope);
+        self.request_ui(tool_name, &scope, explanation).await
+    }
+}
+
+impl DesktopApprovalHandler {
+    fn redact_scope(&self, scope: &str) -> String {
+        let mut value = scope.replace(&*self.workspace_root.to_string_lossy(), "<workspace>");
+        for variable in ["HOME", "USERPROFILE"] {
+            if let Ok(home) = std::env::var(variable) {
+                value = value.replace(&home, "<home>");
+            }
+        }
+        for key in ["api_key", "token", "password", "secret"] {
+            if value.to_ascii_lowercase().contains(key) {
+                return "<redacted scope>".into();
+            }
+        }
+        value
+    }
+
+    async fn request_ui(&self, tool_name: &str, scope: &str, explanation: &str) -> ApprovalChoice {
+        if tool_name.len() + scope.len() + explanation.len() > 16 * 1024 {
+            return ApprovalChoice::Deny;
+        }
+        let Ok(request_id) =
+            NEXT_APPROVAL_ID
+                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
+        else {
+            return ApprovalChoice::Deny;
+        };
+        let (sender, receiver) = oneshot::channel();
+        {
+            let Ok(mut pending) = self.pending.lock() else {
+                return ApprovalChoice::Deny;
+            };
+            if !pending.is_empty() {
+                return ApprovalChoice::Deny;
+            }
+            pending.insert(request_id, sender);
+        }
+        let _lifetime = ApprovalLifetime {
+            handler: self,
+            request_id,
+        };
+        let request = RuntimeOutput::ApprovalRequested {
+            request_id,
+            tool_name: tool_name.to_owned(),
+            scope: scope.to_owned(),
+            explanation: explanation.to_owned(),
+        };
+        if self.events.send(request).await.is_err() {
+            return ApprovalChoice::Deny;
+        }
+        tokio::select! {
+            result = receiver => result.unwrap_or(ApprovalChoice::Deny),
+            _ = self.events.closed() => ApprovalChoice::Deny,
+        }
+    }
 }
 
 /// Handle used by the Desktop presentation to communicate with a live host.
@@ -123,7 +332,7 @@ impl RuntimeHost {
         provider: Arc<dyn LanguageModel>,
         workspace_root: impl Into<PathBuf>,
     ) -> Result<Self, String> {
-        Self::start_with(move || Ok((provider, 128_000)), workspace_root)
+        Self::start_with(move || Ok((provider, 128_000, false)), workspace_root)
     }
 
     /// Load configuration and construct networking resources on the host thread.
@@ -132,14 +341,18 @@ impl RuntimeHost {
             || {
                 let config = talos_config::Config::load().map_err(|error| error.to_string())?;
                 let provider = crate::provider::configured_provider(&config)?;
-                Ok((provider, config.resolve_model_limits().0))
+                Ok((
+                    provider,
+                    config.resolve_model_limits().0,
+                    config.auto.enabled,
+                ))
             },
             workspace_root,
         )
     }
 
     fn start_with(
-        provider: impl FnOnce() -> Result<(Arc<dyn LanguageModel>, u32), String> + Send + 'static,
+        provider: impl FnOnce() -> Result<(Arc<dyn LanguageModel>, u32, bool), String> + Send + 'static,
         workspace_root: impl Into<PathBuf>,
     ) -> Result<Self, String> {
         let workspace_root = workspace_root.into();
@@ -155,19 +368,38 @@ impl RuntimeHost {
                     .build();
                 let terminal = match executor {
                     Ok(executor) => executor.block_on(async move {
-                        let (provider, context_limit) = match provider() {
+                        let (provider, context_limit, auto_enabled) = match provider() {
                             Ok(provider) => provider,
                             Err(error) => {
                                 return RuntimeOutput::Error(error);
                             }
                         };
+                        let approval_root = workspace_root.clone();
+                        let approval =
+                            Arc::new(DesktopApprovalHandler::new(outputs.clone(), approval_root));
+                        let report_output = approval.clone();
                         match RuntimeBuilder::new()
                             .provider(provider)
                             .model_context_limit(context_limit)
                             .workspace_root(workspace_root)
+                            .shared_tools()
+                            .sandbox(talos_sandbox::create_sandbox())
+                            .sandbox_fallback_policy(talos_runtime::SandboxFallbackPolicy::Deny)
+                            .approval_handler(approval.clone())
+                            .permission_mode(talos_runtime::PermissionMode::Interactive)
+                            .auto_assistance(auto_enabled)
+                            .auto_report_sink(Arc::new(move |report| {
+                                report_output.publish(RuntimeOutput::AutoDecision {
+                                    outcome: report.outcome,
+                                    reason: report.reason,
+                                    evaluator: report.evaluator,
+                                });
+                            }))
                             .build()
                         {
-                            Ok(handle) => run_host(command_rx, outputs, handle).await,
+                            Ok(handle) => {
+                                run_host(command_rx, outputs, handle, Some(approval)).await
+                            }
                             Err(error) => RuntimeOutput::Error(error.to_string()),
                         }
                     }),
@@ -225,12 +457,20 @@ async fn run_host(
     mut commands: mpsc::Receiver<RuntimeCommand>,
     outputs: mpsc::Sender<RuntimeOutput>,
     mut handle: RuntimeHandle,
+    approval: Option<Arc<DesktopApprovalHandler>>,
 ) -> RuntimeOutput {
+    let approval = approval.unwrap_or_else(|| {
+        Arc::new(DesktopApprovalHandler::new(
+            outputs.clone(),
+            PathBuf::from("."),
+        ))
+    });
     // Continue draining authoritative events while the presentation is slow.
     // Overflow stops the runtime explicitly rather than silently dropping text.
     let mut pending = PendingOutput::default();
     loop {
         tokio::select! {
+            _ = approval.output_overflow.notified() => return overflow_host(handle).await,
             _ = outputs.closed() => return stop_host(handle).await,
             permit = outputs.reserve(), if !pending.queue.is_empty() => {
                 match permit {
@@ -262,6 +502,9 @@ async fn run_host(
                     }
                     Some(RuntimeCommand::Shutdown) | None => {
                         return stop_host(handle).await;
+                    }
+                    Some(RuntimeCommand::ApprovalResponse { request_id, choice }) => {
+                        let _ = approval.resolve(request_id, choice).await;
                     }
                 }
             }
@@ -303,7 +546,17 @@ fn project_event(event: SessionEvent) -> Option<RuntimeOutput> {
         SessionEvent::TurnEvent { payload, .. } => match payload {
             talos_runtime::TurnEventPayload::Progress {
                 event: AgentEvent::ToolCall { call, .. },
-            } => Some(RuntimeOutput::ToolUnavailable(call.name)),
+            } => Some(RuntimeOutput::ToolStarted {
+                call_id: call.id,
+                name: call.name,
+            }),
+            talos_runtime::TurnEventPayload::Progress {
+                event: AgentEvent::ToolResult { result },
+            } => Some(RuntimeOutput::ToolResult {
+                call_id: result.tool_use_id,
+                content: result.content,
+                is_error: result.is_error,
+            }),
             talos_runtime::TurnEventPayload::Progress {
                 event: AgentEvent::TextDelta { delta },
             } => Some(RuntimeOutput::Text(delta)),
@@ -325,12 +578,365 @@ fn project_event(event: SessionEvent) -> Option<RuntimeOutput> {
 }
 
 #[cfg(test)]
+mod auto_tests;
+
+#[cfg(all(test, any(target_os = "macos", target_os = "linux")))]
+mod cancellation_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use talos_provider::mock::MockProvider;
 
+    pub(super) struct TestWorkspace(pub(super) PathBuf);
+
+    impl TestWorkspace {
+        pub(super) fn new() -> Self {
+            static NEXT: AtomicU64 = AtomicU64::new(0);
+            let path = std::env::temp_dir().join(format!(
+                "talos-desktop-permission-test-{}-{}",
+                std::process::id(),
+                NEXT.fetch_add(1, Ordering::Relaxed)
+            ));
+            std::fs::create_dir(&path).expect("unique test workspace");
+            Self(path.canonicalize().expect("canonical workspace"))
+        }
+    }
+
+    impl Drop for TestWorkspace {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
     #[tokio::test(flavor = "current_thread")]
-    async fn requested_tools_are_explicitly_unavailable_in_no_tools_host() {
+    async fn denied_real_write_has_one_error_result_and_no_file() {
+        real_write_choice(ApprovalChoice::Deny, false).await;
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn approved_once_real_write_creates_exact_content() {
+        real_write_choice(ApprovalChoice::ApproveOnce, true).await;
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn approved_session_real_write_creates_exact_content() {
+        real_write_choice(ApprovalChoice::AlwaysApprove, true).await;
+    }
+
+    async fn real_write_choice(choice: ApprovalChoice, allowed: bool) {
+        let workspace = TestWorkspace::new();
+        let mut provider = MockProvider::new()
+            .with_tool_call(
+                "write",
+                serde_json::json!({"path": "denied.txt", "content": "must not exist"}),
+            )
+            .with_response("Denied.");
+        if allowed {
+            provider = provider
+                .with_tool_call(
+                    "write",
+                    serde_json::json!({
+                        "path": "denied.txt", "content": "must not overwrite"
+                    }),
+                )
+                .with_response("Second request completed.");
+        }
+        let mut host = RuntimeHost::start(Arc::new(provider), workspace.0.clone()).expect("host");
+        host.try_send(RuntimeCommand::Submit("write fixture".into()))
+            .expect("submit");
+        tokio::time::timeout(std::time::Duration::from_secs(10), async {
+            let mut approvals = 0;
+            let mut results = 0;
+            let mut call = None;
+            loop {
+                match host.recv().await.expect("event") {
+                    RuntimeOutput::ToolStarted { call_id, name } => {
+                        assert_eq!(name, "write");
+                        call = Some(call_id);
+                    }
+                    RuntimeOutput::ApprovalRequested {
+                        request_id,
+                        tool_name,
+                        ..
+                    } => {
+                        assert_eq!(tool_name, "write");
+                        approvals += 1;
+                        host.try_send(RuntimeCommand::ApprovalResponse {
+                            request_id,
+                            choice: choice.clone(),
+                        })
+                        .expect("deny");
+                    }
+                    RuntimeOutput::ToolResult {
+                        call_id, is_error, ..
+                    } => {
+                        assert_eq!(Some(call_id), call);
+                        assert_eq!(is_error, !allowed || results > 0);
+                        results += 1;
+                    }
+                    RuntimeOutput::Completed { .. } => {
+                        if allowed && results == 1 {
+                            host.try_send(RuntimeCommand::Submit("repeat the write".into()))
+                                .expect("second turn");
+                        } else {
+                            break;
+                        }
+                    }
+                    RuntimeOutput::Error(error) => panic!("host error: {error}"),
+                    _ => {}
+                }
+            }
+            let expected_approvals = if allowed && matches!(choice, ApprovalChoice::ApproveOnce) {
+                2
+            } else {
+                1
+            };
+            assert_eq!(approvals, expected_approvals);
+            assert_eq!(results, if allowed { 2 } else { 1 });
+            if allowed {
+                assert_eq!(
+                    std::fs::read_to_string(workspace.0.join("denied.txt")).expect("approved file"),
+                    "must not exist"
+                );
+            } else {
+                assert!(!workspace.0.join("denied.txt").exists());
+            }
+            host.try_send(RuntimeCommand::Shutdown).expect("shutdown");
+            assert_eq!(host.recv().await, Some(RuntimeOutput::Stopped));
+        })
+        .await
+        .expect("bounded denied write");
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn cancelled_real_approval_rejects_late_allow_without_writing() {
+        let workspace = TestWorkspace::new();
+        let provider = MockProvider::new()
+            .with_tool_call(
+                "write",
+                serde_json::json!({
+                    "path": "cancelled.txt", "content": "must never execute"
+                }),
+            )
+            .with_response("After cancellation.");
+        let mut host = RuntimeHost::start(Arc::new(provider), workspace.0.clone()).expect("host");
+        host.try_send(RuntimeCommand::Submit("request a write".into()))
+            .expect("submit");
+        tokio::time::timeout(std::time::Duration::from_secs(10), async {
+            let request_id = loop {
+                match host.recv().await.expect("event") {
+                    RuntimeOutput::ApprovalRequested { request_id, .. } => break request_id,
+                    RuntimeOutput::Error(error) => panic!("host error: {error}"),
+                    RuntimeOutput::Completed { .. } => panic!("completed without approval"),
+                    _ => {}
+                }
+            };
+            host.try_send(RuntimeCommand::Interrupt).expect("interrupt");
+            loop {
+                if let RuntimeOutput::Completed { status, .. } =
+                    host.recv().await.expect("cancel event")
+                {
+                    assert_eq!(status, TerminalStatus::Cancelled);
+                    break;
+                }
+            }
+            host.try_send(RuntimeCommand::ApprovalResponse {
+                request_id,
+                choice: ApprovalChoice::ApproveOnce,
+            })
+            .expect("late reply");
+            host.try_send(RuntimeCommand::Submit("continue without tools".into()))
+                .expect("next turn");
+            loop {
+                match host.recv().await.expect("next event") {
+                    RuntimeOutput::Completed { status, .. } => {
+                        assert_eq!(status, TerminalStatus::Success);
+                        break;
+                    }
+                    RuntimeOutput::ToolStarted { .. } => panic!("cancelled tool replayed"),
+                    _ => {}
+                }
+            }
+            host.try_send(RuntimeCommand::Shutdown).expect("shutdown");
+            assert_eq!(host.recv().await, Some(RuntimeOutput::Stopped));
+            assert!(!workspace.0.join("cancelled.txt").exists());
+        })
+        .await
+        .expect("bounded cancellation");
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn full_observer_channel_signals_host_failure_without_blocking() {
+        let (events, _received) = mpsc::channel(1);
+        let handler = DesktopApprovalHandler::new(events, PathBuf::from("."));
+        handler.publish(RuntimeOutput::Text("occupy channel".into()));
+        handler.publish(RuntimeOutput::ApprovalClosed { request_id: 7 });
+        tokio::time::timeout(
+            std::time::Duration::from_secs(1),
+            handler.output_overflow.notified(),
+        )
+        .await
+        .expect("lost approval event must stop the host");
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn disconnect_after_delivering_approval_releases_waiter() {
+        let (events, mut received) = mpsc::channel(8);
+        let handler = Arc::new(DesktopApprovalHandler::new(events, PathBuf::from(".")));
+        let waiting = {
+            let handler = handler.clone();
+            tokio::spawn(async move { handler.request_ui("write", "scope", "").await })
+        };
+        let Some(RuntimeOutput::ApprovalRequested { request_id, .. }) = received.recv().await
+        else {
+            panic!("approval expected");
+        };
+        drop(received);
+        assert_eq!(
+            tokio::time::timeout(std::time::Duration::from_secs(1), waiting)
+                .await
+                .expect("disconnect must release waiter")
+                .expect("approval task"),
+            ApprovalChoice::Deny
+        );
+        assert!(
+            !handler
+                .resolve(request_id, ApprovalChoice::ApproveOnce)
+                .await
+        );
+        assert!(handler.pending.lock().expect("pending lock").is_empty());
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn approval_response_is_exactly_once_and_stale_ids_are_rejected() {
+        let (events, mut received) = mpsc::channel(8);
+        let handler = Arc::new(DesktopApprovalHandler::new(events, PathBuf::from(".")));
+        let waiting = {
+            let handler = handler.clone();
+            tokio::spawn(async move { handler.request_ui("bash", "workspace", "reason").await })
+        };
+        let request_id = match received.recv().await.expect("approval event") {
+            RuntimeOutput::ApprovalRequested { request_id, .. } => request_id,
+            other => panic!("unexpected event: {other:?}"),
+        };
+        assert!(
+            handler
+                .resolve(request_id, ApprovalChoice::ApproveOnce)
+                .await
+        );
+        assert!(
+            !handler
+                .resolve(request_id, ApprovalChoice::AlwaysApprove)
+                .await
+        );
+        assert_eq!(
+            waiting.await.expect("approval task"),
+            ApprovalChoice::ApproveOnce
+        );
+        assert!(
+            matches!(received.recv().await, Some(RuntimeOutput::ApprovalClosed { request_id: closed }) if closed == request_id)
+        );
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn cancelled_approval_cannot_authorize_a_later_request() {
+        let (events, mut received) = mpsc::channel(8);
+        let handler = Arc::new(DesktopApprovalHandler::new(events, PathBuf::from(".")));
+        let task = {
+            let handler = handler.clone();
+            tokio::spawn(async move { handler.request_ui("write", "first", "").await })
+        };
+        let Some(RuntimeOutput::ApprovalRequested {
+            request_id: old, ..
+        }) = received.recv().await
+        else {
+            panic!("request expected")
+        };
+        task.abort();
+        assert!(task.await.expect_err("cancelled").is_cancelled());
+        assert!(handler.pending.lock().expect("pending lock").is_empty());
+        assert!(
+            matches!(received.recv().await, Some(RuntimeOutput::ApprovalClosed { request_id }) if request_id == old)
+        );
+        let next = {
+            let handler = handler.clone();
+            tokio::spawn(async move { handler.request_ui("write", "second", "").await })
+        };
+        let Some(RuntimeOutput::ApprovalRequested {
+            request_id: current,
+            ..
+        }) = received.recv().await
+        else {
+            panic!("request expected")
+        };
+        assert_ne!(old, current);
+        assert!(!handler.resolve(old, ApprovalChoice::AlwaysApprove).await);
+        assert!(handler.resolve(current, ApprovalChoice::Deny).await);
+        assert_eq!(next.await.expect("request completes"), ApprovalChoice::Deny);
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn closed_approval_surface_fails_closed_and_releases_pending_request() {
+        let (events, received) = mpsc::channel(1);
+        drop(received);
+        let handler = DesktopApprovalHandler::new(events, PathBuf::from("."));
+        assert_eq!(
+            handler.request_ui("write", "scope", "").await,
+            ApprovalChoice::Deny
+        );
+        assert!(handler.pending.lock().expect("pending lock").is_empty());
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn real_read_result_keeps_the_requested_call_identity() {
+        let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let provider = MockProvider::new()
+            .with_tool_call("read", serde_json::json!({"path": "Cargo.toml"}))
+            .with_response("Read completed.");
+        let mut host = RuntimeHost::start(Arc::new(provider), workspace).expect("host starts");
+        host.try_send(RuntimeCommand::Submit("read the crate manifest".into()))
+            .expect("submit queues");
+        tokio::time::timeout(std::time::Duration::from_secs(10), async {
+            let mut started = None;
+            let mut results = 0;
+            loop {
+                match host.recv().await.expect("turn event") {
+                    RuntimeOutput::ToolStarted { call_id, name } => {
+                        assert_eq!(name, "read");
+                        assert!(started.replace(call_id).is_none());
+                    }
+                    RuntimeOutput::ToolResult {
+                        call_id,
+                        content,
+                        is_error,
+                    } => {
+                        assert_eq!(Some(&call_id), started.as_ref());
+                        assert!(!is_error, "read failed: {content}");
+                        assert!(content.contains("talos-desktop"));
+                        results += 1;
+                    }
+                    RuntimeOutput::Completed { .. } => {
+                        assert_eq!(results, 1);
+                        break;
+                    }
+                    RuntimeOutput::Error(error) => panic!("host failure: {error}"),
+                    RuntimeOutput::ApprovalRequested { .. } => {
+                        panic!("workspace read unexpectedly needs approval")
+                    }
+                    _ => {}
+                }
+            }
+            host.try_send(RuntimeCommand::Shutdown)
+                .expect("shutdown queues");
+            assert_eq!(host.recv().await, Some(RuntimeOutput::Stopped));
+        })
+        .await
+        .expect("bounded real read turn");
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn requested_tool_is_projected_without_claiming_execution() {
         let provider = MockProvider::new()
             .with_tool_call("bash", Default::default())
             .with_response("No tool ran.");
@@ -341,7 +947,7 @@ mod tests {
             let mut unavailable = false;
             loop {
                 match host.recv().await.expect("turn event") {
-                    RuntimeOutput::ToolUnavailable(name) => {
+                    RuntimeOutput::ToolStarted { name, .. } => {
                         assert_eq!(name, "bash");
                         unavailable = true;
                     }
@@ -590,7 +1196,7 @@ mod tests {
             .expect("shutdown queued");
         let result = tokio::time::timeout(
             std::time::Duration::from_secs(5),
-            run_host(command_rx, outputs, handle),
+            run_host(command_rx, outputs, handle, None),
         )
         .await
         .expect("shutdown must not await presentation");
@@ -613,7 +1219,7 @@ mod tests {
         drop(output_rx);
         let result = tokio::time::timeout(
             std::time::Duration::from_secs(5),
-            run_host(command_rx, outputs, handle),
+            run_host(command_rx, outputs, handle, None),
         )
         .await
         .expect("receiver closure must be observed");

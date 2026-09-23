@@ -45,6 +45,36 @@ use thiserror::Error;
 
 pub mod hardening;
 
+#[cfg(unix)]
+mod supervisor;
+
+/// Cleanup evidence for commands owned by a managed sandbox provider.
+///
+/// Stop admitting commands and drop their execution futures before waiting.
+/// Clones share the same provider-local outstanding operations and sticky failure.
+#[derive(Clone)]
+pub struct SandboxCleanupReceipt {
+    #[cfg(unix)]
+    cleanup: std::sync::Arc<supervisor::Cleanup>,
+}
+
+impl SandboxCleanupReceipt {
+    /// Wait until all registered commands have confirmed cleanup, or report the
+    /// supplied deadline or a previously unconfirmed cleanup. This does not cancel
+    /// running commands and does not cover intentionally escaped process groups.
+    pub async fn wait(&self, timeout: std::time::Duration) -> Result<(), SandboxError> {
+        #[cfg(unix)]
+        {
+            self.cleanup.wait(timeout).await
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = timeout;
+            Ok(())
+        }
+    }
+}
+
 /// Errors that can occur during sandboxed command execution.
 #[derive(Debug, Error)]
 pub enum SandboxError {
@@ -114,6 +144,15 @@ pub trait SandboxProvider: Send + Sync {
 
     /// Returns `true` if the sandbox tool is available on this system.
     fn is_available(&self) -> bool;
+
+    /// Returns provider-owned cleanup evidence, when supported.
+    ///
+    /// The platform providers returned by [`create_sandbox`] supply this on Unix.
+    /// Legacy unit providers and custom implementations default to `None`, which
+    /// means cleanup cannot be confirmed through this API, not successful cleanup.
+    fn cleanup_receipt(&self) -> Option<SandboxCleanupReceipt> {
+        None
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -123,7 +162,7 @@ pub trait SandboxProvider: Send + Sync {
 #[cfg(target_os = "linux")]
 mod linux {
     use super::*;
-    use tokio::process::Command;
+    use std::process::Command;
 
     /// Sandbox implementation using Bubblewrap (`bwrap`) on Linux.
     ///
@@ -151,6 +190,26 @@ mod linux {
             command: &str,
             config: &SandboxConfig,
         ) -> Result<SandboxResult, SandboxError> {
+            self.execute_with_cleanup(command, config, Default::default())
+                .await
+        }
+
+        fn is_available(&self) -> bool {
+            std::process::Command::new("which")
+                .arg("bwrap")
+                .output()
+                .map(|o| o.status.success())
+                .unwrap_or(false)
+        }
+    }
+
+    impl BubblewrapSandbox {
+        pub(crate) async fn execute_with_cleanup(
+            &self,
+            command: &str,
+            config: &SandboxConfig,
+            cleanup: std::sync::Arc<supervisor::Cleanup>,
+        ) -> Result<SandboxResult, SandboxError> {
             if !self.is_available() {
                 return Err(SandboxError::NotAvailable);
             }
@@ -160,6 +219,7 @@ mod linux {
             })?;
 
             let mut cmd = Command::new("bwrap");
+            cmd.current_dir(&config.workspace_root);
 
             cmd.args(["--ro-bind", "/", "/"]);
             cmd.args(["--bind", workspace, workspace]);
@@ -180,12 +240,8 @@ mod linux {
             cmd.arg("--die-with-parent");
             cmd.args(["--", "sh", "-c", command]);
 
-            let output = tokio::time::timeout(std::time::Duration::from_secs(5), cmd.output())
-                .await
-                .map_err(|_| SandboxError::ExecutionFailed("sandbox execution timed out".into()))?
-                .map_err(|e| {
-                    SandboxError::ExecutionFailed(format!("failed to spawn bwrap: {e}"))
-                })?;
+            let output =
+                supervisor::execute(cmd, cleanup, std::time::Duration::from_secs(5), ()).await?;
 
             let stdout = String::from_utf8_lossy(&output.stdout).to_string();
             let stderr = String::from_utf8_lossy(&output.stderr).to_string();
@@ -201,14 +257,6 @@ mod linux {
                 exit_code,
             })
         }
-
-        fn is_available(&self) -> bool {
-            std::process::Command::new("which")
-                .arg("bwrap")
-                .output()
-                .map(|o| o.status.success())
-                .unwrap_or(false)
-        }
     }
 }
 
@@ -223,8 +271,8 @@ pub use linux::BubblewrapSandbox;
 mod macos {
     use super::*;
     use std::io::Write;
+    use std::process::Command;
     use std::sync::OnceLock;
-    use tokio::process::Command;
 
     /// Sandbox implementation using `sandbox-exec` with Seatbelt profiles on macOS.
     ///
@@ -293,6 +341,30 @@ mod macos {
             command: &str,
             config: &SandboxConfig,
         ) -> Result<SandboxResult, SandboxError> {
+            self.execute_with_cleanup(command, config, Default::default())
+                .await
+        }
+
+        fn is_available(&self) -> bool {
+            static HEALTHY: OnceLock<bool> = OnceLock::new();
+            *HEALTHY.get_or_init(|| {
+                // Presence alone does not prove the host permits Seatbelt.
+                std::process::Command::new("sandbox-exec")
+                    .args(["-p", "(version 1)(allow default)", "true"])
+                    .output()
+                    .map(|output| output.status.success())
+                    .unwrap_or(false)
+            })
+        }
+    }
+
+    impl SeatbeltSandbox {
+        pub(crate) async fn execute_with_cleanup(
+            &self,
+            command: &str,
+            config: &SandboxConfig,
+            cleanup: std::sync::Arc<supervisor::Cleanup>,
+        ) -> Result<SandboxResult, SandboxError> {
             if !self.is_available() {
                 return Err(SandboxError::NotAvailable);
             }
@@ -311,19 +383,20 @@ mod macos {
                 SandboxError::ExecutionFailed("profile path is not valid UTF-8".into())
             })?;
 
-            let output = Command::new("sandbox-exec")
+            let mut cmd = Command::new("sandbox-exec");
+            cmd.current_dir(&config.workspace_root)
                 .arg("-f")
                 .arg(profile_path)
-                .args(["sh", "-c", command])
-                .output();
-            let output = tokio::time::timeout(std::time::Duration::from_secs(5), output)
-                .await
-                .map_err(|_| SandboxError::ExecutionFailed("sandbox execution timed out".into()))?
-                .map_err(|e| {
-                    SandboxError::ExecutionFailed(format!("failed to spawn sandbox-exec: {e}"))
-                })?;
-
-            drop(profile_file);
+                .args(["sh", "-c", command]);
+            // The profile belongs to the supervisor until execution and cleanup
+            // finish, even when the requesting future is dropped immediately.
+            let output = supervisor::execute(
+                cmd,
+                cleanup,
+                std::time::Duration::from_secs(5),
+                profile_file,
+            )
+            .await?;
 
             let stdout = String::from_utf8_lossy(&output.stdout).to_string();
             let stderr = String::from_utf8_lossy(&output.stderr).to_string();
@@ -337,20 +410,6 @@ mod macos {
                 stdout,
                 stderr,
                 exit_code,
-            })
-        }
-
-        fn is_available(&self) -> bool {
-            static HEALTHY: OnceLock<bool> = OnceLock::new();
-            *HEALTHY.get_or_init(|| {
-                // `sandbox-exec` may be present on disk but unusable inside a
-                // restricted host (it exits with EPERM in that case). Probe
-                // the actual kernel operation once instead of trusting PATH.
-                std::process::Command::new("sandbox-exec")
-                    .args(["-p", "(version 1)(allow default)", "true"])
-                    .output()
-                    .map(|output| output.status.success())
-                    .unwrap_or(false)
             })
         }
     }
@@ -367,25 +426,71 @@ pub use macos::SeatbeltSandbox;
 ///
 /// Returns a boxed trait object that can be used polymorphically.
 /// The caller should check [`SandboxProvider::is_available`] before use.
+/// Supported Unix providers carry a per-instance [`SandboxCleanupReceipt`].
+/// Retain it and await cleanup before destroying the executing Tokio runtime.
 ///
 /// # Platform Support
 ///
-/// - **Linux**: Returns [`BubblewrapSandbox`]
-/// - **macOS**: Returns [`SeatbeltSandbox`]
+/// - **Linux**: Managed execution using [`BubblewrapSandbox`]
+/// - **macOS**: Managed execution using [`SeatbeltSandbox`]
 /// - **Other**: Returns a stub that always reports `NotAvailable`
 #[must_use]
 pub fn create_sandbox() -> Box<dyn SandboxProvider> {
     #[cfg(target_os = "linux")]
     {
-        Box::new(BubblewrapSandbox::new())
+        Box::new(ManagedSandbox {
+            cleanup: Default::default(),
+        })
     }
     #[cfg(target_os = "macos")]
     {
-        Box::new(SeatbeltSandbox::new())
+        Box::new(ManagedSandbox {
+            cleanup: Default::default(),
+        })
     }
     #[cfg(not(any(target_os = "linux", target_os = "macos")))]
     {
         Box::new(UnsupportedSandbox)
+    }
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+struct ManagedSandbox {
+    cleanup: std::sync::Arc<supervisor::Cleanup>,
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+#[async_trait]
+impl SandboxProvider for ManagedSandbox {
+    async fn execute(
+        &self,
+        command: &str,
+        config: &SandboxConfig,
+    ) -> Result<SandboxResult, SandboxError> {
+        #[cfg(target_os = "linux")]
+        let platform = BubblewrapSandbox;
+        #[cfg(target_os = "macos")]
+        let platform = SeatbeltSandbox;
+        platform
+            .execute_with_cleanup(command, config, self.cleanup.clone())
+            .await
+    }
+
+    fn is_available(&self) -> bool {
+        #[cfg(target_os = "linux")]
+        {
+            BubblewrapSandbox.is_available()
+        }
+        #[cfg(target_os = "macos")]
+        {
+            SeatbeltSandbox.is_available()
+        }
+    }
+
+    fn cleanup_receipt(&self) -> Option<SandboxCleanupReceipt> {
+        Some(SandboxCleanupReceipt {
+            cleanup: self.cleanup.clone(),
+        })
     }
 }
 
@@ -600,6 +705,29 @@ mod tests {
             // Presence of the executable is not sufficient: hosted/macOS
             // environments can deny the kernel sandbox operation.
             let _ = sandbox.is_available();
+        }
+
+        #[tokio::test]
+        async fn test_seatbelt_command_uses_selected_workspace() {
+            let sandbox = SeatbeltSandbox::new();
+            let workspace = tempfile::tempdir().expect("workspace");
+            let root = workspace
+                .path()
+                .canonicalize()
+                .expect("canonical workspace");
+            let config = SandboxConfig {
+                workspace_root: root.clone(),
+                allow_network: false,
+                extra_read_paths: vec![],
+            };
+            let result = sandbox.execute("pwd -P", &config).await;
+            if sandbox.is_available() {
+                let result = result.expect("sandbox executes");
+                assert_eq!(result.exit_code, 0);
+                assert_eq!(result.stdout.trim(), root.to_string_lossy());
+            } else {
+                assert!(matches!(result, Err(SandboxError::NotAvailable)));
+            }
         }
 
         #[tokio::test]

@@ -875,6 +875,57 @@ mod windows_tests {
     }
 
     #[tokio::test]
+    async fn windows_job_preserves_descendant_output_after_leader_exit() {
+        // The child waits for the leader itself, so its delayed output cannot
+        // accidentally precede leader exit on a slow CI runner.
+        let script = r#"$childCommand = 'Wait-Process -Id ' + $PID + ' -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 500; Write-Output descendant-after-leader-exit'; $child = Start-Process powershell.exe -ArgumentList @('-NoLogo', '-NoProfile', '-NonInteractive', '-Command', ('"' + $childCommand + '"')) -NoNewWindow -PassThru; exit 0"#;
+        let launched = Box::new(powershell(script))
+            .launch()
+            .await
+            .expect("Windows Job Object launcher succeeds");
+        let control = launched.control;
+        let mut events = launched.events;
+        let mut output = Vec::new();
+        let terminal = tokio::time::timeout(Duration::from_secs(20), async {
+            while let Some(event) = events.recv().await {
+                match event {
+                    BackgroundProcessEvent::Output(chunk) => output.extend(chunk.bytes),
+                    terminal => return Some(terminal),
+                }
+            }
+            None
+        })
+        .await;
+
+        // Clean up before asserting even if the terminal event never arrived.
+        // Dropping the retained control also closes the kill-on-close Job.
+        let cleanup = control.force_terminate().await;
+        drop(control);
+        if terminal.is_err() {
+            let _ = tokio::time::timeout(Duration::from_secs(10), async {
+                while let Some(event) = events.recv().await {
+                    if !matches!(event, BackgroundProcessEvent::Output(_)) {
+                        break;
+                    }
+                }
+            })
+            .await;
+        }
+        assert!(cleanup.is_ok(), "Job cleanup failed: {cleanup:?}");
+        let terminal = terminal
+            .expect("descendant output must reach EOF within the test deadline")
+            .expect("launcher must emit a terminal event");
+        assert!(
+            matches!(terminal, BackgroundProcessEvent::Exited(ref exit) if exit.success),
+            "unexpected terminal event: {terminal:?}"
+        );
+        assert!(
+            String::from_utf8_lossy(&output).contains("descendant-after-leader-exit"),
+            "leader exit must not truncate delayed descendant output"
+        );
+    }
+
+    #[tokio::test]
     async fn windows_child_runs_only_after_job_assignment_and_resume() {
         let marker =
             std::env::temp_dir().join(format!("talos-i226-assigned-marker-{}", std::process::id()));

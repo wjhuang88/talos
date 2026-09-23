@@ -1,6 +1,7 @@
 //! Bash tool for shell command execution.
 
 use std::path::PathBuf;
+#[cfg(not(windows))]
 use std::process::Stdio;
 use std::time::Duration;
 use std::{
@@ -14,13 +15,17 @@ use serde::Deserialize;
 use serde_json::Value;
 #[cfg(any(unix, windows))]
 use talos_core::background_job::BackgroundJobRequest;
+#[cfg(windows)]
+use talos_core::background_job::{BackgroundJobLauncher, BackgroundProcessEvent};
 use talos_core::background_job::{BackgroundJobPermit, ToolExecutionAdmission};
 use talos_core::tool::{
     AgentTool, ToolExecutionAuthorization, ToolExecutionOutput, ToolFamily, ToolNature,
     ToolPermissionFacet, ToolResourceKind, ToolResult,
 };
 use thiserror::Error;
+#[cfg(not(windows))]
 use tokio::io::{AsyncBufReadExt, BufReader};
+#[cfg(not(windows))]
 use tokio::process::Command;
 
 /// Errors that can occur during bash tool execution.
@@ -55,6 +60,42 @@ pub struct BashTool {
     timeout: Duration,
 }
 
+// Each pipe has its own incomplete line so UTF-8 sequences cannot be split by
+// a chunk boundary or by output arriving from the other pipe.
+#[cfg(any(windows, test))]
+#[derive(Default)]
+struct ShellOutputLine {
+    pending: Vec<u8>,
+}
+
+#[cfg(any(windows, test))]
+impl ShellOutputLine {
+    fn push(&mut self, bytes: &[u8], output: &mut String) {
+        for segment in bytes.split_inclusive(|byte| *byte == b'\n') {
+            self.pending.extend_from_slice(segment);
+            if self.pending.last() == Some(&b'\n') {
+                self.pending.pop();
+                if self.pending.last() == Some(&b'\r') {
+                    self.pending.pop();
+                }
+                self.finish(output);
+            }
+        }
+    }
+
+    fn finish(&mut self, output: &mut String) {
+        output.push_str(&String::from_utf8_lossy(&self.pending));
+        output.push('\n');
+        self.pending.clear();
+    }
+
+    fn flush(&mut self, output: &mut String) {
+        if !self.pending.is_empty() {
+            self.finish(output);
+        }
+    }
+}
+
 fn directory_identity(path: &std::path::Path) -> Option<String> {
     let canonical = path.canonicalize().ok()?;
     let metadata = std::fs::metadata(&canonical).ok()?;
@@ -87,6 +128,7 @@ const SHELL_TOOL_NAME: &str = "powershell";
 #[cfg(not(windows))]
 const SHELL_TOOL_NAME: &str = "bash";
 
+#[cfg(not(windows))]
 fn platform_shell_command(command: &str) -> Command {
     #[cfg(windows)]
     let mut cmd = {
@@ -162,6 +204,16 @@ impl BashTool {
                 "working directory changed or is unavailable; refusing to execute",
             );
         }
+        #[cfg(windows)]
+        {
+            self.run_command_windows(command, timeout_duration).await
+        }
+        #[cfg(not(windows))]
+        self.run_command_unix(command, timeout_duration).await
+    }
+
+    #[cfg(not(windows))]
+    async fn run_command_unix(&self, command: &str, timeout_duration: Duration) -> ToolResult {
         let mut cmd = platform_shell_command(command);
         cmd.current_dir(&self.working_dir)
             .stdout(Stdio::piped())
@@ -265,6 +317,73 @@ impl BashTool {
             content: output,
             is_error,
             continuations: Vec::new(),
+        }
+    }
+
+    /// Runs the Windows foreground shell inside a Job Object so timeout cleanup
+    /// terminates descendants that inherited the output pipes as well.
+    #[cfg(windows)]
+    async fn run_command_windows(&self, command: &str, timeout_duration: Duration) -> ToolResult {
+        let launcher = crate::process_boundary::WindowsBackgroundLauncher::new(
+            "powershell.exe".to_owned(),
+            vec![
+                "-NoLogo".to_owned(),
+                "-NoProfile".to_owned(),
+                "-NonInteractive".to_owned(),
+                "-Command".to_owned(),
+                command.to_owned(),
+            ],
+            self.working_dir.clone(),
+            std::collections::BTreeMap::new(),
+        );
+        let mut launched = match Box::new(launcher).launch().await {
+            Ok(job) => job,
+            Err(error) => return ToolResult::error(format!("failed to spawn shell: {error}")),
+        };
+        let mut output = format!("$ {command}\n");
+        let mut stdout = ShellOutputLine::default();
+        let mut stderr = ShellOutputLine::default();
+        let deadline = tokio::time::sleep(timeout_duration);
+        tokio::pin!(deadline);
+        loop {
+            tokio::select! {
+                event = launched.events.recv() => match event {
+                    Some(BackgroundProcessEvent::Output(chunk)) => {
+                        match chunk.stream {
+                            talos_core::background_job::BackgroundOutputStream::Stdout => stdout.push(&chunk.bytes, &mut output),
+                            talos_core::background_job::BackgroundOutputStream::Stderr => stderr.push(&chunk.bytes, &mut output),
+                        }
+                    }
+                    Some(BackgroundProcessEvent::Exited(exit)) => {
+                        let code = exit.code.unwrap_or(-1);
+                        stdout.flush(&mut output);
+                        stderr.flush(&mut output);
+                        output.push_str(&format!("[exit {code}]"));
+                        return if is_expected_exit_code(command, code) {
+                            ToolResult::success(output)
+                        } else {
+                            ToolResult::error(output)
+                        };
+                    }
+                    Some(BackgroundProcessEvent::SupervisionFailed(error)) => {
+                        stdout.flush(&mut output);
+                        stderr.flush(&mut output);
+                        return ToolResult::error(format!("{output}[supervision error: {error}]"));
+                    }
+                    None => {
+                        stdout.flush(&mut output);
+                        stderr.flush(&mut output);
+                        return ToolResult::error(format!("{output}[supervision closed]"));
+                    },
+                },
+                _ = &mut deadline => {
+                    let _ = launched.control.force_terminate().await;
+                    stdout.flush(&mut output);
+                    stderr.flush(&mut output);
+                    output.push_str("[timeout]");
+                    return ToolResult::error(output);
+                }
+            }
         }
     }
 }
@@ -820,6 +939,20 @@ fn classify_git(args: &[&str]) -> BashCommandClass {
 #[cfg(test)]
 #[allow(warnings)]
 mod tests {
+    #[test]
+    fn output_lines_preserve_split_utf8_and_independent_streams() {
+        let mut stdout = super::ShellOutputLine::default();
+        let mut stderr = super::ShellOutputLine::default();
+        let mut output = String::new();
+        let bytes = "中文\r\n尾行".as_bytes();
+        stdout.push(&bytes[..1], &mut output);
+        stderr.push(b"error\n\n", &mut output);
+        stdout.push(&bytes[1..], &mut output);
+        stdout.flush(&mut output);
+        stderr.flush(&mut output);
+        assert_eq!(output, "error\n\n中文\n尾行\n");
+    }
+
     use super::*;
 
     fn test_dir() -> PathBuf {
@@ -968,6 +1101,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(windows))]
     fn platform_command_removes_dangerous_environment_variables() {
         let command = platform_shell_command("echo safe");
         let removed: Vec<_> = command
@@ -1408,6 +1542,28 @@ mod tests {
         assert!(
             started.elapsed() < Duration::from_secs(5),
             "absolute deadline waited for descendant-held pipe EOF"
+        );
+    }
+
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn windows_timeout_preserves_unterminated_stdout_and_stderr() {
+        let tool = BashTool::new(test_dir()).with_timeout(Duration::from_secs(3));
+        let result = tokio::time::timeout(Duration::from_secs(10), tool.execute(
+            serde_json::json!({"command": "[Console]::Out.Write('stdout-without-newline'); [Console]::Out.Flush(); [Console]::Error.Write('stderr-without-newline'); [Console]::Error.Flush(); Start-Sleep -Seconds 30"})
+        )).await.expect("command timeout must return");
+        let (_, captured) = result.content.split_once('\n').expect("command header");
+        assert!(result.is_error);
+        assert!(captured.contains("[timeout]"));
+        assert!(
+            captured.contains("stdout-without-newline"),
+            "{}",
+            result.content
+        );
+        assert!(
+            captured.contains("stderr-without-newline"),
+            "{}",
+            result.content
         );
     }
 

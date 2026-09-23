@@ -20,7 +20,7 @@
 | Governance Claim PR | #601 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Activation #601 merged as `538cbfef`; I282 implementation merged as `aaa4c015`; exact-head CI and protected review required for implementation |
-| Implementation PR | Not started; local convergence begins from `main@538cbfef` |
+| Implementation PR | #603; local review corrections in progress, not merge-ready |
 | Last Updated | 2026-09-22 |
 | Handoff / Release Condition | Keep I283 as the sole tools/approval authority; no release or new permission authority |
 
@@ -81,9 +81,25 @@ safety. Roll back only the failing slice; no destructive cleanup of user session
 2026-09-22: activation #601 reached `main` as `538cbfef` after I282 implementation merge
 `aaa4c015`; I283 is now effective and local implementation may begin.
 
+## Local Execution Checkpoint — 2026-09-23
+
+Local implementation is converging on `chore/i283-activation-closeout`. The Desktop host now
+composes the existing shared Runtime tools, projects tool start/result events, exposes exact
+request-scoped approval controls, and installs the existing provider-backed Auto resolver through
+an additive RuntimeBuilder boundary. Auto reports are redacted before reaching the UI; permission
+policy and execution authority remain Runtime-owned. Approval responses carry request IDs, reject
+stale or duplicate IDs, and pending requests fail closed when cancelled, closed, or disconnected.
+
+`cargo check -p talos-runtime -p talos-desktop --features talos-desktop/desktop-ui --locked`
+passed. Desktop mock tests: 61 passed. This is not yet a stable candidate: full workspace
+validation, release preflight, governance validators, implementation PR and independent review
+remain pending.
+
 ## Verification Evidence
 
-Implementation checks: not run; activation only, no implementation exists for this child.
+Implementation checks: focused locked checks passed (`cargo check` for Runtime/Desktop, Desktop
+mock suite 61/61, and the exact-once approval response test). Full workspace validation, release
+preflight, governance validators, implementation PR and independent review remain pending.
 Planning checks are recorded centrally in the four-week task.
 
 ## Completion Evidence
@@ -93,4 +109,48 @@ Only already-existing implementation/evidence commits may close this iteration.
 
 ## Variance And Residuals
 
-None yet. Carry eligible human rows to #29 / I285 without transferring protected security gates.
+Running-tool cancellation remains an implementation/review blocker; see accepted
+[ADR-082](../decisions/082-sandbox-command-cancellation-ownership.md).
+Carry eligible human rows to #29 / I285 without transferring protected security gates.
+
+## Review Correction Checkpoint — 2026-09-23
+
+PR #603 candidate `cbb156433f9119166150988264a84945cf003726` passed CI, including
+Windows descendant-pipe timeout and delayed descendant output tests. It is not
+approved for merge: independent review found missing integration coverage and
+runtime initialization/cancellation defects. Local corrections remain unpushed.
+
+Local Desktop tests now pass 74/74: actual read identity, write Once/Session/Deny,
+cross-turn grant reuse, approval cancellation with late replies, and real Auto
+assessment/report paths. Runtime 40 tests and Sandbox 26 tests passed before the
+additional workspace-cwd test, which also passed separately. Auto now explicitly
+selects Interactive permission mode in Desktop while Runtime defaults remain
+Headless; failed Auto lease construction preserves and reports manual fallback.
+Sandbox command cwd now matches the selected workspace.
+
+Next: settle ADR-082 containment/ownership design, implement and prove running-tool
+cancellation, rerun final validation, synchronize owners and obtain fresh review
+before the next stable push. Do not conflate pending-approval cancellation with
+running-process cancellation. No completion claim or I284 activation is made.
+
+## Local Stable Candidate Checkpoint — 2026-09-23
+
+The local candidate includes the owned Unix supervisor, cleanup receipt, Runtime/Agent
+shutdown integration, Darwin `proc_listpids(PROC_PGRP_ONLY)` EPERM disambiguation, Desktop
+running-shell interrupt/shutdown tests, and the existing Windows output/Job Object fixes.
+
+Evidence: Sandbox 40 tests plus 2 doctests, Runtime 41 tests, Desktop 76 tests, and
+talos-skill 81 tests passed. `./scripts/release_preflight.sh` passed, including locked
+workspace checks, Clippy, full tests, both governance validators, text-boundary checks and
+the external Runtime SDK fixture. This is local evidence only; final corrections remain
+uncommitted and require one exact-head remote candidate plus fresh protected review.
+
+## Cancellation Decision Acceptance — 2026-09-23
+
+The maintainer explicitly accepted ADR-082's bounded lifecycle guarantee. Implement
+owned-group cleanup for ordinary shell descendants with explicit completion receipts;
+do not claim containment of descendants deliberately leaving that group. The latter
+remains an unimplemented residual under I283/#29. This checkpoint amends cancellation
+acceptance without rewriting the Published Baseline. New unsafe sites are limited to
+the accepted ABI boundary and still require independent security/API review. The
+decision blocker is resolved; implementation and verification remain outstanding.

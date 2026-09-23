@@ -304,6 +304,18 @@ handle.preview_request("What would you send for this?")?;
 
 ### Scoped approval and runtime lifetime
 
+`RuntimeBuilder` defaults to `PermissionMode::Headless`. Interactive embedding applications
+must explicitly select `.permission_mode(PermissionMode::Interactive)` and supply an approval
+handler. The mode is re-exported by `talos-runtime`; selecting it grants no permissions.
+Existing callers keep the headless default without source changes.
+
+`.auto_assistance(true)` enables model-assisted review only when a manual approval handler is
+available as fallback; it does not implicitly switch the permission mode. Shell eligibility
+still follows the permission context and policy. If the managed workspace lease cannot be
+created, the manual handler remains available and `auto_report_sink` receives an `unavailable`
+report with reason `workspace_lease_unavailable_manual_approval_retained`. The failure must
+not silently remove the user's approval path.
+
 `RuntimeBuilder::approval_handler` receives `Ask` decisions through
 `ApprovalHandler::request_scoped_approval`. Its `GrantPreview` is compiled by `talos-permission`
 from the authoritative tool profile; handlers should render that preview instead of reconstructing
@@ -332,6 +344,20 @@ schema migration.
 composition APIs. I280 changes their import closure, not their execution or authorization policy.
 
 ### Caller-selected sandbox fallback
+
+`create_sandbox()` returns a managed platform provider on macOS/Linux. Its additive
+`SandboxProvider::cleanup_receipt()` capability returns a cloneable `SandboxCleanupReceipt`,
+also re-exported by `talos-runtime`. Runtime captures this receipt before executing tools,
+waits before publishing turn completion, and registers a bounded shutdown finalizer.
+Receipt failure cannot be reported as confirmed cancellation or successful shutdown.
+
+The public `SeatbeltSandbox` / `BubblewrapSandbox` unit types and their constructors remain
+source-compatible. Direct unit providers and existing custom providers default to no receipt;
+`None` means unconfirmed through this capability, not proof of cleanup. Embedders needing
+managed lifecycle evidence should use `create_sandbox()`. Before directly awaiting a receipt,
+stop admitting commands and drop/finish their execution futures. The receipt does not itself
+cancel execution. ADR-082 covers ordinary descendants remaining in the owned Unix process group,
+not deliberate group escape. No permission or sandbox-fallback policy is changed.
 
 When sandbox isolation is unavailable, the SDK exposes an explicit, caller-selected policy
 instead of silently choosing a product default:

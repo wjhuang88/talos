@@ -9424,9 +9424,11 @@ dependencies = [
  "async-trait",
  "gpui",
  "gpui_platform",
+ "serde_json",
  "talos-config",
  "talos-provider",
  "talos-runtime",
+ "talos-sandbox",
  "tokio",
  "unicode-segmentation",
 ]

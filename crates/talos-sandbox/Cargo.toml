@@ -12,7 +12,7 @@ rust-version.workspace = true
 talos-core = { version = "0.10.1", path = "../talos-core" }
 async-trait = "0.1.92"
 thiserror = "2.0.20"
-tokio = { version = "1.53.1", features = ["process", "time"] }
+tokio = { version = "1.53.1", features = ["process", "time", "rt", "sync", "io-util", "macros"] }
 
 [target.'cfg(unix)'.dependencies]
 libc = "1.0.0-alpha.3"

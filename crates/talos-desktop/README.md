@@ -1,6 +1,6 @@
 # Talos Desktop development host
 
-I282 is under local development. These commands describe the implementation in
+I283 is under local development. These commands describe the implementation in
 this branch, not a released Desktop product. Native acceptance is still pending.
 
 ## Launch
@@ -37,13 +37,24 @@ Small windows scroll the task page to reach Send, Cancel and output.
   live mode to change workspace. Output currently displays the latest turn only.
 - Text, terminal errors and cancellation are projected from Runtime events.
   The displayed turn ID comes from Runtime, not a fixture identifier.
-- No executable tools are registered in I282. A tool request is shown as
-  unavailable/not executed. Auto and permission UI belong to I283.
+- Live mode registers shared Runtime tools. Tool calls and results display their
+  actual call IDs; execution remains subject to Runtime permission and sandbox checks.
+- Auto follows the existing `auto.enabled` configuration. Its reported decision,
+  reason and evaluator are displayed; a report does not imply model consultation.
+- A pending approval offers Allow once, Allow session and Deny for the displayed
+  request. Replies are bound to its request ID; stale or repeated replies cannot
+  authorize a later request. Cancelling or closing the approval surface fails closed.
 - Conversations are not persisted in this stage; restart/resume belongs to I284.
   Fixture presets do not configure live execution.
 - Cancel requests a Runtime interrupt. Tests cover a pending provider connection,
   an open paused stream, and provider-backed history compaction; the latter cancels
   the committed turn without waiting for the compactor provider.
+- ADR-082 defines the Unix shell cancellation boundary: ordinary descendants in
+  the owned process group are in scope; descendants deliberately leaving that
+  group are not contained by this mechanism. Cancel and shutdown wait for the
+  managed sandbox's cleanup receipt; unconfirmed cleanup is reported as an error.
+  Native integration tests exercise a running shell and descendant; protected
+  review and the human acceptance rows remain separate gates.
 - Closing the window requests Runtime shutdown and waits asynchronously for its
   result. After the GUI loop exits, the application waits at most 35 seconds
   overall for host completion receipts and reports unconfirmed cleanup as failure.
@@ -71,6 +82,12 @@ On Linux a usable X11/Wayland display is required.
 先用现有 CLI 配好模型，再填写工作区和任务，点击“发送”。“取消”请求停止当前
 对话；关闭窗口会先请求清理 Runtime。窄窗口请向下滚动查看操作按钮与输出。
 
-本阶段不执行工具、不接入 Auto、不保存会话；示例预设不会影响真实请求。
-重启会丢失当前内存会话。历史压缩阶段的取消、原生人工验收和后续阶段仍未闭环，
+真实模式使用共享 Runtime 工具和现有权限、沙箱门禁。Auto 遵循 `auto.enabled`
+配置并显示实际决策；需要人工批准时，可选择单次允许、会话允许或拒绝。
+选择只作用于当前申请，取消或关闭不会批准后续请求。
+Unix shell 取消的保证范围是所属进程组内的普通后代；主动脱离进程组的程序
+不属于该机制的强隔离保证。取消和退出会等待托管沙箱的清理回执，无法确认
+清理时会报告错误。真实 shell 与后代的集成测试不替代安全复核或人工验收。
+本阶段不保存会话；示例预设不会影响真实请求，重启会丢失当前内存会话。
+工具和权限交互的原生人工验收以及后续阶段仍未闭环，
 不能把截图或单元测试通过视为完整桌面交付。
