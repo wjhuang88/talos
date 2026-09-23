@@ -142,7 +142,7 @@ impl OwnedChild {
     }
 
     fn terminate_group(&mut self) -> io::Result<()> {
-        self.terminate_with(|pgid| {
+        let signal_result = self.terminate_with(|pgid| {
             loop {
                 // SAFETY: terminate_with has verified sole ownership of the positive
                 // PID established as group leader by setsid (ADR-082). No reaping
@@ -160,18 +160,21 @@ impl OwnedChild {
                 }
                 return Err(error);
             }
-        })
-        .or_else(|error| {
-            #[cfg(target_os = "macos")]
-            {
-                if error.raw_os_error() == Some(libc::EPERM)
-                    && self.darwin_group_is_only_owned_leader()?
+        });
+        match signal_result {
+            Ok(()) => Ok(()),
+            Err(error) => {
+                #[cfg(target_os = "macos")]
                 {
-                    return Ok(());
+                    if error.raw_os_error() == Some(libc::EPERM)
+                        && self.darwin_group_is_only_owned_leader()?
+                    {
+                        return Ok(());
+                    }
                 }
+                Err(error)
             }
-            Err(error)
-        })
+        }
     }
 
     #[cfg(target_os = "macos")]
