@@ -97,7 +97,7 @@ remain owned residuals and prevent claims of universal accessibility/platform ac
 |---|---|---|---|---|---|---|
 | T1 | Week 1, Sep 22-28 / I282 | Launch a live Desktop task using configured provider; responsive streaming, errors and cancellation; tools unavailable in this initial slice | WORK-001 P0-P4, I280, ADR-059; API map and effective claim | Mock-provider E2E plus real-provider native row; no UI blocking or fictitious results | Keep existing mock explicitly separate; unresolved facade contract becomes a named blocker, never a copied engine | In Progress — claim/activation PR #598 |
 | T2 | Week 2, Sep 29-Oct 5 / I283 | Real file/shell activity, visible existing Auto review, scoped approval and safe cancellation | T1 merged and technical gates passed | Allow/Deny/Once/Session, stale approval, cancel and shutdown matrix; independent security/API review | Tool execution remains disabled until gates pass; do not ship an auto-allow workaround | Complete — PR #603 merged as `93c8b357`; H2/H3 human residual |
-| T3 | Week 3, Oct 6-12 / I284 | Recent tasks, durable transcript resume, actual work/evaluation and read-only change/evidence views | T2 merged; storage/projection compatibility verified | Restart and session-isolation tests; revision/staleness/Delivery gates; no tool replay | Preserve transcript-only recovery if richer projection cannot persist; explicitly show unavailable evidence and keep unmet acceptance open | Planned |
+| T3 | Week 3, Oct 6-12 / I284 | Recent tasks, durable transcript resume, actual work/evaluation and read-only change/evidence views | T2 merged; storage/projection compatibility verified | Restart and session-isolation tests; revision/staleness/Delivery gates; no tool replay | Preserve transcript-only recovery if richer projection cannot persist; explicitly show unavailable evidence and keep unmet acceptance open | In Progress — local implementation on `feat/i284-durable-task-evidence`; stable candidate not pushed |
 | T4 | Week 4, Oct 13-19 / I285 | Reproducible integrated candidate, fixes, user guide and consolidated acceptance report | T1-T3 merged with technical gates passed | Integrated E2E, current-head CI/review, required native rows, documented residuals and clean handoff | Deliver Partial with exact remaining blockers; no fake Complete or unrequested release | Planned |
 
 Reserve roughly three days in Week 4 for fixes/retesting and two for acceptance/documentation.
@@ -295,3 +295,18 @@ governance validators with 0 warnings, full workspace Clippy/tests, and the exte
 Runtime SDK fixture. The formerly pending exact-head remote validation and fresh review were
 subsequently completed by CI run `35825870138` and the independent review bound to `9163bf82`;
 I283 then merged as `93c8b357`.
+
+## I284 Local Convergence Checkpoint — 2026-09-23
+
+I284 local commits `08df087e`, `beed4624`, `ad4a8665`, `1f466182`, `9f549cd6`, `5396f5c4`,
+`1ccdc79c`, `9020d000`, `cf91273c`, and `aaee340a` provide workspace+goal durable identities,
+successful-turn persistence, no-replay cancellation coverage, workspace-scoped Recent tasks
+discovery, explicit Resume, tool provenance and attributable source display, plus an honest
+evaluation `unavailable` state. The full Desktop mock suite is 80/80 and the affected locked
+check passes.
+
+The remaining I284 implementation work is a read-only artifact/change viewer tied to actual task
+evidence and a shared evaluation projection when available; arbitrary workspace dirt remains
+unavailable. H4/H6 natural-person acceptance rows remain open. No implementation PR has been
+pushed; continue local convergence before the one stable candidate, then run preflight, both
+governance validators, exact-head CI and protected review.
