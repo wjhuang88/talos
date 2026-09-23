@@ -60,6 +60,42 @@ pub struct BashTool {
     timeout: Duration,
 }
 
+// Each pipe has its own incomplete line so UTF-8 sequences cannot be split by
+// a chunk boundary or by output arriving from the other pipe.
+#[cfg(any(windows, test))]
+#[derive(Default)]
+struct ShellOutputLine {
+    pending: Vec<u8>,
+}
+
+#[cfg(any(windows, test))]
+impl ShellOutputLine {
+    fn push(&mut self, bytes: &[u8], output: &mut String) {
+        for segment in bytes.split_inclusive(|byte| *byte == b'\n') {
+            self.pending.extend_from_slice(segment);
+            if self.pending.last() == Some(&b'\n') {
+                self.pending.pop();
+                if self.pending.last() == Some(&b'\r') {
+                    self.pending.pop();
+                }
+                self.finish(output);
+            }
+        }
+    }
+
+    fn finish(&mut self, output: &mut String) {
+        output.push_str(&String::from_utf8_lossy(&self.pending));
+        output.push('\n');
+        self.pending.clear();
+    }
+
+    fn flush(&mut self, output: &mut String) {
+        if !self.pending.is_empty() {
+            self.finish(output);
+        }
+    }
+}
+
 fn directory_identity(path: &std::path::Path) -> Option<String> {
     let canonical = path.canonicalize().ok()?;
     let metadata = std::fs::metadata(&canonical).ok()?;
@@ -305,16 +341,23 @@ impl BashTool {
             Err(error) => return ToolResult::error(format!("failed to spawn shell: {error}")),
         };
         let mut output = format!("$ {command}\n");
+        let mut stdout = ShellOutputLine::default();
+        let mut stderr = ShellOutputLine::default();
         let deadline = tokio::time::sleep(timeout_duration);
         tokio::pin!(deadline);
         loop {
             tokio::select! {
                 event = launched.events.recv() => match event {
                     Some(BackgroundProcessEvent::Output(chunk)) => {
-                        output.push_str(&String::from_utf8_lossy(&chunk.bytes));
+                        match chunk.stream {
+                            talos_core::background_job::BackgroundOutputStream::Stdout => stdout.push(&chunk.bytes, &mut output),
+                            talos_core::background_job::BackgroundOutputStream::Stderr => stderr.push(&chunk.bytes, &mut output),
+                        }
                     }
                     Some(BackgroundProcessEvent::Exited(exit)) => {
                         let code = exit.code.unwrap_or(-1);
+                        stdout.flush(&mut output);
+                        stderr.flush(&mut output);
                         output.push_str(&format!("[exit {code}]"));
                         return if is_expected_exit_code(command, code) {
                             ToolResult::success(output)
@@ -888,6 +931,20 @@ fn classify_git(args: &[&str]) -> BashCommandClass {
 #[cfg(test)]
 #[allow(warnings)]
 mod tests {
+    #[test]
+    fn output_lines_preserve_split_utf8_and_independent_streams() {
+        let mut stdout = super::ShellOutputLine::default();
+        let mut stderr = super::ShellOutputLine::default();
+        let mut output = String::new();
+        let bytes = "中文\r\n尾行".as_bytes();
+        stdout.push(&bytes[..1], &mut output);
+        stderr.push(b"error\n\n", &mut output);
+        stdout.push(&bytes[1..], &mut output);
+        stdout.flush(&mut output);
+        stderr.flush(&mut output);
+        assert_eq!(output, "error\n\n中文\n尾行\n");
+    }
+
     use super::*;
 
     fn test_dir() -> PathBuf {
@@ -1036,6 +1093,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(windows))]
     fn platform_command_removes_dangerous_environment_variables() {
         let command = platform_shell_command("echo safe");
         let removed: Vec<_> = command
