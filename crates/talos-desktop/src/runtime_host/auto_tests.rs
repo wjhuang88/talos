@@ -145,8 +145,14 @@ async fn exercise_auto(enabled: bool, allow: bool) {
         );
     } else {
         let expected = workspace.0.canonicalize().expect("canonical workspace");
+        // Windows canonicalize may add the extended-path prefix while shell
+        // output intentionally uses the user-facing drive path.
+        let expected = expected
+            .to_string_lossy()
+            .trim_start_matches(r"\\?\")
+            .to_owned();
         assert!(
-            results[0].1.contains(expected.to_string_lossy().as_ref()),
+            results[0].1.contains(&expected),
             "command must execute in the assessed workspace: {:?}",
             results[0]
         );
