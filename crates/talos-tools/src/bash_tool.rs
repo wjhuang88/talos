@@ -366,12 +366,20 @@ impl BashTool {
                         };
                     }
                     Some(BackgroundProcessEvent::SupervisionFailed(error)) => {
+                        stdout.flush(&mut output);
+                        stderr.flush(&mut output);
                         return ToolResult::error(format!("{output}[supervision error: {error}]"));
                     }
-                    None => return ToolResult::error(format!("{output}[supervision closed]")),
+                    None => {
+                        stdout.flush(&mut output);
+                        stderr.flush(&mut output);
+                        return ToolResult::error(format!("{output}[supervision closed]"));
+                    },
                 },
                 _ = &mut deadline => {
                     let _ = launched.control.force_terminate().await;
+                    stdout.flush(&mut output);
+                    stderr.flush(&mut output);
                     output.push_str("[timeout]");
                     return ToolResult::error(output);
                 }
@@ -1534,6 +1542,28 @@ mod tests {
         assert!(
             started.elapsed() < Duration::from_secs(5),
             "absolute deadline waited for descendant-held pipe EOF"
+        );
+    }
+
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn windows_timeout_preserves_unterminated_stdout_and_stderr() {
+        let tool = BashTool::new(test_dir()).with_timeout(Duration::from_secs(3));
+        let result = tokio::time::timeout(Duration::from_secs(10), tool.execute(
+            serde_json::json!({"command": "[Console]::Out.Write('stdout-without-newline'); [Console]::Out.Flush(); [Console]::Error.Write('stderr-without-newline'); [Console]::Error.Flush(); Start-Sleep -Seconds 30"})
+        )).await.expect("command timeout must return");
+        let (_, captured) = result.content.split_once('\n').expect("command header");
+        assert!(result.is_error);
+        assert!(captured.contains("[timeout]"));
+        assert!(
+            captured.contains("stdout-without-newline"),
+            "{}",
+            result.content
+        );
+        assert!(
+            captured.contains("stderr-without-newline"),
+            "{}",
+            result.content
         );
     }
 

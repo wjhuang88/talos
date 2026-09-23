@@ -56,6 +56,15 @@ Deterministic fake tools/provider tests for Allow/Deny/Once/Session, Auto visibi
 
 Approval identity/cancellation races are protected blockers. Keep tool mode unavailable if failed; do not fall back to unconditional allow.
 
+### Accepted cancellation boundary — 2026-09-23
+
+The maintainer accepted ADR-082 for I283: ordinary shell descendants remaining in the
+owned process group must be terminated on cancellation, with leader reaping and an
+explicit cleanup receipt before confirmed stopped/shutdown. Deliberate escape from
+the group is not covered by this lifecycle guarantee; enforced arbitrary-descendant
+containment remains unimplemented under I283/#29. This acceptance does not waive
+independent security/API review or the running-tool cancellation tests.
+
 ## Required Reads
 
 - [Four-week task](../../tasks/2026-09-22-desktop-four-week-delivery.md)

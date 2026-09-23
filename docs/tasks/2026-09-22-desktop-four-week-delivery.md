@@ -240,3 +240,42 @@ planning publication, not I282 implementation activation. Preserve the separate 
 DEPENDENCY-003 research claim and its branch. Shared Board/backlog edits use union semantics;
 recheck target main at merge time. No new per-subtask Issue, code build, release or dependency
 change is part of this submission. Next work remains I282 readiness mapping and effective claim.
+
+## Local Review Correction Checkpoint — 2026-09-23
+
+This checkpoint supersedes earlier next-action descriptions without rewriting the published
+baseline. I282 implementation is merged as `aaa4c015`; its H1/H5 native rows remain outstanding.
+I283 is Active / Claimed through #601 (`538cbfef`), with implementation PR #603. I284 and I285
+remain Planned and cannot start before I283's implementation and technical gates pass.
+
+I283 candidate `cbb156433f9119166150988264a84945cf003726` passed CI, but local review corrections
+are uncommitted and are not covered by that CI. The I283 owner records the actual tool/approval
+and Auto integration tests, manual-fallback preservation, and workspace-cwd correction. Runtime
+API documentation now explains explicit Interactive mode and unchanged Headless defaults.
+Neither a green older candidate nor pending-approval cancellation proves running-tool cleanup.
+
+Next required decision: proposed ADR-082 defines Unix sandbox process ownership and cancellation.
+Maintainer acceptance is still pending; no new sandbox unsafe supervisor is implemented or
+authorized by automatic task continuation. The decision must distinguish ordinary owned-group
+cleanup from enforced containment of descendants deliberately leaving the group. Keep this
+acceptance open in I283/#29; do not silently narrow it or claim whole-tree cleanup.
+
+Resume on the existing branch, preserving all local corrections. After the decision, finish
+running-tool cancellation and its shutdown receipt, converge tests and protected review locally,
+then push one stable correction candidate to #603. No new iteration, release or separate
+subtask Issue is activated. H1-H6 remain unverified human rows; the four-week task is incomplete.
+
+## Cancellation Decision Accepted — 2026-09-23
+
+The maintainer explicitly accepted ADR-082's bounded owned-group cancellation guarantee.
+The decision gate above is resolved. I283 now implements and validates the supervisor,
+cleanup receipt and Runtime/host shutdown integration locally. Deliberate process-group
+escape containment remains unimplemented under I283/#29, not silently completed.
+Independent protected review and the next stable candidate's CI are still required;
+I284/I285 remain unactivated.
+
+The local stable candidate subsequently passed the full pinned preflight on 2026-09-23:
+Sandbox 40/40 plus 2 doctests, Runtime 41/41, Desktop 76/76, talos-skill 81/81,
+governance validators with 0 warnings, full workspace Clippy/tests, and the external
+Runtime SDK fixture. This remains local evidence; exact-head remote validation and fresh
+review are still required before I283 closes.

@@ -171,6 +171,10 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
         }
     });
 
+    let cleanup_receipt = agent
+        .sandbox
+        .as_ref()
+        .and_then(|sandbox| sandbox.cleanup_receipt());
     let mut agent_task = tokio::spawn(async move {
         agent
             .run_prepared_session_turn(
@@ -183,19 +187,28 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
             .await
     });
 
-    let agent_result = tokio::select! {
+    let mut agent_result = tokio::select! {
         result = &mut agent_task => result,
         _ = cancel_token.cancelled() => {
             agent_task.abort();
             // Join before draining snapshots: a concurrently running Agent
             // may still publish its last closed boundary until abort completes.
             let _ = agent_task.await;
+            // Dropping execution only requests supervisor cancellation. The
+            // receipt establishes cleanup before a terminal event is published.
+            let cleanup_error = if let Some(receipt) = &cleanup_receipt {
+                receipt.wait(std::time::Duration::from_secs(5)).await.err()
+            } else {
+                None
+            };
             let _ = forwarder.await;
             let mut stable_prefix = Vec::new();
             while let Ok(snapshot) = snapshot_rx.try_recv() {
                 stable_prefix = snapshot;
             }
-            let mut cancellation_error = None;
+            let mut cancellation_error = cleanup_error.map(|_| {
+                "sandbox command cleanup was not confirmed after cancellation".to_string()
+            });
             if !stable_prefix.is_empty()
                 && let Some(persistence) = &persistence
                 && let Err(error) = persist_turn_messages(
@@ -206,20 +219,28 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                     true,
                 )
             {
-                cancellation_error = Some(error);
+                match &mut cancellation_error {
+                    Some(message) => message.push_str(&format!("; {error}")),
+                    None => cancellation_error = Some(error),
+                }
             }
-            if cancellation_error.is_none()
-                && let Some(durable) = &durable_persistence
+            if let Some(durable) = &durable_persistence
                 && let Err(error) = durable.session.finalize_turn(
                     &turn_id,
                     &stable_prefix,
                     &durable.policy,
-                    TurnTranscriptOutcome::Cancelled,
+                    if cancellation_error.is_some() {
+                        TurnTranscriptOutcome::Error
+                    } else {
+                        TurnTranscriptOutcome::Cancelled
+                    },
                 )
             {
-                cancellation_error = Some(format!(
-                    "failed to atomically persist cancelled turn: {error}"
-                ));
+                let error = format!("failed to atomically persist cancelled turn: {error}");
+                match &mut cancellation_error {
+                    Some(message) => message.push_str(&format!("; {error}")),
+                    None => cancellation_error = Some(error),
+                }
             }
             if cancellation_error.is_none()
                 && durable_persistence.is_none()
@@ -232,7 +253,16 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
             {
                 cancellation_error = Some(error);
             }
-            if let Some(message) = cancellation_error {
+            if let Some(mut message) = cancellation_error {
+                if durable_persistence.is_none()
+                    && let Err(error) = persist_terminal_outcome(
+                    persistence.as_ref(),
+                    durable_persistence.as_ref(),
+                    &turn_id,
+                    TurnTranscriptOutcome::Error,
+                ) {
+                    message.push_str(&format!("; terminal outcome persistence failed: {error}"));
+                }
                 let completion = TurnCompletionStatus::Error { message };
                 let sequence = sequence.fetch_add(1, Ordering::Relaxed);
                 let _ = eq_tx_clone.send(SessionEvent::TurnEvent {
@@ -269,6 +299,25 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
         }
     };
 
+    // Panic/error completion can also drop an in-flight execution future.
+    // Do not announce even a successful turn until its owned cleanup is known.
+    if let Some(receipt) = &cleanup_receipt
+        && receipt
+            .wait(std::time::Duration::from_secs(5))
+            .await
+            .is_err()
+    {
+        let messages = match agent_result {
+            Ok((_, messages)) => messages,
+            Err(_) => Vec::new(),
+        };
+        agent_result = Ok((
+            Err(crate::AgentError::ToolError(
+                "sandbox command cleanup was not confirmed".into(),
+            )),
+            messages,
+        ));
+    }
     let _ = forwarder.await;
     let diagnostic_failure = diagnostic_failures
         .lock()

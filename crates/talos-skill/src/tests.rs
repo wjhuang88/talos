@@ -1257,12 +1257,16 @@ fn test_shared_skills_disabled_when_explicitly_off() {
 
 #[test]
 fn test_shared_skills_enabled_adds_path() {
-    let home = home_dir().expect("home dir required");
-    let shared_path = home.join(".agents").join("skills");
+    let home = tempfile::tempdir().expect("operation should succeed");
+    let shared_path = home.path().join(".agents").join("skills");
     fs::create_dir_all(&shared_path).expect("operation should succeed");
 
     let dir = tempfile::tempdir().expect("operation should succeed");
-    let loader = SkillLoader::for_workspace_with_options(dir.path(), true);
+    let loader = SkillLoader::for_workspace_with_home_and_options(
+        dir.path(),
+        Some(home.path().to_path_buf()),
+        true,
+    );
     assert!(
         loader.search_paths.iter().any(|p| p == &shared_path),
         "~/.agents/skills should be in search paths when enabled"
@@ -1277,8 +1281,12 @@ fn test_shared_skills_enabled_adds_path() {
 
 #[test]
 fn test_dedup_project_shadows_shared() {
-    let home = home_dir().expect("home dir required");
-    let shared_path = home.join(".agents").join("skills").join("dedup-test");
+    let home = tempfile::tempdir().expect("operation should succeed");
+    let shared_path = home
+        .path()
+        .join(".agents")
+        .join("skills")
+        .join("dedup-test");
     let project_skills = tempfile::tempdir().expect("operation should succeed");
     let proj_skills_dir = project_skills.path().join(".talos/skills/dup-skill");
 
@@ -1297,7 +1305,11 @@ fn test_dedup_project_shadows_shared() {
     )
     .expect("operation should succeed");
 
-    let mut loader = SkillLoader::for_workspace_with_options(project_skills.path(), true);
+    let mut loader = SkillLoader::for_workspace_with_home_and_options(
+        project_skills.path(),
+        Some(home.path().to_path_buf()),
+        true,
+    );
     loader.discover().expect("operation should succeed");
 
     let dup_skills: Vec<_> = loader
@@ -1312,8 +1324,6 @@ fn test_dedup_project_shadows_shared() {
     );
     assert_eq!(dup_skills[0].description, "Project version");
     assert_eq!(dup_skills[0].source, SkillSource::Project);
-
-    let _ = fs::remove_dir_all(&shared_path);
 }
 
 #[test]

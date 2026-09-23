@@ -102,11 +102,14 @@ async fn run_minimal_runtime() -> Result<()> {
         .shutdown(ShutdownOptions::interrupt(Duration::from_secs(1))?)
         .await?;
     assert!(report.is_complete());
-    assert_eq!(report.finalizers().len(), 1);
-    assert_eq!(
-        report.finalizers()[0].identifier().as_str(),
-        "background_jobs"
-    );
+    assert_eq!(report.finalizers().len(), 2);
+    let finalizer_ids: Vec<_> = report
+        .finalizers()
+        .iter()
+        .map(|finalizer| finalizer.identifier().as_str())
+        .collect();
+    assert!(finalizer_ids.contains(&"sandbox_commands"));
+    assert!(finalizer_ids.contains(&"background_jobs"));
     assert_eq!(
         classify_runtime_error(&RuntimeError::RuntimeClosing),
         "closing"
