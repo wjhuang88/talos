@@ -84,6 +84,7 @@ async fn exercise_auto(enabled: bool, allow: bool) {
     let mut host = RuntimeHost::start_with(
         move || Ok((configured, 128_000, enabled)),
         workspace.0.clone(),
+        None,
     )
     .expect("host starts");
     host.try_send(RuntimeCommand::Submit(
