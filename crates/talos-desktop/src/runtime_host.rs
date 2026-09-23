@@ -208,6 +208,7 @@ fn legacy_workspace_external_id(workspace_root: &std::path::Path) -> String {
         .collect::<String>()
 }
 
+#[cfg(test)]
 pub(crate) fn task_external_id(workspace_root: &std::path::Path, goal: &str) -> String {
     format!(
         "desktop-task-v1-{}-{}",
@@ -220,6 +221,18 @@ pub(crate) fn task_external_id(workspace_root: &std::path::Path, goal: &str) -> 
     )
 }
 
+/// Create a fresh, opaque identity for one explicitly created task.
+///
+/// The goal is deliberately not part of the identity: two tasks with identical text are still
+/// separate conversations. Existing v1 identities remain readable for explicit resume.
+pub(crate) fn new_task_external_id(workspace_root: &std::path::Path) -> String {
+    format!(
+        "desktop-task-v2-{}-{}",
+        identity_digest(b"talos-desktop-task-workspace-v1", workspace_root, b""),
+        uuid::Uuid::new_v4()
+    )
+}
+
 /// List existing durable task identities owned by one workspace.
 ///
 /// This is read-only: it never creates a binding and never returns identities from another
@@ -229,6 +242,10 @@ pub(crate) fn list_task_external_ids(
 ) -> Result<Vec<String>, String> {
     let root = workspace_root.join(".talos").join("desktop-sessions");
     let current_prefix = format!(
+        "desktop-task-v2-{}-",
+        identity_digest(b"talos-desktop-task-workspace-v1", workspace_root, b"")
+    );
+    let legacy_v1_prefix = format!(
         "desktop-task-v1-{}-",
         identity_digest(b"talos-desktop-task-workspace-v1", workspace_root, b"")
     );
@@ -239,7 +256,11 @@ pub(crate) fn list_task_external_ids(
     talos_session::DurableSession::list_external_ids(&root)
         .map(|ids| {
             ids.into_iter()
-                .filter(|id| id.starts_with(&current_prefix) || id.starts_with(&legacy_prefix))
+                .filter(|id| {
+                    id.starts_with(&current_prefix)
+                        || id.starts_with(&legacy_v1_prefix)
+                        || id.starts_with(&legacy_prefix)
+                })
                 .collect()
         })
         .map_err(|error| error.to_string())
@@ -833,6 +854,14 @@ mod tests {
             task_external_id(std::path::Path::new("/tmp/project/one"), "same goal"),
             task_external_id(std::path::Path::new("/tmp/project/one_"), "same goal")
         );
+        let first = new_task_external_id(std::path::Path::new("/tmp/project/one"));
+        let second = new_task_external_id(std::path::Path::new("/tmp/project/one"));
+        assert_ne!(
+            first, second,
+            "each explicitly created task needs a fresh identity"
+        );
+        assert!(first.starts_with("desktop-task-v2-"));
+        assert!(!first.contains("/tmp/project/one"));
     }
 
     #[cfg(unix)]
@@ -858,17 +887,24 @@ mod tests {
         let root = workspace.0.join(".talos").join("desktop-sessions");
         let other_root = other.0.join(".talos").join("desktop-sessions");
         let own = task_external_id(&workspace.0, "own");
+        let fresh = new_task_external_id(&workspace.0);
+        let fresh_again = new_task_external_id(&workspace.0);
         let legacy = format!(
             "desktop-task-desktop-workspace-{}-legacy-goal",
             legacy_workspace_external_id(&workspace.0)
         );
         let foreign = task_external_id(&other.0, "foreign");
         talos_session::DurableSession::open_or_create(&root, &own).expect("own binding");
+        talos_session::DurableSession::open_or_create(&root, &fresh).expect("fresh binding");
+        talos_session::DurableSession::open_or_create(&root, &fresh_again)
+            .expect("second fresh binding");
         talos_session::DurableSession::open_or_create(&root, &legacy).expect("legacy binding");
         talos_session::DurableSession::open_or_create(&root, &foreign).expect("foreign binding");
+        let mut expected = vec![legacy, own, fresh, fresh_again];
+        expected.sort();
         assert_eq!(
             list_task_external_ids(&workspace.0).expect("list own tasks"),
-            vec![legacy, own]
+            expected
         );
         assert!(
             list_task_external_ids(&other.0)

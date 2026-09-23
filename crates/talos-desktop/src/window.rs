@@ -22,6 +22,8 @@ enum LiveStatus {
     Streaming,
     Cancelling,
     Closing,
+    SwitchingTask,
+    FinishCurrentTaskFirst,
     Finished,
     Cancelled,
     Stopped,
@@ -41,6 +43,11 @@ impl LiveStatus {
             Self::Streaming => ("Streaming", "正在输出"),
             Self::Cancelling => ("Cancelling", "正在取消"),
             Self::Closing => ("Stopping before closing", "正在停止，完成后关闭"),
+            Self::SwitchingTask => ("Stopping current task", "正在停止当前任务"),
+            Self::FinishCurrentTaskFirst => (
+                "Finish or cancel the current task before switching",
+                "请先完成或取消当前任务，再切换任务",
+            ),
             Self::Finished => ("Finished", "已完成"),
             Self::Cancelled => ("Cancelled", "已取消"),
             Self::Stopped => ("Stopped", "已停止"),
@@ -78,15 +85,66 @@ struct LiveTask {
     session_external_id: Option<String>,
     resume_existing: bool,
     pending_approval: Option<(u64, String, String, String)>,
+    host_generation: Option<uuid::Uuid>,
+    after_host_stop: Option<AfterHostStop>,
+}
+
+#[derive(Clone)]
+enum AfterHostStop {
+    NewTask,
+    Resume {
+        external_id: String,
+        workspace: String,
+    },
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum HostSwitchRequest {
+    Immediate,
+    WaitingForStop,
+    CurrentTaskActive,
+    HostUnavailable,
 }
 
 impl LiveTask {
+    fn is_current_host(&self, generation: uuid::Uuid) -> bool {
+        self.host_generation == Some(generation)
+    }
+
+    fn request_switch(&mut self, action: AfterHostStop) -> HostSwitchRequest {
+        if self.running || self.pending_approval.is_some() || self.closing {
+            return HostSwitchRequest::CurrentTaskActive;
+        }
+        let Some(commands) = &self.commands else {
+            return HostSwitchRequest::Immediate;
+        };
+        if commands
+            .try_send(crate::runtime_host::RuntimeCommand::Shutdown)
+            .is_err()
+        {
+            return HostSwitchRequest::HostUnavailable;
+        }
+        self.closing = true;
+        self.after_host_stop = Some(action);
+        self.status = LiveStatus::SwitchingTask;
+        HostSwitchRequest::WaitingForStop
+    }
+
+    fn stopped(&mut self) -> (Option<AfterHostStop>, bool) {
+        self.status = LiveStatus::Stopped;
+        self.running = false;
+        let switch_action = self.after_host_stop.take();
+        let should_quit = self.closing && switch_action.is_none();
+        (switch_action, should_quit)
+    }
+
     // The window stays alive until a successful Runtime shutdown result arrives.
     fn request_close(&mut self) -> bool {
         let Some(commands) = &self.commands else {
             return true;
         };
         if self.closing {
+            self.after_host_stop = None;
             return false;
         }
         match commands.try_send(crate::runtime_host::RuntimeCommand::Shutdown) {
@@ -500,18 +558,13 @@ impl DesktopWindow {
                 let Some(workspace) = self.durable_task_workspace.clone() else {
                     return;
                 };
-                self.workspace_input
-                    .update(cx, |input, cx| input.set_text(&workspace, cx));
-                self.goal_input
-                    .update(cx, |input, cx| input.set_text("", cx));
-                self.live = Some(LiveTask {
-                    session_external_id: Some(external_id),
-                    resume_existing: true,
-                    workspace: Some(workspace.clone()),
-                    ..LiveTask::default()
-                });
-                self.state.page = Page::NewTask;
-                self.start_live_host(workspace, cx);
+                self.request_task_switch(
+                    AfterHostStop::Resume {
+                        external_id,
+                        workspace,
+                    },
+                    cx,
+                );
             }
             Command::Settings => {
                 self.state.page = Page::Presets;
@@ -595,7 +648,7 @@ impl DesktopWindow {
                     capabilities: self.state.draft_capabilities,
                 });
             }
-            Command::NewTask => self.state.begin_task(),
+            Command::NewTask => self.request_task_switch(AfterHostStop::NewTask, cx),
             Command::SelectPreset(preset) => {
                 self.state.select_preset(preset, false);
                 self.preset_open = false;
@@ -634,6 +687,59 @@ impl DesktopWindow {
             window.focus(&focus, cx);
         }
         cx.notify();
+    }
+
+    fn request_task_switch(&mut self, action: AfterHostStop, cx: &mut Context<Self>) {
+        let request = self
+            .live
+            .as_mut()
+            .map_or(HostSwitchRequest::Immediate, |live| {
+                live.request_switch(action.clone())
+            });
+        match request {
+            HostSwitchRequest::Immediate => self.complete_task_switch(action, cx),
+            HostSwitchRequest::WaitingForStop => self.state.page = Page::NewTask,
+            HostSwitchRequest::CurrentTaskActive => {
+                self.state.page = Page::NewTask;
+                if let Some(live) = &mut self.live {
+                    live.status = LiveStatus::FinishCurrentTaskFirst;
+                }
+            }
+            HostSwitchRequest::HostUnavailable => {
+                self.state.page = Page::NewTask;
+                if let Some(live) = &mut self.live {
+                    live.status = LiveStatus::HostBusy;
+                }
+            }
+        }
+    }
+
+    fn complete_task_switch(&mut self, action: AfterHostStop, cx: &mut Context<Self>) {
+        match action {
+            AfterHostStop::NewTask => {
+                self.live = Some(LiveTask::default());
+                self.state.begin_task();
+                self.goal_input
+                    .update(cx, |input, cx| input.set_text("", cx));
+            }
+            AfterHostStop::Resume {
+                external_id,
+                workspace,
+            } => {
+                self.workspace_input
+                    .update(cx, |input, cx| input.set_text(&workspace, cx));
+                self.goal_input
+                    .update(cx, |input, cx| input.set_text("", cx));
+                self.live = Some(LiveTask {
+                    session_external_id: Some(external_id),
+                    resume_existing: true,
+                    workspace: Some(workspace.clone()),
+                    ..LiveTask::default()
+                });
+                self.state.page = Page::NewTask;
+                self.start_live_host(workspace, cx);
+            }
+        }
     }
 
     fn select_language(&mut self, locale: Locale, window: &mut Window, cx: &mut Context<Self>) {
@@ -1190,6 +1296,16 @@ impl Render for DesktopWindow {
                                 {
                                     let label = if external_id.starts_with("desktop-task-v1-") {
                                         external_id.clone()
+                                    } else if external_id.starts_with("desktop-task-v2-") {
+                                        let suffix = external_id
+                                            .rsplit('-')
+                                            .next()
+                                            .unwrap_or_default();
+                                        if locale == Locale::Chinese {
+                                            format!("已保存任务 {suffix}")
+                                        } else {
+                                            format!("Saved task {suffix}")
+                                        }
                                     } else if locale == Locale::Chinese {
                                         "旧版已保存会话".to_owned()
                                     } else {
@@ -1818,11 +1934,9 @@ impl DesktopWindow {
             return;
         }
         let session_id = live.session_external_id.clone().unwrap_or_else(|| {
-            crate::runtime_host::task_external_id(
-                std::path::Path::new(&workspace),
-                self.goal_input.read(cx).text(),
-            )
+            crate::runtime_host::new_task_external_id(std::path::Path::new(&workspace))
         });
+        live.session_external_id = Some(session_id.clone());
         let host_result = if live.resume_existing {
             RuntimeHost::configured_for_existing_session(workspace.clone(), session_id)
         } else {
@@ -1837,6 +1951,8 @@ impl DesktopWindow {
         };
         live.commands = Some(host.command_sender());
         live.workspace = Some(workspace);
+        let host_generation = uuid::Uuid::new_v4();
+        live.host_generation = Some(host_generation);
         if let Some(exit) = host.take_exit() {
             self.host_exits.borrow_mut().push(exit);
         }
@@ -1844,7 +1960,15 @@ impl DesktopWindow {
             while let Some(event) = host.recv().await {
                 if this
                     .update(cx, |this, cx| {
-                        if let Some(live) = &mut this.live {
+                        let (switch_action, should_quit) = {
+                            let Some(live) = &mut this.live else {
+                                return;
+                            };
+                            if !live.is_current_host(host_generation) {
+                                return;
+                            }
+                            let mut switch_action = None;
+                            let mut should_quit = false;
                             match event {
                                 RuntimeOutput::ToolStarted { call_id, name } => {
                                     live.status = LiveStatus::Streaming;
@@ -1929,13 +2053,15 @@ impl DesktopWindow {
                                     live.closing = false;
                                 }
                                 RuntimeOutput::Stopped => {
-                                    live.status = LiveStatus::Stopped;
-                                    live.running = false;
-                                    if live.closing {
-                                        cx.quit();
-                                    }
+                                    (switch_action, should_quit) = live.stopped();
                                 }
                             }
+                            (switch_action, should_quit)
+                        };
+                        if let Some(action) = switch_action {
+                            this.complete_task_switch(action, cx);
+                        } else if should_quit {
+                            cx.quit();
                         }
                         cx.notify();
                     })
@@ -1945,7 +2071,9 @@ impl DesktopWindow {
                 }
             }
             let _ = this.update(cx, |this, cx| {
-                if let Some(live) = &mut this.live {
+                if let Some(live) = &mut this.live
+                    && live.is_current_host(host_generation)
+                {
                     live.commands = None;
                     live.running = false;
                 }
@@ -2905,6 +3033,94 @@ mod tests {
         assert!(live.closing);
         assert!(matches!(receiver.try_recv(), Ok(RuntimeCommand::Shutdown)));
         assert!(!live.request_close());
+        assert!(receiver.try_recv().is_err());
+    }
+
+    #[test]
+    fn task_switch_waits_for_idle_host_shutdown() {
+        use crate::runtime_host::RuntimeCommand;
+        let generation = uuid::Uuid::new_v4();
+        let (commands, mut receiver) = tokio::sync::mpsc::channel(1);
+        let mut live = super::LiveTask {
+            commands: Some(commands),
+            session_external_id: Some("old-session".into()),
+            host_generation: Some(generation),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            live.request_switch(super::AfterHostStop::NewTask),
+            super::HostSwitchRequest::WaitingForStop
+        );
+        assert!(live.closing);
+        assert!(matches!(
+            live.after_host_stop.as_ref(),
+            Some(super::AfterHostStop::NewTask)
+        ));
+        assert!(matches!(receiver.try_recv(), Ok(RuntimeCommand::Shutdown)));
+        assert_eq!(live.session_external_id.as_deref(), Some("old-session"));
+        assert_eq!(live.status, super::LiveStatus::SwitchingTask);
+
+        let (action, should_quit) = live.stopped();
+        assert!(matches!(action, Some(super::AfterHostStop::NewTask)));
+        assert!(!should_quit);
+        assert!(!live.running);
+        assert_eq!(live.status, super::LiveStatus::Stopped);
+    }
+
+    #[test]
+    fn stale_host_observer_generation_is_rejected() {
+        let current_generation = uuid::Uuid::new_v4();
+        let stale_generation = uuid::Uuid::new_v4();
+        let live = super::LiveTask {
+            host_generation: Some(current_generation),
+            ..Default::default()
+        };
+
+        assert!(live.is_current_host(current_generation));
+        assert!(!live.is_current_host(stale_generation));
+    }
+
+    #[test]
+    fn closing_during_task_switch_supersedes_the_pending_switch() {
+        use crate::runtime_host::RuntimeCommand;
+        let (commands, mut receiver) = tokio::sync::mpsc::channel(1);
+        let mut live = super::LiveTask {
+            commands: Some(commands),
+            ..Default::default()
+        };
+        assert_eq!(
+            live.request_switch(super::AfterHostStop::NewTask),
+            super::HostSwitchRequest::WaitingForStop
+        );
+        assert!(!live.request_close());
+        assert!(live.after_host_stop.is_none());
+        assert!(matches!(receiver.try_recv(), Ok(RuntimeCommand::Shutdown)));
+        let (action, should_quit) = live.stopped();
+        assert!(action.is_none());
+        assert!(should_quit);
+    }
+
+    #[test]
+    fn task_switch_is_rejected_during_execution_or_pending_approval() {
+        let (commands, mut receiver) = tokio::sync::mpsc::channel(1);
+        let mut running = super::LiveTask {
+            commands: Some(commands),
+            running: true,
+            ..Default::default()
+        };
+        assert_eq!(
+            running.request_switch(super::AfterHostStop::NewTask),
+            super::HostSwitchRequest::CurrentTaskActive
+        );
+        assert!(receiver.try_recv().is_err());
+
+        running.running = false;
+        running.pending_approval = Some((1, "write_file".into(), String::new(), String::new()));
+        assert_eq!(
+            running.request_switch(super::AfterHostStop::NewTask),
+            super::HostSwitchRequest::CurrentTaskActive
+        );
         assert!(receiver.try_recv().is_err());
     }
 
