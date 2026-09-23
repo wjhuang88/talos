@@ -52,6 +52,10 @@ fn output_bytes(output: &RuntimeOutput) -> usize {
     match output {
         RuntimeOutput::Text(text) | RuntimeOutput::Error(text) => text.len(),
         RuntimeOutput::ToolStarted { call_id, name } => call_id.len() + name.len(),
+        RuntimeOutput::ToolEvidence {
+            call_id,
+            provenance,
+        } => call_id.len() + provenance.len(),
         RuntimeOutput::ToolResult {
             call_id, content, ..
         } => call_id.len() + content.len(),
@@ -95,6 +99,8 @@ pub(crate) enum RuntimeCommand {
 pub(crate) enum RuntimeOutput {
     /// A tool call was requested; this does not imply successful execution.
     ToolStarted { call_id: String, name: String },
+    /// Read-only provenance for a tool call; absence is represented explicitly.
+    ToolEvidence { call_id: String, provenance: String },
     /// A tool result projected from the Runtime.
     ToolResult {
         call_id: String,
@@ -576,10 +582,10 @@ async fn run_host(
                 let Some(event) = event else {
                     return stop_host(handle).await;
                 };
-                if let Some(output) = project_event(event)
-                    && pending.push(output).is_err()
-                {
-                    return overflow_host(handle).await;
+                for output in project_event(event) {
+                    if pending.push(output).is_err() {
+                        return overflow_host(handle).await;
+                    }
                 }
             }
         }
@@ -604,26 +610,37 @@ async fn overflow_host(handle: RuntimeHandle) -> RuntimeOutput {
     ))
 }
 
-fn project_event(event: SessionEvent) -> Option<RuntimeOutput> {
+fn project_event(event: SessionEvent) -> Vec<RuntimeOutput> {
     match event {
-        SessionEvent::SubmissionStarted { turn_id, .. } => Some(RuntimeOutput::Started { turn_id }),
+        SessionEvent::SubmissionStarted { turn_id, .. } => {
+            vec![RuntimeOutput::Started { turn_id }]
+        }
         SessionEvent::TurnEvent { payload, .. } => match payload {
             talos_runtime::TurnEventPayload::Progress {
-                event: AgentEvent::ToolCall { call, .. },
-            } => Some(RuntimeOutput::ToolStarted {
-                call_id: call.id,
-                name: call.name,
-            }),
+                event:
+                    AgentEvent::ToolCall {
+                        call, provenance, ..
+                    },
+            } => vec![
+                RuntimeOutput::ToolStarted {
+                    call_id: call.id.clone(),
+                    name: call.name,
+                },
+                RuntimeOutput::ToolEvidence {
+                    call_id: call.id,
+                    provenance: format_tool_provenance(&provenance),
+                },
+            ],
             talos_runtime::TurnEventPayload::Progress {
                 event: AgentEvent::ToolResult { result },
-            } => Some(RuntimeOutput::ToolResult {
+            } => vec![RuntimeOutput::ToolResult {
                 call_id: result.tool_use_id,
                 content: result.content,
                 is_error: result.is_error,
-            }),
+            }],
             talos_runtime::TurnEventPayload::Progress {
                 event: AgentEvent::TextDelta { delta },
-            } => Some(RuntimeOutput::Text(delta)),
+            } => vec![RuntimeOutput::Text(delta)],
             talos_runtime::TurnEventPayload::Completed { status } => {
                 let status = match status {
                     talos_runtime::TurnCompletionStatus::Success { .. } => TerminalStatus::Success,
@@ -632,12 +649,26 @@ fn project_event(event: SessionEvent) -> Option<RuntimeOutput> {
                         TerminalStatus::Error(message)
                     }
                 };
-                Some(RuntimeOutput::Completed { status })
+                vec![RuntimeOutput::Completed { status }]
             }
-            _ => None,
+            _ => Vec::new(),
         },
-        SessionEvent::Error { message } => Some(RuntimeOutput::Error(message)),
-        _ => None,
+        SessionEvent::Error { message } => vec![RuntimeOutput::Error(message)],
+        _ => Vec::new(),
+    }
+}
+
+fn format_tool_provenance(provenance: &talos_runtime::ToolProvenance) -> String {
+    match provenance {
+        talos_runtime::ToolProvenance::Native => "native".into(),
+        talos_runtime::ToolProvenance::McpRemote { server } => {
+            format!("mcp:{server}")
+        }
+        talos_runtime::ToolProvenance::Plugin {
+            name,
+            version,
+            carrier,
+        } => format!("plugin:{name}@{version} ({carrier})"),
     }
 }
 
@@ -1135,7 +1166,10 @@ mod tests {
         let result = tokio::time::timeout(std::time::Duration::from_secs(1), async {
             loop {
                 let event = handle.next_event().await.expect("terminal event");
-                if let Some(RuntimeOutput::Completed { status }) = project_event(event) {
+                if let Some(RuntimeOutput::Completed { status }) = project_event(event)
+                    .into_iter()
+                    .find(|output| matches!(output, RuntimeOutput::Completed { .. }))
+                {
                     return status;
                 }
             }

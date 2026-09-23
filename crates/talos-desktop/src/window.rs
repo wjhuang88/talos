@@ -1719,6 +1719,14 @@ impl DesktopWindow {
                                         live.status = LiveStatus::Streaming;
                                         live.output.push_str(&format!("\n→ {name} [{call_id}]\n"));
                                     }
+                                    RuntimeOutput::ToolEvidence {
+                                        call_id,
+                                        provenance,
+                                    } => {
+                                        live.output.push_str(&format!(
+                                            "[evidence {call_id}: provenance={provenance}]\n"
+                                        ));
+                                    }
                                     RuntimeOutput::ToolResult {
                                         call_id,
                                         content,
