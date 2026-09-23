@@ -1963,9 +1963,14 @@ impl DesktopWindow {
                     )),
             )
             .child(div().child(if locale == Locale::Chinese {
-                "工具遵循 Runtime 权限门禁；对话暂不持久化。"
+                "工具遵循 Runtime 权限门禁；成功回合持久化到当前任务会话。"
             } else {
-                "Tools use the Runtime permission gate; conversation is not yet persisted."
+                "Tools use the Runtime permission gate; successful turns persist to this task session."
+            }))
+            .child(div().text_sm().text_color(rgb(0x68758c)).child(if locale == Locale::Chinese {
+                "评估状态：不可用（当前未连接共享评估存储）；不会据此判定可交付。"
+            } else {
+                "Evaluation: unavailable (shared evaluation storage is not connected); Delivery is not inferred."
             }))
             .child(div().child(live.status.label(locale).to_owned()))
             .when_some(live.pending_approval.as_ref(), |view, approval| {
