@@ -299,11 +299,12 @@ I283 then merged as `93c8b357`.
 ## I284 Local Convergence Checkpoint — 2026-09-23
 
 I284 local commits `08df087e`, `beed4624`, `ad4a8665`, `1f466182`, `9f549cd6`, `5396f5c4`,
-`1ccdc79c`, `9020d000`, `cf91273c`, and `aaee340a` provide workspace+goal durable identities,
+`1ccdc79c`, `9020d000`, `cf91273c`, `aaee340a`, and `163a0ab2` provide workspace+goal durable identities,
 successful-turn persistence, no-replay cancellation coverage, workspace-scoped Recent tasks
 discovery, explicit Resume, tool provenance and attributable source display, plus an honest
 evaluation `unavailable` state. The full Desktop mock suite is 80/80 and the affected locked
-check passes.
+check passes. Restart resume renders restored transcript entries explicitly and emits no tool
+execution events for the restored entries.
 
 The remaining I284 implementation work is a read-only artifact/change viewer tied to actual task
 evidence and a shared evaluation projection when available; arbitrary workspace dirt remains

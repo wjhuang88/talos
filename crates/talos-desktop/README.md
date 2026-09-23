@@ -52,7 +52,8 @@ Small windows scroll the task page to reach Send, Cancel and output.
   Recent tasks page lists existing identities for the selected workspace and offers an explicit
   Resume action. Artifact paths are shown only when the tool request carries an attributable
   path; the UI still does not provide a full artifact diff viewer or persisted evaluation/Delivery
-  status. Fixture presets do not configure live execution.
+  status. Resumed transcript entries are marked as restored history and never re-run tools.
+  Fixture presets do not configure live execution.
 - Cancel requests a Runtime interrupt. Tests cover a pending provider connection,
   an open paused stream, and provider-backed history compaction; the latter cancels
   the committed turn without waiting for the compactor provider.
