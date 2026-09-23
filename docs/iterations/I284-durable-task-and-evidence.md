@@ -126,10 +126,15 @@ Local verification on the unpushed candidate passed `cargo check -p talos-deskto
 and `cargo test -p talos-desktop --features desktop-ui --locked` (83/83). Formatting, diff checks,
 and both governance validators passed; each validator reported 0 warnings. The PR's old exact head
 `8e8ebf6` failed the same Desktop Clippy gate on a nested condition in the previous Resume path;
-the local candidate replaces that path, and the exact CI command now passes locally. Full
-The full `./scripts/release_preflight.sh` passed on this local candidate, including workspace
-check, Clippy, tests, doc-tests and both Runtime SDK fixtures. Fresh exact-head CI and independent
-review are still pending. Do not reuse CI/review for old head `8e8ebf6` as evidence for the
+the local candidate replaces that path, and the exact CI command now passes locally. The full
+`./scripts/release_preflight.sh` passed on this local candidate, including workspace
+check, Clippy, tests, doc-tests and both Runtime SDK fixtures. Stable candidate commit `889c1cf2`
+was pushed to the existing PR #607. Exact-head CI run `35856041872` passed the main
+Format/Check/Clippy/Test job, Linux Desktop explicit-feature job, change classifier, remote Issue
+reconciliation and Windows installer fixture. The Windows Rust workspace job completed its tests
+and smoke steps but remains `in_progress` during `Swatinem/rust-cache` post-job cleanup; it has no
+failure conclusion yet and is not counted as a completed green job. Independent review for the
+new exact head is still pending. Do not reuse CI/review for old head `8e8ebf6` as evidence for the
 corrected candidate.
 
 I284 remains Active / Claimed, not Complete. The live UI has no shared durable Work/Evaluation

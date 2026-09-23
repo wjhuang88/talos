@@ -327,8 +327,12 @@ Desktop Clippy command with `-D warnings`, `cargo fmt --all -- --check`, and `gi
 passed. Both governance validators passed with 0 warnings. The remote old head failed Clippy on
 the previous Resume path; the local candidate replaces that path and passes the same command.
 Full `./scripts/release_preflight.sh` passed on the local candidate, including workspace checks,
-tests, doc-tests and Runtime SDK fixtures. Refreshed exact-head CI and independent review are
-pending. Shared durable Work/Evaluation data and trustworthy actual changed-artifact evidence
-remain unavailable; T3 cannot be marked Complete on the current implementation. H4/H6
-natural-person acceptance is still open in #29. Keep I285 Planned until T3's technical gate and its
-own effective child claim are resolved.
+tests, doc-tests and Runtime SDK fixtures. Candidate `889c1cf22257254fe51316432f44e433ba0d4803`
+is PR #607's exact head against base `4e150b3e1bc6910b3a02d75b249573ecff8191e7`. CI run
+`35856041872` passed the main Format/Check/Clippy/Test job, Linux Desktop explicit-feature job,
+change classifier, remote Issue reconciliation and Windows installer fixture. Windows workspace
+tests and smoke steps completed, but the job remains in cache post-cleanup and is not terminal.
+Independent review is pending. Shared durable Work/Evaluation data and trustworthy actual
+changed-artifact evidence remain unavailable; T3 cannot be marked Complete. H4/H6 natural-person
+acceptance is still open in #29. Keep I285 Planned until T3's technical gate and its own effective
+child claim are resolved.

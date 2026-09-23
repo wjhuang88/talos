@@ -94,7 +94,12 @@ warnings`), and `cargo test -p talos-desktop --features desktop-ui --locked` (83
 Formatting, diff checks, and both governance validators passed with 0 warnings. PR #607's old head
 `8e8ebf6` failed that Clippy gate on the prior Resume path; the local candidate replaces that path.
 These local results do not validate the old remote head. Full `./scripts/release_preflight.sh`
-passed on the local candidate; fresh exact-head CI and review remain pending.
+passed locally. Candidate `889c1cf22257254fe51316432f44e433ba0d4803` is PR #607's exact head
+against base `4e150b3e1bc6910b3a02d75b249573ecff8191e7`. CI `35856041872` passed the main
+Format/Check/Clippy/Test job, Linux Desktop explicit-feature job, classifier, remote Issue
+reconciliation and Windows installer fixture. The Windows Rust workspace job has passed its test
+and smoke steps but has not reached a terminal job state while cache cleanup runs; do not count it
+as green until GitHub reports a conclusion. Independent review of this exact head is pending.
 
 I284 remains incomplete: no shared durable Work/Evaluation projection is available to the Desktop
 host, and Runtime events do not yet carry actual changed-artifact evidence sufficient for a real
