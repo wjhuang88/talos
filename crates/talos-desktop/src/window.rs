@@ -1694,7 +1694,10 @@ impl DesktopWindow {
             return;
         }
         if live.commands.is_none() {
-            let mut host = match RuntimeHost::configured(workspace.clone()) {
+            let session_id =
+                crate::runtime_host::task_external_id(std::path::Path::new(&workspace), &prompt);
+            let mut host = match RuntimeHost::configured_for_session(workspace.clone(), session_id)
+            {
                 Ok(host) => host,
                 Err(error) => {
                     live.status = LiveStatus::Error(error);

@@ -162,6 +162,25 @@ fn workspace_external_id(workspace_root: &std::path::Path) -> String {
     )
 }
 
+pub(crate) fn task_external_id(workspace_root: &std::path::Path, goal: &str) -> String {
+    let goal = goal
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() || character == '-' || character == '_' {
+                character
+            } else {
+                '_'
+            }
+        })
+        .take(80)
+        .collect::<String>();
+    format!(
+        "desktop-task-{}-{}",
+        workspace_external_id(workspace_root),
+        goal
+    )
+}
+
 struct ApprovalLifetime<'a> {
     handler: &'a DesktopApprovalHandler,
     request_id: u64,
@@ -352,11 +371,20 @@ impl RuntimeHost {
         Self::start_with(move || Ok((provider, 128_000, false)), workspace_root, None)
     }
 
-    /// Load configuration and construct networking resources on the host thread.
-    pub(crate) fn configured(workspace_root: impl Into<PathBuf>) -> Result<Self, String> {
-        let workspace_root = workspace_root.into();
+    /// Load configuration and bind the host to a caller-selected durable session identity.
+    pub(crate) fn configured_for_session(
+        workspace_root: impl Into<PathBuf>,
+        external_id: impl Into<String>,
+    ) -> Result<Self, String> {
+        Self::configured_with_identity(workspace_root.into(), Some(external_id.into()))
+    }
+
+    fn configured_with_identity(
+        workspace_root: PathBuf,
+        external_id: Option<String>,
+    ) -> Result<Self, String> {
         let session_root = workspace_root.join(".talos").join("desktop-sessions");
-        let external_id = workspace_external_id(&workspace_root);
+        let external_id = external_id.unwrap_or_else(|| workspace_external_id(&workspace_root));
         Self::start_with(
             || {
                 let config = talos_config::Config::load().map_err(|error| error.to_string())?;
@@ -633,6 +661,9 @@ mod tests {
         assert!(!first.contains('/'));
         assert!(!first.contains('\\'));
         assert!(!first.contains(".."));
+        let task = task_external_id(std::path::Path::new("/tmp/project/one"), "Review /tmp");
+        assert!(task.starts_with("desktop-task-"));
+        assert!(!task.contains('/'));
     }
 
     #[tokio::test(flavor = "current_thread")]
