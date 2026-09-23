@@ -187,6 +187,24 @@ pub(crate) fn task_external_id(workspace_root: &std::path::Path, goal: &str) -> 
     )
 }
 
+/// List existing durable task identities owned by one workspace.
+///
+/// This is read-only: it never creates a binding and never returns identities from another
+/// workspace. The returned values are opaque keys suitable for an explicit resume action.
+pub(crate) fn list_task_external_ids(
+    workspace_root: &std::path::Path,
+) -> Result<Vec<String>, String> {
+    let root = workspace_root.join(".talos").join("desktop-sessions");
+    let prefix = format!("desktop-task-{}-", workspace_external_id(workspace_root));
+    talos_session::DurableSession::list_external_ids(&root)
+        .map(|ids| {
+            ids.into_iter()
+                .filter(|id| id.starts_with(&prefix))
+                .collect()
+        })
+        .map_err(|error| error.to_string())
+}
+
 struct ApprovalLifetime<'a> {
     handler: &'a DesktopApprovalHandler,
     request_id: u64,
@@ -695,6 +713,28 @@ mod tests {
         let task = task_external_id(std::path::Path::new("/tmp/project/one"), "Review /tmp");
         assert!(task.starts_with("desktop-task-"));
         assert!(!task.contains('/'));
+    }
+
+    #[test]
+    fn task_identity_listing_is_workspace_scoped_and_read_only() {
+        let workspace = TestWorkspace::new();
+        let other = TestWorkspace::new();
+        let root = workspace.0.join(".talos").join("desktop-sessions");
+        let other_root = other.0.join(".talos").join("desktop-sessions");
+        let own = task_external_id(&workspace.0, "own");
+        let foreign = task_external_id(&other.0, "foreign");
+        talos_session::DurableSession::open_or_create(&root, &own).expect("own binding");
+        talos_session::DurableSession::open_or_create(&root, &foreign).expect("foreign binding");
+        assert_eq!(
+            list_task_external_ids(&workspace.0).expect("list own tasks"),
+            vec![own]
+        );
+        assert!(
+            list_task_external_ids(&other.0)
+                .expect("missing other binding remains empty")
+                .is_empty()
+        );
+        assert!(!other_root.join("durable-bindings.sqlite").exists());
     }
 
     #[tokio::test(flavor = "current_thread")]
