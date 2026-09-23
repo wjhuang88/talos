@@ -1788,6 +1788,13 @@ impl DesktopWindow {
                                         live.status = LiveStatus::Streaming;
                                         live.output.push_str(&format!("\n→ {name} [{call_id}]\n"));
                                     }
+                                    RuntimeOutput::HistoryRestored { entries } => {
+                                        live.output.push_str("[restored durable history]\n");
+                                        for entry in entries {
+                                            live.output.push_str(&entry);
+                                            live.output.push('\n');
+                                        }
+                                    }
                                     RuntimeOutput::ToolEvidence {
                                         call_id,
                                         provenance,

@@ -57,6 +57,7 @@ fn output_bytes(output: &RuntimeOutput) -> usize {
             provenance,
             source,
         } => call_id.len() + provenance.len() + source.as_deref().unwrap_or_default().len(),
+        RuntimeOutput::HistoryRestored { entries } => entries.iter().map(String::len).sum(),
         RuntimeOutput::ToolResult {
             call_id, content, ..
         } => call_id.len() + content.len(),
@@ -106,6 +107,8 @@ pub(crate) enum RuntimeOutput {
         provenance: String,
         source: Option<String>,
     },
+    /// Read-only history restored at host startup; does not represent a new turn or tool run.
+    HistoryRestored { entries: Vec<String> },
     /// A tool result projected from the Runtime.
     ToolResult {
         call_id: String,
@@ -468,6 +471,31 @@ impl RuntimeHost {
                             Ok(session) => session,
                             Err(error) => return RuntimeOutput::Error(error),
                         };
+                        if let Some(session) = &durable_session {
+                            match session.transcript(None, 200) {
+                                Ok(entries) if !entries.is_empty() => {
+                                    let restored = entries
+                                        .into_iter()
+                                        .map(|entry| format!("{}: {}", entry.role, entry.content))
+                                        .collect::<Vec<_>>();
+                                    if outputs
+                                        .send(RuntimeOutput::HistoryRestored { entries: restored })
+                                        .await
+                                        .is_err()
+                                    {
+                                        return RuntimeOutput::Error(
+                                            "Desktop history surface closed during restore".into(),
+                                        );
+                                    }
+                                }
+                                Ok(_) => {}
+                                Err(error) => {
+                                    return RuntimeOutput::Error(format!(
+                                        "durable transcript restore failed: {error}"
+                                    ));
+                                }
+                            }
+                        }
                         let builder = RuntimeBuilder::new()
                             .provider(provider)
                             .model_context_limit(context_limit)
@@ -811,6 +839,32 @@ mod tests {
             .expect("session index reads"),
             vec!["desktop-test-session"]
         );
+
+        let provider = Arc::new(MockProvider::new().with_response("second host"));
+        let mut reopened = RuntimeHost::start_with(
+            move || Ok((provider, 128_000, false)),
+            workspace.0.clone(),
+            Some((storage, external_id)),
+        )
+        .expect("reopened host starts");
+        match tokio::time::timeout(std::time::Duration::from_secs(2), reopened.recv())
+            .await
+            .expect("history restore event")
+            .expect("history restore output")
+        {
+            RuntimeOutput::HistoryRestored { entries } => {
+                assert!(
+                    entries
+                        .iter()
+                        .any(|entry| entry.contains("persist this turn"))
+                );
+            }
+            other => panic!("expected restored history, got {other:?}"),
+        }
+        reopened
+            .try_send(RuntimeCommand::Shutdown)
+            .expect("shutdown reopened");
+        assert_eq!(reopened.recv().await, Some(RuntimeOutput::Stopped));
     }
 
     pub(super) struct TestWorkspace(pub(super) PathBuf);
