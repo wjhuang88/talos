@@ -96,7 +96,7 @@ remain owned residuals and prevent claims of universal accessibility/platform ac
 | ID | Window / iteration | Expected output | Depends on | Completion gate | Fallback | Status |
 |---|---|---|---|---|---|---|
 | T1 | Week 1, Sep 22-28 / I282 | Launch a live Desktop task using configured provider; responsive streaming, errors and cancellation; tools unavailable in this initial slice | WORK-001 P0-P4, I280, ADR-059; API map and effective claim | Mock-provider E2E plus real-provider native row; no UI blocking or fictitious results | Keep existing mock explicitly separate; unresolved facade contract becomes a named blocker, never a copied engine | In Progress — claim/activation PR #598 |
-| T2 | Week 2, Sep 29-Oct 5 / I283 | Real file/shell activity, visible existing Auto review, scoped approval and safe cancellation | T1 merged and technical gates passed | Allow/Deny/Once/Session, stale approval, cancel and shutdown matrix; independent security/API review | Tool execution remains disabled until gates pass; do not ship an auto-allow workaround | In Progress — activation #601 merged |
+| T2 | Week 2, Sep 29-Oct 5 / I283 | Real file/shell activity, visible existing Auto review, scoped approval and safe cancellation | T1 merged and technical gates passed | Allow/Deny/Once/Session, stale approval, cancel and shutdown matrix; independent security/API review | Tool execution remains disabled until gates pass; do not ship an auto-allow workaround | Complete — PR #603 merged as `93c8b357`; H2/H3 human residual |
 | T3 | Week 3, Oct 6-12 / I284 | Recent tasks, durable transcript resume, actual work/evaluation and read-only change/evidence views | T2 merged; storage/projection compatibility verified | Restart and session-isolation tests; revision/staleness/Delivery gates; no tool replay | Preserve transcript-only recovery if richer projection cannot persist; explicitly show unavailable evidence and keep unmet acceptance open | Planned |
 | T4 | Week 4, Oct 13-19 / I285 | Reproducible integrated candidate, fixes, user guide and consolidated acceptance report | T1-T3 merged with technical gates passed | Integrated E2E, current-head CI/review, required native rows, documented residuals and clean handoff | Deliver Partial with exact remaining blockers; no fake Complete or unrequested release | Planned |
 
@@ -184,6 +184,13 @@ Real-provider acceptance uses the maintainer's configured provider only with its
 authorization; automated regression suites use fixtures, not paid requests.
 No dependency is added speculatively; check then-current upstream versions and compatibility if needed.
 
+## T2 Completion Evidence — 2026-09-23
+
+T2 / I283 / DESKTOP-001-D5 technical delivery is evidenced by implementation merge commit
+`93c8b357` (PR #603). Exact-head CI run `35825870138` passed for head `9163bf82`, and the
+independent Agent-role security/API review was bound to that head. H2/H3 remain human acceptance
+residuals in Issue #29; T3 and T4 remain Planned and this four-week planning task is not complete.
+
 ### Time, Cost And Resource Limits
 
 Target four weeks; WIP=1. Reuse build caches, avoid parallel full workspace builds and extra
@@ -208,7 +215,7 @@ and keep optional features out. #29 and owning child retain Desktop gaps; #308 o
 #502 owns dependency research; MODEL-007 and #590 retain their existing owners.
 No unrelated cleanup, automatic dependency upgrade, new per-subtask Issue or release.
 
-## Execution Checkpoint — 2026-09-23
+## Execution Checkpoint — 2026-09-23 (historical checkpoint, superseded)
 
 Completed task items: none; I282 implementation is locally converging.
 Current state: I282/D4 implementation is merged to `main` as `aaa4c015` through #599. I282/D4
@@ -241,12 +248,12 @@ DEPENDENCY-003 research claim and its branch. Shared Board/backlog edits use uni
 recheck target main at merge time. No new per-subtask Issue, code build, release or dependency
 change is part of this submission. Next work remains I282 readiness mapping and effective claim.
 
-## Local Review Correction Checkpoint — 2026-09-23
+## Local Review Correction Checkpoint — 2026-09-23 (historical checkpoint, superseded)
 
 This checkpoint supersedes earlier next-action descriptions without rewriting the published
 baseline. I282 implementation is merged as `aaa4c015`; its H1/H5 native rows remain outstanding.
-I283 is Active / Claimed through #601 (`538cbfef`), with implementation PR #603. I284 and I285
-remain Planned and cannot start before I283's implementation and technical gates pass.
+I283 is complete after implementation PR #603 merged as `93c8b357`; H2/H3 remain explicit human
+acceptance residuals in #29. I284 and I285 remain Planned and are not activated by this closeout.
 
 I283 candidate `cbb156433f9119166150988264a84945cf003726` passed CI, but local review corrections
 are uncommitted and are not covered by that CI. The I283 owner records the actual tool/approval
@@ -265,17 +272,26 @@ running-tool cancellation and its shutdown receipt, converge tests and protected
 then push one stable correction candidate to #603. No new iteration, release or separate
 subtask Issue is activated. H1-H6 remain unverified human rows; the four-week task is incomplete.
 
-## Cancellation Decision Accepted — 2026-09-23
+## Cancellation Decision Accepted — 2026-09-23 (historical checkpoint, superseded)
 
 The maintainer explicitly accepted ADR-082's bounded owned-group cancellation guarantee.
 The decision gate above is resolved. I283 now implements and validates the supervisor,
 cleanup receipt and Runtime/host shutdown integration locally. Deliberate process-group
 escape containment remains unimplemented under I283/#29, not silently completed.
-Independent protected review and the next stable candidate's CI are still required;
-I284/I285 remain unactivated.
+Independent protected review and exact-head CI subsequently passed for `9163bf82`; PR #603 merged
+to `main` as `93c8b357`. H2/H3 remain unverified human rows; I284/I285 remain unactivated.
+
+## I283 Technical Closeout — 2026-09-23
+
+Implementation PR #603 merged to `main` as `93c8b357` after CAS. Exact-head CI run
+`35825870138` passed all six jobs for head `9163bf823579c7111a0a0e3214fdb46e30345d43`.
+Independent Agent-role security/API review conditionally approved the same head and disclosed
+shared-workspace identity limits. I283/DESKTOP-001-D5 are technically complete; H2/H3 remain
+the only known human acceptance residuals. I284 and I285 stay Planned/Unclaimed.
 
 The local stable candidate subsequently passed the full pinned preflight on 2026-09-23:
 Sandbox 40/40 plus 2 doctests, Runtime 41/41, Desktop 76/76, talos-skill 81/81,
 governance validators with 0 warnings, full workspace Clippy/tests, and the external
-Runtime SDK fixture. This remains local evidence; exact-head remote validation and fresh
-review are still required before I283 closes.
+Runtime SDK fixture. The formerly pending exact-head remote validation and fresh review were
+subsequently completed by CI run `35825870138` and the independent review bound to `9163bf82`;
+I283 then merged as `93c8b357`.
