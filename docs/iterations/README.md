@@ -19,7 +19,7 @@ I164 stays Paused; I162's recorded review outcome is terminal. MODEL-007 is defe
 | Iteration | Target | State / activation gate |
 |---|---|---|
 | [I282](I282-live-runtime-host.md) | Sep 22-28: real model task and host lifecycle | Review; implementation merged, H1/H5 in #29 |
-| [I283](I283-live-tools-and-approval.md) | Sep 29-Oct 5: tools and scoped approvals | Active / Claimed; activation #601 merged |
+| [I283](I283-live-tools-and-approval.md) | Sep 29-Oct 5: tools and scoped approvals | Complete; merged `93c8b357`; H2/H3 human acceptance residual |
 | [I284](I284-durable-task-and-evidence.md) | Oct 6-12: resume and evidence | Planned; I283 merged technical stage and persistence/projection map |
 | [I285](I285-desktop-integrated-acceptance.md) | Oct 13-19: integrated candidate and acceptance | Planned; predecessors merged, #29 ledger and effective claim |
 

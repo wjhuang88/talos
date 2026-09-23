@@ -245,8 +245,8 @@ change is part of this submission. Next work remains I282 readiness mapping and 
 
 This checkpoint supersedes earlier next-action descriptions without rewriting the published
 baseline. I282 implementation is merged as `aaa4c015`; its H1/H5 native rows remain outstanding.
-I283 is Active / Claimed through #601 (`538cbfef`), with implementation PR #603. I284 and I285
-remain Planned and cannot start before I283's implementation and technical gates pass.
+I283 is complete after implementation PR #603 merged as `93c8b357`; H2/H3 remain explicit human
+acceptance residuals in #29. I284 and I285 remain Planned and are not activated by this closeout.
 
 I283 candidate `cbb156433f9119166150988264a84945cf003726` passed CI, but local review corrections
 are uncommitted and are not covered by that CI. The I283 owner records the actual tool/approval
@@ -271,8 +271,16 @@ The maintainer explicitly accepted ADR-082's bounded owned-group cancellation gu
 The decision gate above is resolved. I283 now implements and validates the supervisor,
 cleanup receipt and Runtime/host shutdown integration locally. Deliberate process-group
 escape containment remains unimplemented under I283/#29, not silently completed.
-Independent protected review and the next stable candidate's CI are still required;
-I284/I285 remain unactivated.
+Independent protected review and exact-head CI subsequently passed for `9163bf82`; PR #603 merged
+to `main` as `93c8b357`. H2/H3 remain unverified human rows; I284/I285 remain unactivated.
+
+## I283 Technical Closeout — 2026-09-23
+
+Implementation PR #603 merged to `main` as `93c8b357` after CAS. Exact-head CI run
+`35825870138` passed all six jobs for head `9163bf823579c7111a0a0e3214fdb46e30345d43`.
+Independent Agent-role security/API review conditionally approved the same head and disclosed
+shared-workspace identity limits. I283/DESKTOP-001-D5 are technically complete; H2/H3 remain
+the only known human acceptance residuals. I284 and I285 stay Planned/Unclaimed.
 
 The local stable candidate subsequently passed the full pinned preflight on 2026-09-23:
 Sandbox 40/40 plus 2 doctests, Runtime 41/41, Desktop 76/76, talos-skill 81/81,

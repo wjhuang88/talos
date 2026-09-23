@@ -1,6 +1,6 @@
 # DESKTOP-001-D5: Desktop Tools Approval And Cancellation
 
-> Document status: Active — Claimed
+> Document status: Complete — implementation merged; H2/H3 human acceptance remains open
 
 | Field | Value |
 |---|---|
@@ -8,7 +8,7 @@
 | Parent Epic | DESKTOP-001 |
 | Type | Desktop integration / behavior Story |
 | Priority | P1 |
-| Status | Active / Claimed — local convergence |
+| Status | Complete — implementation merged; H2/H3 acceptance residual |
 | Selected Iteration | I283 |
 | Source | #29; four-week Desktop task |
 | Depends On | I282 implementation merged and technical gates passed; deferred human rows tracked; current permission/Auto contracts |
@@ -26,7 +26,7 @@
 | Governance Claim PR | #601 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Activation #601 merged as `538cbfef`; I282 implementation merged as `aaa4c015`; exact-head CI and protected review required for implementation |
-| Implementation PR | Not started; local convergence begins from `main@538cbfef` |
+| Implementation PR | #603 merged as `93c8b357` |
 | Last Updated | 2026-09-22 |
 | Handoff / Release Condition | Keep I283 as the sole tools/approval authority; no release or new permission authority |
 
@@ -83,5 +83,7 @@ New permission policy, shell safety heuristics, sandbox fallback changes, CLI/TU
 
 ## Completion Evidence
 
-Completion Commit: pending.
-No implementation or acceptance evidence exists for this planned child.
+Completion Commit: `93c8b357` (PR #603 implementation merge)
+Exact-head CI: run `35825870138` bound to `9163bf823579c7111a0a0e3214fdb46e30345d43`, all jobs successful.
+Independent review: conditional APPROVE bound to the same head; Agent-role identity disclosed.
+Human acceptance residual: H2/H3 remain open in Issue #29 and are not claimed complete here.

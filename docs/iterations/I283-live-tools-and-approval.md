@@ -1,6 +1,6 @@
 # Iteration I283: Desktop Tools Approval And Cancellation
 
-> Document status: Active — Claimed
+> Document status: Complete — implementation merged; H2/H3 human acceptance remains open
 > Plan date: 2026-09-22
 > Target window: 2026-09-29 to 2026-10-05
 > Planned objective: A Desktop user can execute real file/shell work, understand Auto decisions, allow or deny exact requests, and cancel safely.
@@ -20,8 +20,8 @@
 | Governance Claim PR | #601 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Activation #601 merged as `538cbfef`; I282 implementation merged as `aaa4c015`; exact-head CI and protected review required for implementation |
-| Implementation PR | #603; local review corrections in progress, not merge-ready |
-| Last Updated | 2026-09-22 |
+| Implementation PR | #603; merged as `93c8b357` |
+| Last Updated | 2026-09-23 |
 | Handoff / Release Condition | Keep I283 as the sole tools/approval authority; no release or new permission authority |
 
 ## Published Baseline
@@ -104,8 +104,18 @@ Planning checks are recorded centrally in the four-week task.
 
 ## Completion Evidence
 
-Completion Commit: pending.
+Completion Commit: `93c8b357` (PR #603 implementation merge)
+Exact-head CI: run `35825870138` for `9163bf823579c7111a0a0e3214fdb46e30345d43`, all jobs successful.
+Independent review: conditional APPROVE bound to the same head; shared-workspace Agent-role identity disclosed.
+Human acceptance residual: H2/H3 remain open in Issue #29; this does not block the technical completion evidence.
 Only already-existing implementation/evidence commits may close this iteration.
+
+## Merge Closeout — 2026-09-23
+
+PR #603 merged to `main` as `93c8b357` after merge-time CAS. The implementation provides
+owned Unix process-group cancellation with cleanup receipts, Desktop approval/Auto visibility,
+and Runtime/Agent shutdown integration. I284/I285 remain Planned and are not activated by this
+closeout. H2/H3 require later natural-person validation and remain explicitly residual.
 
 ## Variance And Residuals
 
