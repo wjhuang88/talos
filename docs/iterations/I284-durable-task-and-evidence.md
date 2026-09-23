@@ -1,6 +1,6 @@
 # Iteration I284: Desktop Durable Tasks And Evidence
 
-> Document status: Planned
+> Document status: Active — Claimed
 > Plan date: 2026-09-22
 > Target window: 2026-10-06 to 2026-10-12
 > Planned objective: A Desktop user can reopen a saved conversation and inspect real work status, changes and revision-bound evaluation evidence.
@@ -11,17 +11,17 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | DESKTOP-001-D6 / I284: Desktop Durable Tasks And Evidence; planned scope only |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-6 |
+| Work Slice | DESKTOP-001-D6 / I284: Desktop Durable Tasks And Evidence |
+| Claimed At | 2026-09-23 |
 | Source Issue | #29 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Maintainer requested four-week Desktop planning on 2026-09-22; no implementation activation yet |
-| Implementation PR | Not started |
-| Last Updated | 2026-09-22 |
+| Governance Claim PR | #606 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | I283/D5 implementation and governance closeout merged as `81a5d27c`; I284 is the next serial child |
+| Implementation PR | Not started; ineffective until activation #606 reaches `main` |
+| Last Updated | 2026-09-23 |
 | Handoff / Release Condition | Resolve readiness and establish effective serial child claim before implementation; no release |
 
 ## Published Baseline
@@ -78,7 +78,8 @@ safety. Roll back only the failing slice; no destructive cleanup of user session
 
 ## Actual Activation And Execution
 
-2026-09-22: planning only. Claim, implementation PR and remote evidence not yet established.
+2026-09-23: I284 activation is being established after I283 technical and governance closeout;
+implementation remains ineffective until the activation record reaches `main`.
 
 ## Verification Evidence
 
