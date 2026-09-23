@@ -9429,6 +9429,7 @@ dependencies = [
  "talos-provider",
  "talos-runtime",
  "talos-sandbox",
+ "talos-session",
  "tokio",
  "unicode-segmentation",
 ]

@@ -78,13 +78,18 @@ safety. Roll back only the failing slice; no destructive cleanup of user session
 
 ## Actual Activation And Execution
 
-2026-09-23: I284 activation is being established after I283 technical and governance closeout;
-implementation remains ineffective until the activation record reaches `main`.
+2026-09-23: activation PR #606 merged to `main` as `4e150b3e` after I283 technical and governance
+closeout. The first local implementation slice binds configured Desktop RuntimeHost instances to
+workspace-scoped durable Sessions through the shared `talos-session` facade. Successful turns are
+persisted and readable after shutdown; no automatic tool replay or Desktop-owned database was added.
 
 ## Verification Evidence
 
-Implementation checks: not run; no implementation exists for this child.
-Planning checks are recorded centrally in the four-week task.
+Implementation checks: `cargo test -p talos-session --locked` (189 unit/integration tests plus
+6+1+15+1+2+2+2 integration tests) passed; Desktop mock suite 78/78 passed with `--locked`.
+The durable host integration test verifies a successful turn is persisted and reopened through the
+workspace-scoped binding. Recent-session switching, evidence projection and evaluation staleness
+remain unfinished in this iteration.
 
 ## Completion Evidence
 
@@ -93,4 +98,6 @@ Only already-existing implementation/evidence commits may close this iteration.
 
 ## Variance And Residuals
 
-None yet. Carry eligible human rows to #29 / I285 without transferring protected security gates.
+The current UI has no recent-session picker and does not yet expose artifact/evaluation evidence;
+these are the next I284 slices. H4/H6 remain human acceptance rows in #29. Carry eligible human
+rows without transferring protected security gates.

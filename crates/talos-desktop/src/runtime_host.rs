@@ -145,6 +145,23 @@ struct DesktopApprovalHandler {
 
 static NEXT_APPROVAL_ID: AtomicU64 = AtomicU64::new(1);
 
+fn workspace_external_id(workspace_root: &std::path::Path) -> String {
+    format!(
+        "desktop-workspace-{}",
+        workspace_root
+            .to_string_lossy()
+            .chars()
+            .map(|character| {
+                if character.is_ascii_alphanumeric() || character == '-' || character == '_' {
+                    character
+                } else {
+                    '_'
+                }
+            })
+            .collect::<String>()
+    )
+}
+
 struct ApprovalLifetime<'a> {
     handler: &'a DesktopApprovalHandler,
     request_id: u64,
@@ -332,11 +349,14 @@ impl RuntimeHost {
         provider: Arc<dyn LanguageModel>,
         workspace_root: impl Into<PathBuf>,
     ) -> Result<Self, String> {
-        Self::start_with(move || Ok((provider, 128_000, false)), workspace_root)
+        Self::start_with(move || Ok((provider, 128_000, false)), workspace_root, None)
     }
 
     /// Load configuration and construct networking resources on the host thread.
     pub(crate) fn configured(workspace_root: impl Into<PathBuf>) -> Result<Self, String> {
+        let workspace_root = workspace_root.into();
+        let session_root = workspace_root.join(".talos").join("desktop-sessions");
+        let external_id = workspace_external_id(&workspace_root);
         Self::start_with(
             || {
                 let config = talos_config::Config::load().map_err(|error| error.to_string())?;
@@ -348,12 +368,14 @@ impl RuntimeHost {
                 ))
             },
             workspace_root,
+            Some((session_root, external_id)),
         )
     }
 
     fn start_with(
         provider: impl FnOnce() -> Result<(Arc<dyn LanguageModel>, u32, bool), String> + Send + 'static,
         workspace_root: impl Into<PathBuf>,
+        durable_identity: Option<(PathBuf, String)>,
     ) -> Result<Self, String> {
         let workspace_root = workspace_root.into();
         let (commands, command_rx) = mpsc::channel(COMMAND_CAPACITY);
@@ -378,7 +400,18 @@ impl RuntimeHost {
                         let approval =
                             Arc::new(DesktopApprovalHandler::new(outputs.clone(), approval_root));
                         let report_output = approval.clone();
-                        match RuntimeBuilder::new()
+                        let durable_session = durable_identity
+                            .as_ref()
+                            .map(|(root, external_id)| {
+                                talos_session::DurableSession::open_or_create(root, external_id)
+                                    .map_err(|error| error.to_string())
+                            })
+                            .transpose();
+                        let durable_session = match durable_session {
+                            Ok(session) => session,
+                            Err(error) => return RuntimeOutput::Error(error),
+                        };
+                        let builder = RuntimeBuilder::new()
                             .provider(provider)
                             .model_context_limit(context_limit)
                             .workspace_root(workspace_root)
@@ -394,9 +427,12 @@ impl RuntimeHost {
                                     reason: report.reason,
                                     evaluator: report.evaluator,
                                 });
-                            }))
-                            .build()
-                        {
+                            }));
+                        let builder = match durable_session {
+                            Some(session) => builder.durable_session(session),
+                            None => builder,
+                        };
+                        match builder.build() {
                             Ok(handle) => {
                                 run_host(command_rx, outputs, handle, Some(approval)).await
                             }
@@ -587,6 +623,63 @@ mod cancellation_tests;
 mod tests {
     use super::*;
     use talos_provider::mock::MockProvider;
+
+    #[test]
+    fn workspace_identity_is_stable_and_safe_for_durable_bindings() {
+        let first = workspace_external_id(std::path::Path::new("/tmp/project/one"));
+        let second = workspace_external_id(std::path::Path::new("/tmp/project/one"));
+        assert_eq!(first, second);
+        assert!(first.starts_with("desktop-workspace-"));
+        assert!(!first.contains('/'));
+        assert!(!first.contains('\\'));
+        assert!(!first.contains(".."));
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn configured_host_persists_transcript_to_workspace_session() {
+        let workspace = TestWorkspace::new();
+        let storage = workspace.0.join(".talos").join("desktop-sessions");
+        let external_id = "desktop-test-session".to_owned();
+        let provider = Arc::new(MockProvider::new().with_response("durable response"));
+        let configured = provider.clone();
+        let mut host = RuntimeHost::start_with(
+            move || Ok((configured, 128_000, false)),
+            workspace.0.clone(),
+            Some((storage.clone(), external_id.clone())),
+        )
+        .expect("host starts");
+        host.try_send(RuntimeCommand::Submit("persist this turn".into()))
+            .expect("submit");
+        tokio::time::timeout(std::time::Duration::from_secs(10), async {
+            loop {
+                match host.recv().await.expect("host event") {
+                    RuntimeOutput::Completed { .. } => break,
+                    RuntimeOutput::Error(error) => panic!("host error: {error}"),
+                    _ => {}
+                }
+            }
+        })
+        .await
+        .expect("turn completes");
+        host.try_send(RuntimeCommand::Shutdown).expect("shutdown");
+        tokio::time::timeout(std::time::Duration::from_secs(10), async {
+            while !matches!(host.recv().await, Some(RuntimeOutput::Stopped) | None) {}
+        })
+        .await
+        .expect("host stops");
+
+        let session = talos_session::DurableSession::open_or_create(
+            &workspace.0.join(".talos").join("desktop-sessions"),
+            "desktop-test-session",
+        )
+        .expect("session opens");
+        let transcript = session.transcript(None, 50).expect("transcript reads");
+        assert!(
+            transcript
+                .iter()
+                .any(|entry| entry.content == "persist this turn")
+        );
+    }
 
     pub(super) struct TestWorkspace(pub(super) PathBuf);
 

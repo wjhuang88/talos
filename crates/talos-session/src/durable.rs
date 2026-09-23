@@ -97,6 +97,19 @@ pub struct DurableSession {
 }
 
 impl DurableSession {
+    /// Opens or creates a durable session for a host-owned external identity.
+    pub fn open_or_create(root: &std::path::Path, external_id: &str) -> Result<Self, SessionError> {
+        create_or_open(root, external_id)
+    }
+
+    /// Opens an existing durable session without creating a new binding.
+    pub fn open_existing(
+        root: &std::path::Path,
+        external_id: &str,
+    ) -> Result<Option<Self>, SessionError> {
+        get_by_external_id(root, external_id)
+    }
+
     pub(crate) fn new(
         external_id: String,
         session: Session,

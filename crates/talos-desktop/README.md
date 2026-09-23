@@ -44,8 +44,11 @@ Small windows scroll the task page to reach Send, Cancel and output.
 - A pending approval offers Allow once, Allow session and Deny for the displayed
   request. Replies are bound to its request ID; stale or repeated replies cannot
   authorize a later request. Cancelling or closing the approval surface fails closed.
-- Conversations are not persisted in this stage; restart/resume belongs to I284.
-  Fixture presets do not configure live execution.
+- Configured live mode binds the conversation to a workspace-scoped durable Session under
+  `.talos/desktop-sessions`; successful turns are persisted through the shared Runtime contract
+  and can be read after a host restart. Pending, failed or cancelled turns are not replayed.
+  The current UI still exposes one active host and does not yet provide recent-session switching;
+  that I284 follow-up remains in progress. Fixture presets do not configure live execution.
 - Cancel requests a Runtime interrupt. Tests cover a pending provider connection,
   an open paused stream, and provider-backed history compaction; the latter cancels
   the committed turn without waiting for the compactor provider.
