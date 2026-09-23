@@ -47,8 +47,11 @@ Small windows scroll the task page to reach Send, Cancel and output.
 - Configured live mode binds the conversation to a workspace-scoped durable Session under
   `.talos/desktop-sessions`; successful turns are persisted through the shared Runtime contract
   and can be read after a host restart. Pending, failed or cancelled turns are not replayed.
-  The current UI still exposes one active host and does not yet provide recent-session switching;
-  that I284 follow-up remains in progress. Fixture presets do not configure live execution.
+  Tool activity also exposes read-only provenance evidence (`native`, MCP server, or plugin) with
+  the exact call ID; missing provenance is rendered as unavailable rather than inferred. The
+  current UI still exposes one active host and does not yet provide recent-session switching,
+  artifact diff inspection, or evaluation/Delivery status; those I284 follow-ups remain in
+  progress. Fixture presets do not configure live execution.
 - Cancel requests a Runtime interrupt. Tests cover a pending provider connection,
   an open paused stream, and provider-backed history compaction; the latter cancels
   the committed turn without waiting for the compactor provider.
