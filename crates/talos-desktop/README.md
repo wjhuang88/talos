@@ -49,9 +49,10 @@ Small windows scroll the task page to reach Send, Cancel and output.
   and can be read after a host restart. Pending, failed or cancelled turns are not replayed.
   Tool activity also exposes read-only provenance evidence (`native`, MCP server, or plugin) with
   the exact call ID; missing provenance is rendered as unavailable rather than inferred. The
-  current UI still exposes one active host and does not yet provide recent-session switching,
-  artifact diff inspection, or evaluation/Delivery status; those I284 follow-ups remain in
-  progress. Fixture presets do not configure live execution.
+  Recent tasks page lists existing identities for the selected workspace and offers an explicit
+  Resume action. Artifact paths are shown only when the tool request carries an attributable
+  path; the UI still does not provide a full artifact diff viewer or persisted evaluation/Delivery
+  status. Fixture presets do not configure live execution.
 - Cancel requests a Runtime interrupt. Tests cover a pending provider connection,
   an open paused stream, and provider-backed history compaction; the latter cancels
   the committed turn without waiting for the compactor provider.

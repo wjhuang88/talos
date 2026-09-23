@@ -90,11 +90,11 @@ focused check exposed it as unused.
 ## Verification Evidence
 
 Implementation checks: `cargo test -p talos-session --locked` (189 unit/integration tests plus
-6+1+15+1+2+2+2 integration tests) passed; the Desktop runtime-host focused suite passed 26/26,
-and `cargo check -p talos-desktop --locked` passed. The durable host integration test verifies a
-successful turn is persisted and reopened through the workspace-scoped binding; the provenance
-projection is covered by the tool-event projection test. Recent-session switching, artifact
-evidence, and evaluation staleness remain unfinished in this iteration.
+6+1+15+1+2+2+2 integration tests) passed; the full Desktop mock suite passed 80/80 with
+`--locked`, and `cargo check -p talos-desktop --locked` passed. The durable host integration test
+verifies a successful turn is persisted and reopened through the workspace-scoped binding; task
+discovery, source attribution and explicit unavailable evaluation display are covered. A full
+artifact diff viewer and persisted evaluation staleness remain unfinished in this iteration.
 
 ## Completion Evidence
 
@@ -103,7 +103,7 @@ Only already-existing implementation/evidence commits may close this iteration.
 
 ## Variance And Residuals
 
-The current UI has no recent-session picker and does not yet expose artifact diff or evaluation
-evidence; these are the next I284 slices. Tool provenance is available, but it is not a substitute
-for file/artifact attribution. H4/H6 remain human acceptance rows in #29. Carry eligible human
-rows without transferring protected security gates.
+The current UI now has workspace-scoped recent-session discovery and explicit resume, and it
+exposes tool provenance/path attribution. It still has no full artifact diff viewer or persisted
+evaluation state; these remain the next I284 slices. H4/H6 remain human acceptance rows in #29.
+Carry eligible human rows without transferring protected security gates.
