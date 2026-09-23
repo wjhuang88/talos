@@ -1,9 +1,9 @@
 # Desktop Four-Week Delivery Task
 
-> Document status: Planned
+> Document status: In Progress — T3 / I284 active
 > Plan date: 2026-09-22
 > Target window: 2026-09-22 through 2026-10-19 (four calendar weeks; approximately 20 working days)
-> Execution state: planning only; no new implementation claim is effective.
+> Execution state: T1/T2 merged; T3/I284 implementation PR #607 is under local correction; T4/I285 remains Planned.
 
 ## Outcome
 
@@ -97,7 +97,7 @@ remain owned residuals and prevent claims of universal accessibility/platform ac
 |---|---|---|---|---|---|---|
 | T1 | Week 1, Sep 22-28 / I282 | Launch a live Desktop task using configured provider; responsive streaming, errors and cancellation; tools unavailable in this initial slice | WORK-001 P0-P4, I280, ADR-059; API map and effective claim | Mock-provider E2E plus real-provider native row; no UI blocking or fictitious results | Keep existing mock explicitly separate; unresolved facade contract becomes a named blocker, never a copied engine | In Progress — claim/activation PR #598 |
 | T2 | Week 2, Sep 29-Oct 5 / I283 | Real file/shell activity, visible existing Auto review, scoped approval and safe cancellation | T1 merged and technical gates passed | Allow/Deny/Once/Session, stale approval, cancel and shutdown matrix; independent security/API review | Tool execution remains disabled until gates pass; do not ship an auto-allow workaround | Complete — PR #603 merged as `93c8b357`; H2/H3 human residual |
-| T3 | Week 3, Oct 6-12 / I284 | Recent tasks, durable transcript resume, actual work/evaluation and read-only change/evidence views | T2 merged; storage/projection compatibility verified | Restart and session-isolation tests; revision/staleness/Delivery gates; no tool replay | Preserve transcript-only recovery if richer projection cannot persist; explicitly show unavailable evidence and keep unmet acceptance open | In Progress — local implementation on `feat/i284-durable-task-evidence`; stable candidate not pushed |
+| T3 | Week 3, Oct 6-12 / I284 | Recent tasks, durable transcript resume, actual work/evaluation and read-only change/evidence views | T2 merged; storage/projection compatibility verified | Restart and session-isolation tests; revision/staleness/Delivery gates; no tool replay | Preserve transcript-only recovery if richer projection cannot persist; explicitly show unavailable evidence and keep unmet acceptance open | In Progress — PR #607 remote head `8e8ebf6`; substantive local review corrections not yet pushed; full evidence acceptance remains open |
 | T4 | Week 4, Oct 13-19 / I285 | Reproducible integrated candidate, fixes, user guide and consolidated acceptance report | T1-T3 merged with technical gates passed | Integrated E2E, current-head CI/review, required native rows, documented residuals and clean handoff | Deliver Partial with exact remaining blockers; no fake Complete or unrequested release | Planned |
 
 Reserve roughly three days in Week 4 for fixes/retesting and two for acceptance/documentation.
@@ -311,3 +311,24 @@ evidence and a shared evaluation projection when available; arbitrary workspace 
 unavailable. H4/H6 natural-person acceptance rows remain open. No implementation PR has been
 pushed; continue local convergence before the one stable candidate, then run preflight, both
 governance validators, exact-head CI and protected review.
+
+## I284 Review Correction Checkpoint — 2026-09-23
+
+The preceding checkpoint predates PR #607 and is superseded for current execution state. PR #607
+is open from head `8e8ebf6dde23af4286badd1b66d1dfcf41d62c24` against base
+`4e150b3e1bc6910b3a02d75b249573ecff8191e7`. Independent review found an identity collision/privacy
+defect and a requested-path label that overstated actual artifact evidence. The local candidate
+addresses both, makes Resume existing-only (including on retry), verifies interrupted-write
+recovery does not replay a tool, retains/redacts legacy durable task identities, and moves Recent
+Tasks storage reads to GPUI background execution. The candidate is still uncommitted and unpushed.
+
+Local checks: Desktop mock/UI tests 83/83, `cargo check -p talos-desktop --locked`, the exact CI
+Desktop Clippy command with `-D warnings`, `cargo fmt --all -- --check`, and `git diff --check`
+passed. Both governance validators passed with 0 warnings. The remote old head failed Clippy on
+the previous Resume path; the local candidate replaces that path and passes the same command.
+Full `./scripts/release_preflight.sh` passed on the local candidate, including workspace checks,
+tests, doc-tests and Runtime SDK fixtures. Refreshed exact-head CI and independent review are
+pending. Shared durable Work/Evaluation data and trustworthy actual changed-artifact evidence
+remain unavailable; T3 cannot be marked Complete on the current implementation. H4/H6
+natural-person acceptance is still open in #29. Keep I285 Planned until T3's technical gate and its
+own effective child claim are resolved.

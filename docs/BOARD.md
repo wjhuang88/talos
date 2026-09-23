@@ -19,8 +19,9 @@ Complete/Closed. Implementations #588/#591 merged as `a1cb869b`/`bfdf8b67`;
 exact-head code CI, independent review and composed UI/test/execution-boundary acceptance passed.
 Next selected plan: [four-week Desktop cycle](tasks/2026-09-22-desktop-four-week-delivery.md),
 I282 is Review after implementation merge with H1/H5 deferred in #29; I283 is Complete after
-implementation merge `93c8b357`, with H2/H3 deferred in #29; I284 is claimed pending activation and I285 remains Planned / Unclaimed. MODEL-007 is deferred behind
-Desktop. Locale follow-up #590 remains Refinement/Unclaimed.
+implementation merge `93c8b357`, with H2/H3 deferred in #29; I284 is Active / Claimed after #606
+merged, and PR #607 is under local correction; I285 remains Planned / Unclaimed. MODEL-007 is
+deferred behind Desktop. Locale follow-up #590 remains Refinement/Unclaimed.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
@@ -97,7 +98,7 @@ I277's deferred acceptance stays recorded; it does not reactivate mock developme
 |---|---|---|---|
 | Week 1: real Desktop task | Review / implementation merged; H1/H5 deferred | [I282](iterations/I282-live-runtime-host.md) | #29 native rows before Complete |
 | Week 2: tools and approval | Complete; H2/H3 residual | [I283](iterations/I283-live-tools-and-approval.md) | PR #603 merged `93c8b357`; exact-head CI and review passed |
-| Week 3: resume and evidence | Active / Claimed; activation pending | [I284](iterations/I284-durable-task-and-evidence.md) | I283 closeout `81a5d27c`; activation record must reach main before implementation |
+| Week 3: resume and evidence | Active / Claimed; PR #607 under local correction | [I284](iterations/I284-durable-task-and-evidence.md) | #606 activation `4e150b3e`; refresh exact-head CI/review after local convergence |
 | Week 4: integrated acceptance | Planned / Unclaimed | [I285](iterations/I285-desktop-integrated-acceptance.md) | Integrated candidate, required #29 rows and evidence closure |
 
 | Item | State | Owner Doc | Gate |

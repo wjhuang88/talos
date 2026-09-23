@@ -52,11 +52,11 @@ fn output_bytes(output: &RuntimeOutput) -> usize {
     match output {
         RuntimeOutput::Text(text) | RuntimeOutput::Error(text) => text.len(),
         RuntimeOutput::ToolStarted { call_id, name } => call_id.len() + name.len(),
-        RuntimeOutput::ToolEvidence {
+        RuntimeOutput::ToolRequestContext {
             call_id,
             provenance,
-            source,
-        } => call_id.len() + provenance.len() + source.as_deref().unwrap_or_default().len(),
+            requested_path,
+        } => call_id.len() + provenance.len() + requested_path.as_deref().unwrap_or_default().len(),
         RuntimeOutput::HistoryRestored { entries } => entries.iter().map(String::len).sum(),
         RuntimeOutput::ToolResult {
             call_id, content, ..
@@ -101,11 +101,11 @@ pub(crate) enum RuntimeCommand {
 pub(crate) enum RuntimeOutput {
     /// A tool call was requested; this does not imply successful execution.
     ToolStarted { call_id: String, name: String },
-    /// Read-only provenance for a tool call; absence is represented explicitly.
-    ToolEvidence {
+    /// Metadata from the tool request; requested paths are not proof of a completed change.
+    ToolRequestContext {
         call_id: String,
         provenance: String,
-        source: Option<String>,
+        requested_path: Option<String>,
     },
     /// Read-only history restored at host startup; does not represent a new turn or tool run.
     HistoryRestored { entries: Vec<String> },
@@ -159,25 +159,44 @@ struct DesktopApprovalHandler {
 
 static NEXT_APPROVAL_ID: AtomicU64 = AtomicU64::new(1);
 
+#[derive(Clone, Copy)]
+enum DurableOpenMode {
+    Create,
+    Existing,
+}
+
+struct DurableBinding {
+    root: PathBuf,
+    external_id: String,
+    mode: DurableOpenMode,
+}
+
+fn identity_digest(domain: &[u8], workspace_root: &std::path::Path, value: &[u8]) -> String {
+    use sha2::Digest;
+
+    let mut digest = sha2::Sha256::new();
+    digest.update(domain);
+    digest.update([0]);
+    digest.update(workspace_root.as_os_str().as_encoded_bytes());
+    digest.update([0]);
+    digest.update(value);
+    digest
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
 fn workspace_external_id(workspace_root: &std::path::Path) -> String {
     format!(
-        "desktop-workspace-{}",
-        workspace_root
-            .to_string_lossy()
-            .chars()
-            .map(|character| {
-                if character.is_ascii_alphanumeric() || character == '-' || character == '_' {
-                    character
-                } else {
-                    '_'
-                }
-            })
-            .collect::<String>()
+        "desktop-workspace-v1-{}",
+        identity_digest(b"talos-desktop-workspace-v1", workspace_root, b"")
     )
 }
 
-pub(crate) fn task_external_id(workspace_root: &std::path::Path, goal: &str) -> String {
-    let goal = goal
+fn legacy_workspace_external_id(workspace_root: &std::path::Path) -> String {
+    workspace_root
+        .to_string_lossy()
         .chars()
         .map(|character| {
             if character.is_ascii_alphanumeric() || character == '-' || character == '_' {
@@ -186,12 +205,18 @@ pub(crate) fn task_external_id(workspace_root: &std::path::Path, goal: &str) -> 
                 '_'
             }
         })
-        .take(80)
-        .collect::<String>();
+        .collect::<String>()
+}
+
+pub(crate) fn task_external_id(workspace_root: &std::path::Path, goal: &str) -> String {
     format!(
-        "desktop-task-{}-{}",
-        workspace_external_id(workspace_root),
-        goal
+        "desktop-task-v1-{}-{}",
+        identity_digest(b"talos-desktop-task-workspace-v1", workspace_root, b""),
+        identity_digest(
+            b"talos-desktop-task-goal-v1",
+            workspace_root,
+            goal.as_bytes()
+        )
     )
 }
 
@@ -203,11 +228,18 @@ pub(crate) fn list_task_external_ids(
     workspace_root: &std::path::Path,
 ) -> Result<Vec<String>, String> {
     let root = workspace_root.join(".talos").join("desktop-sessions");
-    let prefix = format!("desktop-task-{}-", workspace_external_id(workspace_root));
+    let current_prefix = format!(
+        "desktop-task-v1-{}-",
+        identity_digest(b"talos-desktop-task-workspace-v1", workspace_root, b"")
+    );
+    let legacy_prefix = format!(
+        "desktop-task-desktop-workspace-{}-",
+        legacy_workspace_external_id(workspace_root)
+    );
     talos_session::DurableSession::list_external_ids(&root)
         .map(|ids| {
             ids.into_iter()
-                .filter(|id| id.starts_with(&prefix))
+                .filter(|id| id.starts_with(&current_prefix) || id.starts_with(&legacy_prefix))
                 .collect()
         })
         .map_err(|error| error.to_string())
@@ -408,12 +440,21 @@ impl RuntimeHost {
         workspace_root: impl Into<PathBuf>,
         external_id: impl Into<String>,
     ) -> Result<Self, String> {
-        Self::configured_with_identity(workspace_root.into(), Some(external_id.into()))
+        Self::configured_with_identity(workspace_root.into(), Some(external_id.into()), false)
+    }
+
+    /// Load configuration and open only an existing durable session identity.
+    pub(crate) fn configured_for_existing_session(
+        workspace_root: impl Into<PathBuf>,
+        external_id: impl Into<String>,
+    ) -> Result<Self, String> {
+        Self::configured_with_identity(workspace_root.into(), Some(external_id.into()), true)
     }
 
     fn configured_with_identity(
         workspace_root: PathBuf,
         external_id: Option<String>,
+        existing_only: bool,
     ) -> Result<Self, String> {
         let session_root = workspace_root.join(".talos").join("desktop-sessions");
         let external_id = external_id.unwrap_or_else(|| workspace_external_id(&workspace_root));
@@ -428,14 +469,22 @@ impl RuntimeHost {
                 ))
             },
             workspace_root,
-            Some((session_root, external_id)),
+            Some(DurableBinding {
+                root: session_root,
+                external_id,
+                mode: if existing_only {
+                    DurableOpenMode::Existing
+                } else {
+                    DurableOpenMode::Create
+                },
+            }),
         )
     }
 
     fn start_with(
         provider: impl FnOnce() -> Result<(Arc<dyn LanguageModel>, u32, bool), String> + Send + 'static,
         workspace_root: impl Into<PathBuf>,
-        durable_identity: Option<(PathBuf, String)>,
+        durable_identity: Option<DurableBinding>,
     ) -> Result<Self, String> {
         let workspace_root = workspace_root.into();
         let (commands, command_rx) = mpsc::channel(COMMAND_CAPACITY);
@@ -462,9 +511,25 @@ impl RuntimeHost {
                         let report_output = approval.clone();
                         let durable_session = durable_identity
                             .as_ref()
-                            .map(|(root, external_id)| {
-                                talos_session::DurableSession::open_or_create(root, external_id)
-                                    .map_err(|error| error.to_string())
+                            .map(|binding| {
+                                let opened = match binding.mode {
+                                    DurableOpenMode::Create => {
+                                        talos_session::DurableSession::open_or_create(
+                                            &binding.root,
+                                            &binding.external_id,
+                                        )
+                                        .map(Some)
+                                    }
+                                    DurableOpenMode::Existing => {
+                                        talos_session::DurableSession::open_existing(
+                                            &binding.root,
+                                            &binding.external_id,
+                                        )
+                                    }
+                                };
+                                opened
+                                    .map_err(|error| error.to_string())?
+                                    .ok_or_else(|| "durable task no longer exists".to_owned())
                             })
                             .transpose();
                         let durable_session = match durable_session {
@@ -677,10 +742,10 @@ fn project_event(event: SessionEvent) -> Vec<RuntimeOutput> {
                     call_id: call.id.clone(),
                     name: call.name,
                 },
-                RuntimeOutput::ToolEvidence {
+                RuntimeOutput::ToolRequestContext {
                     call_id: call.id,
                     provenance: format_tool_provenance(&provenance),
-                    source: tool_source(&call.input),
+                    requested_path: requested_tool_path(&call.input),
                 },
             ],
             talos_runtime::TurnEventPayload::Progress {
@@ -724,7 +789,7 @@ fn format_tool_provenance(provenance: &talos_runtime::ToolProvenance) -> String 
     }
 }
 
-fn tool_source(input: &serde_json::Value) -> Option<String> {
+fn requested_tool_path(input: &serde_json::Value) -> Option<String> {
     ["path", "file_path", "filename"]
         .into_iter()
         .find_map(|key| input.get(key).and_then(serde_json::Value::as_str))
@@ -755,6 +820,35 @@ mod tests {
         let task = task_external_id(std::path::Path::new("/tmp/project/one"), "Review /tmp");
         assert!(task.starts_with("desktop-task-"));
         assert!(!task.contains('/'));
+        assert!(!task.contains("Review"));
+        assert_ne!(
+            task,
+            task_external_id(std::path::Path::new("/tmp/project/one"), "Review _tmp")
+        );
+        assert_ne!(
+            task_external_id(std::path::Path::new("/tmp/project/one"), "中文任务甲"),
+            task_external_id(std::path::Path::new("/tmp/project/one"), "中文任务乙")
+        );
+        assert_ne!(
+            task_external_id(std::path::Path::new("/tmp/project/one"), "same goal"),
+            task_external_id(std::path::Path::new("/tmp/project/one_"), "same goal")
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn workspace_identity_distinguishes_non_utf8_paths() {
+        use std::os::unix::ffi::OsStringExt;
+
+        let first =
+            std::path::PathBuf::from(std::ffi::OsString::from_vec(b"/tmp/project/\xff".to_vec()));
+        let second =
+            std::path::PathBuf::from(std::ffi::OsString::from_vec(b"/tmp/project/\xfe".to_vec()));
+
+        assert_ne!(
+            workspace_external_id(&first),
+            workspace_external_id(&second)
+        );
     }
 
     #[test]
@@ -764,12 +858,17 @@ mod tests {
         let root = workspace.0.join(".talos").join("desktop-sessions");
         let other_root = other.0.join(".talos").join("desktop-sessions");
         let own = task_external_id(&workspace.0, "own");
+        let legacy = format!(
+            "desktop-task-desktop-workspace-{}-legacy-goal",
+            legacy_workspace_external_id(&workspace.0)
+        );
         let foreign = task_external_id(&other.0, "foreign");
         talos_session::DurableSession::open_or_create(&root, &own).expect("own binding");
+        talos_session::DurableSession::open_or_create(&root, &legacy).expect("legacy binding");
         talos_session::DurableSession::open_or_create(&root, &foreign).expect("foreign binding");
         assert_eq!(
             list_task_external_ids(&workspace.0).expect("list own tasks"),
-            vec![own]
+            vec![legacy, own]
         );
         assert!(
             list_task_external_ids(&other.0)
@@ -780,12 +879,46 @@ mod tests {
     }
 
     #[test]
-    fn tool_source_is_explicitly_unavailable_without_a_path_field() {
-        assert_eq!(tool_source(&serde_json::json!({"command": "pwd"})), None);
+    fn requested_tool_path_is_not_mistaken_for_execution_evidence() {
         assert_eq!(
-            tool_source(&serde_json::json!({"file_path": "src/main.rs"})),
+            requested_tool_path(&serde_json::json!({"command": "pwd"})),
+            None
+        );
+        assert_eq!(
+            requested_tool_path(&serde_json::json!({"file_path": "src/main.rs"})),
             Some("src/main.rs".into())
         );
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn opening_a_missing_existing_session_does_not_create_a_binding() {
+        let workspace = TestWorkspace::new();
+        let storage = workspace.0.join(".talos").join("desktop-sessions");
+        let external_id = "desktop-task-v1-missing";
+        let provider = Arc::new(MockProvider::new());
+        let mut host = RuntimeHost::start_with(
+            move || Ok((provider, 128_000, false)),
+            workspace.0.clone(),
+            Some(DurableBinding {
+                root: storage.clone(),
+                external_id: external_id.into(),
+                mode: DurableOpenMode::Existing,
+            }),
+        )
+        .expect("host starts");
+
+        assert!(matches!(
+            tokio::time::timeout(std::time::Duration::from_secs(2), host.recv())
+                .await
+                .expect("host responds"),
+            Some(RuntimeOutput::Error(error)) if error.contains("no longer exists")
+        ));
+        assert!(
+            talos_session::DurableSession::list_external_ids(&storage)
+                .expect("binding listing succeeds")
+                .is_empty()
+        );
+        assert!(!storage.exists());
     }
 
     #[tokio::test(flavor = "current_thread")]
@@ -798,7 +931,11 @@ mod tests {
         let mut host = RuntimeHost::start_with(
             move || Ok((configured, 128_000, false)),
             workspace.0.clone(),
-            Some((storage.clone(), external_id.clone())),
+            Some(DurableBinding {
+                root: storage.clone(),
+                external_id: external_id.clone(),
+                mode: DurableOpenMode::Create,
+            }),
         )
         .expect("host starts");
         host.try_send(RuntimeCommand::Submit("persist this turn".into()))
@@ -844,7 +981,11 @@ mod tests {
         let mut reopened = RuntimeHost::start_with(
             move || Ok((provider, 128_000, false)),
             workspace.0.clone(),
-            Some((storage, external_id)),
+            Some(DurableBinding {
+                root: storage.clone(),
+                external_id: external_id.clone(),
+                mode: DurableOpenMode::Existing,
+            }),
         )
         .expect("reopened host starts");
         match tokio::time::timeout(std::time::Duration::from_secs(2), reopened.recv())
@@ -865,6 +1006,97 @@ mod tests {
             .try_send(RuntimeCommand::Shutdown)
             .expect("shutdown reopened");
         assert_eq!(reopened.recv().await, Some(RuntimeOutput::Stopped));
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn interrupted_durable_task_resume_restores_history_without_replaying_write() {
+        let workspace = TestWorkspace::new();
+        let storage = workspace.0.join(".talos").join("desktop-sessions");
+        let external_id = "desktop-task-v1-interrupted".to_owned();
+        let provider = Arc::new(MockProvider::new().with_tool_call(
+            "write",
+            serde_json::json!({
+                "path": "interrupted.txt",
+                "content": "must not be replayed"
+            }),
+        ));
+        let configured = provider.clone();
+        let mut host = RuntimeHost::start_with(
+            move || Ok((configured, 128_000, false)),
+            workspace.0.clone(),
+            Some(DurableBinding {
+                root: storage.clone(),
+                external_id: external_id.clone(),
+                mode: DurableOpenMode::Create,
+            }),
+        )
+        .expect("host starts");
+        host.try_send(RuntimeCommand::Submit(
+            "request an interrupted write".into(),
+        ))
+        .expect("submit");
+        tokio::time::timeout(std::time::Duration::from_secs(10), async {
+            loop {
+                match host.recv().await.expect("approval event") {
+                    RuntimeOutput::ApprovalRequested { .. } => break,
+                    RuntimeOutput::Error(error) => panic!("host error: {error}"),
+                    RuntimeOutput::Completed { .. } => panic!("turn completed before approval"),
+                    _ => {}
+                }
+            }
+            host.try_send(RuntimeCommand::Interrupt)
+                .expect("interrupt accepted");
+            loop {
+                match host.recv().await.expect("cancel terminal") {
+                    RuntimeOutput::Completed { status } => {
+                        assert_eq!(status, TerminalStatus::Cancelled);
+                        break;
+                    }
+                    RuntimeOutput::Error(error) => panic!("host error: {error}"),
+                    _ => {}
+                }
+            }
+            host.try_send(RuntimeCommand::Shutdown)
+                .expect("shutdown accepted");
+            assert_eq!(host.recv().await, Some(RuntimeOutput::Stopped));
+        })
+        .await
+        .expect("interrupted turn shuts down");
+
+        let replay_provider = Arc::new(MockProvider::new().with_tool_call(
+            "write",
+            serde_json::json!({
+                "path": "interrupted.txt",
+                "content": "must not be replayed"
+            }),
+        ));
+        let mut reopened = RuntimeHost::start_with(
+            move || Ok((replay_provider, 128_000, false)),
+            workspace.0.clone(),
+            Some(DurableBinding {
+                root: storage.clone(),
+                external_id: external_id.clone(),
+                mode: DurableOpenMode::Existing,
+            }),
+        )
+        .expect("existing session reopens");
+        match tokio::time::timeout(std::time::Duration::from_secs(2), reopened.recv())
+            .await
+            .expect("history restore event")
+            .expect("history restore output")
+        {
+            RuntimeOutput::HistoryRestored { entries } => assert!(
+                entries
+                    .iter()
+                    .any(|entry| entry.contains("request an interrupted write"))
+            ),
+            other => panic!("expected restored history, got {other:?}"),
+        }
+        reopened
+            .try_send(RuntimeCommand::Shutdown)
+            .expect("shutdown reopened session");
+        assert_eq!(reopened.recv().await, Some(RuntimeOutput::Stopped));
+        assert!(!workspace.0.join("interrupted.txt").exists());
     }
 
     pub(super) struct TestWorkspace(pub(super) PathBuf);

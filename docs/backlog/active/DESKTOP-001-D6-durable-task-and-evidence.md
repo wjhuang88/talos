@@ -8,7 +8,7 @@
 | Parent Epic | DESKTOP-001 |
 | Type | Desktop integration / behavior Story |
 | Priority | P1 |
-| Status | Active / Claimed — activation pending |
+| Status | Active / Claimed — implementation under local correction |
 | Selected Iteration | I284 |
 | Source | #29; four-week Desktop task |
 | Depends On | I283 implementation merged with technical gates; ADR-042/061; durable-session and WORK-001 projection compatibility map |
@@ -26,9 +26,9 @@
 | Governance Claim PR | #606 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | I283/D5 closeout merged as `81a5d27c`; I284 is the next serial child |
-| Implementation PR | Not started; ineffective until activation #606 reaches `main` |
+| Implementation PR | #607 open; current remote head `8e8ebf6`; local substantive corrections are not yet pushed |
 | Last Updated | 2026-09-23 |
-| Handoff / Release Condition | Resolve readiness and establish effective serial child claim before implementation; no release |
+| Handoff / Release Condition | Finish local convergence, refresh exact-head CI and independent review, then merge-time CAS; no release |
 
 ## Outcome
 
@@ -75,4 +75,28 @@ New durable Mission/Evaluation schema, automatic evaluation on every turn, multi
 ## Completion Evidence
 
 Completion Commit: pending.
-No implementation or acceptance evidence exists for this planned child.
+Implementation is in progress on PR #607; completion and human acceptance evidence are pending.
+
+## Local Review Correction Checkpoint — 2026-09-23
+
+The prior exact head `8e8ebf6dde23af4286badd1b66d1dfcf41d62c24` received two blocking findings:
+sanitized task IDs could collide/leak prompt text, and requested tool paths were labeled as actual
+evidence before execution. The local candidate now uses domain-separated SHA-256 task/workspace
+identities, preserves legacy bindings in Recent Tasks without displaying their embedded path/goal,
+and reports a tool's requested path separately from actual change attribution. Resume opens only an
+existing binding, stays existing-only on retry, restores transcript without submitting a turn, and
+fails visibly when the binding is missing. Workspace task-list storage reads run on GPUI's
+background executor.
+
+Local validation on the unpushed candidate: `cargo check -p talos-desktop --locked`, the exact CI
+Clippy command (`cargo clippy -p talos-desktop --features desktop-ui --all-targets --locked -- -D
+warnings`), and `cargo test -p talos-desktop --features desktop-ui --locked` (83/83) passed.
+Formatting, diff checks, and both governance validators passed with 0 warnings. PR #607's old head
+`8e8ebf6` failed that Clippy gate on the prior Resume path; the local candidate replaces that path.
+These local results do not validate the old remote head. Full `./scripts/release_preflight.sh`
+passed on the local candidate; fresh exact-head CI and review remain pending.
+
+I284 remains incomplete: no shared durable Work/Evaluation projection is available to the Desktop
+host, and Runtime events do not yet carry actual changed-artifact evidence sufficient for a real
+file diff. The live UI must report attribution as unavailable rather than infer it from workspace
+dirt or request arguments. H4/H6 also remain unaccepted in #29.

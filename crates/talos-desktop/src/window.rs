@@ -76,6 +76,7 @@ struct LiveTask {
     closing: bool,
     workspace: Option<String>,
     session_external_id: Option<String>,
+    resume_existing: bool,
     pending_approval: Option<(u64, String, String, String)>,
 }
 
@@ -269,6 +270,7 @@ struct DesktopWindow {
     workspace_prompt_stale: bool,
     durable_task_ids: Vec<String>,
     durable_task_error: Option<String>,
+    durable_task_workspace: Option<String>,
     #[cfg(feature = "visual-test")]
     drag_bounds:
         std::rc::Rc<std::cell::RefCell<std::collections::HashMap<usize, Bounds<gpui::Pixels>>>>,
@@ -308,6 +310,7 @@ impl DesktopWindow {
             workspace_prompt_stale: false,
             durable_task_ids: Vec::new(),
             durable_task_error: None,
+            durable_task_workspace: None,
             #[cfg(feature = "visual-test")]
             drag_bounds: Default::default(),
             state: Presentation::new(locale),
@@ -416,10 +419,15 @@ impl DesktopWindow {
                 } else {
                     workspace
                 };
+                self.durable_task_workspace = Some(workspace.clone());
                 cx.spawn(async move |this, cx| {
-                    let result = crate::runtime_host::list_task_external_ids(std::path::Path::new(
-                        &workspace,
-                    ));
+                    let result = cx
+                        .background_spawn(async move {
+                            crate::runtime_host::list_task_external_ids(std::path::Path::new(
+                                &workspace,
+                            ))
+                        })
+                        .await;
                     let _ = this.update(cx, |this, cx| {
                         match result {
                             Ok(ids) => this.durable_task_ids = ids,
@@ -489,22 +497,21 @@ impl DesktopWindow {
                 let Some(external_id) = self.durable_task_ids.get(index).cloned() else {
                     return;
                 };
-                let workspace = self.workspace_input.read(cx).text().trim().to_owned();
-                if workspace.is_empty()
-                    && let Ok(path) = std::env::current_dir()
-                    && let Some(path) = path.to_str()
-                {
-                    self.workspace_input
-                        .update(cx, |input, cx| input.set_text(path, cx));
-                }
-                self.goal_input.update(cx, |input, cx| {
-                    input.set_text("Continue the saved task", cx)
-                });
+                let Some(workspace) = self.durable_task_workspace.clone() else {
+                    return;
+                };
+                self.workspace_input
+                    .update(cx, |input, cx| input.set_text(&workspace, cx));
+                self.goal_input
+                    .update(cx, |input, cx| input.set_text("", cx));
                 self.live = Some(LiveTask {
                     session_external_id: Some(external_id),
+                    resume_existing: true,
+                    workspace: Some(workspace.clone()),
                     ..LiveTask::default()
                 });
                 self.state.page = Page::NewTask;
+                self.start_live_host(workspace, cx);
             }
             Command::Settings => {
                 self.state.page = Page::Presets;
@@ -1180,9 +1187,18 @@ impl Render for DesktopWindow {
                             .when(!self.durable_task_ids.is_empty(), |list| list.child(
                                 div().text_sm().text_color(rgb(0x5e6f8d)).child("Saved durable sessions"),
                             ).children(self.durable_task_ids.iter().enumerate().map(|(index, external_id)|
-                                div().flex().items_center().justify_between().gap_3().py_2().border_b_1().border_color(rgb(0xd8dee9))
-                                    .child(div().flex_1().min_w_0().text_sm().child(external_id.clone()))
-                                    .child(self.command(("resume-task", index), "Resume", Command::ResumeTask(index), cx))
+                                {
+                                    let label = if external_id.starts_with("desktop-task-v1-") {
+                                        external_id.clone()
+                                    } else if locale == Locale::Chinese {
+                                        "旧版已保存会话".to_owned()
+                                    } else {
+                                        "Legacy saved session".to_owned()
+                                    };
+                                    div().flex().items_center().justify_between().gap_3().py_2().border_b_1().border_color(rgb(0xd8dee9))
+                                        .child(div().flex_1().min_w_0().text_sm().child(label))
+                                        .child(self.command(("resume-task", index), "Resume", Command::ResumeTask(index), cx))
+                                }
                             )))
                             .children(TASK_FIXTURES.iter().enumerate().map(|(index, task)|
                                 div().flex().flex_col().gap_2().py_3().border_b_1().border_color(rgb(0xd8dee9))
@@ -1739,17 +1755,19 @@ impl Render for DesktopWindow {
 
 impl DesktopWindow {
     fn submit_live(&mut self, cx: &mut Context<Self>) {
-        use crate::runtime_host::{RuntimeCommand, RuntimeHost, RuntimeOutput, TerminalStatus};
+        use crate::runtime_host::RuntimeCommand;
         let prompt = self.goal_input.read(cx).text().to_owned();
         let workspace = self.workspace_input.read(cx).text().to_owned();
-        let Some(live) = &mut self.live else {
+        let Some(live) = self.live.as_ref() else {
             return;
         };
         if live.running || live.closing {
             return;
         }
         if prompt.trim().is_empty() || workspace.trim().is_empty() {
-            live.status = LiveStatus::MissingInput;
+            if let Some(live) = &mut self.live {
+                live.status = LiveStatus::MissingInput;
+            }
             return;
         }
         if live
@@ -1757,140 +1775,23 @@ impl DesktopWindow {
             .as_ref()
             .is_some_and(|previous| previous != &workspace)
         {
-            live.status = LiveStatus::WorkspaceChanged;
+            if let Some(live) = &mut self.live {
+                live.status = LiveStatus::WorkspaceChanged;
+            }
             return;
         }
+        if self
+            .live
+            .as_ref()
+            .is_some_and(|live| live.commands.is_none())
+        {
+            self.start_live_host(workspace.clone(), cx);
+        }
+        let Some(live) = &mut self.live else {
+            return;
+        };
         if live.commands.is_none() {
-            let session_id = live.session_external_id.clone().unwrap_or_else(|| {
-                crate::runtime_host::task_external_id(std::path::Path::new(&workspace), &prompt)
-            });
-            let mut host = match RuntimeHost::configured_for_session(workspace.clone(), session_id)
-            {
-                Ok(host) => host,
-                Err(error) => {
-                    live.status = LiveStatus::Error(error);
-                    return;
-                }
-            };
-            live.commands = Some(host.command_sender());
-            if let Some(exit) = host.take_exit() {
-                self.host_exits.borrow_mut().push(exit);
-            }
-            live.workspace = Some(workspace);
-            live.observer = Some(cx.spawn(async move |this, cx| {
-                while let Some(event) = host.recv().await {
-                    if this
-                        .update(cx, |this, cx| {
-                            if let Some(live) = &mut this.live {
-                                match event {
-                                    RuntimeOutput::ToolStarted { call_id, name } => {
-                                        live.status = LiveStatus::Streaming;
-                                        live.output.push_str(&format!("\n→ {name} [{call_id}]\n"));
-                                    }
-                                    RuntimeOutput::HistoryRestored { entries } => {
-                                        live.output.push_str("[restored durable history]\n");
-                                        for entry in entries {
-                                            live.output.push_str(&entry);
-                                            live.output.push('\n');
-                                        }
-                                    }
-                                    RuntimeOutput::ToolEvidence {
-                                        call_id,
-                                        provenance,
-                                        source,
-                                    } => {
-                                        live.output.push_str(&format!(
-                                            "[evidence {call_id}: provenance={provenance}; source={}]\n",
-                                            source.as_deref().unwrap_or("unavailable")
-                                        ));
-                                    }
-                                    RuntimeOutput::ToolResult {
-                                        call_id,
-                                        content,
-                                        is_error,
-                                    } => {
-                                        live.output.push_str(&format!(
-                                            "\n[{} {call_id}]\n{content}\n",
-                                            if is_error { "✗" } else { "✓" }
-                                        ));
-                                    }
-                                    RuntimeOutput::ApprovalRequested {
-                                        request_id,
-                                        tool_name,
-                                        scope,
-                                        explanation,
-                                    } => {
-                                        live.pending_approval =
-                                            Some((request_id, tool_name, scope, explanation));
-                                        live.status = LiveStatus::Streaming;
-                                    }
-                                    RuntimeOutput::AutoDecision {
-                                        outcome,
-                                        reason,
-                                        evaluator,
-                                    } => {
-                                        live.output.push_str(&format!(
-                                            "\n[Auto review: {outcome} — {reason} ({evaluator})]\n"
-                                        ));
-                                    }
-                                    RuntimeOutput::ApprovalClosed { request_id } => {
-                                        if live
-                                            .pending_approval
-                                            .as_ref()
-                                            .is_some_and(|approval| approval.0 == request_id)
-                                        {
-                                            live.pending_approval = None;
-                                        }
-                                    }
-                                    RuntimeOutput::Started { turn_id } => {
-                                        live.turn_id = Some(turn_id);
-                                        live.status = LiveStatus::Connecting
-                                    }
-                                    RuntimeOutput::Text(text) => {
-                                        live.status = LiveStatus::Streaming;
-                                        live.output.push_str(&text);
-                                    }
-                                    RuntimeOutput::Completed { status } => {
-                                        live.pending_approval = None;
-                                        live.running = false;
-                                        live.status = match status {
-                                            TerminalStatus::Success => LiveStatus::Finished,
-                                            TerminalStatus::Cancelled => LiveStatus::Cancelled,
-                                            TerminalStatus::Error(error) => {
-                                                LiveStatus::Error(error)
-                                            }
-                                        };
-                                    }
-                                    RuntimeOutput::Error(error) => {
-                                        live.pending_approval = None;
-                                        live.status = LiveStatus::Error(error);
-                                        live.running = false;
-                                        live.closing = false;
-                                    }
-                                    RuntimeOutput::Stopped => {
-                                        live.status = LiveStatus::Stopped;
-                                        live.running = false;
-                                        if live.closing {
-                                            cx.quit();
-                                        }
-                                    }
-                                }
-                            }
-                            cx.notify();
-                        })
-                        .is_err()
-                    {
-                        break;
-                    }
-                }
-                let _ = this.update(cx, |this, cx| {
-                    if let Some(live) = &mut this.live {
-                        live.commands = None;
-                        live.running = false;
-                    }
-                    cx.notify();
-                });
-            }));
+            return;
         }
         if live
             .commands
@@ -1905,6 +1806,152 @@ impl DesktopWindow {
         } else {
             live.status = LiveStatus::HostBusy;
         }
+    }
+
+    fn start_live_host(&mut self, workspace: String, cx: &mut Context<Self>) {
+        use crate::runtime_host::{RuntimeHost, RuntimeOutput, TerminalStatus};
+
+        let Some(live) = &mut self.live else {
+            return;
+        };
+        if live.commands.is_some() {
+            return;
+        }
+        let session_id = live.session_external_id.clone().unwrap_or_else(|| {
+            crate::runtime_host::task_external_id(
+                std::path::Path::new(&workspace),
+                self.goal_input.read(cx).text(),
+            )
+        });
+        let host_result = if live.resume_existing {
+            RuntimeHost::configured_for_existing_session(workspace.clone(), session_id)
+        } else {
+            RuntimeHost::configured_for_session(workspace.clone(), session_id)
+        };
+        let mut host = match host_result {
+            Ok(host) => host,
+            Err(error) => {
+                live.status = LiveStatus::Error(error);
+                return;
+            }
+        };
+        live.commands = Some(host.command_sender());
+        live.workspace = Some(workspace);
+        if let Some(exit) = host.take_exit() {
+            self.host_exits.borrow_mut().push(exit);
+        }
+        live.observer = Some(cx.spawn(async move |this, cx| {
+            while let Some(event) = host.recv().await {
+                if this
+                    .update(cx, |this, cx| {
+                        if let Some(live) = &mut this.live {
+                            match event {
+                                RuntimeOutput::ToolStarted { call_id, name } => {
+                                    live.status = LiveStatus::Streaming;
+                                    live.output.push_str(&format!("\n→ {name} [{call_id}]\n"));
+                                }
+                                RuntimeOutput::HistoryRestored { entries } => {
+                                    live.output.push_str("[restored durable history]\n");
+                                    for entry in entries {
+                                        live.output.push_str(&entry);
+                                        live.output.push('\n');
+                                    }
+                                }
+                                RuntimeOutput::ToolRequestContext {
+                                    call_id,
+                                    provenance,
+                                    requested_path,
+                                } => {
+                                    live.output.push_str(&format!(
+                                        "[tool request {call_id}: provenance={provenance}; requested path={}; actual change attribution=unavailable]\n",
+                                        requested_path.as_deref().unwrap_or("unavailable")
+                                    ));
+                                }
+                                RuntimeOutput::ToolResult {
+                                    call_id,
+                                    content,
+                                    is_error,
+                                } => {
+                                    live.output.push_str(&format!(
+                                        "\n[{} {call_id}]\n{content}\n",
+                                        if is_error { "✗" } else { "✓" }
+                                    ));
+                                }
+                                RuntimeOutput::ApprovalRequested {
+                                    request_id,
+                                    tool_name,
+                                    scope,
+                                    explanation,
+                                } => {
+                                    live.pending_approval =
+                                        Some((request_id, tool_name, scope, explanation));
+                                    live.status = LiveStatus::Streaming;
+                                }
+                                RuntimeOutput::AutoDecision {
+                                    outcome,
+                                    reason,
+                                    evaluator,
+                                } => {
+                                    live.output.push_str(&format!(
+                                        "\n[Auto review: {outcome} — {reason} ({evaluator})]\n"
+                                    ));
+                                }
+                                RuntimeOutput::ApprovalClosed { request_id } => {
+                                    if live
+                                        .pending_approval
+                                        .as_ref()
+                                        .is_some_and(|approval| approval.0 == request_id)
+                                    {
+                                        live.pending_approval = None;
+                                    }
+                                }
+                                RuntimeOutput::Started { turn_id } => {
+                                    live.turn_id = Some(turn_id);
+                                    live.status = LiveStatus::Connecting
+                                }
+                                RuntimeOutput::Text(text) => {
+                                    live.status = LiveStatus::Streaming;
+                                    live.output.push_str(&text);
+                                }
+                                RuntimeOutput::Completed { status } => {
+                                    live.pending_approval = None;
+                                    live.running = false;
+                                    live.status = match status {
+                                        TerminalStatus::Success => LiveStatus::Finished,
+                                        TerminalStatus::Cancelled => LiveStatus::Cancelled,
+                                        TerminalStatus::Error(error) => LiveStatus::Error(error),
+                                    };
+                                }
+                                RuntimeOutput::Error(error) => {
+                                    live.pending_approval = None;
+                                    live.status = LiveStatus::Error(error);
+                                    live.running = false;
+                                    live.closing = false;
+                                }
+                                RuntimeOutput::Stopped => {
+                                    live.status = LiveStatus::Stopped;
+                                    live.running = false;
+                                    if live.closing {
+                                        cx.quit();
+                                    }
+                                }
+                            }
+                        }
+                        cx.notify();
+                    })
+                    .is_err()
+                {
+                    break;
+                }
+            }
+            let _ = this.update(cx, |this, cx| {
+                if let Some(live) = &mut this.live {
+                    live.commands = None;
+                    live.running = false;
+                }
+                cx.notify();
+            });
+        }));
     }
 
     fn render_live(&self, window: &Window, cx: &mut Context<Self>) -> impl IntoElement {

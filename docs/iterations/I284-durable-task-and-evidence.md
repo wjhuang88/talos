@@ -104,6 +104,36 @@ Only already-existing implementation/evidence commits may close this iteration.
 ## Variance And Residuals
 
 The current UI now has workspace-scoped recent-session discovery and explicit resume, and it
-exposes tool provenance/path attribution. It still has no full artifact diff viewer or persisted
-evaluation state; these remain the next I284 slices. H4/H6 remain human acceptance rows in #29.
-Carry eligible human rows without transferring protected security gates.
+exposes tool request provenance and requested paths, but does not claim that they prove a file
+changed. It still has no full artifact diff viewer or persisted evaluation state. The shared
+Work/Evaluation contracts are storage-neutral; no durable Mission/Evaluation projection is exposed
+to this Desktop host. H4/H6 remain human acceptance rows in #29. Carry eligible human rows without
+transferring protected security gates.
+
+## Local Review Correction Checkpoint — 2026-09-23
+
+PR #607's prior exact head `8e8ebf6dde23af4286badd1b66d1dfcf41d62c24` received two blocking
+findings. Local corrections replace lossy workspace/goal sanitization with domain-separated
+SHA-256 identities, preserve legacy task bindings while redacting their old embedded IDs from the
+Recent Tasks UI, and make Resume open an existing identity only. The existing-only mode survives
+host restart attempts; a missing binding reports an error and does not create a replacement.
+Interrupted pending-write restart coverage now proves transcript restoration without tool replay.
+Tool request paths are presented as request metadata; actual artifact-change attribution remains
+explicitly unavailable. Recent-task SQLite reads now run on GPUI's background executor.
+
+Local verification on the unpushed candidate passed `cargo check -p talos-desktop --locked`,
+`cargo clippy -p talos-desktop --features desktop-ui --all-targets --locked -- -D warnings`,
+and `cargo test -p talos-desktop --features desktop-ui --locked` (83/83). Formatting, diff checks,
+and both governance validators passed; each validator reported 0 warnings. The PR's old exact head
+`8e8ebf6` failed the same Desktop Clippy gate on a nested condition in the previous Resume path;
+the local candidate replaces that path, and the exact CI command now passes locally. Full
+The full `./scripts/release_preflight.sh` passed on this local candidate, including workspace
+check, Clippy, tests, doc-tests and both Runtime SDK fixtures. Fresh exact-head CI and independent
+review are still pending. Do not reuse CI/review for old head `8e8ebf6` as evidence for the
+corrected candidate.
+
+I284 remains Active / Claimed, not Complete. The live UI has no shared durable Work/Evaluation
+source and no actual changed-artifact evidence contract; its unavailable state is truthful but
+does not satisfy the full evidence objective. The actual artifact diff/change viewer and supported
+shared evaluation projection remain unresolved within the published acceptance. H4/H6 still
+require natural-person acceptance through #29.

@@ -9425,6 +9425,7 @@ dependencies = [
  "gpui",
  "gpui_platform",
  "serde_json",
+ "sha2 0.11.0",
  "talos-config",
  "talos-provider",
  "talos-runtime",

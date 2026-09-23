@@ -5,7 +5,7 @@
 | Story ID | DESKTOP-001 |
 | Type | Product / Architecture Spike |
 | Priority | P3 |
-| Status | Planned — four-week live Desktop child plan; no new implementation activated |
+| Status | Parent Deferred / Unclaimed; child D6/I284 Active / Claimed; D7/I285 Planned |
 | Source | [GitHub Issue #29](https://github.com/wjhuang88/talos/issues/29) |
 | Selected Iteration | Parent not directly activated; planned children I282-I285 |
 | Depends On | RUNTIME-001 reusable runtime API; Work Graph/evaluation prerequisite; SESSION-009 for later multi-client behavior; permission and distribution decisions |
@@ -38,7 +38,7 @@ work exists. I277 delivered the mock; WORK-001 P0-P4 is complete. This plan crea
 |---|---|---|---|---|
 | [D4](DESKTOP-001-D4-live-runtime-host.md) | Live provider task, streaming and cancellation | Planned / Unclaimed | I280, WORK-001, ADR-059 and host readiness map | I282 |
 | [D5](DESKTOP-001-D5-live-tools-and-approval.md) | Tools, existing Auto visibility and scoped approval | Planned / Unclaimed | I282 merged technical stage | I283 |
-| [D6](DESKTOP-001-D6-durable-task-and-evidence.md) | Session resume, real work/evaluation and change evidence | Planned / Unclaimed | I283 and persistence/projection mapping | I284 |
+| [D6](DESKTOP-001-D6-durable-task-and-evidence.md) | Session resume, real work/evaluation and change evidence | Active / Claimed; PR #607 under local correction | I283 and persistence/projection mapping | I284 |
 | [D7](DESKTOP-001-D7-desktop-integrated-acceptance.md) | Integrated candidate and consolidated acceptance | Planned / Unclaimed | I282-I284 merged technical stages | I285 |
 
 Existing #29 remains the product/validation tracker. #308 real presets and remaining Desktop
