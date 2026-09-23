@@ -75,6 +75,7 @@ struct LiveTask {
     running: bool,
     closing: bool,
     workspace: Option<String>,
+    session_external_id: Option<String>,
     pending_approval: Option<(u64, String, String, String)>,
 }
 
@@ -222,6 +223,7 @@ enum Command {
     NewPreset,
     Settings,
     ToggleTaskOption(usize),
+    ResumeTask(usize),
     ChooseWorkspace,
     ApproveOnce(u64),
     ApproveSession(u64),
@@ -265,6 +267,8 @@ struct DesktopWindow {
     workspace_prompt: Option<gpui::Task<()>>,
     workspace_prompt_failed: bool,
     workspace_prompt_stale: bool,
+    durable_task_ids: Vec<String>,
+    durable_task_error: Option<String>,
     #[cfg(feature = "visual-test")]
     drag_bounds:
         std::rc::Rc<std::cell::RefCell<std::collections::HashMap<usize, Bounds<gpui::Pixels>>>>,
@@ -302,6 +306,8 @@ impl DesktopWindow {
             workspace_prompt: None,
             workspace_prompt_failed: false,
             workspace_prompt_stale: false,
+            durable_task_ids: Vec::new(),
+            durable_task_error: None,
             #[cfg(feature = "visual-test")]
             drag_bounds: Default::default(),
             state: Presentation::new(locale),
@@ -397,7 +403,33 @@ impl DesktopWindow {
                     }
                 }
             }
-            Command::Tasks => self.state.page = Page::Tasks,
+            Command::Tasks => {
+                self.state.page = Page::Tasks;
+                self.durable_task_error = None;
+                self.durable_task_ids.clear();
+                let workspace = self.workspace_input.read(cx).text().trim().to_owned();
+                let workspace = if workspace.is_empty() {
+                    std::env::current_dir()
+                        .ok()
+                        .and_then(|path| path.to_str().map(str::to_owned))
+                        .unwrap_or_default()
+                } else {
+                    workspace
+                };
+                cx.spawn(async move |this, cx| {
+                    let result = crate::runtime_host::list_task_external_ids(std::path::Path::new(
+                        &workspace,
+                    ));
+                    let _ = this.update(cx, |this, cx| {
+                        match result {
+                            Ok(ids) => this.durable_task_ids = ids,
+                            Err(error) => this.durable_task_error = Some(error),
+                        }
+                        cx.notify();
+                    });
+                })
+                .detach();
+            }
             Command::OpenFixture(index) => {
                 if self.state.open_fixture(index) {
                     self.tab_focus[0].focus(window, cx);
@@ -452,6 +484,28 @@ impl DesktopWindow {
                 if let Some(value) = self.state.task_options.get_mut(index) {
                     *value = !*value;
                 }
+            }
+            Command::ResumeTask(index) => {
+                let Some(external_id) = self.durable_task_ids.get(index).cloned() else {
+                    return;
+                };
+                let workspace = self.workspace_input.read(cx).text().trim().to_owned();
+                if workspace.is_empty() {
+                    if let Ok(path) = std::env::current_dir()
+                        && let Some(path) = path.to_str()
+                    {
+                        self.workspace_input
+                            .update(cx, |input, cx| input.set_text(path, cx));
+                    }
+                }
+                self.goal_input.update(cx, |input, cx| {
+                    input.set_text("Continue the saved task", cx)
+                });
+                self.live = Some(LiveTask {
+                    session_external_id: Some(external_id),
+                    ..LiveTask::default()
+                });
+                self.state.page = Page::NewTask;
             }
             Command::Settings => {
                 self.state.page = Page::Presets;
@@ -1004,6 +1058,7 @@ impl Render for DesktopWindow {
             }
         });
         let fixture = self.state.fixture();
+        let durable_task_error = self.durable_task_error.clone();
         for field in [&self.goal_input, &self.workspace_input]
             .into_iter()
             .chain(self.preset_fields.iter())
@@ -1117,6 +1172,19 @@ impl Render for DesktopWindow {
                     .when(self.state.page == Page::Tasks, |root| root.child(
                         div().id("task-list").flex_1().min_h_0().overflow_y_scroll().p_6().flex().flex_col().gap_4()
                             .child(div().text_xl().child(locale.text(Text::RecentTasks)))
+                            .when(durable_task_error.is_some(), |list| list.child(
+                                div().text_sm().text_color(rgb(0xbf616a)).child(
+                                    durable_task_error
+                                        .unwrap_or_else(|| "Unable to load durable tasks".into()),
+                                ),
+                            ))
+                            .when(!self.durable_task_ids.is_empty(), |list| list.child(
+                                div().text_sm().text_color(rgb(0x5e6f8d)).child("Saved durable sessions"),
+                            ).children(self.durable_task_ids.iter().enumerate().map(|(index, external_id)|
+                                div().flex().items_center().justify_between().gap_3().py_2().border_b_1().border_color(rgb(0xd8dee9))
+                                    .child(div().flex_1().min_w_0().text_sm().child(external_id.clone()))
+                                    .child(self.command(("resume-task", index), "Resume", Command::ResumeTask(index), cx))
+                            )))
                             .children(TASK_FIXTURES.iter().enumerate().map(|(index, task)|
                                 div().flex().flex_col().gap_2().py_3().border_b_1().border_color(rgb(0xd8dee9))
                                     .child(self.command(("open-task", index), task.title.text(locale), Command::OpenFixture(index), cx))
@@ -1694,8 +1762,9 @@ impl DesktopWindow {
             return;
         }
         if live.commands.is_none() {
-            let session_id =
-                crate::runtime_host::task_external_id(std::path::Path::new(&workspace), &prompt);
+            let session_id = live.session_external_id.clone().unwrap_or_else(|| {
+                crate::runtime_host::task_external_id(std::path::Path::new(&workspace), &prompt)
+            });
             let mut host = match RuntimeHost::configured_for_session(workspace.clone(), session_id)
             {
                 Ok(host) => host,
