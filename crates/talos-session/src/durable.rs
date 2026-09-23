@@ -97,6 +97,22 @@ pub struct DurableSession {
 }
 
 impl DurableSession {
+    /// Lists existing host-owned durable identities without creating bindings.
+    pub fn list_external_ids(root: &std::path::Path) -> Result<Vec<String>, SessionError> {
+        let bindings_path = root.join("durable-bindings.sqlite");
+        if !bindings_path.exists() {
+            return Ok(Vec::new());
+        }
+        let connection = open_bindings(&bindings_path)?;
+        let mut statement = connection
+            .prepare("SELECT external_id FROM durable_bindings ORDER BY external_id")
+            .map_err(sql_error)?;
+        let rows = statement
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(sql_error)?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(sql_error)
+    }
+
     /// Opens or creates a durable session for a host-owned external identity.
     pub fn open_or_create(root: &std::path::Path, external_id: &str) -> Result<Self, SessionError> {
         create_or_open(root, external_id)

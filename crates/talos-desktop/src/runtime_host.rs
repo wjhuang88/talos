@@ -679,6 +679,13 @@ mod tests {
                 .iter()
                 .any(|entry| entry.content == "persist this turn")
         );
+        assert_eq!(
+            talos_session::DurableSession::list_external_ids(
+                &workspace.0.join(".talos").join("desktop-sessions")
+            )
+            .expect("session index reads"),
+            vec!["desktop-test-session"]
+        );
     }
 
     pub(super) struct TestWorkspace(pub(super) PathBuf);
