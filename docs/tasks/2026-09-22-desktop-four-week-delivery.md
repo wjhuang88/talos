@@ -184,6 +184,13 @@ Real-provider acceptance uses the maintainer's configured provider only with its
 authorization; automated regression suites use fixtures, not paid requests.
 No dependency is added speculatively; check then-current upstream versions and compatibility if needed.
 
+## T2 Completion Evidence — 2026-09-23
+
+T2 / I283 / DESKTOP-001-D5 technical delivery is evidenced by implementation merge commit
+`93c8b357` (PR #603). Exact-head CI run `35825870138` passed for head `9163bf82`, and the
+independent Agent-role security/API review was bound to that head. H2/H3 remain human acceptance
+residuals in Issue #29; T3 and T4 remain Planned and this four-week planning task is not complete.
+
 ### Time, Cost And Resource Limits
 
 Target four weeks; WIP=1. Reuse build caches, avoid parallel full workspace builds and extra
