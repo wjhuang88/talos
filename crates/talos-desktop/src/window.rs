@@ -490,13 +490,12 @@ impl DesktopWindow {
                     return;
                 };
                 let workspace = self.workspace_input.read(cx).text().trim().to_owned();
-                if workspace.is_empty() {
-                    if let Ok(path) = std::env::current_dir()
-                        && let Some(path) = path.to_str()
-                    {
-                        self.workspace_input
-                            .update(cx, |input, cx| input.set_text(path, cx));
-                    }
+                if workspace.is_empty()
+                    && let Ok(path) = std::env::current_dir()
+                    && let Some(path) = path.to_str()
+                {
+                    self.workspace_input
+                        .update(cx, |input, cx| input.set_text(path, cx));
                 }
                 self.goal_input.update(cx, |input, cx| {
                     input.set_text("Continue the saved task", cx)
