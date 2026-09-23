@@ -81,7 +81,7 @@ safety. Roll back only the failing slice; no destructive cleanup of user session
 2026-09-22: activation #601 reached `main` as `538cbfef` after I282 implementation merge
 `aaa4c015`; I283 is now effective and local implementation may begin.
 
-## Local Execution Checkpoint — 2026-09-23
+## Local Execution Checkpoint — 2026-09-23 (historical checkpoint, superseded)
 
 Local implementation is converging on `chore/i283-activation-closeout`. The Desktop host now
 composes the existing shared Runtime tools, projects tool start/result events, exposes exact
@@ -95,7 +95,7 @@ passed. Desktop mock tests: 61 passed. This is not yet a stable candidate: full 
 validation, release preflight, governance validators, implementation PR and independent review
 remain pending.
 
-## Verification Evidence
+## Verification Evidence (historical checkpoint, superseded)
 
 Implementation checks: focused locked checks passed (`cargo check` for Runtime/Desktop, Desktop
 mock suite 61/61, and the exact-once approval response test). Full workspace validation, release

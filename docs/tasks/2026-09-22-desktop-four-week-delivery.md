@@ -241,7 +241,7 @@ DEPENDENCY-003 research claim and its branch. Shared Board/backlog edits use uni
 recheck target main at merge time. No new per-subtask Issue, code build, release or dependency
 change is part of this submission. Next work remains I282 readiness mapping and effective claim.
 
-## Local Review Correction Checkpoint — 2026-09-23
+## Local Review Correction Checkpoint — 2026-09-23 (historical checkpoint, superseded)
 
 This checkpoint supersedes earlier next-action descriptions without rewriting the published
 baseline. I282 implementation is merged as `aaa4c015`; its H1/H5 native rows remain outstanding.
