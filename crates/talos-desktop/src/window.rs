@@ -1791,9 +1791,11 @@ impl DesktopWindow {
                                     RuntimeOutput::ToolEvidence {
                                         call_id,
                                         provenance,
+                                        source,
                                     } => {
                                         live.output.push_str(&format!(
-                                            "[evidence {call_id}: provenance={provenance}]\n"
+                                            "[evidence {call_id}: provenance={provenance}; source={}]\n",
+                                            source.as_deref().unwrap_or("unavailable")
                                         ));
                                     }
                                     RuntimeOutput::ToolResult {

@@ -55,7 +55,8 @@ fn output_bytes(output: &RuntimeOutput) -> usize {
         RuntimeOutput::ToolEvidence {
             call_id,
             provenance,
-        } => call_id.len() + provenance.len(),
+            source,
+        } => call_id.len() + provenance.len() + source.as_deref().unwrap_or_default().len(),
         RuntimeOutput::ToolResult {
             call_id, content, ..
         } => call_id.len() + content.len(),
@@ -100,7 +101,11 @@ pub(crate) enum RuntimeOutput {
     /// A tool call was requested; this does not imply successful execution.
     ToolStarted { call_id: String, name: String },
     /// Read-only provenance for a tool call; absence is represented explicitly.
-    ToolEvidence { call_id: String, provenance: String },
+    ToolEvidence {
+        call_id: String,
+        provenance: String,
+        source: Option<String>,
+    },
     /// A tool result projected from the Runtime.
     ToolResult {
         call_id: String,
@@ -647,6 +652,7 @@ fn project_event(event: SessionEvent) -> Vec<RuntimeOutput> {
                 RuntimeOutput::ToolEvidence {
                     call_id: call.id,
                     provenance: format_tool_provenance(&provenance),
+                    source: tool_source(&call.input),
                 },
             ],
             talos_runtime::TurnEventPayload::Progress {
@@ -688,6 +694,14 @@ fn format_tool_provenance(provenance: &talos_runtime::ToolProvenance) -> String 
             carrier,
         } => format!("plugin:{name}@{version} ({carrier})"),
     }
+}
+
+fn tool_source(input: &serde_json::Value) -> Option<String> {
+    ["path", "file_path", "filename"]
+        .into_iter()
+        .find_map(|key| input.get(key).and_then(serde_json::Value::as_str))
+        .filter(|value| !value.trim().is_empty())
+        .map(str::to_owned)
 }
 
 #[cfg(test)]
@@ -735,6 +749,15 @@ mod tests {
                 .is_empty()
         );
         assert!(!other_root.join("durable-bindings.sqlite").exists());
+    }
+
+    #[test]
+    fn tool_source_is_explicitly_unavailable_without_a_path_field() {
+        assert_eq!(tool_source(&serde_json::json!({"command": "pwd"})), None);
+        assert_eq!(
+            tool_source(&serde_json::json!({"file_path": "src/main.rs"})),
+            Some("src/main.rs".into())
+        );
     }
 
     #[tokio::test(flavor = "current_thread")]
