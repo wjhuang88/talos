@@ -17,7 +17,7 @@
 | Work Slice | DESKTOP-001-D6 / I284: Desktop Durable Tasks And Evidence |
 | Claimed At | 2026-09-23 |
 | Source Issue | #29 |
-| Governance Claim PR | #606 (activation PR) |
+| Governance Claim PR | #606 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | I283/D5 implementation and governance closeout merged as `81a5d27c`; I284 is the next serial child |
 | Implementation PR | Not started; ineffective until activation #606 reaches `main` |
