@@ -265,7 +265,7 @@ running-tool cancellation and its shutdown receipt, converge tests and protected
 then push one stable correction candidate to #603. No new iteration, release or separate
 subtask Issue is activated. H1-H6 remain unverified human rows; the four-week task is incomplete.
 
-## Cancellation Decision Accepted — 2026-09-23
+## Cancellation Decision Accepted — 2026-09-23 (historical checkpoint, superseded)
 
 The maintainer explicitly accepted ADR-082's bounded owned-group cancellation guarantee.
 The decision gate above is resolved. I283 now implements and validates the supervisor,
@@ -285,5 +285,6 @@ the only known human acceptance residuals. I284 and I285 stay Planned/Unclaimed.
 The local stable candidate subsequently passed the full pinned preflight on 2026-09-23:
 Sandbox 40/40 plus 2 doctests, Runtime 41/41, Desktop 76/76, talos-skill 81/81,
 governance validators with 0 warnings, full workspace Clippy/tests, and the external
-Runtime SDK fixture. This remains local evidence; exact-head remote validation and fresh
-review are still required before I283 closes.
+Runtime SDK fixture. The formerly pending exact-head remote validation and fresh review were
+subsequently completed by CI run `35825870138` and the independent review bound to `9163bf82`;
+I283 then merged as `93c8b357`.

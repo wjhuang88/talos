@@ -117,13 +117,13 @@ owned Unix process-group cancellation with cleanup receipts, Desktop approval/Au
 and Runtime/Agent shutdown integration. I284/I285 remain Planned and are not activated by this
 closeout. H2/H3 require later natural-person validation and remain explicitly residual.
 
-## Variance And Residuals
+## Variance And Residuals (historical checkpoint, superseded 2026-09-23)
 
-Running-tool cancellation remains an implementation/review blocker; see accepted
+At that checkpoint, running-tool cancellation remained an implementation/review blocker; see accepted
 [ADR-082](../decisions/082-sandbox-command-cancellation-ownership.md).
 Carry eligible human rows to #29 / I285 without transferring protected security gates.
 
-## Review Correction Checkpoint — 2026-09-23
+## Review Correction Checkpoint — 2026-09-23 (historical checkpoint, superseded)
 
 PR #603 candidate `cbb156433f9119166150988264a84945cf003726` passed CI, including
 Windows descendant-pipe timeout and delayed descendant output tests. It is not
@@ -138,29 +138,31 @@ selects Interactive permission mode in Desktop while Runtime defaults remain
 Headless; failed Auto lease construction preserves and reports manual fallback.
 Sandbox command cwd now matches the selected workspace.
 
-Next: settle ADR-082 containment/ownership design, implement and prove running-tool
+At that checkpoint, the next steps were to settle ADR-082 containment/ownership design, implement and prove running-tool
 cancellation, rerun final validation, synchronize owners and obtain fresh review
 before the next stable push. Do not conflate pending-approval cancellation with
 running-process cancellation. No completion claim or I284 activation is made.
 
-## Local Stable Candidate Checkpoint — 2026-09-23
+## Local Stable Candidate Checkpoint — 2026-09-23 (historical checkpoint, superseded)
 
 The local candidate includes the owned Unix supervisor, cleanup receipt, Runtime/Agent
 shutdown integration, Darwin `proc_listpids(PROC_PGRP_ONLY)` EPERM disambiguation, Desktop
 running-shell interrupt/shutdown tests, and the existing Windows output/Job Object fixes.
 
-Evidence: Sandbox 40 tests plus 2 doctests, Runtime 41 tests, Desktop 76 tests, and
+Evidence at that checkpoint: Sandbox 40 tests plus 2 doctests, Runtime 41 tests, Desktop 76 tests, and
 talos-skill 81 tests passed. `./scripts/release_preflight.sh` passed, including locked
 workspace checks, Clippy, full tests, both governance validators, text-boundary checks and
-the external Runtime SDK fixture. This is local evidence only; final corrections remain
-uncommitted and require one exact-head remote candidate plus fresh protected review.
+the external Runtime SDK fixture. At that time, final corrections remained uncommitted and
+required an exact-head remote candidate plus fresh protected review; those requirements were
+subsequently satisfied by PR #603.
 
-## Cancellation Decision Acceptance — 2026-09-23
+## Cancellation Decision Acceptance — 2026-09-23 (historical checkpoint, superseded)
 
 The maintainer explicitly accepted ADR-082's bounded lifecycle guarantee. Implement
 owned-group cleanup for ordinary shell descendants with explicit completion receipts;
 do not claim containment of descendants deliberately leaving that group. The latter
 remains an unimplemented residual under I283/#29. This checkpoint amends cancellation
 acceptance without rewriting the Published Baseline. New unsafe sites are limited to
-the accepted ABI boundary and still require independent security/API review. The
-decision blocker is resolved; implementation and verification remain outstanding.
+the accepted ABI boundary and still require independent security/API review. The decision
+blocker was resolved at that time; implementation and verification were subsequently completed
+by PR #603 and its exact-head validation.
