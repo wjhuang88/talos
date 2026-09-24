@@ -18,17 +18,17 @@
 | Field | Value |
 |---|---|
 | Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | DESKTOP-001-D7 / I285: Desktop Integrated Candidate And Acceptance; planned scope only |
-| Claimed At | Not applicable |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-6 |
+| Work Slice | DESKTOP-001-D7 / I285: integrate prior Desktop stages, fix cross-stage acceptance defects including task-page overflow, run reproducible candidate checks and guide/record H1-H6; no new product feature or release |
+| Claimed At | 2026-09-24 |
 | Source Issue | #29 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Maintainer requested four-week Desktop planning on 2026-09-22; no implementation activation yet |
+| Governance Claim PR | Pending |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Maintainer-directed completion of the four-week Desktop delivery; I282-I284 are merged with technical gates; #29 is the existing cycle acceptance tracker |
 | Implementation PR | Not started |
-| Last Updated | 2026-09-22 |
-| Handoff / Release Condition | Resolve readiness and establish effective serial child claim before implementation; no release |
+| Last Updated | 2026-09-24 |
+| Handoff / Release Condition | Claim becomes effective only when the finalized governance PR merges; no release |
 
 ## Outcome
 
@@ -75,4 +75,5 @@ New features, retroactive claims of Windows/Linux native or physical latency acc
 ## Completion Evidence
 
 Completion Commit: pending.
-No implementation or acceptance evidence exists for this planned child.
+I285 activation is being prepared through a governance-only Draft PR. No implementation or human
+acceptance is claimed complete by this record.

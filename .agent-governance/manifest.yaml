@@ -1,5 +1,5 @@
 schema_version: "1"
-next_selected_iteration: "2026-09-22 Desktop four-week plan: I282/I283 merged; I284/D6 Review/Claimed after #607 implementation merge 2845ebdf, with H4/H6 and production evaluation-source acceptance carried in #29; I285/D7 Planned/Unclaimed. MODEL-007 deferred behind Desktop; #502 separate research; #590 Refinement/Unclaimed."
+next_selected_iteration: "2026-09-22 Desktop four-week plan: I282/I283 merged; I284/D6 Review/Claimed after #607 implementation merge 2845ebdf, with H4/H6 and production evaluation-source acceptance carried in #29; I285/D7 remains Planned/Unclaimed pending governance Draft PR finalization. MODEL-007 deferred behind Desktop; #502 separate research; #590 Refinement/Unclaimed."
 desktop_four_week_plan: "docs/tasks/2026-09-22-desktop-four-week-delivery.md; Sep 22-Oct 19 target: live host, tools/approval, durable sessions/evidence, integrated acceptance. Existing #29 validation tracker; I277 Review/Claimed retains deferred rows; I249 Planned and I164 Paused unchanged."
 managed_by: "agent-project-governance"
 i280_execution_note: "I280 / RUNTIME-006 / #234 Complete/Closed at implementation merge 007ca29d; owner closeout merge ade0b68c. Local full preflight, external fixtures, exact-head CI and API/security review passed. No execution-policy or release change."
