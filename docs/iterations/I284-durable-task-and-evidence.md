@@ -1,6 +1,6 @@
 # Iteration I284: Desktop Durable Tasks And Evidence
 
-> Document status: Active — Claimed
+> Document status: Review — Claimed
 > Plan date: 2026-09-22
 > Target window: 2026-10-06 to 2026-10-12
 > Planned objective: A Desktop user can reopen a saved conversation and inspect real work status, changes and revision-bound evaluation evidence.
@@ -20,9 +20,9 @@
 | Governance Claim PR | #606 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | I283/D5 implementation and governance closeout merged as `81a5d27c`; I284 is the next serial child |
-| Implementation PR | #607 open at remote head `6714fd79`; task-isolation commit `61fe13ae` and local Work/artifact evidence changes are not pushed |
-| Last Updated | 2026-09-23 |
-| Handoff / Release Condition | Resolve readiness and establish effective serial child claim before implementation; no release |
+| Implementation PR | #607 merged at exact head `1fc73c2e`; merge commit `2845ebdf` |
+| Last Updated | 2026-09-24 |
+| Handoff / Release Condition | Technical implementation merged; retain Review until H4/H6 and remaining production evaluation-source acceptance are resolved; no release |
 
 ## Published Baseline
 
@@ -98,8 +98,26 @@ artifact diff viewer and persisted evaluation staleness remain unfinished in thi
 
 ## Completion Evidence
 
-Completion Commit: pending.
-Only already-existing implementation/evidence commits may close this iteration.
+Completion Commit: `2845ebdf57ff26c62539a8516499ed7d29caa228` (PR #607 implementation merge).
+This is implementation evidence only; the iteration remains Review while required human and
+production-source acceptance rows remain open.
+
+## Merge Checkpoint — 2026-09-24
+
+PR #607 exact head `1fc73c2ea03356d4711625764e060f3eb3b8c32d` merged into `main` as
+`2845ebdf57ff26c62539a8516499ed7d29caa228`. Exact-head CI run `35959834215` completed
+successfully with all six jobs green: Linux Desktop explicit feature, Windows Rust workspace,
+Format/Check/Clippy/Test, Windows installer fixture, change classification and remote owner
+reconciliation. Incremental independent review approved the same exact head against base
+`4e150b3e1bc6910b3a02d75b249573ecff8191e7`, confirming the only final correction was the
+independent runtime SDK fixture lockfile and that no production/API/permission scope changed.
+
+The merge closes the technical implementation gate, not the full acceptance gate. H4 (restart,
+resume, session isolation and no repeated writes) and H6 (integrated real task, change inspection,
+evaluation and Delivery eligibility) remain deferred human rows in Issue #29. Production still has
+no authoritative session-bound acceptance-criteria/evidence producer, so normal Evaluate remains
+fail-closed as unavailable; the test-only harness does not count as production evidence. I285
+remains the next planned stabilization/acceptance iteration.
 
 ## Variance And Residuals
 

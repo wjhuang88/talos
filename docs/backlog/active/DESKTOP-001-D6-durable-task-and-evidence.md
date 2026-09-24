@@ -1,6 +1,6 @@
 # DESKTOP-001-D6: Desktop Durable Tasks And Evidence
 
-> Document status: Active — Claimed
+> Document status: Review — Claimed
 
 | Field | Value |
 |---|---|
@@ -8,7 +8,7 @@
 | Parent Epic | DESKTOP-001 |
 | Type | Desktop integration / behavior Story |
 | Priority | P1 |
-| Status | Active / Claimed — implementation under local correction |
+| Status | Review / Claimed — implementation merged; human acceptance residuals remain |
 | Selected Iteration | I284 |
 | Source | #29; four-week Desktop task |
 | Depends On | I283 implementation merged with technical gates; ADR-042/061; durable-session and WORK-001 projection compatibility map |
@@ -26,9 +26,9 @@
 | Governance Claim PR | #606 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | I283/D5 closeout merged as `81a5d27c`; I284 is the next serial child |
-| Implementation PR | #607 open at remote head `6714fd79`; task-isolation commit `61fe13ae` plus local Work/artifact evidence changes are not pushed |
-| Last Updated | 2026-09-23 |
-| Handoff / Release Condition | Finish local convergence, refresh exact-head CI and independent review, then merge-time CAS; no release |
+| Implementation PR | #607 merged at exact head `1fc73c2e`; merge commit `2845ebdf` |
+| Last Updated | 2026-09-24 |
+| Handoff / Release Condition | Technical implementation merged; close only after H4/H6 and authoritative evaluation-source acceptance; no release |
 
 ## Outcome
 
@@ -74,8 +74,20 @@ New durable Mission/Evaluation schema, automatic evaluation on every turn, multi
 
 ## Completion Evidence
 
-Completion Commit: pending.
-Implementation is in progress on PR #607; completion and human acceptance evidence are pending.
+Completion Commit: `2845ebdf57ff26c62539a8516499ed7d29caa228` (PR #607 implementation merge).
+Implementation is merged, but the story remains Review because H4/H6 and the production
+evaluation-source acceptance are pending.
+
+## Merge Checkpoint — 2026-09-24
+
+PR #607 exact head `1fc73c2ea03356d4711625764e060f3eb3b8c32d` merged as `2845ebdf`. Exact-head
+CI run `35959834215` was fully successful across all six jobs. Independent incremental review
+approved the exact head and confirmed the final diff was limited to the runtime SDK fixture lock
+file. No production, permission, security or public API scope was added by the correction.
+
+Carry H4 and H6 to Issue #29. The production path remains fail-closed when no authoritative
+criteria/evidence/revision producer exists; the deterministic EvaluationHarness is test-only and
+cannot close the live acceptance row. I285 owns final integrated stabilization and acceptance.
 
 ## Local Review Correction Checkpoint — 2026-09-23
 
