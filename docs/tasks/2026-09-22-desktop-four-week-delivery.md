@@ -3,7 +3,7 @@
 > Document status: In Progress — T3 / I284 in Review; T4 / I285 activation proposed in #608
 > Plan date: 2026-09-22
 > Target window: 2026-09-22 through 2026-10-19 (four calendar weeks; approximately 20 working days)
-> Execution state: T1/T2 merged; T3/I284 PR #607 is locally converging with Work/artifact evidence changes not pushed; T4/I285 remains Planned.
+> Execution state: T1-T3 implementation merged; I284 remains Review for H4/H6 and production evaluation-source acceptance. I285 Active / Claimed is proposed by governance PR #608 and remains ineffective until merge; no implementation push is authorized yet.
 
 ## Outcome
 
