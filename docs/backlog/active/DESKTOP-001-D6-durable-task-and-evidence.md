@@ -26,7 +26,7 @@
 | Governance Claim PR | #606 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | I283/D5 closeout merged as `81a5d27c`; I284 is the next serial child |
-| Implementation PR | #607 open; current remote head `8e8ebf6`; local substantive corrections are not yet pushed |
+| Implementation PR | #607 open at remote head `6714fd79`; task-isolation commit `61fe13ae` plus local Work/artifact evidence changes are not pushed |
 | Last Updated | 2026-09-23 |
 | Handoff / Release Condition | Finish local convergence, refresh exact-head CI and independent review, then merge-time CAS; no release |
 
@@ -101,7 +101,62 @@ reconciliation and Windows installer fixture. The Windows Rust workspace job has
 and smoke steps but has not reached a terminal job state while cache cleanup runs; do not count it
 as green until GitHub reports a conclusion. Independent review of this exact head is pending.
 
-I284 remains incomplete: no shared durable Work/Evaluation projection is available to the Desktop
-host, and Runtime events do not yet carry actual changed-artifact evidence sufficient for a real
-file diff. The live UI must report attribution as unavailable rather than infer it from workspace
-dirt or request arguments. H4/H6 also remain unaccepted in #29.
+At this review checkpoint, the shared Work projection and execution-bound artifact event had not
+yet been added. The later local checkpoint below supersedes this implementation-state note; H4/H6
+remain unaccepted in #29.
+
+## Local Task Isolation Correction — 2026-09-23
+
+Commit `61fe13ae` gives every explicit New Task a fresh workspace-scoped UUID identity and
+serializes New Task/Resume behind the old idle host's `Stopped` event. Switching is rejected while
+a turn or approval is active; host-generation checks prevent stale observers from mutating the
+replacement task. Focused coverage now exercises stop-before-switch, close superseding a pending
+switch, active/approval rejection, and stale observer generations. The locked Desktop UI suite
+passed 87/87 and the exact Desktop Clippy command passed with `-D warnings`.
+
+This correction is local and not included in PR #607 yet. Remote head remains `6714fd79` against
+base `4e150b3e`; the CI and review evidence on that head does not cover `61fe13ae`. Full
+`./scripts/release_preflight.sh` reached the independent Runtime SDK fixture after workspace
+validation, tests and doctests, but the second external fixture build failed with `No space left on
+device`. The failed run is not a green preflight; its task-owned `target/` output was removed with
+`cargo clean`, freeing 19.1 GiB. Re-run the complete preflight on a disk-safe candidate before
+publishing it.
+
+At this task-isolation checkpoint, the shared Work projection and execution-bound artifact event
+were not yet implemented. The later local checkpoint below records the subsequent changes. H4/H6
+human acceptance remains open in #29; do not mark I284 Complete until its technical scope and
+required gates are genuinely resolved.
+
+## Local Work And Artifact Evidence Checkpoint — 2026-09-23
+
+The uncommitted local slice reads the shared Work graph read-only, scoped to the bound session ID.
+A Runtime hook snapshots only workspace-contained regular files no larger than 1 MiB before and
+after successful built-in `write`, `edit` and `delete` calls. It emits session/turn/call/path
+evidence only when the bounded content digest differs. It rejects symlinks and outside paths,
+checks the same tool/path identity at both boundaries, caps pending snapshots at 128 and removes
+unfinished entries at turn completion. The UI describes these as differences observed around
+successful file tools; it shows source identity without exposing file contents.
+
+Local verification: `cargo test -p talos-desktop --features desktop-ui --locked` passed 93/93;
+`cargo clippy -p talos-desktop --features desktop-ui --all-targets --locked -- -D warnings`,
+`cargo fmt --all -- --check` and `git diff --check` passed. Focused regressions cover creation,
+no-op, failed calls, path mismatch, outside paths, size limit, symlink rejection and turn cleanup.
+A RuntimeHost integration test starts a DurableSession, obtains real approval, executes the shared
+`write` tool and asserts the actual file plus its session/turn/call/path event. The shared session
+Work projection has a separate passing `cargo test -p talos-session --locked` result.
+
+This evidence list is in-memory for the open host, does not cover shell/custom tools and does not
+show a content diff. Earlier-run file evidence remains unavailable after restart. The accepted
+scope still has no shared durable Mission/Evaluation source; Evaluation and Delivery therefore
+remain unavailable. I284 is incomplete; H4/H6 are open in #29, and I285 remains Planned.
+
+## Current Source Audit - 2026-09-24
+
+The [I284 source audit](../../iterations/I284-durable-task-and-evidence.md#evidence-boundary-and-evaluation-source-audit---2026-09-24)
+records artifact-boundary corrections, independent slice review and 98 passing Desktop tests.
+The remaining evaluation gap is a production claim/current-subject/evidence handoff, not a request
+for new durable Mission/Evaluation storage (excluded by the baseline). Existing shared evaluator
+types alone do not supply that data. ADR-083 was accepted on 2026-09-24 and the shared
+`RuntimeEvaluationService` is now available, but a real producer and explicit action are still
+required before the story can close. Do not substitute fabricated live evidence or remove the
+acceptance target.

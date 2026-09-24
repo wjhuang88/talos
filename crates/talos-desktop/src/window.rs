@@ -71,6 +71,19 @@ impl LiveStatus {
     }
 }
 
+fn work_status_label(status: crate::runtime_host::WorkUnitStatus, locale: Locale) -> &'static str {
+    match (status, locale) {
+        (crate::runtime_host::WorkUnitStatus::Todo, Locale::English) => "To do",
+        (crate::runtime_host::WorkUnitStatus::Todo, Locale::Chinese) => "待办",
+        (crate::runtime_host::WorkUnitStatus::InProgress, Locale::English) => "In progress",
+        (crate::runtime_host::WorkUnitStatus::InProgress, Locale::Chinese) => "进行中",
+        (crate::runtime_host::WorkUnitStatus::Completed, Locale::English) => "Complete",
+        (crate::runtime_host::WorkUnitStatus::Completed, Locale::Chinese) => "已完成",
+        (crate::runtime_host::WorkUnitStatus::Blocked, Locale::English) => "Blocked",
+        (crate::runtime_host::WorkUnitStatus::Blocked, Locale::Chinese) => "受阻",
+    }
+}
+
 #[derive(Default)]
 struct LiveTask {
     commands: Option<tokio::sync::mpsc::Sender<crate::runtime_host::RuntimeCommand>>,
@@ -87,6 +100,29 @@ struct LiveTask {
     pending_approval: Option<(u64, String, String, String)>,
     host_generation: Option<uuid::Uuid>,
     after_host_stop: Option<AfterHostStop>,
+    work_projection: crate::runtime_host::WorkProjectionState,
+    artifact_changes: Vec<ArtifactChangePresentation>,
+    evaluation: EvaluationPresentation,
+}
+
+#[derive(Default, Clone)]
+enum EvaluationPresentation {
+    #[default]
+    Unavailable,
+    Running,
+    Result {
+        state: String,
+        delivery: talos_core::work::DeliveryEligibility,
+    },
+}
+
+#[derive(Clone)]
+struct ArtifactChangePresentation {
+    session_id: uuid::Uuid,
+    turn_id: u64,
+    call_id: String,
+    operation: String,
+    path: String,
 }
 
 #[derive(Clone)]
@@ -287,6 +323,7 @@ enum Command {
     ApproveOnce(u64),
     ApproveSession(u64),
     DenyApproval(u64),
+    Evaluate,
 }
 
 struct DesktopWindow {
@@ -495,6 +532,21 @@ impl DesktopWindow {
                     });
                 })
                 .detach();
+            }
+            Command::Evaluate => {
+                if let Some(live) = &mut self.live
+                    && let Some(commands) = &live.commands
+                {
+                    if commands
+                        .try_send(crate::runtime_host::RuntimeCommand::Evaluate)
+                        .is_ok()
+                    {
+                        live.status = LiveStatus::Connecting;
+                    } else {
+                        live.status = LiveStatus::HostBusy;
+                        live.output.push_str("\n[Evaluation could not be queued]\n");
+                    }
+                }
             }
             Command::OpenFixture(index) => {
                 if self.state.open_fixture(index) {
@@ -1981,13 +2033,34 @@ impl DesktopWindow {
                                         live.output.push('\n');
                                     }
                                 }
+                                RuntimeOutput::WorkProjection { state } => {
+                                    live.work_projection = state;
+                                }
+                                RuntimeOutput::ArtifactChanged {
+                                    session_id,
+                                    turn_id,
+                                    call_id,
+                                    operation,
+                                    path,
+                                } => {
+                                    if live.artifact_changes.len() == 100 {
+                                        live.artifact_changes.remove(0);
+                                    }
+                                    live.artifact_changes.push(ArtifactChangePresentation {
+                                        session_id,
+                                        turn_id,
+                                        call_id,
+                                        operation,
+                                        path,
+                                    });
+                                }
                                 RuntimeOutput::ToolRequestContext {
                                     call_id,
                                     provenance,
                                     requested_path,
                                 } => {
                                     live.output.push_str(&format!(
-                                        "[tool request {call_id}: provenance={provenance}; requested path={}; actual change attribution=unavailable]\n",
+                                        "[tool request {call_id}: provenance={provenance}; requested path={}]\n",
                                         requested_path.as_deref().unwrap_or("unavailable")
                                     ));
                                 }
@@ -2018,6 +2091,24 @@ impl DesktopWindow {
                                 } => {
                                     live.output.push_str(&format!(
                                         "\n[Auto review: {outcome} — {reason} ({evaluator})]\n"
+                                    ));
+                                }
+                                RuntimeOutput::EvaluationUnavailable { reason } => {
+                                    live.evaluation = EvaluationPresentation::Unavailable;
+                                    live.output.push_str(&format!("\n[Evaluation unavailable: {reason}]\n"));
+                                }
+                                RuntimeOutput::EvaluationStarted => {
+                                    live.evaluation = EvaluationPresentation::Running;
+                                    live.status = LiveStatus::Connecting;
+                                    live.output.push_str("\n[Evaluation started]\n");
+                                }
+                                RuntimeOutput::EvaluationResult { state, delivery } => {
+                                    live.evaluation = EvaluationPresentation::Result {
+                                        state: state.clone(),
+                                        delivery,
+                                    };
+                                    live.output.push_str(&format!(
+                                        "\n[Evaluation: {state}; Delivery: {delivery:?}]\n"
                                     ));
                                 }
                                 RuntimeOutput::ApprovalClosed { request_id } => {
@@ -2082,6 +2173,29 @@ impl DesktopWindow {
         }));
     }
 
+    fn evaluation_view(&self, state: &EvaluationPresentation, locale: Locale) -> impl IntoElement {
+        let text = match state {
+            EvaluationPresentation::Unavailable => {
+                if locale == Locale::Chinese {
+                    "评估状态：不可用；不会判定为可交付。".to_owned()
+                } else {
+                    "Evaluation: unavailable; Delivery is not inferred.".to_owned()
+                }
+            }
+            EvaluationPresentation::Running => {
+                if locale == Locale::Chinese {
+                    "评估状态：进行中".to_owned()
+                } else {
+                    "Evaluation: running".to_owned()
+                }
+            }
+            EvaluationPresentation::Result { state, delivery } => {
+                format!("Evaluation: {state}; Delivery: {delivery:?}")
+            }
+        };
+        div().text_sm().text_color(rgb(0x68758c)).child(text)
+    }
+
     fn render_live(&self, window: &Window, cx: &mut Context<Self>) -> impl IntoElement {
         let locale = self.state.locale;
         let compact = window.viewport_size().width < px(900.);
@@ -2089,6 +2203,121 @@ impl DesktopWindow {
             .live
             .as_ref()
             .expect("live rendering requires live state");
+        let work_view = match &live.work_projection {
+            crate::runtime_host::WorkProjectionState::Loading => div()
+                .child(div().child(if locale == Locale::Chinese {
+                    "工作状态"
+                } else {
+                    "Work status"
+                }))
+                .child(div().text_sm().text_color(rgb(0x68758c)).child(
+                    if locale == Locale::Chinese {
+                        "正在加载工作状态……"
+                    } else {
+                        "Loading work status..."
+                    },
+                )),
+            crate::runtime_host::WorkProjectionState::Unavailable => div()
+                .child(div().child(if locale == Locale::Chinese {
+                    "工作状态"
+                } else {
+                    "Work status"
+                }))
+                .child(div().text_sm().text_color(rgb(0x68758c)).child(
+                    if locale == Locale::Chinese {
+                        "当前会话没有可用的共享工作列表。"
+                    } else {
+                        "Shared work tracking is unavailable for this session."
+                    },
+                )),
+            crate::runtime_host::WorkProjectionState::ReadError => div()
+                .child(div().child(if locale == Locale::Chinese {
+                    "工作状态"
+                } else {
+                    "Work status"
+                }))
+                .child(div().text_sm().text_color(rgb(0xb42318)).child(
+                    if locale == Locale::Chinese {
+                        "读取共享工作列表失败；请重新打开任务重试。"
+                    } else {
+                        "Could not read shared work tracking; reopen the task to retry."
+                    },
+                )),
+            crate::runtime_host::WorkProjectionState::Available { items, truncated } => {
+                let mut view = div().child(div().child(if locale == Locale::Chinese {
+                    "工作状态"
+                } else {
+                    "Work status"
+                }));
+                if items.is_empty() {
+                    view = view.child(div().text_sm().text_color(rgb(0x68758c)).child(
+                        if locale == Locale::Chinese {
+                            "当前会话没有跟踪中的工作项。"
+                        } else {
+                            "No work items are tracked in this session."
+                        },
+                    ));
+                }
+                for item in items {
+                    let title = if item.title_truncated {
+                        format!("{}...", item.title)
+                    } else {
+                        item.title.clone()
+                    };
+                    view = view.child(
+                        div()
+                            .flex()
+                            .gap_2()
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .text_color(rgb(0x68758c))
+                                    .child(work_status_label(item.status, locale)),
+                            )
+                            .child(div().text_sm().child(title)),
+                    );
+                }
+                if *truncated {
+                    view = view.child(div().text_sm().text_color(rgb(0x68758c)).child(
+                        if locale == Locale::Chinese {
+                            "仅显示前 100 项。"
+                        } else {
+                            "Showing the first 100 items."
+                        },
+                    ));
+                }
+                view
+            }
+        };
+        let artifact_view = {
+            let mut view = div().child(div().child(if locale == Locale::Chinese {
+                "成功文件工具调用前后观察到的变化"
+            } else {
+                "Changes observed around successful file tools"
+            }));
+            if live.artifact_changes.is_empty() {
+                view = view.child(div().text_sm().text_color(rgb(0x68758c)).child(if locale
+                    == Locale::Chinese
+                {
+                    "当前打开会话尚未观察到成功文件工具调用前后的文件差异；其他工具或重启前的变化可能不可用。"
+                } else {
+                    "No file differences observed around successful file tools in this open session; other tools or changes from before restart may be unavailable."
+                }));
+            }
+            for change in &live.artifact_changes {
+                view = view.child(
+                    div()
+                        .flex()
+                        .gap_2()
+                        .child(div().text_sm().text_color(rgb(0x68758c)).child(format!(
+                            "{} [turn {}, call {}, session {}]",
+                            change.operation, change.turn_id, change.call_id, change.session_id
+                        )))
+                        .child(div().text_sm().child(change.path.clone())),
+                );
+            }
+            view
+        };
         let content = div()
             .id("live-task")
             .when(compact, |content| {
@@ -2118,6 +2347,12 @@ impl DesktopWindow {
             ))
             .child(div().child(locale.text(Text::Goal)))
             .child(self.goal_input.clone())
+            .child(self.command(
+                "live-evaluate",
+                if locale == Locale::Chinese { "开始评估" } else { "Evaluate" },
+                Command::Evaluate,
+                cx,
+            ))
             .child(
                 div()
                     .flex()
@@ -2148,11 +2383,9 @@ impl DesktopWindow {
             } else {
                 "Tools use the Runtime permission gate; successful turns persist to this task session."
             }))
-            .child(div().text_sm().text_color(rgb(0x68758c)).child(if locale == Locale::Chinese {
-                "评估状态：不可用（当前未连接共享评估存储）；不会据此判定可交付。"
-            } else {
-                "Evaluation: unavailable (shared evaluation storage is not connected); Delivery is not inferred."
-            }))
+            .child(self.evaluation_view(&live.evaluation, locale))
+            .child(work_view)
+            .child(artifact_view)
             .child(div().child(live.status.label(locale).to_owned()))
             .when_some(live.pending_approval.as_ref(), |view, approval| {
                 view.child(div().p_3().rounded_md().bg(rgb(0xe5e9f0)).child(format!(

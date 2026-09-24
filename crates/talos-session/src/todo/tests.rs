@@ -606,6 +606,63 @@ fn session_manager_opens_initialized_todo_repository() {
     assert!(repo.get(session_id, item.id).expect("get").is_some());
 }
 
+#[test]
+fn read_only_work_projection_is_session_scoped_and_never_creates_storage() {
+    let dir = tempfile::tempdir().expect("directory");
+    let manager = crate::SessionManager::with_dir(dir.path().to_path_buf());
+    let database = dir.path().join("todos.sqlite");
+    let session_id = Uuid::new_v4();
+    let other_session_id = Uuid::new_v4();
+
+    assert_eq!(
+        manager
+            .load_work_graph_read_only(session_id)
+            .expect("missing store is unavailable"),
+        None
+    );
+    assert!(
+        !database.exists(),
+        "read-only inspection must not create DB"
+    );
+
+    let repo = manager.todo_repository().expect("initialize todo store");
+    create(&repo, session_id, "current session work");
+    create(&repo, other_session_id, "other session work");
+    drop(repo);
+
+    let graph = manager
+        .load_work_graph_read_only(session_id)
+        .expect("load current session graph")
+        .expect("initialized store exists");
+    assert_eq!(graph.nodes.len(), 1);
+    assert_eq!(graph.nodes[0].title, "current session work");
+    assert!(graph.edges.is_empty());
+}
+
+#[test]
+fn read_only_work_projection_reports_corrupt_storage() {
+    let dir = tempfile::tempdir().expect("directory");
+    let manager = crate::SessionManager::with_dir(dir.path().to_path_buf());
+    let database = dir.path().join("todos.sqlite");
+    std::fs::write(&database, b"not a sqlite database").expect("write corrupt database");
+
+    assert!(manager.load_work_graph_read_only(Uuid::new_v4()).is_err());
+}
+
+#[test]
+fn read_only_work_projection_reports_directory_instead_of_missing_database() {
+    let dir = tempfile::tempdir().expect("directory");
+    let manager = crate::SessionManager::with_dir(dir.path().to_path_buf());
+    let database = dir.path().join("todos.sqlite");
+    std::fs::create_dir(&database).expect("invalid database fixture");
+
+    assert!(manager.load_work_graph_read_only(Uuid::new_v4()).is_err());
+    assert!(
+        database.is_dir(),
+        "inspection must preserve the invalid path"
+    );
+}
+
 #[tokio::test]
 async fn todo_tools_create_query_and_update_status() {
     let dir = tempdir().expect("temp dir");

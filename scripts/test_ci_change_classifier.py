@@ -29,6 +29,18 @@ def payload(*records: tuple[str, str]) -> bytes:
 
 
 class ClassifierTests(unittest.TestCase):
+    def test_successful_reduced_classification_skips_rust_preflight_job(self) -> None:
+        workflow = (Path(__file__).parents[1] / ".github/workflows/ci.yml").read_text(
+            encoding="utf-8"
+        )
+        preflight = workflow.split("\n  preflight:\n", 1)[1].split("\n  windows-rust:\n", 1)[0]
+        self.assertIn("needs: classify-changes", preflight)
+        self.assertIn(
+            "if: always() && (needs.classify-changes.result != 'success' || "
+            "needs.classify-changes.outputs.full_validation != 'false')",
+            preflight,
+        )
+
     def assert_reduced(self, *records: tuple[str, str]) -> None:
         self.assertFalse(MODULE.classify_name_status(payload(*records)).full_validation)
 

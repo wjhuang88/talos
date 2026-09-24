@@ -40,6 +40,28 @@ pub struct TodoRepository {
 }
 
 impl TodoRepository {
+    pub(crate) fn open_read_only(path: &Path) -> Result<Option<Self>, TodoError> {
+        match std::fs::metadata(path) {
+            Ok(metadata) if metadata.is_file() => {}
+            Ok(_) => {
+                return Err(TodoError::Database(
+                    "Todo database path is not a regular file".to_owned(),
+                ));
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(error) => return Err(TodoError::Database(error.to_string())),
+        }
+        let conn = Connection::open_with_flags(
+            path,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )?;
+        conn.pragma_update(None, "query_only", "ON")?;
+        Ok(Some(Self {
+            conn,
+            db_path: path.to_path_buf(),
+        }))
+    }
+
     /// Open or create a todo database at the given path.
     ///
     /// # Errors

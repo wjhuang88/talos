@@ -1,6 +1,6 @@
 # Talos Desktop development host
 
-I283 is under local development. These commands describe the implementation in
+I284 is under local development. These commands describe the implementation in
 this branch, not a released Desktop product. Native acceptance is still pending.
 
 ## Launch
@@ -50,10 +50,14 @@ Small windows scroll the task page to reach Send, Cancel and output.
   Tool activity also exposes read-only provenance evidence (`native`, MCP server, or plugin) with
   the exact call ID; missing provenance is rendered as unavailable rather than inferred. The
   Recent tasks page lists existing identities for the selected workspace and offers an explicit
-  Resume action. Artifact paths are shown only when the tool request carries an attributable
-  path; the UI still does not provide a full artifact diff viewer or persisted evaluation/Delivery
-  status. Resumed transcript entries are marked as restored history and never re-run tools.
-  Fixture presets do not configure live execution.
+  Resume action. The Work panel reads the shared graph for the exact session when available and
+  distinguishes unavailable data from storage errors. The evidence panel lists bounded file
+  differences observed around successful built-in `write`, `edit` and `delete` calls, with session,
+  turn and tool-call identity. It excludes shell/custom tools, symlinks, paths outside the workspace
+  and files larger than 1 MiB; it retains no file contents, does not show a content diff, and prior
+  evidence is unavailable after restart. Evaluation and Delivery remain unavailable without a
+  supported shared persistent evaluation source. Resumed transcript entries are marked as restored
+  history and never re-run tools. Fixture presets do not configure live execution.
 - Cancel requests a Runtime interrupt. Tests cover a pending provider connection,
   an open paused stream, and provider-backed history compaction; the latter cancels
   the committed turn without waiting for the compactor provider.
@@ -96,6 +100,10 @@ On Linux a usable X11/Wayland display is required.
 Unix shell 取消的保证范围是所属进程组内的普通后代；主动脱离进程组的程序
 不属于该机制的强隔离保证。取消和退出会等待托管沙箱的清理回执，无法确认
 清理时会报告错误。真实 shell 与后代的集成测试不替代安全复核或人工验收。
-本阶段不保存会话；示例预设不会影响真实请求，重启会丢失当前内存会话。
+会话 transcript 通过共享 Runtime 持久化，Recent tasks 可显式恢复已有会话，恢复不会重放工具。
+工作面板只读取当前会话的共享工作图；证据面板仅列出成功的内置文件工具调用前后观察到的
+受限文件差异，并显示会话、turn 和工具调用身份，不保留文件内容或提供内容 diff。它不覆盖
+shell/自定义工具、符号链接、工作区外路径或大于 1 MiB 的文件；重启前的文件证据不可用。
+没有共享持久化评估数据时，Evaluation 与 Delivery 保持不可用，不会推断为通过。
 工具和权限交互的原生人工验收以及后续阶段仍未闭环，
 不能把截图或单元测试通过视为完整桌面交付。

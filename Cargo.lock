@@ -9422,11 +9422,15 @@ name = "talos-desktop"
 version = "0.10.1"
 dependencies = [
  "async-trait",
+ "cap-fs-ext",
+ "cap-std",
  "gpui",
  "gpui_platform",
  "serde_json",
  "sha2 0.11.0",
  "talos-config",
+ "talos-core",
+ "talos-plugin",
  "talos-provider",
  "talos-runtime",
  "talos-sandbox",
@@ -9619,6 +9623,8 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.20",
  "tokio",
+ "tokio-util",
+ "uuid",
 ]
 
 [[package]]
@@ -10103,6 +10109,7 @@ dependencies = [
  "bytes",
  "futures-core",
  "futures-sink",
+ "futures-util",
  "libc 0.2.186",
  "pin-project-lite",
  "tokio",

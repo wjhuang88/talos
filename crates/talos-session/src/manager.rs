@@ -207,6 +207,26 @@ impl SessionManager {
         Ok(repo)
     }
 
+    /// Read the canonical Work graph for one session without creating or migrating storage.
+    ///
+    /// Returns `Ok(None)` when the shared Todo database does not exist yet. The query is scoped
+    /// to the exact session ID and never scans or returns another session's work.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the existing database cannot be opened or its graph is invalid.
+    pub fn load_work_graph_read_only(
+        &self,
+        session_id: Uuid,
+    ) -> Result<Option<talos_core::work::WorkGraph>, TodoError> {
+        let Some(repository) =
+            TodoRepository::open_read_only(&self.sessions_dir.join("todos.sqlite"))?
+        else {
+            return Ok(None);
+        };
+        repository.load_work_graph(session_id).map(Some)
+    }
+
     /// Create a new session for the given project and workspace.
     ///
     /// The session file is created at `~/.talos/sessions/<workspace_dir>/<uuid>.tlog`,
