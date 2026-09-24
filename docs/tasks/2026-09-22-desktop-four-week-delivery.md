@@ -1,9 +1,9 @@
 # Desktop Four-Week Delivery Task
 
-> Document status: Planned
+> Document status: In Progress — T3 / I284 active
 > Plan date: 2026-09-22
 > Target window: 2026-09-22 through 2026-10-19 (four calendar weeks; approximately 20 working days)
-> Execution state: planning only; no new implementation claim is effective.
+> Execution state: T1/T2 merged; T3/I284 PR #607 is locally converging with Work/artifact evidence changes not pushed; T4/I285 remains Planned.
 
 ## Outcome
 
@@ -97,7 +97,7 @@ remain owned residuals and prevent claims of universal accessibility/platform ac
 |---|---|---|---|---|---|---|
 | T1 | Week 1, Sep 22-28 / I282 | Launch a live Desktop task using configured provider; responsive streaming, errors and cancellation; tools unavailable in this initial slice | WORK-001 P0-P4, I280, ADR-059; API map and effective claim | Mock-provider E2E plus real-provider native row; no UI blocking or fictitious results | Keep existing mock explicitly separate; unresolved facade contract becomes a named blocker, never a copied engine | In Progress — claim/activation PR #598 |
 | T2 | Week 2, Sep 29-Oct 5 / I283 | Real file/shell activity, visible existing Auto review, scoped approval and safe cancellation | T1 merged and technical gates passed | Allow/Deny/Once/Session, stale approval, cancel and shutdown matrix; independent security/API review | Tool execution remains disabled until gates pass; do not ship an auto-allow workaround | Complete — PR #603 merged as `93c8b357`; H2/H3 human residual |
-| T3 | Week 3, Oct 6-12 / I284 | Recent tasks, durable transcript resume, actual work/evaluation and read-only change/evidence views | T2 merged; storage/projection compatibility verified | Restart and session-isolation tests; revision/staleness/Delivery gates; no tool replay | Preserve transcript-only recovery if richer projection cannot persist; explicitly show unavailable evidence and keep unmet acceptance open | Planned |
+| T3 | Week 3, Oct 6-12 / I284 | Recent tasks, durable transcript resume, actual work/evaluation and read-only change/evidence views | T2 merged; storage/projection compatibility verified | Restart and session-isolation tests; revision/staleness/Delivery gates; no tool replay | Preserve transcript-only recovery if richer projection cannot persist; explicitly show unavailable evidence and keep unmet acceptance open | In Progress — PR #607 remote head `6714fd79`; task isolation committed locally, Work/artifact evidence uncommitted; full preflight, remote exact-head CI/review and human rows remain |
 | T4 | Week 4, Oct 13-19 / I285 | Reproducible integrated candidate, fixes, user guide and consolidated acceptance report | T1-T3 merged with technical gates passed | Integrated E2E, current-head CI/review, required native rows, documented residuals and clean handoff | Deliver Partial with exact remaining blockers; no fake Complete or unrequested release | Planned |
 
 Reserve roughly three days in Week 4 for fixes/retesting and two for acceptance/documentation.
@@ -295,3 +295,135 @@ governance validators with 0 warnings, full workspace Clippy/tests, and the exte
 Runtime SDK fixture. The formerly pending exact-head remote validation and fresh review were
 subsequently completed by CI run `35825870138` and the independent review bound to `9163bf82`;
 I283 then merged as `93c8b357`.
+
+## I284 Local Convergence Checkpoint — 2026-09-23
+
+I284 local commits `08df087e`, `beed4624`, `ad4a8665`, `1f466182`, `9f549cd6`, `5396f5c4`,
+`1ccdc79c`, `9020d000`, `cf91273c`, `aaee340a`, and `163a0ab2` provide workspace+goal durable identities,
+successful-turn persistence, no-replay cancellation coverage, workspace-scoped Recent tasks
+discovery, explicit Resume, tool provenance and attributable source display, plus an honest
+evaluation `unavailable` state. The full Desktop mock suite is 80/80 and the affected locked
+check passes. Restart resume renders restored transcript entries explicitly and emits no tool
+execution events for the restored entries.
+
+The remaining I284 implementation work is a read-only artifact/change viewer tied to actual task
+evidence and a shared evaluation projection when available; arbitrary workspace dirt remains
+unavailable. H4/H6 natural-person acceptance rows remain open. No implementation PR has been
+pushed; continue local convergence before the one stable candidate, then run preflight, both
+governance validators, exact-head CI and protected review.
+
+## I284 Review Correction Checkpoint — 2026-09-23
+
+The preceding checkpoint predates PR #607 and is superseded for current execution state. PR #607
+is open from head `8e8ebf6dde23af4286badd1b66d1dfcf41d62c24` against base
+`4e150b3e1bc6910b3a02d75b249573ecff8191e7`. Independent review found an identity collision/privacy
+defect and a requested-path label that overstated actual artifact evidence. The local candidate
+addresses both, makes Resume existing-only (including on retry), verifies interrupted-write
+recovery does not replay a tool, retains/redacts legacy durable task identities, and moves Recent
+Tasks storage reads to GPUI background execution. The candidate is still uncommitted and unpushed.
+
+Local checks: Desktop mock/UI tests 83/83, `cargo check -p talos-desktop --locked`, the exact CI
+Desktop Clippy command with `-D warnings`, `cargo fmt --all -- --check`, and `git diff --check`
+passed. Both governance validators passed with 0 warnings. The remote old head failed Clippy on
+the previous Resume path; the local candidate replaces that path and passes the same command.
+Full `./scripts/release_preflight.sh` passed on the local candidate, including workspace checks,
+tests, doc-tests and Runtime SDK fixtures. Candidate `889c1cf22257254fe51316432f44e433ba0d4803`
+is PR #607's exact head against base `4e150b3e1bc6910b3a02d75b249573ecff8191e7`. CI run
+`35856041872` passed the main Format/Check/Clippy/Test job, Linux Desktop explicit-feature job,
+change classifier, remote Issue reconciliation and Windows installer fixture. Windows workspace
+tests and smoke steps completed, but the job remains in cache post-cleanup and is not terminal.
+Independent review is pending. Shared durable Work/Evaluation data and trustworthy actual
+changed-artifact evidence remain unavailable; T3 cannot be marked Complete. H4/H6 natural-person
+acceptance is still open in #29. Keep I285 Planned until T3's technical gate and its own effective
+child claim are resolved.
+
+## I284 Task Isolation Checkpoint — 2026-09-23
+
+Local implementation commit `61fe13ae` now ensures New Task receives a unique workspace-scoped
+identity, Resume remains explicit, and an idle previous Runtime host reaches `Stopped` before a
+new task/session host replaces it. Running or approval-pending tasks reject switching, and stale
+host generations cannot overwrite current UI state. Added direct regression tests cover the
+shutdown boundary, close priority and observer-generation fence. Desktop UI tests passed 87/87;
+the exact Desktop all-target Clippy command passed with `-D warnings`.
+
+PR #607 is still remote head `6714fd79` / base `4e150b3e`; the new local commit is not pushed, so
+the old exact-head CI/review evidence does not cover it. Full release preflight ran workspace
+validation, tests, doctests and the first Runtime SDK fixture, but failed while building the second
+independent fixture due to `No space left on device`. This is a failed preflight. Cleaning the
+repository's generated `target/` directory recovered 19.1 GiB; no source or external cache was
+removed. A fresh complete preflight is still required before the next stable candidate.
+
+T3 remains incomplete: shared durable Work/Evaluation projection and trustworthy execution-bound
+artifact-change evidence are not supplied by current APIs. H4/H6 natural-person acceptance stays
+open in #29. I285 remains Planned / Unclaimed, and the four-week task is still In Progress.
+
+## I284 Work And Artifact Evidence Checkpoint — 2026-09-23
+
+Local I284 work now includes a read-only shared Work-graph projection for the exact durable session
+and bounded file-change evidence around successful built-in `write`, `edit` and `delete` calls.
+The latter carries session/turn/tool-call/path identity, compares content digests without retaining
+file contents, rejects symlink/outside/over-1-MiB paths, and is explicitly unavailable after
+restart. Shell/custom-tool changes and content diff display remain unsupported. Shared durable
+Mission/Evaluation storage is not available; Evaluation and Delivery remain unavailable rather
+than inferred.
+
+Current local evidence: Desktop UI tests 93/93, Desktop all-target Clippy with `-D warnings`,
+format check and `git diff --check` passed. PR #607 remains open at remote head `6714fd79` / base
+`4e150b3e`; these uncommitted changes and local commit `61fe13ae` are not covered by its CI/review.
+The previous full preflight failed during its second SDK fixture from disk exhaustion; rerun the
+full local candidate gate after convergence. H4/H6 remain in #29. I284 stays Active / Claimed,
+I285 stays Planned / Unclaimed, and the four-week task remains In Progress.
+
+The full suite includes a RuntimeHost integration fixture that executes the shared `write` tool
+through a DurableSession after explicit approval and verifies the resulting file plus
+session/turn/call/path evidence.
+
+Next item: finish a local audit of the Work/artifact evidence boundary and UI, rerun focused
+session/Desktop checks and the full preflight without changing the published acceptance, then
+perform owner-first synchronization and submit one stable I284 candidate through existing PR #607.
+
+## I284 Current Integration Gap - 2026-09-24
+
+Artifact-boundary corrections passed independent Agent-role slice review and the Desktop suite
+(98/98), Clippy and diff checks. This is not whole-I284 completion or a fresh full preflight.
+The [I284 owner](../iterations/I284-durable-task-and-evidence.md) records the remaining production
+completion-claim/current-subject/evidence handoff gap. Shared evaluator and Mission gate contracts
+exist, but production Runtime/Session sources are not wired. New durable evaluation storage remains
+out of scope; the required explicit evaluation action and pass/fail/stale/Delivery behavior remain
+in scope and unfinished. Resolve the handoff decision rather than fabricate input or narrow T3.
+I284 remains Active/Claimed, I285 Planned, H1-H6 unverified as recorded above; no new remote Issue,
+release or activation is implied by this checkpoint.
+
+## I284 Runtime Contract Checkpoint - 2026-09-24
+
+The Runtime evaluation service/Gate fixture now verifies current PASS eligibility and stale-Goal
+blocking. Focused affected-crate suites passed: Runtime 50/50 and Desktop 100/100; formatting and
+diff checks passed. This validates the Runtime contract only, not the Desktop host Evaluate command
+path or a production session-bound evaluation producer. The Desktop action still reports
+unavailable until authoritative criteria, workspace revision and evidence sources exist. No
+acceptance row is marked complete by this fixture. H4/H6 remain pending in #29, T3/I284 stays In
+Progress, and I285 remains Planned. The clean build consumed 2m11s after `target/` cleanup; about
+11 GiB remains available, so preserve the current incremental artifacts and avoid workspace-wide
+rebuilds.
+
+## I284 Desktop Host Contract Checkpoint - 2026-09-24
+
+The deterministic evaluator fixture is now exercised through the Desktop host's real Evaluate
+command and output channel, not just the Runtime API. Current PASS/eligible, required FAIL/blocked,
+and stale Goal revision/blocked all passed. Verification on this local candidate: Desktop tests
+101/101; Runtime tests 50/50; Desktop and Runtime all-target Clippy pass with `-D warnings`; format,
+diff and both governance validators pass (0 warnings). This remains fixture evidence only: the
+production host has no trusted session-bound acceptance criteria, workspace revision or evidence
+producer and still returns unavailable. T3/I284 remains In Progress, H4/H6 remain pending in #29,
+and I285 stays Planned. Exact-head PR #607 CI/review does not include this local work; no stable
+candidate has been pushed.
+
+The evaluation command loop was corrected so pending evaluation cannot block Interrupt/Shutdown,
+and no-authority requests retain one-for-one unavailable responses. Desktop tests are 102/102;
+the test-only host harness verifies no late verdict after cancellation. This is a responsiveness
+and fail-closed improvement, not production evaluation completion. I284 remains In Progress.
+
+Independent review confirms the production evaluation boundary remains unresolved: no authorized
+session-bound criteria/Goal source or workspace revision lifecycle exists. A test fixture must not
+be promoted as authority, and future subject changes must invalidate any result. No acceptance or
+Completion Commit is claimed.

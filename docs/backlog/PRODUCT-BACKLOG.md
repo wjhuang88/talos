@@ -14,14 +14,16 @@ is Complete/Closed: shell Ask model review under ADR-081, Windows I226 timing re
 UX follow-up merged in #588/#591 as `a1cb869b`/`bfdf8b67`, with exact-head code CI,
 independent Agent security/API approval and composed UI/test/execution-boundary acceptance
 recorded in the owner.
-The maintainer selected the four-week Desktop plan on 2026-09-22; I282-I285 are Planned, not
-activated. MODEL-007 remains deferred behind this cycle, not cancelled.
+The maintainer selected the four-week Desktop plan on 2026-09-22. I282/I283 are merged; I284 is
+Active / Claimed after activation PR #606 merged. PR #607 remains at remote head `6714fd79` while
+task isolation and the Work/artifact evidence slice are local-only. I285 remains Planned / Unclaimed.
+MODEL-007 remains deferred behind this cycle, not cancelled.
 
 | Priority | Focus | Current State / Gate | Required Reads |
 |---|---|---|---|
-| 1 | Desktop week 1: live Runtime host | DESKTOP-001-D4 / I282 Planned / Unclaimed; verify host/API readiness before claim | [D4](active/DESKTOP-001-D4-live-runtime-host.md); [I282](../iterations/I282-live-runtime-host.md); [task](../tasks/2026-09-22-desktop-four-week-delivery.md); ADR-059 |
+| 1 | Desktop week 1: live Runtime host | DESKTOP-001-D4 / I282 Review / Claimed; implementation merged, H1/H5 remain in #29 | [D4](active/DESKTOP-001-D4-live-runtime-host.md); [I282](../iterations/I282-live-runtime-host.md); [task](../tasks/2026-09-22-desktop-four-week-delivery.md); ADR-059 |
 | 1 | Desktop week 2: tools and approval | DESKTOP-001-D5 / I283 Complete; H2/H3 human acceptance residual | [D5](active/DESKTOP-001-D5-live-tools-and-approval.md); [I283](../iterations/I283-live-tools-and-approval.md); task and existing permission contracts |
-| 1 | Desktop week 3: resume and evidence | DESKTOP-001-D6 / I284 Active / Claimed; activation pending | [D6](active/DESKTOP-001-D6-durable-task-and-evidence.md); [I284](../iterations/I284-durable-task-and-evidence.md); ADR-042/061; WORK-001 |
+| 1 | Desktop week 3: resume and evidence | DESKTOP-001-D6 / I284 Active / Claimed; PR #607 remote head `6714fd79`; task isolation and Work/artifact evidence not pushed; durable evaluation and human acceptance incomplete | [D6](active/DESKTOP-001-D6-durable-task-and-evidence.md); [I284](../iterations/I284-durable-task-and-evidence.md); ADR-042/061; WORK-001 |
 | 1 | Desktop week 4: integrated acceptance | DESKTOP-001-D7 / I285 Planned / Unclaimed; consolidate required #29 rows and candidate evidence | [D7](active/DESKTOP-001-D7-desktop-integrated-acceptance.md); [I285](../iterations/I285-desktop-integrated-acceptance.md); [task](../tasks/2026-09-22-desktop-four-week-delivery.md) |
 | 2 | Conversation-language Auto explanations / #590 | Refinement / Unclaimed; multilingual selection, uncertainty fallback and measured overhead remain to refine. Not activated. | [AUTO-UX-001](active/AUTO-UX-001-review-language.md) |
 | 0 | Auto review invalid-output recurrence (2026-09-18) | Open corrective intake / Unclaimed. MiniMax-M3 `ls -la` review fails parsing and falls back to human approval; precise response unavailable. Add redacted diagnostics and evidence-backed repair; preserve permission gates. | [PERM-007-F corrective intake](active/PERM-007-F-generic-shell-effect-classification.md#2026-09-18-invalid-model-review-corrective-intake); ADR-070; source #462 |

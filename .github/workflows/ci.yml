@@ -67,7 +67,7 @@ jobs:
   preflight:
     name: Format + Check + Clippy + Test
     needs: classify-changes
-    if: always()
+    if: always() && (needs.classify-changes.result != 'success' || needs.classify-changes.outputs.full_validation != 'false')
     runs-on: macos-14
 
     steps:

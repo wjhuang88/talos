@@ -22,6 +22,8 @@ enum LiveStatus {
     Streaming,
     Cancelling,
     Closing,
+    SwitchingTask,
+    FinishCurrentTaskFirst,
     Finished,
     Cancelled,
     Stopped,
@@ -41,6 +43,11 @@ impl LiveStatus {
             Self::Streaming => ("Streaming", "正在输出"),
             Self::Cancelling => ("Cancelling", "正在取消"),
             Self::Closing => ("Stopping before closing", "正在停止，完成后关闭"),
+            Self::SwitchingTask => ("Stopping current task", "正在停止当前任务"),
+            Self::FinishCurrentTaskFirst => (
+                "Finish or cancel the current task before switching",
+                "请先完成或取消当前任务，再切换任务",
+            ),
             Self::Finished => ("Finished", "已完成"),
             Self::Cancelled => ("Cancelled", "已取消"),
             Self::Stopped => ("Stopped", "已停止"),
@@ -64,6 +71,19 @@ impl LiveStatus {
     }
 }
 
+fn work_status_label(status: crate::runtime_host::WorkUnitStatus, locale: Locale) -> &'static str {
+    match (status, locale) {
+        (crate::runtime_host::WorkUnitStatus::Todo, Locale::English) => "To do",
+        (crate::runtime_host::WorkUnitStatus::Todo, Locale::Chinese) => "待办",
+        (crate::runtime_host::WorkUnitStatus::InProgress, Locale::English) => "In progress",
+        (crate::runtime_host::WorkUnitStatus::InProgress, Locale::Chinese) => "进行中",
+        (crate::runtime_host::WorkUnitStatus::Completed, Locale::English) => "Complete",
+        (crate::runtime_host::WorkUnitStatus::Completed, Locale::Chinese) => "已完成",
+        (crate::runtime_host::WorkUnitStatus::Blocked, Locale::English) => "Blocked",
+        (crate::runtime_host::WorkUnitStatus::Blocked, Locale::Chinese) => "受阻",
+    }
+}
+
 #[derive(Default)]
 struct LiveTask {
     commands: Option<tokio::sync::mpsc::Sender<crate::runtime_host::RuntimeCommand>>,
@@ -75,16 +95,92 @@ struct LiveTask {
     running: bool,
     closing: bool,
     workspace: Option<String>,
+    session_external_id: Option<String>,
+    resume_existing: bool,
     pending_approval: Option<(u64, String, String, String)>,
+    host_generation: Option<uuid::Uuid>,
+    after_host_stop: Option<AfterHostStop>,
+    work_projection: crate::runtime_host::WorkProjectionState,
+    artifact_changes: Vec<ArtifactChangePresentation>,
+    evaluation: EvaluationPresentation,
+}
+
+#[derive(Default, Clone)]
+enum EvaluationPresentation {
+    #[default]
+    Unavailable,
+    Running,
+    Result {
+        state: String,
+        delivery: talos_core::work::DeliveryEligibility,
+    },
+}
+
+#[derive(Clone)]
+struct ArtifactChangePresentation {
+    session_id: uuid::Uuid,
+    turn_id: u64,
+    call_id: String,
+    operation: String,
+    path: String,
+}
+
+#[derive(Clone)]
+enum AfterHostStop {
+    NewTask,
+    Resume {
+        external_id: String,
+        workspace: String,
+    },
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum HostSwitchRequest {
+    Immediate,
+    WaitingForStop,
+    CurrentTaskActive,
+    HostUnavailable,
 }
 
 impl LiveTask {
+    fn is_current_host(&self, generation: uuid::Uuid) -> bool {
+        self.host_generation == Some(generation)
+    }
+
+    fn request_switch(&mut self, action: AfterHostStop) -> HostSwitchRequest {
+        if self.running || self.pending_approval.is_some() || self.closing {
+            return HostSwitchRequest::CurrentTaskActive;
+        }
+        let Some(commands) = &self.commands else {
+            return HostSwitchRequest::Immediate;
+        };
+        if commands
+            .try_send(crate::runtime_host::RuntimeCommand::Shutdown)
+            .is_err()
+        {
+            return HostSwitchRequest::HostUnavailable;
+        }
+        self.closing = true;
+        self.after_host_stop = Some(action);
+        self.status = LiveStatus::SwitchingTask;
+        HostSwitchRequest::WaitingForStop
+    }
+
+    fn stopped(&mut self) -> (Option<AfterHostStop>, bool) {
+        self.status = LiveStatus::Stopped;
+        self.running = false;
+        let switch_action = self.after_host_stop.take();
+        let should_quit = self.closing && switch_action.is_none();
+        (switch_action, should_quit)
+    }
+
     // The window stays alive until a successful Runtime shutdown result arrives.
     fn request_close(&mut self) -> bool {
         let Some(commands) = &self.commands else {
             return true;
         };
         if self.closing {
+            self.after_host_stop = None;
             return false;
         }
         match commands.try_send(crate::runtime_host::RuntimeCommand::Shutdown) {
@@ -222,10 +318,12 @@ enum Command {
     NewPreset,
     Settings,
     ToggleTaskOption(usize),
+    ResumeTask(usize),
     ChooseWorkspace,
     ApproveOnce(u64),
     ApproveSession(u64),
     DenyApproval(u64),
+    Evaluate,
 }
 
 struct DesktopWindow {
@@ -265,6 +363,9 @@ struct DesktopWindow {
     workspace_prompt: Option<gpui::Task<()>>,
     workspace_prompt_failed: bool,
     workspace_prompt_stale: bool,
+    durable_task_ids: Vec<String>,
+    durable_task_error: Option<String>,
+    durable_task_workspace: Option<String>,
     #[cfg(feature = "visual-test")]
     drag_bounds:
         std::rc::Rc<std::cell::RefCell<std::collections::HashMap<usize, Bounds<gpui::Pixels>>>>,
@@ -302,6 +403,9 @@ impl DesktopWindow {
             workspace_prompt: None,
             workspace_prompt_failed: false,
             workspace_prompt_stale: false,
+            durable_task_ids: Vec::new(),
+            durable_task_error: None,
+            durable_task_workspace: None,
             #[cfg(feature = "visual-test")]
             drag_bounds: Default::default(),
             state: Presentation::new(locale),
@@ -397,7 +501,53 @@ impl DesktopWindow {
                     }
                 }
             }
-            Command::Tasks => self.state.page = Page::Tasks,
+            Command::Tasks => {
+                self.state.page = Page::Tasks;
+                self.durable_task_error = None;
+                self.durable_task_ids.clear();
+                let workspace = self.workspace_input.read(cx).text().trim().to_owned();
+                let workspace = if workspace.is_empty() {
+                    std::env::current_dir()
+                        .ok()
+                        .and_then(|path| path.to_str().map(str::to_owned))
+                        .unwrap_or_default()
+                } else {
+                    workspace
+                };
+                self.durable_task_workspace = Some(workspace.clone());
+                cx.spawn(async move |this, cx| {
+                    let result = cx
+                        .background_spawn(async move {
+                            crate::runtime_host::list_task_external_ids(std::path::Path::new(
+                                &workspace,
+                            ))
+                        })
+                        .await;
+                    let _ = this.update(cx, |this, cx| {
+                        match result {
+                            Ok(ids) => this.durable_task_ids = ids,
+                            Err(error) => this.durable_task_error = Some(error),
+                        }
+                        cx.notify();
+                    });
+                })
+                .detach();
+            }
+            Command::Evaluate => {
+                if let Some(live) = &mut self.live
+                    && let Some(commands) = &live.commands
+                {
+                    if commands
+                        .try_send(crate::runtime_host::RuntimeCommand::Evaluate)
+                        .is_ok()
+                    {
+                        live.status = LiveStatus::Connecting;
+                    } else {
+                        live.status = LiveStatus::HostBusy;
+                        live.output.push_str("\n[Evaluation could not be queued]\n");
+                    }
+                }
+            }
             Command::OpenFixture(index) => {
                 if self.state.open_fixture(index) {
                     self.tab_focus[0].focus(window, cx);
@@ -452,6 +602,21 @@ impl DesktopWindow {
                 if let Some(value) = self.state.task_options.get_mut(index) {
                     *value = !*value;
                 }
+            }
+            Command::ResumeTask(index) => {
+                let Some(external_id) = self.durable_task_ids.get(index).cloned() else {
+                    return;
+                };
+                let Some(workspace) = self.durable_task_workspace.clone() else {
+                    return;
+                };
+                self.request_task_switch(
+                    AfterHostStop::Resume {
+                        external_id,
+                        workspace,
+                    },
+                    cx,
+                );
             }
             Command::Settings => {
                 self.state.page = Page::Presets;
@@ -535,7 +700,7 @@ impl DesktopWindow {
                     capabilities: self.state.draft_capabilities,
                 });
             }
-            Command::NewTask => self.state.begin_task(),
+            Command::NewTask => self.request_task_switch(AfterHostStop::NewTask, cx),
             Command::SelectPreset(preset) => {
                 self.state.select_preset(preset, false);
                 self.preset_open = false;
@@ -574,6 +739,59 @@ impl DesktopWindow {
             window.focus(&focus, cx);
         }
         cx.notify();
+    }
+
+    fn request_task_switch(&mut self, action: AfterHostStop, cx: &mut Context<Self>) {
+        let request = self
+            .live
+            .as_mut()
+            .map_or(HostSwitchRequest::Immediate, |live| {
+                live.request_switch(action.clone())
+            });
+        match request {
+            HostSwitchRequest::Immediate => self.complete_task_switch(action, cx),
+            HostSwitchRequest::WaitingForStop => self.state.page = Page::NewTask,
+            HostSwitchRequest::CurrentTaskActive => {
+                self.state.page = Page::NewTask;
+                if let Some(live) = &mut self.live {
+                    live.status = LiveStatus::FinishCurrentTaskFirst;
+                }
+            }
+            HostSwitchRequest::HostUnavailable => {
+                self.state.page = Page::NewTask;
+                if let Some(live) = &mut self.live {
+                    live.status = LiveStatus::HostBusy;
+                }
+            }
+        }
+    }
+
+    fn complete_task_switch(&mut self, action: AfterHostStop, cx: &mut Context<Self>) {
+        match action {
+            AfterHostStop::NewTask => {
+                self.live = Some(LiveTask::default());
+                self.state.begin_task();
+                self.goal_input
+                    .update(cx, |input, cx| input.set_text("", cx));
+            }
+            AfterHostStop::Resume {
+                external_id,
+                workspace,
+            } => {
+                self.workspace_input
+                    .update(cx, |input, cx| input.set_text(&workspace, cx));
+                self.goal_input
+                    .update(cx, |input, cx| input.set_text("", cx));
+                self.live = Some(LiveTask {
+                    session_external_id: Some(external_id),
+                    resume_existing: true,
+                    workspace: Some(workspace.clone()),
+                    ..LiveTask::default()
+                });
+                self.state.page = Page::NewTask;
+                self.start_live_host(workspace, cx);
+            }
+        }
     }
 
     fn select_language(&mut self, locale: Locale, window: &mut Window, cx: &mut Context<Self>) {
@@ -1004,6 +1222,7 @@ impl Render for DesktopWindow {
             }
         });
         let fixture = self.state.fixture();
+        let durable_task_error = self.durable_task_error.clone();
         for field in [&self.goal_input, &self.workspace_input]
             .into_iter()
             .chain(self.preset_fields.iter())
@@ -1117,6 +1336,38 @@ impl Render for DesktopWindow {
                     .when(self.state.page == Page::Tasks, |root| root.child(
                         div().id("task-list").flex_1().min_h_0().overflow_y_scroll().p_6().flex().flex_col().gap_4()
                             .child(div().text_xl().child(locale.text(Text::RecentTasks)))
+                            .when(durable_task_error.is_some(), |list| list.child(
+                                div().text_sm().text_color(rgb(0xbf616a)).child(
+                                    durable_task_error
+                                        .unwrap_or_else(|| "Unable to load durable tasks".into()),
+                                ),
+                            ))
+                            .when(!self.durable_task_ids.is_empty(), |list| list.child(
+                                div().text_sm().text_color(rgb(0x5e6f8d)).child("Saved durable sessions"),
+                            ).children(self.durable_task_ids.iter().enumerate().map(|(index, external_id)|
+                                {
+                                    let label = if external_id.starts_with("desktop-task-v1-") {
+                                        external_id.clone()
+                                    } else if external_id.starts_with("desktop-task-v2-") {
+                                        let suffix = external_id
+                                            .rsplit('-')
+                                            .next()
+                                            .unwrap_or_default();
+                                        if locale == Locale::Chinese {
+                                            format!("已保存任务 {suffix}")
+                                        } else {
+                                            format!("Saved task {suffix}")
+                                        }
+                                    } else if locale == Locale::Chinese {
+                                        "旧版已保存会话".to_owned()
+                                    } else {
+                                        "Legacy saved session".to_owned()
+                                    };
+                                    div().flex().items_center().justify_between().gap_3().py_2().border_b_1().border_color(rgb(0xd8dee9))
+                                        .child(div().flex_1().min_w_0().text_sm().child(label))
+                                        .child(self.command(("resume-task", index), "Resume", Command::ResumeTask(index), cx))
+                                }
+                            )))
                             .children(TASK_FIXTURES.iter().enumerate().map(|(index, task)|
                                 div().flex().flex_col().gap_2().py_3().border_b_1().border_color(rgb(0xd8dee9))
                                     .child(self.command(("open-task", index), task.title.text(locale), Command::OpenFixture(index), cx))
@@ -1672,17 +1923,19 @@ impl Render for DesktopWindow {
 
 impl DesktopWindow {
     fn submit_live(&mut self, cx: &mut Context<Self>) {
-        use crate::runtime_host::{RuntimeCommand, RuntimeHost, RuntimeOutput, TerminalStatus};
+        use crate::runtime_host::RuntimeCommand;
         let prompt = self.goal_input.read(cx).text().to_owned();
         let workspace = self.workspace_input.read(cx).text().to_owned();
-        let Some(live) = &mut self.live else {
+        let Some(live) = self.live.as_ref() else {
             return;
         };
         if live.running || live.closing {
             return;
         }
         if prompt.trim().is_empty() || workspace.trim().is_empty() {
-            live.status = LiveStatus::MissingInput;
+            if let Some(live) = &mut self.live {
+                live.status = LiveStatus::MissingInput;
+            }
             return;
         }
         if live
@@ -1690,119 +1943,23 @@ impl DesktopWindow {
             .as_ref()
             .is_some_and(|previous| previous != &workspace)
         {
-            live.status = LiveStatus::WorkspaceChanged;
+            if let Some(live) = &mut self.live {
+                live.status = LiveStatus::WorkspaceChanged;
+            }
             return;
         }
+        if self
+            .live
+            .as_ref()
+            .is_some_and(|live| live.commands.is_none())
+        {
+            self.start_live_host(workspace.clone(), cx);
+        }
+        let Some(live) = &mut self.live else {
+            return;
+        };
         if live.commands.is_none() {
-            let mut host = match RuntimeHost::configured(workspace.clone()) {
-                Ok(host) => host,
-                Err(error) => {
-                    live.status = LiveStatus::Error(error);
-                    return;
-                }
-            };
-            live.commands = Some(host.command_sender());
-            if let Some(exit) = host.take_exit() {
-                self.host_exits.borrow_mut().push(exit);
-            }
-            live.workspace = Some(workspace);
-            live.observer = Some(cx.spawn(async move |this, cx| {
-                while let Some(event) = host.recv().await {
-                    if this
-                        .update(cx, |this, cx| {
-                            if let Some(live) = &mut this.live {
-                                match event {
-                                    RuntimeOutput::ToolStarted { call_id, name } => {
-                                        live.status = LiveStatus::Streaming;
-                                        live.output.push_str(&format!("\n→ {name} [{call_id}]\n"));
-                                    }
-                                    RuntimeOutput::ToolResult {
-                                        call_id,
-                                        content,
-                                        is_error,
-                                    } => {
-                                        live.output.push_str(&format!(
-                                            "\n[{} {call_id}]\n{content}\n",
-                                            if is_error { "✗" } else { "✓" }
-                                        ));
-                                    }
-                                    RuntimeOutput::ApprovalRequested {
-                                        request_id,
-                                        tool_name,
-                                        scope,
-                                        explanation,
-                                    } => {
-                                        live.pending_approval =
-                                            Some((request_id, tool_name, scope, explanation));
-                                        live.status = LiveStatus::Streaming;
-                                    }
-                                    RuntimeOutput::AutoDecision {
-                                        outcome,
-                                        reason,
-                                        evaluator,
-                                    } => {
-                                        live.output.push_str(&format!(
-                                            "\n[Auto review: {outcome} — {reason} ({evaluator})]\n"
-                                        ));
-                                    }
-                                    RuntimeOutput::ApprovalClosed { request_id } => {
-                                        if live
-                                            .pending_approval
-                                            .as_ref()
-                                            .is_some_and(|approval| approval.0 == request_id)
-                                        {
-                                            live.pending_approval = None;
-                                        }
-                                    }
-                                    RuntimeOutput::Started { turn_id } => {
-                                        live.turn_id = Some(turn_id);
-                                        live.status = LiveStatus::Connecting
-                                    }
-                                    RuntimeOutput::Text(text) => {
-                                        live.status = LiveStatus::Streaming;
-                                        live.output.push_str(&text);
-                                    }
-                                    RuntimeOutput::Completed { status } => {
-                                        live.pending_approval = None;
-                                        live.running = false;
-                                        live.status = match status {
-                                            TerminalStatus::Success => LiveStatus::Finished,
-                                            TerminalStatus::Cancelled => LiveStatus::Cancelled,
-                                            TerminalStatus::Error(error) => {
-                                                LiveStatus::Error(error)
-                                            }
-                                        };
-                                    }
-                                    RuntimeOutput::Error(error) => {
-                                        live.pending_approval = None;
-                                        live.status = LiveStatus::Error(error);
-                                        live.running = false;
-                                        live.closing = false;
-                                    }
-                                    RuntimeOutput::Stopped => {
-                                        live.status = LiveStatus::Stopped;
-                                        live.running = false;
-                                        if live.closing {
-                                            cx.quit();
-                                        }
-                                    }
-                                }
-                            }
-                            cx.notify();
-                        })
-                        .is_err()
-                    {
-                        break;
-                    }
-                }
-                let _ = this.update(cx, |this, cx| {
-                    if let Some(live) = &mut this.live {
-                        live.commands = None;
-                        live.running = false;
-                    }
-                    cx.notify();
-                });
-            }));
+            return;
         }
         if live
             .commands
@@ -1819,6 +1976,226 @@ impl DesktopWindow {
         }
     }
 
+    fn start_live_host(&mut self, workspace: String, cx: &mut Context<Self>) {
+        use crate::runtime_host::{RuntimeHost, RuntimeOutput, TerminalStatus};
+
+        let Some(live) = &mut self.live else {
+            return;
+        };
+        if live.commands.is_some() {
+            return;
+        }
+        let session_id = live.session_external_id.clone().unwrap_or_else(|| {
+            crate::runtime_host::new_task_external_id(std::path::Path::new(&workspace))
+        });
+        live.session_external_id = Some(session_id.clone());
+        let host_result = if live.resume_existing {
+            RuntimeHost::configured_for_existing_session(workspace.clone(), session_id)
+        } else {
+            RuntimeHost::configured_for_session(workspace.clone(), session_id)
+        };
+        let mut host = match host_result {
+            Ok(host) => host,
+            Err(error) => {
+                live.status = LiveStatus::Error(error);
+                return;
+            }
+        };
+        live.commands = Some(host.command_sender());
+        live.workspace = Some(workspace);
+        let host_generation = uuid::Uuid::new_v4();
+        live.host_generation = Some(host_generation);
+        if let Some(exit) = host.take_exit() {
+            self.host_exits.borrow_mut().push(exit);
+        }
+        live.observer = Some(cx.spawn(async move |this, cx| {
+            while let Some(event) = host.recv().await {
+                if this
+                    .update(cx, |this, cx| {
+                        let (switch_action, should_quit) = {
+                            let Some(live) = &mut this.live else {
+                                return;
+                            };
+                            if !live.is_current_host(host_generation) {
+                                return;
+                            }
+                            let mut switch_action = None;
+                            let mut should_quit = false;
+                            match event {
+                                RuntimeOutput::ToolStarted { call_id, name } => {
+                                    live.status = LiveStatus::Streaming;
+                                    live.output.push_str(&format!("\n→ {name} [{call_id}]\n"));
+                                }
+                                RuntimeOutput::HistoryRestored { entries } => {
+                                    live.output.push_str("[restored durable history]\n");
+                                    for entry in entries {
+                                        live.output.push_str(&entry);
+                                        live.output.push('\n');
+                                    }
+                                }
+                                RuntimeOutput::WorkProjection { state } => {
+                                    live.work_projection = state;
+                                }
+                                RuntimeOutput::ArtifactChanged {
+                                    session_id,
+                                    turn_id,
+                                    call_id,
+                                    operation,
+                                    path,
+                                } => {
+                                    if live.artifact_changes.len() == 100 {
+                                        live.artifact_changes.remove(0);
+                                    }
+                                    live.artifact_changes.push(ArtifactChangePresentation {
+                                        session_id,
+                                        turn_id,
+                                        call_id,
+                                        operation,
+                                        path,
+                                    });
+                                }
+                                RuntimeOutput::ToolRequestContext {
+                                    call_id,
+                                    provenance,
+                                    requested_path,
+                                } => {
+                                    live.output.push_str(&format!(
+                                        "[tool request {call_id}: provenance={provenance}; requested path={}]\n",
+                                        requested_path.as_deref().unwrap_or("unavailable")
+                                    ));
+                                }
+                                RuntimeOutput::ToolResult {
+                                    call_id,
+                                    content,
+                                    is_error,
+                                } => {
+                                    live.output.push_str(&format!(
+                                        "\n[{} {call_id}]\n{content}\n",
+                                        if is_error { "✗" } else { "✓" }
+                                    ));
+                                }
+                                RuntimeOutput::ApprovalRequested {
+                                    request_id,
+                                    tool_name,
+                                    scope,
+                                    explanation,
+                                } => {
+                                    live.pending_approval =
+                                        Some((request_id, tool_name, scope, explanation));
+                                    live.status = LiveStatus::Streaming;
+                                }
+                                RuntimeOutput::AutoDecision {
+                                    outcome,
+                                    reason,
+                                    evaluator,
+                                } => {
+                                    live.output.push_str(&format!(
+                                        "\n[Auto review: {outcome} — {reason} ({evaluator})]\n"
+                                    ));
+                                }
+                                RuntimeOutput::EvaluationUnavailable { reason } => {
+                                    live.evaluation = EvaluationPresentation::Unavailable;
+                                    live.output.push_str(&format!("\n[Evaluation unavailable: {reason}]\n"));
+                                }
+                                RuntimeOutput::EvaluationStarted => {
+                                    live.evaluation = EvaluationPresentation::Running;
+                                    live.status = LiveStatus::Connecting;
+                                    live.output.push_str("\n[Evaluation started]\n");
+                                }
+                                RuntimeOutput::EvaluationResult { state, delivery } => {
+                                    live.evaluation = EvaluationPresentation::Result {
+                                        state: state.clone(),
+                                        delivery,
+                                    };
+                                    live.output.push_str(&format!(
+                                        "\n[Evaluation: {state}; Delivery: {delivery:?}]\n"
+                                    ));
+                                }
+                                RuntimeOutput::ApprovalClosed { request_id } => {
+                                    if live
+                                        .pending_approval
+                                        .as_ref()
+                                        .is_some_and(|approval| approval.0 == request_id)
+                                    {
+                                        live.pending_approval = None;
+                                    }
+                                }
+                                RuntimeOutput::Started { turn_id } => {
+                                    live.turn_id = Some(turn_id);
+                                    live.status = LiveStatus::Connecting
+                                }
+                                RuntimeOutput::Text(text) => {
+                                    live.status = LiveStatus::Streaming;
+                                    live.output.push_str(&text);
+                                }
+                                RuntimeOutput::Completed { status } => {
+                                    live.pending_approval = None;
+                                    live.running = false;
+                                    live.status = match status {
+                                        TerminalStatus::Success => LiveStatus::Finished,
+                                        TerminalStatus::Cancelled => LiveStatus::Cancelled,
+                                        TerminalStatus::Error(error) => LiveStatus::Error(error),
+                                    };
+                                }
+                                RuntimeOutput::Error(error) => {
+                                    live.pending_approval = None;
+                                    live.status = LiveStatus::Error(error);
+                                    live.running = false;
+                                    live.closing = false;
+                                }
+                                RuntimeOutput::Stopped => {
+                                    (switch_action, should_quit) = live.stopped();
+                                }
+                            }
+                            (switch_action, should_quit)
+                        };
+                        if let Some(action) = switch_action {
+                            this.complete_task_switch(action, cx);
+                        } else if should_quit {
+                            cx.quit();
+                        }
+                        cx.notify();
+                    })
+                    .is_err()
+                {
+                    break;
+                }
+            }
+            let _ = this.update(cx, |this, cx| {
+                if let Some(live) = &mut this.live
+                    && live.is_current_host(host_generation)
+                {
+                    live.commands = None;
+                    live.running = false;
+                }
+                cx.notify();
+            });
+        }));
+    }
+
+    fn evaluation_view(&self, state: &EvaluationPresentation, locale: Locale) -> impl IntoElement {
+        let text = match state {
+            EvaluationPresentation::Unavailable => {
+                if locale == Locale::Chinese {
+                    "评估状态：不可用；不会判定为可交付。".to_owned()
+                } else {
+                    "Evaluation: unavailable; Delivery is not inferred.".to_owned()
+                }
+            }
+            EvaluationPresentation::Running => {
+                if locale == Locale::Chinese {
+                    "评估状态：进行中".to_owned()
+                } else {
+                    "Evaluation: running".to_owned()
+                }
+            }
+            EvaluationPresentation::Result { state, delivery } => {
+                format!("Evaluation: {state}; Delivery: {delivery:?}")
+            }
+        };
+        div().text_sm().text_color(rgb(0x68758c)).child(text)
+    }
+
     fn render_live(&self, window: &Window, cx: &mut Context<Self>) -> impl IntoElement {
         let locale = self.state.locale;
         let compact = window.viewport_size().width < px(900.);
@@ -1826,6 +2203,121 @@ impl DesktopWindow {
             .live
             .as_ref()
             .expect("live rendering requires live state");
+        let work_view = match &live.work_projection {
+            crate::runtime_host::WorkProjectionState::Loading => div()
+                .child(div().child(if locale == Locale::Chinese {
+                    "工作状态"
+                } else {
+                    "Work status"
+                }))
+                .child(div().text_sm().text_color(rgb(0x68758c)).child(
+                    if locale == Locale::Chinese {
+                        "正在加载工作状态……"
+                    } else {
+                        "Loading work status..."
+                    },
+                )),
+            crate::runtime_host::WorkProjectionState::Unavailable => div()
+                .child(div().child(if locale == Locale::Chinese {
+                    "工作状态"
+                } else {
+                    "Work status"
+                }))
+                .child(div().text_sm().text_color(rgb(0x68758c)).child(
+                    if locale == Locale::Chinese {
+                        "当前会话没有可用的共享工作列表。"
+                    } else {
+                        "Shared work tracking is unavailable for this session."
+                    },
+                )),
+            crate::runtime_host::WorkProjectionState::ReadError => div()
+                .child(div().child(if locale == Locale::Chinese {
+                    "工作状态"
+                } else {
+                    "Work status"
+                }))
+                .child(div().text_sm().text_color(rgb(0xb42318)).child(
+                    if locale == Locale::Chinese {
+                        "读取共享工作列表失败；请重新打开任务重试。"
+                    } else {
+                        "Could not read shared work tracking; reopen the task to retry."
+                    },
+                )),
+            crate::runtime_host::WorkProjectionState::Available { items, truncated } => {
+                let mut view = div().child(div().child(if locale == Locale::Chinese {
+                    "工作状态"
+                } else {
+                    "Work status"
+                }));
+                if items.is_empty() {
+                    view = view.child(div().text_sm().text_color(rgb(0x68758c)).child(
+                        if locale == Locale::Chinese {
+                            "当前会话没有跟踪中的工作项。"
+                        } else {
+                            "No work items are tracked in this session."
+                        },
+                    ));
+                }
+                for item in items {
+                    let title = if item.title_truncated {
+                        format!("{}...", item.title)
+                    } else {
+                        item.title.clone()
+                    };
+                    view = view.child(
+                        div()
+                            .flex()
+                            .gap_2()
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .text_color(rgb(0x68758c))
+                                    .child(work_status_label(item.status, locale)),
+                            )
+                            .child(div().text_sm().child(title)),
+                    );
+                }
+                if *truncated {
+                    view = view.child(div().text_sm().text_color(rgb(0x68758c)).child(
+                        if locale == Locale::Chinese {
+                            "仅显示前 100 项。"
+                        } else {
+                            "Showing the first 100 items."
+                        },
+                    ));
+                }
+                view
+            }
+        };
+        let artifact_view = {
+            let mut view = div().child(div().child(if locale == Locale::Chinese {
+                "成功文件工具调用前后观察到的变化"
+            } else {
+                "Changes observed around successful file tools"
+            }));
+            if live.artifact_changes.is_empty() {
+                view = view.child(div().text_sm().text_color(rgb(0x68758c)).child(if locale
+                    == Locale::Chinese
+                {
+                    "当前打开会话尚未观察到成功文件工具调用前后的文件差异；其他工具或重启前的变化可能不可用。"
+                } else {
+                    "No file differences observed around successful file tools in this open session; other tools or changes from before restart may be unavailable."
+                }));
+            }
+            for change in &live.artifact_changes {
+                view = view.child(
+                    div()
+                        .flex()
+                        .gap_2()
+                        .child(div().text_sm().text_color(rgb(0x68758c)).child(format!(
+                            "{} [turn {}, call {}, session {}]",
+                            change.operation, change.turn_id, change.call_id, change.session_id
+                        )))
+                        .child(div().text_sm().child(change.path.clone())),
+                );
+            }
+            view
+        };
         let content = div()
             .id("live-task")
             .when(compact, |content| {
@@ -1855,6 +2347,12 @@ impl DesktopWindow {
             ))
             .child(div().child(locale.text(Text::Goal)))
             .child(self.goal_input.clone())
+            .child(self.command(
+                "live-evaluate",
+                if locale == Locale::Chinese { "开始评估" } else { "Evaluate" },
+                Command::Evaluate,
+                cx,
+            ))
             .child(
                 div()
                     .flex()
@@ -1881,10 +2379,13 @@ impl DesktopWindow {
                     )),
             )
             .child(div().child(if locale == Locale::Chinese {
-                "工具遵循 Runtime 权限门禁；对话暂不持久化。"
+                "工具遵循 Runtime 权限门禁；成功回合持久化到当前任务会话。"
             } else {
-                "Tools use the Runtime permission gate; conversation is not yet persisted."
+                "Tools use the Runtime permission gate; successful turns persist to this task session."
             }))
+            .child(self.evaluation_view(&live.evaluation, locale))
+            .child(work_view)
+            .child(artifact_view)
             .child(div().child(live.status.label(locale).to_owned()))
             .when_some(live.pending_approval.as_ref(), |view, approval| {
                 view.child(div().p_3().rounded_md().bg(rgb(0xe5e9f0)).child(format!(
@@ -2765,6 +3266,94 @@ mod tests {
         assert!(live.closing);
         assert!(matches!(receiver.try_recv(), Ok(RuntimeCommand::Shutdown)));
         assert!(!live.request_close());
+        assert!(receiver.try_recv().is_err());
+    }
+
+    #[test]
+    fn task_switch_waits_for_idle_host_shutdown() {
+        use crate::runtime_host::RuntimeCommand;
+        let generation = uuid::Uuid::new_v4();
+        let (commands, mut receiver) = tokio::sync::mpsc::channel(1);
+        let mut live = super::LiveTask {
+            commands: Some(commands),
+            session_external_id: Some("old-session".into()),
+            host_generation: Some(generation),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            live.request_switch(super::AfterHostStop::NewTask),
+            super::HostSwitchRequest::WaitingForStop
+        );
+        assert!(live.closing);
+        assert!(matches!(
+            live.after_host_stop.as_ref(),
+            Some(super::AfterHostStop::NewTask)
+        ));
+        assert!(matches!(receiver.try_recv(), Ok(RuntimeCommand::Shutdown)));
+        assert_eq!(live.session_external_id.as_deref(), Some("old-session"));
+        assert_eq!(live.status, super::LiveStatus::SwitchingTask);
+
+        let (action, should_quit) = live.stopped();
+        assert!(matches!(action, Some(super::AfterHostStop::NewTask)));
+        assert!(!should_quit);
+        assert!(!live.running);
+        assert_eq!(live.status, super::LiveStatus::Stopped);
+    }
+
+    #[test]
+    fn stale_host_observer_generation_is_rejected() {
+        let current_generation = uuid::Uuid::new_v4();
+        let stale_generation = uuid::Uuid::new_v4();
+        let live = super::LiveTask {
+            host_generation: Some(current_generation),
+            ..Default::default()
+        };
+
+        assert!(live.is_current_host(current_generation));
+        assert!(!live.is_current_host(stale_generation));
+    }
+
+    #[test]
+    fn closing_during_task_switch_supersedes_the_pending_switch() {
+        use crate::runtime_host::RuntimeCommand;
+        let (commands, mut receiver) = tokio::sync::mpsc::channel(1);
+        let mut live = super::LiveTask {
+            commands: Some(commands),
+            ..Default::default()
+        };
+        assert_eq!(
+            live.request_switch(super::AfterHostStop::NewTask),
+            super::HostSwitchRequest::WaitingForStop
+        );
+        assert!(!live.request_close());
+        assert!(live.after_host_stop.is_none());
+        assert!(matches!(receiver.try_recv(), Ok(RuntimeCommand::Shutdown)));
+        let (action, should_quit) = live.stopped();
+        assert!(action.is_none());
+        assert!(should_quit);
+    }
+
+    #[test]
+    fn task_switch_is_rejected_during_execution_or_pending_approval() {
+        let (commands, mut receiver) = tokio::sync::mpsc::channel(1);
+        let mut running = super::LiveTask {
+            commands: Some(commands),
+            running: true,
+            ..Default::default()
+        };
+        assert_eq!(
+            running.request_switch(super::AfterHostStop::NewTask),
+            super::HostSwitchRequest::CurrentTaskActive
+        );
+        assert!(receiver.try_recv().is_err());
+
+        running.running = false;
+        running.pending_approval = Some((1, "write_file".into(), String::new(), String::new()));
+        assert_eq!(
+            running.request_switch(super::AfterHostStop::NewTask),
+            super::HostSwitchRequest::CurrentTaskActive
+        );
         assert!(receiver.try_recv().is_err());
     }
 

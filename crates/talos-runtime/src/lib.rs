@@ -173,6 +173,144 @@ pub use talos_agent::evaluator::{
 pub use talos_agent::{
     AgentError, SandboxFallbackContext, SandboxFallbackDecision, SandboxFallbackPolicy,
 };
+
+/// Shared independent evaluation coordinator for embedded clients.
+///
+/// The caller owns the revision-bound claim and evidence provenance. This service only delegates
+/// to the independent evaluator; it never creates a claim, mutates Work state, or turns executor
+/// text into a verdict.
+pub struct RuntimeEvaluationService {
+    evaluator: IndependentEvaluator,
+}
+
+/// Ephemeral, Runtime-owned evaluation context for one explicit Desktop/SDK task.
+///
+/// Creation is the authority boundary for Mission/Goal identities and the initial workspace
+/// revision. The context is intentionally not persisted; callers must display `Unavailable`
+/// after restart until a supported durable owner restores it.
+#[derive(Debug, Clone)]
+pub struct RuntimeEvaluationContext {
+    claim: talos_core::evaluation::CompletionClaim,
+}
+
+impl RuntimeEvaluationContext {
+    /// Create a context from an explicit user goal and immutable criteria snapshot.
+    pub fn new(
+        goal: impl Into<String>,
+        criteria: Vec<talos_core::evaluation::AcceptanceCriterion>,
+        workspace: talos_core::evaluation::WorkspaceRevision,
+    ) -> Result<Self, talos_core::evaluation::EvaluationError> {
+        let mission = talos_core::work::WorkIdentity {
+            id: uuid::Uuid::new_v4(),
+            kind: talos_core::work::WorkKind::Mission,
+            revision: 1,
+        };
+        let goal_identity = talos_core::work::WorkIdentity {
+            id: uuid::Uuid::new_v4(),
+            kind: talos_core::work::WorkKind::Goal,
+            revision: 1,
+        };
+        let subject = talos_core::evaluation::EvaluationSubject {
+            mission,
+            goal: goal_identity,
+            workspace,
+        };
+        let claim = talos_core::evaluation::CompletionClaim::new(
+            subject,
+            criteria,
+            Vec::new(),
+            Vec::new(),
+            goal,
+        )?;
+        Ok(Self { claim })
+    }
+
+    /// Return the immutable claim snapshot to the explicit evaluation action.
+    #[must_use]
+    pub fn claim(&self) -> &talos_core::evaluation::CompletionClaim {
+        &self.claim
+    }
+}
+
+impl RuntimeEvaluationService {
+    /// Construct a coordinator with an injected assessor for deterministic integrations.
+    #[must_use]
+    pub fn new(assessor: Arc<dyn EvaluatorAssessor>, deadline: std::time::Duration) -> Self {
+        Self {
+            evaluator: IndependentEvaluator::new(assessor, deadline),
+        }
+    }
+
+    /// Construct a coordinator around a provider-backed evaluator.
+    #[must_use]
+    pub fn provider(provider: Arc<dyn LanguageModel>, deadline: std::time::Duration) -> Self {
+        Self::new(Arc::new(ProviderEvaluatorAssessor::new(provider)), deadline)
+    }
+
+    /// Evaluate an already-authorized claim with bounded, fail-closed semantics.
+    pub async fn evaluate(
+        &self,
+        claim: &talos_core::evaluation::CompletionClaim,
+        evidence: Vec<ValidationEvidence>,
+    ) -> EvaluatorOutcome {
+        self.evaluator.evaluate(claim, evidence).await
+    }
+
+    /// Evaluate with caller-owned cancellation.
+    pub async fn evaluate_with_cancellation(
+        &self,
+        claim: &talos_core::evaluation::CompletionClaim,
+        evidence: Vec<ValidationEvidence>,
+        cancellation: tokio_util::sync::CancellationToken,
+    ) -> EvaluatorOutcome {
+        self.evaluator
+            .evaluate_with_cancellation(claim, evidence, cancellation)
+            .await
+    }
+
+    /// Revalidate an accepted report against the caller's current authoritative subject.
+    ///
+    /// Call this after evaluation and whenever the subject changes. An old PASS becomes stale
+    /// before either presentation or the Delivery gate consumes it; no report is discarded.
+    pub fn observe_current_subject(
+        outcome: &mut EvaluatorOutcome,
+        current: talos_core::evaluation::EvaluationSubject,
+    ) -> Result<(), talos_core::evaluation::EvaluationError> {
+        current.validate()?;
+        if let EvaluatorOutcome::Report { evaluation } = outcome {
+            if evaluation.state == talos_core::evaluation::EvaluationState::Stale {
+                return Ok(());
+            }
+            evaluation.observe_subject(current)?;
+        }
+        Ok(())
+    }
+
+    /// Return the evaluator's read-only tool admission policy.
+    #[must_use]
+    pub const fn admission(&self) -> EvaluatorAdmission {
+        self.evaluator.admission()
+    }
+
+    /// Apply the shared deterministic Mission gate to already-produced evaluations.
+    ///
+    /// This never invokes a model or mutates Work state. Missing and stale data remain blocked.
+    #[must_use]
+    pub fn delivery_gate(
+        mission: talos_core::work::WorkIdentity,
+        required_goals: &[talos_core::work::WorkIdentity],
+        goal_evaluations: &[talos_core::evaluation::Evaluation],
+        mission_evaluation: Option<talos_core::work::MissionEvaluation>,
+    ) -> talos_core::work::MissionGateResult {
+        talos_core::work::MissionGate {
+            mission,
+            required_goals,
+            goal_evaluations,
+            mission_evaluation,
+        }
+        .evaluate()
+    }
+}
 pub use talos_core::ApprovalChoice;
 pub use talos_core::background_job::{
     BackgroundCleanupOutcome, BackgroundJobId, BackgroundJobLauncher, BackgroundJobPermit,
@@ -1201,6 +1339,200 @@ mod tests {
     use tokio::sync::Notify;
 
     use super::*;
+
+    #[test]
+    fn evaluation_context_uses_caller_workspace_revision() {
+        let criterion = talos_core::evaluation::AcceptanceCriterion {
+            id: uuid::Uuid::new_v4(),
+            kind: talos_core::evaluation::CriterionKind::Behavior,
+            statement: "the task is inspectable".into(),
+            required: true,
+        };
+        let workspace = talos_core::evaluation::WorkspaceRevision {
+            id: uuid::Uuid::new_v4(),
+            revision: 42,
+        };
+        let context =
+            RuntimeEvaluationContext::new("inspect", vec![criterion], workspace).expect("context");
+        assert_eq!(context.claim().subject.workspace, workspace);
+        assert_eq!(
+            context.claim().subject.mission.kind,
+            talos_core::work::WorkKind::Mission
+        );
+        assert_eq!(
+            context.claim().subject.goal.kind,
+            talos_core::work::WorkKind::Goal
+        );
+    }
+
+    #[test]
+    fn runtime_delivery_gate_keeps_missing_mission_evaluation_blocked() {
+        let mission = talos_core::work::WorkIdentity {
+            id: uuid::Uuid::new_v4(),
+            kind: talos_core::work::WorkKind::Mission,
+            revision: 1,
+        };
+        let result = RuntimeEvaluationService::delivery_gate(mission, &[], &[], None);
+        assert_eq!(
+            result.delivery,
+            talos_core::work::DeliveryEligibility::Blocked {
+                reason: talos_core::work::DeliveryBlockReason::MissingMissionEvaluation
+            }
+        );
+    }
+
+    struct FixedEvaluationAssessor(String);
+
+    #[async_trait::async_trait]
+    impl EvaluatorAssessor for FixedEvaluationAssessor {
+        async fn assess(
+            &self,
+            _request: EvaluatorRequest,
+            _deadline: Duration,
+        ) -> Result<String, String> {
+            Ok(self.0.clone())
+        }
+    }
+
+    #[tokio::test]
+    async fn runtime_evaluation_contract_passes_and_stale_goal_blocks_delivery() {
+        use talos_core::evaluation::{
+            AcceptanceCriterion, CriterionEvaluation, CriterionKind, CriterionVerdict,
+            EvaluationReport, EvaluationVerdict, EvidenceRef, WorkspaceRevision,
+        };
+        use talos_core::work::{
+            DeliveryBlockReason, DeliveryEligibility, MissionEvaluation, WorkIdentity, WorkKind,
+        };
+
+        let mission = WorkIdentity {
+            id: uuid::Uuid::new_v4(),
+            kind: WorkKind::Mission,
+            revision: 3,
+        };
+        let goal = WorkIdentity {
+            id: uuid::Uuid::new_v4(),
+            kind: WorkKind::Goal,
+            revision: 7,
+        };
+        let criterion = AcceptanceCriterion {
+            id: uuid::Uuid::new_v4(),
+            kind: CriterionKind::Validation,
+            statement: "the declared validation passes".into(),
+            required: true,
+        };
+        let evidence_ref = EvidenceRef {
+            id: uuid::Uuid::new_v4(),
+            kind: "validation-run".into(),
+        };
+        let subject = talos_core::evaluation::EvaluationSubject {
+            mission,
+            goal,
+            workspace: WorkspaceRevision {
+                id: uuid::Uuid::new_v4(),
+                revision: 11,
+            },
+        };
+        let claim = talos_core::evaluation::CompletionClaim::new(
+            subject,
+            vec![criterion.clone()],
+            Vec::new(),
+            Vec::new(),
+            "fixture claim",
+        )
+        .expect("valid claim");
+        let report = EvaluationReport::new(
+            &claim,
+            subject,
+            vec![CriterionEvaluation {
+                criterion_id: criterion.id,
+                verdict: CriterionVerdict::Pass,
+                evidence: vec![evidence_ref.clone()],
+                finding_ids: Vec::new(),
+            }],
+            Vec::new(),
+        )
+        .expect("valid fixture report");
+        let service = RuntimeEvaluationService::new(
+            Arc::new(FixedEvaluationAssessor(
+                serde_json::to_string(&report).expect("serialize report"),
+            )),
+            Duration::from_secs(1),
+        );
+        let evidence = ValidationEvidence::new(
+            evidence_ref,
+            ValidationEvidenceStatus::Passed,
+            "fixture-record-digest",
+        )
+        .expect("integrity-bound evidence");
+        let evaluation = match service.evaluate(&claim, vec![evidence]).await {
+            EvaluatorOutcome::Report { evaluation } => *evaluation,
+            EvaluatorOutcome::Failure(error) => panic!("unexpected evaluation failure: {error:?}"),
+        };
+        assert!(evaluation.has_valid_pass());
+
+        let current_gate = RuntimeEvaluationService::delivery_gate(
+            mission,
+            &[goal],
+            std::slice::from_ref(&evaluation),
+            Some(MissionEvaluation {
+                mission,
+                verdict: EvaluationVerdict::Pass,
+            }),
+        );
+        assert_eq!(current_gate.delivery, DeliveryEligibility::Eligible);
+
+        let changed_goal = WorkIdentity {
+            revision: goal.revision + 1,
+            ..goal
+        };
+        let stale_gate = RuntimeEvaluationService::delivery_gate(
+            mission,
+            &[changed_goal],
+            std::slice::from_ref(&evaluation),
+            Some(MissionEvaluation {
+                mission,
+                verdict: EvaluationVerdict::Pass,
+            }),
+        );
+        assert_eq!(
+            stale_gate.delivery,
+            DeliveryEligibility::Blocked {
+                reason: DeliveryBlockReason::StaleGoalEvaluation,
+            }
+        );
+
+        // A workspace-only change must also invalidate PASS, even with unchanged Goal identity.
+        let mut outcome = EvaluatorOutcome::Report {
+            evaluation: Box::new(evaluation),
+        };
+        let mut current = subject;
+        current.workspace.revision += 1;
+        RuntimeEvaluationService::observe_current_subject(&mut outcome, current)
+            .expect("current subject is valid");
+        RuntimeEvaluationService::observe_current_subject(&mut outcome, subject)
+            .expect("stale results remain stale even if the old subject reappears");
+        let EvaluatorOutcome::Report { evaluation } = outcome else {
+            panic!("retain the historical report");
+        };
+        assert_eq!(
+            evaluation.state,
+            talos_core::evaluation::EvaluationState::Stale
+        );
+        assert!(!evaluation.has_valid_pass());
+        assert!(matches!(
+            RuntimeEvaluationService::delivery_gate(
+                mission,
+                &[goal],
+                &[*evaluation],
+                Some(MissionEvaluation {
+                    mission,
+                    verdict: EvaluationVerdict::Pass
+                }),
+            )
+            .delivery,
+            DeliveryEligibility::Blocked { .. }
+        ));
+    }
 
     #[cfg(feature = "shared-composition")]
     #[test]
