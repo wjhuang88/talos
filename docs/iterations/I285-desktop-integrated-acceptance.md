@@ -1,6 +1,6 @@
 # Iteration I285: Desktop Integrated Candidate And Acceptance
 
-> Document status: Planned
+> Document status: Active — Claimed (proposed; ineffective until PR #608 merges)
 > Plan date: 2026-09-22
 > Target window: 2026-10-13 to 2026-10-19
 > Planned objective: A reproducibly built Desktop candidate passes an integrated real-task walkthrough with documented limits and a clean handoff.
@@ -11,13 +11,13 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | DESKTOP-001-D7 / I285: integrate prior Desktop stages, fix cross-stage acceptance defects including task-page overflow, run reproducible candidate checks and guide/record H1-H6; no new product feature or release |
 | Claimed At | 2026-09-24 |
 | Source Issue | #29 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #608 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer-directed completion of the four-week Desktop delivery; I282-I284 are merged with technical gates; #29 is the existing cycle acceptance tracker |
 | Implementation PR | Not started |
@@ -78,9 +78,9 @@ safety. Roll back only the failing slice; no destructive cleanup of user session
 
 ## Actual Activation And Execution
 
-2026-09-24: I282-I284 implementation stages are merged to main. A governance-only draft is being
-prepared to activate I285. This owner remains Planned / Unclaimed until the PR number is known and
-the final proposed claim is recorded. No implementation code is included in the governance slice.
+2026-09-24: I282-I284 implementation stages are merged to main. Governance PR #608 proposes
+atomic activation of I285. The proposed claim has no effect until this finalized record merges.
+No implementation code is included in the governance slice.
 
 ## Verification Evidence
 

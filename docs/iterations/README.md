@@ -13,7 +13,7 @@ That snapshot is historical evidence and not current activation authority.
 
 Current cycle (2026-09-22): [four-week Desktop delivery](../tasks/2026-09-22-desktop-four-week-delivery.md),
 I282/I283 merged and I284 Review / Claimed after implementation PR #607 merged as `2845ebdf`;
-I285 remains Planned / Unclaimed while a governance-only Draft PR is prepared. The task records the
+I285 Active / Claimed is proposed by governance PR #608 and is ineffective until merge. The task records the
 non-terminal inventory: I277 remains Review with deferred checks in #29, I249 stays deferred Planned,
 I164 stays Paused; I162's recorded review outcome is terminal. MODEL-007 is deferred behind Desktop.
 
@@ -22,7 +22,7 @@ I164 stays Paused; I162's recorded review outcome is terminal. MODEL-007 is defe
 | [I282](I282-live-runtime-host.md) | Sep 22-28: real model task and host lifecycle | Review; implementation merged, H1/H5 in #29 |
 | [I283](I283-live-tools-and-approval.md) | Sep 29-Oct 5: tools and scoped approvals | Complete; merged `93c8b357`; H2/H3 human acceptance residual |
 | [I284](I284-durable-task-and-evidence.md) | Oct 6-12: resume and evidence | Review / Claimed; PR #607 merged as `2845ebdf` from `1fc73c2e`; CI/review passed; durable evaluation source and H4/H6 remain open |
-| [I285](I285-desktop-integrated-acceptance.md) | Oct 13-19: integrated candidate and acceptance | Planned / Unclaimed; governance Draft PR being prepared; predecessors merged and #29 ledger exists |
+| [I285](I285-desktop-integrated-acceptance.md) | Oct 13-19: integrated candidate and acceptance | Active / Claimed proposed by #608; ineffective until merge; predecessors merged and #29 ledger exists |
 
 Completed cycle (2026-09-20): [I278 root Plugin source delivery](I278-root-plugin-source-delivery.md)
 is Complete / Closed through #576 merge `1e5a8592`, with exact-head CI, independent review and
