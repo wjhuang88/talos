@@ -1,9 +1,9 @@
 # Desktop Four-Week Delivery Task
 
-> Document status: In Progress — T3 / I284 in Review; T4 / I285 Review / Claimed
+> Document status: In Progress — T3 / I284 in Review; T4 / I285 Review / Partial
 > Plan date: 2026-09-22
 > Target window: 2026-09-22 through 2026-10-19 (four calendar weeks; approximately 20 working days)
-> Execution state: T1-T3 implementation merged; I284 remains Review for H4/H6 and production evaluation-source acceptance. I285 is Review / Claimed after governance PR #608 merged; local candidate checks are converged, with H1 provider-error presentation and H6 authoritative Evaluation evidence still outstanding.
+> Execution state: T1-T4 implementation candidates are merged; I284 remains Review for H4/H6 and production evaluation-source acceptance. I285 implementation merged as `422729ca`, but remains Review / Partial with H1 provider-error presentation and H6 authoritative Evaluation evidence outstanding.
 
 ## Outcome
 
@@ -103,7 +103,7 @@ remain owned residuals and prevent claims of universal accessibility/platform ac
 | T1 | Week 1, Sep 22-28 / I282 | Launch a live Desktop task using configured provider; responsive streaming, errors and cancellation; tools unavailable in this initial slice | WORK-001 P0-P4, I280, ADR-059; API map and effective claim | Mock-provider E2E plus real-provider native row; no UI blocking or fictitious results | Keep existing mock explicitly separate; unresolved facade contract becomes a named blocker, never a copied engine | In Progress — claim/activation PR #598 |
 | T2 | Week 2, Sep 29-Oct 5 / I283 | Real file/shell activity, visible existing Auto review, scoped approval and safe cancellation | T1 merged and technical gates passed | Allow/Deny/Once/Session, stale approval, cancel and shutdown matrix; independent security/API review | Tool execution remains disabled until gates pass; do not ship an auto-allow workaround | Complete — PR #603 merged as `93c8b357`; H2/H3 human residual |
 | T3 | Week 3, Oct 6-12 / I284 | Recent tasks, durable transcript resume, actual work/evaluation and read-only change/evidence views | T2 merged; storage/projection compatibility verified | Restart and session-isolation tests; revision/staleness/Delivery gates; no tool replay | Preserve transcript-only recovery if richer projection cannot persist; explicitly show unavailable evidence and keep unmet acceptance open | Review — PR #607 merged as `2845ebdf` from exact head `1fc73c2e`; CI `35959834215` and incremental review passed; H4/H6 plus production evaluation-source acceptance remain in #29 |
-| T4 | Week 4, Oct 13-19 / I285 | Reproducible integrated candidate, fixes, user guide and consolidated acceptance report | T1-T3 merged with technical gates passed | Integrated E2E, current-head CI/review, required native rows, documented residuals and clean handoff | Deliver Partial with exact remaining blockers; no fake Complete or unrequested release | Review / Claimed; #608 merged as `e1a89a1b`; local candidate checks passed, H1 provider-error presentation and H6 authoritative Evaluation evidence remain residuals |
+| T4 | Week 4, Oct 13-19 / I285 | Reproducible integrated candidate, fixes, user guide and consolidated acceptance report | T1-T3 merged with technical gates passed | Integrated E2E, current-head CI/review, required native rows, documented residuals and clean handoff | Deliver Partial with exact remaining blockers; no fake Complete or unrequested release | Review / Partial; implementation PR #609 merged as `422729ca` from exact head `8cc75639`; CI `36535972702` and review `5885650377` passed; H1 provider-error presentation and H6 authoritative Evaluation evidence remain residuals |
 
 Reserve roughly three days in Week 4 for fixes/retesting and two for acceptance/documentation.
 The dates are planning targets, not autonomous wall-clock scheduling or a guarantee. Each weekly

@@ -1,6 +1,6 @@
 # Iteration I285: Desktop Integrated Candidate And Acceptance
 
-> Document status: Review — Claimed (effective after PR #608 merge)
+> Document status: Review — Partial (implementation merged; H1/H6 residuals remain)
 > Plan date: 2026-09-22
 > Target window: 2026-10-13 to 2026-10-19
 > Planned objective: A reproducibly built Desktop candidate passes an integrated real-task walkthrough with documented limits and a clean handoff.
@@ -20,7 +20,7 @@
 | Governance Claim PR | #608 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | PR #608 merged as `e1a89a1b25092ad37860314f02d1d212055b9fcc`; I282-I284 are merged with technical gates; #29 is the existing cycle acceptance tracker |
-| Implementation PR | #609, submitted from local candidate `c172636d27c741e2f320323a42b07afad78f99c6`; exact-head CI/review pending |
+| Implementation PR | #609 merged as `422729caecdc8e76c7de8217654921723d5a3fdf` from exact head `8cc7563906e061070b36a50a08367ca63c40d53a`; CI `36535972702` passed; independent Agent-role review `5885650377` approved exact head |
 | Last Updated | 2026-09-29 |
 | Handoff / Release Condition | H1-H6 evidence and owner-first closeout are required; no release |
 
@@ -193,8 +193,17 @@ artifact evidence is complete at the observed viewport. Provider-error presentat
 pending a safe injection path. Product Mission flow and high-fidelity reference surfaces remain
 outside I285 and are tracked by MISSION-UX.
 
-Completion Commit: pending.
+Completion Commit: `422729caecdc8e76c7de8217654921723d5a3fdf` (implementation merge; I285 remains Review / Partial because H1/H6 are unresolved).
 Only already-existing implementation/evidence commits may close this iteration.
+
+### Stable Candidate Merge Checkpoint — 2026-09-29
+
+PR #609 was merged after merge-time CAS with exact head `8cc7563906e061070b36a50a08367ca63c40d53a`,
+base `e1a89a1b25092ad37860314f02d1d212055b9fcc`, successful exact-head CI run `36535972702`,
+and independent Agent-role review `5885650377`. The implementation is now in `main` as
+`422729caecdc8e76c7de8217654921723d5a3fdf`. This merge closes the implementation candidate only;
+it does not close H1 provider-error presentation or H6 authoritative current/stale Evaluation
+evidence, and it does not complete the four-week task.
 
 ### Local Candidate Checkpoint — 2026-09-29
 
@@ -213,7 +222,7 @@ presentation remains unverified because there is no safe isolated error-injectio
 production current/stale Evaluation remains unavailable because no authoritative live evidence
 producer is wired. Neither gap can be closed by a fixture or ordinary manual click-through.
 
-Completion Commit: pending. A stable implementation PR and exact-head review/CI remain required.
+Completion Commit: `422729caecdc8e76c7de8217654921723d5a3fdf` (implementation merge; residual acceptance remains open).
 
 ### Full local preflight — 2026-09-29
 
