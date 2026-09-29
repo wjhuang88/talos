@@ -143,6 +143,29 @@ enum HostSwitchRequest {
 }
 
 impl LiveTask {
+    fn request_cancel(&mut self) {
+        if self.closing || self.status == LiveStatus::Cancelling {
+            return;
+        }
+        if !self.running && !matches!(self.evaluation, EvaluationPresentation::Running) {
+            return;
+        }
+        let Some(commands) = &self.commands else {
+            return;
+        };
+        if commands
+            .try_send(crate::runtime_host::RuntimeCommand::Interrupt)
+            .is_ok()
+        {
+            if self.running {
+                self.status = LiveStatus::Cancelling;
+                self.pending_approval = None;
+            }
+        } else {
+            self.status = LiveStatus::CancelFailed;
+        }
+    }
+
     fn is_current_host(&self, generation: uuid::Uuid) -> bool {
         self.host_generation == Some(generation)
     }
@@ -458,18 +481,8 @@ impl DesktopWindow {
             Command::LiveLocale(locale) => self.select_language(locale, window, cx),
             Command::SubmitLive => self.submit_live(cx),
             Command::CancelLive => {
-                if let Some(live) = &mut self.live
-                    && let Some(commands) = &live.commands
-                {
-                    if commands
-                        .try_send(crate::runtime_host::RuntimeCommand::Interrupt)
-                        .is_ok()
-                    {
-                        live.status = LiveStatus::Cancelling;
-                        live.pending_approval = None;
-                    } else {
-                        live.status = LiveStatus::CancelFailed;
-                    }
+                if let Some(live) = &mut self.live {
+                    live.request_cancel();
                 }
             }
             Command::ApproveOnce(request_id)
@@ -541,7 +554,7 @@ impl DesktopWindow {
                         .try_send(crate::runtime_host::RuntimeCommand::Evaluate)
                         .is_ok()
                     {
-                        live.status = LiveStatus::Connecting;
+                        live.evaluation = EvaluationPresentation::Running;
                     } else {
                         live.status = LiveStatus::HostBusy;
                         live.output.push_str("\n[Evaluation could not be queued]\n");
@@ -2099,7 +2112,6 @@ impl DesktopWindow {
                                 }
                                 RuntimeOutput::EvaluationStarted => {
                                     live.evaluation = EvaluationPresentation::Running;
-                                    live.status = LiveStatus::Connecting;
                                     live.output.push_str("\n[Evaluation started]\n");
                                 }
                                 RuntimeOutput::EvaluationResult { state, delivery } => {
@@ -2308,23 +2320,23 @@ impl DesktopWindow {
                 view = view.child(
                     div()
                         .flex()
+                        .flex_col()
+                        .min_w_0()
                         .gap_2()
+                        .child(div().text_sm().child(change.path.clone()))
                         .child(div().text_sm().text_color(rgb(0x68758c)).child(format!(
-                            "{} [turn {}, call {}, session {}]",
+                            "{} · turn {}\ncall: {}\nsession: {}",
                             change.operation, change.turn_id, change.call_id, change.session_id
-                        )))
-                        .child(div().text_sm().child(change.path.clone())),
+                        ))),
                 );
             }
             view
         };
         let content = div()
             .id("live-task")
-            .when(compact, |content| {
-                content
-                    .overflow_y_scroll()
-                    .track_scroll(&self.live_form_scroll)
-            })
+            .min_h_0()
+            .overflow_y_scroll()
+            .track_scroll(&self.live_form_scroll)
             .size_full()
             .flex()
             .flex_col()
@@ -2447,11 +2459,9 @@ impl DesktopWindow {
             .child(
                 div()
                     .id("live-output")
-                    .flex_1()
-                    .min_h_0()
-                    .when(compact, |output| output.min_h(px(200.)).flex_shrink_0())
-                    .overflow_y_scroll()
-                    .track_scroll(&self.task_scroll)
+                    // Keep the transcript at its content height. The page owns vertical
+                    // scrolling, so short windows cannot collapse this into a nested scroller.
+                    .flex_shrink_0()
                     .p_4()
                     .rounded_lg()
                     .bg(rgb(0xffffff))
@@ -2459,6 +2469,36 @@ impl DesktopWindow {
                     .border_color(rgb(0xd8dee9))
                     .child(live.output.clone()),
             );
+        let tasks = div()
+            .id("live-saved-tasks")
+            .size_full()
+            .min_h_0()
+            .overflow_y_scroll()
+            .p_6()
+            .flex()
+            .flex_col()
+            .gap_4()
+            .child(div().text_xl().child(locale.text(Text::RecentTasks)))
+            .when_some(self.durable_task_error.as_ref(), |view, error| {
+                view.child(div().text_color(rgb(0xbf616a)).child(error.clone()))
+            })
+            .children(self.durable_task_ids.iter().enumerate().map(|(index, id)| {
+                div()
+                    .flex()
+                    .gap_3()
+                    .flex_shrink_0()
+                    .child(div().flex_1().min_w_0().child(id.clone()))
+                    .child(self.command(
+                        ("live-resume", index),
+                        if locale == Locale::Chinese {
+                            "恢复"
+                        } else {
+                            "Resume"
+                        },
+                        Command::ResumeTask(index),
+                        cx,
+                    ))
+            }));
         let settings = div()
             .id("live-settings-page")
             .size_full()
@@ -2553,6 +2593,12 @@ impl DesktopWindow {
                     ))
                     .when(!compact, |nav| nav.child(div().flex_1()))
                     .child(self.command(
+                        "live-recent-tasks",
+                        locale.text(Text::RecentTasks),
+                        Command::Tasks,
+                        cx,
+                    ))
+                    .child(self.command(
                         "live-settings",
                         locale.text(Text::Settings),
                         Command::Settings,
@@ -2567,6 +2613,8 @@ impl DesktopWindow {
                     .when(!compact, |body| body.h_full())
                     .child(if self.state.page == Page::Presets {
                         settings.into_any_element()
+                    } else if self.state.page == Page::Tasks {
+                        tasks.into_any_element()
                     } else {
                         content.into_any_element()
                     }),
@@ -3267,6 +3315,45 @@ mod tests {
         assert!(matches!(receiver.try_recv(), Ok(RuntimeCommand::Shutdown)));
         assert!(!live.request_close());
         assert!(receiver.try_recv().is_err());
+    }
+
+    #[test]
+    fn cancel_after_terminal_does_not_leave_ui_cancelling() {
+        use super::{EvaluationPresentation, LiveStatus, LiveTask};
+        let (commands, mut receiver) = tokio::sync::mpsc::channel(4);
+        let mut live = LiveTask {
+            commands: Some(commands),
+            ..Default::default()
+        };
+        for status in [
+            LiveStatus::Ready,
+            LiveStatus::Finished,
+            LiveStatus::Cancelled,
+        ] {
+            live.status = status;
+            live.request_cancel();
+            assert_ne!(live.status, LiveStatus::Cancelling);
+            assert!(receiver.try_recv().is_err());
+        }
+        live.running = true;
+        live.status = LiveStatus::Streaming;
+        live.request_cancel();
+        live.request_cancel();
+        assert_eq!(live.status, LiveStatus::Cancelling);
+        assert!(matches!(
+            receiver.try_recv(),
+            Ok(crate::runtime_host::RuntimeCommand::Interrupt)
+        ));
+        assert!(receiver.try_recv().is_err());
+        live.running = false;
+        live.status = LiveStatus::Finished;
+        live.evaluation = EvaluationPresentation::Running;
+        live.request_cancel();
+        assert_eq!(live.status, LiveStatus::Finished);
+        assert!(matches!(
+            receiver.try_recv(),
+            Ok(crate::runtime_host::RuntimeCommand::Interrupt)
+        ));
     }
 
     #[test]

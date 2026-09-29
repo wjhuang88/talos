@@ -3043,6 +3043,15 @@ async fn fixture_durable_cancelled_turn_replays_latest_closed_prefix() {
         .expect("durable session");
     let transcript = reopened.transcript(None, 100).expect("transcript");
     assert!(
+        matches!(
+            reopened.read_messages().expect("replay").last(),
+            Some(Message::Assistant { content, tool_calls, .. })
+                if content.contains("this turn was interrupted by the user")
+                    && tool_calls.is_empty()
+        ),
+        "cancelled history must close the old request before the next submission"
+    );
+    assert!(
         !transcript.is_empty(),
         "closed tool exchange must survive cancel"
     );

@@ -774,7 +774,7 @@ impl ApprovalHandler for DesktopApprovalHandler {
     async fn request_scoped_approval_with_explanation(
         &self,
         tool_name: &str,
-        _arguments: &serde_json::Value,
+        arguments: &serde_json::Value,
         _summary_fields: &[String],
         preview: &GrantPreview,
         explanation: &str,
@@ -791,8 +791,23 @@ impl ApprovalHandler for DesktopApprovalHandler {
             .collect::<Vec<_>>()
             .join("\n");
         let scope = self.redact_scope(&scope);
-        self.request_ui(tool_name, &scope, explanation).await
+        let Ok(details) = approval_details(arguments, explanation) else {
+            return ApprovalChoice::Deny;
+        };
+        self.request_ui(tool_name, &scope, &details).await
     }
+}
+
+// Render the exact pending request, not a model-authored reconstruction. This is
+// transient local approval UI data; do not copy it into transcript or diagnostic logs.
+fn approval_details(
+    arguments: &serde_json::Value,
+    explanation: &str,
+) -> Result<String, serde_json::Error> {
+    let arguments = serde_json::to_string_pretty(arguments)?;
+    Ok(format!(
+        "实际工具参数 / Actual tool arguments (JSON):\n{arguments}\n\n审核说明 / Review explanation:\n{explanation}"
+    ))
 }
 
 impl DesktopApprovalHandler {
@@ -2656,9 +2671,12 @@ mod tests {
                     RuntimeOutput::ApprovalRequested {
                         request_id,
                         tool_name,
+                        explanation,
                         ..
                     } => {
                         assert_eq!(tool_name, "write");
+                        assert!(explanation.contains("Actual tool arguments (JSON):"));
+                        assert!(explanation.contains("\"content\""));
                         approvals += 1;
                         host.try_send(RuntimeCommand::ApprovalResponse {
                             request_id,
