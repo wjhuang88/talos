@@ -1523,6 +1523,7 @@ mod cancellation_tests;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::provider::{FailureInjectedProvider, FailureInjection};
     use talos_plugin::HookHandler;
     use talos_provider::mock::MockProvider;
 
@@ -2620,6 +2621,104 @@ mod tests {
         }
         host.try_send(RuntimeCommand::Shutdown).expect("shutdown");
         while !matches!(host.recv().await, Some(RuntimeOutput::Stopped) | None) {}
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn injected_provider_error_reaches_host_and_next_submit() {
+        assert_injected_failure_reaches_host(
+            FailureInjection::Error,
+            "acceptance provider failure",
+        )
+        .await;
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn injected_first_packet_timeout_reaches_host_and_next_submit() {
+        assert_injected_failure_reaches_host(
+            FailureInjection::Timeout(std::time::Duration::from_millis(100)),
+            "first-packet timeout",
+        )
+        .await;
+    }
+
+    async fn assert_injected_failure_reaches_host(mode: FailureInjection, expected: &str) {
+        let workspace = TestWorkspace::new();
+        let provider = Arc::new(FailureInjectedProvider { mode });
+        let mut host = RuntimeHost::start(provider, workspace.0.clone()).expect("host starts");
+        tokio::time::timeout(std::time::Duration::from_secs(10), async {
+            for _ in 0..2 {
+                host.try_send(RuntimeCommand::Submit("probe".into()))
+                    .expect("submit");
+                let mut started = false;
+                loop {
+                    match host.recv().await.expect("host event") {
+                        RuntimeOutput::Started { .. } => started = true,
+                        RuntimeOutput::Completed {
+                            status: TerminalStatus::Error(error),
+                        } => {
+                            assert!(started, "failure must follow a started turn");
+                            assert!(error.contains(expected), "unexpected failure: {error}");
+                            break;
+                        }
+                        RuntimeOutput::Completed { status } => {
+                            panic!("injected failure completed as {status:?}")
+                        }
+                        RuntimeOutput::Stopped => panic!("host stopped before second submission"),
+                        _ => {}
+                    }
+                }
+            }
+            host.try_send(RuntimeCommand::Shutdown).expect("shutdown");
+            while !matches!(host.recv().await, Some(RuntimeOutput::Stopped) | None) {}
+        })
+        .await
+        .expect("bounded injected failure and retry");
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn cancelling_injected_timeout_stays_cancelled_and_accepts_next_submit() {
+        let workspace = TestWorkspace::new();
+        let provider = Arc::new(FailureInjectedProvider {
+            mode: FailureInjection::Timeout(std::time::Duration::from_secs(5)),
+        });
+        let mut host = RuntimeHost::start(provider, workspace.0.clone()).expect("host starts");
+        tokio::time::timeout(std::time::Duration::from_secs(10), async {
+            host.try_send(RuntimeCommand::Submit("first".into()))
+                .expect("submit");
+            while !matches!(host.recv().await, Some(RuntimeOutput::Started { .. })) {}
+            host.try_send(RuntimeCommand::Interrupt).expect("interrupt");
+            loop {
+                match host.recv().await.expect("cancel event") {
+                    RuntimeOutput::Completed { status } => {
+                        assert_eq!(status, TerminalStatus::Cancelled);
+                        break;
+                    }
+                    RuntimeOutput::Stopped => panic!("host stopped during cancellation"),
+                    _ => {}
+                }
+            }
+            host.try_send(RuntimeCommand::Submit("second".into()))
+                .expect("later submit");
+            loop {
+                match host.recv().await.expect("later event") {
+                    RuntimeOutput::Started { .. } => break,
+                    RuntimeOutput::Stopped => panic!("host stopped before later submission"),
+                    _ => {}
+                }
+            }
+            host.try_send(RuntimeCommand::Interrupt)
+                .expect("second interrupt");
+            while !matches!(
+                host.recv().await,
+                Some(RuntimeOutput::Completed {
+                    status: TerminalStatus::Cancelled
+                })
+            ) {}
+            host.try_send(RuntimeCommand::Shutdown).expect("shutdown");
+            while !matches!(host.recv().await, Some(RuntimeOutput::Stopped) | None) {}
+        })
+        .await
+        .expect("bounded cancellation and next submission");
     }
 
     #[tokio::test(flavor = "current_thread")]
