@@ -12,12 +12,52 @@ branches remain unchanged; unknown protocol versions fail closed. A host explici
 before publishing its exact schema. Do not publish a permissive union or silently downgrade a
 v2 call to V1. Hosts may continue using V1, which carries no frame-interaction guarantee.
 
-V2 adds `frame-tree(tabRef)` and requires explicit tabRef/frameRef on frame-local observation
-and interaction. Snapshot creates a snapshotRef; element operations require snapshotRef and
-an elementRef issued inside that snapshot. Press/scroll require an explicit frame even without
-an element. Tab/window lifecycle operations remain session-bound, not child-frame operations.
-The final exhaustive branch table and generated-schema parity are required before API acceptance;
-this proposal does not claim to be that executable schema.
+Every request has `protocolVersion: 2` and one `operation` discriminator. The following 21
+branches are closed objects: only common fields plus the listed required/optional fields are
+accepted, with `additionalProperties: false` at every object. No implicit current tab/frame.
+
+| Operation | Required fields (besides common fields) | Optional fields | Resource class |
+|---|---|---|---|
+| open | tabRef, url | visibility | Navigate |
+| read | tabRef, frameRef | none | Observe |
+| snapshot | tabRef, frameRef | none | Observe |
+| current-url | tabRef, frameRef | none | Observe |
+| screenshot | tabRef, frameRef | none | Observe |
+| click | tabRef, frameRef, snapshotRef, elementRef | none | Interact |
+| fill | tabRef, frameRef, snapshotRef, elementRef, text | none | Interact |
+| select | tabRef, frameRef, snapshotRef, elementRef, option | none | Interact |
+| hover | tabRef, frameRef, snapshotRef, elementRef | none | Interact |
+| check | tabRef, frameRef, snapshotRef, elementRef | none | Interact |
+| uncheck | tabRef, frameRef, snapshotRef, elementRef | none | Interact |
+| press | tabRef, frameRef, key | none | Interact |
+| scroll | tabRef, frameRef, direction | amount | Interact |
+| wait-for-element | tabRef, frameRef, snapshotRef, elementRef | none | Observe |
+| wait-milliseconds | milliseconds | none | SessionWait |
+| tab-new | none | none | SessionCreate |
+| tab-list | none | none | SessionInventory |
+| tab-close | tabRef | none | TabLifecycle |
+| tab-switch | tabRef | none | TabLifecycle |
+| window-close | none | none | SessionClose |
+| frame-tree | tabRef | none | FrameInventory |
+
+`press.key` is required and its enum is Enter, Tab, Escape, Space, Backspace,
+Delete, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Home, End, PageUp, PageDown. No chords or text.
+`direction` is up/down/left/right; `amount` is an integer 1..5000 (default 500 CSS pixels).
+`milliseconds` is integer 1..30000. Visibility is background/foreground (default background).
+`url` is absolute HTTP(S), host required, credentials/NUL forbidden, at most 4096 UTF-8 bytes.
+Fill text is at most 4096 bytes (empty allowed); option is 1..1024 bytes; both reject NUL.
+All references are 1..128 ASCII bytes matching `[A-Za-z0-9_-]+`; prefix/shape never grants scope.
+Reject nulls, fractional integers, duplicate JSON keys and any unlisted field. Schema string
+length checks are supplemented with UTF-8 byte admission checks. Entire request limit: 16 KiB.
+Ingress JSON parsers must reject duplicate keys before conversion to serde_json::Value; a tool
+cannot recover discarded duplicate keys. Generated schema and typed semantic parser must reject
+the same invalid fixture corpus except explicit byte-limit checks enforced by semantic admission.
+
+`open` navigates only the named tab's top document; it is never a child-frame navigation escape.
+`press` targets the resolved document, never browser-global keyboard focus. An executor unable to
+isolate this target returns UnsupportedOperation. Wait-for-element observes the existing element
+for at most 5 seconds; it does not relocate or rebuild it. All calls have a 35-second maximum
+execution deadline; approval wait has a separate ticket lifetime below. Timeout never triggers retry.
 
 ## Identity And Bounded Discovery
 
@@ -34,9 +74,8 @@ resolve to an omitted or ambiguous node. Excess depth/size returns bounded trunc
 ResourceLimit, never an unbounded traversal. Each repeated discovery is independently authorized.
 Delayed frames are Pending until a fresh discovery observes readiness; no implicit polling/retry.
 
-Snapshots are scoped to exactly one tab/frame and bounded by the accepted WEB-007 content budgets.
-Until those numeric budgets are accepted, implementation readiness is blocked. Duplicate names
-are harmless because names never locate a frame. Unknown or mismatched tuple members fail closed.
+Snapshots are scoped to exactly one tab/frame and bounded by the v2 output budgets below.
+Duplicate names are harmless because names never locate a frame. Unknown or mismatched tuple members fail closed.
 
 ## Invalidation
 
@@ -50,33 +89,68 @@ rebind an old token. Lifecycle stream loss/overflow marks context unavailable un
 re-established and newly discovered.
 
 Stable bounded failures: InvalidReference, StaleFrameReference, DetachedFrame, StaleElementReference,
-ContextUnavailable, OriginNotAuthorized, UnsupportedVersion, ResourceLimit, IndeterminateExecution.
+ContextUnavailable, OriginNotAuthorized, UnsupportedVersion, UnsupportedOperation, ResourceLimit,
+AdmissionExpired, InvalidRequest, PermissionDenied, IndeterminateExecution.
 Unknown/tombstone-evicted refs may return InvalidReference; preserving exact historical diagnostics
 must not require an unbounded tombstone store. No raw transport errors appear in these results.
 
 ## Trusted Admission And Permission Resource
 
-Propose a browser-specific resource with exact normalized top-level origin, exact target-frame
-origin, operation class and host-bound session/tab/frame generation scope. Origins use parsed
-scheme/host/effective port, never paths, credentials, queries or fragments. For nested frames,
-trusted ancestry identity is part of context binding; ancestry is not authority. Every additional
-frame actually observed must be authorized before its content is disclosed.
+Use a typed `BrowserPermissionResource` tagged union, not Domain strings or PathBuf. Every
+variant binds host-created executor identity and browser/session generation; variants are:
 
-The resource is derived from a trusted lifecycle registry associated with the bound executor;
-it is not derived from model fields or from page text. Parent approval never grants cross-origin
-child access. A same-origin child still requires valid explicit frame identity and operation scope.
-Opaque/sandboxed origins fail closed for interaction in the initial contract. Inherited origins
-such as about:blank/srcdoc require trustworthy effective-origin evidence; otherwise deny. No
-wildcard or textual host-suffix matching. Business-write policy remains host owned.
+| Variant | Additional exact scope | What it permits |
+|---|---|---|
+| SessionInventory | session epoch | Bounded tab identifiers and approved origin metadata only |
+| SessionCreate | session epoch | Create one empty tab; no URL or content access |
+| SessionWait | session epoch, milliseconds | Bounded delay only |
+| SessionClose | session epoch | Close the bound browser window |
+| TabLifecycle | tab identity/epoch, close or switch | Only the named lifecycle operation |
+| FrameInventory | tab identity/epoch, top-origin identity | Bounded frame structure/origin metadata only |
+| Navigate | tab identity/epoch, current top-origin identity, exact destination origin | One explicit top-level navigation |
+| Observe | tab/frame epochs, exact top and frame origins, exact operation | One frame-local observation |
+| Interact | Observe scope plus snapshot/element when applicable | One exact interaction |
 
-Frame-tree discovery needs approval for the bound tab's structural enumeration. It may disclose
-only the approved bounded origin/structure inventory, not child content. A subsequent child read
-or action requires that child's resource; enumeration approval cannot authorize interaction.
+Origin identity is `HttpOrigin(scheme, ASCII canonical host, effective port)` or a host-verified
+`OpaqueDocument(documentEpoch)` for lifecycle/inventory only. Opaque identity is not serialized
+as a reusable public origin. Observation/interaction requires HttpOrigin; sandboxed opaque frames
+fail closed. Inherited about:blank/srcdoc origins require trustworthy effective-origin evidence.
+Unknown/unavailable is not an origin and never matches. Origins contain no path/query/fragment,
+userinfo or page text; forbid wildcards, suffix matching and lossy port normalization.
+
+The host binds executor/session identity and maintains a trusted bounded lifecycle registry before
+tool composition. Session inventory/create/wait/close therefore do not require a previously issued
+tab/frame token. Tab-list yields opaque tabRef; frame-tree yields frameRef, including Pending refs
+that cannot be observed or acted upon until fresh authorized discovery. A newly created empty tab
+can be navigated using OpaqueDocument as its current origin identity. Host lifecycle subscriptions
+update state without executing model operations or minting grants. On lost synchronization, deny
+context-dependent operations with ContextUnavailable; trusted host resynchronization or explicit
+session replacement is required before discovery can resume. Do not promise that a model call can
+repair unavailable trusted state by bypassing permission.
+
+Inventory authorization explicitly covers bounded tab/frame origin and structure disclosure only;
+URLs, titles, names and content are absent. Unapproved inventory reveals no child origin metadata.
+Parent grants never cover a cross-origin child read/action. Same-origin children still require
+explicit valid frame scope. Ancestry identity is bound for context integrity, never authority.
+All browser grants in this initial v2 design are invocation-only, with exact operation and request
+binding. Existing Network allow rules and session grants do not imply a browser grant; host policy
+may evaluate each new invocation but cannot skip browser admission. Business-write policy remains
+host owned. Denials are final for that invocation.
+
+Navigate authorizes the requested destination origin and current tab context. Automatic cross-origin
+redirects must be blocked before the unapproved request is sent, returning OriginNotAuthorized;
+no automatic follow, reauthorization or replay. Same-origin redirects stay within the approved
+origin and execution deadline. If a backend cannot enforce this, Navigate is UnsupportedOperation.
+Interactive page actions may cause site behavior; this contract does not authorize unrelated
+browser navigation. The executor must stop origin-changing navigation before network dispatch or
+declare the affected operation unsupported. Already performed effects are never undone or replayed.
 
 Ordering:
 
 1. Exact closed schema, typed parse and semantic checks.
-2. Resolve refs from trusted bounded lifecycle state; reject stale/mismatched/unready contexts.
+2. Resolve only the refs required by the selected branch from trusted lifecycle state; reject
+   stale/mismatched contexts and unready observation/interaction targets. Inventory may return
+   Pending frames; session operations do not require undiscovered frame refs.
 3. Produce an immutable invocation-bound admission ticket carrying context epochs and origins.
 4. Evaluate the browser permission resource from that ticket before prompts or reusable grants.
 5. At authorized dispatch, validate the same ticket and refs again. Context changes invalidate
@@ -87,12 +161,42 @@ Ordering:
 Direct execute must not turn step 5 into an authorization bypass: require the same admitted,
 authorized capability or return a bounded denial. A generic Network facet alone is insufficient.
 
-Repository gap: AgentTool execution_admission and permission_profile are synchronous and do not
-currently carry this ticket. API review must choose an invocation-owned context integration with
-concurrency-safe authorization binding. A tool-global “last request” cache is rejected. A stale
-cache must not be refreshed by making a browser execution call before permission; fail closed and
-require explicit discovery instead. Browser lifecycle synchronization is trusted host plumbing,
-not a model-visible tool or authority grant.
+### Prepared Invocation API And Migration
+
+Selected design: add an opt-in prepared invocation path alongside existing AgentTool methods.
+These are proposed API names/semantics, not claims that the API exists:
+
+- `prepare_invocation(input)` returns an owned, non-Clone `PreparedToolInvocation`, or a bounded
+  error. It owns the validated canonical request, invocation nonce, executor identity, lifecycle
+  epochs, derived typed browser resource, creation time and 120-second monotonic expiry.
+- The permission-aware composition root evaluates only that object's typed resource. It issues a
+  `BrowserInvocationAuthorization` bound to the invocation nonce, entire canonical request digest,
+  resource and expiry. Resource equality alone cannot authorize a different fill value or operation.
+- `execute_prepared(prepared, authorization)` consumes both exactly once. Talos validates matching
+  request/context/expiry and epochs before consuming into an executor call; denial, cancellation,
+  timeout or mismatched capability destroys the ticket. A reused nonce is rejected even if a
+  transport message was duplicated. The bounded nonce store fails closed on capacity exhaustion.
+- Constructors/access to authorization are restricted to trusted permission composition; no model
+  or plugin may deserialize or mint one. Plugin transport carries a host-generated invocation ID,
+  the admitted request and expected epochs, never a permission object to reinterpret.
+- ManagedBrowserTool refuses legacy `execute`, `execute_authorized` and output variants with a
+  bounded PermissionDenied even if supplied existing path authorizations. A missing prepared-path
+  implementation fails closed; other tools retain legacy behavior without forced migration.
+
+Current code facts: permission_profile is computed before execution_admission in
+`crates/talos-agent/src/tool_execution.rs`; that admission result selects foreground/background,
+not an invocation ticket. `ToolExecutionAuthorization` in
+`crates/talos-core/src/tool/authorization.rs` is path-bound, and Domain matching is not exact-origin
+browser authorization. Do not insert browser resources into either representation. The new
+prepared path must run exact validation/admission BEFORE deriving/evaluating the permission
+resource; legacy hook order stays untouched for non-browser tools.
+
+The implementation slice must add explicit support in talos-agent dispatch/permission pipeline,
+talos-runtime's permission-aware wrappers, and talos-mcp's server permission/handler path, with
+wrapper forwarding tests. Any composition root not migrated must reject browser registration or
+execution. Public defaulted AgentTool hooks preserve existing implementers; new resource and
+capability types are separate from existing exhaustive enums/structs. Record an ADR and migration
+plan before code/API publication; no existing path-authority contract is widened by this proposal.
 
 ## Lifecycle Race And Trust Boundary
 
@@ -104,19 +208,82 @@ resolved document identity, never to whatever frame currently occupies a slot. I
 establish this property, it is not conformant. Browser crashes or ambiguous completion return
 IndeterminateExecution with no automatic replay, recreation or fallback.
 
+A backend readiness check declares supported operation/document-binding pairs before approval;
+unsupported pairs return UnsupportedOperation with zero mutation. Per-session serialization alone
+is insufficient because pages navigate autonomously. All interactions (including press/scroll)
+must use a document-bound primitive that fails if the document ceases to be current. Coordinate
+clicks or browser-global keyboard/scroll dispatch based only on a preceding epoch check are
+nonconformant. Reads/snapshots/screenshots must likewise be captured from the bound document and
+validate its continued identity before releasing output; a mismatch discards the entire result.
+Tests insert deterministic barriers between final epoch check, action/capture, and result release.
+No native implementation is claimed to meet these requirements until its implementation story
+supplies real-browser evidence; unsupported operations remain unavailable without fallback.
+
 Host and process executors are trusted implementations of this boundary, not hostile code confined
 by a Rust trait. Plugin trust/isolation remains the process-carrier story's responsibility. A
 conformance suite proves tested behavior; it cannot enforce honesty by a malicious executor.
 
-## Projection And Composition
+## Typed Outputs, Budgets And Projection
 
-Keep fill/select values, credentials, cookies/storage, headers, raw DOM, selectors/scripts,
-profiles, raw driver IDs and diagnostics out of ordinary observer projections. Permission
-presentation may show bounded sanitized top/child origins, operation and opaque references;
-model/display/persistence views remain separately bounded. Browser-page ingestion and disclosure
-continuations cannot mint browser authorization or forward arbitrary frame commands. Default
-registries remain unchanged; host and process adapters share the same Talos-owned schema,
-admission, permission and projection rules.
+All output objects are closed tagged variants, validated before model/display/persistence projection:
+
+| Variant | Allowed payload | Numeric bounds |
+|---|---|---|
+| Ack | operation, status=ok | 1 KiB total |
+| TabCreated | tabRef | 1 KiB total |
+| Tabs | entries(tabRef, origin-or-opaque-state), truncated | 64 entries, 16 KiB total |
+| Frames | entries(frameRef, parentFrameRef-or-null, origin-or-opaque-state, readiness), truncated | 128 nodes, depth 16, 64 KiB total |
+| PageUrl | sanitized origin and path | 4096 bytes total; no query/fragment/userinfo |
+| Read | plain frame-local text, truncated | 32 KiB text, 40 KiB total |
+| Snapshot | snapshotRef, nodes(elementRef, parentElementRef-or-null, role, name, states), truncated | 512 nodes, depth 32, name 256 bytes, 64 KiB total |
+| Screenshot | transient artifactRef, mime, width, height, byteLength | PNG only, 2 MiB encoded, 2048 per dimension, 4 megapixels |
+| Failure | code from fixed enum, operation-or-null, outcome=notExecuted/unknown/partial | 1 KiB, no free-form driver message |
+
+Failure operation is null only when no valid request discriminator was admitted. notExecuted
+requires proof that no action ran; partial denotes known effects before a blocked redirect or later
+failure; unknown covers ambiguous completion. A post-action failure must never claim notExecuted.
+Frames readiness is Pending or Ready; opaque-state is the literal opaque and contains no document
+identity. Output discriminator is `kind` with exactly the variant names above; no extra fields.
+
+Ack covers action/lifecycle/wait success; TabCreated covers tab-new; all observation/discovery
+operations map only to their named variant. Snapshot node fields are exactly elementRef,
+parentElementRef-or-null, role, name and states.
+Roles are generic, button, checkbox, radio, textbox, combobox, option, link, heading, list, listitem,
+table, row, cell, image and statictext. States are a unique array drawn from checked, unchecked,
+mixed, selected, expanded, collapsed, disabled, readonly and required (at most nine). Role names
+never contain raw DOM attributes; unknown roles reduce to generic and unknown states are omitted.
+No unvalidated arbitrary JSON payloads. Per-origin
+strings are at most 2048 bytes; over-budget results reject or truncate only at validated boundaries.
+Truncation never leaves dangling references or dangling snapshot tree links. V2's normal transport
+JSON envelope is at most 96 KiB; screenshot bytes travel through a separate bounded transient
+artifact channel. No base64/data URL or raw filesystem path is embedded in tool text.
+
+Registry budgets per bound session: 64 tabs, 128 live frames per tab, one current snapshot per
+frame, 512 elements per snapshot, 256 outstanding tickets/nonces. Tickets expire after 120 seconds;
+completed nonces remain only until original expiry, after which every replay is expired anyway.
+Opaque references are never reused; eviction invalidates references and returns InvalidReference.
+Capacity exhaustion returns ResourceLimit before approval/execution, never silently drops a live
+authorization. Host session destruction clears registry and changes generation.
+
+Frame-local text/snapshot traversal MUST stop at embedded browsing-context boundaries, including
+same-origin children. No descendant text, form values or accessibility subtree may be included.
+Screenshot capture must exclude/mask every descendant frame's pixels before creating the transient
+artifact; if exact containment cannot be proven, return UnsupportedOperation. Tests seed child
+secrets and inspect the image as well as text output. Choosing a parent frame does not approve
+visual access to its children. Password/OTP fields are omitted; sensitive classification/redaction
+is required before any model projection. Page data is untrusted content, never tool instructions.
+
+Fill/select values, credentials, cookies/storage, headers, raw DOM, selectors/scripts, profiles,
+raw driver IDs and diagnostics are never projected. Approval display may include sanitized origins,
+operation and opaque references, at most 4 KiB. Model view uses the typed budgets above; display
+and persistence each retain at most 4 KiB summary with no page text, snapshot names, image bytes,
+input values or raw URLs. Screenshot artifact capabilities expire within 120 seconds, are bound
+to the requesting invocation/session and are never durable or executable filesystem handles.
+
+Browser-page ingestion and disclosure continuations cannot mint browser authority or forward
+frame commands. Default registries remain unchanged; host and process adapters share these
+Talos-owned admission, permission and projection rules. A host executor lacking an optional
+operation must return UnsupportedOperation; it may not substitute a broader operation.
 
 ## Mandatory Acceptance Matrix
 
@@ -145,9 +312,18 @@ mutations. Test both normal registry dispatch and direct/authorized entry points
 | Boundaries | Depth/node/byte limits, oversized tokens/results/errors are bounded/redacted |
 | Transport ambiguity | One attempt, IndeterminateExecution, zero replay/fallback |
 | Projection secrecy | Seed secrets in URLs/input/results/errors; assert absence in forbidden views |
+| Bootstrap / empty tab | Session inventory/create works without frame refs; unknown trusted state never grants authority |
+| Redirect / focus escape | Unapproved origin requests blocked before dispatch; frame-local key actions never use global focus |
+| Child observation isolation | Text/AX traversal excludes descendants; screenshots mask child secrets or fail closed |
+| Ticket replay / payload swap | Expired, reused, foreign-executor or changed fill-value tickets reject before executor call |
+| Canceled approval / capacity | Cancel destroys ticket; 257th outstanding ticket fails closed without eviction of live authority |
+| Origin normalization | Scheme/port differences stay distinct; Unicode host canonicalization is shared; suffix/wildcard grants reject |
+| Document-action barrier | Navigation between check and press/scroll/capture rejects without wrong-document mutation or output |
 | Optional composition | Default inventory unchanged; host executor works without native/plugin dependencies |
 
-Before acceptance, reviewers must resolve the exhaustive v2 schema, numeric snapshot/result budgets,
-permission type/ticket API and backend atomicity evidence. Then select the runnable host conformance
-iteration and effective claim. Native iframe fixtures require real-browser evidence in the native
+Independent review must evaluate the above selected v2 schema, budgets, prepared API and
+fail-closed backend requirements. Actual backend atomicity, generated-schema parity and runtime
+behavior require implementation evidence before delivery; design approval does not supply it.
+Then select the runnable host conformance iteration and effective claim. Native iframe fixtures
+require real-browser evidence in the native
 implementation story; fake-executor tests alone cannot satisfy downstream delivery for #520.

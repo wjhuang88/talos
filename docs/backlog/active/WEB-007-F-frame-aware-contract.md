@@ -52,10 +52,12 @@ schema. No crate name is reserved. Browser protocol types and fixture specificat
 the eventual WEB-007 protocol package; adapter admission/projection belongs in talos-tools;
 permission integration requires review of talos-core/talos-permission APIs before activation.
 
-Unvalidated assumption: trusted lifecycle state can be read synchronously before permission and
-bound across approval to execution. Current AgentTool admission returns an execution mode, not
-an opaque browser admission ticket. The proposal explicitly records this API gap; an unbound
-lookup or mutable “last admitted request” cache is not an acceptable implementation.
+Selected proposed integration: an additive invocation-owned prepared path derives typed browser
+resources after exact admission and consumes an exact request-bound one-shot authorization.
+Current AgentTool admission returns only an execution mode and path authorizations are insufficient.
+The proposal specifies root migration and fail-closed legacy entry points. Actual backend support
+for document-bound actions remains an implementation assumption requiring real-browser evidence;
+unsupported operation/document pairs must fail closed, never use global input fallbacks.
 
 ## Exclusions And Dependencies
 
@@ -115,3 +117,13 @@ passed with zero warnings. `bash scripts/assess_project_scale.sh .` reported hig
 release-managed, required worktrees; this proposal uses an isolated worktree. `git diff --check`
 passed. Documentation-only intake: no Rust build, runtime fixture or security acceptance claimed.
 Remaining closure gates are the unchecked acceptance rows above; #618 remains open.
+
+## Independent Review Follow-Up
+
+The first API/security subagent reviewed head `7eec170666e7cdee0f2c9049ab58a372075ec137`
+against base `7331dbfa5ba9554868b9b92c73b022876f880acf` and returned REQUEST CHANGES:
+complete operation/output bounds, choose prepared API, define inventory/navigation resources,
+exclude descendant content and require document-bound backend actions. The revised proposal
+addresses all five; fresh exact-head review remains required. The governance subagent approved
+that original head only as an intake proposal, not accepted contract or implementation delivery.
+Both reviews are independent Agent roles using shared workspace/account, not separate humans.
