@@ -195,6 +195,7 @@ as Refinement / Unclaimed, outside I285; no activation until I285 is disposition
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
+| Frame-aware browser contract / #618 | Intake / Unclaimed | [WEB-007-F](backlog/active/WEB-007-F-frame-aware-contract.md) | Independent API/security acceptance, runnable iteration selection and effective claim before implementation. |
 | See owner documents and Product Backlog for the full retained historical and future inventory. | Reference | [Product Backlog](backlog/PRODUCT-BACKLOG.md) | Owner docs remain authoritative. |
 
 ## I169 Closeout (2026-08-06)

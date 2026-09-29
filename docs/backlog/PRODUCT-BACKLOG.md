@@ -24,6 +24,7 @@ deferred behind this cycle, not cancelled.
 
 | Priority | Focus | Current State / Gate | Required Reads |
 |---|---|---|---|
+| 1 | Frame-aware browser contract / #618 | WEB-007-F Intake / Unclaimed; proposed v2 identity, origin permission and race-bound admission require independent API/security acceptance before iteration selection. | [WEB-007-F](active/WEB-007-F-frame-aware-contract.md); [proposal](../proposals/WEB-007-F-frame-aware-browser-contract.md); WEB-007 / #452 |
 | 1 | Desktop week 1: live Runtime host | DESKTOP-001-D4 / I282 Review / Claimed; implementation merged, H1/H5 remain in #29 | [D4](active/DESKTOP-001-D4-live-runtime-host.md); [I282](../iterations/I282-live-runtime-host.md); [task](../tasks/2026-09-22-desktop-four-week-delivery.md); ADR-059 |
 | 1 | Desktop week 2: tools and approval | DESKTOP-001-D5 / I283 Complete; H2/H3 human acceptance residual | [D5](active/DESKTOP-001-D5-live-tools-and-approval.md); [I283](../iterations/I283-live-tools-and-approval.md); task and existing permission contracts |
 | 1 | Desktop week 3: resume and evidence | DESKTOP-001-D6 / I284 Review / Claimed; PR #607 merged as `2845ebdf` from `1fc73c2e`; CI/review passed; durable evaluation and human acceptance incomplete | [D6](active/DESKTOP-001-D6-durable-task-and-evidence.md); [I284](../iterations/I284-durable-task-and-evidence.md); ADR-042/061; WORK-001 |

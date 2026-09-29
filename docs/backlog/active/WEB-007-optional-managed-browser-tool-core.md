@@ -30,8 +30,9 @@
 ## Intake Boundary
 
 Issue #452 proposes an optional, unregistered-by-default native browser-tool core backed by a
-host-supplied executor. Talos must retain permission, credentials, browser lifecycle, process,
-retry, and site-policy authority. This owner records intake only; it authorizes no implementation,
+host-supplied executor. Talos owns contract admission, permission integration and safe projection.
+Hosts/executors retain credentials, browser lifecycle, process and site-policy authority; the
+adapter never retries. This owner records intake only; it authorizes no implementation,
 dependency, release, publication, or default-profile change.
 
 The relationship with WEB-005, exact crate/feature boundary, request schema, safe projections,
@@ -50,3 +51,11 @@ Collaboration Claim.
 
 This owner was created solely to reconcile open Issue #452 with the project owner matrix. It does
 not supersede WEB-005 or reserve an implementation owner.
+
+## Frame-Aware Child Intake
+
+[WEB-007-F](WEB-007-F-frame-aware-contract.md) owns #618 / #520 Request B frame identity,
+origin permission, stale-reference boundaries and shared acceptance fixtures. It remains Intake /
+Unclaimed; its versioned contract is Proposed, with no implementation iteration selected. Process
+carrier and native-browser delivery must consume the accepted contract rather than invent their
+own frame authorization. Parent #452 V1 is not silently expanded by this child.
