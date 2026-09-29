@@ -224,6 +224,20 @@ producer is wired. Neither gap can be closed by a fixture or ordinary manual cli
 
 Completion Commit: `422729caecdc8e76c7de8217654921723d5a3fdf` (implementation merge; residual acceptance remains open).
 
+### Residual Audit Checkpoint — 2026-09-29
+
+The provider audit confirmed that `MockProvider::with_error` and localhost HTTP servers used by
+provider tests provide deterministic error/timeout coverage for automated tests only. The Desktop
+production configuration has no safe, isolated failure-injection control for a configured provider.
+We therefore do not treat fixture/mock output, credential changes, or network disruption as H1
+native evidence. H1 remains open pending an explicitly authorized injection contract.
+
+The same audit found no new production session-bound criteria/evidence producer for H6.
+`RuntimeEvaluationService` and the Desktop host continue to fail closed with `EvaluationUnavailable`
+when authoritative subject, revision, or evidence is absent. No fixture result is promoted to
+production authority, and H6 remains an API/source residual rather than a remaining click-through
+step. PR #604 is an unrelated review thread and is intentionally excluded from I285 scope.
+
 ### Full local preflight — 2026-09-29
 
 `CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0

@@ -433,6 +433,17 @@ session-bound criteria/Goal source or workspace revision lifecycle exists. A tes
 be promoted as authority, and future subject changes must invalidate any result. No acceptance or
 Completion Commit is claimed.
 
+## Residual Audit Checkpoint — 2026-09-29
+
+The current-state audit reconfirmed that H1 cannot be closed with the available interfaces:
+provider mocks and localhost fixtures cover automated propagation, but no safe isolated failure
+injection exists in the configured Desktop provider path. H1 therefore remains Review / Partial;
+credentials must not be altered and networking must not be disrupted to manufacture evidence.
+H6 likewise has no newly authorized production evaluation producer; the fail-closed
+`EvaluationUnavailable` result remains correct when authoritative criteria, subject revision, or
+evidence is absent. Issue #604 is an unrelated review thread and does not change the four-week
+delivery state.
+
 ## Product-Design Variance — 2026-09-29
 
 The I285 walkthrough exposed a product-level gap not covered by its no-new-feature baseline:
