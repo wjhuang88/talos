@@ -26,7 +26,7 @@
 | Governance Claim PR | #608 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | PR #608 merged as `e1a89a1b25092ad37860314f02d1d212055b9fcc`; I282-I284 are merged with technical gates; #29 is the existing cycle acceptance tracker |
-| Implementation PR | Local candidate converged; stable implementation PR not yet submitted |
+| Implementation PR | #609, submitted from local candidate `c172636d27c741e2f320323a42b07afad78f99c6`; exact-head CI/review pending |
 | Last Updated | 2026-09-29 |
 | Handoff / Release Condition | H1-H6 evidence and owner-first closeout are required; no release |
 
