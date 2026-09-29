@@ -86,8 +86,8 @@ Implementation starts from that merge or later `main`.
 | Governance Claim PR | #621 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer accepted the contract on 2026-09-29; #621 exact-head CI `36590316149`, independent Agent-role review comment `5893341827`, and merge-time CAS recorded below |
-| Implementation PR | Not started |
-| Last Updated | 2026-09-29 |
+| Implementation PR | #622 |
+| Last Updated | 2026-09-30 |
 | Handoff / Release Condition | H1 native evidence and implementation review required; I287/H6 separate; no release |
 
 ## Activation Checkpoint — 2026-09-29
