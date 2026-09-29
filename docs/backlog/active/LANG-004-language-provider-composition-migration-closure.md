@@ -19,7 +19,7 @@
 | Claim State | Unclaimed |
 | Responsible Actor | Not assigned |
 | Executing Agent | Not assigned |
-| Work Slice | Complete multi-provider language composition, deterministic routing and language-by-language ownership transfer out of the transitional single-provider model |
+| Work Slice | Own multi-provider language composition, deterministic routing and language-by-language ownership transfer out of the transitional single-provider model |
 | Claimed At | Not applicable |
 | Source Issue | #616 |
 | Governance Claim PR | Not applicable |

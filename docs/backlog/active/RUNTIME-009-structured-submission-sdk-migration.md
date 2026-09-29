@@ -19,7 +19,7 @@
 | Claim State | Unclaimed |
 | Responsible Actor | Not assigned |
 | Executing Agent | Not assigned |
-| Work Slice | Complete the public tracked/idempotent submission and reconciliation migration while retaining submit(String) as a convenience wrapper |
+| Work Slice | Own the public tracked/idempotent submission and reconciliation migration while retaining submit(String) as a convenience wrapper |
 | Claimed At | Not applicable |
 | Source Issue | #614 |
 | Governance Claim PR | Not applicable |
