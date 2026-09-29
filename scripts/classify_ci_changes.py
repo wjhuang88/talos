@@ -12,7 +12,7 @@ from pathlib import Path, PurePosixPath
 
 
 SHA_PATTERN = re.compile(r"[0-9a-fA-F]{40}")
-ROOT_DOCUMENTS = {"AGENTS.md", "CHANGELOG.md", "README.md", "README.zh-CN.md"}
+ROOT_DOCUMENTS = {"AGENTS.md", "CHANGELOG.md", "EVOLUTION.md", "README.md", "README.zh-CN.md"}
 TEXT_GOVERNANCE_FILES = {".agent-governance/manifest.yaml"}
 PLUGIN_SOURCE_GUIDES = {"plugins/README.md", "crates/talos-plugin/README.md"}
 

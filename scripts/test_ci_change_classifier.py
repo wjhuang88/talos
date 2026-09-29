@@ -80,6 +80,17 @@ class ClassifierTests(unittest.TestCase):
             with self.subTest(path=path):
                 self.assert_full(payload(("M", path)))
 
+    def test_root_evolution_document_is_reduced_without_widening_allowlist(self) -> None:
+        for status in ("A", "M"):
+            with self.subTest(status=status):
+                self.assert_reduced((status, "EVOLUTION.md"))
+        self.assert_reduced(("M", "EVOLUTION.md"), ("M", "docs/BOARD.md"))
+        self.assert_full(payload(("M", "EVOLUTION.md"), ("M", "Cargo.toml")))
+        self.assert_full(payload(("D", "EVOLUTION.md")))
+        for path in ("OTHER.md", "evolution.md", "nested/EVOLUTION.md", "EVOLUTION.md.sh"):
+            with self.subTest(path=path):
+                self.assert_full(payload(("M", path)))
+
     def test_site_html_is_reduced_but_mixed_code_is_full(self) -> None:
         self.assert_reduced(("M", "site/install.html"), ("A", "site/zh/install.html"))
         self.assert_full(payload(("M", "site/install.html"), ("M", "site/install.sh")))
