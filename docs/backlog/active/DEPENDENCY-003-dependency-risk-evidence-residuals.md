@@ -38,6 +38,14 @@
 - Route the native boundary through ARCH-034-R04 and recurring audit semantics through
   DEPENDENCY-001 without treating either completed/reference owner as implementation authority.
 
+## Child Owners
+
+- [DEPENDENCY-003-A](DEPENDENCY-003-A-libc-stable-baseline-migration.md): Talos-direct `libc`
+  stable-baseline migration selected by the maintainer on 2026-09-23. Active / Claimed under
+  governance PR #604 when that claim reaches `main`; scope is limited to manifests, resulting
+  lock/fixture resolution, compatibility/platform evidence and rollback. Rust hardening behavior,
+  ARCH-034-R04-AG1 and the advisory/deprecation evidence residual remain outside this child.
+
 ## Exclusions
 
 No dependency, manifest, lockfile, sandbox, permission, process-hardening, audit implementation,
