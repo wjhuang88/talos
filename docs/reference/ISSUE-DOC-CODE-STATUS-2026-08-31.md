@@ -62,6 +62,10 @@
 | [#563](https://github.com/wjhuang88/talos/issues/563) | extend auto review to higher-risk writes with diff and rollback gates | [PERM-007-G](../backlog/active/PERM-007-G-higher-risk-auto-writes.md) | Refinement / Unclaimed | Intake-only owner; higher-risk writes, rollback, and impact analysis remain unimplemented and unauthorized. |
 | [#590](https://github.com/wjhuang88/talos/issues/590) | Conversation-language Auto review explanations | [AUTO-UX-001](../backlog/active/AUTO-UX-001-review-language.md) | Refinement / Unclaimed | Intake only; no language detector or permission change activated. |
 
+| [#612](https://github.com/wjhuang88/talos/issues/612) | Session truth/context/execution/control semantic rebaseline | [SESSION-011](../backlog/active/SESSION-011-session-semantic-rebaseline.md) | Refinement / Unclaimed | Architecture/coordination owner only; preserve TLOG/session invariants and claim bounded implementation children separately. |
+| [#613](https://github.com/wjhuang88/talos/issues/613) | legacy SessionEvent and UI compatibility closeout | [RUNTIME-008](../backlog/active/RUNTIME-008-runtime-event-compatibility-closeout.md) | Refinement / Unclaimed | Own compatibility inventory/deprecation/removal plan; no canonical event redesign or removal authority yet. |
+| [#614](https://github.com/wjhuang88/talos/issues/614) | structured submission receipt/reconciliation SDK migration | [RUNTIME-009](../backlog/active/RUNTIME-009-structured-submission-sdk-migration.md) | Refinement / Unclaimed | Additive public tracked API/canonicalization owner only; no custody/TLOG/permission behavior change authorized. |
+| [#616](https://github.com/wjhuang88/talos/issues/616) | language provider composition and migration closure | [LANG-004](../backlog/active/LANG-004-language-provider-composition-migration-closure.md) | Refinement / Unclaimed | Multi-provider composition and ownership-transfer closure owner; completed language slices remain historical. |
 ## Synchronization Notes
 
 2026-09-20: removed closed #298/#310/#334 from the active matrix after verifying
