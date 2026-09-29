@@ -227,11 +227,12 @@ manual work:
 
 | Residual | Follow-up | Status | Reason |
 |---|---|---|---|
-| H1 provider-error/timeout presentation | [I286](../iterations/I286-desktop-provider-error-injection-contract.md) | Planned / Unclaimed | A safe failure-injection contract is required before native evidence can be collected. |
+| H1 provider-error/timeout presentation | [I286](../iterations/I286-desktop-provider-error-injection-contract.md) | Active / Claimed proposed by #621; ineffective until merge | Debug-only synthetic failure contract accepted 2026-09-29; native UI evidence still required, not real network timeout evidence. |
 | H6 authoritative current/stale Evaluation evidence | [I287](../iterations/I287-desktop-evaluation-evidence-source.md) | Planned / Unclaimed | The production session-bound evidence producer and contract do not yet exist. |
 
-These follow-ups do not reopen I285 implementation or authorize code changes. #29 remains the
-acceptance ledger; the current cycle is delivered as Review / Partial.
+These follow-ups do not reopen I285 implementation. I286 code authority begins only after #621
+merges to `main`; I287 remains unclaimed. #29 remains the acceptance ledger, and the current cycle
+is delivered as Review / Partial.
 
 ## Execution Checkpoint — 2026-09-23 (historical checkpoint, superseded)
 

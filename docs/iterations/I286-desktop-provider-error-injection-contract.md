@@ -1,6 +1,6 @@
 # I286 — Desktop Provider Error Injection Contract
 
-> Document status: Planned / Unclaimed
+> Document status: Active / Claimed (proposed by #621; ineffective until merge to main)
 > Planned objective: Define and implement a safe, isolated provider failure path that exercises the real Desktop error/timeout presentation without changing credentials, disrupting networking, or treating a mock response as native evidence.
 
 ## Scope
@@ -25,21 +25,22 @@
 
 ## Governance
 
-No effective claim, implementation branch, or PR is active. Activation requires a target-branch Collaboration Claim.
+PR #621 proposes the claim and activation atomically. Neither takes effect until its exact
+governance candidate is merged to `main`; no implementation is committed or pushed before then.
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | I286 / Desktop H1: private debug-only provider failure injection, deterministic host/UI tests and native H1 acceptance; no Runtime/provider public API, permission policy, release behavior or I287 Evaluation source |
-| Claimed At | Not applicable |
+| Claimed At | 2026-09-29 |
 | Source Issue | #29 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #621 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Pending exact-head governance CI and independent security/API review |
+| Authorization Evidence | Maintainer accepted the contract on 2026-09-29; exact-head governance CI and independent security/API review required before #621 merge |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-29 |
 | Handoff / Release Condition | H1 native evidence and implementation review required; I287/H6 separate; no release |
