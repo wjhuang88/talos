@@ -3,7 +3,7 @@
 > Document status: In Progress — T3 / I284 in Review; T4 / I285 Review / Partial
 > Plan date: 2026-09-22
 > Target window: 2026-09-22 through 2026-10-19 (four calendar weeks; approximately 20 working days)
-> Execution state: T1-T4 implementation candidates are merged; I284 remains Review for H4/H6 and production evaluation-source acceptance. I285 implementation merged as `422729ca`, but remains Review / Partial with H1 provider-error presentation and H6 authoritative Evaluation evidence outstanding.
+> Execution state: T1-T4 implementation candidates are merged; I285 remains Review / Partial. H1 is transferred to planned follow-up I286 (safe provider failure injection); H6 is transferred to planned follow-up I287 (authoritative Evaluation evidence source). This four-week delivery remains Partial and must not be marked Complete.
 
 ## Outcome
 
@@ -219,6 +219,19 @@ single-model configuration and selected workspace, fail closed on permissions an
 and keep optional features out. #29 and owning child retain Desktop gaps; #308 owns real presets;
 #502 owns dependency research; MODEL-007 and #590 retain their existing owners.
 No unrelated cleanup, automatic dependency upgrade, new per-subtask Issue or release.
+
+### Post-cycle Residual Disposition — 2026-09-29
+
+The two unresolved acceptance rows are now explicit follow-up iterations rather than undefined
+manual work:
+
+| Residual | Follow-up | Status | Reason |
+|---|---|---|---|
+| H1 provider-error/timeout presentation | [I286](../iterations/I286-desktop-provider-error-injection-contract.md) | Planned / Unclaimed | A safe failure-injection contract is required before native evidence can be collected. |
+| H6 authoritative current/stale Evaluation evidence | [I287](../iterations/I287-desktop-evaluation-evidence-source.md) | Planned / Unclaimed | The production session-bound evidence producer and contract do not yet exist. |
+
+These follow-ups do not reopen I285 implementation or authorize code changes. #29 remains the
+acceptance ledger; the current cycle is delivered as Review / Partial.
 
 ## Execution Checkpoint — 2026-09-23 (historical checkpoint, superseded)
 
