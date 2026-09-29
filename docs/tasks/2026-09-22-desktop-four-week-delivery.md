@@ -1,9 +1,9 @@
 # Desktop Four-Week Delivery Task
 
-> Document status: In Progress — T3 / I284 in Review; T4 / I285 activation proposed in #608
+> Document status: In Progress — T3 / I284 in Review; T4 / I285 Review / Claimed
 > Plan date: 2026-09-22
 > Target window: 2026-09-22 through 2026-10-19 (four calendar weeks; approximately 20 working days)
-> Execution state: T1-T3 implementation merged; I284 remains Review for H4/H6 and production evaluation-source acceptance. I285 Active / Claimed is proposed by governance PR #608 and remains ineffective until merge; no implementation push is authorized yet.
+> Execution state: T1-T3 implementation merged; I284 remains Review for H4/H6 and production evaluation-source acceptance. I285 is Review / Claimed after governance PR #608 merged; local candidate checks are converged, with H1 provider-error presentation and H6 authoritative Evaluation evidence still outstanding.
 
 ## Outcome
 
@@ -76,15 +76,20 @@ technical gates pass, with the outstanding human rows explicitly carried forward
 
 | Row | Source | Human scenario | Evidence state |
 |---|---|---|---|
-| H1 | I282 | Launch with configured provider, submit one real task, observe content and provider-error handling | Not run; head/build/device pending |
-| H2 | I283 | Observe existing Auto decision, approve one bounded request, deny another and verify actual workspace effects | Not run; head/build/device pending |
-| H3 | I283 | Cancel while streaming, while a tool runs and while approval is pending; verify stopped state and no stale approval | Not run; head/build/device pending |
-| H4 | I284 | Exit/relaunch, resume the selected session, switch between two saved sessions and verify isolation/no repeated write | Not run; head/build/device pending |
-| H5 | I282/I285 | Chinese multiline IME, English/Chinese Settings, focus, scroll and layout during live output | Not run; head/build/device pending |
-| H6 | I284/I285 | Integrated real task through result/change inspection; distinguish missing/stale/current evaluation and Delivery eligibility | Not run; head/build/device pending |
+| H1 | I282 | Launch with configured provider, submit one real task, observe content and provider-error handling | Real-provider success observed. Provider-error/timeout remains unverified; safe isolated injection is unavailable, so do not alter credentials/config or disrupt networking. |
+| H2 | I283 | Observe existing Auto decision, approve one bounded request, deny another and verify actual workspace effects | Auto/model decision, deny, allow-once, session grant, different-path fresh approval and file effects observed; host restart requires fresh approval. Preserve as integration evidence; final-candidate retest only if permission code changes. |
+| H3 | I283 | Cancel while streaming, while a tool runs and while approval is pending; verify stopped state and no stale approval | Streaming, running-shell, and approval-wait cancellation observed; idle Cancel stayed Finished; Cancelled-to-new-request sentinel passed. Process-tree cleanup relies on automated tests, not native observation. |
+| H4 | I284 | Exit/relaunch, resume the selected session, switch between two saved sessions and verify isolation/no repeated write | History/resume and session isolation observed; post-write restart preserved file fingerprint/timestamps, with no repeated write. Retest only if session/recovery code changes. |
+| H5 | I282/I285 | Chinese multiline IME, English/Chinese Settings, focus, scroll and layout during live output | IME, locale/input preservation, directory-picker cancel, focus, page scroll and resize observed. 2026-09-29 screenshots show artifact evidence metadata fitting without horizontal clipping, and the narrow-window page scroll reveals the complete tool result without overlap or truncation. |
+| H6 | I284/I285 | Integrated real task through result/change inspection; distinguish missing/stale/current evaluation and Delivery eligibility | Actual file-change evidence and unavailable evaluation state observed; Finished/output preserved and Delivery not inferred. Production current/stale result remains unavailable due missing authoritative live evidence source; not resolvable by manual UI action or fixtures. |
+
+Native evidence, candidate identity and remaining checks are recorded in
+[I285's 2026-09-25 checkpoint](../iterations/I285-desktop-integrated-acceptance.md#native-acceptance-checkpoint--2026-09-25).
 
 At I285, retest interacting behavior at the final integrated head. Record application faults and
 provider nondeterminism separately; a scripted fixture is not evidence of real-provider acceptance.
+The detailed, newer evidence ledger is authoritative in
+[I285's consolidated human acceptance state](../iterations/I285-desktop-integrated-acceptance.md#consolidated-human-acceptance-state--2026-09-29).
 
 I277's already deferred VoiceOver, reduced-motion, Windows/Linux native interaction and physical
 display measurements remain separate #29 rows. They are not retroactively waived or repeated as
@@ -98,7 +103,7 @@ remain owned residuals and prevent claims of universal accessibility/platform ac
 | T1 | Week 1, Sep 22-28 / I282 | Launch a live Desktop task using configured provider; responsive streaming, errors and cancellation; tools unavailable in this initial slice | WORK-001 P0-P4, I280, ADR-059; API map and effective claim | Mock-provider E2E plus real-provider native row; no UI blocking or fictitious results | Keep existing mock explicitly separate; unresolved facade contract becomes a named blocker, never a copied engine | In Progress — claim/activation PR #598 |
 | T2 | Week 2, Sep 29-Oct 5 / I283 | Real file/shell activity, visible existing Auto review, scoped approval and safe cancellation | T1 merged and technical gates passed | Allow/Deny/Once/Session, stale approval, cancel and shutdown matrix; independent security/API review | Tool execution remains disabled until gates pass; do not ship an auto-allow workaround | Complete — PR #603 merged as `93c8b357`; H2/H3 human residual |
 | T3 | Week 3, Oct 6-12 / I284 | Recent tasks, durable transcript resume, actual work/evaluation and read-only change/evidence views | T2 merged; storage/projection compatibility verified | Restart and session-isolation tests; revision/staleness/Delivery gates; no tool replay | Preserve transcript-only recovery if richer projection cannot persist; explicitly show unavailable evidence and keep unmet acceptance open | Review — PR #607 merged as `2845ebdf` from exact head `1fc73c2e`; CI `35959834215` and incremental review passed; H4/H6 plus production evaluation-source acceptance remain in #29 |
-| T4 | Week 4, Oct 13-19 / I285 | Reproducible integrated candidate, fixes, user guide and consolidated acceptance report | T1-T3 merged with technical gates passed | Integrated E2E, current-head CI/review, required native rows, documented residuals and clean handoff | Deliver Partial with exact remaining blockers; no fake Complete or unrequested release | Active / Claimed proposed by governance PR #608; ineffective until merge, no implementation authority yet |
+| T4 | Week 4, Oct 13-19 / I285 | Reproducible integrated candidate, fixes, user guide and consolidated acceptance report | T1-T3 merged with technical gates passed | Integrated E2E, current-head CI/review, required native rows, documented residuals and clean handoff | Deliver Partial with exact remaining blockers; no fake Complete or unrequested release | Review / Claimed; #608 merged as `e1a89a1b`; local candidate checks passed, H1 provider-error presentation and H6 authoritative Evaluation evidence remain residuals |
 
 Reserve roughly three days in Week 4 for fixes/retesting and two for acceptance/documentation.
 The dates are planning targets, not autonomous wall-clock scheduling or a guarantee. Each weekly
@@ -427,3 +432,16 @@ Independent review confirms the production evaluation boundary remains unresolve
 session-bound criteria/Goal source or workspace revision lifecycle exists. A test fixture must not
 be promoted as authority, and future subject changes must invalidate any result. No acceptance or
 Completion Commit is claimed.
+
+## Product-Design Variance — 2026-09-29
+
+The I285 walkthrough exposed a product-level gap not covered by its no-new-feature baseline:
+the configured live host performs real Runtime work but remains prompt/conversation-first rather
+than following the Mission shaping, user-confirmed plan baseline, and Mission-first supervision
+model in the accepted design. Several richer task overview surfaces are fixture-backed, and the
+maintainer requires high-fidelity reproduction of the archived design images.
+
+This work is not silently added to I285. It is registered as DESKTOP-001-MISSION-UX Refinement /
+Unclaimed in the existing #29 cycle tracker. MISSION-UX is a successor candidate only after I285's
+acceptance/status is disposed and shared Runtime/Work API readiness is mapped. No additional remote
+Issue or implementation authority is created by this checkpoint.

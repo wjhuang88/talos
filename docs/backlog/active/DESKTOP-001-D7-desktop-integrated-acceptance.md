@@ -1,6 +1,6 @@
 # DESKTOP-001-D7: Desktop Integrated Candidate And Acceptance
 
-> Document status: Active — Claimed (proposed; ineffective until PR #608 merges)
+> Document status: Review — Claimed (effective after PR #608 merge)
 
 | Field | Value |
 |---|---|
@@ -8,7 +8,7 @@
 | Parent Epic | DESKTOP-001 |
 | Type | Desktop integration / behavior Story |
 | Priority | P1 |
-| Status | Active / Claimed |
+| Status | Review / Claimed |
 | Selected Iteration | I285 |
 | Source | #29; four-week Desktop task |
 | Depends On | I282-I284 implementation stages merged with technical gates; acceptance ledger in #29 |
@@ -25,10 +25,10 @@
 | Source Issue | #29 |
 | Governance Claim PR | #608 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Maintainer-directed completion of the four-week Desktop delivery; I282-I284 are merged with technical gates; #29 is the existing cycle acceptance tracker |
-| Implementation PR | Not started |
-| Last Updated | 2026-09-24 |
-| Handoff / Release Condition | Claim becomes effective only when the finalized governance PR merges; no release |
+| Authorization Evidence | PR #608 merged as `e1a89a1b25092ad37860314f02d1d212055b9fcc`; I282-I284 are merged with technical gates; #29 is the existing cycle acceptance tracker |
+| Implementation PR | #609, submitted from local candidate `c172636d27c741e2f320323a42b07afad78f99c6`; exact-head CI/review pending |
+| Last Updated | 2026-09-29 |
+| Handoff / Release Condition | H1-H6 evidence and owner-first closeout are required; no release |
 
 ## Outcome
 
@@ -75,5 +75,5 @@ New features, retroactive claims of Windows/Linux native or physical latency acc
 ## Completion Evidence
 
 Completion Commit: pending.
-I285 activation is proposed by governance PR #608 and is ineffective until merge. No implementation
-or human acceptance is claimed complete by this record.
+I285 activation is effective after governance PR #608 merged as `e1a89a1b25092ad37860314f02d1d212055b9fcc`.
+No implementation or human acceptance is claimed complete by this record.

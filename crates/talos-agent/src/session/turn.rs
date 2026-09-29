@@ -206,6 +206,15 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
             while let Ok(snapshot) = snapshot_rx.try_recv() {
                 stable_prefix = snapshot;
             }
+            if !stable_prefix.is_empty() {
+                // Preserve completed effects, but close the cancelled request before
+                // the next user message (including after durable session recovery).
+                stable_prefix.push(Message::Assistant {
+                    content: "[Runtime notice: this turn was interrupted by the user. The prior request is no longer active. Completed tool effects recorded above are not undone. Treat the next user message as a new request, not a continuation of the interrupted task.]".into(),
+                    tool_calls: Vec::new(),
+                    reasoning: None,
+                });
+            }
             let mut cancellation_error = cleanup_error.map(|_| {
                 "sandbox command cleanup was not confirmed after cancellation".to_string()
             });

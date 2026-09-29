@@ -1,6 +1,6 @@
 # Iteration I285: Desktop Integrated Candidate And Acceptance
 
-> Document status: Active — Claimed (proposed; ineffective until PR #608 merges)
+> Document status: Review — Claimed (effective after PR #608 merge)
 > Plan date: 2026-09-22
 > Target window: 2026-10-13 to 2026-10-19
 > Planned objective: A reproducibly built Desktop candidate passes an integrated real-task walkthrough with documented limits and a clean handoff.
@@ -19,10 +19,10 @@
 | Source Issue | #29 |
 | Governance Claim PR | #608 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Maintainer-directed completion of the four-week Desktop delivery; I282-I284 are merged with technical gates; #29 is the existing cycle acceptance tracker |
-| Implementation PR | Not started |
-| Last Updated | 2026-09-24 |
-| Handoff / Release Condition | Claim becomes effective only when the finalized governance PR merges; no release |
+| Authorization Evidence | PR #608 merged as `e1a89a1b25092ad37860314f02d1d212055b9fcc`; I282-I284 are merged with technical gates; #29 is the existing cycle acceptance tracker |
+| Implementation PR | #609, submitted from local candidate `c172636d27c741e2f320323a42b07afad78f99c6`; exact-head CI/review pending |
+| Last Updated | 2026-09-29 |
+| Handoff / Release Condition | H1-H6 evidence and owner-first closeout are required; no release |
 
 ## Published Baseline
 
@@ -78,9 +78,9 @@ safety. Roll back only the failing slice; no destructive cleanup of user session
 
 ## Actual Activation And Execution
 
-2026-09-24: I282-I284 implementation stages are merged to main. Governance PR #608 proposes
-atomic activation of I285. The proposed claim has no effect until this finalized record merges.
-No implementation code is included in the governance slice.
+2026-09-24: I282-I284 implementation stages are merged to main. Governance PR #608 merged as
+`e1a89a1b25092ad37860314f02d1d212055b9fcc`, activating I285. No implementation code was included
+in the governance slice.
 
 ## Verification Evidence
 
@@ -90,13 +90,147 @@ centrally in the four-week task and Issue #29.
 
 ## Completion Evidence
 
+### Native acceptance checkpoint — 2026-09-25
+
+Local candidate based on `e1a89a1b25092ad37860314f02d1d212055b9fcc`, with uncommitted
+Desktop changes; macOS arm64, native window and trackpad. Latest approval candidate executable
+SHA-256 before the subsequent artifact-layout fix:
+`ded35ebe8189f31c714699a9583e5b75e55cc1ad1f10b2ea61a680e26b667d9e`.
+Earlier screenshots exercised earlier local builds; they are not exact-head release evidence.
+
+- H1 partial: real provider returned OK, SECOND_OK and follow-up answers. Provider-error UI remains untested.
+- H2 observed: model-reviewed pwd, denied bash, approved-once write (13 bytes, I285_WRITE_OK),
+  a fresh approval for another write, session approval reuse and a fresh approval for a different path.
+  User confirmed the second-round write received its own Allow once; do not attribute it to the first round.
+- H3 partial: streaming cancel and approval-wait cancel stopped the UI. Agent read-only `ls -ld`
+  confirmed i285-scope-check-20260925.txt absent; user confirmed Cancelled. Running-tool cancellation remains untested natively.
+- H4 partial: restart restored durable history; a subsequent model request recalled END_SCROLL.
+  Switching between two saved sessions preserved distinct histories and kept B_SESSION_0925/ACK
+  out of the first session. Restart after a successful write/no replay remains to verify.
+- H5 observed: short/long output uses one page scroll, resize, Chinese multiline IME,
+  locale switch preserving input, directory-picker cancel and Tab/Shift-Tab passed user checks.
+- H6 partial: successful file changes appeared and unavailable evaluation preserved Finished
+  and prior output. Production current/stale evaluation evidence remains unavailable.
+
+Local corrections: evaluation state no longer overwrites conversation status; live navigation
+exposes saved sessions; approval displays exact JSON arguments under the existing bounded request
+and request-ID lifecycle. Focused host tests passed 46/46, Clippy and builds passed.
+Residuals: artifact metadata horizontally overflowed (now locally changed to stacked path/identity,
+native retest pending); saved-task labels are opaque; cancellation followed by a new instruction
+once produced a model conflict response (cause unproven). Permission presentation still needs
+independent security review before a stable candidate. No whole-row or cycle completion is claimed.
+
+### Native acceptance continuation — 2026-09-26
+
+The earlier generic session-reuse report was insufficient: direct file inspection found
+I285_SECOND_WRITE rather than the expected I285_SESSION_WRITE_OK. That earlier report is not
+proof of a successful repeated write. Controlled follow-up used the same `edit` tool and path:
+after session approval, direct inspection confirmed I285_SESSION_WRITE_OK (21 bytes), then
+I285_EDIT_REUSE_OK (18 bytes); the maintainer confirmed no second approval. After restart,
+the same edit/path requested fresh approval; cancellation left I285_EDIT_REUSE_OK and mtime
+1790352037 unchanged. A different-path request also required approval and was cancelled;
+the agent directly confirmed that scope-check file absent.
+
+H4 post-write recovery: inode 384731270, size 17, mtime/ctime 1790337801 and SHA-256
+311a64bcf449e380acdb413887ad0fcf0b51937ae24e0fffd8b3dd8aa76ba505 were unchanged across
+the earlier restart/resume, with content I285_SECOND_WRITE. No repeated write was observed.
+The temporarily empty recent-task list recovered after selecting the original workspace.
+
+H3 running-tool cancellation: maintainer explicitly confirmed bash had begun executing
+`sleep 30` before Cancel, and the UI immediately entered Cancelled. This establishes native
+UI behavior, not a direct descendant-process inspection; automated cleanup tests remain required.
+Remaining native checks: provider-error presentation and the stacked artifact-row layout.
+Current/stale production evaluation remains unavailable. Test file remains in the selected
+workspace for bounded acceptance; remove only after verification and explicit cleanup scope.
+
+Cancellation-boundary correction: cancelled durable history now ends with a Runtime-authored
+assistant interruption marker, preserving completed effects while distinguishing the next user
+submission from continuation of the cancelled request. Focused `talos-agent` Session tests passed
+35/35, including cancelled durable replay. On 2026-09-28 the maintainer retested an idle Cancel
+after a successful turn: status remained Finished. A streaming 5000-line task then transitioned
+from Cancelling to Cancelled and stopped output. Full Desktop tests passed 103/103. The earlier
+stuck-Cancelling observation preceded the local correction and is not counted as a passing result.
+The Cancelled-to-new-request sentinel probe returned CANCEL_BOUNDARY_OK after the correction.
+
+### Product-flow and visual-design variance — 2026-09-29
+
+Code/design comparison confirmed that the live host is a real Runtime/provider/tool/permission
+integration, but not the designed Mission-first product workflow. The current live task page accepts
+a goal/prompt and sends it into the conversation without structured plan proposal, user review, or a
+confirmed Mission baseline. It primarily presents conversation output, controls, and a per-session
+Todo-backed work projection; the Mission overview/progress and task-local navigation prototypes
+remain fixture-backed. The user also confirmed that high fidelity to the archived design images is
+required, not merely reuse of their palette.
+
+Real execution plumbing therefore does not establish product-flow or visual conformance; the user's
+impression that this was a mock was reasonable. This is product work outside I285's published
+scope. Do not silently expand I285 or claim the live host conforms. The follow-up is registered as
+[DESKTOP-001-MISSION-UX](../backlog/active/DESKTOP-001-mission-first-desktop-workflow.md), Refinement /
+Unclaimed, using existing Issue #29 rather than creating a per-task Issue. MISSION-UX is not selected or
+activated; first dispose I285's outstanding acceptance/status truthfully, then map the shared
+Runtime/Work contracts and confirm how to implement the Mission baseline lifecycle without a
+Desktop-owned store. Its visual acceptance explicitly compares the four archived reference
+surfaces at high fidelity.
+
+### Consolidated human acceptance state — 2026-09-29
+
+This table supersedes the initial H1-H6 summary above where later checkpoints provide newer
+evidence. Historical checkpoints remain intact. Evidence below is native/user-observed unless
+explicitly identified as automated; observations made on an unidentified local binary are not
+exact-candidate release evidence.
+
+| Row | Current result | Remaining action / limit |
+|---|---|---|
+| H1 — real provider and error presentation | Real configured-provider success responses were observed. | Provider-error/timeout presentation is not verified. No safe, isolated error-injection control is currently available; do not alter real credentials/configuration or simulate failure by disrupting networking. Keep open until a safe test path exists. |
+| H2 — Auto, approvals and file effects | Auto/model decision, human deny, allow-once, session grant, a fresh request for another path, and resulting file effects were observed. Session grants were confirmed not to survive host restart. | Preserve as integration evidence; retest only if the relevant permission path changes before final candidate. Independent security/API review remains a separate gate. |
+| H3 — cancellation | Streaming cancellation, approval-wait cancellation, and cancellation after a running shell command had begun were observed. Idle Cancel remained Finished; streaming transitioned Cancelling -> Cancelled and stopped output. The cancelled-to-new-request sentinel returned `CANCEL_BOUNDARY_OK`. | Native UI behavior is observed. Descendant/process-tree cleanup is established by automated tests, not direct native process inspection; do not claim the screenshot alone proves cleanup. |
+| H4 — resume and isolation | Restart/resume restored history; two saved sessions remained isolated; post-write file fingerprint/timestamps did not change on resume, showing no repeated write. | Existing evidence is sufficient for these scenarios; exact final-candidate recheck is required if session/recovery code changes. |
+| H5 — input, layout and navigation | Chinese multiline IME, locale switching, directory-picker cancel, focus traversal, page scrolling and resize were observed. On 2026-09-29, user screenshots after creating `i285-layout-check.txt` showed path, operation, turn, call and session metadata in the live artifact-evidence region without horizontal clipping. A follow-up narrow-window screenshot showed the complete tool result after scrolling, including the completion marker, byte count, preview and Chinese result, with no overlap or truncation. | The 2026-09-29 binary SHA is unknown. The screenshots are not a test of a product `Changes` page (none exists in live UI) and do not establish the full Mission-first product flow. |
+| H6 — changes, evaluation and delivery | Successful file-change evidence was shown. Unavailable evaluation preserved Finished/output and did not claim Delivery. | Production current/stale Evaluation remains unavailable because no authoritative live subject/evidence producer is wired. This is a shared contract/source gap, not a remaining manual interaction; do not use fixtures to claim PASS. |
+
+Current actionable native check: none for the H5 layout/scroll scenario; the narrow-window
+artifact evidence is complete at the observed viewport. Provider-error presentation is deferred
+pending a safe injection path. Product Mission flow and high-fidelity reference surfaces remain
+outside I285 and are tracked by MISSION-UX.
+
 Completion Commit: pending.
 Only already-existing implementation/evidence commits may close this iteration.
 
+### Local Candidate Checkpoint — 2026-09-29
+
+The local I285 candidate includes the bounded integrated corrections already present in the
+working tree: terminal-cancel state handling, distinct Evaluation-unavailable presentation,
+real permission arguments, durable cancelled-turn closure, stacked artifact evidence metadata,
+and content-driven page scrolling/recent-task navigation. Focused Desktop tests passed `103/103`,
+and the `talos-agent` cancelled-turn recovery test passed. One full Desktop run first exposed the
+known process-group cleanup timing failure in
+`runtime_host::cancellation_tests::running_shell_interrupt_waits_for_descendant_cleanup`; the
+same test passed when rerun alone and the subsequent full run passed `103/103`. This remains a
+timing-sensitive residual to observe on the stable candidate, not a claim of permanent repair.
+
+H5 is complete for the observed macOS narrow-window layout/scroll scenario. H1 provider-error
+presentation remains unverified because there is no safe isolated error-injection path, and H6
+production current/stale Evaluation remains unavailable because no authoritative live evidence
+producer is wired. Neither gap can be closed by a fixture or ordinary manual click-through.
+
+Completion Commit: pending. A stable implementation PR and exact-head review/CI remain required.
+
+### Full local preflight — 2026-09-29
+
+`CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0
+./scripts/release_preflight.sh` exited 0 after the workspace checks and tests and both external
+Runtime SDK fixture variants; each fixture printed `talos-runtime external fixture passed`, and
+the script ended with `release preflight: passed`. The profile flags reduce regenerable debug
+build output; they do not change the preflight gates. This validates the current uncommitted local
+candidate, not an exact-head remote CI run. H1/H6 and independent integration/security/API review
+remain outstanding.
+
 ## Variance And Residuals
 
-H1-H6 remain unaccepted until performed on the final integrated candidate. On 2026-09-24, H1
-attempt exposed task-page controls below the visible window with no page-level scrolling at the
-observed window size; the maintainer later identified the content as below the fold. A local
-layout correction is being held outside this governance-only candidate and will be validated in
-the I285 implementation stage. This observation is not a provider/runtime failure finding.
+The 2026-09-24 below-the-fold observation was corrected: the live task page uses content-driven
+viewport overflow scrolling, and output grows with content under the same page scroll rather than
+using a collapsed nested scroller. Later native checks confirmed page scrolling, resize and long
+output behavior. See the consolidated H1-H6 table above for current evidence and remaining actions.
+
+I277's separately deferred VoiceOver, reduced-motion, Windows/Linux native interaction and physical
+display measurements remain outside this I285 manual batch and are not counted as passed.

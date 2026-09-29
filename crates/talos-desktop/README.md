@@ -1,7 +1,7 @@
 # Talos Desktop development host
 
-I284 is under local development. These commands describe the implementation in
-this branch, not a released Desktop product. Native acceptance is still pending.
+I282-I284 implementation stages are merged; I285 integrated acceptance is in progress.
+These commands describe this development branch, not a released Desktop product.
 
 ## Launch
 
@@ -29,7 +29,9 @@ usage charges.
 Enter an explicit workspace and task, then choose **Send**. The folder button
 uses the native directory picker. **Current task** and **Settings** navigate
 without starting another turn. Language switching preserves the task and output.
-Small windows scroll the task page to reach Send, Cancel and output.
+The task page scrolls when its contents exceed the available window area. Output grows with
+its contents and shares that page scroll; there is no nested vertical output scroller.
+Choose the original workspace before opening **Recent tasks**, then select **Resume**.
 
 ## Current behavior and limits
 
@@ -44,6 +46,9 @@ Small windows scroll the task page to reach Send, Cancel and output.
 - A pending approval offers Allow once, Allow session and Deny for the displayed
   request. Replies are bound to its request ID; stale or repeated replies cannot
   authorize a later request. Cancelling or closing the approval surface fails closed.
+  The local approval panel displays actual JSON arguments alongside the scope and review
+  explanation. Oversized requests are denied rather than shown incompletely for approval.
+  Session grants are scoped and do not survive restarting the host.
 - Configured live mode binds the conversation to a workspace-scoped durable Session under
   `.talos/desktop-sessions`; successful turns are persisted through the shared Runtime contract
   and can be read after a host restart. Pending, failed or cancelled turns are not replayed.
@@ -92,7 +97,9 @@ On Linux a usable X11/Wayland display is required.
 
 上面的 `--live zh-CN` 命令打开真实模型模式；不带 `--live` 则仍为示例原型。
 先用现有 CLI 配好模型，再填写工作区和任务，点击“发送”。“取消”请求停止当前
-对话；关闭窗口会先请求清理 Runtime。窄窗口请向下滚动查看操作按钮与输出。
+对话；关闭窗口会先请求清理 Runtime。内容超过窗口时整页滚动，输出区随内容增高，
+不再嵌套纵向滚动。恢复历史前先选择原工作区，再进入“最近任务”点击“恢复”。
+审批面板显示实际 JSON 参数；会话授权不跨执行服务重启保留。
 
 真实模式使用共享 Runtime 工具和现有权限、沙箱门禁。Auto 遵循 `auto.enabled`
 配置并显示实际决策；需要人工批准时，可选择单次允许、会话允许或拒绝。

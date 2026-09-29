@@ -5,7 +5,7 @@
 | Story ID | DESKTOP-001 |
 | Type | Product / Architecture Spike |
 | Priority | P3 |
-| Status | Parent Deferred / Unclaimed; child D6/I284 Active / Claimed; D7/I285 Planned |
+| Status | Parent Deferred / Unclaimed; D6/I284 Review / Claimed; D7/I285 Review / Claimed; MISSION-UX Refinement / Unclaimed |
 | Source | [GitHub Issue #29](https://github.com/wjhuang88/talos/issues/29) |
 | Selected Iteration | Parent not directly activated; planned children I282-I285 |
 | Depends On | RUNTIME-001 reusable runtime API; Work Graph/evaluation prerequisite; SESSION-009 for later multi-client behavior; permission and distribution decisions |
@@ -43,6 +43,14 @@ work exists. I277 delivered the mock; WORK-001 P0-P4 is complete. This plan crea
 
 Existing #29 remains the product/validation tracker. #308 real presets and remaining Desktop
 product scope stay separate; this cycle does not close the entire parent or authorize release.
+
+### Execution Status Update — 2026-09-29
+
+The published child-plan table above is preserved as its original scheduling baseline. Current
+execution truth is I284 Review / Claimed after PR #607 merge `2845ebdf`; I285 Review / Claimed after
+#608 merge `e1a89a1b`. D8 is recorded as Refinement / Unclaimed in
+[`DESKTOP-001-MISSION-UX`](DESKTOP-001-mission-first-desktop-workflow.md), a possible successor after
+I285 disposition and shared API mapping; it is not selected or activated.
 
 ## Identity / Goal / Value — Preserved Product Direction
 
