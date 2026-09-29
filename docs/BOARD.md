@@ -103,6 +103,8 @@ I277's deferred acceptance stays recorded; it does not reactivate mock developme
 | Week 2: tools and approval | Complete; H2/H3 residual | [I283](iterations/I283-live-tools-and-approval.md) | PR #603 merged `93c8b357`; exact-head CI and review passed |
 | Week 3: resume and evidence | Review / Claimed; PR #607 merged as `2845ebdf` from exact head `1fc73c2e`; CI `35959834215` and incremental review passed; durable evaluation source and H4/H6 remain open | [I284](iterations/I284-durable-task-and-evidence.md) | #606 activation `4e150b3e`; I285 owns integrated stabilization; H4/H6 stay in #29 |
 | Week 4: integrated acceptance | Review / Partial; implementation #609 merged as `422729ca`; exact-head CI `36535972702` and review `5885650377` passed; H1/H6 remain open | [I285](iterations/I285-desktop-integrated-acceptance.md) | Required #29 evidence closure and safe H1/H6 evidence |
+| Desktop H1 provider failure evidence | Active / Claimed proposed by #621; ineffective until merge | [I286](iterations/I286-desktop-provider-error-injection-contract.md) | Accepted debug-only contract; native H1 evidence and exact-head security/API review |
+| Desktop H6 Evaluation evidence source | Planned / Unclaimed | [I287](iterations/I287-desktop-evaluation-evidence-source.md) | Production session-bound source contract and native H6 evidence |
 
 Product/design conformance gap found in the live host: Mission shaping and confirmed-plan flow plus
 high-fidelity reference implementation are tracked by [DESKTOP-001-MISSION-UX](backlog/active/DESKTOP-001-mission-first-desktop-workflow.md)

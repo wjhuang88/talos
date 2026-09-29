@@ -3,7 +3,7 @@
 > Document status: In Progress — T3 / I284 in Review; T4 / I285 Review / Partial
 > Plan date: 2026-09-22
 > Target window: 2026-09-22 through 2026-10-19 (four calendar weeks; approximately 20 working days)
-> Execution state: T1-T4 implementation candidates are merged; I284 remains Review for H4/H6 and production evaluation-source acceptance. I285 implementation merged as `422729ca`, but remains Review / Partial with H1 provider-error presentation and H6 authoritative Evaluation evidence outstanding.
+> Execution state: T1-T4 implementation candidates are merged; I285 remains Review / Partial. H1 is transferred to planned follow-up I286 (safe provider failure injection); H6 is transferred to planned follow-up I287 (authoritative Evaluation evidence source). This four-week delivery remains Partial and must not be marked Complete.
 
 ## Outcome
 
@@ -220,6 +220,20 @@ and keep optional features out. #29 and owning child retain Desktop gaps; #308 o
 #502 owns dependency research; MODEL-007 and #590 retain their existing owners.
 No unrelated cleanup, automatic dependency upgrade, new per-subtask Issue or release.
 
+### Post-cycle Residual Disposition — 2026-09-29
+
+The two unresolved acceptance rows are now explicit follow-up iterations rather than undefined
+manual work:
+
+| Residual | Follow-up | Status | Reason |
+|---|---|---|---|
+| H1 provider-error/timeout presentation | [I286](../iterations/I286-desktop-provider-error-injection-contract.md) | Active / Claimed proposed by #621; ineffective until merge | Debug-only synthetic failure contract accepted 2026-09-29; native UI evidence still required, not real network timeout evidence. |
+| H6 authoritative current/stale Evaluation evidence | [I287](../iterations/I287-desktop-evaluation-evidence-source.md) | Planned / Unclaimed | The production session-bound evidence producer and contract do not yet exist. |
+
+These follow-ups do not reopen I285 implementation. I286 code authority begins only after #621
+merges to `main`; I287 remains unclaimed. #29 remains the acceptance ledger, and the current cycle
+is delivered as Review / Partial.
+
 ## Execution Checkpoint — 2026-09-23 (historical checkpoint, superseded)
 
 Completed task items: none; I282 implementation is locally converging.
@@ -432,6 +446,17 @@ Independent review confirms the production evaluation boundary remains unresolve
 session-bound criteria/Goal source or workspace revision lifecycle exists. A test fixture must not
 be promoted as authority, and future subject changes must invalidate any result. No acceptance or
 Completion Commit is claimed.
+
+## Residual Audit Checkpoint — 2026-09-29
+
+The current-state audit reconfirmed that H1 cannot be closed with the available interfaces:
+provider mocks and localhost fixtures cover automated propagation, but no safe isolated failure
+injection exists in the configured Desktop provider path. H1 therefore remains Review / Partial;
+credentials must not be altered and networking must not be disrupted to manufacture evidence.
+H6 likewise has no newly authorized production evaluation producer; the fail-closed
+`EvaluationUnavailable` result remains correct when authoritative criteria, subject revision, or
+evidence is absent. Issue #604 is an unrelated review thread and does not change the four-week
+delivery state.
 
 ## Product-Design Variance — 2026-09-29
 
