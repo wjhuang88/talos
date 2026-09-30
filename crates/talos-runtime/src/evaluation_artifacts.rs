@@ -423,6 +423,18 @@ mod tests {
                 .as_deref(),
             Some("fresh")
         );
+        for content in [
+            "",
+            "单行",
+            "single\n",
+            "single\r\n",
+            "first\nsecond\n",
+            " trailing \n",
+        ] {
+            std::fs::write(root.path().join("a"), content).expect("exact content fixture");
+            let observations = registry.capture(subject()).expect("complete capture");
+            assert_eq!(observations[0].content.as_deref(), Some(content));
+        }
         std::fs::remove_file(root.path().join("a")).expect("remove fixture");
         assert!(registry.capture(subject()).is_err());
         let delete = call("delete", "a");

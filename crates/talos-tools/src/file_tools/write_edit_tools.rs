@@ -278,6 +278,7 @@ impl EditTool {
         input: Value,
         authorizations: &[ToolExecutionAuthorization],
     ) -> Result<String, FileToolError> {
+        validate_anchored_field_types(&input)?;
         let anchored: AnchoredEditInput = serde_json::from_value(input)
             .map_err(|error| FileToolError::InvalidInput(error.to_string()))?;
         let registry = self
@@ -343,32 +344,80 @@ impl EditTool {
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 struct AnchoredEditInput {
     path: String,
+    /// Copy the complete transient snapshot id from a fresh read; never a line number.
     snapshot_id: String,
     operations: Vec<AnchoredOperation>,
+}
+
+// Report field locations without echoing private snapshot handles, hashes or file contents.
+fn validate_anchored_field_types(input: &Value) -> Result<(), FileToolError> {
+    for field in ["path", "snapshot_id"] {
+        if input.get(field).is_some_and(|value| !value.is_string()) {
+            return Err(FileToolError::InvalidInput(format!(
+                "{field} must be a JSON string; copy snapshot_id from a fresh read"
+            )));
+        }
+    }
+    if let Some(operations) = input.get("operations").and_then(Value::as_array) {
+        for (index, operation) in operations.iter().enumerate() {
+            let fields: &[&str] = match operation.get("op").and_then(Value::as_str) {
+                Some("replace" | "insert_before" | "insert_after") => &["target", "content"],
+                Some("replace_range") => &["start", "end", "content"],
+                Some("delete") => &["start", "end"],
+                _ => &["op"],
+            };
+            for &field in fields {
+                let Some(value) = operation.get(field) else {
+                    continue;
+                };
+                if value.is_string()
+                    || (field == "end" && value.is_null() && operation["op"] == "delete")
+                {
+                    continue;
+                }
+                let hint = if matches!(field, "target" | "start" | "end") {
+                    "copy the full line:hh string from a fresh read, not an integer or bare line number"
+                } else {
+                    "use a JSON string"
+                };
+                return Err(FileToolError::InvalidInput(format!(
+                    "operations[{index}].{field} must be a JSON string; {hint}. No edit was applied"
+                )));
+            }
+        }
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 #[serde(tag = "op", rename_all = "snake_case")]
 enum AnchoredOperation {
     Replace {
+        /// Full line:hh anchor copied from read, not a bare line number.
         target: String,
         content: String,
     },
     ReplaceRange {
+        /// Inclusive first line:hh anchor copied from read, not a bare line number.
         start: String,
+        /// Inclusive last line:hh anchor copied from read, not a bare line number.
         end: String,
         content: String,
     },
     InsertBefore {
+        /// Full line:hh anchor copied from read, not a bare line number.
         target: String,
         content: String,
     },
     InsertAfter {
+        /// Full line:hh anchor copied from read, not a bare line number.
         target: String,
         content: String,
     },
     Delete {
+        /// Inclusive first line:hh anchor copied from read, not a bare line number.
         start: String,
+        /// Optional inclusive last line:hh anchor copied from read.
         #[serde(default)]
         end: Option<String>,
     },
