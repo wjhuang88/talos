@@ -105,6 +105,7 @@ I277's deferred acceptance stays recorded; it does not reactivate mock developme
 | Week 4: integrated acceptance | Review / Partial; implementation #609 merged as `422729ca`; exact-head CI `36535972702` and review `5885650377` passed; H6 remains open | [I285](iterations/I285-desktop-integrated-acceptance.md) | Required #29 evidence closure and authoritative H6 evidence |
 | Desktop H1 provider failure evidence | Complete / Closed; implementation merged as `c97f35b9` | [I286](iterations/I286-desktop-provider-error-injection-contract.md) | Debug-only implementation and native H1 evidence complete; I287/H6 remains separate |
 | Desktop H6 Evaluation evidence source | Active / Claimed | [I287](iterations/I287-desktop-evaluation-evidence-source.md) | Runtime-owned session/revision-bound source and native H6 evidence |
+| I288 Search architecture audit / SEARCH-001-A | Active / Claimed proposed; ineffective until #627 merges | [I288](iterations/I288-search-architecture-audit.md) / [SEARCH-001-A](backlog/active/SEARCH-001-A-architecture-migration-contract.md) / #625 | #627 is governance-only; exact-head CI, both governance validators and merge-time CAS required. Parallel scope is architecture-only and must not overlap DEPENDENCY-003-A/Desktop residuals. |
 
 Product/design conformance gap found in the live host: Mission shaping and confirmed-plan flow plus
 high-fidelity reference implementation are tracked by [DESKTOP-001-MISSION-UX](backlog/active/DESKTOP-001-mission-first-desktop-workflow.md)

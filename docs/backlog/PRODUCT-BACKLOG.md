@@ -191,7 +191,7 @@ Required reads:
 
 ## Refinement / Blocked Items
 
-- **Zero-config global web search / [SEARCH-001](active/SEARCH-001-zero-config-global-search.md) / [#624](https://github.com/wjhuang88/talos/issues/624)**: Intake / Unclaimed Epic; only the [SEARCH-001-A](active/SEARCH-001-A-architecture-migration-contract.md) / [#625](https://github.com/wjhuang88/talos/issues/625) architecture audit/ADR child is open for refinement. No iteration, effective claim, runtime implementation, crate/dependency or default search behavior change is authorized. Reuse ADR-072/CAP-001 and NET-001/#199; accept the migration architecture before activating later children.
+- **Zero-config global web search / [SEARCH-001](active/SEARCH-001-zero-config-global-search.md) / [#624](https://github.com/wjhuang88/talos/issues/624)**: Epic remains Intake / Unclaimed. [SEARCH-001-A](active/SEARCH-001-A-architecture-migration-contract.md) / [#625](https://github.com/wjhuang88/talos/issues/625) is Active / Claimed **proposed** in [I288](../iterations/I288-search-architecture-audit.md) via governance PR #627; claim and activation are ineffective until #627 merges. I288 is architecture-only and explicitly non-overlapping with DEPENDENCY-003-A and retained Desktop Review/Planned work. No runtime implementation, crate/dependency or default search behavior change is authorized. Reuse ADR-072/CAP-001 and NET-001/#199.
 
 The authoritative open-Issue mapping and dispositions are maintained in
 [`docs/reference/ISSUE-DOC-CODE-STATUS-2026-08-01.md`](../reference/ISSUE-DOC-CODE-STATUS-2026-08-01.md).
