@@ -1,6 +1,6 @@
 # I286 — Desktop Provider Error Injection Contract
 
-> Document status: Review / Claimed
+> Document status: Complete / Closed
 > Planned objective: Define and implement a safe, isolated provider failure path that exercises the real Desktop error/timeout presentation without changing credentials, disrupting networking, or treating a mock response as native evidence.
 
 ## Scope
@@ -36,7 +36,7 @@ path is unchanged.
 `cargo clippy -p talos-desktop --features desktop-ui --all-targets --locked -- -D warnings`
 pass locally. These checks include provider and real RuntimeHost error, timeout,
 cancellation, and later-submit coverage. Native H1 evidence is recorded below; I286 remains
-Review pending implementation PR merge and owner-first closeout.
+The implementation and owner-first closeout are recorded below.
 
 The debug-only boundary was checked separately with
 `cargo check --release -p talos-desktop --features desktop-ui --locked --bin talos-desktop-mock`
@@ -92,11 +92,23 @@ remote network timeout. No credentials or release behavior were changed.
 PR #621 merged the claim and activation atomically to `main` as `33875dd3` on 2026-09-29.
 Implementation starts from that merge or later `main`.
 
+## Completion Checkpoint — 2026-09-30
+
+Implementation PR #622 merged to `main` as `c97f35b9` from exact head
+`8c5e1e5710fd2a09703abb4e37f8fb8ac3a62691` against base
+`33875dd3d099d51e4e6a9c038ba7d134e496262a`. Exact-head CI `36657262002` passed all six jobs,
+and the independent Agent-role review approved the same head. Native H1 error, timeout,
+cancellation, recovery, and default-path acceptance is complete as recorded above. The
+debug-only injection remains distinct from real remote network-timeout evidence. I287/H6 remains
+Planned and separate; no release or migration work is implied.
+
+Completion Commit: `c97f35b9`
+
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | I286 / Desktop H1: private debug-only provider failure injection, deterministic host/UI tests and native H1 acceptance; no Runtime/provider public API, permission policy, release behavior or I287 Evaluation source |
@@ -105,9 +117,9 @@ Implementation starts from that merge or later `main`.
 | Governance Claim PR | #621 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer accepted the contract on 2026-09-29; #621 exact-head CI `36590316149`, independent Agent-role review comment `5893341827`, and merge-time CAS recorded below |
-| Implementation PR | #622 |
+| Implementation PR | #622 (merged as `c97f35b9`) |
 | Last Updated | 2026-09-30 |
-| Handoff / Release Condition | H1 native evidence and implementation review required; I287/H6 separate; no release |
+| Handoff / Release Condition | Closed after native H1 evidence and implementation merge; I287/H6 separate; no release |
 
 ## Activation Checkpoint — 2026-09-29
 
