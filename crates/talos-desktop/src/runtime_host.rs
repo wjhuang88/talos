@@ -1208,6 +1208,7 @@ impl RuntimeHost {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn run_host(
     mut commands: mpsc::Receiver<RuntimeCommand>,
     outputs: mpsc::Sender<RuntimeOutput>,
