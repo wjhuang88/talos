@@ -439,6 +439,7 @@ edit recipe. The old report's Criterion Pass refers to its original snapshot, no
 This supplies native changed-file/stale evidence; exact edit timestamps were not independently
 captured. The prior task-document assertion of an unavailable external bash request was incorrect.
 
-Local implementation candidate is 42f040ff88f6ab68fcea1b77f049a9815d4cf8be, not yet pushed.
-I287 remains non-complete: final candidate review/CI, remaining recorded tool-projection residuals
-and owner-first closeout are still required. No additional native repetition is requested here.
+The stable implementation candidate is `3b9648c85ae0187c072acfff246edbcd90e84920` on PR #631
+against `main` at `b6e63d851ddf67d8d607f41513dcedae37d01af6`. Exact-head CI, independent
+security/API review, merge-time CAS and owner-first closeout remain required. I287 remains
+non-complete; no additional native repetition is requested here until the candidate gates settle.
