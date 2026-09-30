@@ -191,6 +191,8 @@ Required reads:
 
 ## Refinement / Blocked Items
 
+- **Zero-config global web search / [SEARCH-001](active/SEARCH-001-zero-config-global-search.md) / [#624](https://github.com/wjhuang88/talos/issues/624)**: Intake / Unclaimed Epic; only the [SEARCH-001-A](active/SEARCH-001-A-architecture-migration-contract.md) / [#625](https://github.com/wjhuang88/talos/issues/625) architecture audit/ADR child is open for refinement. No iteration, effective claim, runtime implementation, crate/dependency or default search behavior change is authorized. Reuse ADR-072/CAP-001 and NET-001/#199; accept the migration architecture before activating later children.
+
 The authoritative open-Issue mapping and dispositions are maintained in
 [`docs/reference/ISSUE-DOC-CODE-STATUS-2026-08-01.md`](../reference/ISSUE-DOC-CODE-STATUS-2026-08-01.md).
 Key chains include:
