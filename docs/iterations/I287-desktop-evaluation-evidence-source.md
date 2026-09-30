@@ -1,6 +1,6 @@
 # I287 — Desktop Evaluation Evidence Source
 
-> Document status: Planned / Unclaimed
+> Document status: Active / Claimed
 > Planned objective: Provide a production-authoritative, session-bound Evaluation evidence source so Desktop distinguishes missing, stale and current evidence and gates Delivery without fabricated PASS results.
 
 ## Scope
@@ -27,4 +27,86 @@
 
 ## Governance
 
-No claim, owner, implementation branch, or PR is active. Activation requires an effective target-branch Collaboration Claim and an accepted contract/ADR for the production evidence source.
+## Collaboration Claim
+
+| Field | Value |
+|---|---|
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | `codex / single maintainer` |
+| Work Slice | Runtime-owned session-bound Evaluation evidence producer, bounded workspace revision, Desktop projection wiring and H6 validation; no durable Mission/Evaluation schema |
+| Claimed At | 2026-09-30 |
+| Source Issue | #29 |
+| Governance Claim PR | Direct commit 5bb36663 |
+| Authorization Mode | Direct commit |
+| Authorization Evidence | Maintainer accepted ADR-084 contract on 2026-09-30 |
+| Implementation PR | Not started |
+| Last Updated | 2026-09-30 |
+| Handoff / Release Condition | Implementation merge plus independent security/API review and native H6 evidence |
+
+ADR-084 is the accepted production contract for this slice. Implementation starts locally from the
+current `main` and must remain within the Work Slice above.
+
+Activation provenance correction (2026-09-30): `5bb36663` is the starting baseline, not an
+existing claim activation commit. The maintainer accepted ADR-084 and repeatedly authorized
+local I287 commits. This local governance record establishes that authorization; its actual
+commit SHA will be backfilled in the following implementation checkpoint. Earlier uncommitted
+implementation must not be described as having started from an already-published claim.
+
+## Local Review Checkpoint — 2026-09-30
+
+The initial local implementation passed 50 Runtime tests, 109 Desktop tests, and both governance
+validators with zero warnings. Independent Agent-role security/API review returned REQUEST CHANGES;
+these passing tests are not candidate approval or H6 acceptance.
+
+Required local corrections before a stable candidate:
+
+- Hash-only capture must not become criterion-level PASS; connect a real semantic validation
+  producer before claiming production Evaluation is available.
+- Derive revision and evidence from the same bounded capture and recheck the current subject after
+  model evaluation, before presentation and Delivery.
+- Bound file reads, directory traversal and depth, preserve cancellation responsiveness, and use
+  a confined-open boundary that rejects symlink replacement races.
+- Prevent external construction of authoritative snapshots; include complete Mission/Goal revisions
+  in their integrity identity.
+- Define subsequent goal/claim lifecycle and add production-path coverage for changed goals,
+  workspace changes during evaluation, unavailable evidence and restart.
+
+Partial corrections now keep hash-only evidence Unavailable and reject it before model assessment,
+make snapshot fields private, include Mission/Goal revisions in the digest, and limit per-file reads
+before allocation. These do not yet resolve the complete review. I287 remains Active / Claimed;
+H6 and the stable candidate commit remain pending. The maintainer has authorized the local candidate
+commit after convergence and requested native acceptance only after local tests/docs are complete.
+
+Snapshot follow-up: revision and record identity now derive from the same collected content digest,
+with a subsequent stability check; path lengths are framed in that digest and native workspace path
+bytes avoid lossy identity collisions. Added assertions cover Mission/Goal revision changes and
+rejection of the previous subject after file modification. This does not prove an atomic filesystem
+snapshot or resolve confined-open races, semantic evidence, or post-evaluation revalidation.
+
+Traversal follow-up: snapshots now stop at 4,096 inspected directory entries or depth 32, including
+empty-directory trees that do not consume the regular-file limit. A regression exercises both
+guards. These limits complement the 256-file/16-MiB bounds; safe confined opens and cancellable
+blocking isolation remain required before the production path is accepted.
+
+Host follow-up: every explicit Evaluate request now creates its own context from the requested
+goal/current workspace, rather than caching the first goal indefinitely. After assessment the host
+reads the workspace revision again and calls `observe_current_subject` before projecting a verdict
+or invoking Delivery. An unreadable workspace returns Unavailable. Existing Runtime contract tests
+exercise workspace-only staleness and irreversible invalidation of the old PASS; a production-path
+race regression and asynchronous confined scanning are still required.
+
+## Local Implementation Checkpoint — 2026-09-30
+
+Confined capture now pins a cap-std directory handle and uses one-component no-follow directory
+traversal and no-follow/nonblocking file opens, validating the opened handle before reading.
+Eight focused Runtime evidence tests passed, including ambient root replacement, directory
+symlink and socket rejection. Replacing the ambient root leaves this source pinned to the old
+directory; reconciling that identity with the live tool workspace remains a production residual.
+
+The authorized local commit preserves this partial implementation, not a push-ready or accepted
+H6 candidate. Remaining I287 work: Runtime-produced semantic observations without fabricated
+validation PASS, cancellable blocking isolation, production host race/restart/goal-change tests,
+independent security/API approval, and native acceptance. Goal verdict and Mission-level Delivery
+must remain distinct; missing Mission evaluation cannot be synthesized. No broad workspace
+content upload or automatic validation-command execution is authorized by this checkpoint.

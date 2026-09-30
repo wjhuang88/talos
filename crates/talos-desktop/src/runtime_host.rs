@@ -112,7 +112,7 @@ pub(crate) enum RuntimeCommand {
         choice: ApprovalChoice,
     },
     /// Explicitly request evaluation of the current task.
-    Evaluate,
+    Evaluate(String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1071,6 +1071,22 @@ impl RuntimeHost {
                                     .ok()
                                     .map(|sessions_dir| (sessions_dir, session.id()))
                             });
+                            // Evidence production is owned by the Runtime and is bound to the
+                            // durable session.  A source alone is not an evaluation claim: until
+                            // an authoritative claim/criteria context is supplied, Evaluate must
+                            // remain unavailable rather than manufacturing a verdict.
+                            let evidence_source = durable_session.as_ref().map(|session| {
+                                talos_runtime::RuntimeEvaluationEvidenceSource::new(
+                                    session.id(),
+                                    workspace_root.clone(),
+                                )
+                            });
+                            let evaluation_service = evidence_source.as_ref().map(|_| {
+                                talos_runtime::RuntimeEvaluationService::provider(
+                                    provider.clone(),
+                                    std::time::Duration::from_secs(8),
+                                )
+                            });
                             let mut builder = RuntimeBuilder::new()
                                 .provider(provider)
                                 .model_context_limit(context_limit)
@@ -1121,6 +1137,8 @@ impl RuntimeHost {
                                         handle,
                                         Some(approval),
                                         work_source,
+                                        evidence_source,
+                                        evaluation_service,
                                         evaluation_harness,
                                     )
                                     .await
@@ -1186,6 +1204,8 @@ async fn run_host(
     mut handle: RuntimeHandle,
     approval: Option<Arc<DesktopApprovalHandler>>,
     work_source: Option<(PathBuf, uuid::Uuid)>,
+    evidence_source: Option<talos_runtime::RuntimeEvaluationEvidenceSource>,
+    evaluation_service: Option<talos_runtime::RuntimeEvaluationService>,
     evaluation_harness: Option<EvaluationHarness>,
 ) -> RuntimeOutput {
     let approval = approval.unwrap_or_else(|| {
@@ -1267,13 +1287,20 @@ async fn run_host(
                     Some(RuntimeCommand::ApprovalResponse { request_id, choice }) => {
                         let _ = approval.resolve(request_id, choice).await;
                     }
-                    Some(RuntimeCommand::Evaluate) => {
+                    Some(RuntimeCommand::Evaluate(goal)) => {
                         if evaluation.is_some() {
                             continue;
                         }
-                        if evaluation_harness.is_none() {
+                        if evaluation_harness.is_none()
+                            && (evidence_source.is_none() || evaluation_service.is_none())
+                        {
+                            let reason = if evidence_source.is_none() {
+                                "no authoritative claim, acceptance criteria, or evidence source is connected"
+                            } else {
+                                "no authoritative evaluation claim or acceptance criteria is connected"
+                            };
                             if pending.push(RuntimeOutput::EvaluationUnavailable {
-                                reason: "no authoritative claim, acceptance criteria, or evidence source is connected".into(),
+                                reason: reason.into(),
                             }).is_err() {
                                 return overflow_host(handle).await;
                             }
@@ -1283,6 +1310,45 @@ async fn run_host(
                             return overflow_host(handle).await;
                         }
                         let harness = evaluation_harness.as_ref();
+                        // Each explicit request snapshots its own goal and current workspace.
+                        // Never silently reuse a previous request's acceptance context.
+                        let mut evaluation_context = None;
+                        if harness.is_none() {
+                            let Some(source) = evidence_source.as_ref() else {
+                                continue;
+                            };
+                            let workspace = match source.workspace_revision() {
+                                Ok(workspace) => workspace,
+                                Err(error) => {
+                                    if pending.push(RuntimeOutput::EvaluationUnavailable { reason: error }).is_err() {
+                                        return overflow_host(handle).await;
+                                    }
+                                    continue;
+                                }
+                            };
+                            let criterion = talos_core::evaluation::AcceptanceCriterion {
+                                id: uuid::Uuid::new_v4(),
+                                kind: talos_core::evaluation::CriterionKind::Validation,
+                                statement: goal.clone(),
+                                required: true,
+                            };
+                            evaluation_context = match talos_runtime::RuntimeEvaluationContext::new(
+                                goal,
+                                vec![criterion],
+                                workspace,
+                            ) {
+                                Ok(context) => Some(context),
+                                Err(error) => {
+                                    if pending.push(RuntimeOutput::EvaluationUnavailable { reason: error.to_string() }).is_err() {
+                                        return overflow_host(handle).await;
+                                    }
+                                    continue;
+                                }
+                            };
+                        }
+                        let service = evaluation_service.as_ref();
+                        let source = evidence_source.as_ref();
+                        let context = evaluation_context.clone();
                         evaluation = Some(Box::pin(async move {
                         match harness {
                             Some(harness) => {
@@ -1318,9 +1384,51 @@ async fn run_host(
                                     delivery: gate.delivery,
                                 }
                             }
-                            None => RuntimeOutput::EvaluationUnavailable {
-                                reason: "no authoritative claim, acceptance criteria, or evidence source is connected".into(),
-                            },
+                            None => {
+                                let (Some(service), Some(source), Some(context)) =
+                                    (service, source, context.as_ref())
+                                else {
+                                    return RuntimeOutput::EvaluationUnavailable { reason: "no authoritative evaluation context is connected".into() };
+                                };
+                                let snapshot = match source.capture(context.claim().subject) {
+                                    Ok(snapshot) => snapshot,
+                                    Err(error) => return RuntimeOutput::EvaluationUnavailable { reason: error },
+                                };
+                                let mut result = service
+                                    .evaluate_snapshot(source.session_id(), context.claim(), &snapshot)
+                                    .await;
+                                // A verdict is about the captured revision, not whatever happens
+                                // to occupy the workspace when the provider returns.
+                                let workspace = match source.workspace_revision() {
+                                    Ok(workspace) => workspace,
+                                    Err(error) => return RuntimeOutput::EvaluationUnavailable { reason: error },
+                                };
+                                let subject = talos_core::evaluation::EvaluationSubject {
+                                    workspace,
+                                    ..context.claim().subject
+                                };
+                                if let Err(error) = talos_runtime::RuntimeEvaluationService::observe_current_subject(
+                                    &mut result,
+                                    subject,
+                                ) {
+                                    return RuntimeOutput::EvaluationUnavailable { reason: error.to_string() };
+                                }
+                                let (state, evaluations): (String, Vec<_>) = match result {
+                                    talos_runtime::EvaluatorOutcome::Report { evaluation } => {
+                                        (format!("{:?}", evaluation.state), vec![*evaluation])
+                                    }
+                                    talos_runtime::EvaluatorOutcome::Failure(failure) => {
+                                        (format!("Failure: {}", failure.reason), Vec::new())
+                                    }
+                                };
+                                let gate = talos_runtime::RuntimeEvaluationService::delivery_gate(
+                                    subject.mission,
+                                    &[subject.goal],
+                                    &evaluations,
+                                    None,
+                                );
+                                RuntimeOutput::EvaluationResult { state, delivery: gate.delivery }
+                            }
                         }
                         }));
                     }
@@ -2450,7 +2558,8 @@ mod tests {
             )
             .expect("host");
             tokio::time::timeout(std::time::Duration::from_secs(5), async {
-                host.try_send(RuntimeCommand::Evaluate).expect("evaluate");
+                host.try_send(RuntimeCommand::Evaluate("test goal".into()))
+                    .expect("evaluate");
                 started.notified().await;
                 host.try_send(if interrupt {
                     RuntimeCommand::Interrupt
@@ -2541,7 +2650,7 @@ mod tests {
                 Some(evaluation_harness(verdict, goal_revision)),
             )
             .expect("host starts with test-only evaluator fixture");
-            host.try_send(RuntimeCommand::Evaluate)
+            host.try_send(RuntimeCommand::Evaluate("test goal".into()))
                 .expect("queue explicit evaluation");
 
             let projected = tokio::time::timeout(std::time::Duration::from_secs(5), async {
@@ -2599,10 +2708,10 @@ mod tests {
         .expect("host starts");
         let command = host.command_sender();
         command
-            .send(RuntimeCommand::Evaluate)
+            .send(RuntimeCommand::Evaluate("test goal".into()))
             .await
             .expect("evaluate");
-        host.try_send(RuntimeCommand::Evaluate)
+        host.try_send(RuntimeCommand::Evaluate("test goal".into()))
             .expect("second evaluate");
         let mut unavailable_count = 0;
         while unavailable_count < 2 {
@@ -3384,7 +3493,7 @@ mod tests {
             .expect("shutdown queued");
         let result = tokio::time::timeout(
             std::time::Duration::from_secs(5),
-            run_host(command_rx, outputs, handle, None, None, None),
+            run_host(command_rx, outputs, handle, None, None, None, None, None),
         )
         .await
         .expect("shutdown must not await presentation");
@@ -3407,7 +3516,7 @@ mod tests {
         drop(output_rx);
         let result = tokio::time::timeout(
             std::time::Duration::from_secs(5),
-            run_host(command_rx, outputs, handle, None, None, None),
+            run_host(command_rx, outputs, handle, None, None, None, None, None),
         )
         .await
         .expect("receiver closure must be observed");

@@ -30,6 +30,7 @@ use std::sync::Arc;
 use crate::composition::SharedToolProfile;
 use async_trait::async_trait;
 use serde_json::Value;
+use sha2::Digest;
 use talos_agent::auto_resolver::{
     AutoPermissionControl, AutoPermissionResolver, ManagedWorkspaceLease,
     ProviderAutoPermissionAssessor,
@@ -50,6 +51,302 @@ use talos_plugin::HookRegistry;
 use talos_skill::SkillIndex;
 use thiserror::Error;
 use tokio::sync::mpsc;
+
+/// Limits for the Runtime-owned workspace evidence snapshot.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EvaluationEvidenceLimits {
+    /// Maximum number of regular files included in a snapshot.
+    pub max_files: usize,
+    /// Maximum total bytes read from regular files.
+    pub max_bytes: u64,
+}
+
+impl Default for EvaluationEvidenceLimits {
+    fn default() -> Self {
+        Self {
+            max_files: 256,
+            max_bytes: 16 * 1024 * 1024,
+        }
+    }
+}
+
+/// Runtime-owned, ephemeral evidence snapshot for one exact session and evaluation subject.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EvaluationEvidenceSnapshot {
+    /// Session that owns the evidence; UI-generated identities are not accepted.
+    session_id: uuid::Uuid,
+    /// Exact subject and workspace revision observed by the Runtime.
+    subject: talos_core::evaluation::EvaluationSubject,
+    /// Revision-bound evidence supplied to the independent evaluator.
+    evidence: Vec<ValidationEvidence>,
+}
+
+/// Bounded workspace evidence producer owned by the Runtime.
+///
+/// The source is deliberately ephemeral and read-only. It hashes the bounded regular-file
+/// contents under the configured workspace and binds the resulting record to the Runtime
+/// session and exact subject. Any unreadable entry, symlink, or bound violation fails closed.
+pub struct RuntimeEvaluationEvidenceSource {
+    session_id: uuid::Uuid,
+    workspace_root: PathBuf,
+    workspace_directory: Result<cap_std::fs::Dir, String>,
+    limits: EvaluationEvidenceLimits,
+}
+
+impl RuntimeEvaluationEvidenceSource {
+    /// Create a source for one Runtime session and workspace root.
+    #[must_use]
+    pub fn new(session_id: uuid::Uuid, workspace_root: impl Into<PathBuf>) -> Self {
+        let workspace_root = workspace_root.into();
+        // Pin authority once. Later renames or replacements of the ambient path must
+        // never redirect this session's evidence reads into another workspace.
+        let workspace_directory =
+            cap_std::fs::Dir::open_ambient_dir(&workspace_root, cap_std::ambient_authority())
+                .map_err(|error| format!("workspace is unavailable: {error}"));
+        let workspace_root = std::fs::canonicalize(&workspace_root).unwrap_or(workspace_root);
+        Self {
+            session_id,
+            workspace_root,
+            workspace_directory,
+            limits: EvaluationEvidenceLimits::default(),
+        }
+    }
+
+    /// Override snapshot bounds; zero values are rejected by [`Self::capture`].
+    #[must_use]
+    pub fn with_limits(mut self, limits: EvaluationEvidenceLimits) -> Self {
+        self.limits = limits;
+        self
+    }
+
+    /// Return the durable Runtime session identity owning future snapshots.
+    #[must_use]
+    pub const fn session_id(&self) -> uuid::Uuid {
+        self.session_id
+    }
+
+    /// Compute the current bounded workspace identity and content revision.
+    pub fn workspace_revision(&self) -> Result<talos_core::evaluation::WorkspaceRevision, String> {
+        let (root, digest) = self.snapshot_digest()?;
+        Self::revision_for_digest(&root, digest)
+    }
+
+    fn revision_for_digest(
+        root: &std::path::Path,
+        digest: [u8; 32],
+    ) -> Result<talos_core::evaluation::WorkspaceRevision, String> {
+        let mut identity = sha2::Sha256::new();
+        identity.update(b"talos-runtime-workspace-v1");
+        identity.update(root.as_os_str().as_encoded_bytes());
+        let identity = uuid::Uuid::from_bytes(
+            sha2::Sha256::digest(identity.finalize())[..16]
+                .try_into()
+                .expect("sha256 prefix has a fixed length"),
+        );
+        let revision = u64::from_le_bytes(
+            digest[..8]
+                .try_into()
+                .expect("sha256 prefix has a fixed length"),
+        );
+        Ok(talos_core::evaluation::WorkspaceRevision {
+            id: identity,
+            revision,
+        })
+    }
+
+    /// Capture one fresh, session-bound evidence snapshot for the supplied subject.
+    pub fn capture(
+        &self,
+        subject: talos_core::evaluation::EvaluationSubject,
+    ) -> Result<EvaluationEvidenceSnapshot, String> {
+        subject.validate().map_err(|error| error.to_string())?;
+        let (root, before_digest) = self.snapshot_digest()?;
+        let current_workspace = Self::revision_for_digest(&root, before_digest)?;
+        if subject.workspace != current_workspace {
+            return Err("workspace evidence revision is stale".into());
+        }
+        let mut digest = sha2::Sha256::new();
+        digest.update(b"talos-runtime-evaluation-v1");
+        digest.update(self.session_id.as_bytes());
+        digest.update(subject.mission.id.as_bytes());
+        digest.update(subject.mission.revision.to_le_bytes());
+        digest.update(subject.goal.id.as_bytes());
+        digest.update(subject.goal.revision.to_le_bytes());
+        digest.update(subject.workspace.id.as_bytes());
+        digest.update(subject.workspace.revision.to_le_bytes());
+        digest.update(before_digest);
+        let record_digest = hex_digest(&digest.finalize());
+        let evidence_id = uuid::Uuid::from_bytes(
+            sha2::Sha256::digest(record_digest.as_bytes())[..16]
+                .try_into()
+                .expect("sha256 prefix has a fixed length"),
+        );
+        let evidence_ref = talos_core::evaluation::EvidenceRef {
+            id: evidence_id,
+            kind: "runtime-session-workspace-v1".into(),
+        };
+        // A workspace hash proves only that the bounded snapshot was collected. It is not
+        // semantic validation of an arbitrary goal, so keep it unavailable until a real
+        // criterion-aware producer supplies validation evidence.
+        let after_digest = self.snapshot_digest()?.1;
+        if before_digest != after_digest {
+            return Err("workspace changed while evidence was captured".into());
+        }
+        let evidence = ValidationEvidence::new(
+            evidence_ref,
+            ValidationEvidenceStatus::Unavailable,
+            record_digest,
+        )
+        .map_err(|error| error.to_string())?;
+        Ok(EvaluationEvidenceSnapshot {
+            session_id: self.session_id,
+            subject,
+            evidence: vec![evidence],
+        })
+    }
+
+    fn snapshot_digest(&self) -> Result<(PathBuf, [u8; 32]), String> {
+        if self.limits.max_files == 0 || self.limits.max_bytes == 0 {
+            return Err("evaluation evidence bounds must be non-zero".into());
+        }
+        let directory = self.workspace_directory.as_ref().map_err(Clone::clone)?;
+        let root = self.workspace_root.clone();
+        let mut files = Vec::new();
+        let mut total_bytes = 0_u64;
+        let mut entries_remaining = 4096;
+        collect_workspace_files(
+            directory,
+            std::path::Path::new(""),
+            self.limits,
+            &mut files,
+            &mut total_bytes,
+            &mut entries_remaining,
+            0,
+        )?;
+        files.sort_by(|left, right| left.0.cmp(&right.0));
+        let mut digest = sha2::Sha256::new();
+        digest.update(b"talos-runtime-workspace-content-v1");
+        for (path, bytes, file_digest) in files {
+            digest.update((path.len() as u64).to_le_bytes());
+            digest.update(path.as_bytes());
+            digest.update(bytes.to_le_bytes());
+            digest.update(file_digest);
+        }
+        Ok((root, digest.finalize().into()))
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn collect_workspace_files(
+    directory: &cap_std::fs::Dir,
+    relative_directory: &std::path::Path,
+    limits: EvaluationEvidenceLimits,
+    files: &mut Vec<(String, u64, [u8; 32])>,
+    total_bytes: &mut u64,
+    entries_remaining: &mut usize,
+    depth: usize,
+) -> Result<(), String> {
+    use cap_fs_ext::{DirExt, FollowSymlinks, OpenOptionsFollowExt, OpenOptionsSyncExt};
+    if depth > 32 {
+        return Err("workspace evidence directory depth exceeded".into());
+    }
+    let entries = directory
+        .entries()
+        .map_err(|error| format!("workspace cannot be inspected: {error}"))?;
+    for entry in entries {
+        *entries_remaining = entries_remaining
+            .checked_sub(1)
+            .ok_or_else(|| "workspace evidence entry bound exceeded".to_owned())?;
+        let entry = entry.map_err(|error| format!("workspace cannot be inspected: {error}"))?;
+        let name = entry.file_name();
+        let path = relative_directory.join(&name);
+        let metadata = directory
+            .symlink_metadata(&name)
+            .map_err(|error| format!("workspace cannot be inspected: {error}"))?;
+        if metadata.file_type().is_symlink() {
+            return Err("workspace contains an unsupported symlink entry".into());
+        }
+        if metadata.is_dir() {
+            // Generated and VCS metadata is not user-authored workspace evidence. Excluding it
+            // keeps the bounded snapshot stable across builds and prevents `target/` from
+            // consuming the entire evidence budget.
+            if is_ignored_workspace_directory(&path) {
+                continue;
+            }
+            // Each lookup is one component relative to a pinned directory. No
+            // path-based check/open sequence can follow a substituted symlink.
+            let child = directory
+                .open_dir_nofollow(&name)
+                .map_err(|error| format!("workspace directory cannot be opened: {error}"))?;
+            collect_workspace_files(
+                &child,
+                &path,
+                limits,
+                files,
+                total_bytes,
+                entries_remaining,
+                depth + 1,
+            )?;
+            continue;
+        }
+        if !metadata.is_file() {
+            return Err("workspace contains an unsupported non-file entry".into());
+        }
+        if files.len() >= limits.max_files {
+            return Err("workspace evidence file bound exceeded".into());
+        }
+        let remaining = limits.max_bytes.saturating_sub(*total_bytes);
+        if metadata.len() > remaining {
+            return Err("workspace evidence byte bound exceeded".into());
+        }
+        let mut options = cap_std::fs::OpenOptions::new();
+        options.read(true).follow(FollowSymlinks::No).nonblock(true);
+        let file = directory
+            .open_with(&name, &options)
+            .map_err(|error| format!("workspace file cannot be read: {error}"))?;
+        // Reject substituted FIFOs/devices before any read; nonblocking open also
+        // prevents a FIFO substitution from hanging while waiting for a writer.
+        let opened_metadata = file
+            .metadata()
+            .map_err(|error| format!("workspace file cannot be inspected: {error}"))?;
+        if !opened_metadata.is_file() {
+            return Err("workspace contains an unsupported non-file entry".into());
+        }
+        if opened_metadata.len() > remaining {
+            return Err("workspace evidence byte bound exceeded".into());
+        }
+        let mut bytes = Vec::new();
+        std::io::Read::read_to_end(
+            &mut std::io::Read::take(file, remaining.saturating_add(1)),
+            &mut bytes,
+        )
+        .map_err(|error| format!("workspace file cannot be read: {error}"))?;
+        let size = u64::try_from(bytes.len()).map_err(|_| "workspace file is too large")?;
+        *total_bytes = total_bytes
+            .checked_add(size)
+            .ok_or_else(|| "workspace evidence byte bound exceeded".to_owned())?;
+        if *total_bytes > limits.max_bytes {
+            return Err("workspace evidence byte bound exceeded".into());
+        }
+        let relative = path
+            .to_str()
+            .ok_or_else(|| "workspace path is not valid UTF-8".to_owned())?
+            .replace(std::path::MAIN_SEPARATOR, "/");
+        files.push((relative, size, sha2::Sha256::digest(bytes).into()));
+    }
+    Ok(())
+}
+
+fn is_ignored_workspace_directory(path: &std::path::Path) -> bool {
+    matches!(
+        path.file_name().and_then(|name| name.to_str()),
+        Some(".git") | Some("target") | Some("node_modules")
+    )
+}
+
+fn hex_digest(bytes: &[u8]) -> String {
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+}
 
 /// Shared language-provider host context for optional TUI and symbol consumers.
 #[cfg(feature = "language-provider")]
@@ -254,6 +551,41 @@ impl RuntimeEvaluationService {
         evidence: Vec<ValidationEvidence>,
     ) -> EvaluatorOutcome {
         self.evaluator.evaluate(claim, evidence).await
+    }
+
+    /// Evaluate a Runtime-produced snapshot only when both session and subject bindings match.
+    ///
+    /// This is the boundary used by presentation adapters: they cannot substitute a fixture,
+    /// another session, or an old workspace revision while retaining the evaluator's authority.
+    pub async fn evaluate_snapshot(
+        &self,
+        expected_session: uuid::Uuid,
+        claim: &talos_core::evaluation::CompletionClaim,
+        snapshot: &EvaluationEvidenceSnapshot,
+    ) -> EvaluatorOutcome {
+        if snapshot.session_id != expected_session {
+            return EvaluatorOutcome::Failure(EvaluatorFailure {
+                evaluator: "runtime-evidence-binding".into(),
+                reason: "evaluation evidence belongs to another Runtime session".into(),
+            });
+        }
+        if snapshot.subject != claim.subject {
+            return EvaluatorOutcome::Failure(EvaluatorFailure {
+                evaluator: "runtime-evidence-binding".into(),
+                reason: "evaluation evidence subject or workspace revision is stale".into(),
+            });
+        }
+        if !snapshot
+            .evidence
+            .iter()
+            .any(|record| record.status == ValidationEvidenceStatus::Passed)
+        {
+            return EvaluatorOutcome::Failure(EvaluatorFailure {
+                evaluator: "runtime-evidence-binding".into(),
+                reason: "workspace fingerprint is not criterion validation evidence".into(),
+            });
+        }
+        self.evaluate(claim, snapshot.evidence.clone()).await
     }
 
     /// Evaluate with caller-owned cancellation.
@@ -1340,6 +1672,228 @@ mod tests {
 
     use super::*;
 
+    fn evidence_subject() -> talos_core::evaluation::EvaluationSubject {
+        talos_core::evaluation::EvaluationSubject {
+            mission: talos_core::work::WorkIdentity {
+                id: uuid::Uuid::new_v4(),
+                kind: talos_core::work::WorkKind::Mission,
+                revision: 1,
+            },
+            goal: talos_core::work::WorkIdentity {
+                id: uuid::Uuid::new_v4(),
+                kind: talos_core::work::WorkKind::Goal,
+                revision: 1,
+            },
+            workspace: talos_core::evaluation::WorkspaceRevision {
+                id: uuid::Uuid::new_v4(),
+                revision: 1,
+            },
+        }
+    }
+
+    #[test]
+    fn runtime_evidence_is_stable_and_session_bound() {
+        let workspace = tempfile::tempdir().expect("workspace");
+        std::fs::write(workspace.path().join("input.txt"), "stable").expect("write fixture");
+        let session = uuid::Uuid::new_v4();
+        let source = RuntimeEvaluationEvidenceSource::new(session, workspace.path());
+        let subject = talos_core::evaluation::EvaluationSubject {
+            workspace: source.workspace_revision().expect("revision"),
+            ..evidence_subject()
+        };
+        let first = source.capture(subject).expect("capture");
+        let second = source.capture(subject).expect("capture");
+        assert_eq!(first, second);
+        assert_eq!(
+            first.evidence[0].status,
+            ValidationEvidenceStatus::Unavailable
+        );
+
+        let other = RuntimeEvaluationEvidenceSource::new(uuid::Uuid::new_v4(), workspace.path())
+            .capture(subject)
+            .expect("capture");
+        assert_ne!(
+            first.evidence[0].record_digest,
+            other.evidence[0].record_digest
+        );
+    }
+
+    #[test]
+    fn runtime_evidence_changes_for_subject_or_workspace_content() {
+        let workspace = tempfile::tempdir().expect("workspace");
+        std::fs::write(workspace.path().join("input.txt"), "one").expect("write fixture");
+        let source = RuntimeEvaluationEvidenceSource::new(uuid::Uuid::new_v4(), workspace.path());
+        let subject = talos_core::evaluation::EvaluationSubject {
+            workspace: source.workspace_revision().expect("revision"),
+            ..evidence_subject()
+        };
+        let first = source.capture(subject).expect("capture");
+
+        let mut revised_goal = subject;
+        revised_goal.goal.revision += 1;
+        let revised = source.capture(revised_goal).expect("revised goal capture");
+        assert_ne!(
+            first.evidence[0].evidence.id,
+            revised.evidence[0].evidence.id
+        );
+        let mut revised_mission = subject;
+        revised_mission.mission.revision += 1;
+        let revised = source
+            .capture(revised_mission)
+            .expect("revised mission capture");
+        assert_ne!(
+            first.evidence[0].evidence.id,
+            revised.evidence[0].evidence.id
+        );
+
+        let mut changed_subject = subject;
+        changed_subject.workspace.revision += 1;
+        assert!(source.capture(changed_subject).is_err());
+
+        std::fs::write(workspace.path().join("input.txt"), "two").expect("rewrite fixture");
+        assert!(source.capture(subject).is_err());
+        let changed_subject = talos_core::evaluation::EvaluationSubject {
+            workspace: source.workspace_revision().expect("revision"),
+            ..subject
+        };
+        let changed_content = source.capture(changed_subject).expect("capture");
+        assert_ne!(
+            first.evidence[0].record_digest,
+            changed_content.evidence[0].record_digest
+        );
+    }
+
+    #[test]
+    fn runtime_evidence_bounds_empty_directory_traversal() {
+        let workspace = tempfile::tempdir().expect("workspace");
+        let mut path = workspace.path().to_path_buf();
+        for _ in 0..33 {
+            path.push("child");
+            std::fs::create_dir(&path).expect("directory fixture");
+        }
+        let source = RuntimeEvaluationEvidenceSource::new(uuid::Uuid::new_v4(), workspace.path());
+        assert_eq!(
+            source
+                .workspace_revision()
+                .expect_err("depth must be bounded"),
+            "workspace evidence directory depth exceeded"
+        );
+
+        let mut files = Vec::new();
+        let mut total_bytes = 0;
+        let mut entries_remaining = 0;
+        assert_eq!(
+            collect_workspace_files(
+                source.workspace_directory.as_ref().expect("pinned root"),
+                std::path::Path::new(""),
+                EvaluationEvidenceLimits::default(),
+                &mut files,
+                &mut total_bytes,
+                &mut entries_remaining,
+                0,
+            )
+            .expect_err("entries must be bounded even without regular files"),
+            "workspace evidence entry bound exceeded"
+        );
+    }
+
+    #[test]
+    fn runtime_evidence_fails_closed_on_bounds_and_missing_workspace() {
+        let workspace = tempfile::tempdir().expect("workspace");
+        std::fs::write(workspace.path().join("input.txt"), "1234").expect("write fixture");
+        let subject = evidence_subject();
+        let file_limited =
+            RuntimeEvaluationEvidenceSource::new(uuid::Uuid::new_v4(), workspace.path())
+                .with_limits(EvaluationEvidenceLimits {
+                    max_files: 1,
+                    max_bytes: 3,
+                });
+        assert!(file_limited.capture(subject).is_err());
+
+        let missing = RuntimeEvaluationEvidenceSource::new(
+            uuid::Uuid::new_v4(),
+            workspace.path().join("does-not-exist"),
+        );
+        assert!(missing.capture(subject).is_err());
+    }
+
+    #[test]
+    fn runtime_evidence_ignores_generated_workspace_directories() {
+        let workspace = tempfile::tempdir().expect("workspace");
+        std::fs::write(workspace.path().join("input.txt"), "source").expect("write fixture");
+        std::fs::create_dir(workspace.path().join("target")).expect("target directory");
+        std::fs::write(
+            workspace.path().join("target/generated.bin"),
+            vec![0_u8; 1024],
+        )
+        .expect("generated fixture");
+        let source = RuntimeEvaluationEvidenceSource::new(uuid::Uuid::new_v4(), workspace.path());
+        let subject = talos_core::evaluation::EvaluationSubject {
+            workspace: source.workspace_revision().expect("revision"),
+            ..evidence_subject()
+        };
+        let snapshot = source.capture(subject).expect("capture");
+        assert_eq!(snapshot.evidence.len(), 1);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn runtime_evidence_pins_root_across_ambient_path_replacement() {
+        let parent = tempfile::tempdir().expect("parent");
+        let root = parent.path().join("workspace");
+        std::fs::create_dir(&root).expect("workspace");
+        std::fs::write(root.join("input.txt"), "original").expect("fixture");
+        let source = RuntimeEvaluationEvidenceSource::new(uuid::Uuid::new_v4(), &root);
+        let original = source.workspace_revision().expect("original revision");
+        std::fs::rename(&root, parent.path().join("original")).expect("move original");
+        std::fs::create_dir(&root).expect("replacement workspace");
+        std::fs::write(root.join("input.txt"), "replacement").expect("replacement fixture");
+        assert_eq!(
+            source.workspace_revision().expect("pinned revision"),
+            original
+        );
+        assert_ne!(
+            RuntimeEvaluationEvidenceSource::new(uuid::Uuid::new_v4(), &root)
+                .workspace_revision()
+                .expect("replacement revision"),
+            original,
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn runtime_evidence_rejects_directory_symlinks_and_socket_entries() {
+        let workspace = tempfile::tempdir().expect("workspace");
+        let outside = tempfile::tempdir().expect("outside");
+        std::fs::write(outside.path().join("secret"), "outside").expect("outside fixture");
+        let link = workspace.path().join("directory-link");
+        std::os::unix::fs::symlink(outside.path(), &link).expect("directory symlink");
+        let source = RuntimeEvaluationEvidenceSource::new(uuid::Uuid::new_v4(), workspace.path());
+        assert!(source.workspace_revision().is_err());
+        std::fs::remove_file(link).expect("remove fixture symlink");
+        let _socket = std::os::unix::net::UnixListener::bind(workspace.path().join("socket"))
+            .expect("socket fixture");
+        assert_eq!(
+            source.workspace_revision().expect_err("non-file rejected"),
+            "workspace contains an unsupported non-file entry"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn runtime_evidence_fails_closed_on_symlink() {
+        let workspace = tempfile::tempdir().expect("workspace");
+        let target = workspace.path().join("target.txt");
+        std::fs::write(&target, "target").expect("write fixture");
+        std::os::unix::fs::symlink(&target, workspace.path().join("link.txt"))
+            .expect("symlink fixture");
+        assert!(
+            RuntimeEvaluationEvidenceSource::new(uuid::Uuid::new_v4(), workspace.path())
+                .capture(evidence_subject())
+                .is_err()
+        );
+    }
+
     #[test]
     fn evaluation_context_uses_caller_workspace_revision() {
         let criterion = talos_core::evaluation::AcceptanceCriterion {
@@ -1379,6 +1933,54 @@ mod tests {
                 reason: talos_core::work::DeliveryBlockReason::MissingMissionEvaluation
             }
         );
+    }
+
+    #[tokio::test]
+    async fn runtime_snapshot_binding_rejects_wrong_session_and_subject() {
+        let context = RuntimeEvaluationContext::new(
+            "binding test",
+            vec![talos_core::evaluation::AcceptanceCriterion {
+                id: uuid::Uuid::new_v4(),
+                kind: talos_core::evaluation::CriterionKind::Validation,
+                statement: "binding is checked".into(),
+                required: true,
+            }],
+            talos_core::evaluation::WorkspaceRevision {
+                id: uuid::Uuid::new_v4(),
+                revision: 1,
+            },
+        )
+        .expect("context");
+        let claim = context.claim();
+        let snapshot = EvaluationEvidenceSnapshot {
+            session_id: uuid::Uuid::new_v4(),
+            subject: claim.subject,
+            evidence: Vec::new(),
+        };
+        let service = RuntimeEvaluationService::new(
+            Arc::new(FixedEvaluationAssessor("unused".into())),
+            Duration::from_secs(1),
+        );
+        let wrong_session = service
+            .evaluate_snapshot(uuid::Uuid::new_v4(), claim, &snapshot)
+            .await;
+        assert!(matches!(
+            wrong_session,
+            EvaluatorOutcome::Failure(EvaluatorFailure { reason, .. })
+                if reason.contains("another Runtime session")
+        ));
+
+        let mut stale = snapshot;
+        stale.session_id = uuid::Uuid::new_v4();
+        stale.subject.workspace.revision += 1;
+        let wrong_subject = service
+            .evaluate_snapshot(stale.session_id, claim, &stale)
+            .await;
+        assert!(matches!(
+            wrong_subject,
+            EvaluatorOutcome::Failure(EvaluatorFailure { reason, .. })
+                if reason.contains("subject")
+        ));
     }
 
     struct FixedEvaluationAssessor(String);

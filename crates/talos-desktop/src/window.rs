@@ -551,7 +551,9 @@ impl DesktopWindow {
                     && let Some(commands) = &live.commands
                 {
                     if commands
-                        .try_send(crate::runtime_host::RuntimeCommand::Evaluate)
+                        .try_send(crate::runtime_host::RuntimeCommand::Evaluate(
+                            self.goal_input.read(cx).text().to_owned(),
+                        ))
                         .is_ok()
                     {
                         live.evaluation = EvaluationPresentation::Running;

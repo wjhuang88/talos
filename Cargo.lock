@@ -9609,7 +9609,10 @@ name = "talos-runtime"
 version = "0.10.1"
 dependencies = [
  "async-trait",
+ "cap-fs-ext",
+ "cap-std",
  "serde_json",
+ "sha2 0.11.0",
  "talos-agent",
  "talos-core",
  "talos-permission",
