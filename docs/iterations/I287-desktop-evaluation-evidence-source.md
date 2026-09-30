@@ -417,3 +417,28 @@ The Runtime test covers empty, Unicode, LF, CRLF, multiline and trailing-space c
 Rebuilt acceptance binary SHA-256:
 `1f4170453a58a6e6c5381fedf6eb87219f1a932c3a6f242ecbd8eb771e3b1aa2`.
 Native acceptance requires restart and fresh write evidence. No commit or push was made.
+
+### Native evidence reconciliation — 2026-10-01
+
+The 2026-09-30 23:29 screenshot shows a rejected edit missing operations followed by a successful
+corrected edit to H6_CONTENT_CHECK. Independent read-only disk inspection confirmed that exact
+content with one LF (17 bytes). The 23:31 screenshot shows Criterion 1 Pass and a finding correctly
+describing complete single-line content with the permitted trailing newline; Delivery remains
+Blocked / MissingMissionEvaluation. These observations used the fingerprinted binary above.
+
+The 00:00 restart screenshot shows Ready, empty output, no session file observations and
+Evaluation unavailable. It proves the initial UI did not restore the old PASS; it does not prove
+a backend evaluation ran, since no Evaluation started event appears. The prior conversational
+claim that a disabled button proved the backend evidence check was too strong.
+
+The 00:05 screenshot shows successful edit to H6_STALE_BASE, successful bash read-only byte
+inspection of that value, then Evaluation Stale with Delivery Blocked / GoalNotPassed. The
+path=unavailable metadata on bash does not mean command failure. A subsequent read-only disk
+inspection found H6_STALE_EXTERNAL followed by LF, consistent with the user following the external
+edit recipe. The old report's Criterion Pass refers to its original snapshot, not the changed file.
+This supplies native changed-file/stale evidence; exact edit timestamps were not independently
+captured. The prior task-document assertion of an unavailable external bash request was incorrect.
+
+Local implementation candidate is 42f040ff88f6ab68fcea1b77f049a9815d4cf8be, not yet pushed.
+I287 remains non-complete: final candidate review/CI, remaining recorded tool-projection residuals
+and owner-first closeout are still required. No additional native repetition is requested here.
