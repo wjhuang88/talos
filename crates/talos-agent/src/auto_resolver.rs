@@ -58,17 +58,35 @@ impl ConversationLocale {
         if sample.chars().filter(|c| c.is_alphabetic()).count() < 2 {
             return fallback.clone();
         }
-        let locale = if sample.chars().any(|c| ('\u{3040}'..='\u{30ff}').contains(&c)) {
+        let locale = if sample
+            .chars()
+            .any(|c| ('\u{3040}'..='\u{30ff}').contains(&c))
+        {
             "ja-JP"
-        } else if sample.chars().any(|c| ('\u{ac00}'..='\u{d7af}').contains(&c)) {
+        } else if sample
+            .chars()
+            .any(|c| ('\u{ac00}'..='\u{d7af}').contains(&c))
+        {
             "ko-KR"
-        } else if sample.chars().any(|c| ('\u{0400}'..='\u{04ff}').contains(&c)) {
+        } else if sample
+            .chars()
+            .any(|c| ('\u{0400}'..='\u{04ff}').contains(&c))
+        {
             "ru-RU"
-        } else if sample.chars().any(|c| ('\u{0600}'..='\u{06ff}').contains(&c)) {
+        } else if sample
+            .chars()
+            .any(|c| ('\u{0600}'..='\u{06ff}').contains(&c))
+        {
             "ar"
-        } else if sample.chars().any(|c| ('\u{0900}'..='\u{097f}').contains(&c)) {
+        } else if sample
+            .chars()
+            .any(|c| ('\u{0900}'..='\u{097f}').contains(&c))
+        {
             "hi-IN"
-        } else if sample.chars().any(|c| ('\u{4e00}'..='\u{9fff}').contains(&c)) {
+        } else if sample
+            .chars()
+            .any(|c| ('\u{4e00}'..='\u{9fff}').contains(&c))
+        {
             "zh-CN"
         } else if looks_like_english(sample) {
             "en-US"
@@ -505,10 +523,19 @@ fn human_review_explanation(
     let mut explanation = match (locale, configured_ask) {
         ("zh-CN", true) => "权限规则要求人工确认；模型评估不能覆盖该要求。".to_owned(),
         ("zh-CN", false) => "模型评估需要你作出决定；它不会授予执行权限。".to_owned(),
-        ("ja-JP", true) => "権限ルールにより人間の確認が必要です。モデル評価で変更することはできません。".to_owned(),
-        ("ja-JP", false) => "モデル評価にはあなたの判断が必要です。実行権限は付与されません。".to_owned(),
-        (_, true) => "Your permission rule requires human confirmation; model assessment cannot override it.".to_owned(),
-        _ => "Model assessment requires your decision; it does not grant execution permission.".to_owned(),
+        ("ja-JP", true) => {
+            "権限ルールにより人間の確認が必要です。モデル評価で変更することはできません。"
+                .to_owned()
+        }
+        ("ja-JP", false) => {
+            "モデル評価にはあなたの判断が必要です。実行権限は付与されません。".to_owned()
+        }
+        (_, true) => {
+            "Your permission rule requires human confirmation; model assessment cannot override it."
+                .to_owned()
+        }
+        _ => "Model assessment requires your decision; it does not grant execution permission."
+            .to_owned(),
     };
     if let Some(summary) = response
         .effect_summary
@@ -3208,10 +3235,22 @@ mod tests {
     #[test]
     fn conversation_locale_detection_is_bounded_and_deterministic() {
         let fallback = ConversationLocale("en-US".into());
-        assert_eq!(ConversationLocale::detect("请检查这个文件", &fallback).as_str(), "zh-CN");
-        assert_eq!(ConversationLocale::detect("このファイルを確認してください", &fallback).as_str(), "ja-JP");
-        assert_eq!(ConversationLocale::detect("ls -la ./src", &fallback).as_str(), "en-US");
-        assert_eq!(ConversationLocale::detect("🙂", &fallback).as_str(), "en-US");
+        assert_eq!(
+            ConversationLocale::detect("请检查这个文件", &fallback).as_str(),
+            "zh-CN"
+        );
+        assert_eq!(
+            ConversationLocale::detect("このファイルを確認してください", &fallback).as_str(),
+            "ja-JP"
+        );
+        assert_eq!(
+            ConversationLocale::detect("ls -la ./src", &fallback).as_str(),
+            "en-US"
+        );
+        assert_eq!(
+            ConversationLocale::detect("🙂", &fallback).as_str(),
+            "en-US"
+        );
     }
 
     #[test]
