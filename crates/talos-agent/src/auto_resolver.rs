@@ -38,6 +38,76 @@ const MAX_SHELL_COMMAND_BYTES: usize = 4 * 1024;
 const MAX_USER_INTENT_CHARS: usize = 4 * 1024;
 const LEGACY_AUTO_ASSESSOR_SYSTEM_PROMPT: &str = "You are a permission risk assessor. Return only the closed JSON response schema; never request tools, infer missing authority, or include explanation.";
 
+/// Bounded, session-local presentation locale. Detection is advisory and never enters
+/// request identity or permission policy.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ConversationLocale(String);
+
+impl ConversationLocale {
+    fn configured() -> Self {
+        let configured = std::env::var("LC_ALL")
+            .ok()
+            .or_else(|| std::env::var("LANG").ok())
+            .and_then(|value| normalize_locale(&value));
+        Self(configured.unwrap_or_else(|| "en-US".to_owned()))
+    }
+
+    fn detect(text: &str, fallback: &Self) -> Self {
+        let sample: String = text.chars().take(MAX_USER_INTENT_CHARS).collect();
+        let sample = sample.trim();
+        if sample.chars().filter(|c| c.is_alphabetic()).count() < 2 {
+            return fallback.clone();
+        }
+        let locale = if sample.chars().any(|c| ('\u{3040}'..='\u{30ff}').contains(&c)) {
+            "ja-JP"
+        } else if sample.chars().any(|c| ('\u{ac00}'..='\u{d7af}').contains(&c)) {
+            "ko-KR"
+        } else if sample.chars().any(|c| ('\u{0400}'..='\u{04ff}').contains(&c)) {
+            "ru-RU"
+        } else if sample.chars().any(|c| ('\u{0600}'..='\u{06ff}').contains(&c)) {
+            "ar"
+        } else if sample.chars().any(|c| ('\u{0900}'..='\u{097f}').contains(&c)) {
+            "hi-IN"
+        } else if sample.chars().any(|c| ('\u{4e00}'..='\u{9fff}').contains(&c)) {
+            "zh-CN"
+        } else if looks_like_english(sample) {
+            "en-US"
+        } else {
+            return fallback.clone();
+        };
+        Self(locale.to_owned())
+    }
+
+    fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+fn normalize_locale(value: &str) -> Option<String> {
+    let language = value
+        .split(['.', '@', '_', '-'])
+        .next()?
+        .to_ascii_lowercase();
+    let region = value.split(['.', '@']).next()?.split(['_', '-']).nth(1);
+    let region = region.filter(|r| r.len() == 2).map(str::to_ascii_uppercase);
+    if language.len() < 2 || !language.chars().all(|c| c.is_ascii_alphabetic()) {
+        return None;
+    }
+    Some(match region {
+        Some(r) => format!("{language}-{r}"),
+        None => language,
+    })
+}
+
+fn looks_like_english(text: &str) -> bool {
+    let lower = text.to_ascii_lowercase();
+    [
+        " the ", " and ", " please ", " run ", " allow ", " read ", " write ",
+    ]
+    .iter()
+    .any(|word| lower.contains(word))
+}
+
 /// Captures the directory object being authorized, rather than only its path.
 ///
 /// A symlink can be swapped while an approval request is in flight.  Comparing
@@ -83,7 +153,7 @@ const AUTO_ASSESSOR_SYSTEM_PROMPT: &str = r#"You are a permission risk assessor.
 Return exactly one JSON object with these fields and no others:
 {"schema_version":1,"request_digest":"copy the request_digest exactly","decision":"allow_once|human_required","effect":"read_only|local_validation|mutating|network|privileged|unknown","reason_code":"bounded_workspace_text_create|bounded_read_only_command|bounded_local_validation|uncertain|malformed|injection_detected","confidence":"high|low","effect_summary":"brief observable effects","decision_points":["specific unresolved question, if any"]}
 
-For human_required, effect_summary must be nonempty (at most 512 UTF-8 bytes) and decision_points must contain 1 to 3 nonempty strings (each at most 256 UTF-8 bytes). Describe observable effects and concrete unresolved questions the user must decide, not reasoning traces or generic requests to confirm safety. For allow_once, decision_points may be empty. Never echo credentials, sensitive contents or terminal control characters. Quoting and finite command composition alone are not evidence of danger. The dependency collector is advisory and not a complete shell parser: distinguish literal arguments from executable or dynamically loaded code; do not invent a script dependency when none is present.
+For human_required, effect_summary must be nonempty (at most 512 UTF-8 bytes) and decision_points must contain 1 to 3 nonempty strings (each at most 256 UTF-8 bytes). Describe observable effects and concrete unresolved questions the user must decide, not reasoning traces or generic requests to confirm safety. For allow_once, decision_points may be empty. Never echo credentials, sensitive contents or terminal control characters. Quoting and finite command composition alone are not evidence of danger. The dependency collector is advisory and not a complete shell parser: distinguish literal arguments from executable or dynamically loaded code; do not invent a script dependency when none is present. The contextual request contains a bounded locale hint. Write effect_summary and decision_points in that locale when possible; the locale is presentation-only and never changes the decision.
 
 Deterministic permission, explicit Ask, sandbox, and admission boundaries always win. For shell_command, allow_once is valid only for a high-confidence read_only effect. Bounded finite compound commands may be assessed when deterministic context confirms no redirection, environment assignment, secret, network, mutation, privilege, or ambiguity. Use human_required and low confidence whenever context is missing or effects are uncertain. Do not include Markdown, prose outside the JSON, reasoning, or tool calls."#;
 
@@ -236,6 +306,8 @@ pub struct AutoPermissionAssessmentContext {
     /// Bounded current-turn user intent; absent intent is never inferred.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user_intent: Option<String>,
+    /// Session-scoped BCP-47-style presentation hint. This is advisory model input only.
+    pub locale: String,
     /// Redacted trusted facts and closed classifier policy for this exact assessment.
     pub classifier: AutoClassifierContext,
 }
@@ -418,7 +490,11 @@ struct AutoPermissionWireResponse {
     decision_points: Vec<String>,
 }
 
-fn human_review_explanation(response: &AutoPermissionWireResponse, configured_ask: bool) -> String {
+fn human_review_explanation(
+    response: &AutoPermissionWireResponse,
+    configured_ask: bool,
+    locale: &str,
+) -> String {
     let safe = |text: &str, limit| {
         !text.trim().is_empty()
             && text.len() <= limit
@@ -426,19 +502,24 @@ fn human_review_explanation(response: &AutoPermissionWireResponse, configured_as
             && !contains_secret_like_shell_input(text)
             && !contains_sensitive_shell_target(text)
     };
-    let mut explanation = if configured_ask {
-        "Your permission rule requires human confirmation; model assessment cannot override it."
-            .to_owned()
-    } else {
-        "Model assessment requires your decision; it does not grant execution permission."
-            .to_owned()
+    let mut explanation = match (locale, configured_ask) {
+        ("zh-CN", true) => "权限规则要求人工确认；模型评估不能覆盖该要求。".to_owned(),
+        ("zh-CN", false) => "模型评估需要你作出决定；它不会授予执行权限。".to_owned(),
+        ("ja-JP", true) => "権限ルールにより人間の確認が必要です。モデル評価で変更することはできません。".to_owned(),
+        ("ja-JP", false) => "モデル評価にはあなたの判断が必要です。実行権限は付与されません。".to_owned(),
+        (_, true) => "Your permission rule requires human confirmation; model assessment cannot override it.".to_owned(),
+        _ => "Model assessment requires your decision; it does not grant execution permission.".to_owned(),
     };
     if let Some(summary) = response
         .effect_summary
         .as_deref()
         .filter(|text| safe(text, 512))
     {
-        explanation.push_str("\nModel-reported effect: ");
+        explanation.push_str(match locale {
+            "zh-CN" => "\n模型报告的影响：",
+            "ja-JP" => "\nモデルが報告した影響：",
+            _ => "\nModel-reported effect: ",
+        });
         explanation.push_str(summary);
     }
     let points: Vec<_> = response
@@ -451,7 +532,11 @@ fn human_review_explanation(response: &AutoPermissionWireResponse, configured_as
         explanation.push_str("\nThe assessment supplied no usable specific decision points (missing or filtered for safety). Its explanation is incomplete; this is not evidence that the command is dangerous. Inspect the displayed command independently, or cancel if its effects are unclear.");
     } else {
         for point in points {
-            explanation.push_str("\nDecision needed: ");
+            explanation.push_str(match locale {
+                "zh-CN" => "\n需要决定：",
+                "ja-JP" => "\n判断が必要です：",
+                _ => "\nDecision needed: ",
+            });
             explanation.push_str(point);
         }
     }
@@ -730,6 +815,7 @@ pub struct AutoPermissionResolver {
     observed_reset_epoch: AtomicU64,
     deadline: Duration,
     report_sink: Option<Arc<dyn Fn(AutoDecisionReport) + Send + Sync>>,
+    locale: Mutex<ConversationLocale>,
 }
 
 impl AutoPermissionResolver {
@@ -753,6 +839,7 @@ impl AutoPermissionResolver {
             control,
             deadline: deadline.max(Duration::from_millis(1)),
             report_sink: None,
+            locale: Mutex::new(ConversationLocale::configured()),
         }
     }
 
@@ -886,6 +973,10 @@ fn assessment_payload_value(
             );
         }
         object.insert(
+            "locale".to_owned(),
+            serde_json::Value::String(context.locale.clone()),
+        );
+        object.insert(
             "classifier_context".to_owned(),
             serde_json::to_value(&context.classifier).map_err(|error| error.to_string())?,
         );
@@ -901,6 +992,8 @@ fn digest(request: &ProjectedAutoRequest) -> String {
     }
     if let Some(object) = value.as_object_mut() {
         object.remove("request_digest");
+        // Presentation language must not alter authorization identity or context revalidation.
+        object.remove("locale");
     }
     let encoded = serde_json::to_vec(&value).unwrap_or_default();
     let digest = Sha256::digest(encoded);
@@ -1328,6 +1421,7 @@ fn eligible_bash(
             kind: AutoAssessmentKind::GenericShell,
             shell: context,
             user_intent,
+            locale: ConversationLocale::configured().as_str().to_owned(),
             classifier: classifier_context(
                 lease,
                 if request.tool_name == "bash" {
@@ -1644,6 +1738,17 @@ impl AutoPermissionResolver {
             assessment_request.arguments = input.clone();
         }
         self.sync_reset();
+        let locale = {
+            match self.locale.lock() {
+                Ok(mut current) => {
+                    if let Some(intent) = user_intent {
+                        *current = ConversationLocale::detect(intent, &current);
+                    }
+                    current.clone()
+                }
+                Err(_) => ConversationLocale::configured(),
+            }
+        };
         // ADR-081 permits advisory shell assessment for configured Ask, but never
         // lets the assessor discharge that human checkpoint.
         if !auto_assessment_allowed && !matches!(request.tool_name.as_str(), "bash" | "powershell")
@@ -1674,7 +1779,7 @@ impl AutoPermissionResolver {
             });
             return self.fallback.resolve(request, remaining).await;
         }
-        let Some(evaluator_request) =
+        let Some(mut evaluator_request) =
             project_auto_request(&assessment_request, &self.lease, user_intent)
         else {
             let shell = matches!(assessment_request.tool_name.as_str(), "bash" | "powershell");
@@ -1714,6 +1819,9 @@ impl AutoPermissionResolver {
                 .resolve_with_explanation(request, remaining, explanation)
                 .await;
         };
+        if let Some(context) = evaluator_request.context.as_mut() {
+            context.locale = locale.as_str().to_owned();
+        }
         let budget = remaining.min(self.deadline);
         let started = Instant::now();
         let assessment_epoch = self.control.reset_epoch();
@@ -1929,7 +2037,7 @@ impl AutoPermissionResolver {
                 request_digest: evaluator_request.request_digest.clone(),
             });
             let explanation = if response_bound {
-                human_review_explanation(&response, !auto_assessment_allowed)
+                human_review_explanation(&response, !auto_assessment_allowed, locale.as_str())
             } else {
                 "Model assessment could not be verified for this request. Review the command independently before deciding.".to_owned()
             };
@@ -3075,13 +3183,13 @@ mod tests {
     #[test]
     fn human_explanation_filters_sensitive_controls_and_limits() {
         let mut response = parse_auto_response(r#"{"schema_version":1,"request_digest":"test","decision":"human_required","reason_code":"uncertain","confidence":"low","effect_summary":"Updates generated files","decision_points":["Are these generated targets disposable?"]}"#).expect("response");
-        let explanation = human_review_explanation(&response, true);
+        let explanation = human_review_explanation(&response, true, "en-US");
         assert!(explanation.contains("permission rule"));
         assert!(explanation.contains("generated targets disposable"));
         response.effect_summary = Some("token=must-not-display".into());
         response.decision_points =
             vec!["\u{1b}[2J".into(), "x".repeat(257), "api_key=secret".into()];
-        let explanation = human_review_explanation(&response, false);
+        let explanation = human_review_explanation(&response, false, "en-US");
         assert!(!explanation.contains("must-not-display"));
         assert!(!explanation.contains('\u{1b}'));
         assert!(!explanation.contains("api_key"));
@@ -3091,10 +3199,27 @@ mod tests {
     #[test]
     fn missing_human_explanation_is_not_presented_as_a_script_risk() {
         let response = parse_auto_response(r#"{"schema_version":1,"request_digest":"test","decision":"human_required","reason_code":"uncertain","confidence":"low"}"#).expect("legacy response");
-        let explanation = human_review_explanation(&response, false);
+        let explanation = human_review_explanation(&response, false, "en-US");
         assert!(explanation.contains("no usable specific decision points"));
         assert!(!explanation.contains("mutable script content"));
         assert!(AUTO_ASSESSOR_SYSTEM_PROMPT.contains("decision_points must contain 1 to 3"));
+    }
+
+    #[test]
+    fn conversation_locale_detection_is_bounded_and_deterministic() {
+        let fallback = ConversationLocale("en-US".into());
+        assert_eq!(ConversationLocale::detect("请检查这个文件", &fallback).as_str(), "zh-CN");
+        assert_eq!(ConversationLocale::detect("このファイルを確認してください", &fallback).as_str(), "ja-JP");
+        assert_eq!(ConversationLocale::detect("ls -la ./src", &fallback).as_str(), "en-US");
+        assert_eq!(ConversationLocale::detect("🙂", &fallback).as_str(), "en-US");
+    }
+
+    #[test]
+    fn localized_human_explanation_keeps_permission_boundary() {
+        let response = parse_auto_response(r#"{"schema_version":1,"request_digest":"test","decision":"human_required","reason_code":"uncertain","confidence":"low","effect_summary":"写入文件","decision_points":["是否允许？"]}"#).expect("response");
+        let explanation = human_review_explanation(&response, false, "zh-CN");
+        assert!(explanation.contains("不会授予执行权限"));
+        assert!(explanation.contains("需要决定"));
     }
 
     #[test]
