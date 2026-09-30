@@ -69,12 +69,12 @@
 | [#616](https://github.com/wjhuang88/talos/issues/616) | language provider composition and migration closure | [LANG-004](../backlog/active/LANG-004-language-provider-composition-migration-closure.md) | Refinement / Unclaimed | Multi-provider composition and ownership-transfer closure owner; completed language slices remain historical. |
 | [#623](https://github.com/wjhuang88/talos/issues/623) | SDK host-configured Auto review and human approval fallback | [INTEGRATION-002](../backlog/active/INTEGRATION-002-embedded-runtime-auto-review-api.md) | Refinement / Unclaimed | Existing intake owner; API/ADR and independent implementation governance required; unrelated to SEARCH-001. |
 | [#624](https://github.com/wjhuang88/talos/issues/624) | zero-config global search architecture and provider internalization | [SEARCH-001](../backlog/active/SEARCH-001-zero-config-global-search.md) | Intake / Unclaimed | Architecture epic and dependency map only; no direct implementation or selected iteration; draft intake PR #626. |
-| [#625](https://github.com/wjhuang88/talos/issues/625) | search architecture audit, migration matrix and ADR | [SEARCH-001-A](../backlog/active/SEARCH-001-A-architecture-migration-contract.md) | Intake / Unclaimed | First architecture child only; needs review and effective claim before work; no runtime/search behavior change; draft intake PR #626. |
+| [#625](https://github.com/wjhuang88/talos/issues/625) | search architecture audit, migration matrix and ADR | [SEARCH-001-A](../backlog/active/SEARCH-001-A-architecture-migration-contract.md) | Active / Claimed | I288 claim/activation proposed via #627 and ineffective until merge; architecture-only scope, no runtime/search behavior change. |
 
 ## Synchronization Notes
 
 2026-09-30: Added #623 against its existing INTEGRATION-002 intake owner, and #624/#625 against
-SEARCH-001/SEARCH-001-A created by the unclaimed architecture-intake PR #626. No task is activated,
+SEARCH-001/SEARCH-001-A created by merged architecture-intake PR #626. SEARCH-001-A/I288 is now proposed for atomic claim+activation via #627; no claim is effective until that merge,
 no independent #623 implementation is claimed, and older dated snapshots remain unchanged.
 
 2026-09-20: removed closed #298/#310/#334 from the active matrix after verifying

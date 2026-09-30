@@ -1,6 +1,6 @@
 # SEARCH-001-A: Search Architecture Audit, Migration Matrix & ADR
 
-**Status**: Intake / Unclaimed — selection and architecture execution require normal governance
+**Status**: Active / Claimed (proposed; ineffective until #627 merges)
 **Type**: Architecture / Governance Story and evidence-led Spike
 **Parent Epic**: [SEARCH-001](SEARCH-001-zero-config-global-search.md) / [Issue #624](https://github.com/wjhuang88/talos/issues/624)
 
@@ -8,26 +8,26 @@
 |---|---|
 | Story ID | SEARCH-001-A |
 | Source Issue | [#625](https://github.com/wjhuang88/talos/issues/625) |
-| Priority | Proposed P2; not selected |
-| Selected Iteration | None |
+| Priority | P2; maintainer selected 2026-09-30 |
+| Selected Iteration | [I288](../../iterations/I288-search-architecture-audit.md) |
 | Dependencies | None for audit; accepted ADR and effective claim are gates for subsequent implementation |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned — architecture inventory/ADR only, once selected |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | GPT-5.6 Sol / talos开发 session |
+| Work Slice | SEARCH-001-A architecture audit, deterministic current-behavior characterization, provider-admission/multi-region evidence plan, ADR and B–I migration matrix only; no production search implementation |
+| Claimed At | 2026-09-30 |
 | Source Issue | #625 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #627 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Maintainer requested continued SEARCH-001 progression after #626 merged on 2026-09-30; #627 is governance-only and requires exact-head CI, both governance validators, no blocking review feedback and merge-time CAS. I288 is explicitly non-overlapping with DEPENDENCY-003-A and retained Desktop Review/Planned work. |
 | Implementation PR | Not started |
 | Last Updated | 2026-09-30 |
-| Handoff / Release Condition | Accepted architecture + owner/migration matrix; only then propose separately claimed B–I children |
+| Handoff / Release Condition | Claim and Active state become effective only when #627 merges; then accepted architecture + owner/migration matrix are required before separately claiming B–I children |
 
 ## Identity / Goal / Value
 
