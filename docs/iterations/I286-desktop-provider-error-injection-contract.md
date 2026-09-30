@@ -35,8 +35,8 @@ path is unchanged.
 (109/109, repeated after the five-second change), and
 `cargo clippy -p talos-desktop --features desktop-ui --all-targets --locked -- -D warnings`
 pass locally. These checks include provider and real RuntimeHost error, timeout,
-cancellation, and later-submit coverage. Native H1 evidence is still outstanding, so no
-completion claim is made.
+cancellation, and later-submit coverage. Native H1 evidence is recorded below; I286 remains
+Review pending implementation PR merge and owner-first closeout.
 
 The debug-only boundary was checked separately with
 `cargo check --release -p talos-desktop --features desktop-ui --locked --bin talos-desktop-mock`
@@ -67,6 +67,24 @@ case in a fresh process, and record the observed UI state and candidate SHA in I
 3. Launch `target/debug/talos-desktop-mock --live` with the variable unset, submit a short prompt
    and verify the configured provider can respond normally. Do not use this synthetic timeout as
    evidence of a real network timeout or provider transport correctness.
+
+## Native H1 Acceptance Checkpoint — 2026-09-30
+
+The exact debug candidate from implementation PR #622 was exercised in a real Desktop window.
+The maintainer confirmed all three cases:
+
+- `error`: the UI reached the explicit provider-error terminal state, remained responsive, and a
+  subsequent submission created a new turn and was accepted.
+- `timeout`: the UI reached the explicit first-packet-timeout terminal state. A subsequent request
+  could be cancelled before the five-second deadline, reached `Cancelled`, and no delayed timeout
+  replaced that terminal state.
+- unset variable: the configured provider path proceeded normally. A cross-workspace read still
+  passed through the permission gate; the configured model's `allow_once` assessment did not grant
+  execution by itself, and the maintainer approved the intended read. A later submission was also
+  accepted.
+
+This is native UI evidence for the debug injection and recovery paths, not evidence of a real
+remote network timeout. No credentials or release behavior were changed.
 
 ## Governance
 

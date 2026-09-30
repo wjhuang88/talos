@@ -76,7 +76,7 @@ technical gates pass, with the outstanding human rows explicitly carried forward
 
 | Row | Source | Human scenario | Evidence state |
 |---|---|---|---|
-| H1 | I282/I286 | Launch with configured provider, submit one real task, observe content and provider-error handling | Real-provider success observed. I286 has a local debug-only error/timeout injection candidate and native acceptance recipe; provider-error/timeout UI observation remains unverified. Do not alter credentials/config or disrupt networking. |
+| H1 | I282/I286 | Launch with configured provider, submit one real task, observe content and provider-error handling | I286 native debug error/timeout and recovery paths accepted on 2026-09-30; default configured-provider path and permission gate observed. This is synthetic failure evidence, not real remote timeout evidence. |
 | H2 | I283 | Observe existing Auto decision, approve one bounded request, deny another and verify actual workspace effects | Auto/model decision, deny, allow-once, session grant, different-path fresh approval and file effects observed; host restart requires fresh approval. Preserve as integration evidence; final-candidate retest only if permission code changes. |
 | H3 | I283 | Cancel while streaming, while a tool runs and while approval is pending; verify stopped state and no stale approval | Streaming, running-shell, and approval-wait cancellation observed; idle Cancel stayed Finished; Cancelled-to-new-request sentinel passed. Process-tree cleanup relies on automated tests, not native observation. |
 | H4 | I284 | Exit/relaunch, resume the selected session, switch between two saved sessions and verify isolation/no repeated write | History/resume and session isolation observed; post-write restart preserved file fingerprint/timestamps, with no repeated write. Retest only if session/recovery code changes. |
@@ -227,7 +227,7 @@ manual work:
 
 | Residual | Follow-up | Status | Reason |
 |---|---|---|---|
-| H1 provider-error/timeout presentation | [I286](../iterations/I286-desktop-provider-error-injection-contract.md) | Review / Claimed; #621 merged as `33875dd3` | Debug-only synthetic failure implementation locally validated; native UI evidence still required, not real network timeout evidence. |
+| H1 provider-error/timeout presentation | [I286](../iterations/I286-desktop-provider-error-injection-contract.md) | Review / Claimed; #621 merged as `33875dd3`; #622 implementation candidate under closeout | Debug-only synthetic failure, timeout, cancellation, retry, and default-path native UI evidence recorded 2026-09-30; implementation merge and owner closeout remain. |
 | H6 authoritative current/stale Evaluation evidence | [I287](../iterations/I287-desktop-evaluation-evidence-source.md) | Planned / Unclaimed | The production session-bound evidence producer and contract do not yet exist. |
 
 These follow-ups do not reopen I285 implementation. #621 merged to `main` as `33875dd3`,
