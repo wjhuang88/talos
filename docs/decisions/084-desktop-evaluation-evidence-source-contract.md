@@ -40,6 +40,32 @@ instead of blocking the UI or fabricating a verdict.
 
 ## Validation
 
+### Local API implementation note (2026-09-30)
+
+The local I287 candidate adds `ArtifactObservation` to the evaluator's fresh context. Observations
+are distinct from successful validation: only Behavior criteria can cite observed file contents
+or observed deletion. Technical/Validation criteria still require actual validation records.
+The Runtime registry registers only matching, permission-allowed, successful built-in
+write/edit/delete calls; it reads those paths with confined handles when evaluation is requested.
+Unregistered workspace contents are not added to the model request. File text is untrusted data,
+not instructions. Capture limits are 32 registered artifacts, 64 KiB per file and 256 KiB total
+UTF-8 content. Unsupported or unreadable artifacts fail closed; these limits are not a claim
+that every task can be assessed from file contents.
+
+The Desktop host uses its fixed trusted built-in tool composition. SDK embedders attaching the
+registry must preserve that trust and authorize evaluator disclosure: matching a tool name is
+not authentication of arbitrary plugin implementations. Likewise, public evaluator observations
+are caller-authenticated input, not proof that an untrusted caller executed a tool.
+
+Migration: existing evaluator methods retain their signatures and send no artifact observations.
+Serialized `EvaluatorRequest` accepts an absent `artifact_observations` field as an empty list.
+Rust callers constructing this public struct must add `artifact_observations: Vec::new()` (or
+their explicitly authorized observations). This source compatibility change requires the
+repository's pre-1.0 compatibility release policy; it must not be shipped as an unnoticed patch.
+The new observation API and Runtime producer still require independent security/API review.
+
+### Required checks
+
 - unit tests for deterministic revision, subject/session mismatch, stale revision and unavailable
   evidence;
 - locked Runtime/Desktop tests covering Delivery gating and restart behavior;

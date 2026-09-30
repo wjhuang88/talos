@@ -64,6 +64,12 @@ Choose the original workspace before opening **Recent tasks**, then select **Res
   supported authoritative Runtime evaluation source. A workspace fingerprint alone does not
   validate task completion. I287's ephemeral evidence contract does not require a new persistent
   evaluation store, and cannot restore an old PASS from conversation history after restart.
+  Explicit Evaluate requests can supply a separate Runtime-produced observation of authorized,
+  successful built-in file operations: up to 32 artifacts, 64 KiB per UTF-8 file and 256 KiB total.
+  These current file contents are sent to the evaluator, unlike the metadata-only evidence panel.
+  Unregistered workspace files are not sent. Observations can support content-based Behavior
+  criteria, but cannot prove tests passed or unobserved execution succeeded. Missing, unsupported
+  or stale evidence fails closed; a Goal verdict alone does not authorize Mission Delivery.
   Resumed transcript entries are marked as restored
   history and never re-run tools. Fixture presets do not configure live execution.
 - Cancel requests a Runtime interrupt. Tests cover a pending provider connection,
@@ -116,5 +122,10 @@ Unix shell 取消的保证范围是所属进程组内的普通后代；主动脱
 shell/自定义工具、符号链接、工作区外路径或大于 1 MiB 的文件；重启前的文件证据不可用。
 没有权威 Runtime 评估来源时，Evaluation 与 Delivery 保持不可用；工作区指纹不能证明任务完成。
 I287 的临时证据合同不要求新增持久化评估存储，重启后也不能从对话历史恢复旧的 PASS。
+显式评估会把当前会话中已授权、成功执行的内置文件工具产物交给评估模型：最多 32 个产物，
+每个 UTF-8 文件最多 64 KiB，合计最多 256 KiB。此路径会发送受限的实际文件内容，
+与只显示元数据的证据面板不同；未登记的工作区文件不会发送。内容观察只能支持相应的行为标准，
+不能证明测试通过或未观察到的执行成功。证据缺失、不支持或过期时保持不可用；
+单个 Goal 的评估结论不能代替 Mission 的交付门禁。
 工具和权限交互的原生人工验收以及后续阶段仍未闭环，
 不能把截图或单元测试通过视为完整桌面交付。

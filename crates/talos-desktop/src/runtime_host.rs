@@ -1076,11 +1076,17 @@ impl RuntimeHost {
                             // an authoritative claim/criteria context is supplied, Evaluate must
                             // remain unavailable rather than manufacturing a verdict.
                             let evidence_source = durable_session.as_ref().map(|session| {
-                                talos_runtime::RuntimeEvaluationEvidenceSource::new(
-                                    session.id(),
-                                    workspace_root.clone(),
+                                Arc::new(
+                                    talos_runtime::RuntimeEvaluationEvidenceSource::new(
+                                        session.id(),
+                                        workspace_root.clone(),
+                                    )
+                                    .with_capture_slots(hook_slots.clone()),
                                 )
                             });
+                            let artifact_registry = evidence_source
+                                .as_ref()
+                                .map(|source| source.artifact_registry());
                             let evaluation_service = evidence_source.as_ref().map(|_| {
                                 talos_runtime::RuntimeEvaluationService::provider(
                                     provider.clone(),
@@ -1123,6 +1129,9 @@ impl RuntimeHost {
                                         hook_slots,
                                     ),
                                 ));
+                                if let Some(registry) = &artifact_registry {
+                                    hooks.register(registry.clone());
+                                }
                                 builder = builder.hook_registry(Arc::new(hooks));
                             }
                             let builder = match durable_session {
@@ -1138,6 +1147,7 @@ impl RuntimeHost {
                                         Some(approval),
                                         work_source,
                                         evidence_source,
+                                        artifact_registry,
                                         evaluation_service,
                                         evaluation_harness,
                                     )
@@ -1204,7 +1214,10 @@ async fn run_host(
     mut handle: RuntimeHandle,
     approval: Option<Arc<DesktopApprovalHandler>>,
     work_source: Option<(PathBuf, uuid::Uuid)>,
-    evidence_source: Option<talos_runtime::RuntimeEvaluationEvidenceSource>,
+    evidence_source: Option<Arc<talos_runtime::RuntimeEvaluationEvidenceSource>>,
+    artifact_registry: Option<
+        Arc<talos_runtime::evaluation_artifacts::RuntimeArtifactEvidenceRegistry>,
+    >,
     evaluation_service: Option<talos_runtime::RuntimeEvaluationService>,
     evaluation_harness: Option<EvaluationHarness>,
 ) -> RuntimeOutput {
@@ -1260,6 +1273,12 @@ async fn run_host(
             command = commands.recv() => {
                 match command {
                     Some(RuntimeCommand::Submit(message)) => {
+                        drop(evaluation.take());
+                        if pending.push(RuntimeOutput::EvaluationUnavailable {
+                            reason: "a new task request invalidated the previous evaluation".into(),
+                        }).is_err() {
+                            return overflow_host(handle).await;
+                        }
                         if let Err(error) = handle.submit(message).await
                             && pending.push(RuntimeOutput::Error(error.to_string())).is_err()
                         {
@@ -1310,25 +1329,26 @@ async fn run_host(
                             return overflow_host(handle).await;
                         }
                         let harness = evaluation_harness.as_ref();
+                        let service = evaluation_service.as_ref();
+                        let source = evidence_source.as_ref();
+                        let artifact_registry = artifact_registry.as_ref();
+                        evaluation = Some(Box::pin(async move {
                         // Each explicit request snapshots its own goal and current workspace.
                         // Never silently reuse a previous request's acceptance context.
                         let mut evaluation_context = None;
                         if harness.is_none() {
-                            let Some(source) = evidence_source.as_ref() else {
-                                continue;
+                            let Some(source) = source else {
+                                return RuntimeOutput::EvaluationUnavailable { reason: "no authoritative evidence source".into() };
                             };
-                            let workspace = match source.workspace_revision() {
+                            let workspace = match source.workspace_revision_async().await {
                                 Ok(workspace) => workspace,
                                 Err(error) => {
-                                    if pending.push(RuntimeOutput::EvaluationUnavailable { reason: error }).is_err() {
-                                        return overflow_host(handle).await;
-                                    }
-                                    continue;
+                                    return RuntimeOutput::EvaluationUnavailable { reason: error };
                                 }
                             };
                             let criterion = talos_core::evaluation::AcceptanceCriterion {
                                 id: uuid::Uuid::new_v4(),
-                                kind: talos_core::evaluation::CriterionKind::Validation,
+                                kind: talos_core::evaluation::CriterionKind::Behavior,
                                 statement: goal.clone(),
                                 required: true,
                             };
@@ -1339,17 +1359,11 @@ async fn run_host(
                             ) {
                                 Ok(context) => Some(context),
                                 Err(error) => {
-                                    if pending.push(RuntimeOutput::EvaluationUnavailable { reason: error.to_string() }).is_err() {
-                                        return overflow_host(handle).await;
-                                    }
-                                    continue;
+                                    return RuntimeOutput::EvaluationUnavailable { reason: error.to_string() };
                                 }
                             };
                         }
-                        let service = evaluation_service.as_ref();
-                        let source = evidence_source.as_ref();
-                        let context = evaluation_context.clone();
-                        evaluation = Some(Box::pin(async move {
+                        let context = evaluation_context;
                         match harness {
                             Some(harness) => {
                                 let mut result = harness
@@ -1390,7 +1404,11 @@ async fn run_host(
                                 else {
                                     return RuntimeOutput::EvaluationUnavailable { reason: "no authoritative evaluation context is connected".into() };
                                 };
-                                let snapshot = match source.capture(context.claim().subject) {
+                                let snapshot = match if let Some(registry) = artifact_registry {
+                                    source.capture_artifacts_async(context.claim().subject, registry).await
+                                } else {
+                                    source.capture_async(context.claim().subject).await
+                                } {
                                     Ok(snapshot) => snapshot,
                                     Err(error) => return RuntimeOutput::EvaluationUnavailable { reason: error },
                                 };
@@ -1399,7 +1417,7 @@ async fn run_host(
                                     .await;
                                 // A verdict is about the captured revision, not whatever happens
                                 // to occupy the workspace when the provider returns.
-                                let workspace = match source.workspace_revision() {
+                                let workspace = match source.workspace_revision_async().await {
                                     Ok(workspace) => workspace,
                                     Err(error) => return RuntimeOutput::EvaluationUnavailable { reason: error },
                                 };
@@ -2300,6 +2318,232 @@ mod tests {
         );
         host.try_send(RuntimeCommand::Shutdown).expect("shutdown");
         assert_eq!(host.recv().await, Some(RuntimeOutput::Stopped));
+    }
+
+    struct ObservedArtifactAssessor {
+        entered: Arc<tokio::sync::Notify>,
+        release: Arc<tokio::sync::Notify>,
+    }
+
+    #[async_trait]
+    impl talos_runtime::EvaluatorAssessor for ObservedArtifactAssessor {
+        async fn assess(
+            &self,
+            request: talos_runtime::EvaluatorRequest,
+            _: std::time::Duration,
+        ) -> Result<String, String> {
+            use talos_core::evaluation::{CriterionEvaluation, CriterionVerdict, EvaluationReport};
+            assert_eq!(request.artifact_observations.len(), 1);
+            let artifact = &request.artifact_observations[0];
+            assert_eq!(artifact.relative_path, "observed.txt");
+            assert_eq!(artifact.content.as_deref(), Some("runtime observed output"));
+            assert_eq!(artifact.subject, request.claim.subject);
+            self.entered.notify_one();
+            self.release.notified().await;
+            let report = EvaluationReport::new(
+                &request.claim,
+                request.claim.subject,
+                vec![CriterionEvaluation {
+                    criterion_id: request.claim.criteria[0].id,
+                    verdict: CriterionVerdict::Pass,
+                    evidence: vec![artifact.evidence.clone()],
+                    finding_ids: Vec::new(),
+                }],
+                Vec::new(),
+            )
+            .map_err(|error| error.to_string())?;
+            serde_json::to_string(&report).map_err(|error| error.to_string())
+        }
+    }
+
+    async fn next_production_output(outputs: &mut mpsc::Receiver<RuntimeOutput>) -> RuntimeOutput {
+        tokio::time::timeout(std::time::Duration::from_secs(10), outputs.recv())
+            .await
+            .expect("bounded production host output")
+            .expect("host remains alive")
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn production_evaluation_uses_authorized_artifacts_and_rejects_stale_or_superseded_results()
+     {
+        // The assessor is deterministic; evidence and permission execution are production paths.
+        for scenario in ["current", "stale", "new-submit", "restart"] {
+            let workspace = TestWorkspace::new();
+            let source = Arc::new(talos_runtime::RuntimeEvaluationEvidenceSource::new(
+                uuid::Uuid::new_v4(),
+                &workspace.0,
+            ));
+            let registry = source.artifact_registry();
+            let entered = Arc::new(tokio::sync::Notify::new());
+            let release = Arc::new(tokio::sync::Notify::new());
+            let service = talos_runtime::RuntimeEvaluationService::new(
+                Arc::new(ObservedArtifactAssessor {
+                    entered: entered.clone(),
+                    release: release.clone(),
+                }),
+                std::time::Duration::from_secs(10),
+            );
+            let (commands, command_rx) = mpsc::channel(16);
+            let (outputs, mut output_rx) = mpsc::channel(128);
+            let approval = Arc::new(DesktopApprovalHandler::new(
+                outputs.clone(),
+                workspace.0.clone(),
+            ));
+            let mut hooks = talos_runtime::RuntimeHookRegistry::new();
+            hooks.register(registry.clone());
+            let handle = RuntimeBuilder::new()
+                .provider(Arc::new(MockProvider::new()
+                    .with_tool_call("write", serde_json::json!({"path":"observed.txt", "content":"runtime observed output"}))
+                    .with_response("done")))
+                .workspace_root(&workspace.0)
+                .shared_tools()
+                .approval_handler(approval.clone())
+                .permission_mode(talos_runtime::PermissionMode::Interactive)
+                .hook_registry(Arc::new(hooks))
+                .build().expect("real runtime");
+            // Restart reopens the same workspace but has no execution observations.
+            let evaluation_registry = if scenario == "restart" {
+                source.artifact_registry()
+            } else {
+                registry
+            };
+            let host = tokio::spawn(run_host(
+                command_rx,
+                outputs,
+                handle,
+                Some(approval),
+                None,
+                Some(source),
+                Some(evaluation_registry),
+                Some(service),
+                None,
+            ));
+            commands
+                .send(RuntimeCommand::Submit("write the artifact".into()))
+                .await
+                .expect("submit");
+            let mut approved = false;
+            loop {
+                match next_production_output(&mut output_rx).await {
+                    RuntimeOutput::ApprovalRequested { request_id, .. } => {
+                        approved = true;
+                        commands
+                            .send(RuntimeCommand::ApprovalResponse {
+                                request_id,
+                                choice: ApprovalChoice::ApproveOnce,
+                            })
+                            .await
+                            .expect("approve");
+                    }
+                    RuntimeOutput::Completed { status } => {
+                        assert_eq!(status, TerminalStatus::Success);
+                        assert!(approved, "write must traverse approval");
+                        break;
+                    }
+                    RuntimeOutput::Error(error) => panic!("production error: {error}"),
+                    _ => {}
+                }
+            }
+            assert_eq!(
+                std::fs::read_to_string(workspace.0.join("observed.txt"))
+                    .expect("written artifact"),
+                "runtime observed output"
+            );
+            commands
+                .send(RuntimeCommand::Evaluate(
+                    "write observed.txt containing runtime observed output".into(),
+                ))
+                .await
+                .expect("evaluate");
+            if scenario != "restart" {
+                tokio::time::timeout(std::time::Duration::from_secs(10), entered.notified())
+                    .await
+                    .expect("actual observations reach assessor");
+                if scenario == "stale" {
+                    std::fs::write(
+                        workspace.0.join("observed.txt"),
+                        "changed during evaluation",
+                    )
+                    .expect("external change");
+                }
+                if scenario == "new-submit" {
+                    commands
+                        .send(RuntimeCommand::Submit(
+                            "new task supersedes evaluation".into(),
+                        ))
+                        .await
+                        .expect("supersede");
+                    loop {
+                        match next_production_output(&mut output_rx).await {
+                            RuntimeOutput::EvaluationUnavailable { reason }
+                                if reason.contains("new task") =>
+                            {
+                                break;
+                            }
+                            RuntimeOutput::EvaluationResult { .. } => {
+                                panic!("old evaluator completed before release")
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                release.notify_one();
+            }
+            if scenario == "new-submit" {
+                loop {
+                    match next_production_output(&mut output_rx).await {
+                        RuntimeOutput::Completed { .. } => break,
+                        RuntimeOutput::EvaluationResult { .. } => {
+                            panic!("cancelled evaluation resurfaced")
+                        }
+                        RuntimeOutput::ApprovalRequested { request_id, .. } => {
+                            commands
+                                .send(RuntimeCommand::ApprovalResponse {
+                                    request_id,
+                                    choice: ApprovalChoice::Deny,
+                                })
+                                .await
+                                .expect("deny new write");
+                        }
+                        _ => {}
+                    }
+                }
+            } else {
+                loop {
+                    match next_production_output(&mut output_rx).await {
+                        RuntimeOutput::EvaluationResult { state, delivery } => {
+                            assert!(!matches!(
+                                delivery,
+                                talos_core::work::DeliveryEligibility::Eligible
+                            ));
+                            match scenario {
+                                "current" => assert!(state.contains("Pass"), "{state}"),
+                                "stale" => assert!(state.contains("Stale"), "{state}"),
+                                "restart" => assert!(state.contains("Failure"), "{state}"),
+                                _ => unreachable!(),
+                            }
+                            break;
+                        }
+                        RuntimeOutput::EvaluationUnavailable { reason }
+                            if scenario == "restart" =>
+                        {
+                            assert!(!reason.is_empty());
+                            break;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            commands
+                .send(RuntimeCommand::Shutdown)
+                .await
+                .expect("shutdown");
+            let terminal = tokio::time::timeout(std::time::Duration::from_secs(5), host)
+                .await
+                .expect("host stops")
+                .expect("host task");
+            assert_eq!(terminal, RuntimeOutput::Stopped);
+        }
     }
 
     #[tokio::test(flavor = "current_thread")]
@@ -3493,7 +3737,9 @@ mod tests {
             .expect("shutdown queued");
         let result = tokio::time::timeout(
             std::time::Duration::from_secs(5),
-            run_host(command_rx, outputs, handle, None, None, None, None, None),
+            run_host(
+                command_rx, outputs, handle, None, None, None, None, None, None,
+            ),
         )
         .await
         .expect("shutdown must not await presentation");
@@ -3516,7 +3762,9 @@ mod tests {
         drop(output_rx);
         let result = tokio::time::timeout(
             std::time::Duration::from_secs(5),
-            run_host(command_rx, outputs, handle, None, None, None, None, None),
+            run_host(
+                command_rx, outputs, handle, None, None, None, None, None, None,
+            ),
         )
         .await
         .expect("receiver closure must be observed");

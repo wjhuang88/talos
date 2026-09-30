@@ -118,3 +118,20 @@ workspace locked check and workspace Clippy with `-D warnings`. Its workspace te
 was interrupted with SIGINT (exit 130) when free disk fell to approximately 1.6 GiB; the full
 preflight and full workspace test suite have not passed for this checkpoint. Prior focused tests
 are not a substitute for that remaining gate. No remote candidate was pushed.
+
+Semantic-evidence follow-up: local code now adds a separate bounded artifact-observation request
+field, rather than converting file collection into validation PASS. Runtime hooks register matching
+permission-allowed successful file calls; Desktop requests fresh confined content observations.
+Four registry tests and thirteen evaluator tests passed. Snapshot work now uses a single retained
+blocking-worker slot with bounded caller wait. Full production integration/race tests, native-feature
+build, incremental security/API review and H6 remain outstanding. The API migration is recorded in
+ADR-084. These results do not supersede the remaining full-preflight gate above.
+
+Latest local correction (2026-09-30): the bounded snapshot retains per-file digests and rejects
+artifact content or deletion observations that do not belong to that exact snapshot, including an
+A-to-B-to-A race. Source and registry verify the pinned workspace directory identity before and
+after capture and fail closed if the ambient tool root was replaced. The Desktop production-path
+test covers an authorized write, current evaluation, workspace mutation during assessment,
+superseding submission cancellation, and an empty post-restart registry. The observation contract
+is deliberately limited to current contents at an authorized successful path; hooks do not claim
+an atomic execution handle for arbitrary embedding tools.

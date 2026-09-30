@@ -2061,6 +2061,7 @@ impl DesktopWindow {
                                     if live.artifact_changes.len() == 100 {
                                         live.artifact_changes.remove(0);
                                     }
+                                    live.evaluation = EvaluationPresentation::Unavailable;
                                     live.artifact_changes.push(ArtifactChangePresentation {
                                         session_id,
                                         turn_id,

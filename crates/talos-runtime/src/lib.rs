@@ -52,6 +52,8 @@ use talos_skill::SkillIndex;
 use thiserror::Error;
 use tokio::sync::mpsc;
 
+pub mod evaluation_artifacts;
+
 /// Limits for the Runtime-owned workspace evidence snapshot.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EvaluationEvidenceLimits {
@@ -79,6 +81,8 @@ pub struct EvaluationEvidenceSnapshot {
     subject: talos_core::evaluation::EvaluationSubject,
     /// Revision-bound evidence supplied to the independent evaluator.
     evidence: Vec<ValidationEvidence>,
+    observations: Vec<talos_agent::evaluator::ArtifactObservation>,
+    file_digests: std::collections::BTreeMap<String, [u8; 32]>,
 }
 
 /// Bounded workspace evidence producer owned by the Runtime.
@@ -91,7 +95,15 @@ pub struct RuntimeEvaluationEvidenceSource {
     workspace_root: PathBuf,
     workspace_directory: Result<cap_std::fs::Dir, String>,
     limits: EvaluationEvidenceLimits,
+    capture_slots: Arc<tokio::sync::Semaphore>,
+    authority: uuid::Uuid,
 }
+
+type WorkspaceDigest = (
+    PathBuf,
+    [u8; 32],
+    std::collections::BTreeMap<String, [u8; 32]>,
+);
 
 impl RuntimeEvaluationEvidenceSource {
     /// Create a source for one Runtime session and workspace root.
@@ -109,6 +121,8 @@ impl RuntimeEvaluationEvidenceSource {
             workspace_root,
             workspace_directory,
             limits: EvaluationEvidenceLimits::default(),
+            capture_slots: Arc::new(tokio::sync::Semaphore::new(1)),
+            authority: uuid::Uuid::new_v4(),
         }
     }
 
@@ -125,9 +139,86 @@ impl RuntimeEvaluationEvidenceSource {
         self.session_id
     }
 
+    /// Create an artifact registry sharing this exact pinned workspace authority.
+    #[must_use]
+    pub fn artifact_registry(&self) -> Arc<evaluation_artifacts::RuntimeArtifactEvidenceRegistry> {
+        Arc::new(evaluation_artifacts::RuntimeArtifactEvidenceRegistry::from_source(self))
+    }
+
+    /// Use the host's retained blocking-worker budget for capture and shutdown accounting.
+    #[must_use]
+    pub fn with_capture_slots(mut self, slots: Arc<tokio::sync::Semaphore>) -> Self {
+        self.capture_slots = slots;
+        self
+    }
+
+    /// Compute a revision without blocking the caller's executor.
+    ///
+    /// A cancelled or timed-out wait retains its single worker slot until the OS read returns;
+    /// repeated requests therefore cannot accumulate detached filesystem workers.
+    pub async fn workspace_revision_async(
+        self: &Arc<Self>,
+    ) -> Result<talos_core::evaluation::WorkspaceRevision, String> {
+        let source = self.clone();
+        self.run_capture(move || source.workspace_revision()).await
+    }
+
+    /// Capture bounded evidence on a single blocking worker, returning unavailable on timeout.
+    pub async fn capture_async(
+        self: &Arc<Self>,
+        subject: talos_core::evaluation::EvaluationSubject,
+    ) -> Result<EvaluationEvidenceSnapshot, String> {
+        let source = self.clone();
+        self.run_capture(move || source.capture(subject)).await
+    }
+
+    /// Capture execution-bound artifact observations between matching workspace revisions.
+    pub async fn capture_artifacts_async(
+        self: &Arc<Self>,
+        subject: talos_core::evaluation::EvaluationSubject,
+        registry: &Arc<evaluation_artifacts::RuntimeArtifactEvidenceRegistry>,
+    ) -> Result<EvaluationEvidenceSnapshot, String> {
+        if registry.authority != self.authority {
+            return Err("artifact registry belongs to another workspace authority".into());
+        }
+        let mut snapshot = self.capture_async(subject).await?;
+        snapshot.observations = registry.capture_async(subject).await?;
+        snapshot.verify_observation_contents()?;
+        if snapshot
+            .observations
+            .iter()
+            .any(|record| record.session_id != self.session_id)
+        {
+            return Err("artifact registry belongs to another session".into());
+        }
+        if self.workspace_revision_async().await? != subject.workspace {
+            return Err("workspace changed during artifact capture".into());
+        }
+        Ok(snapshot)
+    }
+
+    async fn run_capture<T: Send + 'static>(
+        &self,
+        capture: impl FnOnce() -> Result<T, String> + Send + 'static,
+    ) -> Result<T, String> {
+        let permit = self
+            .capture_slots
+            .clone()
+            .try_acquire_owned()
+            .map_err(|_| "workspace evidence capture is busy".to_owned())?;
+        let worker = tokio::task::spawn_blocking(move || {
+            let _permit = permit;
+            capture()
+        });
+        tokio::time::timeout(std::time::Duration::from_secs(2), worker)
+            .await
+            .map_err(|_| "workspace evidence capture timed out".to_owned())?
+            .map_err(|_| "workspace evidence capture failed".to_owned())?
+    }
+
     /// Compute the current bounded workspace identity and content revision.
     pub fn workspace_revision(&self) -> Result<talos_core::evaluation::WorkspaceRevision, String> {
-        let (root, digest) = self.snapshot_digest()?;
+        let (root, digest, _) = self.snapshot_digest()?;
         Self::revision_for_digest(&root, digest)
     }
 
@@ -160,7 +251,7 @@ impl RuntimeEvaluationEvidenceSource {
         subject: talos_core::evaluation::EvaluationSubject,
     ) -> Result<EvaluationEvidenceSnapshot, String> {
         subject.validate().map_err(|error| error.to_string())?;
-        let (root, before_digest) = self.snapshot_digest()?;
+        let (root, before_digest, file_digests) = self.snapshot_digest()?;
         let current_workspace = Self::revision_for_digest(&root, before_digest)?;
         if subject.workspace != current_workspace {
             return Err("workspace evidence revision is stale".into());
@@ -202,14 +293,17 @@ impl RuntimeEvaluationEvidenceSource {
             session_id: self.session_id,
             subject,
             evidence: vec![evidence],
+            observations: Vec::new(),
+            file_digests,
         })
     }
 
-    fn snapshot_digest(&self) -> Result<(PathBuf, [u8; 32]), String> {
+    fn snapshot_digest(&self) -> Result<WorkspaceDigest, String> {
         if self.limits.max_files == 0 || self.limits.max_bytes == 0 {
             return Err("evaluation evidence bounds must be non-zero".into());
         }
         let directory = self.workspace_directory.as_ref().map_err(Clone::clone)?;
+        verify_workspace_root(directory, &self.workspace_root)?;
         let root = self.workspace_root.clone();
         let mut files = Vec::new();
         let mut total_bytes = 0_u64;
@@ -226,14 +320,62 @@ impl RuntimeEvaluationEvidenceSource {
         files.sort_by(|left, right| left.0.cmp(&right.0));
         let mut digest = sha2::Sha256::new();
         digest.update(b"talos-runtime-workspace-content-v1");
+        let mut file_digests = std::collections::BTreeMap::new();
         for (path, bytes, file_digest) in files {
             digest.update((path.len() as u64).to_le_bytes());
             digest.update(path.as_bytes());
             digest.update(bytes.to_le_bytes());
             digest.update(file_digest);
+            file_digests.insert(path, file_digest);
         }
-        Ok((root, digest.finalize().into()))
+        verify_workspace_root(directory, &self.workspace_root)?;
+        Ok((root, digest.finalize().into(), file_digests))
     }
+}
+
+impl EvaluationEvidenceSnapshot {
+    /// Whether authoritative artifact observations or successful validation evidence exist.
+    #[must_use]
+    pub fn has_semantic_evidence(&self) -> bool {
+        !self.observations.is_empty()
+            || self
+                .evidence
+                .iter()
+                .any(|evidence| evidence.status == ValidationEvidenceStatus::Passed)
+    }
+
+    fn verify_observation_contents(&self) -> Result<(), String> {
+        for observation in &self.observations {
+            let observed = observation
+                .content
+                .as_ref()
+                .map(|content| <[u8; 32]>::from(sha2::Sha256::digest(content.as_bytes())));
+            if observed.as_ref() != self.file_digests.get(&observation.relative_path) {
+                return Err("artifact contents differ from workspace revision snapshot".into());
+            }
+        }
+        Ok(())
+    }
+}
+
+fn verify_workspace_root(
+    directory: &cap_std::fs::Dir,
+    path: &std::path::Path,
+) -> Result<(), String> {
+    use cap_fs_ext::MetadataExt;
+    let current = cap_std::fs::Dir::open_ambient_dir(path, cap_std::ambient_authority())
+        .map_err(|error| format!("workspace root unavailable: {error}"))?;
+    let pinned = directory
+        .dir_metadata()
+        .map_err(|error| error.to_string())?;
+    let current = current.dir_metadata().map_err(|error| error.to_string())?;
+    let same =
+        std::panic::catch_unwind(|| pinned.dev() == current.dev() && pinned.ino() == current.ino())
+            .map_err(|_| "workspace root identity unavailable")?;
+    if !same {
+        return Err("workspace root has been replaced".into());
+    }
+    Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -579,13 +721,31 @@ impl RuntimeEvaluationService {
             .evidence
             .iter()
             .any(|record| record.status == ValidationEvidenceStatus::Passed)
+            && snapshot.observations.is_empty()
         {
             return EvaluatorOutcome::Failure(EvaluatorFailure {
                 evaluator: "runtime-evidence-binding".into(),
                 reason: "workspace fingerprint is not criterion validation evidence".into(),
             });
         }
-        self.evaluate(claim, snapshot.evidence.clone()).await
+        if snapshot
+            .observations
+            .iter()
+            .any(|record| record.session_id != expected_session || record.subject != claim.subject)
+        {
+            return EvaluatorOutcome::Failure(EvaluatorFailure {
+                evaluator: "runtime-evidence-binding".into(),
+                reason: "artifact observation session or subject mismatch".into(),
+            });
+        }
+        self.evaluator
+            .evaluate_with_observations(
+                claim,
+                snapshot.evidence.clone(),
+                snapshot.observations.clone(),
+                tokio_util::sync::CancellationToken::new(),
+            )
+            .await
     }
 
     /// Evaluate with caller-owned cancellation.
@@ -1849,8 +2009,8 @@ mod tests {
         std::fs::create_dir(&root).expect("replacement workspace");
         std::fs::write(root.join("input.txt"), "replacement").expect("replacement fixture");
         assert_eq!(
-            source.workspace_revision().expect("pinned revision"),
-            original
+            source.workspace_revision().expect_err("replaced root"),
+            "workspace root has been replaced"
         );
         assert_ne!(
             RuntimeEvaluationEvidenceSource::new(uuid::Uuid::new_v4(), &root)
@@ -1956,6 +2116,8 @@ mod tests {
             session_id: uuid::Uuid::new_v4(),
             subject: claim.subject,
             evidence: Vec::new(),
+            observations: Vec::new(),
+            file_digests: Default::default(),
         };
         let service = RuntimeEvaluationService::new(
             Arc::new(FixedEvaluationAssessor("unused".into())),
@@ -1980,6 +2142,49 @@ mod tests {
             wrong_subject,
             EvaluatorOutcome::Failure(EvaluatorFailure { reason, .. })
                 if reason.contains("subject")
+        ));
+    }
+
+    #[tokio::test]
+    async fn hash_only_snapshot_never_consults_model_or_certifies_goal() {
+        struct UnexpectedAssessor;
+        #[async_trait::async_trait]
+        impl EvaluatorAssessor for UnexpectedAssessor {
+            async fn assess(
+                &self,
+                _request: EvaluatorRequest,
+                _deadline: Duration,
+            ) -> Result<String, String> {
+                panic!("a content fingerprint must not trigger semantic certification");
+            }
+        }
+
+        let workspace = tempfile::tempdir().expect("workspace");
+        std::fs::write(
+            workspace.path().join("result.txt"),
+            "not the requested result",
+        )
+        .expect("fixture");
+        let source = RuntimeEvaluationEvidenceSource::new(uuid::Uuid::new_v4(), workspace.path());
+        let context = RuntimeEvaluationContext::new(
+            "write the requested result",
+            vec![talos_core::evaluation::AcceptanceCriterion {
+                id: uuid::Uuid::new_v4(),
+                kind: talos_core::evaluation::CriterionKind::Behavior,
+                statement: "the result contains the requested text".into(),
+                required: true,
+            }],
+            source.workspace_revision().expect("revision"),
+        )
+        .expect("context");
+        let snapshot = source.capture(context.claim().subject).expect("capture");
+        let service =
+            RuntimeEvaluationService::new(Arc::new(UnexpectedAssessor), Duration::from_secs(1));
+        assert!(matches!(
+            service
+                .evaluate_snapshot(source.session_id(), context.claim(), &snapshot)
+                .await,
+            EvaluatorOutcome::Failure(_)
         ));
     }
 
@@ -3533,6 +3738,77 @@ mod tests {
         assert_eq!(executions.load(Ordering::SeqCst), 0);
 
         runtime.shutdown().await.expect("shutdown succeeds");
+    }
+
+    #[tokio::test]
+    async fn artifact_registry_observes_real_permission_gated_write() {
+        let root = tempfile::tempdir().expect("workspace");
+        let source = Arc::new(RuntimeEvaluationEvidenceSource::new(
+            uuid::Uuid::new_v4(),
+            root.path(),
+        ));
+        let registry = source.artifact_registry();
+        let mut hooks = RuntimeHookRegistry::new();
+        hooks.register(registry.clone());
+        let provider = Arc::new(
+            MockProvider::new()
+                .with_tool_call(
+                    "write",
+                    serde_json::json!({"path":"result.txt","content":"observed result"}),
+                )
+                .with_response("done"),
+        );
+        let mut runtime = RuntimeBuilder::new()
+            .provider(provider)
+            .workspace_root(root.path())
+            .tool(Arc::new(talos_tools::WriteTool::new(
+                root.path().to_path_buf(),
+            )))
+            .permission_rule(PermissionRule::new_nature(
+                ToolNature::Write,
+                None,
+                None,
+                PermissionDecision::Allow,
+            ))
+            .hook_registry(Arc::new(hooks))
+            .build()
+            .expect("runtime");
+        runtime.submit("write the result").await.expect("submit");
+        collect_until_turn_completed(&mut runtime)
+            .await
+            .expect("completed");
+        assert_eq!(
+            std::fs::read_to_string(root.path().join("result.txt")).expect("real write"),
+            "observed result"
+        );
+        let subject = talos_core::evaluation::EvaluationSubject {
+            workspace: source.workspace_revision_async().await.expect("revision"),
+            ..evidence_subject()
+        };
+        let snapshot = source
+            .capture_artifacts_async(subject, &registry)
+            .await
+            .expect("capture");
+        assert_eq!(snapshot.observations.len(), 1);
+        // Deterministically exercise A -> B -> A between revision and observation reads.
+        // Matching endpoint revisions alone must not authenticate the intervening B.
+        let mut aba_snapshot = source.capture(subject).expect("A snapshot");
+        std::fs::write(root.path().join("result.txt"), "intervening B").expect("B");
+        aba_snapshot.observations = registry.capture(subject).expect("B observations");
+        std::fs::write(root.path().join("result.txt"), "observed result").expect("restore A");
+        assert_eq!(
+            source.workspace_revision().expect("A again"),
+            subject.workspace
+        );
+        assert!(aba_snapshot.verify_observation_contents().is_err());
+        // Absence is also content: a deleted file cannot authenticate an existing A.
+        aba_snapshot.observations[0].content = None;
+        assert!(aba_snapshot.verify_observation_contents().is_err());
+        assert_eq!(
+            snapshot.observations[0].content.as_deref(),
+            Some("observed result")
+        );
+        runtime.shutdown().await.expect("shutdown");
     }
 
     #[tokio::test]
