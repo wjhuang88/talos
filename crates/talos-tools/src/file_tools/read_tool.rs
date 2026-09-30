@@ -176,7 +176,7 @@ impl AgentTool for ReadTool {
 
     fn description(&self) -> &str {
         if self.snapshots.is_some() {
-            "Read file content with compact line:hh anchors and a transient snapshot id for precise edit calls"
+            "Read file content with compact line:hh anchors and a transient snapshot id for precise edit calls. Anchors work for a one-line file without a trailing newline; replacing that line preserves the absence of a final newline."
         } else {
             "Read file content with optional line range or offset/limit pagination"
         }

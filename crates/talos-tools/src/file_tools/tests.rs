@@ -870,6 +870,28 @@ mod file_tool_tests {
     }
 
     #[tokio::test]
+    async fn anchored_edit_replaces_single_line_without_final_newline() {
+        let temp_dir = tempfile::tempdir().expect("operation should succeed");
+        let path = temp_dir.path().join("single.txt");
+        fs::write(&path, b"H6_INITIAL").expect("operation should succeed");
+        let (read, _, edit, _) = super::snapshot_aware_file_tools(temp_dir.path().to_path_buf());
+        let read_result = read.execute(json!({"path": "single.txt"})).await;
+        assert!(!read_result.is_error, "{}", read_result.content);
+        let (snapshot_id, refs) = snapshot_header_and_refs(&read_result.content);
+        assert_eq!(refs.len(), 1);
+
+        let result = edit
+            .execute(json!({
+                "path": "single.txt",
+                "snapshot_id": snapshot_id,
+                "operations": [{"op": "replace", "target": refs[0], "content": "H6_CHANGED"}]
+            }))
+            .await;
+        assert!(!result.is_error, "{}", result.content);
+        assert_eq!(fs::read(&path).expect("read edited file"), b"H6_CHANGED");
+    }
+
+    #[tokio::test]
     async fn two_digit_collision_cannot_bypass_full_revision_check() {
         let temp_dir = tempfile::tempdir().expect("operation should succeed");
         let path = temp_dir.path().join("collision.txt");

@@ -388,7 +388,7 @@ impl AgentTool for EditTool {
 
     fn description(&self) -> &str {
         if self.snapshots.is_some() {
-            "Apply a legacy string replacement or a snapshot-anchored atomic line edit"
+            "Apply a legacy string replacement or a snapshot-anchored atomic line edit. Anchored replacement supports a one-line file without a trailing newline and preserves that exact end-of-file state."
         } else {
             "Apply a string replacement in a file"
         }

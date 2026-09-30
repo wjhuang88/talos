@@ -161,7 +161,9 @@ impl EvaluatorAssessor for ProviderEvaluatorAssessor {
                 cache_markers: Vec::new(),
             },
             Message::User {
-                content: format!("Evaluate this bounded claim snapshot; return JSON only:\n{payload}"),
+                content: format!(
+                    "Evaluate this bounded claim snapshot; return JSON only. Use this exact shape; replace values, never field types:\n{{\"id\":\"<uuid>\",\"claim_id\":\"<claim uuid>\",\"subject\":{{\"mission\":{{\"id\":\"<uuid>\",\"kind\":\"mission\",\"revision\":1}},\"goal\":{{\"id\":\"<uuid>\",\"kind\":\"goal\",\"revision\":1}},\"workspace\":{{\"id\":\"<uuid>\",\"revision\":1}}}},\"results\":[{{\"criterion_id\":\"<criterion uuid>\",\"verdict\":\"pass\",\"evidence\":[],\"finding_ids\":[]}}],\"findings\":[],\"verdict\":\"pass\"}}\nThe results value MUST be an array of criterion objects, never a prose string. findings, evidence and finding_ids MUST be arrays. Use the exact IDs and subject from the input.\nINPUT:\n{payload}"
+                ),
             },
         ];
         let mut events = self
