@@ -63,8 +63,18 @@ repeating known mistakes.
 | 51 | TUI / Streaming | 最终 flush 必须消费源缓冲，不能把 transient preview 当作源文 | I256 / TEXT-001 |
 | 52 | Desktop / Testing | 当前选项和键盘焦点要分离；测试不能固化首项默认焦点 | I277 |
 | 53 | CI / Dependencies | 离线 all-feature 审计前须显式准备完整锁依赖，默认构建缓存不足 | I277 |
+| 54 | Governance | 新 Issue owner 同步必须包含远端校验使用的状态矩阵 | #618 |
 
 ## Lessons
+
+## 2026-09-29 - Intake Owner Registration Includes The Remote Matrix
+
+- Trigger: #618 intake proposal passed local governance checks but failed remote reconciliation.
+- Symptom: The issue owner and Board existed, but the open-Issue matrix omitted #618.
+- Root cause: Local structural validation does not check the live Issue-to-matrix inventory.
+- Fix: Add the same Intake / Unclaimed child owner to the matrix and synchronize the Issue.
+- Prevention: Include the latest ISSUE-DOC-CODE-STATUS matrix in the closure ledger when registering an Issue owner; run remote reconciliation before submission when credentials are available.
+- Promoted to rule/check: Existing scripts/validate_remote_issue_owners.py; no new policy.
 
 ## 2026-09-18 - Optional Dependencies Need Explicit Offline Preparation
 
