@@ -3,7 +3,7 @@
 > Document status: In Progress — T3 / I284 in Review; T4 / I285 Review / Partial
 > Plan date: 2026-09-22
 > Target window: 2026-09-22 through 2026-10-19 (four calendar weeks; approximately 20 working days)
-> Execution state: T1-T4 implementation candidates are merged; I285 remains Review / Partial. H1 is transferred to planned follow-up I286 (safe provider failure injection); H6 is transferred to planned follow-up I287 (authoritative Evaluation evidence source). This four-week delivery remains Partial and must not be marked Complete.
+> Execution state: T1-T4 implementation candidates are merged; I285 remains Review / Partial. H1 is assigned to I286 (native debug error/timeout acceptance recorded; implementation closeout pending); H6 is assigned to planned I287 (authoritative Evaluation evidence source). This four-week delivery remains Partial and must not be marked Complete.
 
 ## Outcome
 
@@ -76,7 +76,7 @@ technical gates pass, with the outstanding human rows explicitly carried forward
 
 | Row | Source | Human scenario | Evidence state |
 |---|---|---|---|
-| H1 | I282 | Launch with configured provider, submit one real task, observe content and provider-error handling | Real-provider success observed. Provider-error/timeout remains unverified; safe isolated injection is unavailable, so do not alter credentials/config or disrupt networking. |
+| H1 | I282/I286 | Launch with configured provider, submit one real task, observe content and provider-error handling | I286 native debug error/timeout and recovery paths accepted on 2026-09-30; default configured-provider path and permission gate observed. This is synthetic failure evidence, not real remote timeout evidence. |
 | H2 | I283 | Observe existing Auto decision, approve one bounded request, deny another and verify actual workspace effects | Auto/model decision, deny, allow-once, session grant, different-path fresh approval and file effects observed; host restart requires fresh approval. Preserve as integration evidence; final-candidate retest only if permission code changes. |
 | H3 | I283 | Cancel while streaming, while a tool runs and while approval is pending; verify stopped state and no stale approval | Streaming, running-shell, and approval-wait cancellation observed; idle Cancel stayed Finished; Cancelled-to-new-request sentinel passed. Process-tree cleanup relies on automated tests, not native observation. |
 | H4 | I284 | Exit/relaunch, resume the selected session, switch between two saved sessions and verify isolation/no repeated write | History/resume and session isolation observed; post-write restart preserved file fingerprint/timestamps, with no repeated write. Retest only if session/recovery code changes. |
@@ -227,12 +227,12 @@ manual work:
 
 | Residual | Follow-up | Status | Reason |
 |---|---|---|---|
-| H1 provider-error/timeout presentation | [I286](../iterations/I286-desktop-provider-error-injection-contract.md) | Active / Claimed proposed by #621; ineffective until merge | Debug-only synthetic failure contract accepted 2026-09-29; native UI evidence still required, not real network timeout evidence. |
+| H1 provider-error/timeout presentation | [I286](../iterations/I286-desktop-provider-error-injection-contract.md) | Review / Claimed; #621 merged as `33875dd3`; #622 implementation candidate under closeout | Debug-only synthetic failure, timeout, cancellation, retry, and default-path native UI evidence recorded 2026-09-30; implementation merge and owner closeout remain. |
 | H6 authoritative current/stale Evaluation evidence | [I287](../iterations/I287-desktop-evaluation-evidence-source.md) | Planned / Unclaimed | The production session-bound evidence producer and contract do not yet exist. |
 
-These follow-ups do not reopen I285 implementation. I286 code authority begins only after #621
-merges to `main`; I287 remains unclaimed. #29 remains the acceptance ledger, and the current cycle
-is delivered as Review / Partial.
+These follow-ups do not reopen I285 implementation. #621 merged to `main` as `33875dd3`,
+activating I286 code authority; I287 remains unclaimed. #29 remains the acceptance ledger, and
+the current cycle is delivered as Review / Partial.
 
 ## Execution Checkpoint — 2026-09-23 (historical checkpoint, superseded)
 
