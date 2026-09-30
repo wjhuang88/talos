@@ -47,7 +47,8 @@ suite could run. This first run was not a passing preflight. After clearing gene
 artifacts, the full `release_preflight.sh` passed with `CARGO_PROFILE_DEV_DEBUG=0
 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=2`; it included workspace tests,
 doctests and the external Runtime SDK fixture. The full preflight was repeated after the
-five-second injection change and passed. Native H1 observation remains outstanding.
+five-second injection change and passed. At this historical checkpoint, native H1 observation
+remained outstanding; the current native result is recorded below.
 
 ## Native H1 Acceptance Recipe
 

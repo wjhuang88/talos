@@ -3,7 +3,7 @@
 > Document status: In Progress — T3 / I284 in Review; T4 / I285 Review / Partial
 > Plan date: 2026-09-22
 > Target window: 2026-09-22 through 2026-10-19 (four calendar weeks; approximately 20 working days)
-> Execution state: T1-T4 implementation candidates are merged; I285 remains Review / Partial. H1 is assigned to I286 (Review / Claimed; native acceptance pending); H6 is assigned to planned I287 (authoritative Evaluation evidence source). This four-week delivery remains Partial and must not be marked Complete.
+> Execution state: T1-T4 implementation candidates are merged; I285 remains Review / Partial. H1 is assigned to I286 (native debug error/timeout acceptance recorded; implementation closeout pending); H6 is assigned to planned I287 (authoritative Evaluation evidence source). This four-week delivery remains Partial and must not be marked Complete.
 
 ## Outcome
 
