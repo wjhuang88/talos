@@ -37,7 +37,7 @@
 | Work Slice | Runtime-owned session-bound Evaluation evidence producer, bounded workspace revision, Desktop projection wiring and H6 validation; no durable Mission/Evaluation schema |
 | Claimed At | 2026-09-30 |
 | Source Issue | #29 |
-| Governance Claim PR | Direct commit 5bb36663 |
+| Governance Claim PR | Direct commit 7d405136 |
 | Authorization Mode | Direct commit |
 | Authorization Evidence | Maintainer accepted ADR-084 contract on 2026-09-30 |
 | Implementation PR | Not started |
@@ -49,9 +49,11 @@ current `main` and must remain within the Work Slice above.
 
 Activation provenance correction (2026-09-30): `5bb36663` is the starting baseline, not an
 existing claim activation commit. The maintainer accepted ADR-084 and repeatedly authorized
-local I287 commits. This local governance record establishes that authorization; its actual
-commit SHA will be backfilled in the following implementation checkpoint. Earlier uncommitted
-implementation must not be described as having started from an already-published claim.
+local I287 commits. Local commit `7d405136` recorded both governance and partial implementation;
+this did not follow the SOP's separate claim-before-implementation sequence and is not evidence
+of remote activation or merge approval. Earlier uncommitted implementation must not be described
+as having started from an already-published claim. Reconcile this local checkpoint before any
+remote candidate; do not treat local commit authorization as a remote-gate waiver.
 
 ## Local Review Checkpoint — 2026-09-30
 
@@ -110,3 +112,9 @@ validation PASS, cancellable blocking isolation, production host race/restart/go
 independent security/API approval, and native acceptance. Goal verdict and Mission-level Delivery
 must remain distinct; missing Mission evaluation cannot be synthesized. No broad workspace
 content upload or automatic validation-command execution is authorized by this checkpoint.
+
+Local verification after confined capture: `./scripts/release_preflight.sh` passed formatting,
+workspace locked check and workspace Clippy with `-D warnings`. Its workspace test compilation
+was interrupted with SIGINT (exit 130) when free disk fell to approximately 1.6 GiB; the full
+preflight and full workspace test suite have not passed for this checkpoint. Prior focused tests
+are not a substitute for that remaining gate. No remote candidate was pushed.
