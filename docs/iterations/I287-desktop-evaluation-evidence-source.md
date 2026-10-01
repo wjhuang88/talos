@@ -1,6 +1,6 @@
 # I287 — Desktop Evaluation Evidence Source
 
-> Document status: Active / Claimed
+> Document status: Review / Partial
 > Planned objective: Provide a production-authoritative, session-bound Evaluation evidence source so Desktop distinguishes missing, stale and current evidence and gates Delivery without fabricated PASS results.
 
 ## Scope
@@ -439,7 +439,19 @@ edit recipe. The old report's Criterion Pass refers to its original snapshot, no
 This supplies native changed-file/stale evidence; exact edit timestamps were not independently
 captured. The prior task-document assertion of an unavailable external bash request was incorrect.
 
-The stable implementation candidate is `3b9648c85ae0187c072acfff246edbcd90e84920` on PR #631
-against `main` at `b6e63d851ddf67d8d607f41513dcedae37d01af6`. Exact-head CI, independent
-security/API review, merge-time CAS and owner-first closeout remain required. I287 remains
-non-complete; no additional native repetition is requested here until the candidate gates settle.
+The stable implementation candidate was `67d9bd52d06bfad566b850985e80149801a28d0b` on PR #631
+against `main` at `b6e63d851ddf67d8d607f41513dcedae37d01af6`. PR #631 merged after exact-head
+CI `36792450056`, independent security/API approval `5921753941`, and merge-time CAS; the
+implementation is now on `main` in merge commit `f0e16e857ea76caa7c386fac5006b9f53a86d67a`.
+I287 remains Review / Partial: native H6 demonstrates current and changed-file stale evidence
+with Delivery blocked, but does not demonstrate a successful Mission-level Delivery. No further
+native repetition is required for the already-observed scenarios; any new evidence must target
+that explicit residual.
+
+### Owner-first closeout — 2026-10-01
+
+Completion Commit: `f0e16e857ea76caa7c386fac5006b9f53a86d67a` (PR #631 merge). Exact-head CI
+`36792450056` passed all six jobs, and independent Agent-role review `5921753941` was bound to
+the exact head/base. Implementation, tests and the bounded evidence source are merged; the
+Mission-evaluation/Delivery proof remains an explicit residual in #29 and the four-week task.
+This closeout intentionally does not mark I287 Complete.

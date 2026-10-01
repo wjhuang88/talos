@@ -24,7 +24,7 @@ I164 stays Paused; I162's recorded review outcome is terminal. MODEL-007 is defe
 | [I284](I284-durable-task-and-evidence.md) | Oct 6-12: resume and evidence | Review / Claimed; PR #607 merged as `2845ebdf` from `1fc73c2e`; CI/review passed; durable evaluation source and H4/H6 remain open |
 | [I285](I285-desktop-integrated-acceptance.md) | Oct 13-19: integrated candidate and acceptance | Review / Partial; implementation #609 merged as `422729ca`; exact-head CI `36535972702` and review `5885650377` passed; H6 authoritative evidence residual remains |
 | [I286](I286-desktop-provider-error-injection-contract.md) | Follow-up: safe provider failure evidence | Complete / Closed; implementation merged as `c97f35b9`; H1 native evidence recorded 2026-09-30 |
-| [I287](I287-desktop-evaluation-evidence-source.md) | Follow-up: authoritative Evaluation evidence | Active / Claimed; ADR-084 accepted; Runtime-owned session/revision-bound source and H6 only |
+| [I287](I287-desktop-evaluation-evidence-source.md) | Follow-up: authoritative Evaluation evidence | Review / Partial; PR #631 merged as `f0e16e85`; exact-head CI `36792450056` and independent approval `5921753941`; Mission-level Delivery evidence remains in #29 |
 
 DESKTOP-001-MISSION-UX is a Refinement / Unclaimed successor candidate for the Mission-first workflow and
 high-fidelity design implementation. It is not an iteration and is not activated while I285's
