@@ -275,3 +275,12 @@ EOF regression tests do not establish that the screenshot symptom is fixed.
 
 I285 remains Review / Partial until that native H6 evidence and owner-first closeout are recorded.
 No fixture, unit test or exact-head CI result substitutes for this human observation.
+
+### Post-I287 Reconciliation — 2026-10-01
+
+I287 is now merged in `main` as `f0e16e857ea76caa7c386fac5006b9f53a86d67a` after exact-head
+CI `36792450056` and independent security/API approval `5921753941`. The authoritative
+session/revision-bound source is therefore implemented and no longer a missing-source residual.
+Native H6 evidence recorded current content, restart unavailability and changed-file stale state
+with Delivery blocked. Mission-level Delivery success was not demonstrated, so I285 remains
+Review / Partial and the remaining H6 evidence is retained in #29 rather than marked complete.
