@@ -1,6 +1,6 @@
 # Desktop Four-Week Delivery Task
 
-> Document status: In Progress — T3 / I284 in Review; T4 / I285 Review / Partial
+> Document status: In Progress — T3 / I284 in Review; T4 / I285 Review / Partial; I287 Review / Partial
 > Plan date: 2026-09-22
 > Target window: 2026-09-22 through 2026-10-19 (four calendar weeks; approximately 20 working days)
 > Execution state: T1-T4 implementation candidates are merged; I285 remains Review / Partial. H1 is assigned to I286 (native debug error/timeout acceptance and implementation closeout complete); H6 is assigned to active I287 (authoritative Evaluation evidence source). This four-week delivery remains Partial and must not be marked Complete.
@@ -81,7 +81,7 @@ technical gates pass, with the outstanding human rows explicitly carried forward
 | H3 | I283 | Cancel while streaming, while a tool runs and while approval is pending; verify stopped state and no stale approval | Streaming, running-shell, and approval-wait cancellation observed; idle Cancel stayed Finished; Cancelled-to-new-request sentinel passed. Process-tree cleanup relies on automated tests, not native observation. |
 | H4 | I284 | Exit/relaunch, resume the selected session, switch between two saved sessions and verify isolation/no repeated write | History/resume and session isolation observed; post-write restart preserved file fingerprint/timestamps, with no repeated write. Retest only if session/recovery code changes. |
 | H5 | I282/I285 | Chinese multiline IME, English/Chinese Settings, focus, scroll and layout during live output | IME, locale/input preservation, directory-picker cancel, focus, page scroll and resize observed. 2026-09-29 screenshots show artifact evidence metadata fitting without horizontal clipping, and the narrow-window page scroll reveals the complete tool result without overlap or truncation. |
-| H6 | I284/I285/I287 | Integrated real task through result/change inspection; distinguish missing/stale/current evaluation and Delivery eligibility | Native content Pass, restart UI unavailable, and Stale with Delivery blocked observed. Disk inspection confirms H6_STALE_EXTERNAL after the report captured H6_STALE_BASE; bash path=unavailable was metadata, not command failure. Restart screenshot proves UI reset, not a backend evaluation request. Candidate `3b9648c8` is on PR #631; exact-head CI/review, residuals and owner closeout remain open. |
+| H6 | I284/I285/I287 | Integrated real task through result/change inspection; distinguish missing/stale/current evaluation and Delivery eligibility | Native content Pass, restart UI unavailable, and Stale with Delivery blocked observed. Disk inspection confirms H6_STALE_EXTERNAL after the report captured H6_STALE_BASE; bash path=unavailable was metadata, not command failure. PR #631 merged as `f0e16e85` after exact-head CI/review; Mission-level Delivery evidence remains a documented residual. |
 
 Native evidence, candidate identity and remaining checks are recorded in
 [I285's 2026-09-25 checkpoint](../iterations/I285-desktop-integrated-acceptance.md#native-acceptance-checkpoint--2026-09-25).
