@@ -22,6 +22,61 @@ use tokio::sync::{mpsc, oneshot};
 const COMMAND_CAPACITY: usize = 16;
 const EVENT_CAPACITY: usize = 128;
 const MAX_PENDING_BYTES: usize = 1024 * 1024;
+// Match the shared evaluator's bounded maximum, including dispatch and generation.
+const EVALUATION_DEADLINE: std::time::Duration = std::time::Duration::from_secs(30);
+
+fn evaluation_description(evaluation: &talos_core::evaluation::Evaluation) -> String {
+    use std::fmt::Write;
+    let mut description = format!("{:?}", evaluation.state);
+    if let Some(report) = &evaluation.report {
+        for (index, criterion) in evaluation.claim.criteria.iter().take(16).enumerate() {
+            let Some(result) = report
+                .results
+                .iter()
+                .find(|result| result.criterion_id == criterion.id)
+            else {
+                continue;
+            };
+            let _ = write!(
+                description,
+                "\nCriterion {}: {:?}",
+                index + 1,
+                result.verdict
+            );
+        }
+        if report.findings.is_empty() {
+            description.push_str("\nEvaluator supplied no detailed findings.");
+        }
+        for finding in report.findings.iter().take(16) {
+            // Findings are model-authored explanations, not authority or raw wire output.
+            // Do not project evidence IDs, report IDs or provider-private reasoning.
+            let summary: String = finding
+                .summary
+                .chars()
+                .filter(|character| !character.is_control())
+                .take(512)
+                .collect();
+            let _ = write!(
+                description,
+                "\nEvaluator finding ({:?}): {}",
+                finding.severity, summary
+            );
+            if finding
+                .summary
+                .chars()
+                .filter(|character| !character.is_control())
+                .count()
+                > 512
+            {
+                description.push_str(" [truncated]");
+            }
+        }
+        if report.findings.len() > 16 || evaluation.claim.criteria.len() > 16 {
+            description.push_str("\nAdditional evaluation details omitted.");
+        }
+    }
+    description
+}
 
 #[derive(Default)]
 struct PendingOutput {
@@ -1090,7 +1145,7 @@ impl RuntimeHost {
                             let evaluation_service = evidence_source.as_ref().map(|_| {
                                 talos_runtime::RuntimeEvaluationService::provider(
                                     provider.clone(),
-                                    std::time::Duration::from_secs(8),
+                                    EVALUATION_DEADLINE,
                                 )
                             });
                             let mut builder = RuntimeBuilder::new()
@@ -1382,7 +1437,7 @@ async fn run_host(
                                 }
                                 let (state, evaluations): (String, Vec<_>) = match result {
                                     talos_runtime::EvaluatorOutcome::Report { evaluation } => {
-                                        (format!("{:?}", evaluation.state), vec![*evaluation])
+                                        (evaluation_description(&evaluation), vec![*evaluation])
                                     }
                                     talos_runtime::EvaluatorOutcome::Failure(failure) => {
                                         (format!("Failure: {}", failure.reason), Vec::new())
@@ -1434,7 +1489,7 @@ async fn run_host(
                                 }
                                 let (state, evaluations): (String, Vec<_>) = match result {
                                     talos_runtime::EvaluatorOutcome::Report { evaluation } => {
-                                        (format!("{:?}", evaluation.state), vec![*evaluation])
+                                        (evaluation_description(&evaluation), vec![*evaluation])
                                     }
                                     talos_runtime::EvaluatorOutcome::Failure(failure) => {
                                         (format!("Failure: {}", failure.reason), Vec::new())
@@ -1650,6 +1705,64 @@ mod cancellation_tests;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn evaluation_description_includes_bounded_findings_without_ids() {
+        use talos_core::evaluation::{EvaluationFinding, FindingSeverity};
+        let mut harness =
+            evaluation_harness(talos_core::evaluation::CriterionVerdict::Inconclusive, 1);
+        harness.claim.criteria[0].statement = "check".into();
+        let finding = EvaluationFinding {
+            id: uuid::Uuid::new_v4(),
+            criterion_id: Some(harness.claim.criteria[0].id),
+            severity: FindingSeverity::Warning,
+            summary: "why it is inconclusive".into(),
+            evidence: vec![],
+        };
+        let report = talos_core::evaluation::EvaluationReport::new(
+            &harness.claim,
+            harness.claim.subject,
+            vec![talos_core::evaluation::CriterionEvaluation {
+                criterion_id: harness.claim.criteria[0].id,
+                verdict: talos_core::evaluation::CriterionVerdict::Inconclusive,
+                evidence: vec![],
+                finding_ids: vec![finding.id],
+            }],
+            vec![finding],
+        )
+        .expect("report");
+        let mut evaluation = harness.claim.evaluation();
+        evaluation.begin().expect("begin");
+        evaluation.accept_report(report).expect("accept");
+        let rendered = evaluation_description(&evaluation);
+        assert!(rendered.contains("Criterion 1: Inconclusive"));
+        assert!(rendered.contains("why it is inconclusive"));
+        assert!(rendered.contains("Evaluator finding (Warning): "));
+        assert!(!rendered.contains(&harness.claim.id.to_string()));
+        let report = evaluation.report.as_mut().expect("report");
+        let mut finding = report.findings[0].clone();
+        finding.summary = format!("\u{1b}{}", "界".repeat(1000));
+        report.findings = vec![finding; 32];
+        let rendered = evaluation_description(&evaluation);
+        assert_eq!(rendered.matches("Evaluator finding").count(), 16);
+        assert!(!rendered.contains('\u{1b}'));
+        assert!(!rendered.contains(&"界".repeat(513)));
+        assert!(rendered.contains("[truncated]"));
+        let mut second = evaluation.claim.criteria[0].clone();
+        second.id = uuid::Uuid::new_v4();
+        evaluation.claim.criteria.push(second.clone());
+        evaluation.report.as_mut().expect("report").results.insert(
+            0,
+            talos_core::evaluation::CriterionEvaluation {
+                criterion_id: second.id,
+                verdict: talos_core::evaluation::CriterionVerdict::Fail,
+                evidence: vec![],
+                finding_ids: vec![],
+            },
+        );
+        let rendered = evaluation_description(&evaluation);
+        assert!(rendered.contains("Criterion 1: Inconclusive\nCriterion 2: Fail"));
+    }
     use crate::provider::{FailureInjectedProvider, FailureInjection};
     use talos_plugin::HookHandler;
     use talos_provider::mock::MockProvider;
@@ -2382,7 +2495,7 @@ mod tests {
                     entered: entered.clone(),
                     release: release.clone(),
                 }),
-                std::time::Duration::from_secs(10),
+                EVALUATION_DEADLINE,
             );
             let (commands, command_rx) = mpsc::channel(16);
             let (outputs, mut output_rx) = mpsc::channel(128);
@@ -2856,6 +2969,58 @@ mod tests {
         }
     }
 
+    #[tokio::test(start_paused = true)]
+    async fn evaluation_budget_allows_slow_responses_but_remains_bounded() {
+        struct DelayedAssessor(std::time::Duration);
+        #[async_trait]
+        impl talos_runtime::EvaluatorAssessor for DelayedAssessor {
+            async fn assess(
+                &self,
+                request: talos_runtime::EvaluatorRequest,
+                _: std::time::Duration,
+            ) -> Result<String, String> {
+                tokio::time::sleep(self.0).await;
+                use talos_core::evaluation::{
+                    CriterionEvaluation, CriterionVerdict, EvaluationReport,
+                };
+                let results = request
+                    .claim
+                    .criteria
+                    .iter()
+                    .map(|criterion| CriterionEvaluation {
+                        criterion_id: criterion.id,
+                        verdict: CriterionVerdict::Inconclusive,
+                        evidence: vec![],
+                        finding_ids: vec![],
+                    })
+                    .collect();
+                let report =
+                    EvaluationReport::new(&request.claim, request.claim.subject, results, vec![])
+                        .expect("valid report");
+                Ok(serde_json::to_string(&report).expect("serialized report"))
+            }
+        }
+        let harness = evaluation_harness(talos_core::evaluation::CriterionVerdict::Inconclusive, 1);
+        for seconds in [9, 31] {
+            let service = talos_runtime::RuntimeEvaluationService::new(
+                Arc::new(DelayedAssessor(std::time::Duration::from_secs(seconds))),
+                EVALUATION_DEADLINE,
+            );
+            let outcome = service.evaluate(&harness.claim, vec![]).await;
+            if seconds == 9 {
+                assert!(matches!(
+                    outcome,
+                    talos_runtime::EvaluatorOutcome::Report { .. }
+                ));
+            } else {
+                assert!(
+                    matches!(outcome, talos_runtime::EvaluatorOutcome::Failure(failure)
+                    if failure.reason.contains("deadline exceeded"))
+                );
+            }
+        }
+    }
+
     #[tokio::test(flavor = "current_thread")]
     async fn evaluate_command_projects_shared_pass_fail_and_stale_delivery() {
         use talos_core::evaluation::CriterionVerdict;
@@ -2911,7 +3076,14 @@ mod tests {
             })
             .await
             .expect("evaluation projection arrives");
-            assert_eq!(projected, (expected_state.to_owned(), expected_delivery));
+            assert_eq!(projected.0.lines().next(), Some(expected_state));
+            assert!(projected.0.contains("\nCriterion 1:"));
+            assert!(
+                projected
+                    .0
+                    .ends_with("Evaluator supplied no detailed findings.")
+            );
+            assert_eq!(projected.1, expected_delivery);
 
             host.try_send(RuntimeCommand::Shutdown)
                 .expect("shutdown fixture host");

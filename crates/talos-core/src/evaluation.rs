@@ -272,7 +272,29 @@ impl EvaluationReport {
         {
             return Err(EvaluationError::FindingMismatch);
         }
+        for result in &results {
+            if findings.iter().any(|finding| {
+                (result.finding_ids.contains(&finding.id)
+                    && finding
+                        .criterion_id
+                        .is_some_and(|id| id != result.criterion_id))
+                    || (result.verdict == CriterionVerdict::Pass
+                        && finding.severity == FindingSeverity::Blocking
+                        && finding
+                            .criterion_id
+                            .is_none_or(|id| id == result.criterion_id))
+            }) {
+                return Err(EvaluationError::FindingMismatch);
+            }
+        }
         let verdict = aggregate_verdict(&claim.criteria, &results);
+        if verdict == EvaluationVerdict::Pass
+            && findings.iter().any(|finding| {
+                finding.criterion_id.is_none() && finding.severity == FindingSeverity::Blocking
+            })
+        {
+            return Err(EvaluationError::FindingMismatch);
+        }
         Ok(Self {
             id: Uuid::new_v4(),
             claim_id: claim.id,
@@ -499,6 +521,85 @@ mod tests {
             evidence: vec![],
             finding_ids: vec![],
         }
+    }
+
+    #[test]
+    fn findings_cannot_cross_criteria_or_contradict_pass() {
+        let claim = CompletionClaim::new(
+            subject(),
+            vec![criterion(true), criterion(false)],
+            vec![],
+            vec![],
+            "done",
+        )
+        .expect("claim");
+        let first = claim.criteria[0].id;
+        let second = claim.criteria[1].id;
+        let mut finding = EvaluationFinding {
+            id: Uuid::new_v4(),
+            criterion_id: Some(second),
+            severity: FindingSeverity::Warning,
+            summary: "review".into(),
+            evidence: vec![],
+        };
+        let mut results = vec![
+            result(first, CriterionVerdict::Pass),
+            result(second, CriterionVerdict::Inconclusive),
+        ];
+        results[0].finding_ids.push(finding.id);
+        assert_eq!(
+            EvaluationReport::new(
+                &claim,
+                claim.subject,
+                results.clone(),
+                vec![finding.clone()]
+            ),
+            Err(EvaluationError::FindingMismatch)
+        );
+        finding.criterion_id = Some(first);
+        assert!(
+            EvaluationReport::new(
+                &claim,
+                claim.subject,
+                results.clone(),
+                vec![finding.clone()]
+            )
+            .is_ok()
+        );
+        finding.severity = FindingSeverity::Blocking;
+        results[0].finding_ids.clear();
+        for target in [Some(first), None] {
+            finding.criterion_id = target;
+            assert_eq!(
+                EvaluationReport::new(
+                    &claim,
+                    claim.subject,
+                    results.clone(),
+                    vec![finding.clone()]
+                ),
+                Err(EvaluationError::FindingMismatch)
+            );
+        }
+        results[0].verdict = CriterionVerdict::Fail;
+        assert!(EvaluationReport::new(&claim, claim.subject, results, vec![finding]).is_ok());
+    }
+
+    #[test]
+    fn global_blocking_finding_prevents_optional_only_pass() {
+        let claim = CompletionClaim::new(subject(), vec![criterion(false)], vec![], vec![], "done")
+            .expect("claim");
+        let results = vec![result(claim.criteria[0].id, CriterionVerdict::Inconclusive)];
+        let finding = EvaluationFinding {
+            id: Uuid::new_v4(),
+            criterion_id: None,
+            severity: FindingSeverity::Blocking,
+            summary: "blocked".into(),
+            evidence: vec![],
+        };
+        assert_eq!(
+            EvaluationReport::new(&claim, claim.subject, results, vec![finding]),
+            Err(EvaluationError::FindingMismatch)
+        );
     }
 
     #[test]

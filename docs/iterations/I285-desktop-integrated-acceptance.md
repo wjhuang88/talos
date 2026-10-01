@@ -1,6 +1,6 @@
 # Iteration I285: Desktop Integrated Candidate And Acceptance
 
-> Document status: Review — Partial (implementation merged; H1/H6 residuals remain)
+> Document status: Review — Partial (implementation merged; H6 native acceptance remains)
 > Plan date: 2026-09-22
 > Target window: 2026-10-13 to 2026-10-19
 > Planned objective: A reproducibly built Desktop candidate passes an integrated real-task walkthrough with documented limits and a clean handoff.
@@ -21,8 +21,8 @@
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | PR #608 merged as `e1a89a1b25092ad37860314f02d1d212055b9fcc`; I282-I284 are merged with technical gates; #29 is the existing cycle acceptance tracker |
 | Implementation PR | #609 merged as `422729caecdc8e76c7de8217654921723d5a3fdf` from exact head `8cc7563906e061070b36a50a08367ca63c40d53a`; CI `36535972702` passed; independent Agent-role review `5885650377` approved exact head |
-| Last Updated | 2026-09-29 |
-| Handoff / Release Condition | H1-H6 evidence and owner-first closeout are required; no release |
+| Last Updated | 2026-09-30 |
+| Handoff / Release Condition | H6 native evidence and owner-first closeout are required; no release |
 
 ## Published Baseline
 
@@ -257,3 +257,21 @@ output behavior. See the consolidated H1-H6 table above for current evidence and
 
 I277's separately deferred VoiceOver, reduced-motion, Windows/Linux native interaction and physical
 display measurements remain outside this I285 manual batch and are not counted as passed.
+
+### Current Acceptance Update — 2026-09-30
+
+I286 closed H1 on 2026-09-30: the configured-provider path and permission gate were observed, and
+the opt-in debug error/timeout path exercised native error presentation, cancellation and recovery.
+The four-week owner records the exact evidence and limits; synthetic injection is not described as
+a real remote-provider timeout.
+
+I287 has since implemented the production session/revision-bound Evaluation evidence source and
+Desktop wiring on `main` at `b6e63d85`; exact-head CI `36690452723` passed all six jobs. This
+supersedes the 2026-09-29 H6 statement that the authoritative source was missing. H6 is still open:
+the native flow using built-in `edit`, a valid current Evaluation, a later workspace mutation,
+stale/unavailable Evaluation and disabled Delivery has not been confirmed by the maintainer. The
+edit symptom raised from the screenshot also lacks captured tool arguments/error text; the anchored
+EOF regression tests do not establish that the screenshot symptom is fixed.
+
+I285 remains Review / Partial until that native H6 evidence and owner-first closeout are recorded.
+No fixture, unit test or exact-head CI result substitutes for this human observation.

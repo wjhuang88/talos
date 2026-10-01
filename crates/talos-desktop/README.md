@@ -67,9 +67,17 @@ Choose the original workspace before opening **Recent tasks**, then select **Res
   Explicit Evaluate requests can supply a separate Runtime-produced observation of authorized,
   successful built-in file operations: up to 32 artifacts, 64 KiB per UTF-8 file and 256 KiB total.
   These current file contents are sent to the evaluator, unlike the metadata-only evidence panel.
+  Content is complete and preserves whitespace/newlines; oversized files are rejected, not truncated.
   Unregistered workspace files are not sent. Observations can support content-based Behavior
   criteria, but cannot prove tests passed or unobserved execution succeeded. Missing, unsupported
   or stale evidence fails closed; a Goal verdict alone does not authorize Mission Delivery.
+  Evaluate assesses the current Goal input; Send starts a task turn instead. For a content-only
+  check, enter the expected file state and click Evaluate without Send. Evaluation displays
+  criterion verdicts in claim order and bounded model-authored findings, or explicitly states
+  that no detailed findings were supplied. These explanations are not independent evidence.
+  Malformed or incomplete model reports remain failures; they are never repaired into PASS.
+  Evaluation has a 30-second total deadline covering model dispatch and response generation;
+  timeout invalidates the current evaluation and keeps Delivery blocked. Cancel remains available.
   Resumed transcript entries are marked as restored
   history and never re-run tools. Fixture presets do not configure live execution.
 - Cancel requests a Runtime interrupt. Tests cover a pending provider connection,
@@ -127,5 +135,11 @@ I287 的临时证据合同不要求新增持久化评估存储，重启后也不
 与只显示元数据的证据面板不同；未登记的工作区文件不会发送。内容观察只能支持相应的行为标准，
 不能证明测试通过或未观察到的执行成功。证据缺失、不支持或过期时保持不可用；
 单个 Goal 的评估结论不能代替 Mission 的交付门禁。
+文件内容完整保留空格和换行；超限文件会被拒绝，不会截断后交给评估模型。
+Evaluate 评估当前 Goal 输入框中的目标；Send 则启动任务执行。只验收文件内容时，
+填写预期文件状态后直接点击 Evaluate，不点击 Send。结果按验收标准原顺序显示，
+并展示有长度限制的模型说明；模型未给出详细说明时会明确提示。这些说明本身不是证据。
+格式错误或未完整返回的报告保持失败，不会自动补成 PASS。
+评估的总时限为 30 秒，包含模型请求派发与响应生成；超时使当前评估失效，交付保持阻止，期间仍可取消。
 工具和权限交互的原生人工验收以及后续阶段仍未闭环，
 不能把截图或单元测试通过视为完整桌面交付。

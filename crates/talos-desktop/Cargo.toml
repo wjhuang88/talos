@@ -39,3 +39,4 @@ gpui_platform = { git = "https://github.com/zed-industries/zed", rev = "ac5af8b9
 unicode-segmentation = { version = "1.13.3", optional = true }
 
 [dev-dependencies]
+tokio = { version = "1.53.1", features = ["test-util"] }

@@ -892,6 +892,93 @@ mod file_tool_tests {
     }
 
     #[tokio::test]
+    async fn anchored_edit_identifies_wrong_field_types_without_mutation_or_private_values() {
+        let temp_dir = tempfile::tempdir().expect("temporary workspace");
+        let path = temp_dir.path().join("single.txt");
+        fs::write(&path, b"H6_INITIAL").expect("write fixture");
+        let (read, _, edit, _) = super::snapshot_aware_file_tools(temp_dir.path().to_path_buf());
+        let result = read.execute(json!({"path": "single.txt"})).await;
+        let (snapshot_id, refs) = snapshot_header_and_refs(&result.content);
+        let valid = json!({
+            "path": "single.txt", "snapshot_id": snapshot_id,
+            "operations": [{"op": "replace_range", "start": refs[0], "end": refs[0], "content": "H6_CHANGED"}]
+        });
+        for field in ["start", "end", "content", "op"] {
+            let mut input = valid.clone();
+            input["operations"][0][field] = json!(1);
+            let error = edit.execute(input).await;
+            assert!(error.is_error);
+            assert!(
+                error.content.contains(&format!("operations[0].{field}")),
+                "{}",
+                error.content
+            );
+            assert!(!error.content.contains(&snapshot_id));
+            assert!(!error.content.contains(&refs[0]));
+            assert_eq!(fs::read(&path).expect("read unchanged file"), b"H6_INITIAL");
+        }
+        let mut input = valid.clone();
+        input["snapshot_id"] = json!(1);
+        let error = edit.execute(input).await;
+        assert!(error.is_error && error.content.contains("snapshot_id must be a JSON string"));
+        for op in ["replace", "insert_before", "insert_after"] {
+            let mut input = valid.clone();
+            input["operations"] = json!([{"op": op, "target": 1, "content": "changed"}]);
+            let error = edit.execute(input).await;
+            assert!(error.is_error && error.content.contains("operations[0].target"));
+            assert_eq!(fs::read(&path).expect("unchanged target"), b"H6_INITIAL");
+        }
+        let mut input = valid.clone();
+        input["operations"][0]["end"] = serde_json::Value::Null;
+        let error = edit.execute(input).await;
+        assert!(error.is_error && error.content.contains("operations[0].end"));
+        // Preserve serde's existing tolerance of fields unused by the selected operation.
+        let mut valid = valid;
+        valid["operations"][0]["target"] = json!(1);
+        let corrected = edit.execute(valid).await;
+        assert!(!corrected.is_error, "{}", corrected.content);
+        assert_eq!(fs::read(&path).expect("read corrected edit"), b"H6_CHANGED");
+    }
+
+    #[tokio::test]
+    async fn anchored_edit_valid_operation_compatibility_matrix() {
+        for (op, expected) in [
+            ("replace", "X\nb\n"),
+            ("replace_range", "X\n"),
+            ("insert_before", "X\na\nb\n"),
+            ("insert_after", "a\nX\nb\n"),
+            ("delete", "b\n"),
+        ] {
+            let workspace = tempfile::tempdir().expect("workspace");
+            let path = workspace.path().join("file.txt");
+            fs::write(&path, "a\nb\n").expect("fixture");
+            let (read, _, edit, _) = super::snapshot_aware_file_tools(workspace.path().into());
+            let result = read.execute(json!({"path": "file.txt"})).await;
+            let (snapshot_id, refs) = snapshot_header_and_refs(&result.content);
+            let operation = match op {
+                "replace_range" => {
+                    json!({"op": op, "start": refs[0], "end": refs[1], "content": "X", "target": 1})
+                }
+                "delete" => {
+                    json!({"op": op, "start": refs[0], "end": null, "content": 1, "target": 1})
+                }
+                _ => json!({"op": op, "target": refs[0], "content": "X", "start": 1, "end": 1}),
+            };
+            let result = edit.execute(json!({"path": "file.txt", "snapshot_id": snapshot_id, "operations": [operation]})).await;
+            assert!(!result.is_error, "{op}: {}", result.content);
+            assert_eq!(fs::read_to_string(&path).expect("result"), expected, "{op}");
+            // Snapshot-aware tools must still accept the legacy replacement API.
+            let result = edit
+                .execute(
+                    json!({"path": "file.txt", "old_string": expected, "new_string": "legacy"}),
+                )
+                .await;
+            assert!(!result.is_error, "{}", result.content);
+            assert_eq!(fs::read(&path).expect("legacy result"), b"legacy");
+        }
+    }
+
+    #[tokio::test]
     async fn two_digit_collision_cannot_bypass_full_revision_check() {
         let temp_dir = tempfile::tempdir().expect("operation should succeed");
         let path = temp_dir.path().join("collision.txt");

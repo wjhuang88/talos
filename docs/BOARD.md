@@ -21,8 +21,9 @@ Next selected plan: [four-week Desktop cycle](tasks/2026-09-22-desktop-four-week
 I282 is Review after implementation merge with H1/H5 deferred in #29; I283 is Complete after
 implementation merge `93c8b357`, with H2/H3 deferred in #29; I284 is Review / Claimed after
 implementation merge `2845ebdf` from PR #607 exact head `1fc73c2e`. Exact-head CI and incremental
-review passed; H4/H6 and production evaluation-source acceptance remain in #29. I285 Review /
-Claimed follows governance PR #608 merged as `e1a89a1b`; H1/H6 remain open. MODEL-007 is
+review passed; H4 and native H6 remain in #29; I287's production evaluation source is implemented
+on `main` at `b6e63d85`. I285 Review / Claimed follows governance PR #608 merged as `e1a89a1b`;
+H6 native acceptance remains open, while H1 is closed through I286. MODEL-007 is
 deferred behind Desktop. Locale follow-up #590 remains Refinement/Unclaimed.
 
 | Item | State | Owner Doc | Gate |
@@ -101,10 +102,10 @@ I277's deferred acceptance stays recorded; it does not reactivate mock developme
 |---|---|---|---|
 | Week 1: real Desktop task | Review / implementation merged; H1/H5 deferred | [I282](iterations/I282-live-runtime-host.md) | #29 native rows before Complete |
 | Week 2: tools and approval | Complete; H2/H3 residual | [I283](iterations/I283-live-tools-and-approval.md) | PR #603 merged `93c8b357`; exact-head CI and review passed |
-| Week 3: resume and evidence | Review / Claimed; PR #607 merged as `2845ebdf` from exact head `1fc73c2e`; CI `35959834215` and incremental review passed; durable evaluation source and H4/H6 remain open | [I284](iterations/I284-durable-task-and-evidence.md) | #606 activation `4e150b3e`; I285 owns integrated stabilization; H4/H6 stay in #29 |
-| Week 4: integrated acceptance | Review / Partial; implementation #609 merged as `422729ca`; exact-head CI `36535972702` and review `5885650377` passed; H6 remains open | [I285](iterations/I285-desktop-integrated-acceptance.md) | Required #29 evidence closure and authoritative H6 evidence |
+| Week 3: resume and evidence | Review / Claimed; PR #607 merged as `2845ebdf` from exact head `1fc73c2e`; CI `35959834215` and incremental review passed; H4/native H6 remain open | [I284](iterations/I284-durable-task-and-evidence.md) | #606 activation `4e150b3e`; I285 owns integrated stabilization; H4/H6 stay in #29; I287 source merged as `b6e63d85` |
+| Week 4: integrated acceptance | Review / Partial; implementation #609 merged as `422729ca`; exact-head CI `36535972702` and review `5885650377` passed; native H6 remains open | [I285](iterations/I285-desktop-integrated-acceptance.md) | Required #29 native H6 evidence and owner-first closeout |
 | Desktop H1 provider failure evidence | Complete / Closed; implementation merged as `c97f35b9` | [I286](iterations/I286-desktop-provider-error-injection-contract.md) | Debug-only implementation and native H1 evidence complete; I287/H6 remains separate |
-| Desktop H6 Evaluation evidence source | Active / Claimed | [I287](iterations/I287-desktop-evaluation-evidence-source.md) | Runtime-owned session/revision-bound source and native H6 evidence |
+| Desktop H6 Evaluation evidence source | Active / Claimed | [I287](iterations/I287-desktop-evaluation-evidence-source.md) | Source merged as `b6e63d85`; exact-head CI `36690452723` passed 6/6; native edit/current-to-stale acceptance and owner-first closeout remain |
 | I288 Search architecture audit / SEARCH-001-A | Active / Claimed proposed; ineffective until #627 merges | [I288](iterations/I288-search-architecture-audit.md) / [SEARCH-001-A](backlog/active/SEARCH-001-A-architecture-migration-contract.md) / #625 | #627 is governance-only; exact-head CI, both governance validators and merge-time CAS required. Parallel scope is architecture-only and must not overlap DEPENDENCY-003-A/Desktop residuals. |
 
 Product/design conformance gap found in the live host: Mission shaping and confirmed-plan flow plus
