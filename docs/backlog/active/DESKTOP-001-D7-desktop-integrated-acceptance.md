@@ -1,6 +1,6 @@
 # DESKTOP-001-D7: Desktop Integrated Candidate And Acceptance
 
-> Document status: Review — Claimed (effective after PR #608 merge)
+> Document status: Review — Partial (implementation and acceptance evidence recorded; residuals remain)
 
 | Field | Value |
 |---|---|
@@ -8,7 +8,7 @@
 | Parent Epic | DESKTOP-001 |
 | Type | Desktop integration / behavior Story |
 | Priority | P1 |
-| Status | Review / Claimed |
+| Status | Review / Partial |
 | Selected Iteration | I285 |
 | Source | #29; four-week Desktop task |
 | Depends On | I282-I284 implementation stages merged with technical gates; acceptance ledger in #29 |
@@ -26,8 +26,8 @@
 | Governance Claim PR | #608 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | PR #608 merged as `e1a89a1b25092ad37860314f02d1d212055b9fcc`; I282-I284 are merged with technical gates; #29 is the existing cycle acceptance tracker |
-| Implementation PR | #609, submitted from local candidate `c172636d27c741e2f320323a42b07afad78f99c6`; exact-head CI/review pending |
-| Last Updated | 2026-09-29 |
+| Implementation PR | #609 merged as `422729caecdc8e76c7de8217654921723d5a3fdf`; exact-head CI `36535972702`; independent review `5885650377` |
+| Last Updated | 2026-10-01 |
 | Handoff / Release Condition | H1-H6 evidence and owner-first closeout are required; no release |
 
 ## Outcome
@@ -74,6 +74,10 @@ New features, retroactive claims of Windows/Linux native or physical latency acc
 
 ## Completion Evidence
 
-Completion Commit: pending.
+Completion Commit: `422729caecdc8e76c7de8217654921723d5a3fdf` (implementation merge).
 I285 activation is effective after governance PR #608 merged as `e1a89a1b25092ad37860314f02d1d212055b9fcc`.
-No implementation or human acceptance is claimed complete by this record.
+I286 closed H1 and I287 supplied authoritative current/stale/unavailable Evaluation evidence and
+the fail-closed Delivery gate. The observed assistant-prose snapshot/anchor disclosure in I287
+remains under investigation against ADR-045; final owner reconciliation remains pending.
+I277 deferred platform/accessibility rows are separate and non-blocking for this cycle.
+Mission-level Delivery success is not an additional acceptance requirement.

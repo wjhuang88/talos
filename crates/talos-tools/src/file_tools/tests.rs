@@ -651,6 +651,13 @@ mod file_tool_tests {
         }
 
         let projection = read.project_result(&result);
+        let private_tokens = read.model_private_tokens(&result);
+        assert!(private_tokens.contains(&format!("[snapshot:{snapshot_id}]")));
+        assert!(private_tokens.contains(&snapshot_id));
+        for line in result.content.lines().skip(1) {
+            let (anchor, _) = line.split_once('|').expect("anchored line");
+            assert!(private_tokens.contains(&format!("{anchor}|")));
+        }
         assert_eq!(projection.model_content, result.content);
         assert!(!projection.display_content.contains("snapshot:"));
         assert!(projection.display_content.contains("1: alpha"));

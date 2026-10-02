@@ -443,15 +443,68 @@ The stable implementation candidate was `67d9bd52d06bfad566b850985e80149801a28d0
 against `main` at `b6e63d851ddf67d8d607f41513dcedae37d01af6`. PR #631 merged after exact-head
 CI `36792450056`, independent security/API approval `5921753941`, and merge-time CAS; the
 implementation is now on `main` in merge commit `f0e16e857ea76caa7c386fac5006b9f53a86d67a`.
-I287 remains Review / Partial: native H6 demonstrates current and changed-file stale evidence
-with Delivery blocked, but does not demonstrate a successful Mission-level Delivery. No further
-native repetition is required for the already-observed scenarios; any new evidence must target
-that explicit residual.
+I287 remains Review / Partial: native H6 demonstrates current, unavailable-after-restart and
+changed-file-stale evidence with Delivery blocked when evidence is not current. A successful
+Mission-level Delivery is not required by the published H6 baseline; no further native repetition
+is required for the already-observed scenarios. Any new evidence must target a separately recorded
+privacy/projection residual or another explicit acceptance gap.
 
 ### Owner-first closeout — 2026-10-01
 
 Completion Commit: `f0e16e857ea76caa7c386fac5006b9f53a86d67a` (PR #631 merge). Exact-head CI
 `36792450056` passed all six jobs, and independent Agent-role review `5921753941` was bound to
-the exact head/base. Implementation, tests and the bounded evidence source are merged; the
-Mission-evaluation/Delivery proof remains an explicit residual in #29 and the four-week task.
-This closeout intentionally does not mark I287 Complete.
+the exact head/base. Implementation, tests and the bounded evidence source are merged.
+The fail-closed Delivery behavior is the required contract when Mission-level evidence is absent;
+no Mission-success proof is claimed or required. This closeout intentionally keeps I287 Review /
+Partial for the explicit residual ledger rather than inventing a stronger completion claim.
+
+### Residual audit — 2026-10-01
+
+The concrete remaining investigation is the 17:37 assistant-prose disclosure of transient
+snapshot/anchor coordination data described above. Source inspection confirms that the Agent
+forwards provider `TextDelta` events before tool projection; existing tool-result projection tests
+alone do not prove prose non-disclosure. Trace observer, hook and persistence paths under ADR-045
+and add a reproducing regression before choosing a correction. This is not a demand for additional
+Mission-level Delivery success. I277 deferred device rows remain separately owned and non-blocking.
+
+### Privacy projection correction — 2026-10-02 (local candidate)
+
+The residual is addressed locally without changing provider-side messages or signed reasoning:
+tools explicitly declare concrete transient tokens, and the Agent filters those tokens across
+streamed text/thinking chunks, reasoning blocks, hook payloads, returned history and persistence
+projections. Filtering is strict and bounded to tool-declared snapshot headers and line anchors;
+ordinary prose is not syntax-scanned or redacted. Provider retries use attempt-scoped buffers so
+an incomplete private prefix cannot leak into a recovered response. Continuation hooks receive the
+same active token set, while provider messages retain the original values required for the next
+model call.
+
+Local evidence: `cargo test -p talos-agent --locked --lib` (425 passed),
+`cargo test -p talos-tools --features file-write --locked --lib` (110 passed),
+`cargo clippy -p talos-agent -p talos-tools --locked -- -D warnings`, both governance validators,
+`cargo fmt --all -- --check`, and `git diff --check` pass. The candidate is not yet committed,
+merged, or independently reviewed; I287 therefore remains `Review / Partial` until a stable
+implementation commit receives exact-head CI and the required security/API review.
+
+### Local convergence follow-up — 2026-10-03
+
+The observer projection now also covers bare generated handles, nested tool argument strings,
+Before/AfterToolBatch, Before/AfterToolCall, permission-hook and approval presentation, and
+default-projection tool result echoes. Permission evaluation and execution still receive original
+arguments; provider history keeps the original transient values. The cross-tool regression now
+reads a private token and echoes it through a different tool, asserting both original execution/
+provider values and sanitized hooks/events/history. Incremental read-only Agent review approved
+the boundary before the final batch-result correction; final candidate review is still required.
+The additive API compatibility note is recorded in ADR-045.
+
+Focused Agent tests passed (426), Tools file-write tests passed (110), and the updated cross-tool
+regression passed. Full preflight has not yet passed the final candidate: one attempt failed from
+disk exhaustion; a later attempt failed the sandbox closed-pipes timeout assertion without its
+actual error detail. The sandbox suite subsequently passed 20 consecutive 40-test runs. This is
+not a root-cause fix: the assertion now includes the actual error to make recurrence diagnosable.
+Another full preflight stopped at CLI linking with `errno=28`; rebuildable incremental artifacts
+were removed after the build terminated. No source, worktree or acceptance executable was deleted.
+A subsequent `./scripts/release_preflight.sh` completed successfully, including workspace tests,
+both governance validators and both external Runtime SDK fixtures. This validates the local
+candidate, but does not establish the root cause of the earlier sandbox timing failure; recurrence
+remains a diagnostic risk. The stable commit, exact-head CI/review and owner-first closeout remain
+pending.

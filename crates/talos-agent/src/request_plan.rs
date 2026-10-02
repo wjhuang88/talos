@@ -9,6 +9,7 @@ use talos_core::tool::ToolPresentationPolicy;
 use talos_plugin::{HookContext, HookEvent, HookOutcome, TurnId, TurnStatus};
 
 use crate::configuration::describe_presented_tools;
+use crate::transient_text::PrivateTokens;
 use crate::{Agent, AgentError, AgentResult};
 
 /// One owned Provider request that is budgeted and dispatched without rebuild.
@@ -152,6 +153,7 @@ impl Agent {
                 &active_tool_definitions,
                 &mut continuation_parts,
                 request_context_limit,
+                &PrivateTokens::default(),
             )
             .await
         {
@@ -181,8 +183,9 @@ impl Agent {
         tool_definitions: &[ToolDefinition],
         continuation_parts: &mut Vec<ContentPart>,
         request_context_limit: Option<u32>,
+        private_tokens: &PrivateTokens,
     ) -> AgentResult<ProviderRequestPlan> {
-        let hook_messages = self.persistence_projection(messages);
+        let hook_messages = self.persistence_projection_with_tokens(messages, private_tokens);
         let observed_provider_messages = match self
             .run_hook(
                 hook_ctx,

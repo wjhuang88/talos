@@ -18,12 +18,11 @@ Current cycle: [I281](iterations/I281-auto-shell-review-and-windows-timing.md),
 Complete/Closed. Implementations #588/#591 merged as `a1cb869b`/`bfdf8b67`;
 exact-head code CI, independent review and composed UI/test/execution-boundary acceptance passed.
 Next selected plan: [four-week Desktop cycle](tasks/2026-09-22-desktop-four-week-delivery.md),
-I282 is Review after implementation merge with H1/H5 deferred in #29; I283 is Complete after
-implementation merge `93c8b357`, with H2/H3 deferred in #29; I284 is Review / Claimed after
-implementation merge `2845ebdf` from PR #607 exact head `1fc73c2e`. Exact-head CI and incremental
-review passed; H4 and native H6 remain in #29; I287's production evaluation source is implemented
-on `main` at `b6e63d85`. I285 Review / Claimed follows governance PR #608 merged as `e1a89a1b`;
-H6 native acceptance remains open, while H1 is closed through I286. MODEL-007 is
+I282-I285 implementations are merged. H1-H6 observations are recorded in the four-week ledger;
+I286 closed H1 and I287's authoritative source merged as `f0e16e85` with exact-head CI/review.
+I284/I285/I287 remain Review / Partial pending the observed assistant-prose snapshot/anchor
+disclosure investigation under ADR-045 and final owner reconciliation. Mission-level Delivery
+success is not an additional H6 requirement; I277 deferred device rows are non-blocking. MODEL-007 is
 deferred behind Desktop. Locale follow-up #590 remains Refinement/Unclaimed.
 
 | Item | State | Owner Doc | Gate |

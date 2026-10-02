@@ -14,10 +14,10 @@ is Complete/Closed: shell Ask model review under ADR-081, Windows I226 timing re
 UX follow-up merged in #588/#591 as `a1cb869b`/`bfdf8b67`, with exact-head code CI,
 independent Agent security/API approval and composed UI/test/execution-boundary acceptance
 recorded in the owner.
-The maintainer selected the four-week Desktop plan on 2026-09-22. I282/I283 are merged; I284 is
-Review / Claimed after implementation PR #607 merged as `2845ebdf` from exact head `1fc73c2e`.
-Exact-head CI and incremental review passed; durable evaluation evidence and human acceptance
-remain incomplete. I285 Review / Claimed is effective after governance PR #608 merged as `e1a89a1b`.
+The maintainer selected the four-week Desktop plan on 2026-09-22. I282-I285 and I286/I287
+implementations are merged; H1-H6 observations are recorded. I284/I285/I287 remain Review / Partial
+for the observed ADR-045 assistant-prose disclosure investigation and final owner reconciliation.
+The authoritative Evaluation source exists; Mission-level Delivery success is not an H6 requirement.
 The live host's Mission-workflow and visual-design mismatch is separately recorded as
 DESKTOP-001-MISSION-UX Refinement / Unclaimed; it is not part of I285 or activated. MODEL-007 remains
 deferred behind this cycle, not cancelled.

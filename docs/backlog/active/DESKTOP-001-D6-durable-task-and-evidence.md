@@ -1,6 +1,6 @@
 # DESKTOP-001-D6: Desktop Durable Tasks And Evidence
 
-> Document status: Review — Claimed
+> Document status: Review — Partial; implementation and authoritative evidence source merged
 
 | Field | Value |
 |---|---|
@@ -8,7 +8,7 @@
 | Parent Epic | DESKTOP-001 |
 | Type | Desktop integration / behavior Story |
 | Priority | P1 |
-| Status | Review / Claimed — implementation merged; human acceptance residuals remain |
+| Status | Review / Partial — implementation merged; H4/H6 evidence recorded, deferred residuals remain |
 | Selected Iteration | I284 |
 | Source | #29; four-week Desktop task |
 | Depends On | I283 implementation merged with technical gates; ADR-042/061; durable-session and WORK-001 projection compatibility map |
@@ -28,7 +28,7 @@
 | Authorization Evidence | I283/D5 closeout merged as `81a5d27c`; I284 is the next serial child |
 | Implementation PR | #607 merged at exact head `1fc73c2e`; merge commit `2845ebdf` |
 | Last Updated | 2026-09-24 |
-| Handoff / Release Condition | Technical implementation merged; close only after H4/H6 and authoritative evaluation-source acceptance; no release |
+| Handoff / Release Condition | Technical implementation and I287 evidence source merged; retain Review / Partial for recorded residuals; no release |
 
 ## Outcome
 
@@ -75,8 +75,9 @@ New durable Mission/Evaluation schema, automatic evaluation on every turn, multi
 ## Completion Evidence
 
 Completion Commit: `2845ebdf57ff26c62539a8516499ed7d29caa228` (PR #607 implementation merge).
-Implementation is merged, but the story remains Review because H4/H6 and the production
-evaluation-source acceptance are pending.
+Implementation is merged. I287 now supplies the authoritative session/revision-bound evidence
+source; H4/H6 observations are recorded with fail-closed Delivery behavior. The story remains
+Review / Partial for the explicit residual ledger, not because the evidence source is missing.
 
 ## Merge Checkpoint — 2026-09-24
 

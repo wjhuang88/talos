@@ -1,6 +1,6 @@
 # Iteration I282: Live Runtime Desktop Host
 
-> Document status: Review — Claimed; implementation merged, human acceptance outstanding
+> Document status: Review — Claimed; H1/H5 evidence recorded, final owner reconciliation pending
 > Plan date: 2026-09-22
 > Target window: 2026-09-22 to 2026-09-28
 > Planned objective: A runnable live Desktop task streams real configured-provider output and can be cancelled without blocking the UI.
@@ -22,7 +22,7 @@
 | Authorization Evidence | User authorized continuation; exact-head CI, governance validators and merge-time CAS required; no independent natural-person reviewer available |
 | Implementation PR | #599 (`2dfe13b1`, `0bd6a7bc`); merged as `aaa4c015` |
 | Last Updated | 2026-09-22 |
-| Handoff / Release Condition | H1/H5 native acceptance remains in #29; no release authority |
+| Handoff / Release Condition | Reconcile H1/H5 evidence into owner closeout; I277 deferred rows are separate and non-blocking; no release authority |
 
 ## Published Baseline
 
@@ -98,7 +98,7 @@ CI: run `35766202595`, all jobs passed; implementation merge commit: `aaa4c015`.
 
 ## Completion Evidence
 
-Completion Commit: `aaa4c015` (implementation merge; owner remains Review pending H1/H5).
+Completion Commit: `aaa4c015` (implementation merge; H1/H5 evidence recorded in the four-week ledger, final owner reconciliation pending).
 Only already-existing implementation/evidence commits may close this iteration.
 
 ## Variance And Residuals
