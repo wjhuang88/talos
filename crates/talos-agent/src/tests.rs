@@ -282,6 +282,29 @@ impl ApprovalResolver for AutoDenyFallback {
 
 struct ProjectedMockTool;
 
+struct PrivateEchoTool;
+
+#[async_trait]
+impl AgentTool for PrivateEchoTool {
+    fn name(&self) -> &str {
+        "private_echo"
+    }
+    fn description(&self) -> &str {
+        "Echo fixture using default projections"
+    }
+    fn parameters(&self) -> Value {
+        serde_json::json!({})
+    }
+    fn is_read_only(&self) -> bool {
+        true
+    }
+    async fn execute(&self, input: Value) -> ToolExecutionResult {
+        let text = input["note"].as_str().expect("echo text");
+        assert_eq!(text, "echo [snapshot:s1] and s1/1:aa|");
+        ToolExecutionResult::success(text)
+    }
+}
+
 #[async_trait]
 impl AgentTool for ProjectedMockTool {
     fn name(&self) -> &str {
@@ -321,6 +344,10 @@ impl AgentTool for ProjectedMockTool {
             display_content: "read 1 line".into(),
             persistence_content: "read 1 line".into(),
         }
+    }
+
+    fn model_private_tokens(&self, _result: &ToolExecutionResult) -> Vec<String> {
+        vec!["[snapshot:s1]".into(), "s1".into(), "1:aa|".into()]
     }
 }
 
@@ -654,6 +681,7 @@ impl HookHandler for ProjectionCaptureHook {
     fn subscribed(&self) -> &'static [HookEventKind] {
         &[
             HookEventKind::BeforeProviderCall,
+            HookEventKind::OnTextDelta,
             HookEventKind::OnToolCallProposed,
             HookEventKind::BeforeToolBatch,
             HookEventKind::BeforeToolCall,
@@ -667,6 +695,7 @@ impl HookHandler for ProjectionCaptureHook {
 
     async fn on_event(&self, _ctx: &HookContext, event: &mut HookEvent<'_>) -> HookResult {
         let payload = match event {
+            HookEvent::OnTextDelta { text } => text.to_string(),
             HookEvent::BeforeProviderCall { messages } => {
                 serde_json::to_string(messages).expect("serialize hook messages")
             }
@@ -2224,7 +2253,49 @@ async fn model_private_projection_reaches_model_but_not_events_or_returned_histo
         vec![
             AgentEvent::TurnStart,
             AgentEvent::TextDelta {
-                delta: "done".into(),
+                delta: "done; coordination [snap".into(),
+            },
+            AgentEvent::TextDelta {
+                delta: "shot:s1] and s1/1:".into(),
+            },
+            AgentEvent::TextDelta {
+                delta: "aa| must remain private".into(),
+            },
+            AgentEvent::ThinkingDelta {
+                delta: "reason [snap".into(),
+            },
+            AgentEvent::ThinkingDelta {
+                delta: "shot:s1]".into(),
+            },
+            AgentEvent::ReasoningComplete {
+                blocks: vec![
+                    ReasoningBlock::Plain {
+                        text: "reason [snapshot:s1]".into(),
+                    },
+                    ReasoningBlock::Thinking {
+                        text: "signed 1:aa|".into(),
+                        signature: Some("signature-fixture".into()),
+                    },
+                ],
+            },
+            AgentEvent::ToolCall {
+                call: ToolCall {
+                    id: "second_read".into(),
+                    name: "private_echo".into(),
+                    input: serde_json::json!({"path": "other.rs", "note": "echo [snapshot:s1] and s1/1:aa|"}),
+                },
+                provenance: Default::default(),
+                summary_fields: vec![],
+            },
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::ToolUse,
+                usage: Usage::default(),
+            },
+        ],
+        vec![
+            AgentEvent::TurnStart,
+            AgentEvent::TextDelta {
+                delta: " finished".into(),
             },
             AgentEvent::TurnEnd {
                 stop_reason: StopReason::EndTurn,
@@ -2235,6 +2306,7 @@ async fn model_private_projection_reaches_model_but_not_events_or_returned_histo
     let (model, captured_messages) = CapturingMessagesModel::new(responses);
     let mut registry = ToolRegistry::new();
     registry.register(Arc::new(ProjectedMockTool));
+    registry.register(Arc::new(PrivateEchoTool));
     let hook_payloads = Arc::new(Mutex::new(Vec::new()));
     let mut hooks = HookRegistry::new();
     hooks.register(Arc::new(ProjectionCaptureHook {
@@ -2252,7 +2324,7 @@ async fn model_private_projection_reaches_model_but_not_events_or_returned_histo
     );
     let (tx, mut rx) = mpsc::unbounded_channel();
 
-    let (_, returned) = agent
+    let (response, returned) = agent
         .run_streaming("read".into(), vec![], tx)
         .await
         .expect("turn succeeds");
@@ -2267,6 +2339,27 @@ async fn model_private_projection_reaches_model_but_not_events_or_returned_histo
         .expect("model tool result");
     assert!(model_text.contains("snapshot:s1"));
     assert!(model_text.contains("1:aa|"));
+    assert!(captured[2].iter().any(|message| matches!(message,
+        Message::Tool { result } if result.content == "echo [snapshot:s1] and s1/1:aa|"
+    )));
+    assert_eq!(response, " finished");
+    assert!(captured[2].iter().any(|message| matches!(message,
+        Message::Assistant { content, .. }
+        if content == "done; coordination [snapshot:s1] and s1/1:aa| must remain private"
+    )));
+    assert!(
+        serde_json::to_string(&captured[2])
+            .expect("provider history")
+            .contains("signed 1:aa|")
+    );
+    assert_eq!(
+        returned.last(),
+        Some(&Message::Assistant {
+            content: " finished".into(),
+            tool_calls: vec![],
+            reasoning: None,
+        })
+    );
     drop(captured);
 
     let serialized = serde_json::to_string(&returned).expect("serialize returned messages");
@@ -2275,12 +2368,25 @@ async fn model_private_projection_reaches_model_but_not_events_or_returned_histo
     assert!(!serialized.contains("1:aa|"));
     assert!(serialized.contains("read 1 line"));
 
+    let mut visible_text = String::new();
+    let mut visible_reasoning = String::new();
     while let Ok(event) = rx.try_recv() {
+        if let AgentEvent::TextDelta { delta } = &event {
+            visible_text.push_str(delta);
+        }
+        if let AgentEvent::ThinkingDelta { delta } = &event {
+            visible_reasoning.push_str(delta);
+        }
         let event = serde_json::to_string(&event).expect("serialize event");
         assert!(!event.contains("snapshot_id"));
         assert!(!event.contains("snapshot:s1"));
         assert!(!event.contains("1:aa|"));
     }
+    assert_eq!(visible_reasoning, "reason [private]");
+    assert_eq!(
+        visible_text,
+        "done; coordination [private] and [private]/[private] must remain private finished"
+    );
 
     let hook_payloads = hook_payloads.lock().await;
     assert!(!hook_payloads.is_empty());
@@ -2290,6 +2396,50 @@ async fn model_private_projection_reaches_model_but_not_events_or_returned_histo
         assert!(!payload.contains("snapshot:s1"));
         assert!(!payload.contains("1:aa|"));
     }
+}
+
+#[tokio::test]
+#[allow(deprecated)]
+async fn model_private_projection_without_event_sender_preserves_incomplete_prefix() {
+    let responses = vec![
+        vec![
+            AgentEvent::TurnStart,
+            AgentEvent::ToolCall {
+                call: ToolCall {
+                    id: "private_call".into(),
+                    name: "projected_read".into(),
+                    input: serde_json::json!({"path": "src/lib.rs"}),
+                },
+                provenance: Default::default(),
+                summary_fields: vec![],
+            },
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::ToolUse,
+                usage: Usage::default(),
+            },
+        ],
+        vec![
+            AgentEvent::TurnStart,
+            AgentEvent::TextDelta {
+                delta: "visible [snap".into(),
+            },
+            AgentEvent::TextDelta {
+                delta: "shot:s1] then ordinary [snap".into(),
+            },
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::EndTurn,
+                usage: Usage::default(),
+            },
+        ],
+    ];
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(ProjectedMockTool));
+    let agent = Agent::new(Arc::new(MockModel::new(responses)), registry);
+
+    assert_eq!(
+        agent.run("read".into()).await.expect("turn succeeds"),
+        "visible [private] then ordinary [snap"
+    );
 }
 
 #[tokio::test]

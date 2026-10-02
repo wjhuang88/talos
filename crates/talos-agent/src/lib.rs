@@ -46,6 +46,7 @@ mod execution_ledger;
 mod process_tool;
 pub mod token;
 mod tool_output;
+mod transient_text;
 
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -809,9 +810,14 @@ impl Agent {
         // It cannot become a recursive model/tool loop.
         let mut protocol_recovery_attempts = 0u8;
         let mut protocol_override = None;
+        let mut private_tokens = transient_text::PrivateTokens::default();
 
         if let Some(snapshot_tx) = &snapshot_tx {
-            let _ = snapshot_tx.send(self.persistence_projection(&messages[persist_start..]));
+            let _ =
+                snapshot_tx.send(self.persistence_projection_with_tokens(
+                    &messages[persist_start..],
+                    &private_tokens,
+                ));
         }
 
         let (result, final_status) = 'turn_loop: loop {
@@ -825,6 +831,7 @@ impl Agent {
                         &active_tool_definitions,
                         &mut pending_continuation_parts,
                         request_context_limit,
+                        &private_tokens,
                     )
                     .await
                 {
@@ -938,6 +945,11 @@ impl Agent {
             };
 
             let mut turn_tool_calls: Vec<PendingToolCall> = Vec::new();
+            // Buffers belong to this provider attempt. A failed attempt must
+            // never prefix the recovered response with an incomplete fragment.
+            let mut observed_text_pending = String::new();
+            let mut observed_reasoning_pending = String::new();
+            let mut hook_text_pending = String::new();
             let mut turn_text = String::new();
             let mut turn_reasoning_blocks: Option<Vec<ReasoningBlock>> = None;
             let mut saw_turn_end = false;
@@ -949,20 +961,82 @@ impl Agent {
                 if let Some(ref tx) = event_tx
                     && !matches!(event, AgentEvent::ToolCall { .. })
                 {
-                    let _ = tx.send(event.clone());
+                    match &event {
+                        AgentEvent::TextDelta { delta } => {
+                            let output = private_tokens.push(&mut observed_text_pending, delta);
+                            if !output.is_empty() {
+                                let _ = tx.send(AgentEvent::TextDelta { delta: output });
+                            }
+                        }
+                        AgentEvent::TurnEnd { .. } => {
+                            let output = private_tokens.finish(&mut observed_text_pending);
+                            if !output.is_empty() {
+                                let _ = tx.send(AgentEvent::TextDelta { delta: output });
+                            }
+                            let output = private_tokens.finish(&mut observed_reasoning_pending);
+                            if !output.is_empty() {
+                                let _ = tx.send(AgentEvent::ThinkingDelta { delta: output });
+                            }
+                            let _ = tx.send(event.clone());
+                        }
+                        AgentEvent::ThinkingDelta { delta } => {
+                            let output =
+                                private_tokens.push(&mut observed_reasoning_pending, delta);
+                            if !output.is_empty() {
+                                let _ = tx.send(AgentEvent::ThinkingDelta { delta: output });
+                            }
+                        }
+                        AgentEvent::ReasoningComplete { blocks } => {
+                            let projected = blocks
+                                .iter()
+                                .filter_map(|block| match block {
+                                    ReasoningBlock::Plain { text } => Some(ReasoningBlock::Plain {
+                                        text: private_tokens.project(text),
+                                    }),
+                                    ReasoningBlock::Thinking { text, signature } => (private_tokens
+                                        .project(text)
+                                        == *text)
+                                        .then(|| ReasoningBlock::Thinking {
+                                            text: text.clone(),
+                                            signature: signature.clone(),
+                                        }),
+                                    ReasoningBlock::Redacted { .. } => None,
+                                })
+                                .collect();
+                            let _ = tx.send(AgentEvent::ReasoningComplete { blocks: projected });
+                        }
+                        _ => {
+                            let _ = tx.send(event.clone());
+                        }
+                    }
                 }
 
                 match event {
                     AgentEvent::TextDelta { delta } => {
+                        let raw_pending = format!("{hook_text_pending}{delta}");
+                        let observed_delta = private_tokens.push(&mut hook_text_pending, &delta);
+                        let raw_delta = &raw_pending[..raw_pending.len() - hook_text_pending.len()];
+                        if observed_delta.is_empty() {
+                            continue;
+                        }
                         match self
-                            .run_hook(&hook_ctx, HookEvent::OnTextDelta { text: &delta })
+                            .run_hook(
+                                &hook_ctx,
+                                HookEvent::OnTextDelta {
+                                    text: &observed_delta,
+                                },
+                            )
                             .await
                         {
                             Ok(HookOutcome::Continue(HookEvent::OnTextDelta { text }))
                             | Ok(HookOutcome::Skip(HookEvent::OnTextDelta { text })) => {
-                                turn_text.push_str(text);
+                                turn_text.push_str(if text == observed_delta {
+                                    raw_delta
+                                } else {
+                                    text
+                                });
                             }
-                            Ok(_) => turn_text.push_str(&delta),
+                            Ok(_) => turn_text.push_str(raw_delta),
                             Err(error) => {
                                 break 'turn_loop (Err(error), TurnStatus::Denied);
                             }
@@ -981,6 +1055,27 @@ impl Agent {
                         stop_reason,
                         usage: turn_usage,
                     } => {
+                        let raw_delta = hook_text_pending.clone();
+                        let final_delta = private_tokens.finish(&mut hook_text_pending);
+                        if !final_delta.is_empty() {
+                            match self
+                                .run_hook(&hook_ctx, HookEvent::OnTextDelta { text: &final_delta })
+                                .await
+                            {
+                                Ok(HookOutcome::Continue(HookEvent::OnTextDelta { text }))
+                                | Ok(HookOutcome::Skip(HookEvent::OnTextDelta { text })) => {
+                                    turn_text.push_str(if text == final_delta {
+                                        &raw_delta
+                                    } else {
+                                        text
+                                    });
+                                }
+                                Ok(_) => turn_text.push_str(&raw_delta),
+                                Err(error) => {
+                                    break 'turn_loop (Err(error), TurnStatus::Denied);
+                                }
+                            }
+                        }
                         saw_turn_end = true;
                         turn_stop_reason = Some(stop_reason.clone());
                         usage = turn_usage;
@@ -1139,7 +1234,7 @@ impl Agent {
                     tool_calls: vec![],
                     reasoning,
                 });
-                break (Ok(turn_text), TurnStatus::Success);
+                break (Ok(private_tokens.project(&turn_text)), TurnStatus::Success);
             }
 
             let proposed_tool_calls: Vec<ToolCall> = turn_tool_calls
@@ -1148,7 +1243,11 @@ impl Agent {
                 .collect();
             let projected_tool_calls = proposed_tool_calls
                 .iter()
-                .map(|call| self.project_tool_call(call))
+                .map(|call| {
+                    let mut projected = self.project_tool_call(call);
+                    private_tokens.project_value(&mut projected.input);
+                    projected
+                })
                 .collect::<Vec<_>>();
 
             let effective_tool_calls = match self
@@ -1258,10 +1357,16 @@ impl Agent {
                         user_intent.as_deref(),
                         &active_tool_presentation_policy,
                         &active_presented_tool_names,
+                        &mut private_tokens,
                     )
                     .await
                 {
                     Ok((results, parts)) => {
+                        for (call, result) in effective_tool_calls.iter().zip(&results) {
+                            if let Some(tool) = self.tools.get(&call.name) {
+                                private_tokens.extend(tool.model_private_tokens(result));
+                            }
+                        }
                         pending_continuation_parts.extend(parts);
                         results
                     }
@@ -1281,6 +1386,7 @@ impl Agent {
                         user_intent,
                         &active_tool_presentation_policy,
                         &active_presented_tool_names,
+                        &private_tokens,
                     )
                     .await
                 {
@@ -1292,8 +1398,13 @@ impl Agent {
                 pending_continuation_parts.extend(parts);
 
                 for (call, result) in effective_tool_calls.iter().zip(tool_results.iter()) {
-                    let projected_call = self.project_tool_call(call);
-                    let projected_result = self.project_tool_result(&call.name, result);
+                    if let Some(tool) = self.tools.get(&call.name) {
+                        private_tokens.extend(tool.model_private_tokens(result));
+                    }
+                    let mut projected_call = self.project_tool_call(call);
+                    private_tokens.project_value(&mut projected_call.input);
+                    let mut projected_result = self.project_tool_result(&call.name, result);
+                    projected_result.content = private_tokens.project(&projected_result.content);
                     let observation = ToolObservation {
                         call: projected_call.clone(),
                         result: projected_result.clone(),
@@ -1342,7 +1453,7 @@ impl Agent {
                         });
                     let ui_result = MessageToolResult {
                         tool_use_id: observed.call.id.clone(),
-                        content: projection.display_content,
+                        content: private_tokens.project(&projection.display_content),
                         is_error: observed.result.is_error,
                     };
                     let llm_result = if observed.result.is_error {
@@ -1393,7 +1504,11 @@ impl Agent {
             let projected_batch = effective_tool_calls
                 .iter()
                 .zip(tool_results.iter())
-                .map(|(call, result)| self.project_tool_result(&call.name, result))
+                .map(|(call, result)| {
+                    let mut projected = self.project_tool_result(&call.name, result);
+                    projected.content = private_tokens.project(&projected.content);
+                    projected
+                })
                 .collect::<Vec<_>>();
             let _ = self
                 .run_hook(
@@ -1406,7 +1521,10 @@ impl Agent {
             if let Some(snapshot_tx) = &snapshot_tx {
                 // This is the first safe boundary after a complete tool batch:
                 // the projection excludes private fields and incomplete calls.
-                let _ = snapshot_tx.send(self.persistence_projection(&messages[persist_start..]));
+                let _ = snapshot_tx.send(self.persistence_projection_with_tokens(
+                    &messages[persist_start..],
+                    &private_tokens,
+                ));
             }
             if let Some(boundary_tx) = &boundary_tx {
                 let (response, injected) = tokio::sync::oneshot::channel();
@@ -1418,8 +1536,10 @@ impl Agent {
                     let (_, injected_messages) = Self::structured_session_inputs(&batch.items);
                     messages.extend(injected_messages);
                     if let Some(snapshot_tx) = &snapshot_tx {
-                        let _ = snapshot_tx
-                            .send(self.persistence_projection(&messages[persist_start..]));
+                        let _ = snapshot_tx.send(self.persistence_projection_with_tokens(
+                            &messages[persist_start..],
+                            &private_tokens,
+                        ));
                     }
                     if let Some(boundary_ack_tx) = &boundary_ack_tx {
                         let (projected, confirmation) = tokio::sync::oneshot::channel();
@@ -1445,11 +1565,16 @@ impl Agent {
         // persist. Incomplete streamed assistant fragments are never pushed to
         // `messages` — only finalized assistant messages with complete tool
         // calls are (SESSION-006 / I135).
-        let partial_messages = self.persistence_projection(&messages[persist_start..]);
+        let partial_messages =
+            self.persistence_projection_with_tokens(&messages[persist_start..], &private_tokens);
         (result, partial_messages)
     }
 
-    fn persistence_projection(&self, messages: &[Message]) -> Vec<Message> {
+    fn persistence_projection_with_tokens(
+        &self,
+        messages: &[Message],
+        private_tokens: &transient_text::PrivateTokens,
+    ) -> Vec<Message> {
         let mut tool_names = HashMap::<String, String>::new();
         messages
             .iter()
@@ -1459,7 +1584,7 @@ impl Agent {
                     tool_calls,
                     reasoning,
                 } => Message::Assistant {
-                    content: content.clone(),
+                    content: private_tokens.project(content),
                     tool_calls: tool_calls
                         .iter()
                         .map(|call| {
@@ -1468,10 +1593,25 @@ impl Agent {
                             if let Some(tool) = self.tools.get(&call.name) {
                                 projected.input = tool.project_input(&call.input);
                             }
+                            private_tokens.project_value(&mut projected.input);
                             projected
                         })
                         .collect(),
-                    reasoning: reasoning.clone(),
+                    reasoning: reasoning.as_ref().map(|reasoning| {
+                        let mut projected = reasoning.clone();
+                        for block in &mut projected.blocks {
+                            if let talos_core::message::ReasoningBlock::Plain { text } = block {
+                                *text = private_tokens.project(text);
+                            }
+                        }
+                        projected.blocks.retain(|block| match block {
+                            ReasoningBlock::Thinking { text, .. } => {
+                                private_tokens.project(text) == *text
+                            }
+                            _ => true,
+                        });
+                        projected
+                    }),
                 },
                 Message::Tool { result } => {
                     let content = tool_names
@@ -1489,7 +1629,7 @@ impl Agent {
                     Message::Tool {
                         result: MessageToolResult {
                             tool_use_id: result.tool_use_id.clone(),
-                            content,
+                            content: private_tokens.project(&content),
                             is_error: result.is_error,
                         },
                     }

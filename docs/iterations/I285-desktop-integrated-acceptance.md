@@ -282,5 +282,7 @@ I287 is now merged in `main` as `f0e16e857ea76caa7c386fac5006b9f53a86d67a` after
 CI `36792450056` and independent security/API approval `5921753941`. The authoritative
 session/revision-bound source is therefore implemented and no longer a missing-source residual.
 Native H6 evidence recorded current content, restart unavailability and changed-file stale state
-with Delivery blocked. Mission-level Delivery success was not demonstrated, so I285 remains
-Review / Partial and the remaining H6 evidence is retained in #29 rather than marked complete.
+with Delivery blocked. Mission-level Delivery success is not a requirement of H6. Review / Partial
+is retained for I287's observed assistant-prose snapshot/anchor disclosure investigation under
+ADR-045 and final owner reconciliation, not additional H6 click-through testing. I277's deferred
+device/accessibility rows remain independent and non-blocking for this cycle.

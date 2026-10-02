@@ -1,6 +1,6 @@
 # Iteration I284: Desktop Durable Tasks And Evidence
 
-> Document status: Review — Claimed
+> Document status: Review — Partial; implementation and authoritative evidence source merged
 > Plan date: 2026-09-22
 > Target window: 2026-10-06 to 2026-10-12
 > Planned objective: A Desktop user can reopen a saved conversation and inspect real work status, changes and revision-bound evaluation evidence.
@@ -22,7 +22,7 @@
 | Authorization Evidence | I283/D5 implementation and governance closeout merged as `81a5d27c`; I284 is the next serial child |
 | Implementation PR | #607 merged at exact head `1fc73c2e`; merge commit `2845ebdf` |
 | Last Updated | 2026-09-24 |
-| Handoff / Release Condition | Technical implementation merged; retain Review until H4/H6 and remaining production evaluation-source acceptance are resolved; no release |
+| Handoff / Release Condition | Technical implementation and I287 evidence source merged; retain Review / Partial for recorded residuals; no release |
 
 ## Published Baseline
 
@@ -99,8 +99,9 @@ artifact diff viewer and persisted evaluation staleness remain unfinished in thi
 ## Completion Evidence
 
 Completion Commit: `2845ebdf57ff26c62539a8516499ed7d29caa228` (PR #607 implementation merge).
-This is implementation evidence only; the iteration remains Review while required human and
-production-source acceptance rows remain open.
+This is implementation evidence. I287 subsequently merged the authoritative session/revision-bound
+source and recorded native current/stale/unavailable evidence; the iteration remains Review / Partial
+for explicit residual rows, with Delivery fail-closed when evidence is unavailable or stale.
 
 ## Merge Checkpoint — 2026-09-24
 

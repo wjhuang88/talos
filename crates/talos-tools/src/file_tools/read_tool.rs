@@ -247,4 +247,46 @@ impl AgentTool for ReadTool {
             talos_core::tool::ToolResultProjection::shared(result.content.clone())
         }
     }
+
+    fn model_private_tokens(&self, result: &talos_core::tool::ToolResult) -> Vec<String> {
+        if self.snapshots.is_none() || result.is_error {
+            return Vec::new();
+        }
+        let mut lines = result.content.lines();
+        let Some(id) = lines
+            .next()
+            .and_then(|header| {
+                header
+                    .strip_prefix("[snapshot:")
+                    .and_then(|value| value.strip_suffix(']'))
+            })
+            .filter(|id| !id.is_empty() && id.bytes().all(|byte| byte.is_ascii_alphanumeric()))
+        else {
+            return Vec::new();
+        };
+        // The handle itself is private as well as its display header. Restrict
+        // the bare-token form to the registry's `s<8-hex><base36>` shape so
+        // ordinary prose is never treated as a snapshot identifier.
+        let handle_is_valid = id.len() >= 10
+            && id.starts_with('s')
+            && id[1..9].bytes().all(|byte| byte.is_ascii_hexdigit())
+            && id[9..].bytes().all(|byte| byte.is_ascii_alphanumeric());
+        let mut tokens = vec![format!("[snapshot:{id}]")];
+        if handle_is_valid {
+            tokens.push(id.to_owned());
+        }
+        for line in lines {
+            if let Some((anchor, _)) = line.split_once('|')
+                && let Some((number, code)) = anchor.split_once(':')
+                && !number.is_empty()
+                && number.bytes().all(|byte| byte.is_ascii_digit())
+                && code.len() == 2
+                && code.bytes().all(|byte| byte.is_ascii_hexdigit())
+            {
+                tokens.push(anchor.to_owned());
+                tokens.push(format!("{anchor}|"));
+            }
+        }
+        tokens
+    }
 }

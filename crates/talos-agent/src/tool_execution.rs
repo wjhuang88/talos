@@ -20,6 +20,7 @@ use tokio::sync::mpsc;
 
 use crate::compression::BashOutputCompressor;
 use crate::permission_pipeline::PermissionAuthorizationRequest;
+use crate::transient_text::PrivateTokens;
 use crate::{
     Agent, AgentError, AgentResult, MAX_CONCURRENT_READ_ONLY, PendingToolCall,
     SandboxFallbackContext, SandboxFallbackDecision, SandboxFallbackPolicy,
@@ -33,6 +34,7 @@ impl Agent {
     /// sandbox execution (for bash tools), and direct execution.
     ///
     /// Results are returned in the same order as the input calls.
+    #[allow(clippy::too_many_arguments)]
     pub(crate) async fn execute_tools_with_presentation(
         &self,
         hook_ctx: &HookContext,
@@ -40,6 +42,7 @@ impl Agent {
         user_intent: Option<&str>,
         policy: &ToolPresentationPolicy,
         presented_tool_names: &std::collections::HashSet<String>,
+        private_tokens: &PrivateTokens,
     ) -> AgentResult<(Vec<ToolExecutionResult>, Vec<ContentPart>)> {
         if calls.is_empty() {
             return Ok((Vec::new(), Vec::new()));
@@ -105,6 +108,7 @@ impl Agent {
                                 policy,
                                 presented_tool_names,
                                 quota,
+                                private_tokens,
                             )
                             .await;
                         (idx, result)
@@ -130,6 +134,7 @@ impl Agent {
                     policy,
                     presented_tool_names,
                     &read_image_quota,
+                    private_tokens,
                 )
                 .await?;
             results[idx] = Some(result);
@@ -252,6 +257,7 @@ impl Agent {
         user_intent: Option<&str>,
         policy: &ToolPresentationPolicy,
         presented_tool_names: &std::collections::HashSet<String>,
+        private_tokens: &mut PrivateTokens,
     ) -> AgentResult<(Vec<ToolExecutionResult>, Vec<ContentPart>)> {
         let mut seen: std::collections::HashSet<(String, String)> =
             std::collections::HashSet::new();
@@ -267,7 +273,9 @@ impl Agent {
         let mut all_parts: Vec<ContentPart> = Vec::new();
         let read_image_quota = std::sync::atomic::AtomicUsize::new(0);
         for pending in deduped {
-            let _ = event_tx.send(self.tool_call_event(&pending.call, &pending.provenance));
+            let mut visible_call = pending.call.clone();
+            private_tokens.project_value(&mut visible_call.input);
+            let _ = event_tx.send(self.tool_call_event(&visible_call, &pending.provenance));
 
             let (result, parts) = self
                 .execute_single_tool_with_presentation(
@@ -278,11 +286,17 @@ impl Agent {
                     policy,
                     presented_tool_names,
                     &read_image_quota,
+                    private_tokens,
                 )
                 .await?;
             all_parts.extend(parts);
-            let projected_call = self.project_tool_call(&pending.call);
-            let projected_result = self.project_tool_result(&pending.call.name, &result);
+            if let Some(tool) = self.tools.get(&pending.call.name) {
+                private_tokens.extend(tool.model_private_tokens(&result));
+            }
+            let mut projected_call = self.project_tool_call(&pending.call);
+            private_tokens.project_value(&mut projected_call.input);
+            let mut projected_result = self.project_tool_result(&pending.call.name, &result);
+            projected_result.content = private_tokens.project(&projected_result.content);
             let observation = ToolObservation {
                 call: projected_call.clone(),
                 result: projected_result.clone(),
@@ -325,7 +339,7 @@ impl Agent {
                 });
             let ui_result = MessageToolResult {
                 tool_use_id: observed.call.id.clone(),
-                content: projection.display_content,
+                content: private_tokens.project(&projection.display_content),
                 is_error: observed.result.is_error,
             };
             let llm_result = if observed.result.is_error {
@@ -368,9 +382,11 @@ impl Agent {
         policy: &ToolPresentationPolicy,
         presented_tool_names: &std::collections::HashSet<String>,
         read_image_quota: &std::sync::atomic::AtomicUsize,
+        private_tokens: &PrivateTokens,
     ) -> AgentResult<(ToolExecutionResult, Vec<ContentPart>)> {
         let original_call = call.clone();
-        let projected_call = self.project_tool_call(call);
+        let mut projected_call = self.project_tool_call(call);
+        private_tokens.project_value(&mut projected_call.input);
         let effective_call = match self
             .run_hook(
                 hook_ctx,
@@ -491,11 +507,12 @@ impl Agent {
         let mut authorizations: Option<Vec<ToolExecutionAuthorization>> = None;
         let permission_allowed = if let Some(pipeline) = self.permission_pipeline.as_deref() {
             let permission_deadline_at = tokio::time::Instant::now() + self.permission_deadline;
-            let permission_call = ToolCall {
+            let mut permission_call = ToolCall {
                 id: call.id.clone(),
                 name: call.name.clone(),
                 input: crate::permission_pipeline::project_permission_input(&call.input),
             };
+            private_tokens.project_value(&mut permission_call.input);
             for event in [
                 HookEvent::OnToolCallProposed {
                     call: &permission_call,
@@ -537,12 +554,14 @@ impl Agent {
             }
 
             let working_directory = tool.execution_working_directory();
+            let mut presentation_input = tool.project_input(&call.input);
+            private_tokens.project_value(&mut presentation_input);
             let authorization_request = PermissionAuthorizationRequest {
                 tool_name: &call.name,
                 provenance: tool.provenance(),
                 profile: &permission_profile,
                 input: &call.input,
-                presentation_input: tool.project_input(&call.input),
+                presentation_input,
                 summary_fields: tool
                     .summary_fields()
                     .iter()
@@ -773,8 +792,14 @@ impl Agent {
 
         self.execution_ledger.complete(hook_ctx.turn_id, &call);
 
-        let projected_call = self.project_tool_call(&call);
-        let projected_result = self.project_tool_result(&call.name, &result);
+        let mut private_tokens = private_tokens.clone();
+        if let Some(tool) = registry.get(&call.name) {
+            private_tokens.extend(tool.model_private_tokens(&result));
+        }
+        let mut projected_call = self.project_tool_call(&call);
+        private_tokens.project_value(&mut projected_call.input);
+        let mut projected_result = self.project_tool_result(&call.name, &result);
+        projected_result.content = private_tokens.project(&projected_result.content);
         let original_result = result;
         let result = match self
             .run_hook(

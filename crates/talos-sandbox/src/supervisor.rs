@@ -578,7 +578,7 @@ mod tests {
         )
         .await
         .expect_err("leader still running");
-        assert!(result.to_string().contains("timed out"));
+        assert!(result.to_string().contains("timed out"), "{result:?}");
         cleanup.wait(Duration::from_secs(1)).await.expect("receipt");
         assert!(!directory.path().join("forbidden").exists());
     }

@@ -118,6 +118,12 @@ pub trait AgentTool: Send + Sync {
         ToolResultProjection::shared(result.content.clone())
     }
 
+    /// Returns concrete transient strings that may appear only in the active
+    /// provider context and must be removed from observer projections.
+    fn model_private_tokens(&self, _result: &ToolResult) -> Vec<String> {
+        Vec::new()
+    }
+
     /// Returns whether this tool is read-only (does not modify external state).
     ///
     /// The default implementation returns `false`. Override for tools that

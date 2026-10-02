@@ -76,6 +76,21 @@ Revisit if a durable workflow proves it must replay transient coordination state
 rebuild. Any replacement must define expiry, authority, redaction, and migration without weakening
 the permission pipeline or changing TLOG format implicitly.
 
+## Implementation clarification — 2026-10-03 (I287)
+
+`AgentTool::model_private_tokens(&ToolResult) -> Vec<String>` is an additive default method
+returning no tokens for existing implementers. A tool that issues transient coordination values
+declares their concrete strings here as well as providing its normal result projection. This
+covers a model quoting those values later in prose, reasoning, another tool's arguments or result.
+The Agent applies the active turn's declarations to observer and persistence copies, including
+stream chunks and hook/approval presentation. It does not rewrite provider messages, signed
+reasoning, permission evaluation input or actual tool execution arguments. No transcript migration
+is required; existing third-party tools compile without implementing the new method.
+
+Declarations are exact strings, not general syntax patterns or secret discovery. Tools should
+declare only their own transient values; arbitrary short prose fragments would redact legitimate
+content. Snapshot-aware read declares the complete header, generated handle and line anchors.
+
 ## Related
 
 - ADR-039 Runtime Event Semantic Single-Flow Boundary
