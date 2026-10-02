@@ -1,6 +1,6 @@
 # Iteration I284: Desktop Durable Tasks And Evidence
 
-> Document status: Review — Partial; implementation and authoritative evidence source merged
+> Document status: Complete / Closed
 > Plan date: 2026-09-22
 > Target window: 2026-10-06 to 2026-10-12
 > Planned objective: A Desktop user can reopen a saved conversation and inspect real work status, changes and revision-bound evaluation evidence.
@@ -11,7 +11,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | DESKTOP-001-D6 / I284: Desktop Durable Tasks And Evidence |
@@ -22,7 +22,7 @@
 | Authorization Evidence | I283/D5 implementation and governance closeout merged as `81a5d27c`; I284 is the next serial child |
 | Implementation PR | #607 merged at exact head `1fc73c2e`; merge commit `2845ebdf` |
 | Last Updated | 2026-09-24 |
-| Handoff / Release Condition | Technical implementation and I287 evidence source merged; retain Review / Partial for recorded residuals; no release |
+| Handoff / Release Condition | Implementation, I287 source/privacy correction and H4/H6 evidence complete; no release |
 
 ## Published Baseline
 
@@ -325,3 +325,17 @@ evaluation and emits no late verdict; the production no-authority path returns o
 structured result. Desktop tests passed 102/102 after correcting the no-authority double-request
 regression. This does not change the production-source gap: current session-bound criteria,
 workspace revision and evidence are still unavailable.
+
+## Final Owner Closeout — 2026-10-03
+
+Completion Commit: `2845ebdf57ff26c62539a8516499ed7d29caa228`,
+`f0e16e857ea76caa7c386fac5006b9f53a86d67a`,
+`8f795d653aeebb8a2f78f30a70115bcc7358adfd` (implementation
+merges #607, #631 and #634). I287 supplies the Runtime-owned, session/revision-bound
+production evidence source; H4 restart, isolation and no-replay and H6 current,
+restart-unavailable and changed-file-stale states were observed natively. The
+ADR-045 transient-token projection residual was corrected and passed exact-head
+CI/security/API review in #634. Earlier gap statements above remain historical.
+No durable Mission evaluation store or successful Mission Delivery is claimed;
+absence of current evidence still blocks Delivery. I277 device/accessibility rows
+remain separately deferred.

@@ -5,7 +5,7 @@
 | Story ID | DESKTOP-001 |
 | Type | Product / Architecture Spike |
 | Priority | P3 |
-| Status | Parent Deferred / Unclaimed; D6/I284 Review / Claimed; D7/I285 Review / Claimed; MISSION-UX Refinement / Unclaimed |
+| Status | Parent Deferred / Unclaimed; D4-D7/I282-I285 Complete; MISSION-UX Refinement / Unclaimed |
 | Source | [GitHub Issue #29](https://github.com/wjhuang88/talos/issues/29) |
 | Selected Iteration | Parent not directly activated; planned children I282-I285 |
 | Depends On | RUNTIME-001 reusable runtime API; Work Graph/evaluation prerequisite; SESSION-009 for later multi-client behavior; permission and distribution decisions |
@@ -51,6 +51,17 @@ execution truth is I284 Review / Claimed after PR #607 merge `2845ebdf`; I285 Re
 #608 merge `e1a89a1b`. D8 is recorded as Refinement / Unclaimed in
 [`DESKTOP-001-MISSION-UX`](DESKTOP-001-mission-first-desktop-workflow.md), a possible successor after
 I285 disposition and shared API mapping; it is not selected or activated.
+
+### Four-Week Child Closeout — 2026-10-03
+
+D4-D7/I282-I285 and I286/I287 are Complete for the scoped local development
+candidate. PR #634 merged as `8f795d65`, closing the observed ADR-045
+transient-projection residual after exact-head CI and independent Agent-role
+security/API review. H1-H6 native observations and limits are recorded in the
+[four-week task](../../tasks/2026-09-22-desktop-four-week-delivery.md).
+The parent remains Deferred / Unclaimed: Mission-first workflow and high-fidelity
+design work are owned by MISSION-UX, and I277 device/accessibility rows remain
+deferred in #29. Child closeout does not complete the entire Desktop product.
 
 ## Identity / Goal / Value — Preserved Product Direction
 

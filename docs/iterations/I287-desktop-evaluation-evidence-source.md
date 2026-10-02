@@ -1,6 +1,6 @@
 # I287 — Desktop Evaluation Evidence Source
 
-> Document status: Review / Partial
+> Document status: Complete / Closed
 > Planned objective: Provide a production-authoritative, session-bound Evaluation evidence source so Desktop distinguishes missing, stale and current evidence and gates Delivery without fabricated PASS results.
 
 ## Scope
@@ -31,7 +31,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | `codex / single maintainer` |
 | Work Slice | Runtime-owned session-bound Evaluation evidence producer, bounded workspace revision, Desktop projection wiring and H6 validation; no durable Mission/Evaluation schema |
@@ -40,8 +40,8 @@
 | Governance Claim PR | Direct commit 7d405136 |
 | Authorization Mode | Direct commit |
 | Authorization Evidence | Maintainer accepted ADR-084 contract on 2026-09-30 |
-| Implementation PR | Direct-to-main implementation commits `80b2b806`, `c266aaf3`, `d24147d9`, `b122067d`, `b94407c5`, `cff9fbef`, `b6e63d85` |
-| Last Updated | 2026-09-30 |
+| Implementation PR | Initial commits through `b6e63d85`; #631 merged as `f0e16e85`; #634 merged as `8f795d65` |
+| Last Updated | 2026-10-03 |
 | Handoff / Release Condition | Implementation merge plus independent security/API review and native H6 evidence |
 
 ADR-084 is the accepted production contract for this slice. Implementation starts locally from the
@@ -508,3 +508,42 @@ both governance validators and both external Runtime SDK fixtures. This validate
 candidate, but does not establish the root cause of the earlier sandbox timing failure; recurrence
 remains a diagnostic risk. The stable commit, exact-head CI/review and owner-first closeout remain
 pending.
+
+### Final owner closeout — 2026-10-03
+
+Completion Commit: `f0e16e857ea76caa7c386fac5006b9f53a86d67a`,
+`8f795d653aeebb8a2f78f30a70115bcc7358adfd` (implementation merges #631 and #634).
+PR #634 exact head `308ba7d49a08e4bff5924109ddd72383b4c9b663` against
+`c62c8f4d5d3c27090aa4cce092cabd7385005f16` passed all six CI jobs in run
+`37043830735`. Independent Agent-role security/API review approved that exact
+head/base with no blocker in PR comment `5958202669`; it is not a separate human
+account review. Merge-time CAS confirmed unchanged head/base, green jobs, no
+blocking feedback and no production-file overlap with other open PRs. #628/#629
+touch Board/Backlog derived views only and require union-preserving updates.
+
+The correction filters declared transient read handles/anchors from streamed and
+stored observer projections, hooks and approval presentation without changing the
+provider's private context, permission evaluation or tool execution arguments.
+Local Agent tests passed 426/426, Tools tests 110/110, full release preflight,
+format, Clippy and both governance validators passed. The existing H6 native
+current, restart-unavailable and changed-file-stale observations remain valid;
+no additional Mission-level Delivery success is claimed. Earlier sandbox timing
+failure root cause is unknown and is retained as a diagnostic risk, not an I287
+acceptance claim. I277 deferred device/accessibility checks remain separate.
+
+### Closeout validation supplement — 2026-10-03
+
+The regression `approval_projection_redacts_private_tokens_without_changing_execution`
+exercises the actual Agent Ask -> resolver -> ApproveOnce path after a private-token
+read. It asserts exactly one approval, redacted nested coordination fields,
+unchanged ordinary path/content and original arguments at execution. This closes
+the coverage gap left by the read-only cross-tool projection fixture; the focused
+locked test and full Agent suite (427/427) passed. No production behavior was
+changed by this supplement. Independent Agent-role incremental review approved
+the test and evidence supplement; exact-head candidate gates remain required.
+
+#634 changed approval presentation and observer/persistence projections, not the
+permission authority or Desktop layout/buttons. Prior H1-H6 native observations
+are reused alongside affected-path automatic tests; they are not described as a
+complete native rerun at the final head. Some earlier screenshots lack an exact
+binary SHA, as recorded in I285. This evidence limitation remains explicit.

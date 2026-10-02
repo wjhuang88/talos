@@ -1,6 +1,6 @@
 # Iteration I282: Live Runtime Desktop Host
 
-> Document status: Review — Claimed; H1/H5 evidence recorded, final owner reconciliation pending
+> Document status: Complete / Closed
 > Plan date: 2026-09-22
 > Target window: 2026-09-22 to 2026-09-28
 > Planned objective: A runnable live Desktop task streams real configured-provider output and can be cancelled without blocking the UI.
@@ -11,7 +11,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | DESKTOP-001-D4 / I282: live Desktop Runtime host, provider output, cancellation and host lifecycle; no tools |
@@ -101,8 +101,19 @@ CI: run `35766202595`, all jobs passed; implementation merge commit: `aaa4c015`.
 Completion Commit: `aaa4c015` (implementation merge; H1/H5 evidence recorded in the four-week ledger, final owner reconciliation pending).
 Only already-existing implementation/evidence commits may close this iteration.
 
+## Final Owner Closeout — 2026-10-03
+
+Completion Commit: `aaa4c015` (I282 implementation merge); H1 provider error/timeout
+presentation and recovery were subsequently accepted under I286, while H5 Chinese
+IME, locale switching and narrow-window layout were observed in the four-week
+acceptance ledger. The debug-injected timeout is not evidence of a real remote
+network timeout. I277's deferred platform/accessibility rows remain separate.
+The I287 transient-projection privacy residual was closed by PR #634 merge
+`8f795d653aeebb8a2f78f30a70115bcc7358adfd` and does not change this
+host's provider, layout or cancellation behavior.
+
 ## Variance And Residuals
 
-Human rows H1/H5 remain open in #29; carry them to I285 without transferring protected security
-gates. I283 may be activated only through its own effective claim and after this owner-first
-review state is recorded.
+H1/H5 are recorded in the four-week ledger and reconciled in the final closeout
+above. I277's deferred device/accessibility acceptance remains in #29; this
+completion does not claim those observations or authorize a release.

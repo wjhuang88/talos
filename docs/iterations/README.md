@@ -13,23 +13,23 @@ That snapshot is historical evidence and not current activation authority.
 
 Current cycle (2026-09-22): [four-week Desktop delivery](../tasks/2026-09-22-desktop-four-week-delivery.md),
 I282-I285 implementations and I286/I287 follow-ups are merged; H1-H6 observations are recorded.
-I284/I285/I287 remain Review / Partial for the ADR-045 prose-disclosure investigation and final
-owner reconciliation, not a missing Evaluation source or Mission-success requirement. The task records the
+I282/I284/I285/I287 owners record Complete after #634 closed the ADR-045 projection residual
+at merge `8f795d65` with exact-head CI/review. The task records the
 non-terminal inventory: I277 remains Review with deferred checks in #29, I249 stays deferred Planned,
 I164 stays Paused; I162's recorded review outcome is terminal. MODEL-007 is deferred behind Desktop.
 
 | Iteration | Target | State / activation gate |
 |---|---|---|
-| [I282](I282-live-runtime-host.md) | Sep 22-28: real model task and host lifecycle | Review; implementation merged, H1/H5 recorded; final owner reconciliation pending |
+| [I282](I282-live-runtime-host.md) | Sep 22-28: real model task and host lifecycle | Complete / Closed; implementation `aaa4c015`, H1/H5 recorded |
 | [I283](I283-live-tools-and-approval.md) | Sep 29-Oct 5: tools and scoped approvals | Complete; merged `93c8b357`; H2/H3 observations recorded in four-week ledger |
-| [I284](I284-durable-task-and-evidence.md) | Oct 6-12: resume and evidence | Review / Partial; PR #607 merged as `2845ebdf`; I287 source and H4/H6 evidence recorded; privacy residual and reconciliation pending |
-| [I285](I285-desktop-integrated-acceptance.md) | Oct 13-19: integrated candidate and acceptance | Review / Partial; implementation #609 merged as `422729ca`; CI `36535972702` and review `5885650377` passed; ADR-045 privacy residual and reconciliation pending |
+| [I284](I284-durable-task-and-evidence.md) | Oct 6-12: resume and evidence | Complete / Closed; `2845ebdf`, I287 source and H4/H6 recorded; privacy correction `8f795d65` |
+| [I285](I285-desktop-integrated-acceptance.md) | Oct 13-19: integrated candidate and acceptance | Complete / Closed; `422729ca`, H1-H6 and #634 CI/review recorded |
 | [I286](I286-desktop-provider-error-injection-contract.md) | Follow-up: safe provider failure evidence | Complete / Closed; implementation merged as `c97f35b9`; H1 native evidence recorded 2026-09-30 |
-| [I287](I287-desktop-evaluation-evidence-source.md) | Follow-up: authoritative Evaluation evidence | Review / Partial; PR #631 merged as `f0e16e85`; exact-head CI `36792450056` and independent approval `5921753941`; H6 observed, ADR-045 prose-disclosure investigation remains |
+| [I287](I287-desktop-evaluation-evidence-source.md) | Follow-up: authoritative Evaluation evidence | Complete / Closed; #631/#634 merged as `f0e16e85`/`8f795d65`; H6 observed, exact-head CI/security/API review passed |
 
 DESKTOP-001-MISSION-UX is a Refinement / Unclaimed successor candidate for the Mission-first workflow and
-high-fidelity design implementation. It is not an iteration and is not activated while I285's
-acceptance/status disposition remains open.
+high-fidelity design implementation. It is not an activated iteration; shared API mapping
+and a separate effective claim remain required.
 
 Completed cycle (2026-09-20): [I278 root Plugin source delivery](I278-root-plugin-source-delivery.md)
 is Complete / Closed through #576 merge `1e5a8592`, with exact-head CI, independent review and
