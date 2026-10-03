@@ -23,7 +23,7 @@ I286 closed H1 and I287's authoritative source merged as `f0e16e85` with exact-h
 I282/I284/I285/I287 owners now record Complete after #634 privacy correction merged as
 `8f795d65` with all six CI jobs and independent Agent-role review passed. Mission-level Delivery
 success is not an additional H6 requirement; I277 deferred device rows are non-blocking. MODEL-007 is
-deferred behind Desktop. Locale follow-up #590 is Complete / Closed via PR #640 (`9bb565e0`).
+deferred behind Desktop. Locale follow-up #590 is Review / Claimed; phase 1 merged via PR #640 (`9bb565e0`), I291 owns remaining acceptance.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
@@ -105,7 +105,7 @@ I277's deferred acceptance stays recorded; it does not reactivate mock developme
 | Week 4: integrated acceptance | Complete / Closed; scoped development candidate | [I285](iterations/I285-desktop-integrated-acceptance.md) | Implementation `422729ca`; H1-H6 and #634 CI/review recorded; no release |
 | Desktop H1 provider failure evidence | Complete / Closed; implementation merged as `c97f35b9` | [I286](iterations/I286-desktop-provider-error-injection-contract.md) | Debug-only implementation and native H1 evidence complete; I287/H6 remains separate |
 | Desktop H6 Evaluation evidence source | Complete / Closed | [I287](iterations/I287-desktop-evaluation-evidence-source.md) | #631/#634 merged as `f0e16e85`/`8f795d65`; native H6, exact-head CI and Agent-role security/API review passed |
-| I288 Search architecture audit / SEARCH-001-A | Complete / Claimed | [I288](iterations/I288-search-architecture-audit.md) / [SEARCH-001-A](backlog/active/SEARCH-001-A-architecture-migration-contract.md) / #625 | ADR-085 accepted; PR #629 merged as `4567bf85`; B/C/D are separately unclaimed follow-up owners. |
+| I288 Search architecture audit / SEARCH-001-A | Active / Claimed proposed; ineffective until #627 merges | [I288](iterations/I288-search-architecture-audit.md) / [SEARCH-001-A](backlog/active/SEARCH-001-A-architecture-migration-contract.md) / #625 | #627 is governance-only; exact-head CI, both governance validators and merge-time CAS required. Parallel scope is architecture-only and must not overlap DEPENDENCY-003-A/Desktop residuals. |
 | TUI history return to bottom | Complete / Closed | [I289](iterations/I289-tui-history-return-to-bottom.md) / [TUI-062](backlog/active/TUI-062-history-return-to-bottom.md) | #628 merged 1226f313; full preflight, six CI checks, Agent review and native acceptance passed. |
 
 Product/design conformance gap found in the live host: Mission shaping and confirmed-plan flow plus
@@ -200,7 +200,7 @@ as Refinement / Unclaimed, outside I285; no activation until I285 is disposition
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
 | Frame-aware browser contract / #618 | Intake / Unclaimed | [WEB-007-F](backlog/active/WEB-007-F-frame-aware-contract.md) | Independent API/security acceptance, runnable iteration selection and effective claim before implementation. |
-| SEARCH-001 global zero-config web search / #624 | Intake / Unclaimed; not selected | [SEARCH-001](backlog/active/SEARCH-001-zero-config-global-search.md) / [SEARCH-001-A](backlog/active/SEARCH-001-A-architecture-migration-contract.md) | A is complete with ADR-085 accepted; B #642, C #643 and D #644 are dependency-ready but remain separately unclaimed. |
+| SEARCH-001 global zero-config web search / #624 | Intake / Unclaimed; not selected | [SEARCH-001](backlog/active/SEARCH-001-zero-config-global-search.md) / [SEARCH-001-A](backlog/active/SEARCH-001-A-architecture-migration-contract.md) | Architecture child #625 requires normal selection and effective claim; accepted ADR precedes later implementation; no active Board work. |
 | See owner documents and Product Backlog for the full retained historical and future inventory. | Reference | [Product Backlog](backlog/PRODUCT-BACKLOG.md) | Owner docs remain authoritative. |
 
 ## I169 Closeout (2026-08-06)
@@ -212,7 +212,7 @@ as Refinement / Unclaimed, outside I285; no activation until I285 is disposition
 
 ## Auto Review Locale — 2026-10-03
 
-AUTO-UX-001 / #590: I290 Planned / Unclaimed, claim Pending. Owner:
+AUTO-UX-001 / #590: I290 Review / Claimed; I291 follow-up proposed. Owner:
 [Story](backlog/active/AUTO-UX-001-review-language.md),
 [iteration](iterations/I290-auto-review-conversation-locale.md). #630 remains a historical
 draft; no completion or permission-policy authority is claimed.

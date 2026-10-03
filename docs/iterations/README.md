@@ -22,9 +22,14 @@ are recorded in I289; it does not claim a retrospective selection preflight.
 ## Auto Review Locale Recovery — 2026-10-03
 
 [I290](I290-auto-review-conversation-locale.md) / AUTO-UX-001 proposes a bounded locale
-implementation slice for #590. Claim is Pending and ineffective until governance merge;
+implementation slice for #590. Phase 1 claim and implementation are merged; product completion remains pending I291;
 #630 is historical draft evidence only. I290 records selection inventory, compatibility
 and localization responsibilities before rebuilt implementation.
+
+
+## Auto Review Locale Product Follow-up — 2026-10-03
+
+[I291](I291-auto-review-locale-product-followup.md) is the corrective product-acceptance slice for #590. It owns session-level evidence aggregation, extensible language detection, compatibility-preserving API integration, and the deterministic acceptance matrix. No permission semantics, GPUI version, or release behavior changes are authorized.
 
 ## Lifecycle
 

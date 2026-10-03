@@ -1,6 +1,6 @@
 # Iteration I290: Auto Review Conversation Locale
 
-> Document status: Complete
+> Document status: Review
 > Published plan date: 2026-10-03
 > MVP deliverable: Auto review effect summaries and human decision prompts follow locally detected conversation language, with deterministic configured UI-locale fallback.
 
@@ -24,7 +24,7 @@ This is recovery-time evidence, not a retrospective preflight for the September 
 | I277 | Review, remaining acceptance Deferred | Retain device/human checks in #29 |
 | I288 | Active / Claimed, #627 already merged | Keep architecture-only search scope and #629 separate; stale proposed wording is unrelated drift |
 | I289 | Complete / Closed | Preserve #628/#638 completion evidence |
-| I290 | Complete / Closed | No implementation authority until governance merge |
+| I290 | Review / Claimed | Phase 1 implementation merged; I291 owns remaining product acceptance |
 
 Current owner headers across all iteration documents were inspected; no additional
 Active/Review/Planned/Blocked iteration was found. Separate DEPENDENCY-003-A Story
@@ -85,6 +85,6 @@ SHA; the claim/status commit is not completion evidence.
 | Handoff / Release Condition | Effective claim merge precedes rebuilt implementation; no release/version/permission-policy change. |
 
 
-## Completion Evidence
+## Phase 1 Evidence
 
-Completion Commit: `9bb565e09f5e0f3de8602183b4a670bf63f0aefc` (PR #640). Exact-head CI run 2961 passed; governance and collaboration validators passed.
+Phase 1 implementation commit: `9bb565e09f5e0f3de8602183b4a670bf63f0aefc` (PR #640). Exact-head CI run 2961 passed. I291 remains required for product completion.
