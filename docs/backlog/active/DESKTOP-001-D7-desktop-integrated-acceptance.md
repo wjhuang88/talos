@@ -1,6 +1,6 @@
 # DESKTOP-001-D7: Desktop Integrated Candidate And Acceptance
 
-> Document status: Review — Partial (implementation and acceptance evidence recorded; residuals remain)
+> Document status: Complete / Closed (four-week development candidate)
 
 | Field | Value |
 |---|---|
@@ -8,7 +8,7 @@
 | Parent Epic | DESKTOP-001 |
 | Type | Desktop integration / behavior Story |
 | Priority | P1 |
-| Status | Review / Partial |
+| Status | Complete / Closed |
 | Selected Iteration | I285 |
 | Source | #29; four-week Desktop task |
 | Depends On | I282-I284 implementation stages merged with technical gates; acceptance ledger in #29 |
@@ -17,7 +17,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | DESKTOP-001-D7 / I285: integrate prior Desktop stages, fix cross-stage acceptance defects including task-page overflow, run reproducible candidate checks and guide/record H1-H6; no new product feature or release |
@@ -77,7 +77,19 @@ New features, retroactive claims of Windows/Linux native or physical latency acc
 Completion Commit: `422729caecdc8e76c7de8217654921723d5a3fdf` (implementation merge).
 I285 activation is effective after governance PR #608 merged as `e1a89a1b25092ad37860314f02d1d212055b9fcc`.
 I286 closed H1 and I287 supplied authoritative current/stale/unavailable Evaluation evidence and
-the fail-closed Delivery gate. The observed assistant-prose snapshot/anchor disclosure in I287
-remains under investigation against ADR-045; final owner reconciliation remains pending.
+the fail-closed Delivery gate. PR #634 resolved the observed assistant-prose
+snapshot/anchor disclosure; the final owner closeout below records its evidence.
 I277 deferred platform/accessibility rows are separate and non-blocking for this cycle.
 Mission-level Delivery success is not an additional acceptance requirement.
+
+## Final Owner Closeout — 2026-10-03
+
+Completion Commit: `422729caecdc8e76c7de8217654921723d5a3fdf`,
+`c97f35b9`, `f0e16e857ea76caa7c386fac5006b9f53a86d67a`,
+`8f795d653aeebb8a2f78f30a70115bcc7358adfd` (merged candidate,
+H1/H6 follow-ups and ADR-045 privacy correction). H1-H6 native evidence is
+recorded in the four-week ledger; #634 passed exact-head CI run
+`37043830735` and independent Agent-role security/API review comment
+`5958202669`. I277 device/accessibility rows remain deferred in #29;
+Mission-first product workflow is a separate unclaimed successor, not a
+claim that this candidate matches that future design.

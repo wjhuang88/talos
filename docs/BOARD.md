@@ -20,8 +20,8 @@ exact-head code CI, independent review and composed UI/test/execution-boundary a
 Next selected plan: [four-week Desktop cycle](tasks/2026-09-22-desktop-four-week-delivery.md),
 I282-I285 implementations are merged. H1-H6 observations are recorded in the four-week ledger;
 I286 closed H1 and I287's authoritative source merged as `f0e16e85` with exact-head CI/review.
-I284/I285/I287 remain Review / Partial pending the observed assistant-prose snapshot/anchor
-disclosure investigation under ADR-045 and final owner reconciliation. Mission-level Delivery
+I282/I284/I285/I287 owners now record Complete after #634 privacy correction merged as
+`8f795d65` with all six CI jobs and independent Agent-role review passed. Mission-level Delivery
 success is not an additional H6 requirement; I277 deferred device rows are non-blocking. MODEL-007 is
 deferred behind Desktop. Locale follow-up #590 remains Refinement/Unclaimed.
 
@@ -99,12 +99,12 @@ I277's deferred acceptance stays recorded; it does not reactivate mock developme
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| Week 1: real Desktop task | Review / implementation merged; H1/H5 deferred | [I282](iterations/I282-live-runtime-host.md) | #29 native rows before Complete |
-| Week 2: tools and approval | Complete; H2/H3 residual | [I283](iterations/I283-live-tools-and-approval.md) | PR #603 merged `93c8b357`; exact-head CI and review passed |
-| Week 3: resume and evidence | Review / Claimed; PR #607 merged as `2845ebdf` from exact head `1fc73c2e`; CI `35959834215` and incremental review passed; H4/native H6 remain open | [I284](iterations/I284-durable-task-and-evidence.md) | #606 activation `4e150b3e`; I285 owns integrated stabilization; H4/H6 stay in #29; I287 source merged as `b6e63d85` |
-| Week 4: integrated acceptance | Review / Partial; implementation #609 merged as `422729ca`; exact-head CI `36535972702` and review `5885650377` passed; native H6 remains open | [I285](iterations/I285-desktop-integrated-acceptance.md) | Required #29 native H6 evidence and owner-first closeout |
+| Week 1: real Desktop task | Complete / Closed; H1/H5 recorded | [I282](iterations/I282-live-runtime-host.md) | Implementation `aaa4c015`; I277 deferred checks separate |
+| Week 2: tools and approval | Complete; H2/H3 observed | [I283](iterations/I283-live-tools-and-approval.md) | PR #603 merged `93c8b357`; exact-head CI and review passed |
+| Week 3: resume and evidence | Complete / Closed; H4/H6 recorded | [I284](iterations/I284-durable-task-and-evidence.md) | Implementation `2845ebdf`; I287 source and privacy correction merged |
+| Week 4: integrated acceptance | Complete / Closed; scoped development candidate | [I285](iterations/I285-desktop-integrated-acceptance.md) | Implementation `422729ca`; H1-H6 and #634 CI/review recorded; no release |
 | Desktop H1 provider failure evidence | Complete / Closed; implementation merged as `c97f35b9` | [I286](iterations/I286-desktop-provider-error-injection-contract.md) | Debug-only implementation and native H1 evidence complete; I287/H6 remains separate |
-| Desktop H6 Evaluation evidence source | Review / Partial | [I287](iterations/I287-desktop-evaluation-evidence-source.md) | PR #631 merged as `f0e16e85`; exact-head CI `36792450056` and independent approval `5921753941`; native current/stale evidence recorded, Mission-level Delivery remains residual in #29 |
+| Desktop H6 Evaluation evidence source | Complete / Closed | [I287](iterations/I287-desktop-evaluation-evidence-source.md) | #631/#634 merged as `f0e16e85`/`8f795d65`; native H6, exact-head CI and Agent-role security/API review passed |
 | I288 Search architecture audit / SEARCH-001-A | Active / Claimed proposed; ineffective until #627 merges | [I288](iterations/I288-search-architecture-audit.md) / [SEARCH-001-A](backlog/active/SEARCH-001-A-architecture-migration-contract.md) / #625 | #627 is governance-only; exact-head CI, both governance validators and merge-time CAS required. Parallel scope is architecture-only and must not overlap DEPENDENCY-003-A/Desktop residuals. |
 
 Product/design conformance gap found in the live host: Mission shaping and confirmed-plan flow plus

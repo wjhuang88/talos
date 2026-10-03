@@ -1,6 +1,6 @@
 # DESKTOP-001-D4: Live Runtime Desktop Host
 
-> Document status: Review — Claimed; H1/H5 evidence recorded, final owner reconciliation pending
+> Document status: Complete / Closed
 
 | Field | Value |
 |---|---|
@@ -8,7 +8,7 @@
 | Parent Epic | DESKTOP-001 |
 | Type | Desktop integration / behavior Story |
 | Priority | P1 |
-| Status | Review / Claimed — H1/H5 evidence recorded; final owner reconciliation pending |
+| Status | Complete / Closed — H1/H5 evidence recorded |
 | Selected Iteration | I282 |
 | Source | #29; four-week Desktop task |
 | Depends On | WORK-001 P0-P4 and I280 complete; ADR-059; explicit host/API readiness map |
@@ -17,7 +17,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | DESKTOP-001-D4 / I282: live Desktop Runtime host, provider output, cancellation and host lifecycle; no tools |
@@ -86,3 +86,11 @@ remains deferred in #29.
 ## Completion Evidence
 
 Completion Commit: `aaa4c015` (implementation merge; H1/H5 evidence recorded in the four-week ledger, final owner reconciliation pending).
+
+## Final Owner Closeout — 2026-10-03
+
+Completion Commit: `aaa4c015` (implementation merge). H1 native configured-provider
+and debug-only synthetic failure/recovery evidence is owned by I286; H5 IME,
+locale and page-layout observations are in the four-week acceptance ledger.
+The synthetic timeout is not a claim about real network timeout behavior.
+I277 device/accessibility rows remain separately deferred.

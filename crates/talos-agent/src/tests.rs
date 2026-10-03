@@ -284,6 +284,128 @@ struct ProjectedMockTool;
 
 struct PrivateEchoTool;
 
+struct ApprovalProjectionProbe {
+    executed: Arc<Mutex<Vec<Value>>>,
+}
+
+#[async_trait]
+impl AgentTool for ApprovalProjectionProbe {
+    fn name(&self) -> &str {
+        "approval_projection_probe"
+    }
+    fn description(&self) -> &str {
+        "Capture approved execution arguments without filesystem effects"
+    }
+    fn parameters(&self) -> Value {
+        serde_json::json!({})
+    }
+    fn is_read_only(&self) -> bool {
+        false
+    }
+    fn permission_profile(&self, input: &Value) -> Vec<ToolPermissionFacet> {
+        vec![ToolPermissionFacet::with_resource(
+            ToolNature::Write,
+            input["path"].as_str().expect("fixture path"),
+            ToolResourceKind::Path,
+        )]
+    }
+    async fn execute(&self, input: Value) -> ToolExecutionResult {
+        self.executed.lock().await.push(input);
+        ToolExecutionResult::success("approved fixture executed")
+    }
+}
+
+struct CaptureApprovalProjection {
+    requests: Arc<Mutex<Vec<PermissionApprovalRequest>>>,
+}
+
+#[async_trait]
+impl ApprovalResolver for CaptureApprovalProjection {
+    async fn resolve(
+        &self,
+        request: PermissionApprovalRequest,
+        _remaining: std::time::Duration,
+    ) -> Result<talos_core::ApprovalChoice, ApprovalResolverError> {
+        self.requests.lock().await.push(request);
+        Ok(talos_core::ApprovalChoice::ApproveOnce)
+    }
+}
+
+#[tokio::test]
+async fn approval_projection_redacts_private_tokens_without_changing_execution() {
+    let root = tempfile::tempdir().expect("workspace");
+    let input = serde_json::json!({
+        "path": root.path().join("approved.txt"),
+        "content": "ordinary content 中文",
+        "coordination": {"snapshot": "s1", "anchor": "1:aa|"}
+    });
+    let mut responses = Vec::new();
+    for (id, name, arguments) in [
+        ("read", "projected_read", serde_json::json!({})),
+        ("approve", "approval_projection_probe", input.clone()),
+    ] {
+        responses.push(vec![
+            AgentEvent::TurnStart,
+            AgentEvent::ToolCall {
+                call: ToolCall {
+                    id: id.into(),
+                    name: name.into(),
+                    input: arguments,
+                },
+                provenance: Default::default(),
+                summary_fields: vec![],
+            },
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::ToolUse,
+                usage: Usage::default(),
+            },
+        ]);
+    }
+    responses.push(vec![AgentEvent::TurnEnd {
+        stop_reason: StopReason::EndTurn,
+        usage: Usage::default(),
+    }]);
+    let executed = Arc::new(Mutex::new(Vec::new()));
+    let requests = Arc::new(Mutex::new(Vec::new()));
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(ProjectedMockTool));
+    registry.register(Arc::new(ApprovalProjectionProbe {
+        executed: executed.clone(),
+    }));
+    let agent = Agent::with_security_and_hooks(
+        Arc::new(MockModel::new(responses)),
+        registry,
+        Some(Arc::new(PermissionEngine::with_workspace_root(
+            root.path().to_path_buf(),
+        ))),
+        None,
+        root.path().to_path_buf(),
+        Arc::new(HookRegistry::new()),
+    )
+    .with_approval_resolver(Arc::new(CaptureApprovalProjection {
+        requests: requests.clone(),
+    }));
+    agent
+        .run("read then approved probe".into())
+        .await
+        .expect("turn succeeds");
+    let requests = requests.lock().await;
+    assert_eq!(
+        requests.len(),
+        1,
+        "must exercise Ask and resolver, not automatic allow"
+    );
+    assert_eq!(requests[0].tool_name, "approval_projection_probe");
+    let mut expected = input.clone();
+    expected["coordination"] = serde_json::json!({"snapshot": "[private]", "anchor": "[private]"});
+    assert_eq!(requests[0].arguments, expected);
+    assert_eq!(
+        *executed.lock().await,
+        vec![input],
+        "execution must retain original arguments"
+    );
+}
+
 #[async_trait]
 impl AgentTool for PrivateEchoTool {
     fn name(&self) -> &str {

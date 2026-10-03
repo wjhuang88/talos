@@ -395,17 +395,21 @@ async fn supervise_io(
         let detail = format!("sandbox process-group cleanup failed: {error}");
         return (Err(failed(&detail)), Some(detail));
     }
-    let cleanup = tokio::time::timeout(CLEANUP_LIMIT, async {
-        let (status, stdout, stderr) = tokio::join!(
-            owner.reap(),
-            stdout.read_to_end(&mut out),
-            stderr.read_to_end(&mut err),
-        );
-        Ok::<_, io::Error>((status?, stdout?, stderr?))
-    })
+    let cleanup = tokio::time::timeout(
+        CLEANUP_LIMIT,
+        finish_cleanup(
+            &mut owner,
+            &mut stdout,
+            &mut stderr,
+            &mut out,
+            &mut err,
+            out_eof,
+            err_eof,
+        ),
+    )
     .await;
     match cleanup {
-        Ok(Ok((status, _, _))) => {
+        Ok(Ok(status)) => {
             let result = match reason {
                 Some(reason) => Err(failed(reason)),
                 None => Ok(Output {
@@ -421,6 +425,41 @@ async fn supervise_io(
             (Err(failed(&detail)), Some(detail))
         }
     }
+}
+
+async fn finish_cleanup(
+    owner: &mut OwnedChild,
+    stdout: &mut (impl AsyncRead + Unpin),
+    stderr: &mut (impl AsyncRead + Unpin),
+    out: &mut Vec<u8>,
+    err: &mut Vec<u8>,
+    mut out_eof: bool,
+    mut err_eof: bool,
+) -> io::Result<std::process::ExitStatus> {
+    let mut out_buf = [0u8; 8192];
+    let mut err_buf = [0u8; 8192];
+    // Keep the exited leader unreaped while pipe-owning descendants may still
+    // be starting. Its pinned ID permits another checked group signal.
+    loop {
+        let leader_exited = owner.observe()?;
+        if leader_exited && out_eof && err_eof {
+            break;
+        }
+        tokio::select! {
+            read = stdout.read(&mut out_buf), if !out_eof => match read {
+                Ok(0) => out_eof = true,
+                Ok(n) => out.extend_from_slice(&out_buf[..n]),
+                Err(error) => return Err(error),
+            },
+            read = stderr.read(&mut err_buf), if !err_eof => match read {
+                Ok(0) => err_eof = true,
+                Ok(n) => err.extend_from_slice(&err_buf[..n]),
+                Err(error) => return Err(error),
+            },
+            _ = tokio::time::sleep(POLL) => owner.terminate_group()?,
+        }
+    }
+    owner.reap().await
 }
 
 #[cfg(test)]
@@ -529,6 +568,45 @@ mod tests {
             .wait(Duration::from_secs(2))
             .await
             .expect("cancel cleanup receipt");
+        tokio::time::sleep(Duration::from_millis(1050)).await;
+        assert!(!directory.path().join("forbidden").exists());
+    }
+
+    #[tokio::test]
+    async fn cleanup_rechecks_owned_group_before_reaping_leader() {
+        let directory = tempfile::tempdir().expect("workspace");
+        let mut owner = test_owner(shell(
+            "(sleep 1; printf late > forbidden) & printf ready > ready; wait",
+            directory.path(),
+        ));
+        let stdout = owner.child.stdout.take().expect("stdout");
+        let stderr = owner.child.stderr.take().expect("stderr");
+        let mut stdout = tokio::process::ChildStdout::from_std(stdout).expect("async stdout");
+        let mut stderr = tokio::process::ChildStderr::from_std(stderr).expect("async stderr");
+        ready(&directory.path().join("ready")).await;
+
+        // Simulate the first cancellation signal racing with a fork and only
+        // reaching the leader. The descendant retains the inherited pipes.
+        // SAFETY: this positive PID belongs to the still-owned, unreaped child.
+        assert_eq!(unsafe { libc::kill(owner.pgid, libc::SIGKILL) }, 0);
+        let mut out = Vec::new();
+        let mut err = Vec::new();
+        tokio::time::timeout(
+            Duration::from_secs(2),
+            finish_cleanup(
+                &mut owner,
+                &mut stdout,
+                &mut stderr,
+                &mut out,
+                &mut err,
+                false,
+                false,
+            ),
+        )
+        .await
+        .expect("bounded cleanup")
+        .expect("group cleanup and reap");
+        assert!(!owner.may_signal);
         tokio::time::sleep(Duration::from_millis(1050)).await;
         assert!(!directory.path().join("forbidden").exists());
     }

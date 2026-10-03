@@ -1,6 +1,6 @@
 # Iteration I285: Desktop Integrated Candidate And Acceptance
 
-> Document status: Review — Partial (implementation merged; H6 native acceptance remains)
+> Document status: Complete / Closed (four-week integrated development candidate)
 > Plan date: 2026-09-22
 > Target window: 2026-10-13 to 2026-10-19
 > Planned objective: A reproducibly built Desktop candidate passes an integrated real-task walkthrough with documented limits and a clean handoff.
@@ -11,7 +11,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | DESKTOP-001-D7 / I285: integrate prior Desktop stages, fix cross-stage acceptance defects including task-page overflow, run reproducible candidate checks and guide/record H1-H6; no new product feature or release |
@@ -286,3 +286,19 @@ with Delivery blocked. Mission-level Delivery success is not a requirement of H6
 is retained for I287's observed assistant-prose snapshot/anchor disclosure investigation under
 ADR-045 and final owner reconciliation, not additional H6 click-through testing. I277's deferred
 device/accessibility rows remain independent and non-blocking for this cycle.
+
+### Final Integrated Owner Closeout — 2026-10-03
+
+Completion Commit: `422729caecdc8e76c7de8217654921723d5a3fdf`,
+`c97f35b9`, `f0e16e857ea76caa7c386fac5006b9f53a86d67a`,
+`8f795d653aeebb8a2f78f30a70115bcc7358adfd` (already-merged
+implementation evidence for integrated candidate, H1, H6 and ADR-045 privacy
+correction). The four-week ledger records native H1-H6 observations; the
+latest H6 confirms current, restart-unavailable and external-change-stale
+Evaluation with fail-closed Delivery. PR #634 passed all six exact-head CI
+jobs in run `37043830735` and independent Agent-role security/API review in
+comment `5958202669`; merge-time CAS passed. The full local preflight and
+affected tests passed before that merge. I277's pre-existing platform,
+accessibility and physical-display rows remain separately deferred in #29.
+The accepted Mission-first workflow/design gap is the unclaimed successor
+DESKTOP-001-MISSION-UX, not a hidden part of this development candidate.

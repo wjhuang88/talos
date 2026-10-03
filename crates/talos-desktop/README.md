@@ -1,7 +1,7 @@
 # Talos Desktop development host
 
-I282-I284 implementation stages are merged; I285 integrated acceptance is in progress.
-These commands describe this development branch, not a released Desktop product.
+I282-I285 and their H1/H6 follow-ups form a validated local development candidate.
+These commands describe the development host, not a released Desktop product.
 
 ## Launch
 
@@ -60,8 +60,9 @@ Choose the original workspace before opening **Recent tasks**, then select **Res
   differences observed around successful built-in `write`, `edit` and `delete` calls, with session,
   turn and tool-call identity. It excludes shell/custom tools, symlinks, paths outside the workspace
   and files larger than 1 MiB; it retains no file contents, does not show a content diff, and prior
-  evidence is unavailable after restart. Evaluation and Delivery remain unavailable without a
-  supported authoritative Runtime evaluation source. A workspace fingerprint alone does not
+  evidence is unavailable after restart. Evaluation is available only when the
+  Runtime can assemble authoritative session/revision-bound criteria and evidence;
+  otherwise Evaluation and Delivery fail closed. A workspace fingerprint alone does not
   validate task completion. I287's ephemeral evidence contract does not require a new persistent
   evaluation store, and cannot restore an old PASS from conversation history after restart.
   Explicit Evaluate requests can supply a separate Runtime-produced observation of authorized,
@@ -141,5 +142,6 @@ Evaluate 评估当前 Goal 输入框中的目标；Send 则启动任务执行。
 并展示有长度限制的模型说明；模型未给出详细说明时会明确提示。这些说明本身不是证据。
 格式错误或未完整返回的报告保持失败，不会自动补成 PASS。
 评估的总时限为 30 秒，包含模型请求派发与响应生成；超时使当前评估失效，交付保持阻止，期间仍可取消。
-工具和权限交互的原生人工验收以及后续阶段仍未闭环，
-不能把截图或单元测试通过视为完整桌面交付。
+本轮 H1-H6 原生人工验收与相应代码门禁已记录在四周任务中；此前延期的
+VoiceOver、Windows/Linux 原生交互等 I277 项仍未验收。这个本地候选也尚未实现
+后续 Mission-first 完整产品流程，不能把截图或单元测试通过视为完整桌面产品交付。

@@ -1,9 +1,9 @@
 # Desktop Four-Week Delivery Task
 
-> Document status: In Progress — T3 / I284 in Review; T4 / I285 Review / Partial; I287 Review / Partial
+> Document status: Complete / Closed — four-week development candidate; I277 deferred checks and successor product work remain separate
 > Plan date: 2026-09-22
 > Target window: 2026-09-22 through 2026-10-19 (four calendar weeks; approximately 20 working days)
-> Execution state: T1-T4 implementation candidates are merged; I285 remains Review / Partial. H1 is assigned to I286 (native debug error/timeout acceptance and implementation closeout complete); H6 is assigned to active I287 (authoritative Evaluation evidence source). This four-week delivery remains Partial and must not be marked Complete.
+> Execution state: T1-T4 and H1/H6 follow-up implementations are merged. H1-H6 native evidence, final I287 privacy correction and exact-head CI/review are recorded below. This closes the scoped development candidate, not the full Desktop product or deferred I277 device checks.
 
 ## Outcome
 
@@ -100,10 +100,10 @@ remain owned residuals and prevent claims of universal accessibility/platform ac
 
 | ID | Window / iteration | Expected output | Depends on | Completion gate | Fallback | Status |
 |---|---|---|---|---|---|---|
-| T1 | Week 1, Sep 22-28 / I282 | Launch a live Desktop task using configured provider; responsive streaming, errors and cancellation; tools unavailable in this initial slice | WORK-001 P0-P4, I280, ADR-059; API map and effective claim | Mock-provider E2E plus real-provider native row; no UI blocking or fictitious results | Keep existing mock explicitly separate; unresolved facade contract becomes a named blocker, never a copied engine | Review / Partial — implementation merged as `aaa4c015`; H1 closed by I286, H5 platform/accessibility residuals remain separate in I277/#29 |
-| T2 | Week 2, Sep 29-Oct 5 / I283 | Real file/shell activity, visible existing Auto review, scoped approval and safe cancellation | T1 merged and technical gates passed | Allow/Deny/Once/Session, stale approval, cancel and shutdown matrix; independent security/API review | Tool execution remains disabled until gates pass; do not ship an auto-allow workaround | Complete — PR #603 merged as `93c8b357`; H2/H3 human residual |
-| T3 | Week 3, Oct 6-12 / I284 | Recent tasks, durable transcript resume, actual work/evaluation and read-only change/evidence views | T2 merged; storage/projection compatibility verified | Restart and session-isolation tests; revision/staleness/Delivery gates; no tool replay | Preserve transcript-only recovery if richer projection cannot persist; explicitly show unavailable evidence and keep unmet acceptance open | Review / Partial — implementation merged as `2845ebdf`; I287 authoritative source merged as `f0e16e85`; H4/H6 evidence is recorded, with fail-closed Delivery and separate remaining residuals |
-| T4 | Week 4, Oct 13-19 / I285 | Reproducible integrated candidate, fixes, user guide and consolidated acceptance report | T1-T3 merged with technical gates passed | Integrated E2E, current-head CI/review, required native rows, documented residuals and clean handoff | Deliver Partial with exact remaining blockers; no fake Complete or unrequested release | Review / Partial; implementation PR #609 merged as `422729ca`; CI `36535972702` and review `5885650377` passed; I286 H1 and I287 H6 evidence are recorded, while I277 deferred platform/accessibility rows and any explicitly listed privacy residual remain separate |
+| T1 | Week 1, Sep 22-28 / I282 | Launch a live Desktop task using configured provider; responsive streaming, errors and cancellation; tools unavailable in this initial slice | WORK-001 P0-P4, I280, ADR-059; API map and effective claim | Mock-provider E2E plus real-provider native row; no UI blocking or fictitious results | Keep existing mock explicitly separate; unresolved facade contract becomes a named blocker, never a copied engine | Complete — implementation `aaa4c015`; H1 closed by I286 and H5 observed; I277 device/accessibility checks stay separate |
+| T2 | Week 2, Sep 29-Oct 5 / I283 | Real file/shell activity, visible existing Auto review, scoped approval and safe cancellation | T1 merged and technical gates passed | Allow/Deny/Once/Session, stale approval, cancel and shutdown matrix; independent security/API review | Tool execution remains disabled until gates pass; do not ship an auto-allow workaround | Complete — PR #603 merged as `93c8b357`; H2/H3 observed |
+| T3 | Week 3, Oct 6-12 / I284 | Recent tasks, durable transcript resume, actual work/evaluation and read-only change/evidence views | T2 merged; storage/projection compatibility verified | Restart and session-isolation tests; revision/staleness/Delivery gates; no tool replay | Preserve transcript-only recovery if richer projection cannot persist; explicitly show unavailable evidence and keep unmet acceptance open | Complete — implementation `2845ebdf`, I287 source `f0e16e85`, privacy correction `8f795d65`; H4/H6 and fail-closed Delivery observed |
+| T4 | Week 4, Oct 13-19 / I285 | Reproducible integrated candidate, fixes, user guide and consolidated acceptance report | T1-T3 merged with technical gates passed | Integrated E2E, current-head CI/review, required native rows, documented residuals and clean handoff | Deliver Partial with exact remaining blockers; no fake Complete or unrequested release | Complete — integrated implementation `422729ca`; I286 H1, I287 H6 and ADR-045 correction merged; H1-H6 ledger and CI/review evidence recorded; I277 residuals separate |
 
 Reserve roughly three days in Week 4 for fixes/retesting and two for acceptance/documentation.
 The dates are planning targets, not autonomous wall-clock scheduling or a guarantee. Each weekly
@@ -472,3 +472,26 @@ This work is not silently added to I285. It is registered as DESKTOP-001-MISSION
 Unclaimed in the existing #29 cycle tracker. MISSION-UX is a successor candidate only after I285's
 acceptance/status is disposed and shared Runtime/Work API readiness is mapped. No additional remote
 Issue or implementation authority is created by this checkpoint.
+
+## Final Four-Week Candidate Closeout — 2026-10-03
+
+Completion Commit: `aaa4c015`, `93c8b357`,
+`2845ebdf57ff26c62539a8516499ed7d29caa228`,
+`422729caecdc8e76c7de8217654921723d5a3fdf`, `c97f35b9`,
+`f0e16e857ea76caa7c386fac5006b9f53a86d67a`,
+`8f795d653aeebb8a2f78f30a70115bcc7358adfd` (already-merged
+implementation evidence for T1-T4, H1/H6 and ADR-045 privacy correction).
+The H1-H6 ledger above records native observations and their limits. #634 exact
+head `308ba7d49a08e4bff5924109ddd72383b4c9b663` passed all six CI jobs
+in run `37043830735`; an independent Agent-role security/API review approved
+that head/base in comment `5958202669`. Merge-time CAS passed before merge
+`8f795d65`. The local full release preflight, 426 Agent tests, 110 Tools tests,
+format, Clippy and both governance validators passed for the final code stage.
+
+This is a usable local single-client development candidate, not a signed release
+or a claim of complete Mission-first product behavior. I277's previously deferred
+VoiceOver, reduced-motion, Windows/Linux native and physical-display measurements
+remain owned in #29 and are not marked passed. The separately registered
+DESKTOP-001-MISSION-UX successor retains the Mission shaping/design-fidelity gap;
+#308 presets and other baseline exclusions also remain outside this cycle.
+Earlier Partial checkpoints above remain historical, not current status.
