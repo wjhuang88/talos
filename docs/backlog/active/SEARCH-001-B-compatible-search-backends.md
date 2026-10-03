@@ -1,6 +1,6 @@
 # SEARCH-001-B: Compatible SearchBackend Boundary
 
-**Status**: Planned / Unclaimed
+**Status**: Active / Claimed
 **Type**: Implementation / Compatibility
 **Parent Epic**: [SEARCH-001](SEARCH-001-zero-config-global-search.md) / [Issue #624](https://github.com/wjhuang88/talos/issues/624)
 
@@ -17,16 +17,16 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | None; compatibility boundary is dependency-ready but unclaimed |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | GPT-6 Sol / talos开发 session |
+| Work Slice | SEARCH-001-B compatibility boundary and adapter characterization; no router behavior change |
+| Claimed At | 2026-10-03 |
 | Source Issue | #642 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
-| Handoff / Release Condition | Select a bounded iteration and establish an effective claim before implementation |
+| Governance Claim PR | #651 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Governance-only claim+activation PR #651; exact-head CI, both governance validators and merge-time CAS required. |
+| Handoff / Release Condition | Claim and I291 activation become effective only after #651 merges; implementation PR follows from that merge. |
 
 ## Goal
 

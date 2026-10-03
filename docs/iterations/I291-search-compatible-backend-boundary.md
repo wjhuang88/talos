@@ -1,6 +1,6 @@
 # Iteration I291: Search Compatible Backend Boundary
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-10-03
 > Planned objective: Implement SEARCH-001-B's private SearchBackend compatibility boundary without changing production search behavior.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -10,15 +10,15 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | GPT-6 Sol / talos开发 session |
 | Work Slice | SEARCH-001-B compatibility boundary only; no router behavior change |
-| Claimed At | Not applicable |
+| Claimed At | 2026-10-03 |
 | Source Issue | #642 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #651 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Governance-only claim+activation PR #651; exact-head CI, both governance validators and merge-time CAS required. |
 | Implementation PR | Not started |
 | Last Updated | 2026-10-03 |
 | Handoff / Release Condition | Atomic claim+activation before implementation |
@@ -74,7 +74,7 @@
 
 | Date | Type | Record |
 |---|---|---|
-| 2026-10-03 | Planned | Selected after ADR-085 acceptance; claim and activation remain ineffective until the finalized governance PR merges. |
+| 2026-10-03 | Atomic claim+activation proposal | PR #651 proposes the bounded B/I291 claim and Active state; both remain ineffective until the finalized exact head reaches `main`. |
 
 ## Verification Evidence
 

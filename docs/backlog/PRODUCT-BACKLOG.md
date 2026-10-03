@@ -192,6 +192,7 @@ Required reads:
 ## Refinement / Blocked Items
 
 - **Zero-config global web search / [SEARCH-001](active/SEARCH-001-zero-config-global-search.md) / [#624](https://github.com/wjhuang88/talos/issues/624)**: Epic remains Intake / Unclaimed and must stay open through A→I. [SEARCH-001-A](active/SEARCH-001-A-architecture-migration-contract.md) / [#625](https://github.com/wjhuang88/talos/issues/625) is Complete / Claimed in [I288](../iterations/I288-search-architecture-audit.md); ADR-085 was accepted when PR #629 merged as `4567bf85`. Dependency-ready follow-ups are B / #642, C / #643 and D / #644, each Proposed / Unclaimed. No runtime implementation, crate/dependency or default search behavior change is authorized by these planning records. Reuse ADR-072/CAP-001 and NET-001/#199.
+- **SEARCH-001-B / #642** is selected into [I291](../iterations/I291-search-compatible-backend-boundary.md); claim+activation is proposed in governance PR #651 and remains ineffective until merge. The work slice is limited to compatible internal seams and test-only characterization.
 
 The authoritative open-Issue mapping and dispositions are maintained in
 [`docs/reference/ISSUE-DOC-CODE-STATUS-2026-08-01.md`](../reference/ISSUE-DOC-CODE-STATUS-2026-08-01.md).
