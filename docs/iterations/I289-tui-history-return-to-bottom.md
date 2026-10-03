@@ -1,6 +1,6 @@
 # Iteration I289: TUI History Return To Bottom
 
-> Document status: Active
+> Document status: Active (proposed; ineffective until #637 merges)
 > Published plan date: 2026-09-30
 > MVP deliverable: A visible return-to-bottom hint and `Ctrl+Down` action for anchored history.
 
@@ -12,11 +12,11 @@
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | TUI-062 history return-to-bottom prompt and Ctrl+Down routing. |
-| Claimed At | 2026-09-30 |
+| Claimed At | 2026-10-03 |
 | Source Issue | None |
 | Governance Claim PR | #637 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | User requested correction on 2026-10-03. No independent maintainer is available in this session; exact-head CI, Agent review, validators and CAS required. Proposed claim is ineffective until #637 merges. |
+| Authorization Evidence | User requested normal governed progression and independent Agent review. No independent maintainer is available in this session; exact-head CI, Agent review, validators and CAS required. Proposed claim is ineffective until #637 merges. |
 | Implementation PR | #628 (existing candidate; blocked on effective claim) |
 | Last Updated | 2026-10-03 |
 | Handoff / Release Condition | Do not mark Complete until implementation evidence exists. |
@@ -44,7 +44,7 @@
 
 ## Completion Evidence
 
-- Completion Commit: d6d90412 (candidate; native acceptance and target-branch review remain)
+- Completion Commit: d6d90412 (historical candidate only; native acceptance and target-branch review remain)
 
 ## Actual Activation And Execution
 
@@ -61,8 +61,10 @@ unsupported: a user request to implement in a worktree did not authorize bypassi
 the target-branch claim order. Earlier execution records are provenance, not proof
 of effective ownership or activation. No emergency override is claimed.
 
-Delivery remains Review because implementation exists, while collaboration is
-Unclaimed because no effective target-branch claim was verified. PR #628 must not
+At recovery inspection, the historical implementation candidate was Review and
+collaboration was Unclaimed because no effective target-branch claim existed.
+This governance-only PR proposes Active / Claimed; neither state is effective
+until #637 merges. It does not retroactively authorize the earlier implementation. PR #628 must not
 merge until a separate governance-only claim establishes ownership, followed by
 fresh implementation validation and independent review. Native terminal acceptance
 also remains pending; this recovery is not completion evidence.
@@ -99,7 +101,7 @@ mentions of Review/Active do not supersede terminal owner headers.
 No other non-terminal Active, Review, Planned or Blocked iteration was found in
 current owner status headers at this snapshot. I162 is Complete with a recorded
 Review outcome, not a non-terminal Review iteration. Effective dependency work
-DEP-ENDENCY-003-A has a separate Story owner and must remain non-overlapping;
+DEPENDENCY-003-A has a separate Story owner and must remain non-overlapping;
 no unrelated dependency, Desktop or search-owner state is changed here.
 
 ## User-Facing Documentation Target

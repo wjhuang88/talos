@@ -11,7 +11,8 @@ That snapshot is historical evidence and not current activation authority.
 
 ## TUI History Return Recovery — 2026-10-03
 
-[I289](I289-tui-history-return-to-bottom.md) / TUI-062 is Review / Unclaimed.
+[I289](I289-tui-history-return-to-bottom.md) / TUI-062 proposes Active / Claimed
+in governance-only PR #637; both remain ineffective until its target-branch merge.
 PR #628 contains an existing implementation candidate, but its local claim was
 never activated on the target branch. A separate governance-only effective claim,
 fresh exact-head validation/review and native terminal acceptance remain required.
