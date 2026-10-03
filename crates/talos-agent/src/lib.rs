@@ -812,6 +812,17 @@ impl Agent {
         let mut protocol_override = None;
         let mut private_tokens = transient_text::PrivateTokens::default();
 
+        if let Some(pipeline) = self.permission_pipeline.as_ref() {
+            let observed_user_messages: Vec<String> = messages[persist_start..]
+                .iter()
+                .filter_map(|message| match message {
+                    Message::User { content } => Some(content.clone()),
+                    _ => None,
+                })
+                .collect();
+            pipeline.observe_user_messages(&observed_user_messages);
+        }
+
         if let Some(snapshot_tx) = &snapshot_tx {
             let _ =
                 snapshot_tx.send(self.persistence_projection_with_tokens(
