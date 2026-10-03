@@ -1,6 +1,6 @@
 # AUTO-UX-001: Conversation-Language Auto Review Explanations
 
-**Status**: Active / Claimed (governance PR #639 pending merge)
+**Status**: Complete / Closed
 **Type**: Product Story
 **Source Issue**: #590
 
@@ -52,3 +52,8 @@ No retrospective authorization or completion is claimed.
 | Implementation PR | #630 (historical draft; rebuild after effective claim) |
 | Last Updated | 2026-10-03 |
 | Handoff / Release Condition | Effective claim merge precedes rebuilt implementation; no release/version/permission-policy change. |
+
+
+## Completion Evidence
+
+Completion Commit: `9bb565e09f5e0f3de8602183b4a670bf63f0aefc` (PR #640). Exact-head CI run 2961 passed.
