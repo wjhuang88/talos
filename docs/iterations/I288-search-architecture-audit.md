@@ -1,6 +1,6 @@
 # Iteration I288: Search Architecture Audit And Migration Contract
 
-> Document status: Review / Claimed
+> Document status: Complete / Claimed
 > Published plan date: 2026-09-30
 > Planned objective: Establish the reviewed Talos-owned search architecture, compatibility baseline, provider-admission evidence contract, and rollbackable migration matrix for SEARCH-001-A without changing production search behavior.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -21,7 +21,7 @@
 | Authorization Evidence | Governance claim #627 merged as `6f651a28fe901a894942ab1c56015a60491a054e` after exact-head reduced CI, both governance validators, remote Issue reconciliation and merge-time CAS. |
 | Implementation PR | #629 |
 | Last Updated | 2026-09-30 |
-| Handoff / Release Condition | Accepted architecture/ADR and recorded compatibility/provider evidence gates; later children remain separately unclaimed |
+| Handoff / Release Condition | ADR-085 accepted; B/C/D are dependency-ready and separately unclaimed |
 
 Claim and activation became effective when governance PR #627 merged as `6f651a28fe901a894942ab1c56015a60491a054e`. I288 remains architecture/evidence-only: production search behavior, dependencies, configuration and provider implementation are still outside this iteration.
 
@@ -107,11 +107,13 @@ Claim and activation became effective when governance PR #627 merged as `6f651a2
 - Source/code-truth audit: `docs/reference/I288-SEARCH-ARCHITECTURE-AUDIT-2026-09-30.md`.
 - Architecture decision candidate: `docs/decisions/085-talos-owned-search-routing-boundary.md`.
 - Deterministic routing characterization: `select_pattern_propagates_fast_error_before_later_success` in `crates/talos-tools/src/web_search.rs`.
-- Exact-head focused/workspace/governance CI: pending implementation PR.
+- Exact-head remote CI was started for the rebased candidate; local locked focused validation and both governance validators passed.
 
 ## Completion Evidence
 
-- Completion Commit: pending; retain Review/Partial until an already-existing evidence commit can be cited.
+- Completion Commit: `4567bf85ef1fb151fbb07a30e1f5f26a81feeed7` (PR #629 merge)
+- ADR-085 accepted on 2026-10-03.
+- Follow-up owners: SEARCH-001-B / #642, SEARCH-001-C / #643, SEARCH-001-D / #644.
 
 ## Variance And Residuals
 

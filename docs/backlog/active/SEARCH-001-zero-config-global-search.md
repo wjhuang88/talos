@@ -27,7 +27,7 @@
 | Authorization Mode | Not applicable |
 | Authorization Evidence | Not applicable |
 | Implementation PR | None — Epic parents are not implementation units |
-| Last Updated | 2026-09-30 |
+| Last Updated | 2026-10-03 |
 | Handoff / Release Condition | Keep parent open until the terminal-state acceptance below is met and residuals are owned. |
 
 ## Identity / Goal / Value
@@ -68,10 +68,10 @@ The table is a proposal for child **outcomes**, not blanket implementation autho
 
 | Child | Outcome | Depends on | Issue / State |
 |---|---|---|---|
-| SEARCH-001-A | Code-truth audit, migration matrix, architecture ADR, provider qualification gates | None | [#625](https://github.com/wjhuang88/talos/issues/625), Active / Claimed via #627; ADR-085 architecture candidate under I288 review |
-| SEARCH-001-B | Domain extraction with current-behavior-compatible adapters | A ADR accepted | Proposed only |
-| SEARCH-001-C | Talos-owned auto router, deadlines, error semantics, #199 integration | B / A | Proposed only |
-| SEARCH-001-D | Provider feasibility and real multi-region (incl. mainland China) evidence gate | A; research may overlap B | Proposed only |
+| SEARCH-001-A | Code-truth audit, migration matrix, architecture ADR, provider qualification gates | None | [#625](https://github.com/wjhuang88/talos/issues/625), Complete / Claimed; ADR-085 accepted in #629 (`4567bf85`) |
+| SEARCH-001-B | Domain extraction with current-behavior-compatible adapters | A ADR accepted | [#642](https://github.com/wjhuang88/talos/issues/642), Proposed / Unclaimed |
+| SEARCH-001-C | Talos-owned auto router, deadlines, error semantics, #199 integration | B / A | [#643](https://github.com/wjhuang88/talos/issues/643), Proposed / Unclaimed |
+| SEARCH-001-D | Provider feasibility and real multi-region (incl. mainland China) evidence gate | A; research may overlap B | [#644](https://github.com/wjhuang88/talos/issues/644), Proposed / Unclaimed |
 | SEARCH-001-E | First Talos-native zero-key provider with fixtures | C / D | Proposed only |
 | SEARCH-001-F | Second meaningfully independent native zero-key provider | C / D / E interface | Proposed only |
 | SEARCH-001-G | Global auto-routing, change recovery, smoke/soak validation | E / F | Proposed only |

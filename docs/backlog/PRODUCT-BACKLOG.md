@@ -191,7 +191,7 @@ Required reads:
 
 ## Refinement / Blocked Items
 
-- **Zero-config global web search / [SEARCH-001](active/SEARCH-001-zero-config-global-search.md) / [#624](https://github.com/wjhuang88/talos/issues/624)**: Epic remains Intake / Unclaimed. [SEARCH-001-A](active/SEARCH-001-A-architecture-migration-contract.md) / [#625](https://github.com/wjhuang88/talos/issues/625) is Review / Claimed in [I288](../iterations/I288-search-architecture-audit.md); governance claim #627 merged as `6f651a28`, and implementation/architecture PR #629 carries ADR-085 plus the I288 audit/test evidence. I288 is architecture-only and explicitly non-overlapping with DEPENDENCY-003-A and retained Desktop Review/Planned work. No runtime implementation, crate/dependency or default search behavior change is authorized. Reuse ADR-072/CAP-001 and NET-001/#199.
+- **Zero-config global web search / [SEARCH-001](active/SEARCH-001-zero-config-global-search.md) / [#624](https://github.com/wjhuang88/talos/issues/624)**: Epic remains Intake / Unclaimed and must stay open through A→I. [SEARCH-001-A](active/SEARCH-001-A-architecture-migration-contract.md) / [#625](https://github.com/wjhuang88/talos/issues/625) is Complete / Claimed in [I288](../iterations/I288-search-architecture-audit.md); ADR-085 was accepted when PR #629 merged as `4567bf85`. Dependency-ready follow-ups are B / #642, C / #643 and D / #644, each Proposed / Unclaimed. No runtime implementation, crate/dependency or default search behavior change is authorized by these planning records. Reuse ADR-072/CAP-001 and NET-001/#199.
 
 The authoritative open-Issue mapping and dispositions are maintained in
 [`docs/reference/ISSUE-DOC-CODE-STATUS-2026-08-01.md`](../reference/ISSUE-DOC-CODE-STATUS-2026-08-01.md).

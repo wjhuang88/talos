@@ -1,6 +1,6 @@
 # ADR-085: Talos-Owned Web Search Routing And Backend Boundary
 
-*Status: Proposed / I288*
+*Status: Accepted / I288 (2026-10-03)*
 
 ## Context
 
@@ -249,3 +249,8 @@ I288 code-truth and migration evidence:
 The deterministic characterization test added in I288 proves that the exact `tokio::select!`
 pattern used by current routing propagates a fast error before a later success. No production
 search behavior changes in I288.
+
+Acceptance record: PR #629 was merged to `main` as `4567bf85ef1fb151fbb07a30e1f5f26a81feeed7`
+after the architecture package, deterministic test, governance validation and locked focused
+tests were reviewed. The decision authorizes dependency-ready B/C/D planning; it does not itself
+authorize a provider implementation or change production search behavior.
