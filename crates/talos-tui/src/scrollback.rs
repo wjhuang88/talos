@@ -1046,6 +1046,7 @@ pub(crate) fn wrap_to_display_width(text: &str, max_width: usize) -> Vec<String>
 
 pub(crate) struct TipsComponent<'a> {
     pub(crate) tip: Option<&'a crate::state::Tip>,
+    pub(crate) history_scrolled: bool,
 }
 
 impl ViewportComponent for TipsComponent<'_> {
@@ -1065,6 +1066,11 @@ impl ViewportComponent for TipsComponent<'_> {
             Text::from(Line::from(Span::styled(
                 format!(" {}", tip.text),
                 Style::default().fg(color),
+            )))
+        } else if self.history_scrolled {
+            Text::from(Line::from(Span::styled(
+                " Ctrl+Down to return to bottom",
+                Style::default().fg(semantic::DIM_TEXT),
             )))
         } else {
             Text::from(Line::from(Span::styled(

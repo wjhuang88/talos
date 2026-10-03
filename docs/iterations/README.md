@@ -11,11 +11,11 @@ That snapshot is historical evidence and not current activation authority.
 
 ## TUI History Return Recovery — 2026-10-03
 
-[I289](I289-tui-history-return-to-bottom.md) / TUI-062 proposes Active / Claimed
-in governance-only PR #637; both remain ineffective until its target-branch merge.
-PR #628 contains an existing implementation candidate, but its local claim was
-never activated on the target branch. A separate governance-only effective claim,
-fresh exact-head validation/review and native terminal acceptance remain required.
+[I289](I289-tui-history-return-to-bottom.md) / TUI-062 is Review / Claimed.
+Governance-only PR #637 merged as `243b48fc`; the claim is effective. PR #628 was
+rebuilt from that merge, with implementation `c931f678`, two new regression tests
+and bilingual shortcut documentation. Fresh exact-head validation/review and
+native terminal acceptance remain required; no Complete status is claimed.
 The recovery-time inventory and dispositions of I249, I277, I288 and paused I164
 are recorded in I289; it does not claim a retrospective selection preflight.
 

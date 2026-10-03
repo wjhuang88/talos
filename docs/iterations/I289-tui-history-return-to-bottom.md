@@ -1,6 +1,6 @@
 # Iteration I289: TUI History Return To Bottom
 
-> Document status: Active (proposed; ineffective until #637 merges)
+> Document status: Review
 > Published plan date: 2026-09-30
 > MVP deliverable: A visible return-to-bottom hint and `Ctrl+Down` action for anchored history.
 
@@ -16,8 +16,8 @@
 | Source Issue | None |
 | Governance Claim PR | #637 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | User requested normal governed progression and independent Agent review. No independent maintainer is available in this session; exact-head CI, Agent review, validators and CAS required. Proposed claim is ineffective until #637 merges. |
-| Implementation PR | #628 (existing candidate; blocked on effective claim) |
+| Authorization Evidence | User requested normal governed progression and independent Agent review. No independent maintainer is available in this session; exact-head CI, Agent review, validators and CAS required. Claim became effective through #637 merge 243b48fc after exact-head validation, Agent review and CAS. |
+| Implementation PR | #628 (rebuilt from effective claim merge 243b48fc) |
 | Last Updated | 2026-10-03 |
 | Handoff / Release Condition | Do not mark Complete until implementation evidence exists. |
 
@@ -108,3 +108,16 @@ no unrelated dependency, Desktop or search-owner state is changed here.
 
 - `README.md` and `README.zh-CN.md`: document the history return shortcut after
   effective claim activation, alongside existing TUI keyboard controls.
+
+## 2026-10-03 Effective Claim And Rebuilt Candidate
+
+- Governance PR #637 merged as `243b48fc`; claim is now effective on main.
+- Implementation commit: `c931f678`, created from that merge in an isolated worktree.
+- Implementation PR: #628. Historical premature commits remain disclosed above.
+- Locked offline TUI tests: 594 unit, 2 integration and 2 doc tests passed, including two new history-return regressions.
+- README.md and README.zh-CN.md document the shortcut and transient-tip precedence.
+- Owner remains Review pending fresh exact-head CI/review and native terminal acceptance.
+
+## Maintainer Native Acceptance (2026-10-03)
+
+Maintainer confirmed in this session: scrolling history displays the Ctrl+Down hint; Ctrl+Down returns to the bottom without cancelling an active task. Native acceptance passed. Fresh exact-head CI and full preflight remain required before merge.

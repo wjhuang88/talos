@@ -91,6 +91,10 @@ impl Tui {
         };
         let tips = crate::scrollback::TipsComponent {
             tip: state.tip.as_ref(),
+            history_scrolled: !matches!(
+                self.history_scroll.mode,
+                crate::history_projection::HistoryScrollMode::FollowTail
+            ),
         };
         let input_pad_top = crate::scrollback::InputPadComponent;
         let input_pad_bot = crate::scrollback::InputPadComponent;
