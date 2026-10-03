@@ -12,4 +12,5 @@
 | Exclusions | No GeoIP routing, provider default changes, or second generic retry/circuit-breaker system. |
 
 Implementation requires a separately effective claim and stable iteration. This document is an
-intake owner only.
+intake owner only. Its dedicated owner ID prevents the remote reconciliation matrix from
+assigning the parent SEARCH-001 owner to multiple child issues.

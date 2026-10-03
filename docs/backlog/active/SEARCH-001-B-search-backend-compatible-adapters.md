@@ -12,4 +12,5 @@
 | Exclusions | No production routing change, public API, provider addition, or generic retry behavior. |
 
 Implementation requires a separately effective claim and stable iteration. This document is an
-intake owner only.
+intake owner only. Its dedicated owner ID prevents the remote reconciliation matrix from
+assigning the parent SEARCH-001 owner to multiple child issues.
