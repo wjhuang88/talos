@@ -61,7 +61,7 @@
 | [#475](https://github.com/wjhuang88/talos/issues/475) | evolving durable memory through reflection, recall, and outcome-aware experience | [MEM-012](../backlog/active/MEM-012-evolving-memory-experience.md) | Intake / Unclaimed | Architecture intake only; preserve ADR-016 and defer schema/runtime changes to separately governed child slices. |
 | [#502](https://github.com/wjhuang88/talos/issues/502) | libc migration and dependency advisory evidence residuals | [DEPENDENCY-003](../backlog/active/DEPENDENCY-003-dependency-risk-evidence-residuals.md) | Refinement / Unclaimed | Parent remains the authoritative Issue owner. Stable `0.2` Talos-direct libc migration is separately protected by child DEPENDENCY-003-A / governance PR #604; advisory/deprecation evidence remains on the parent and no Rust hardening behavior is authorized by the child. |
 | [#563](https://github.com/wjhuang88/talos/issues/563) | extend auto review to higher-risk writes with diff and rollback gates | [PERM-007-G](../backlog/active/PERM-007-G-higher-risk-auto-writes.md) | Refinement / Unclaimed | Intake-only owner; higher-risk writes, rollback, and impact analysis remain unimplemented and unauthorized. |
-| [#590](https://github.com/wjhuang88/talos/issues/590) | Conversation-language Auto review explanations | [AUTO-UX-001](../backlog/active/AUTO-UX-001-review-language.md) | Refinement / Unclaimed | Intake only; no language detector or permission change activated. |
+| [#590](https://github.com/wjhuang88/talos/issues/590) | Conversation-language Auto review explanations | [AUTO-UX-001](../backlog/active/AUTO-UX-001-review-language.md) | Review / Claimed | Phase 1 implementation PR #640 merged; I291 product-acceptance follow-up is governed by PR #647. No permission-policy change. |
 
 | [#612](https://github.com/wjhuang88/talos/issues/612) | Session truth/context/execution/control semantic rebaseline | [SESSION-011](../backlog/active/SESSION-011-session-semantic-rebaseline.md) | Refinement / Unclaimed | Architecture/coordination owner only; preserve TLOG/session invariants and claim bounded implementation children separately. |
 | [#613](https://github.com/wjhuang88/talos/issues/613) | legacy SessionEvent and UI compatibility closeout | [RUNTIME-008](../backlog/active/RUNTIME-008-runtime-event-compatibility-closeout.md) | Refinement / Unclaimed | Own compatibility inventory/deprecation/removal plan; no canonical event redesign or removal authority yet. |
@@ -70,17 +70,15 @@
 | [#623](https://github.com/wjhuang88/talos/issues/623) | SDK host-configured Auto review and human approval fallback | [INTEGRATION-002](../backlog/active/INTEGRATION-002-embedded-runtime-auto-review-api.md) | Refinement / Unclaimed | Existing intake owner; API/ADR and independent implementation governance required; unrelated to SEARCH-001. |
 | [#624](https://github.com/wjhuang88/talos/issues/624) | zero-config global search architecture and provider internalization | [SEARCH-001](../backlog/active/SEARCH-001-zero-config-global-search.md) | Intake / Unclaimed | Architecture epic and dependency map only; no direct implementation or selected iteration; draft intake PR #626. |
 | [#625](https://github.com/wjhuang88/talos/issues/625) | search architecture audit, migration matrix and ADR | [SEARCH-001-A](../backlog/active/SEARCH-001-A-architecture-migration-contract.md) | Review / Claimed | I288 claim effective via #627 merge `6f651a28`; architecture-only PR #629 carries ADR-085/audit/test evidence, no production search behavior change. |
+| [#642](https://github.com/wjhuang88/talos/issues/642) | SearchBackend boundary with compatible adapters | [SEARCH-001-B](../backlog/active/SEARCH-001-B-search-backend-compatible-adapters.md) | Planned / Unclaimed | Follow-up child; implementation requires its own iteration and effective claim after SEARCH-001-A architecture acceptance. |
+| [#643](https://github.com/wjhuang88/talos/issues/643) | Talos-owned first-valid-success SearchRouter | [SEARCH-001-C](../backlog/active/SEARCH-001-C-search-router.md) | Planned / Unclaimed | Later child gated by SEARCH-001-B and NET-001 coordination; no current implementation authority. |
+| [#644](https://github.com/wjhuang88/talos/issues/644) | Native zero-key provider and regional evidence gate | [SEARCH-001-D](../backlog/active/SEARCH-001-D-provider-evidence.md) | Planned / Unclaimed | Research child may proceed only under its own iteration and claim; no production provider behavior is authorized. |
 
 ## Synchronization Notes
 
 2026-09-30: Added #623 against its existing INTEGRATION-002 intake owner, and #624/#625 against
 SEARCH-001/SEARCH-001-A created by merged architecture-intake PR #626. SEARCH-001-A/I288 claim became effective through #627 merge `6f651a28`; architecture review is now active,
 no independent #623 implementation is claimed, and older dated snapshots remain unchanged.
-
-2026-10-03 current follow-up: PR #629 merged as `4567bf85`; ADR-085 and I288/SEARCH-001-A are
-accepted/complete. The SEARCH-001 parent remains open. Dependency-ready child owners and Issues
-#642 (B), #643 (C) and #644 (D) are Proposed / Unclaimed; no implementation claim or production
-search behavior change is authorized by their creation.
 
 2026-09-20: removed closed #298/#310/#334 from the active matrix after verifying
 their GitHub closure and TUI-056/TUI-057/TUI-061 owner completion. Their prior
