@@ -56,10 +56,15 @@ impl ConversationLocale {
         let sample: String = text.chars().take(MAX_USER_INTENT_CHARS).collect();
         let sample = sample.trim();
         let letters: Vec<char> = sample.chars().filter(|c| c.is_alphabetic()).collect();
-        if letters.len() < 3 || sample.chars().filter(|c| c.is_ascii_alphanumeric()).count() > 0
-            && sample.chars().filter(|c| c.is_alphabetic()).count() < sample.chars().count() / 5
-        { return fallback.clone(); }
-        let script = |range: std::ops::RangeInclusive<char>| letters.iter().filter(|c| range.contains(c)).count();
+        if letters.len() < 3
+            || sample.chars().filter(|c| c.is_ascii_alphanumeric()).count() > 0
+                && sample.chars().filter(|c| c.is_alphabetic()).count() < sample.chars().count() / 5
+        {
+            return fallback.clone();
+        }
+        let script = |range: std::ops::RangeInclusive<char>| {
+            letters.iter().filter(|c| range.contains(c)).count()
+        };
         let candidates = [
             ("ja", script('\u{3040}'..='\u{30ff}')),
             ("ko", script('\u{ac00}'..='\u{d7af}')),
@@ -69,8 +74,12 @@ impl ConversationLocale {
             ("zh", script('\u{4e00}'..='\u{9fff}')),
         ];
         let (tag, count) = candidates.into_iter().max_by_key(|(_, n)| *n).unwrap();
-        if count * 2 >= letters.len() && count >= 3 { return Self(tag.to_owned()); }
-        if looks_like_english(sample) { return Self("en".to_owned()); }
+        if count * 2 >= letters.len() && count >= 3 {
+            return Self(tag.to_owned());
+        }
+        if looks_like_english(sample) {
+            return Self("en".to_owned());
+        }
         fallback.clone()
     }
 
