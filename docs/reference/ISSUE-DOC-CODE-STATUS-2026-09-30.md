@@ -77,6 +77,11 @@
 SEARCH-001/SEARCH-001-A created by merged architecture-intake PR #626. SEARCH-001-A/I288 claim became effective through #627 merge `6f651a28`; architecture review is now active,
 no independent #623 implementation is claimed, and older dated snapshots remain unchanged.
 
+2026-10-03 current follow-up: PR #629 merged as `4567bf85`; ADR-085 and I288/SEARCH-001-A are
+accepted/complete. The SEARCH-001 parent remains open. Dependency-ready child owners and Issues
+#642 (B), #643 (C) and #644 (D) are Proposed / Unclaimed; no implementation claim or production
+search behavior change is authorized by their creation.
+
 2026-09-20: removed closed #298/#310/#334 from the active matrix after verifying
 their GitHub closure and TUI-056/TUI-057/TUI-061 owner completion. Their prior
 rows described the proposed #579 claim; implementation #580 merged as

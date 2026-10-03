@@ -1,6 +1,6 @@
 # SEARCH-001-A: Search Architecture Audit, Migration Matrix & ADR
 
-**Status**: Review / Claimed
+**Status**: Complete / Claimed
 **Type**: Architecture / Governance Story and evidence-led Spike
 **Parent Epic**: [SEARCH-001](SEARCH-001-zero-config-global-search.md) / [Issue #624](https://github.com/wjhuang88/talos/issues/624)
 
@@ -26,8 +26,8 @@
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Governance claim PR #627 merged as `6f651a28fe901a894942ab1c56015a60491a054e` after exact-head reduced CI, both governance validators, remote Issue reconciliation and merge-time CAS. I288 is architecture-only and non-overlapping with other active slices. |
 | Implementation PR | #629 |
-| Last Updated | 2026-09-30 |
-| Handoff / Release Condition | PR #629 exact-head validation + architecture review/maintainer disposition; accept ADR-085 before creating dependency-ready B/C/D child owners and claims |
+| Last Updated | 2026-10-03 |
+| Handoff / Release Condition | ADR-085 accepted; B/C/D are dependency-ready and separately unclaimed |
 
 ## Identity / Goal / Value
 
@@ -105,11 +105,18 @@ This architecture phase does not advertise new features. It owns the documentati
 
 ## Acceptance For Technical / Governance Work
 
-- [ ] A reviewed code-truth matrix with explicit version, actual routes, current permissions and observed failure evidence exists.
-- [ ] Deterministic baseline evidence characterizes first-completed vs first-valid-success and fallback/cancellation cases.
-- [ ] Provider admission, independence, fixture and multi-region verification plan includes real mainland-China evidence acquisition with provenance.
-- [ ] Proposed ADR addresses crate/module decision, domain and shared-network boundary, default/advanced configuration, security/privacy and no-startup-network constraints.
-- [ ] B–I compatibility, dependency, test, activation and rollback gates are documented and accepted in normal architecture review.
-- [ ] No production API/config/dependency/network behavior changed under this child, and repository owner/compact backlog/Issue statuses are synchronized.
+- [x] A reviewed code-truth matrix with explicit version, actual routes, current permissions and observed failure evidence exists.
+- [x] Deterministic baseline evidence characterizes first-completed vs first-valid-success and fallback/cancellation cases.
+- [x] Provider admission, independence, fixture and multi-region verification plan includes real mainland-China evidence acquisition with provenance.
+- [x] Proposed ADR addresses crate/module decision, domain and shared-network boundary, default/advanced configuration, security/privacy and no-startup-network constraints.
+- [x] B–I compatibility, dependency, test, activation and rollback gates are documented and accepted in normal architecture review.
+- [x] No production API/config/dependency/network behavior changed under this child, and repository owner/compact backlog/Issue statuses are synchronized.
 
-Do not mark Complete merely because a proposal exists. Acceptance must record the review/decision and any unresolved feasibility risks before implementation owners become Ready.
+## Completion Evidence
+
+- Completion Commit: `4567bf85ef1fb151fbb07a30e1f5f26a81feeed7` (PR #629 merge)
+- Validation: `scripts/validate_project_governance.sh .`,
+  `bash scripts/validate_collaboration_claims.sh .`, and
+  `cargo test -p talos-tools --features network --locked` (105 passed)
+- Residual: provider feasibility and regional evidence remain SEARCH-001-D / #644; no native
+  provider is admitted by this architecture decision.
