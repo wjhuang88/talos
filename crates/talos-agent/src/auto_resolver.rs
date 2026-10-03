@@ -73,7 +73,9 @@ impl ConversationLocale {
             ("hi", script('\u{0900}'..='\u{097f}')),
             ("zh", script('\u{4e00}'..='\u{9fff}')),
         ];
-        let (tag, count) = candidates.into_iter().max_by_key(|(_, n)| *n).unwrap();
+        let Some((tag, count)) = candidates.into_iter().max_by_key(|(_, n)| *n) else {
+            return fallback.clone();
+        };
         if count * 2 >= letters.len() && count >= 3 {
             return Self(tag.to_owned());
         }
