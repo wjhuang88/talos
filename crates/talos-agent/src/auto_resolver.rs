@@ -1618,7 +1618,9 @@ fn project_auto_request(
 #[async_trait]
 impl ApprovalResolver for AutoPermissionResolver {
     fn observe_user_messages(&self, messages: &[String]) {
-        let Ok(mut current) = self.locale.lock() else { return; };
+        let Ok(mut current) = self.locale.lock() else {
+            return;
+        };
         for message in messages {
             let detected = ConversationLocale::detect(message, &current);
             if detected != *current {
