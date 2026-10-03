@@ -1,13 +1,13 @@
 # TUI-062: History Return To Bottom
 
-> Document status: Review
+> Document status: Active
 
 | Field | Value |
 |---|---|
 | Story ID | TUI-062 |
 | Type | TUI interaction enhancement |
 | Priority | P1 |
-| Status | Review |
+| Status | Active |
 | Source | User request, 2026-09-30 |
 | Selected Iteration | I289 |
 | Depends On | Existing history scroll projection and follow-tail state |
@@ -16,15 +16,15 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | Presentation-only history return-to-bottom affordance: prompt while anchored and Ctrl+Down to restore FollowTail. |
 | Claimed At | 2026-09-30 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not authorized; pending governance review |
-| Authorization Evidence | No effective target-branch claim or Direct-commit authorization verified; see historical deviation below. |
+| Governance Claim PR | #637 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | User requested correction on 2026-10-03. No independent maintainer is available in this session; exact-head CI, Agent review, validators and CAS required. Proposed claim is ineffective until #637 merges. |
 | Implementation PR | #628 (existing candidate; blocked on effective claim) |
 | Last Updated | 2026-10-03 |
 | Handoff / Release Condition | Activate claim on target branch before stable implementation submission. |

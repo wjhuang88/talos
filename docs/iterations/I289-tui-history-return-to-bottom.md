@@ -1,6 +1,6 @@
 # Iteration I289: TUI History Return To Bottom
 
-> Document status: Review
+> Document status: Active
 > Published plan date: 2026-09-30
 > MVP deliverable: A visible return-to-bottom hint and `Ctrl+Down` action for anchored history.
 
@@ -8,15 +8,15 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | TUI-062 history return-to-bottom prompt and Ctrl+Down routing. |
 | Claimed At | 2026-09-30 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not authorized; pending governance review |
-| Authorization Evidence | No effective target-branch claim or Direct-commit authorization verified; see historical deviation below. |
+| Governance Claim PR | #637 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | User requested correction on 2026-10-03. No independent maintainer is available in this session; exact-head CI, Agent review, validators and CAS required. Proposed claim is ineffective until #637 merges. |
 | Implementation PR | #628 (existing candidate; blocked on effective claim) |
 | Last Updated | 2026-10-03 |
 | Handoff / Release Condition | Do not mark Complete until implementation evidence exists. |
