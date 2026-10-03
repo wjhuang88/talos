@@ -1,6 +1,6 @@
 # AUTO-UX-001: Conversation-Language Auto Review Explanations
 
-**Status**: Complete / Closed
+**Status**: Review / Claimed (follow-up I291 required)
 **Type**: Product Story
 **Source Issue**: #590
 
@@ -54,6 +54,6 @@ No retrospective authorization or completion is claimed.
 | Handoff / Release Condition | Effective claim merge precedes rebuilt implementation; no release/version/permission-policy change. |
 
 
-## Completion Evidence
+## Phase 1 Evidence
 
 Completion Commit: `9bb565e09f5e0f3de8602183b4a670bf63f0aefc` (PR #640). Exact-head CI run 2961 passed.

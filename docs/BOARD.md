@@ -23,7 +23,7 @@ I286 closed H1 and I287's authoritative source merged as `f0e16e85` with exact-h
 I282/I284/I285/I287 owners now record Complete after #634 privacy correction merged as
 `8f795d65` with all six CI jobs and independent Agent-role review passed. Mission-level Delivery
 success is not an additional H6 requirement; I277 deferred device rows are non-blocking. MODEL-007 is
-deferred behind Desktop. Locale follow-up #590 is Complete / Closed via PR #640 (`9bb565e0`).
+deferred behind Desktop. Locale follow-up #590 is Review / Claimed; phase 1 merged via PR #640 (`9bb565e0`), I291 owns remaining acceptance.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
@@ -212,7 +212,7 @@ as Refinement / Unclaimed, outside I285; no activation until I285 is disposition
 
 ## Auto Review Locale — 2026-10-03
 
-AUTO-UX-001 / #590: I290 Planned / Unclaimed, claim Pending. Owner:
+AUTO-UX-001 / #590: I290 Review / Claimed; I291 follow-up proposed. Owner:
 [Story](backlog/active/AUTO-UX-001-review-language.md),
 [iteration](iterations/I290-auto-review-conversation-locale.md). #630 remains a historical
 draft; no completion or permission-policy authority is claimed.
