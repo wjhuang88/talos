@@ -209,3 +209,10 @@ as Refinement / Unclaimed, outside I285; no activation until I285 is disposition
 - Completion is bound to PR #131 merge commit `685d3b4f4088a172551f8c844a89f5dee9469430`, exact accepted Head `90165cace4625c0f27616b3e1b9871bcb6a10186`, CI `31010166558` and rebuilt real-terminal acceptance.
 - Issue #136 remains independently Open and non-blocking for direct `/delete` recovery-command wording.
 - Recovery PR #120 and its branch remain immutable archival evidence.
+
+## Auto Review Locale — 2026-10-03
+
+AUTO-UX-001 / #590: I290 Planned / Unclaimed, claim Pending. Owner:
+[Story](backlog/active/AUTO-UX-001-review-language.md),
+[iteration](iterations/I290-auto-review-conversation-locale.md). #630 remains a historical
+draft; no completion or permission-policy authority is claimed.

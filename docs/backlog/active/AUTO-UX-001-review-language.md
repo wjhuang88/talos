@@ -32,6 +32,23 @@ Language selection affects presentation only, never permission authority.
 
 ## Scheduling And Residuals
 
-Intake only, not an I281 implementation requirement. No implementation claim or
-activation. Detection method, supported-language coverage and nonlocalized UI
-fallback remain refinement decisions owned here and in Issue #590.
+Selected for I290, proposed activation only. PR #630 is a historical draft created before an
+effective claim; it must be rebuilt from the claim merge or later and receive fresh checks.
+No retrospective authorization or completion is claimed.
+
+## Collaboration Claim
+
+| Field | Value |
+|---|---|
+| Claim State | Unclaimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-6 |
+| Work Slice | AUTO-UX-001 / #590: session-local conversation locale and Auto review presentation only |
+| Claimed At | 2026-10-03 |
+| Source Issue | #590 |
+| Governance Claim PR | Pending |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | User requested completion of #590, authorized publication to wjhuang88/talos and continued work. No independent maintainer is available in this session. Governance exact-head CI, validators and review are required; implementation requires independent API/security review. |
+| Implementation PR | #630 (historical draft; rebuild after effective claim) |
+| Last Updated | 2026-10-03 |
+| Handoff / Release Condition | Effective claim merge precedes rebuilt implementation; no release/version/permission-policy change. |
