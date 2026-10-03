@@ -1,4 +1,4 @@
-i290_execution_note: "AUTO-UX-001 / #590 I290 Planned/Unclaimed; governance claim Pending. #630 historical draft must be rebuilt after effective claim; no release or permission-policy change."
+i290_execution_note: "AUTO-UX-001 / #590 I290 Active/Claimed; governance claim #639. #630 historical draft must be rebuilt after effective claim; no release or permission-policy change."
 schema_version: "1"
 next_selected_iteration: "2026-10-03 Desktop four-week candidate: I282-I287 owner closeout records H1-H6 evidence and #634 privacy correction merged as 8f795d65. DESKTOP-001-MISSION-UX remains Refinement/Unclaimed and requires shared API mapping and its own activation. I277 device/accessibility checks remain deferred in #29. No successor iteration or release activated; MODEL-007 and #502 retain separate owners."
 desktop_four_week_plan: "docs/tasks/2026-09-22-desktop-four-week-delivery.md; Sep 22-Oct 19 target: live host, tools/approval, durable sessions/evidence, integrated acceptance. Existing #29 validation tracker; I277 Review/Claimed retains deferred rows; I249 Planned and I164 Paused unchanged."

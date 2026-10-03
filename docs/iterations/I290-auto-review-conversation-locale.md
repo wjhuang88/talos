@@ -1,6 +1,6 @@
 # Iteration I290: Auto Review Conversation Locale
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-10-03
 > MVP deliverable: Auto review effect summaries and human decision prompts follow locally detected conversation language, with deterministic configured UI-locale fallback.
 
@@ -24,7 +24,7 @@ This is recovery-time evidence, not a retrospective preflight for the September 
 | I277 | Review, remaining acceptance Deferred | Retain device/human checks in #29 |
 | I288 | Active / Claimed, #627 already merged | Keep architecture-only search scope and #629 separate; stale proposed wording is unrelated drift |
 | I289 | Complete / Closed | Preserve #628/#638 completion evidence |
-| I290 | Planned / Unclaimed proposed claim | No implementation authority until governance merge |
+| I290 | Active / Claimed (#639 pending merge) | No implementation authority until governance merge |
 
 Current owner headers across all iteration documents were inspected; no additional
 Active/Review/Planned/Blocked iteration was found. Separate DEPENDENCY-003-A Story
@@ -71,13 +71,13 @@ SHA; the claim/status commit is not completion evidence.
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | AUTO-UX-001 / #590: session-local conversation locale and Auto review presentation only |
 | Claimed At | 2026-10-03 |
 | Source Issue | #590 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #639 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | User requested completion of #590, authorized publication to wjhuang88/talos and continued work. No independent maintainer is available in this session. Governance exact-head CI, validators and review are required; implementation requires independent API/security review. |
 | Implementation PR | #630 (historical draft; rebuild after effective claim) |

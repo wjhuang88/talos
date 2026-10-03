@@ -1,6 +1,6 @@
 # AUTO-UX-001: Conversation-Language Auto Review Explanations
 
-**Status**: Refinement / Unclaimed
+**Status**: Active / Claimed (governance PR #639 pending merge)
 **Type**: Product Story
 **Source Issue**: #590
 
@@ -40,13 +40,13 @@ No retrospective authorization or completion is claimed.
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | AUTO-UX-001 / #590: session-local conversation locale and Auto review presentation only |
 | Claimed At | 2026-10-03 |
 | Source Issue | #590 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #639 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | User requested completion of #590, authorized publication to wjhuang88/talos and continued work. No independent maintainer is available in this session. Governance exact-head CI, validators and review are required; implementation requires independent API/security review. |
 | Implementation PR | #630 (historical draft; rebuild after effective claim) |

@@ -23,7 +23,7 @@ I286 closed H1 and I287's authoritative source merged as `f0e16e85` with exact-h
 I282/I284/I285/I287 owners now record Complete after #634 privacy correction merged as
 `8f795d65` with all six CI jobs and independent Agent-role review passed. Mission-level Delivery
 success is not an additional H6 requirement; I277 deferred device rows are non-blocking. MODEL-007 is
-deferred behind Desktop. Locale follow-up #590 remains Refinement/Unclaimed.
+deferred behind Desktop. Locale follow-up #590 is Active / Claimed via governance PR #639 pending merge.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
