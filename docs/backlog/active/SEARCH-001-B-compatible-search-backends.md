@@ -1,6 +1,6 @@
 # SEARCH-001-B: Compatible SearchBackend Boundary
 
-**Status**: Proposed / Unclaimed
+**Status**: Planned / Unclaimed
 **Type**: Implementation / Compatibility
 **Parent Epic**: [SEARCH-001](SEARCH-001-zero-config-global-search.md) / [Issue #624](https://github.com/wjhuang88/talos/issues/624)
 
@@ -9,7 +9,7 @@
 | Story ID | SEARCH-001-B |
 | Source Issue | [#642](https://github.com/wjhuang88/talos/issues/642) |
 | Depends on | Accepted ADR-085; SEARCH-001-A / #625 merged as `4567bf85` |
-| Selected Iteration | None; requires a separately selected bounded iteration |
+| Selected Iteration | [I291](../../iterations/I291-search-compatible-backend-boundary.md) |
 | Implementation PR | None |
 | Last Updated | 2026-10-03 |
 
