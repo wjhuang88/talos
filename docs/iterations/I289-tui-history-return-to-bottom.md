@@ -1,6 +1,6 @@
 # Iteration I289: TUI History Return To Bottom
 
-> Document status: Review (proposed; ineffective until #637 merges)
+> Document status: Review
 > Published plan date: 2026-09-30
 > MVP deliverable: A visible return-to-bottom hint and `Ctrl+Down` action for anchored history.
 
@@ -16,8 +16,8 @@
 | Source Issue | None |
 | Governance Claim PR | #637 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | User requested normal governed progression and independent Agent review. No independent maintainer is available in this session; exact-head CI, Agent review, validators and CAS required. Proposed claim is ineffective until #637 merges. |
-| Implementation PR | #628 (existing candidate; blocked on effective claim) |
+| Authorization Evidence | User requested normal governed progression and independent Agent review. No independent maintainer is available in this session; exact-head CI, Agent review, validators and CAS required. Claim became effective through #637 merge 243b48fc after exact-head validation, Agent review and CAS. |
+| Implementation PR | #628 (rebuilt from effective claim merge 243b48fc) |
 | Last Updated | 2026-10-03 |
 | Handoff / Release Condition | Do not mark Complete until implementation evidence exists. |
 
