@@ -495,3 +495,21 @@ remain owned in #29 and are not marked passed. The separately registered
 DESKTOP-001-MISSION-UX successor retains the Mission shaping/design-fidelity gap;
 #308 presets and other baseline exclusions also remain outside this cycle.
 Earlier Partial checkpoints above remain historical, not current status.
+
+### Final merged validation supplement — 2026-10-03
+
+PR #635 merged as `989d01773be02e0f712633187f4fd53498f67e26` after all six
+CI jobs passed at exact head `fcbe3dcfb7de5072b40ad3e373c92b6900e6d2ed`
+against base `8f795d653aeebb8a2f78f30a70115bcc7358adfd` (run `37100843062`).
+Independent Agent-role security/API APPROVE is recorded in PR comment `5966294430`;
+this is not independent human approval. Merge-time checks confirmed unchanged
+head/base, no blocking feedback and no overlapping production-file changes.
+
+The supplemental code preserves process-group ownership until inherited pipes
+are drained and the leader can be reaped, and retains cleanup error detail.
+It includes an approval-projection regression proving original execution arguments
+are preserved. Local supervisor tests passed 14/14, Desktop cancellation tests 2/2,
+and Agent tests 427/427; the final CI ran the full release preflight successfully.
+The precise original OS interleaving was not reproduced locally; the identified
+ownership/reap race is covered by the new deterministic regression. ADR-082's
+bounded owned-group contract and the native-evidence limitations above are unchanged.
