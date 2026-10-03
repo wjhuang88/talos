@@ -11,11 +11,11 @@ That snapshot is historical evidence and not current activation authority.
 
 ## TUI History Return Recovery — 2026-10-03
 
-[I289](I289-tui-history-return-to-bottom.md) / TUI-062 is Review / Claimed.
+[I289](I289-tui-history-return-to-bottom.md) / TUI-062 is Complete / Closed.
 Governance-only PR #637 merged as `243b48fc`; the claim is effective. PR #628 was
 rebuilt from that merge, with implementation `c931f678`, two new regression tests
-and bilingual shortcut documentation. Fresh exact-head validation/review and
-native terminal acceptance remain required; no Complete status is claimed.
+and bilingual shortcut documentation. PR #628 merged as `1226f313` after full
+preflight, all six CI checks, exact-head Agent review and native acceptance passed.
 The recovery-time inventory and dispositions of I249, I277, I288 and paused I164
 are recorded in I289; it does not claim a retrospective selection preflight.
 
@@ -248,3 +248,7 @@ The prior full iteration registry and non-terminal inventory remain available at
 
 Individual plans and completion records remain under `docs/iterations/`; this compact index does not
 replace or rewrite them.
+
+### TUI-062 / I289 Closeout — 2026-10-03
+
+Complete / Closed; owner Completion Commit `1226f313e7136f4b2a3d8db6f9179c4ed52072e1` (#628 merge). Full preflight, CI `37115859644`, exact-head Agent review and maintainer native acceptance passed. No remaining slice residuals.
