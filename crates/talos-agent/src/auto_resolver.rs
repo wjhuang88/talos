@@ -63,7 +63,7 @@ impl ConversationLocale {
             return fallback.clone();
         }
         let script = |range: std::ops::RangeInclusive<char>| {
-            letters.iter().filter(|c| range.contains(c)).count()
+            letters.iter().filter(|c| range.contains(*c)).count()
         };
         let candidates = [
             ("ja", script('\u{3040}'..='\u{30ff}')),
