@@ -1,6 +1,6 @@
 # Iteration I283: Desktop Tools Approval And Cancellation
 
-> Document status: Complete — implementation merged; H2/H3 human acceptance remains open
+> Document status: Complete — implementation merged; H2/H3 observations recorded in the four-week acceptance ledger
 > Plan date: 2026-09-22
 > Target window: 2026-09-29 to 2026-10-05
 > Planned objective: A Desktop user can execute real file/shell work, understand Auto decisions, allow or deny exact requests, and cancel safely.

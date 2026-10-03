@@ -1,6 +1,6 @@
 # DESKTOP-001-D5: Desktop Tools Approval And Cancellation
 
-> Document status: Complete — implementation merged; H2/H3 human acceptance remains open
+> Document status: Complete — implementation merged; H2/H3 observations recorded in the four-week acceptance ledger
 
 | Field | Value |
 |---|---|
@@ -8,7 +8,7 @@
 | Parent Epic | DESKTOP-001 |
 | Type | Desktop integration / behavior Story |
 | Priority | P1 |
-| Status | Complete — implementation merged; H2/H3 acceptance residual |
+| Status | Complete — implementation merged; H2/H3 observations recorded |
 | Selected Iteration | I283 |
 | Source | #29; four-week Desktop task |
 | Depends On | I282 implementation merged and technical gates passed; deferred human rows tracked; current permission/Auto contracts |
