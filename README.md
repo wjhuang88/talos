@@ -743,6 +743,9 @@ clearing it. Selection reads only the rendered frame and never exposes hidden tr
 credential data.
 
 Keyboard PageUp/PageDown and Ctrl+Home/Ctrl+End remain the reliable history-navigation controls.
+Ctrl+Down also returns to the latest history and resumes following new output. While history is
+scrolled away from the bottom, the tips row shows this shortcut; transient notifications take
+precedence until they clear. Esc retains its existing cancellation and panel behavior.
 `/copy last` and `/copy all` remain available for semantic message/transcript copies.
 
 ## Slash Commands

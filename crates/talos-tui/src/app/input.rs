@@ -232,6 +232,11 @@ impl Tui {
                         self.history_scroll.jump_to_end();
                         return false;
                     }
+                    KeyCode::Down if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
+                        self.history_prefix_start = None;
+                        self.history_scroll.jump_to_end();
+                        return false;
+                    }
                     _ => {}
                 }
                 if key.code == KeyCode::Char('c')

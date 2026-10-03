@@ -29,6 +29,89 @@ fn state_line(text: &str) -> ScrollbackLine {
 }
 
 #[test]
+fn history_return_shortcut_restores_tail_without_cancelling_or_editing() {
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), Some(tx));
+    tui.terminal
+        .set_test_size(ratatui::layout::Size::new(80, 24));
+    for index in 0..60 {
+        tui.transcript
+            .append(TranscriptBlock::StyledLine(state_line(&format!(
+                "history row {index}"
+            ))));
+    }
+    tui.state.input_append_char('x');
+    tui.state.status.is_processing = true;
+    tui.draw_frame().expect("initial frame");
+    assert!(
+        !tui.terminal
+            .test_rendered_text()
+            .contains("return to bottom")
+    );
+    tui.handle_input_event(&key_press(KeyCode::PageUp));
+    tui.history_prefix_start = Some(0);
+    tui.draw_frame().expect("anchored frame");
+    assert!(
+        tui.terminal
+            .test_rendered_text()
+            .contains("Ctrl+Down to return to bottom")
+    );
+    tui.handle_input_event(&key_press_with_modifiers(
+        KeyCode::Down,
+        KeyModifiers::CONTROL,
+    ));
+    assert_eq!(tui.history_scroll.mode, HistoryScrollMode::FollowTail);
+    assert_eq!(tui.history_prefix_start, None);
+    assert_eq!(tui.state.input_buffer, "x");
+    assert!(rx.try_recv().is_err());
+    tui.transcript
+        .append(TranscriptBlock::StyledLine(state_line("new tail entry")));
+    tui.draw_frame().expect("restored frame");
+    let rendered = tui.terminal.test_rendered_text();
+    assert!(!rendered.contains("return to bottom"));
+    assert!(rendered.contains("new tail entry"));
+}
+
+#[test]
+fn history_return_hint_yields_to_transient_error_tip() {
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.terminal
+        .set_test_size(ratatui::layout::Size::new(80, 24));
+    for index in 0..60 {
+        tui.transcript
+            .append(TranscriptBlock::StyledLine(state_line(&format!(
+                "history row {index}"
+            ))));
+    }
+    tui.draw_frame().expect("initial frame");
+    tui.handle_input_event(&key_press(KeyCode::PageUp));
+    tui.state.tip = Some(crate::state::Tip {
+        kind: TipKind::Error,
+        text: "transient error".into(),
+        ttl: std::time::Duration::from_secs(2),
+        created_at: std::time::Instant::now(),
+    });
+    tui.draw_frame().expect("error frame");
+    assert!(
+        tui.terminal
+            .test_rendered_text()
+            .contains("transient error")
+    );
+    assert!(
+        !tui.terminal
+            .test_rendered_text()
+            .contains("return to bottom")
+    );
+    tui.state.tip = None;
+    tui.draw_frame().expect("hint frame");
+    assert!(
+        tui.terminal
+            .test_rendered_text()
+            .contains("return to bottom")
+    );
+}
+
+#[test]
 fn reasoning_click_toggles_but_drag_back_to_origin_does_not() {
     use crossterm::event::MouseButton;
     let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
