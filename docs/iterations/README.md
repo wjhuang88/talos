@@ -9,6 +9,15 @@ The complete pre-closeout index is preserved unchanged at
 [`ITERATIONS-INDEX-pre-I170-closeout-2026-08-01.md`](ITERATIONS-INDEX-pre-I170-closeout-2026-08-01.md).
 That snapshot is historical evidence and not current activation authority.
 
+## TUI History Return Recovery — 2026-10-03
+
+[I289](I289-tui-history-return-to-bottom.md) / TUI-062 is Review / Unclaimed.
+PR #628 contains an existing implementation candidate, but its local claim was
+never activated on the target branch. A separate governance-only effective claim,
+fresh exact-head validation/review and native terminal acceptance remain required.
+The recovery-time inventory and dispositions of I249, I277, I288 and paused I164
+are recorded in I289; it does not claim a retrospective selection preflight.
+
 ## Lifecycle
 
 Current cycle (2026-09-22): [four-week Desktop delivery](../tasks/2026-09-22-desktop-four-week-delivery.md),

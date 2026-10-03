@@ -64,6 +64,7 @@ repeating known mistakes.
 | 52 | Desktop / Testing | 当前选项和键盘焦点要分离；测试不能固化首项默认焦点 | I277 |
 | 53 | CI / Dependencies | 离线 all-feature 审计前须显式准备完整锁依赖，默认构建缓存不足 | I277 |
 | 54 | Governance | 新 Issue owner 同步必须包含远端校验使用的状态矩阵 | #618 |
+| 55 | Governance | 本地 claim 提交不是目标分支所有权，validator 通过不能证明授权 | TUI-062 / #628 |
 
 ## Lessons
 
@@ -1054,3 +1055,12 @@ repeating known mistakes.
 - Prevention: Keep unrelated Issue/Board/matrix repair in a separately owned governance batch and
   require fresh CI/review only when the candidate or relevant base substantively changes.
 - Promoted to rule/check: `AGENTS.md`, the collaboration/iteration/start SOPs, and ADR-071.
+
+## 2026-10-03 - Local claim commits do not establish target-branch ownership
+
+- Trigger: Independent Agent review of TUI-062 / PR #628 before merge.
+- Symptom: The implementation PR carried claim commits not present on main, while owners described Direct-commit authorization and effective Claimed state.
+- Root cause: Local commit order and structural-validator success were mistaken for target-branch claim activation; ordinary user implementation authorization was mistaken for permission to bypass the collaboration sequence.
+- Fix: Record the historical deviation, restore Unclaimed while retaining truthful Review delivery, and prepare a separate governance-only claim before implementation merge. The recovery remains pending until that claim is effective.
+- Prevention: Verify target-branch owner content and claim ancestry before implementation, and verify authorization evidence semantically rather than relying on validator success. Never backdate an activation or selection inventory to conceal a missing preflight.
+- Promoted to rule/check: Existing AGENTS.md Goal-Driven Execution and docs/sop/AGENT-COLLABORATION.md Target-branch truth / Direct-Commit Sequence already require this; no new policy is needed.
