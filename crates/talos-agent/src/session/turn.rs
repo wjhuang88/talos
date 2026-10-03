@@ -215,8 +215,8 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                     reasoning: None,
                 });
             }
-            let mut cancellation_error = cleanup_error.map(|_| {
-                "sandbox command cleanup was not confirmed after cancellation".to_string()
+            let mut cancellation_error = cleanup_error.map(|error| {
+                format!("sandbox command cleanup was not confirmed after cancellation: {error}")
             });
             if !stable_prefix.is_empty()
                 && let Some(persistence) = &persistence
