@@ -19,6 +19,13 @@ preflight, all six CI checks, exact-head Agent review and native acceptance pass
 The recovery-time inventory and dispositions of I249, I277, I288 and paused I164
 are recorded in I289; it does not claim a retrospective selection preflight.
 
+## Auto Review Locale Recovery — 2026-10-03
+
+[I290](I290-auto-review-conversation-locale.md) / AUTO-UX-001 proposes a bounded locale
+implementation slice for #590. Claim is Pending and ineffective until governance merge;
+#630 is historical draft evidence only. I290 records selection inventory, compatibility
+and localization responsibilities before rebuilt implementation.
+
 ## Lifecycle
 
 Current cycle (2026-09-22): [four-week Desktop delivery](../tasks/2026-09-22-desktop-four-week-delivery.md),
