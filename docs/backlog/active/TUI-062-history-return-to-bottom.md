@@ -1,13 +1,13 @@
 # TUI-062: History Return To Bottom
 
-> Document status: Review
+> Document status: Complete
 
 | Field | Value |
 |---|---|
 | Story ID | TUI-062 |
 | Type | TUI interaction enhancement |
 | Priority | P1 |
-| Status | Review |
+| Status | Complete |
 | Source | User request, 2026-09-30 |
 | Selected Iteration | I289 |
 | Depends On | Existing history scroll projection and follow-tail state |
@@ -16,7 +16,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | Presentation-only history return-to-bottom affordance: prompt while anchored and Ctrl+Down to restore FollowTail. |
@@ -25,9 +25,9 @@
 | Governance Claim PR | #637 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | User requested normal governed progression and independent Agent review. No independent maintainer is available in this session; exact-head CI, Agent review, validators and CAS required. Claim became effective through #637 merge 243b48fc after exact-head validation, Agent review and CAS. |
-| Implementation PR | #628 (rebuilt from effective claim merge 243b48fc) |
+| Implementation PR | #628 (merged as 1226f313) |
 | Last Updated | 2026-10-03 |
-| Handoff / Release Condition | Exact-head CI/review and native terminal acceptance before Complete. |
+| Handoff / Release Condition | Complete through #628; no remaining slice residuals. |
 
 ## Scope
 
@@ -106,3 +106,11 @@ claim target and retain this historical deviation record.
 ## Maintainer Native Acceptance (2026-10-03)
 
 Maintainer confirmed in this session: scrolling history displays the Ctrl+Down hint; Ctrl+Down returns to the bottom without cancelling an active task. Native acceptance passed. Fresh exact-head CI and full preflight remain required before merge.
+
+## Final Closeout (2026-10-03)
+
+Completion Commit: 1226f313e7136f4b2a3d8db6f9179c4ed52072e1
+
+PR #628 merged the tested implementation into main. Exact head `0c278c9036f0538b0637430a249d2558e60dd70f` passed all six CI checks in run `37115859644`; independent Agent review approved that head. Standard `./scripts/release_preflight.sh` passed locally with locked workspace check, Clippy, tests and external SDK fixture. Both governance validators passed. Maintainer native terminal acceptance passed. Merge-time CAS confirmed unchanged target, head, ownership and non-overlapping open work.
+
+Delivery is Complete and claim Closed. No remaining acceptance or implementation residuals in this Work Slice. Earlier pending statements are historical execution records superseded by this closeout. The original premature-claim deviation remains disclosed; effective claim #637 and the rebuilt implementation corrected the delivery sequence.
