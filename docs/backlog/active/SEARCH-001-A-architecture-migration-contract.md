@@ -1,6 +1,6 @@
 # SEARCH-001-A: Search Architecture Audit, Migration Matrix & ADR
 
-**Status**: Active / Claimed (proposed; ineffective until #627 merges)
+**Status**: Review / Claimed
 **Type**: Architecture / Governance Story and evidence-led Spike
 **Parent Epic**: [SEARCH-001](SEARCH-001-zero-config-global-search.md) / [Issue #624](https://github.com/wjhuang88/talos/issues/624)
 
@@ -24,10 +24,10 @@
 | Source Issue | #625 |
 | Governance Claim PR | #627 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Maintainer requested continued SEARCH-001 progression after #626 merged on 2026-09-30; #627 is governance-only and requires exact-head CI, both governance validators, no blocking review feedback and merge-time CAS. I288 is explicitly non-overlapping with DEPENDENCY-003-A and retained Desktop Review/Planned work. |
-| Implementation PR | Not started |
+| Authorization Evidence | Governance claim PR #627 merged as `6f651a28fe901a894942ab1c56015a60491a054e` after exact-head reduced CI, both governance validators, remote Issue reconciliation and merge-time CAS. I288 is architecture-only and non-overlapping with other active slices. |
+| Implementation PR | #629 |
 | Last Updated | 2026-09-30 |
-| Handoff / Release Condition | Claim and Active state become effective only when #627 merges; then accepted architecture + owner/migration matrix are required before separately claiming B–I children |
+| Handoff / Release Condition | PR #629 exact-head validation + architecture review/maintainer disposition; accept ADR-085 before creating dependency-ready B/C/D child owners and claims |
 
 ## Identity / Goal / Value
 
@@ -57,6 +57,30 @@ This child is **not** a production search implementation. Its result is a review
 - NET-001 / [#199](https://github.com/wjhuang88/talos/issues/199) owns generic resilience; coordinate API timing rather than independently implementing a generic breaker.
 - TOOL-009 is historical existing search delivery, not automatically a new implementation claim.
 - Parent [SEARCH-001](SEARCH-001-zero-config-global-search.md) owns the target product outcome and acceptance, not this child's execution.
+
+## I288 Architecture Candidate
+
+Evidence package:
+
+- [I288 Search Architecture Audit](../../reference/I288-SEARCH-ARCHITECTURE-AUDIT-2026-09-30.md)
+- [ADR-085: Talos-Owned Web Search Routing And Backend Boundary](../../decisions/085-talos-owned-search-routing-boundary.md)
+
+Current candidate decisions:
+
+- keep `web_search` tool name/schema/family/Network permission stable;
+- model engine implementations as private `SearchBackend` strategies below the built-in ADR-072
+  Search Provider, rather than registering each engine as a platform Provider;
+- keep the first boundary inside `talos-tools/network`; do not create a public `talos-search`
+  crate until a second supported consumer or SDK/release boundary justifies extraction;
+- Talos owns backend identity, typed errors, first-valid-success routing and bounded hedging;
+- no startup probes, no country/GeoIP routing, and no query text in health state;
+- credential presence makes a premium backend available but does not imply user consent to use it;
+- Wikipedia is transitional knowledge fallback, not a target generic web backend;
+- named native zero-key candidates remain unadmitted until SEARCH-001-D records terms,
+  maintainability, fixture, independence and real regional evidence.
+
+I288 also records a deterministic test characterizing the current first-completion
+`tokio::select!` behavior; it does not alter production routing.
 
 ## Uncertainty And Validation Path
 

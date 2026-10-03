@@ -23,6 +23,7 @@ silently rewrite the reason or boundary that governed an earlier implementation.
 
 | ADR | State | Current Boundary / Gate |
 |---|---|---|
+| [085: Talos-Owned Web Search Routing And Backend Boundary](085-talos-owned-search-routing-boundary.md) | Proposed / I288 | Keep `web_search` stable; use private SearchBackend strategies under the built-in Search Provider, Talos-owned first-valid-success routing, no startup probes or GeoIP routing, explicit premium selection, and no new `talos-search` crate until reuse justifies extraction. |
 | [083: Shared Evaluation Context And Delivery Boundary](083-shared-evaluation-context-boundary.md) | Accepted / I284 | Shared Runtime owns explicit revision-bound evaluation context and Delivery projection; Desktop is a client. No new durable schema or automatic evaluation is authorized. |
 | [084: Session-Bound Desktop Evaluation Evidence Source](084-desktop-evaluation-evidence-source-contract.md) | Accepted / I287 | Runtime-owned, session-bound, revision-bound ephemeral evidence producer; Desktop remains a projection client and Delivery fails closed without current authoritative evidence. |
 | [082: Owned Unix Sandbox Command Cancellation](082-sandbox-command-cancellation-ownership.md) | Accepted / I283 Active | Maintainer accepted owned-group cancellation and narrow Unix ABI use; deliberate group escape remains an unimplemented residual. Implementation and protected review are pending. |
