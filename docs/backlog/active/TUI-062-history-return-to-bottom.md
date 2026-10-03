@@ -61,7 +61,7 @@
 
 ## Completion Evidence
 
-- Completion Commit: d6d90412 (historical candidate only; not closure evidence for this proposed activation)
+- Historical candidate commit: d6d90412 (historical candidate only; not closure evidence for this proposed activation)
 
 ## Governance Recovery — 2026-10-03
 

@@ -44,7 +44,7 @@
 
 ## Completion Evidence
 
-- Completion Commit: d6d90412 (historical candidate only; native acceptance and target-branch review remain)
+- Historical candidate commit: d6d90412 (historical candidate only; native acceptance and target-branch review remain)
 
 ## Actual Activation And Execution
 
