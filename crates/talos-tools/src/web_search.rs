@@ -686,4 +686,26 @@ mod tests {
         let output = tool.format_results("xyzzy", &[], ResultSource::DuckDuckGo, true);
         assert!(output.contains("No results found"));
     }
+
+    #[tokio::test]
+    async fn select_pattern_propagates_fast_error_before_later_success() {
+        // Characterize the exact select pattern used by execute_search without
+        // making a network request. The first branch completes with an error;
+        // the second cannot become ready until after one scheduler yield.
+        let fast_error = async { Err::<u8, &'static str>("fast failure") };
+        let later_success = async {
+            tokio::task::yield_now().await;
+            Ok::<u8, &'static str>(1)
+        };
+
+        tokio::pin!(fast_error);
+        tokio::pin!(later_success);
+
+        let result = tokio::select! {
+            result = &mut fast_error => result,
+            result = &mut later_success => result,
+        };
+
+        assert_eq!(result, Err("fast failure"));
+    }
 }

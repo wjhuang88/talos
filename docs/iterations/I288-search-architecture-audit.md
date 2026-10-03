@@ -1,6 +1,6 @@
 # Iteration I288: Search Architecture Audit And Migration Contract
 
-> Document status: Active / Claimed (proposed; ineffective until #627 merges)
+> Document status: Review / Claimed
 > Published plan date: 2026-09-30
 > Planned objective: Establish the reviewed Talos-owned search architecture, compatibility baseline, provider-admission evidence contract, and rollbackable migration matrix for SEARCH-001-A without changing production search behavior.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -18,13 +18,12 @@
 | Source Issue | #625 |
 | Governance Claim PR | #627 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Maintainer requested continued SEARCH-001 progression after #626 merge on 2026-09-30. #627 is governance-only; exact-head CI, both governance validators, no blocking review feedback and merge-time CAS are required before merge. |
-| Implementation PR | Not started |
+| Authorization Evidence | Governance claim #627 merged as `6f651a28fe901a894942ab1c56015a60491a054e` after exact-head reduced CI, both governance validators, remote Issue reconciliation and merge-time CAS. |
+| Implementation PR | #629 |
 | Last Updated | 2026-09-30 |
 | Handoff / Release Condition | Accepted architecture/ADR and recorded compatibility/provider evidence gates; later children remain separately unclaimed |
 
-Before implementation, follow `docs/sop/AGENT-COLLABORATION.md`. This governance-only PR proposes both `Claimed` and `Active`; neither state has effect until
-#627 reaches `main`. Production implementation remains prohibited until that merge.
+Claim and activation became effective when governance PR #627 merged as `6f651a28fe901a894942ab1c56015a60491a054e`. I288 remains architecture/evidence-only: production search behavior, dependencies, configuration and provider implementation are still outside this iteration.
 
 ## Published Baseline
 
@@ -100,11 +99,15 @@ Before implementation, follow `docs/sop/AGENT-COLLABORATION.md`. This governance
 
 | Date | Type | Record |
 |---|---|---|
-| 2026-09-30 | Atomic claim+activation proposal | Maintainer requested progression after #626 merged. I286 is Closed; I287 remains Planned/Unclaimed; I285 Review and DEPENDENCY-003-A Active work are explicitly retained. #627 proposes I288 as a non-overlapping architecture-only Active/Claimed slice; both states remain ineffective until #627 merges. |
+| 2026-09-30 | Atomic claim+activation proposal | Maintainer requested progression after #626 merged. I286 is Closed; I287 remains Planned/Unclaimed; I285 Review and DEPENDENCY-003-A Active work are explicitly retained. #627 proposes I288 as a non-overlapping architecture-only Active/Claimed slice; both states remain ineffective until #627 merges. |\n| 2026-09-30 | Claim effective | Governance PR #627 merged as `6f651a28`; I288 architecture/evidence Work Slice is effective. Published selection-time dispositions above remain historical baseline and are not rewritten by later parallel-work state changes. |\n| 2026-09-30 | Code-truth audit | Confirmed current `WebSearchTool` owns routing; `tokio::select!` is first-completion; upstream `rust_websearch::search()` source identity is discarded; Tavily participates from env-key presence; Wikipedia is generic fallback. |\n| 2026-09-30 | Architecture candidate | Added ADR-085 and `docs/reference/I288-SEARCH-ARCHITECTURE-AUDIT-2026-09-30.md`; selected private SearchBackend + Talos SearchRouter inside `talos-tools`, no new crate, no startup probe/GeoIP routing, explicit premium usage and evidence-gated native providers. |\n| 2026-09-30 | Deterministic evidence | Added a test-only `tokio::select!` characterization proving a fast error can win before a later success; production `execute_search` remains unchanged. |
 
 ## Verification Evidence
 
-- Pending after finalized claim and architecture execution.
+- Implementation PR: #629.
+- Source/code-truth audit: `docs/reference/I288-SEARCH-ARCHITECTURE-AUDIT-2026-09-30.md`.
+- Architecture decision candidate: `docs/decisions/085-talos-owned-search-routing-boundary.md`.
+- Deterministic routing characterization: `select_pattern_propagates_fast_error_before_later_success` in `crates/talos-tools/src/web_search.rs`.
+- Exact-head focused/workspace/governance CI: pending implementation PR.
 
 ## Completion Evidence
 
