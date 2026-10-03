@@ -117,3 +117,7 @@ no unrelated dependency, Desktop or search-owner state is changed here.
 - Locked offline TUI tests: 594 unit, 2 integration and 2 doc tests passed, including two new history-return regressions.
 - README.md and README.zh-CN.md document the shortcut and transient-tip precedence.
 - Owner remains Review pending fresh exact-head CI/review and native terminal acceptance.
+
+## Maintainer Native Acceptance (2026-10-03)
+
+Maintainer confirmed in this session: scrolling history displays the Ctrl+Down hint; Ctrl+Down returns to the bottom without cancelling an active task. Native acceptance passed. Fresh exact-head CI and full preflight remain required before merge.
