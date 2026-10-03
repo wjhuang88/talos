@@ -72,7 +72,7 @@
 | [#625](https://github.com/wjhuang88/talos/issues/625) | search architecture audit, migration matrix and ADR | [SEARCH-001-A](../backlog/active/SEARCH-001-A-architecture-migration-contract.md) | Review / Claimed | I288 claim effective via #627 merge `6f651a28`; architecture-only PR #629 carries ADR-085/audit/test evidence, no production search behavior change. |
 | [#642](https://github.com/wjhuang88/talos/issues/642) | SearchBackend boundary with compatible adapters | [SEARCH-001-B](../backlog/active/SEARCH-001-B-search-backend-compatible-adapters.md) | Planned / Unclaimed | Follow-up child; implementation requires its own iteration and effective claim after SEARCH-001-A architecture acceptance. |
 | [#643](https://github.com/wjhuang88/talos/issues/643) | Talos-owned first-valid-success SearchRouter | [SEARCH-001-C](../backlog/active/SEARCH-001-C-search-router.md) | Planned / Unclaimed | Later child gated by SEARCH-001-B and NET-001 coordination; no current implementation authority. |
-| [#644](https://github.com/wjhuang88/talos/issues/644) | Native zero-key provider and regional evidence gate | [SEARCH-001-D](../backlog/active/SEARCH-001-D-provider-evidence.md) | Planned / Unclaimed | Research child may proceed only under its own iteration and claim; no production provider behavior is authorized. |
+| [#644](https://github.com/wjhuang88/talos/issues/644) | Native zero-key provider and regional evidence gate | [SEARCH-001-D](../backlog/active/SEARCH-001-D-native-provider-evidence.md) | Research / Unclaimed | Research child may proceed only under its own iteration and claim; no production provider behavior is authorized. |
 
 ## Synchronization Notes
 
