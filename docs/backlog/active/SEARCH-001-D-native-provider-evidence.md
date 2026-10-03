@@ -12,4 +12,5 @@
 | Exclusions | No production provider, regional routing, access-control bypass, or default behavior change. |
 
 Research may proceed only under a separately effective claim. This document is an intake owner
-only and does not authorize production implementation.
+only and does not authorize production implementation. Its dedicated owner ID prevents the remote
+reconciliation matrix from assigning the parent SEARCH-001 owner to multiple child issues.
