@@ -89,11 +89,11 @@ C waits for B delivery. D remains separately unclaimed. No release is authorized
 
 | Date | Type | Record |
 |---|---|---|
-| 2026-10-04 | Atomic claim+activation proposal | PR #651 proposes the bounded B/I292 claim and Active state; both remain ineffective until the finalized exact head reaches `main`. |
+| 2026-10-04 | Atomic claim+activation effective | PR #651 merged as `6490118fed913521ac9d1875ccd63fb5e3914af1`; I292 and the B claim are active on `main`. |
 
 ## Verification Evidence
 
-- Pending implementation claim and candidate PR.
+- Implementation candidate PR #653 adds the private typed boundary and deterministic fixtures; completion remains pending merge.
 
 ## Completion Evidence
 

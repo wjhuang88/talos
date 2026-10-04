@@ -10,7 +10,7 @@
 | Source Issue | [#642](https://github.com/wjhuang88/talos/issues/642) |
 | Depends on | Accepted ADR-085; SEARCH-001-A / #625 merged as `4567bf85` |
 | Selected Iteration | None; requires a separately selected bounded iteration |
-| Implementation PR | None |
+| Implementation PR | #653 (draft candidate) |
 | Last Updated | 2026-10-03 |
 
 ## Collaboration Claim
