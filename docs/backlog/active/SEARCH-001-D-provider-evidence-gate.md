@@ -1,6 +1,6 @@
 # SEARCH-001-D: Native Provider Admission And Regional Evidence
 
-**Status**: Proposed / Unclaimed
+**Status**: Proposed / Unclaimed; selected in I294
 **Type**: Research / Evidence Gate
 **Parent Epic**: [SEARCH-001](SEARCH-001-zero-config-global-search.md) / [Issue #624](https://github.com/wjhuang88/talos/issues/624)
 
@@ -9,7 +9,7 @@
 | Story ID | SEARCH-001-D |
 | Source Issue | [#644](https://github.com/wjhuang88/talos/issues/644) |
 | Depends on | Accepted ADR-085; SEARCH-001-A / #625 merged as `4567bf85` |
-| Selected Iteration | None; requires a separately selected bounded research iteration |
+| Selected Iteration | [I294](../../iterations/I294-search-provider-evidence.md) |
 | Implementation PR | None |
 | Last Updated | 2026-10-03 |
 
