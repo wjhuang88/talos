@@ -1,16 +1,8 @@
 # SEARCH-001-B: SearchBackend Compatible Adapters
 
-> Document status: Intake / Unclaimed
+**Status**: Planned / Unclaimed
+**Type**: Architecture / Implementation Child
+**Source Issue**: #642
 
-| Field | Value |
-|---|---|
-| Source Issue | #642 |
-| Parent | SEARCH-001 / #624 |
-| Status | Intake / Unclaimed |
-| Scope | Extract private SearchBackend request/result/error seams and preserve existing adapter behavior. |
-| Dependencies | ADR-085; SEARCH-001-A / #625 and #629 |
-| Exclusions | No production routing change, public API, provider addition, or generic retry behavior. |
-
-Implementation requires a separately effective claim and stable iteration. This document is an
-intake owner only. Its dedicated owner ID prevents the remote reconciliation matrix from
-assigning the parent SEARCH-001 owner to multiple child issues.
+Own the private SearchBackend extraction after SEARCH-001-A. No production behavior, provider,
+permission or release change is authorized before a separate effective claim.
