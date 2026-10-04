@@ -24,4 +24,3 @@ No production behavior change, provider addition, GeoIP routing, CAPTCHA/access-
 ## Acceptance
 
 The candidate matrix has dated evidence links and honest limitations; two independent native zero-key routes are explicitly admitted or remain blocked; E/F authorization is gated by the result.
-

@@ -26,4 +26,3 @@ No model-facing schema/output change, GeoIP or country routing, startup probe, g
 ## Acceptance
 
 Deterministic fixtures cover first-valid-success, fast-error/slow-success, all-fail, invalid result, timeout, cancellation and bounded hedging. Locked tests, governance validation, focused review and rollback evidence pass.
-
