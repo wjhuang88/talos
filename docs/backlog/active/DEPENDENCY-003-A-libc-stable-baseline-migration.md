@@ -1,13 +1,13 @@
 # DEPENDENCY-003-A: libc Stable Baseline Migration
 
-> Document status: Active / Claimed
+> Document status: Review / Claimed
 
 | Field | Value |
 |---|---|
 | Parent | DEPENDENCY-003 |
 | Type | Dependency Migration / Native Boundary Compatibility |
 | Priority | P2 |
-| Status | Active / Claimed |
+| Status | Review / Claimed |
 | Source | GitHub Issue #502 |
 | Selected Iteration | None |
 | Depends On | I250 completion; ADR-007; ADR-082; ARCH-034-R04; completed #502 libc route research plus current-main supervisor-surface refresh |
@@ -26,9 +26,9 @@
 | Governance Claim PR | #604 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | ADR-007, ADR-082 and the #502 2026-09-23 maintainer route decision establish the protected native/dependency boundary; PR #604 requires exact-head independent security/escape-vector review covering the complete current direct-libc surface, applicable CI, both governance validators and merge-time CAS before merge. |
-| Implementation PR | Not started |
-| Last Updated | 2026-09-29 |
-| Handoff / Release Condition | Merge #604 only after exact-head independent protected-scope review, CI, both governance validators and merge-time CAS. Start the implementation branch only from that merge or a later main commit; no Cargo or production implementation is authorized before then. |
+| Implementation PR | #645 |
+| Last Updated | 2026-10-04 |
+| Handoff / Release Condition | #604 is merged; #645 must satisfy every acceptance gate, exact-head CI and independent protected-scope review before merge-time CAS. Post-merge baseline and owner-first closeout remain separate. |
 
 ## Decision Basis
 
@@ -72,6 +72,43 @@ This owner does **not** authorize:
 If the 0.2 migration requires any excluded behavior change, stop and route that finding to a separately reviewed owner.
 
 ## Compatibility / Security Review Questions
+
+### 2026-10-04 Exact-Candidate ABI Matrix
+
+Candidate `1d23edc545c215c8fbaae09f3723c601c004c866` resolves `libc 0.2.186` in
+the workspace and `libc 0.2.189` in the independent SDK fixture. The source inventory
+below includes the ADR-082 additions absent from the earlier research pass.
+
+| Caller | API / ABI surface | Stable 0.2 comparison and boundary |
+|---|---|---|
+| `talos-sandbox/src/hardening.rs` | `rlimit`, `rlim_t`, `setrlimit`, `RLIMIT_CORE/CPU/AS` | Unix 0.2 retains the two-field 64-bit `rlimit` layout and target-specific resource parameter; existing casts and error handling are unchanged. |
+| `talos-tools/src/process_boundary.rs` | `setsid`, `unsetenv`, `setrlimit`, negative-PGID `kill`, `SIGTERM/SIGKILL`, `ESRCH` | Signatures and constants remain available under Unix cfg; existing ignored `setrlimit` result remains ARCH-034-R04-AG1, not fixed here. |
+| `talos-sandbox/src/supervisor.rs` | `pid_t`, `id_t`, `waitid(P_PID, WEXITED/WNOHANG/WNOWAIT)`, `siginfo_t::si_pid`, `setsid`, negative-PGID `kill`, `ECHILD/ESRCH/EPERM` | Stable 0.2 preserves the target-specific signatures, flags and `siginfo_t` accessor layout on Darwin and Linux musl x86_64/aarch64; existing ownership and fail-closed checks are unchanged. |
+| Darwin-only `supervisor.rs` | `proc_listpids(u32,u32,*mut c_void,c_int)`, local `PROC_PGRP_ONLY=2`, `pid_t` buffer | Stable 0.2 signature matches the macOS SDK `libproc.h`; selector value matches `sys/proc_info.h`. Two `pid_t` entries provide eight bytes and the one-entry result remains four bytes. |
+| Windows | Unix target dependencies and `cfg(unix)` callers | No Windows libc dependency or call path is introduced. |
+
+Independent read-only Agent security/API review approved this static comparison for the
+exact candidate and base `510dd64699846d44e553166eef3e1b43fa1683cb` on 2026-10-04.
+This is not a runtime ABI proof or a substitute for locked CI/platform tests. Existing
+group-escape limitations and ARCH-034-R04-AG1 remain unresolved.
+
+### 2026-10-04 Validation Checkpoint
+
+- PR #645 at `1d23edc545c215c8fbaae09f3723c601c004c866` / base
+  `510dd64699846d44e553166eef3e1b43fa1683cb`: CI run `37179680972`
+  passed its six jobs, including macOS workspace preflight, Linux Desktop and Windows workspace.
+  A later head containing this checkpoint requires fresh exact-head CI/review binding.
+- Local `cargo check --workspace --all-targets --all-features --locked` passed; focused
+  `talos-sandbox` and `talos-tools` tests passed (41 each, plus two sandbox doc tests).
+  Both governance validators passed with zero warnings.
+- Local `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`
+  failed on untouched `talos-core/src/capability.rs` test `unwrap_used` and
+  `talos-text/src/wasm_provider.rs` test `unwrap_used` / `items_after_test_module`.
+  Do not treat the narrower CI Clippy pass as satisfying this acceptance gate.
+- Rust 1.95 is the declared workspace MSRV; stable libc 0.2.186 declares 1.65.
+  A full workspace 1.95 build has not run because that toolchain is not installed locally.
+  All-feature workspace tests and all explicit minimal/default/optional combinations
+  are not yet evidenced. No acceptance exception is inferred from lack of evidence.
 
 Independent review must confirm:
 
