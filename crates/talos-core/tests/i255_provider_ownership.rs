@@ -39,7 +39,7 @@ fn collision_and_invalid_batch_leave_no_partial_registration() {
     assert_eq!(
         registry
             .register_owned(vec![provider("new"), provider("existing")])
-            .unwrap_err(),
+            .expect_err("duplicate provider registration must fail"),
         ProviderRegistrationError::Occupied("existing".into())
     );
     assert_eq!(resolve(&registry, "new"), ResolutionResult::Unavailable);

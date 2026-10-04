@@ -171,7 +171,7 @@ mod tests {
                 Some("background:bash:exact:test".to_owned()),
             )
             .await
-            .unwrap();
+            .expect("first background job reservation succeeds");
         let _permit2 = supervisor
             .reserve_with_permission_resource(
                 BackgroundJobRequest {
@@ -181,7 +181,7 @@ mod tests {
                 Some("background:bash:exact:test".to_owned()),
             )
             .await
-            .unwrap();
+            .expect("second background job reservation succeeds");
         let job_ids = supervisor.job_ids();
         assert_eq!(job_ids.len(), 2);
         let tool = ProcessTool::new(supervisor);
@@ -196,7 +196,7 @@ mod tests {
                     .remove(0);
                 assert_eq!(facet.nature, ToolNature::Execute);
                 assert_eq!(facet.resource_kind, Some(ToolResourceKind::Command));
-                facet.resource.unwrap()
+                facet.resource.expect("cancel facet has a job resource")
             })
             .collect::<Vec<_>>();
         assert_ne!(resources[0], resources[1]);

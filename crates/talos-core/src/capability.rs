@@ -361,8 +361,16 @@ mod tests {
     fn validates_nested_descriptors_and_major_compatibility() {
         let descriptor = provider("1.2.3");
         assert!(descriptor.validate().is_ok());
-        assert!(descriptor.is_compatible_with("1.9.0").unwrap());
-        assert!(!descriptor.is_compatible_with("2.0.0").unwrap());
+        assert!(
+            descriptor
+                .is_compatible_with("1.9.0")
+                .expect("valid compatible version")
+        );
+        assert!(
+            !descriptor
+                .is_compatible_with("2.0.0")
+                .expect("valid incompatible version")
+        );
     }
 
     #[test]
@@ -385,21 +393,25 @@ mod tests {
         let mut descriptor = provider("1.2.3");
         descriptor.metadata.insert("z".into(), "last".into());
         descriptor.metadata.insert("a".into(), "first".into());
-        let encoded = serde_json::to_string(&descriptor).unwrap();
-        let decoded: ProviderDescriptor = serde_json::from_str(&encoded).unwrap();
+        let encoded = serde_json::to_string(&descriptor).expect("serialize descriptor");
+        let decoded: ProviderDescriptor =
+            serde_json::from_str(&encoded).expect("deserialize descriptor");
         assert_eq!(descriptor, decoded);
         assert!(decoded.validate().is_ok());
-        assert_eq!(serde_json::to_string(&decoded).unwrap(), encoded);
-        assert!(encoded.find("\"a\"").unwrap() < encoded.find("\"z\"").unwrap());
+        assert_eq!(
+            serde_json::to_string(&decoded).expect("serialize decoded descriptor"),
+            encoded
+        );
+        assert!(encoded.find("\"a\"").expect("a key") < encoded.find("\"z\"").expect("z key"));
     }
 
     #[test]
     fn unknown_carrier_and_provenance_fail_closed() {
         let descriptor = provider("1.2.3");
-        let mut value = serde_json::to_value(&descriptor).unwrap();
+        let mut value = serde_json::to_value(&descriptor).expect("serialize descriptor");
         value["carrier"] = serde_json::json!("FutureCarrier");
         assert!(serde_json::from_value::<ProviderDescriptor>(value).is_err());
-        let mut value = serde_json::to_value(&descriptor).unwrap();
+        let mut value = serde_json::to_value(&descriptor).expect("serialize descriptor");
         value["provenance"] = serde_json::json!("FutureProvenance");
         assert!(serde_json::from_value::<ProviderDescriptor>(value).is_err());
     }
@@ -407,14 +419,19 @@ mod tests {
     #[test]
     fn legacy_origin_is_readable_but_never_inferred_as_built_in() {
         let legacy = r#"{"id":"provider.legacy","version":"1.0.0"}"#;
-        let descriptor: ProviderDescriptor = serde_json::from_str(legacy).unwrap();
+        let descriptor: ProviderDescriptor =
+            serde_json::from_str(legacy).expect("deserialize legacy descriptor");
         assert_eq!(descriptor.provenance, Provenance::Unknown);
         assert_eq!(descriptor.carrier, Carrier::Unknown);
         assert_eq!(descriptor.validate(), Err(DescriptorError::UnknownOrigin));
         for field in ["carrier", "provenance"] {
-            let mut value = serde_json::to_value(provider("1.0.0")).unwrap();
-            value.as_object_mut().unwrap().remove(field);
-            let decoded: ProviderDescriptor = serde_json::from_value(value).unwrap();
+            let mut value = serde_json::to_value(provider("1.0.0")).expect("serialize provider");
+            value
+                .as_object_mut()
+                .expect("descriptor serializes as an object")
+                .remove(field);
+            let decoded: ProviderDescriptor =
+                serde_json::from_value(value).expect("deserialize legacy provider");
             assert_eq!(decoded.validate(), Err(DescriptorError::UnknownOrigin));
         }
     }
@@ -436,8 +453,8 @@ mod tests {
         second.id = "a.provider".into();
         second.capabilities = vec![capability];
         let mut registry = CapabilityRegistry::default();
-        registry.register(first).unwrap();
-        registry.register(second).unwrap();
+        registry.register(first).expect("register first provider");
+        registry.register(second).expect("register second provider");
         let request = CapabilityRequest {
             capability_id: "text.search".into(),
             version: "1.0.0".into(),

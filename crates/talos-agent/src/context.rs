@@ -305,7 +305,10 @@ mod tests {
 
         let context = ContextLoader::new(child).load().expect("load failed");
         assert!(context.contains("(nearest project scope wins)"));
-        assert!(context.find("root rule").unwrap() < context.find("child rule").unwrap());
+        assert!(
+            context.find("root rule").expect("root rule is present")
+                < context.find("child rule").expect("child rule is present")
+        );
     }
 
     #[test]

@@ -101,10 +101,17 @@ group-escape limitations and ARCH-034-R04-AG1 remain unresolved.
 - Local `cargo check --workspace --all-targets --all-features --locked` passed; focused
   `talos-sandbox` and `talos-tools` tests passed (41 each, plus two sandbox doc tests).
   Both governance validators passed with zero warnings.
-- Local `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`
-  failed on untouched `talos-core/src/capability.rs` test `unwrap_used` and
-  `talos-text/src/wasm_provider.rs` test `unwrap_used` / `items_after_test_module`.
-  Do not treat the narrower CI Clippy pass as satisfying this acceptance gate.
+- The all-target/all-feature Clippy gate initially exposed test-only lints in the affected
+  packages. Those tests were updated to use descriptive `expect` diagnostics, and
+  `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` now passes.
+  No permission, process-hardening, or other production behavior was changed for these lint fixes.
+- A focused all-feature test run for `talos-agent`, `talos-core`, `talos-text`, and `talos-tools`
+  initially failed while linking with `No space left on device`; after removing only the
+  regenerable `target/debug/incremental` cache, the rerun completed compilation and all selected
+  tests except the opt-in `installed_language_plugins_drive_all_four_symbol_tools` test. That
+  test requires `TALOS_LANGUAGE_BUNDLE_ROOT` pointing at real packaged Rust/Python Bundles and
+  failed locally before exercising the migration. The missing fixture is an environment gate,
+  not a passing test result; the full workspace test and packaged-Bundle validation remain open.
 - Rust 1.95 is the declared workspace MSRV; stable libc 0.2.186 declares 1.65.
   A full workspace 1.95 build has not run because that toolchain is not installed locally.
   All-feature workspace tests and all explicit minimal/default/optional combinations

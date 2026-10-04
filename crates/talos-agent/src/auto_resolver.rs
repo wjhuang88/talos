@@ -3057,10 +3057,12 @@ mod tests {
         ));
         let calls = Arc::new(AtomicUsize::new(0));
         let control = AutoPermissionControl::new(false);
-        let lease =
-            ManagedWorkspaceLease::new(root.path(), state.session_id().unwrap().stable_id())
-                .expect("lease")
-                .with_atomic_create_capability(Arc::new(TestCapability));
+        let lease = ManagedWorkspaceLease::new(
+            root.path(),
+            state.session_id().expect("session has an ID").stable_id(),
+        )
+        .expect("lease")
+        .with_atomic_create_capability(Arc::new(TestCapability));
         let resolver = AutoPermissionResolver::new(
             Arc::new(CountingAssessor {
                 calls: calls.clone(),
@@ -3076,7 +3078,7 @@ mod tests {
             resolver
                 .resolve(request, Duration::from_secs(1))
                 .await
-                .unwrap(),
+                .expect("disabled resolver returns a decision"),
             ApprovalChoice::Deny
         );
         assert_eq!(calls.load(Ordering::Acquire), 0);
@@ -3087,7 +3089,7 @@ mod tests {
             resolver
                 .resolve(request, Duration::from_secs(1))
                 .await
-                .unwrap(),
+                .expect("enabled resolver returns a decision"),
             ApprovalChoice::ApproveOnce
         );
         assert_eq!(calls.load(Ordering::Acquire), 1);
@@ -3103,10 +3105,12 @@ mod tests {
         let control = AutoPermissionControl::new(true);
         let started = Arc::new(Notify::new());
         let release = Arc::new(Notify::new());
-        let lease =
-            ManagedWorkspaceLease::new(root.path(), state.session_id().unwrap().stable_id())
-                .expect("lease")
-                .with_atomic_create_capability(Arc::new(TestCapability));
+        let lease = ManagedWorkspaceLease::new(
+            root.path(),
+            state.session_id().expect("session has an ID").stable_id(),
+        )
+        .expect("lease")
+        .with_atomic_create_capability(Arc::new(TestCapability));
         let resolver = Arc::new(AutoPermissionResolver::new(
             Arc::new(BlockingAssessor {
                 started: started.clone(),
