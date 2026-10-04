@@ -313,8 +313,6 @@ pub struct AutoPermissionAssessmentContext {
     /// Bounded current-turn user intent; absent intent is never inferred.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user_intent: Option<String>,
-    /// Session-scoped BCP-47-style presentation hint. This is advisory model input only.
-    pub locale: String,
     /// Redacted trusted facts and closed classifier policy for this exact assessment.
     pub classifier: AutoClassifierContext,
 }
@@ -612,6 +610,16 @@ pub trait AutoPermissionAssessor: Send + Sync {
         request: AutoPermissionRequest,
         remaining: Duration,
     ) -> Result<String, String>;
+    /// Assesses a base request with a bounded presentation-only locale hint.
+    async fn assess_with_locale(&self, request: AutoPermissionRequest, _locale: &str, remaining: Duration) -> Result<String, String> {
+        self.assess(request, remaining).await
+    }
+
+    /// Assesses a contextual request with a bounded presentation-only locale hint.
+    async fn assess_with_context_and_locale(&self, request: AutoPermissionRequest, context: AutoPermissionAssessmentContext, _locale: &str, remaining: Duration) -> Result<String, String> {
+        self.assess_with_context(request, context, remaining).await
+    }
+
     /// Assesses a generic shell request with its exact bounded context.
     ///
     /// The default rejects the request so existing third-party assessors cannot accidentally
@@ -624,6 +632,11 @@ pub trait AutoPermissionAssessor: Send + Sync {
     ) -> Result<String, String> {
         Err("contextual auto assessment is unsupported".to_owned())
     }
+    /// Assesses script evidence with a presentation-only locale hint.
+    async fn assess_with_script_evidence_and_locale(&self, request: AutoPermissionRequest, context: AutoPermissionAssessmentContext, evidence: AutoScriptEvidence, _locale: &str, remaining: Duration) -> Result<String, String> {
+        self.assess_with_script_evidence(request, context, evidence, remaining).await
+    }
+
     /// Assesses full script evidence without permitting older adapters to silently omit it.
     ///
     /// Evidence is untrusted data and may be incomplete. A snapshot does not bind later
@@ -682,7 +695,7 @@ impl AutoPermissionAssessor for ProviderAutoPermissionAssessor {
         request: AutoPermissionRequest,
         remaining: Duration,
     ) -> Result<String, String> {
-        self.assess_payload(request, None, None, remaining).await
+        self.assess_payload(request, None, None, None, remaining).await
     }
 
     async fn assess_with_context(
@@ -691,8 +704,18 @@ impl AutoPermissionAssessor for ProviderAutoPermissionAssessor {
         context: AutoPermissionAssessmentContext,
         remaining: Duration,
     ) -> Result<String, String> {
-        self.assess_payload(request, Some(context), None, remaining)
+        self.assess_payload(request, Some(context), None, None, remaining)
             .await
+    }
+    async fn assess_with_locale(&self, request: AutoPermissionRequest, locale: &str, remaining: Duration) -> Result<String, String> {
+        self.assess_payload(request, None, Some(locale), None, remaining).await
+    }
+
+    async fn assess_with_context_and_locale(&self, request: AutoPermissionRequest, context: AutoPermissionAssessmentContext, locale: &str, remaining: Duration) -> Result<String, String> {
+        self.assess_payload(request, Some(context), Some(locale), None, remaining).await
+    }
+    async fn assess_with_script_evidence_and_locale(&self, request: AutoPermissionRequest, context: AutoPermissionAssessmentContext, evidence: AutoScriptEvidence, locale: &str, remaining: Duration) -> Result<String, String> {
+        self.assess_payload(request, Some(context), Some(locale), Some(evidence), remaining).await
     }
 
     async fn assess_with_script_evidence(
@@ -702,7 +725,7 @@ impl AutoPermissionAssessor for ProviderAutoPermissionAssessor {
         evidence: AutoScriptEvidence,
         remaining: Duration,
     ) -> Result<String, String> {
-        self.assess_payload(request, Some(context), Some(evidence), remaining)
+        self.assess_payload(request, Some(context), None, Some(evidence), remaining)
             .await
     }
 
@@ -716,11 +739,15 @@ impl ProviderAutoPermissionAssessor {
         &self,
         request: AutoPermissionRequest,
         context: Option<AutoPermissionAssessmentContext>,
+        locale: Option<&str>,
         evidence: Option<AutoScriptEvidence>,
         remaining: Duration,
     ) -> Result<String, String> {
         let contextual = context.is_some();
         let mut payload = assessment_payload_value(&request, context.as_ref())?;
+        if let Some(locale) = locale {
+            payload["locale"] = serde_json::Value::String(locale.to_owned());
+        }
         if let Some(evidence) = evidence {
             payload["script_evidence"] =
                 serde_json::to_value(evidence).map_err(|error| error.to_string())?;
@@ -988,10 +1015,6 @@ fn assessment_payload_value(
                 serde_json::Value::String(user_intent.clone()),
             );
         }
-        object.insert(
-            "locale".to_owned(),
-            serde_json::Value::String(context.locale.clone()),
-        );
         object.insert(
             "classifier_context".to_owned(),
             serde_json::to_value(&context.classifier).map_err(|error| error.to_string())?,
@@ -1437,7 +1460,6 @@ fn eligible_bash(
             kind: AutoAssessmentKind::GenericShell,
             shell: context,
             user_intent,
-            locale: ConversationLocale::configured().as_str().to_owned(),
             classifier: classifier_context(
                 lease,
                 if request.tool_name == "bash" {
@@ -1621,8 +1643,10 @@ impl ApprovalResolver for AutoPermissionResolver {
         let Ok(mut current) = self.locale.lock() else {
             return;
         };
+        let configured = ConversationLocale::configured();
+        *current = configured.clone();
         for message in messages {
-            let detected = ConversationLocale::detect(message, &current);
+            let detected = ConversationLocale::detect(message, &configured);
             if detected != *current {
                 *current = detected;
             }
@@ -1847,9 +1871,6 @@ impl AutoPermissionResolver {
                 .resolve_with_explanation(request, remaining, explanation)
                 .await;
         };
-        if let Some(context) = evaluator_request.context.as_mut() {
-            context.locale = locale.as_str().to_owned();
-        }
         let budget = remaining.min(self.deadline);
         let started = Instant::now();
         let assessment_epoch = self.control.reset_epoch();
@@ -1857,21 +1878,22 @@ impl AutoPermissionResolver {
             if let Some(context) = evaluator_request.context.clone() {
                 if let Some(evidence) = evaluator_request.script_evidence.clone() {
                     self.assessor
-                        .assess_with_script_evidence(
+                        .assess_with_script_evidence_and_locale(
                             evaluator_request.request.clone(),
                             context,
                             evidence,
+                            locale.as_str(),
                             budget,
                         )
                         .await
                 } else {
                     self.assessor
-                        .assess_with_context(evaluator_request.request.clone(), context, budget)
+                        .assess_with_context_and_locale(evaluator_request.request.clone(), context, locale.as_str(), budget)
                         .await
                 }
             } else {
                 self.assessor
-                    .assess(evaluator_request.request.clone(), budget)
+                    .assess_with_locale(evaluator_request.request.clone(), locale.as_str(), budget)
                     .await
             }
         };
