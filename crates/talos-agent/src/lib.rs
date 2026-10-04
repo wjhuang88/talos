@@ -814,18 +814,37 @@ impl Agent {
 
         if let Some(pipeline) = self.permission_pipeline.as_ref() {
             const MAX_OBSERVED_USER_MESSAGES: usize = 8;
-            let observed_user_messages: Vec<String> = messages
-                .iter()
-                .filter_map(|message| match message {
-                    Message::User { content } => Some(content.clone()),
-                    _ => None,
-                })
-                .rev()
-                .take(MAX_OBSERVED_USER_MESSAGES)
-                .collect::<Vec<_>>()
-                .into_iter()
-                .rev()
-                .collect();
+            const MAX_OBSERVED_USER_BYTES: usize = 16 * 1024;
+            let mut observed_user_messages = Vec::with_capacity(MAX_OBSERVED_USER_MESSAGES);
+            let mut observed_bytes = 0usize;
+            for message in messages.iter().rev() {
+                let Message::User { content } = message else {
+                    continue;
+                };
+                if observed_user_messages.len() >= MAX_OBSERVED_USER_MESSAGES
+                    || observed_bytes >= MAX_OBSERVED_USER_BYTES
+                {
+                    break;
+                }
+                let remaining = MAX_OBSERVED_USER_BYTES - observed_bytes;
+                let bounded: String = content
+                    .chars()
+                    .take(4096)
+                    .scan(0usize, |bytes, ch| {
+                        let next = *bytes + ch.len_utf8();
+                        (next <= remaining).then(|| {
+                            *bytes = next;
+                            ch
+                        })
+                    })
+                    .collect();
+                if bounded.is_empty() {
+                    continue;
+                }
+                observed_bytes += bounded.len();
+                observed_user_messages.push(bounded);
+            }
+            observed_user_messages.reverse();
             pipeline.observe_user_messages_for_session(&observed_user_messages);
         }
 

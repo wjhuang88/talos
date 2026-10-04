@@ -313,6 +313,8 @@ pub struct AutoPermissionAssessmentContext {
     /// Bounded current-turn user intent; absent intent is never inferred.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user_intent: Option<String>,
+    /// Session-scoped BCP-47-style presentation hint. This is advisory model input only.
+    pub locale: String,
     /// Redacted trusted facts and closed classifier policy for this exact assessment.
     pub classifier: AutoClassifierContext,
 }
@@ -544,7 +546,11 @@ fn human_review_explanation(
         .take(3)
         .collect();
     if points.is_empty() {
-        explanation.push_str("\nThe assessment supplied no usable specific decision points (missing or filtered for safety). Its explanation is incomplete; this is not evidence that the command is dangerous. Inspect the displayed command independently, or cancel if its effects are unclear.");
+        explanation.push_str(match language {
+            "zh" => "\n评估没有提供可用的具体决策点（可能缺失或因安全原因被过滤）。说明不完整；这不代表命令一定危险。请独立检查显示的命令，或在影响不明确时取消。",
+            "ja" => "\n評価には利用可能な具体的な判断点がありません（欠落または安全上の理由で除外された可能性があります）。説明は不完全です。これはコマンドが危険だという証拠ではありません。表示されたコマンドを独自に確認し、不明な場合はキャンセルしてください。",
+            _ => "\nThe assessment supplied no usable specific decision points (missing or filtered for safety). Its explanation is incomplete; this is not evidence that the command is dangerous. Inspect the displayed command independently, or cancel if its effects are unclear.",
+        });
     } else {
         for point in points {
             explanation.push_str(match language {
@@ -1507,7 +1513,15 @@ fn eligible_bash(
         context: Some(AutoPermissionAssessmentContext {
             kind: AutoAssessmentKind::GenericShell,
             shell: context,
-            user_intent,
+            user_intent: user_intent.clone(),
+            locale: user_intent
+                .as_deref()
+                .map(|intent| {
+                    ConversationLocale::detect(intent, &ConversationLocale::configured())
+                        .as_str()
+                        .to_owned()
+                })
+                .unwrap_or_else(|| ConversationLocale::configured().as_str().to_owned()),
             classifier: classifier_context(
                 lease,
                 if request.tool_name == "bash" {
