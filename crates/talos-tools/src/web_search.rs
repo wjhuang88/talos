@@ -13,6 +13,10 @@ use serde_json::Value;
 use talos_core::tool::{AgentTool, ToolFamily, ToolNature, ToolResult};
 use thiserror::Error;
 
+use crate::search_backend::{
+    SearchBackend, SearchBackendError, SearchBackendId, SearchBackendRequest, SearchBackendResult,
+};
+
 // ---------------------------------------------------------------------------
 // Error type
 // ---------------------------------------------------------------------------
@@ -75,6 +79,72 @@ enum ResultSource {
     Tavily,
     SearXNG,
     Wikipedia,
+}
+
+/// Compatibility adapter that gives each existing path the private backend shape.
+///
+/// The adapter delegates to the established methods below, so this slice only changes
+/// the internal boundary and normalization point; request policy and output stay intact.
+struct CompatibilityBackend<'a> {
+    tool: &'a WebSearchTool,
+    id: SearchBackendId,
+}
+
+impl<'a> CompatibilityBackend<'a> {
+    fn new(tool: &'a WebSearchTool, id: SearchBackendId) -> Self {
+        Self { tool, id }
+    }
+}
+
+#[async_trait]
+impl SearchBackend for CompatibilityBackend<'_> {
+    fn id(&self) -> SearchBackendId {
+        self.id
+    }
+
+    async fn search(
+        &self,
+        request: SearchBackendRequest,
+    ) -> Result<Vec<SearchBackendResult>, SearchBackendError> {
+        let max_results = request.max_results;
+        let results = match self.id {
+            SearchBackendId::DuckDuckGo => {
+                self.tool
+                    .search_duckduckgo(&request.query, max_results)
+                    .await
+            }
+            SearchBackendId::Tavily => {
+                self.tool
+                    .search_tavily(&request.query, max_results, true)
+                    .await
+            }
+            SearchBackendId::SearXng => self.tool.search_searxng(&request.query, max_results).await,
+            SearchBackendId::Wikipedia => {
+                self.tool
+                    .search_wikipedia(&request.query, max_results)
+                    .await
+            }
+        }
+        .map_err(|error| {
+            if matches!(self.id, SearchBackendId::Tavily | SearchBackendId::SearXng)
+                && (error.contains("not set") || error.contains("not configured"))
+            {
+                SearchBackendError::NotConfigured
+            } else {
+                SearchBackendError::RequestFailed(error)
+            }
+        })?;
+
+        Ok(results
+            .into_iter()
+            .map(|result| SearchBackendResult {
+                backend: self.id,
+                title: result.title,
+                url: result.url,
+                snippet: result.snippet,
+            })
+            .collect())
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -323,6 +393,14 @@ impl WebSearchTool {
         Ok(results)
     }
 
+    async fn run_backend(
+        &self,
+        id: SearchBackendId,
+        request: SearchBackendRequest,
+    ) -> Result<Vec<SearchBackendResult>, SearchBackendError> {
+        CompatibilityBackend::new(self, id).search(request).await
+    }
+
     /// Run all available backends in parallel (race), with fallback chain.
     ///
     /// Only configured backends participate in the race. Unconfigured
@@ -334,24 +412,37 @@ impl WebSearchTool {
         max_results: u32,
         include_snippets: bool,
     ) -> (Vec<WebResult>, ResultSource) {
+        let request = SearchBackendRequest {
+            query: query.to_string(),
+            max_results,
+        };
+
         // DuckDuckGo — always available (zero config).
-        let ddg_fut = self.search_duckduckgo(query, max_results);
+        let ddg_fut = self.run_backend(SearchBackendId::DuckDuckGo, request.clone());
 
         // Tavily — only race if API key is set. Otherwise never completes,
         // so it can't steal the race with a "not configured" error.
         let tavily_fut: std::pin::Pin<
-            Box<dyn std::future::Future<Output = Result<Vec<WebResult>, String>> + Send>,
+            Box<
+                dyn std::future::Future<
+                        Output = Result<Vec<SearchBackendResult>, SearchBackendError>,
+                    > + Send,
+            >,
         > = if self.tavily_api_key.is_some() {
-            Box::pin(self.search_tavily(query, max_results, include_snippets))
+            Box::pin(self.run_backend(SearchBackendId::Tavily, request.clone()))
         } else {
             Box::pin(std::future::pending())
         };
 
         // SearXNG — same pattern as Tavily.
         let searxng_fut: std::pin::Pin<
-            Box<dyn std::future::Future<Output = Result<Vec<WebResult>, String>> + Send>,
+            Box<
+                dyn std::future::Future<
+                        Output = Result<Vec<SearchBackendResult>, SearchBackendError>,
+                    > + Send,
+            >,
         > = if self.searxng_url.is_some() {
-            Box::pin(self.search_searxng(query, max_results))
+            Box::pin(self.run_backend(SearchBackendId::SearXng, request.clone()))
         } else {
             Box::pin(std::future::pending())
         };
@@ -365,11 +456,39 @@ impl WebSearchTool {
         };
 
         match race_result {
-            Ok((results, source)) => (results, source),
+            Ok((results, source)) => (
+                results
+                    .into_iter()
+                    .map(|result| WebResult {
+                        title: result.title,
+                        url: result.url,
+                        snippet: if include_snippets {
+                            result.snippet
+                        } else {
+                            String::new()
+                        },
+                    })
+                    .collect(),
+                source,
+            ),
             Err(_) => {
                 // All participating backends failed. Try Wikipedia as last resort.
-                match self.search_wikipedia(query, max_results).await {
-                    Ok(results) => (results, ResultSource::Wikipedia),
+                match self.run_backend(SearchBackendId::Wikipedia, request).await {
+                    Ok(results) => (
+                        results
+                            .into_iter()
+                            .map(|result| WebResult {
+                                title: result.title,
+                                url: result.url,
+                                snippet: if include_snippets {
+                                    result.snippet
+                                } else {
+                                    String::new()
+                                },
+                            })
+                            .collect(),
+                        ResultSource::Wikipedia,
+                    ),
                     Err(_) => (vec![], ResultSource::Wikipedia),
                 }
             }
