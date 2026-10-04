@@ -94,3 +94,7 @@ Phase 1 implementation commit: `9bb565e09f5e0f3de8602183b4a670bf63f0aefc` (PR #6
 PR #652 merged at `9582733cca444c3ccfe70faf9daff869757c7fcf`; exact-head CI run 2988 and
 independent API/security review passed. Product status remains Review / Claimed. See I291
 Execution Evidence And Remaining Acceptance for the outstanding matrix and resume sequence.
+
+The Stage A+B+C candidate now adds confidence-aware majority aggregation, supported-script and
+fallback fixtures, and permission-session isolation coverage; it remains pending PR review and
+exact-head CI.

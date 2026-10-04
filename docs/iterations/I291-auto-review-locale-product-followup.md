@@ -90,3 +90,22 @@ Resume in this owner and existing Work Slice: implement and locally test detecto
 and session tracking together, then capture multilingual assessor/surface evidence and measure cost.
 Submit one converged follow-up candidate with fresh exact-head CI and independent review.
 Keep AUTO-UX-001, I290, I291 Review / Claimed and #590 open until all published acceptance rows pass.
+
+## Stage A+B+C Candidate Evidence (2026-10-04)
+
+The first acceptance candidate changes locale aggregation from last-message-wins to a bounded
+majority selection over the observed session window. Detection now records an internal confidence
+level: high/medium script-majority, medium English heuristic, and low for short, code-like,
+ambiguous or unsupported input. Low-confidence observations retain the configured fallback.
+Supported-script fixtures cover `zh`, `en`, `ja`, `ko`, `ru`, `ar` and `hi`; mixed/unsupported
+inputs fall back deterministically. Session-scoped observation tests prove that a foreign session
+cannot mutate the resolver and that a resumed bounded history selects the majority locale.
+
+Local evidence for this candidate:
+
+- `cargo fmt --all -- --check`
+- `CARGO_BUILD_JOBS=2 cargo test -p talos-agent --lib` — 433 passed
+- targeted locale and session-observation tests — passed
+
+This is an in-progress acceptance candidate. UI locale wiring, real assessor prompt capture,
+provider failure-path evidence, performance measurement and user documentation remain open.
