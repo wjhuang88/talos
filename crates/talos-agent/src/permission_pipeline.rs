@@ -99,6 +99,15 @@ pub struct PermissionAuthorizationRequest<'a> {
 /// Surface adapter that resolves an already-evaluated `Ask`.
 #[async_trait]
 pub trait ApprovalResolver: Send + Sync {
+    /// Observes bounded user-authored messages for presentation-only session context.
+    fn observe_user_messages(&self, _messages: &[String]) {}
+
+    /// Observes messages only when they belong to the resolver's permission session.
+    /// The default preserves compatibility with existing surface resolvers.
+    fn observe_user_messages_for_session(&self, _session_id: &str, messages: &[String]) {
+        self.observe_user_messages(messages);
+    }
+
     /// Resolves only the bounded approval scope; policy and execution remain Agent-owned.
     async fn resolve(
         &self,
@@ -273,6 +282,24 @@ impl PermissionPipeline {
     }
 
     /// Evaluates, resolves and admits one exact normalized request.
+    /// Feeds bounded user-authored messages to the resolver without changing authorization input.
+    pub fn observe_user_messages(&self, messages: &[String]) {
+        if let Some(resolver) = self.resolver.as_ref() {
+            resolver.observe_user_messages(messages);
+        }
+    }
+
+    /// Feeds presentation context while binding it to this pipeline's session identity.
+    pub fn observe_user_messages_for_session(&self, messages: &[String]) {
+        let Ok(session_id) = self.state.session_id() else {
+            return;
+        };
+        if let Some(resolver) = self.resolver.as_ref() {
+            let stable_id = session_id.stable_id();
+            resolver.observe_user_messages_for_session(&stable_id, messages);
+        }
+    }
+
     pub async fn authorize(
         &self,
         authorization: PermissionAuthorizationRequest<'_>,

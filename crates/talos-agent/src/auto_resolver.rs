@@ -502,6 +502,7 @@ fn human_review_explanation(
     configured_ask: bool,
     locale: &str,
 ) -> String {
+    let language = locale.split('-').next().unwrap_or(locale);
     let safe = |text: &str, limit| {
         !text.trim().is_empty()
             && text.len() <= limit
@@ -509,7 +510,7 @@ fn human_review_explanation(
             && !contains_secret_like_shell_input(text)
             && !contains_sensitive_shell_target(text)
     };
-    let mut explanation = match (locale, configured_ask) {
+    let mut explanation = match (language, configured_ask) {
         ("zh", true) => "权限规则要求人工确认；模型评估不能覆盖该要求。".to_owned(),
         ("zh", false) => "模型评估需要你作出决定；它不会授予执行权限。".to_owned(),
         ("ja", true) => {
@@ -531,7 +532,7 @@ fn human_review_explanation(
         .as_deref()
         .filter(|text| safe(text, 512))
     {
-        explanation.push_str(match locale {
+        explanation.push_str(match language {
             "zh" => "\n模型报告的影响：",
             "ja" => "\nモデルが報告した影響：",
             _ => "\nModel-reported effect: ",
@@ -545,10 +546,14 @@ fn human_review_explanation(
         .take(3)
         .collect();
     if points.is_empty() {
-        explanation.push_str("\nThe assessment supplied no usable specific decision points (missing or filtered for safety). Its explanation is incomplete; this is not evidence that the command is dangerous. Inspect the displayed command independently, or cancel if its effects are unclear.");
+        explanation.push_str(match language {
+            "zh" => "\n评估没有提供可用的具体决策点（可能缺失或因安全原因被过滤）。说明不完整；这不代表命令一定危险。请独立检查显示的命令，或在影响不明确时取消。",
+            "ja" => "\n評価には利用可能な具体的な判断点がありません（欠落または安全上の理由で除外された可能性があります）。説明は不完全です。これはコマンドが危険だという証拠ではありません。表示されたコマンドを独自に確認し、不明な場合はキャンセルしてください。",
+            _ => "\nThe assessment supplied no usable specific decision points (missing or filtered for safety). Its explanation is incomplete; this is not evidence that the command is dangerous. Inspect the displayed command independently, or cancel if its effects are unclear.",
+        });
     } else {
         for point in points {
-            explanation.push_str(match locale {
+            explanation.push_str(match language {
                 "zh" => "\n需要决定：",
                 "ja" => "\n判断が必要です：",
                 _ => "\nDecision needed: ",
@@ -612,6 +617,27 @@ pub trait AutoPermissionAssessor: Send + Sync {
         request: AutoPermissionRequest,
         remaining: Duration,
     ) -> Result<String, String>;
+    /// Assesses a base request with a bounded presentation-only locale hint.
+    async fn assess_with_locale(
+        &self,
+        request: AutoPermissionRequest,
+        _locale: &str,
+        remaining: Duration,
+    ) -> Result<String, String> {
+        self.assess(request, remaining).await
+    }
+
+    /// Assesses a contextual request with a bounded presentation-only locale hint.
+    async fn assess_with_context_and_locale(
+        &self,
+        request: AutoPermissionRequest,
+        context: AutoPermissionAssessmentContext,
+        _locale: &str,
+        remaining: Duration,
+    ) -> Result<String, String> {
+        self.assess_with_context(request, context, remaining).await
+    }
+
     /// Assesses a generic shell request with its exact bounded context.
     ///
     /// The default rejects the request so existing third-party assessors cannot accidentally
@@ -624,6 +650,19 @@ pub trait AutoPermissionAssessor: Send + Sync {
     ) -> Result<String, String> {
         Err("contextual auto assessment is unsupported".to_owned())
     }
+    /// Assesses script evidence with a presentation-only locale hint.
+    async fn assess_with_script_evidence_and_locale(
+        &self,
+        request: AutoPermissionRequest,
+        context: AutoPermissionAssessmentContext,
+        evidence: AutoScriptEvidence,
+        _locale: &str,
+        remaining: Duration,
+    ) -> Result<String, String> {
+        self.assess_with_script_evidence(request, context, evidence, remaining)
+            .await
+    }
+
     /// Assesses full script evidence without permitting older adapters to silently omit it.
     ///
     /// Evidence is untrusted data and may be incomplete. A snapshot does not bind later
@@ -682,7 +721,8 @@ impl AutoPermissionAssessor for ProviderAutoPermissionAssessor {
         request: AutoPermissionRequest,
         remaining: Duration,
     ) -> Result<String, String> {
-        self.assess_payload(request, None, None, remaining).await
+        self.assess_payload(request, None, None, None, remaining)
+            .await
     }
 
     async fn assess_with_context(
@@ -691,8 +731,45 @@ impl AutoPermissionAssessor for ProviderAutoPermissionAssessor {
         context: AutoPermissionAssessmentContext,
         remaining: Duration,
     ) -> Result<String, String> {
-        self.assess_payload(request, Some(context), None, remaining)
+        self.assess_payload(request, Some(context), None, None, remaining)
             .await
+    }
+    async fn assess_with_locale(
+        &self,
+        request: AutoPermissionRequest,
+        locale: &str,
+        remaining: Duration,
+    ) -> Result<String, String> {
+        self.assess_payload(request, None, Some(locale), None, remaining)
+            .await
+    }
+
+    async fn assess_with_context_and_locale(
+        &self,
+        request: AutoPermissionRequest,
+        context: AutoPermissionAssessmentContext,
+        locale: &str,
+        remaining: Duration,
+    ) -> Result<String, String> {
+        self.assess_payload(request, Some(context), Some(locale), None, remaining)
+            .await
+    }
+    async fn assess_with_script_evidence_and_locale(
+        &self,
+        request: AutoPermissionRequest,
+        context: AutoPermissionAssessmentContext,
+        evidence: AutoScriptEvidence,
+        locale: &str,
+        remaining: Duration,
+    ) -> Result<String, String> {
+        self.assess_payload(
+            request,
+            Some(context),
+            Some(locale),
+            Some(evidence),
+            remaining,
+        )
+        .await
     }
 
     async fn assess_with_script_evidence(
@@ -702,7 +779,7 @@ impl AutoPermissionAssessor for ProviderAutoPermissionAssessor {
         evidence: AutoScriptEvidence,
         remaining: Duration,
     ) -> Result<String, String> {
-        self.assess_payload(request, Some(context), Some(evidence), remaining)
+        self.assess_payload(request, Some(context), None, Some(evidence), remaining)
             .await
     }
 
@@ -716,11 +793,15 @@ impl ProviderAutoPermissionAssessor {
         &self,
         request: AutoPermissionRequest,
         context: Option<AutoPermissionAssessmentContext>,
+        locale: Option<&str>,
         evidence: Option<AutoScriptEvidence>,
         remaining: Duration,
     ) -> Result<String, String> {
         let contextual = context.is_some();
         let mut payload = assessment_payload_value(&request, context.as_ref())?;
+        if let Some(locale) = locale {
+            payload["locale"] = serde_json::Value::String(locale.to_owned());
+        }
         if let Some(evidence) = evidence {
             payload["script_evidence"] =
                 serde_json::to_value(evidence).map_err(|error| error.to_string())?;
@@ -988,10 +1069,6 @@ fn assessment_payload_value(
                 serde_json::Value::String(user_intent.clone()),
             );
         }
-        object.insert(
-            "locale".to_owned(),
-            serde_json::Value::String(context.locale.clone()),
-        );
         object.insert(
             "classifier_context".to_owned(),
             serde_json::to_value(&context.classifier).map_err(|error| error.to_string())?,
@@ -1436,8 +1513,15 @@ fn eligible_bash(
         context: Some(AutoPermissionAssessmentContext {
             kind: AutoAssessmentKind::GenericShell,
             shell: context,
-            user_intent,
-            locale: ConversationLocale::configured().as_str().to_owned(),
+            user_intent: user_intent.clone(),
+            locale: user_intent
+                .as_deref()
+                .map(|intent| {
+                    ConversationLocale::detect(intent, &ConversationLocale::configured())
+                        .as_str()
+                        .to_owned()
+                })
+                .unwrap_or_else(|| ConversationLocale::configured().as_str().to_owned()),
             classifier: classifier_context(
                 lease,
                 if request.tool_name == "bash" {
@@ -1615,8 +1699,34 @@ fn project_auto_request(
         .or_else(|| eligible_bash(request, lease, user_intent))
 }
 
+impl AutoPermissionResolver {
+    fn observe_locale(&self, messages: &[String]) {
+        let Ok(mut current) = self.locale.lock() else {
+            return;
+        };
+        let configured = ConversationLocale::configured();
+        *current = configured.clone();
+        for message in messages {
+            let detected = ConversationLocale::detect(message, &configured);
+            if detected != *current {
+                *current = detected;
+            }
+        }
+    }
+}
+
 #[async_trait]
 impl ApprovalResolver for AutoPermissionResolver {
+    fn observe_user_messages(&self, messages: &[String]) {
+        self.observe_locale(messages);
+    }
+
+    fn observe_user_messages_for_session(&self, session_id: &str, messages: &[String]) {
+        if self.lease.matches_session(session_id) {
+            self.observe_locale(messages);
+        }
+    }
+
     async fn resolve(
         &self,
         request: PermissionApprovalRequest,
@@ -1795,7 +1905,7 @@ impl AutoPermissionResolver {
             });
             return self.fallback.resolve(request, remaining).await;
         }
-        let Some(mut evaluator_request) =
+        let Some(evaluator_request) =
             project_auto_request(&assessment_request, &self.lease, user_intent)
         else {
             let shell = matches!(assessment_request.tool_name.as_str(), "bash" | "powershell");
@@ -1835,9 +1945,6 @@ impl AutoPermissionResolver {
                 .resolve_with_explanation(request, remaining, explanation)
                 .await;
         };
-        if let Some(context) = evaluator_request.context.as_mut() {
-            context.locale = locale.as_str().to_owned();
-        }
         let budget = remaining.min(self.deadline);
         let started = Instant::now();
         let assessment_epoch = self.control.reset_epoch();
@@ -1845,21 +1952,27 @@ impl AutoPermissionResolver {
             if let Some(context) = evaluator_request.context.clone() {
                 if let Some(evidence) = evaluator_request.script_evidence.clone() {
                     self.assessor
-                        .assess_with_script_evidence(
+                        .assess_with_script_evidence_and_locale(
                             evaluator_request.request.clone(),
                             context,
                             evidence,
+                            locale.as_str(),
                             budget,
                         )
                         .await
                 } else {
                     self.assessor
-                        .assess_with_context(evaluator_request.request.clone(), context, budget)
+                        .assess_with_context_and_locale(
+                            evaluator_request.request.clone(),
+                            context,
+                            locale.as_str(),
+                            budget,
+                        )
                         .await
                 }
             } else {
                 self.assessor
-                    .assess(evaluator_request.request.clone(), budget)
+                    .assess_with_locale(evaluator_request.request.clone(), locale.as_str(), budget)
                     .await
             }
         };
@@ -3246,6 +3359,14 @@ mod tests {
     fn localized_human_explanation_keeps_permission_boundary() {
         let response = parse_auto_response(r#"{"schema_version":1,"request_digest":"test","decision":"human_required","reason_code":"uncertain","confidence":"low","effect_summary":"写入文件","decision_points":["是否允许？"]}"#).expect("response");
         let explanation = human_review_explanation(&response, false, "zh");
+        assert!(explanation.contains("不会授予执行权限"));
+        assert!(explanation.contains("需要决定"));
+    }
+
+    #[test]
+    fn localized_human_explanation_accepts_bcp47_language_tags() {
+        let response = parse_auto_response(r#"{"schema_version":1,"request_digest":"test","decision":"human_required","reason_code":"uncertain","confidence":"low","effect_summary":"写入文件","decision_points":["是否允许？"]}"#).expect("response");
+        let explanation = human_review_explanation(&response, false, "zh-CN");
         assert!(explanation.contains("不会授予执行权限"));
         assert!(explanation.contains("需要决定"));
     }
