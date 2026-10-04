@@ -500,6 +500,7 @@ fn human_review_explanation(
     configured_ask: bool,
     locale: &str,
 ) -> String {
+    let language = locale.split('-').next().unwrap_or(locale);
     let safe = |text: &str, limit| {
         !text.trim().is_empty()
             && text.len() <= limit
@@ -507,7 +508,7 @@ fn human_review_explanation(
             && !contains_secret_like_shell_input(text)
             && !contains_sensitive_shell_target(text)
     };
-    let mut explanation = match (locale, configured_ask) {
+    let mut explanation = match (language, configured_ask) {
         ("zh", true) => "权限规则要求人工确认；模型评估不能覆盖该要求。".to_owned(),
         ("zh", false) => "模型评估需要你作出决定；它不会授予执行权限。".to_owned(),
         ("ja", true) => {
@@ -529,7 +530,7 @@ fn human_review_explanation(
         .as_deref()
         .filter(|text| safe(text, 512))
     {
-        explanation.push_str(match locale {
+        explanation.push_str(match language {
             "zh" => "\n模型报告的影响：",
             "ja" => "\nモデルが報告した影響：",
             _ => "\nModel-reported effect: ",
@@ -546,7 +547,7 @@ fn human_review_explanation(
         explanation.push_str("\nThe assessment supplied no usable specific decision points (missing or filtered for safety). Its explanation is incomplete; this is not evidence that the command is dangerous. Inspect the displayed command independently, or cancel if its effects are unclear.");
     } else {
         for point in points {
-            explanation.push_str(match locale {
+            explanation.push_str(match language {
                 "zh" => "\n需要决定：",
                 "ja" => "\n判断が必要です：",
                 _ => "\nDecision needed: ",
@@ -611,12 +612,23 @@ pub trait AutoPermissionAssessor: Send + Sync {
         remaining: Duration,
     ) -> Result<String, String>;
     /// Assesses a base request with a bounded presentation-only locale hint.
-    async fn assess_with_locale(&self, request: AutoPermissionRequest, _locale: &str, remaining: Duration) -> Result<String, String> {
+    async fn assess_with_locale(
+        &self,
+        request: AutoPermissionRequest,
+        _locale: &str,
+        remaining: Duration,
+    ) -> Result<String, String> {
         self.assess(request, remaining).await
     }
 
     /// Assesses a contextual request with a bounded presentation-only locale hint.
-    async fn assess_with_context_and_locale(&self, request: AutoPermissionRequest, context: AutoPermissionAssessmentContext, _locale: &str, remaining: Duration) -> Result<String, String> {
+    async fn assess_with_context_and_locale(
+        &self,
+        request: AutoPermissionRequest,
+        context: AutoPermissionAssessmentContext,
+        _locale: &str,
+        remaining: Duration,
+    ) -> Result<String, String> {
         self.assess_with_context(request, context, remaining).await
     }
 
@@ -633,8 +645,16 @@ pub trait AutoPermissionAssessor: Send + Sync {
         Err("contextual auto assessment is unsupported".to_owned())
     }
     /// Assesses script evidence with a presentation-only locale hint.
-    async fn assess_with_script_evidence_and_locale(&self, request: AutoPermissionRequest, context: AutoPermissionAssessmentContext, evidence: AutoScriptEvidence, _locale: &str, remaining: Duration) -> Result<String, String> {
-        self.assess_with_script_evidence(request, context, evidence, remaining).await
+    async fn assess_with_script_evidence_and_locale(
+        &self,
+        request: AutoPermissionRequest,
+        context: AutoPermissionAssessmentContext,
+        evidence: AutoScriptEvidence,
+        _locale: &str,
+        remaining: Duration,
+    ) -> Result<String, String> {
+        self.assess_with_script_evidence(request, context, evidence, remaining)
+            .await
     }
 
     /// Assesses full script evidence without permitting older adapters to silently omit it.
@@ -695,7 +715,8 @@ impl AutoPermissionAssessor for ProviderAutoPermissionAssessor {
         request: AutoPermissionRequest,
         remaining: Duration,
     ) -> Result<String, String> {
-        self.assess_payload(request, None, None, None, remaining).await
+        self.assess_payload(request, None, None, None, remaining)
+            .await
     }
 
     async fn assess_with_context(
@@ -707,15 +728,42 @@ impl AutoPermissionAssessor for ProviderAutoPermissionAssessor {
         self.assess_payload(request, Some(context), None, None, remaining)
             .await
     }
-    async fn assess_with_locale(&self, request: AutoPermissionRequest, locale: &str, remaining: Duration) -> Result<String, String> {
-        self.assess_payload(request, None, Some(locale), None, remaining).await
+    async fn assess_with_locale(
+        &self,
+        request: AutoPermissionRequest,
+        locale: &str,
+        remaining: Duration,
+    ) -> Result<String, String> {
+        self.assess_payload(request, None, Some(locale), None, remaining)
+            .await
     }
 
-    async fn assess_with_context_and_locale(&self, request: AutoPermissionRequest, context: AutoPermissionAssessmentContext, locale: &str, remaining: Duration) -> Result<String, String> {
-        self.assess_payload(request, Some(context), Some(locale), None, remaining).await
+    async fn assess_with_context_and_locale(
+        &self,
+        request: AutoPermissionRequest,
+        context: AutoPermissionAssessmentContext,
+        locale: &str,
+        remaining: Duration,
+    ) -> Result<String, String> {
+        self.assess_payload(request, Some(context), Some(locale), None, remaining)
+            .await
     }
-    async fn assess_with_script_evidence_and_locale(&self, request: AutoPermissionRequest, context: AutoPermissionAssessmentContext, evidence: AutoScriptEvidence, locale: &str, remaining: Duration) -> Result<String, String> {
-        self.assess_payload(request, Some(context), Some(locale), Some(evidence), remaining).await
+    async fn assess_with_script_evidence_and_locale(
+        &self,
+        request: AutoPermissionRequest,
+        context: AutoPermissionAssessmentContext,
+        evidence: AutoScriptEvidence,
+        locale: &str,
+        remaining: Duration,
+    ) -> Result<String, String> {
+        self.assess_payload(
+            request,
+            Some(context),
+            Some(locale),
+            Some(evidence),
+            remaining,
+        )
+        .await
     }
 
     async fn assess_with_script_evidence(
@@ -1637,9 +1685,8 @@ fn project_auto_request(
         .or_else(|| eligible_bash(request, lease, user_intent))
 }
 
-#[async_trait]
-impl ApprovalResolver for AutoPermissionResolver {
-    fn observe_user_messages(&self, messages: &[String]) {
+impl AutoPermissionResolver {
+    fn observe_locale(&self, messages: &[String]) {
         let Ok(mut current) = self.locale.lock() else {
             return;
         };
@@ -1650,6 +1697,19 @@ impl ApprovalResolver for AutoPermissionResolver {
             if detected != *current {
                 *current = detected;
             }
+        }
+    }
+}
+
+#[async_trait]
+impl ApprovalResolver for AutoPermissionResolver {
+    fn observe_user_messages(&self, messages: &[String]) {
+        self.observe_locale(messages);
+    }
+
+    fn observe_user_messages_for_session(&self, session_id: &str, messages: &[String]) {
+        if self.lease.matches_session(session_id) {
+            self.observe_locale(messages);
         }
     }
 
@@ -1831,7 +1891,7 @@ impl AutoPermissionResolver {
             });
             return self.fallback.resolve(request, remaining).await;
         }
-        let Some(mut evaluator_request) =
+        let Some(evaluator_request) =
             project_auto_request(&assessment_request, &self.lease, user_intent)
         else {
             let shell = matches!(assessment_request.tool_name.as_str(), "bash" | "powershell");
@@ -1888,7 +1948,12 @@ impl AutoPermissionResolver {
                         .await
                 } else {
                     self.assessor
-                        .assess_with_context_and_locale(evaluator_request.request.clone(), context, locale.as_str(), budget)
+                        .assess_with_context_and_locale(
+                            evaluator_request.request.clone(),
+                            context,
+                            locale.as_str(),
+                            budget,
+                        )
                         .await
                 }
             } else {
@@ -3280,6 +3345,14 @@ mod tests {
     fn localized_human_explanation_keeps_permission_boundary() {
         let response = parse_auto_response(r#"{"schema_version":1,"request_digest":"test","decision":"human_required","reason_code":"uncertain","confidence":"low","effect_summary":"写入文件","decision_points":["是否允许？"]}"#).expect("response");
         let explanation = human_review_explanation(&response, false, "zh");
+        assert!(explanation.contains("不会授予执行权限"));
+        assert!(explanation.contains("需要决定"));
+    }
+
+    #[test]
+    fn localized_human_explanation_accepts_bcp47_language_tags() {
+        let response = parse_auto_response(r#"{"schema_version":1,"request_digest":"test","decision":"human_required","reason_code":"uncertain","confidence":"low","effect_summary":"写入文件","decision_points":["是否允许？"]}"#).expect("response");
+        let explanation = human_review_explanation(&response, false, "zh-CN");
         assert!(explanation.contains("不会授予执行权限"));
         assert!(explanation.contains("需要决定"));
     }

@@ -813,14 +813,20 @@ impl Agent {
         let mut private_tokens = transient_text::PrivateTokens::default();
 
         if let Some(pipeline) = self.permission_pipeline.as_ref() {
-            let observed_user_messages: Vec<String> = messages[persist_start..]
+            const MAX_OBSERVED_USER_MESSAGES: usize = 8;
+            let observed_user_messages: Vec<String> = messages
                 .iter()
                 .filter_map(|message| match message {
                     Message::User { content } => Some(content.clone()),
                     _ => None,
                 })
+                .rev()
+                .take(MAX_OBSERVED_USER_MESSAGES)
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
                 .collect();
-            pipeline.observe_user_messages(&observed_user_messages);
+            pipeline.observe_user_messages_for_session(&observed_user_messages);
         }
 
         if let Some(snapshot_tx) = &snapshot_tx {
