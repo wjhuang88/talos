@@ -73,6 +73,8 @@ mod process_boundary;
 pub mod read_image_tool;
 #[cfg(all(feature = "network", feature = "file-write"))]
 pub mod save_url;
+#[cfg(feature = "network")]
+mod search_backend;
 #[cfg(feature = "search")]
 pub mod search_engine;
 #[cfg(feature = "search")]
