@@ -213,7 +213,7 @@ as Refinement / Unclaimed, outside I285; no activation until I285 is disposition
 
 ## Auto Review Locale — 2026-10-03
 
-AUTO-UX-001 / #590: I290 Review / Claimed; I291 follow-up proposed. Owner:
+AUTO-UX-001 / #590: I290 Review / Claimed; I291 Review / Claimed; #652 merged (`9582733c`), acceptance matrix remains open. Owner:
 [Story](backlog/active/AUTO-UX-001-review-language.md),
 [iteration](iterations/I290-auto-review-conversation-locale.md). #630 remains a historical
 draft; no completion or permission-policy authority is claimed.

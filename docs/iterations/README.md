@@ -29,7 +29,7 @@ and localization responsibilities before rebuilt implementation.
 
 ## Auto Review Locale Product Follow-up — 2026-10-03
 
-[I291](I291-auto-review-locale-product-followup.md) is the corrective product-acceptance slice for #590. It owns session-level evidence aggregation, extensible language detection, compatibility-preserving API integration, and the deterministic acceptance matrix. No permission semantics, GPUI version, or release behavior changes are authorized.
+[I291](I291-auto-review-locale-product-followup.md) is the corrective product-acceptance slice for #590. It owns session-level evidence aggregation, extensible language detection, compatibility-preserving API integration, and the deterministic acceptance matrix. PR #652 merged (`9582733c`); I291 remains Review / Claimed with outstanding acceptance recorded in its owner. No permission semantics, GPUI version, or release behavior changes are authorized.
 
 ## Lifecycle
 
