@@ -88,7 +88,7 @@ image = { version = "0.25", default-features = false, optional = true, features 
 cap-std = { version = "4.0.3", default-features = false, optional = true }
 
 [target.'cfg(unix)'.dependencies]
-libc = { version = "1.0.0-alpha.3", optional = true }
+libc = { version = "0.2", optional = true }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61.2", optional = true, features = [

@@ -1095,7 +1095,12 @@ mod tests {
     impl BackgroundProcessControl for TestControl {
         async fn terminate(&self) -> Result<(), String> {
             self.terminate_count.fetch_add(1, Ordering::SeqCst);
-            if let Some(sender) = self.events.lock().unwrap().take() {
+            if let Some(sender) = self
+                .events
+                .lock()
+                .expect("events lock is not poisoned")
+                .take()
+            {
                 let _ = sender.try_send(BackgroundProcessEvent::Exited(BackgroundProcessExit {
                     code: Some(1),
                     success: false,
@@ -1138,16 +1143,16 @@ mod tests {
                 timeout,
             })
             .await
-            .unwrap();
+            .expect("background job reservation succeeds");
         let id = supervisor
             .inner
             .state
             .lock()
-            .unwrap()
+            .expect("supervisor state lock is not poisoned")
             .jobs
             .keys()
             .next()
-            .unwrap()
+            .expect("reserved job is present")
             .clone();
         let result = permit.launch(Box::new(HangingLauncher)).await;
         assert!(!result.is_error, "hanging launcher should be admitted");
@@ -1172,7 +1177,11 @@ mod tests {
         let (event_tx, _event_rx) = mpsc::unbounded_channel();
         let supervisor = BackgroundJobSupervisor::new(event_tx, "session".to_owned(), 1);
         {
-            let mut state = supervisor.inner.state.lock().unwrap();
+            let mut state = supervisor
+                .inner
+                .state
+                .lock()
+                .expect("supervisor state lock is not poisoned");
             state.shutdown_requested = true;
             state.launching = 1;
         }
@@ -1182,12 +1191,31 @@ mod tests {
             tokio::spawn(async move { supervisor.close_admission_after_launches().await })
         };
         tokio::task::yield_now().await;
-        assert!(!supervisor.inner.state.lock().unwrap().closing);
+        assert!(
+            !supervisor
+                .inner
+                .state
+                .lock()
+                .expect("supervisor state lock is not poisoned")
+                .closing
+        );
 
-        supervisor.inner.state.lock().unwrap().launching = 0;
+        supervisor
+            .inner
+            .state
+            .lock()
+            .expect("supervisor state lock is not poisoned")
+            .launching = 0;
         supervisor.inner.state_changed.notify_waiters();
-        waiter.await.unwrap();
-        assert!(supervisor.inner.state.lock().unwrap().closing);
+        waiter.await.expect("shutdown waiter completes");
+        assert!(
+            supervisor
+                .inner
+                .state
+                .lock()
+                .expect("supervisor state lock is not poisoned")
+                .closing
+        );
     }
 
     #[tokio::test]
@@ -1212,7 +1240,13 @@ mod tests {
             bytes: b"two".to_vec(),
             captured_at: SystemTime::UNIX_EPOCH,
         });
-        supervisor.inner.state.lock().unwrap().jobs.insert(id, job);
+        supervisor
+            .inner
+            .state
+            .lock()
+            .expect("supervisor state lock is not poisoned")
+            .jobs
+            .insert(id, job);
 
         let first = supervisor
             .process_action(
@@ -1223,7 +1257,8 @@ mod tests {
                 None,
             )
             .await;
-        let first: serde_json::Value = serde_json::from_str(&first.content).unwrap();
+        let first: serde_json::Value =
+            serde_json::from_str(&first.content).expect("first read response is JSON");
         assert_eq!(first["events"][0]["text"], "one");
         assert_eq!(first["next_cursor"], 3);
 
@@ -1236,7 +1271,8 @@ mod tests {
                 None,
             )
             .await;
-        let second: serde_json::Value = serde_json::from_str(&second.content).unwrap();
+        let second: serde_json::Value =
+            serde_json::from_str(&second.content).expect("second read response is JSON");
         assert_eq!(second["events"][0]["text"], "two");
         assert_eq!(second["next_cursor"], 6);
     }
@@ -1258,7 +1294,13 @@ mod tests {
             bytes: b"abcdef".to_vec(),
             captured_at: SystemTime::UNIX_EPOCH,
         });
-        supervisor.inner.state.lock().unwrap().jobs.insert(id, job);
+        supervisor
+            .inner
+            .state
+            .lock()
+            .expect("supervisor state lock is not poisoned")
+            .jobs
+            .insert(id, job);
 
         let first = supervisor
             .process_action(
@@ -1269,7 +1311,8 @@ mod tests {
                 None,
             )
             .await;
-        let first: serde_json::Value = serde_json::from_str(&first.content).unwrap();
+        let first: serde_json::Value =
+            serde_json::from_str(&first.content).expect("first read response is JSON");
         assert_eq!(first["events"][0]["text"], "ab");
         assert_eq!(first["next_cursor"], 2);
         assert_eq!(first["partial"], true);
@@ -1283,7 +1326,8 @@ mod tests {
                 None,
             )
             .await;
-        let second: serde_json::Value = serde_json::from_str(&second.content).unwrap();
+        let second: serde_json::Value =
+            serde_json::from_str(&second.content).expect("second read response is JSON");
         assert_eq!(second["events"][0]["text"], "cd");
         assert_eq!(second["next_cursor"], 4);
     }
@@ -1306,7 +1350,13 @@ mod tests {
             bytes: vec![b'x'; 40 * 1024],
             captured_at: SystemTime::UNIX_EPOCH,
         });
-        supervisor.inner.state.lock().unwrap().jobs.insert(id, job);
+        supervisor
+            .inner
+            .state
+            .lock()
+            .expect("supervisor state lock is not poisoned")
+            .jobs
+            .insert(id, job);
 
         let result = supervisor
             .process_action(
@@ -1317,12 +1367,16 @@ mod tests {
                 None,
             )
             .await;
-        let value: serde_json::Value = serde_json::from_str(&result.content).unwrap();
+        let value: serde_json::Value =
+            serde_json::from_str(&result.content).expect("read response is JSON");
         assert_eq!(value["dropped_before"], 10);
         assert_eq!(value["events"][0]["cursor"], 10);
         assert_eq!(value["next_cursor"], 10 + 32 * 1024);
         assert_eq!(
-            value["events"][0]["text"].as_str().unwrap().len(),
+            value["events"][0]["text"]
+                .as_str()
+                .expect("output text is a string")
+                .len(),
             32 * 1024
         );
     }
@@ -1337,16 +1391,16 @@ mod tests {
                 timeout: Duration::from_secs(5),
             })
             .await
-            .unwrap();
+            .expect("background job reservation succeeds");
         let id = supervisor
             .inner
             .state
             .lock()
-            .unwrap()
+            .expect("supervisor state lock is not poisoned")
             .jobs
             .keys()
             .next()
-            .unwrap()
+            .expect("reserved job is present")
             .clone();
         supervisor.process_cancel(id.as_str(), 0).await;
         let launches = Arc::new(AtomicUsize::new(0));
@@ -1355,7 +1409,15 @@ mod tests {
             .await;
         assert!(!result.is_error);
         assert_eq!(launches.load(Ordering::SeqCst), 0);
-        assert_eq!(supervisor.inner.state.lock().unwrap().launching, 0);
+        assert_eq!(
+            supervisor
+                .inner
+                .state
+                .lock()
+                .expect("supervisor state lock is not poisoned")
+                .launching,
+            0
+        );
     }
 
     #[tokio::test]
@@ -1369,7 +1431,13 @@ mod tests {
             "background:bash:test".to_owned(),
             1,
         );
-        supervisor.inner.state.lock().unwrap().jobs.insert(id, job);
+        supervisor
+            .inner
+            .state
+            .lock()
+            .expect("supervisor state lock is not poisoned")
+            .jobs
+            .insert(id, job);
 
         let result = supervisor
             .process_action(
@@ -1380,7 +1448,8 @@ mod tests {
                 None,
             )
             .await;
-        let result: serde_json::Value = serde_json::from_str(&result.content).unwrap();
+        let result: serde_json::Value =
+            serde_json::from_str(&result.content).expect("cancel response is JSON");
         assert_eq!(result["state"], "starting");
         assert_eq!(result["cancellation_requested"], true);
         assert!(
@@ -1388,13 +1457,13 @@ mod tests {
                 .inner
                 .state
                 .lock()
-                .unwrap()
+                .expect("supervisor state lock is not poisoned")
                 .jobs
                 .get(&BackgroundJobId::new("job_starting"))
-                .unwrap()
+                .expect("starting job remains present")
                 .cancel_token
                 .as_ref()
-                .unwrap()
+                .expect("starting job has a cancellation token")
                 .is_cancelled()
         );
     }
@@ -1406,7 +1475,8 @@ mod tests {
         let id = launch_hanging(&supervisor, Duration::from_millis(20)).await;
         tokio::time::sleep(Duration::from_millis(100)).await;
         let status = supervisor.process_status(id.as_str());
-        let status: serde_json::Value = serde_json::from_str(&status.content).unwrap();
+        let status: serde_json::Value =
+            serde_json::from_str(&status.content).expect("status response is JSON");
         assert_eq!(status["state"], "timed_out");
         assert_eq!(status["cleanup_outcome"], "terminated");
     }
@@ -1417,7 +1487,8 @@ mod tests {
         let supervisor = BackgroundJobSupervisor::new(event_tx, "session".to_owned(), 1);
         let id = launch_hanging(&supervisor, Duration::from_secs(5)).await;
         let status = supervisor.process_cancel(id.as_str(), 5_000).await;
-        let status: serde_json::Value = serde_json::from_str(&status.content).unwrap();
+        let status: serde_json::Value =
+            serde_json::from_str(&status.content).expect("status response is JSON");
         assert_eq!(status["state"], "cancelled");
         assert_eq!(status["cleanup_outcome"], "terminated");
     }
@@ -1427,9 +1498,13 @@ mod tests {
         let (event_tx, _event_rx) = mpsc::unbounded_channel();
         let supervisor = BackgroundJobSupervisor::new(event_tx, "session".to_owned(), 1);
         let id = launch_hanging(&supervisor, Duration::from_secs(5)).await;
-        supervisor.finalize().await.unwrap();
+        supervisor
+            .finalize()
+            .await
+            .expect("supervisor finalization succeeds");
         let status = supervisor.process_status(id.as_str());
-        let status: serde_json::Value = serde_json::from_str(&status.content).unwrap();
+        let status: serde_json::Value =
+            serde_json::from_str(&status.content).expect("status response is JSON");
         assert_eq!(status["state"], "cancelled");
         assert_eq!(status["cleanup_outcome"], "terminated");
     }

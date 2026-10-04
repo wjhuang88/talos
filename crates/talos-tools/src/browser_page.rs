@@ -409,13 +409,13 @@ mod tests {
     #[test]
     fn connector_link_filter_rejects_script_and_data_schemes() {
         assert!(!is_supported_link(
-            &Url::parse("javascript:alert(1)").unwrap()
+            &Url::parse("javascript:alert(1)").expect("parse javascript URL")
         ));
         assert!(!is_supported_link(
-            &Url::parse("data:text/plain,secret").unwrap()
+            &Url::parse("data:text/plain,secret").expect("parse data URL")
         ));
         assert!(is_supported_link(
-            &Url::parse("https://example.com").unwrap()
+            &Url::parse("https://example.com").expect("parse https URL")
         ));
     }
 }

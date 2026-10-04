@@ -131,7 +131,9 @@ mod tests {
         let ledger = ExecutionLedger::default();
         let turn = TurnId::new();
         let tool = call("call-1", json!({"path":"a"}));
-        ledger.reserve(turn, &tool).unwrap();
+        ledger
+            .reserve(turn, &tool)
+            .expect("first call reservation succeeds");
         ledger.complete(turn, &tool);
         assert_eq!(ledger.state(turn, &tool), Some(State::Completed));
         assert_eq!(
@@ -146,7 +148,9 @@ mod tests {
         let turn = TurnId::new();
         let first = call("call-1", json!({"path":"a"}));
         let second = call("call-1", json!({"path":"b"}));
-        ledger.reserve(turn, &first).unwrap();
+        ledger
+            .reserve(turn, &first)
+            .expect("first payload reservation succeeds");
         assert_eq!(
             ledger.reserve(turn, &second),
             Err(ReservationError::IdentityConflict)
@@ -159,7 +163,9 @@ mod tests {
         let first_turn = TurnId::new();
         let second_turn = TurnId::new();
         let tool = call("tc_0", json!({"path":"a"}));
-        ledger.reserve(first_turn, &tool).unwrap();
+        ledger
+            .reserve(first_turn, &tool)
+            .expect("reservation in the first turn succeeds");
         assert_eq!(ledger.reserve(second_turn, &tool), Ok(()));
     }
 }

@@ -264,6 +264,20 @@ pub fn validate_request(
     validate_source(&request.source, limits)
 }
 
+impl Default for WasmProviderLimits {
+    fn default() -> Self {
+        Self {
+            // Cold Tree-sitter Rust query compilation alone costs ~897M Wasmtime
+            // fuel; a 13KiB source costs ~1.054B. Keep a finite language-only
+            // budget while the independent 500ms deadline bounds CPU custody.
+            // Explicit caller limits and generic Tool runtime fuel are unchanged.
+            fuel: 2_000_000_000,
+            timeout: Duration::from_millis(500),
+            max_source_bytes: 1_000_000,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -331,7 +345,10 @@ mod tests {
 
     #[test]
     fn memory_ranges_are_checked_before_guest_decode() {
-        assert_eq!(validate_memory_range(2, 3, 8).unwrap(), 2..5);
+        assert_eq!(
+            validate_memory_range(2, 3, 8).expect("range is within bounds"),
+            2..5
+        );
         assert!(validate_memory_range(7, 2, 8).is_err());
     }
 
@@ -362,19 +379,5 @@ mod tests {
             malformed,
             Err("symbol provider result has an invalid shape")
         );
-    }
-}
-
-impl Default for WasmProviderLimits {
-    fn default() -> Self {
-        Self {
-            // Cold Tree-sitter Rust query compilation alone costs ~897M Wasmtime
-            // fuel; a 13KiB source costs ~1.054B. Keep a finite language-only
-            // budget while the independent 500ms deadline bounds CPU custody.
-            // Explicit caller limits and generic Tool runtime fuel are unchanged.
-            fuel: 2_000_000_000,
-            timeout: Duration::from_millis(500),
-            max_source_bytes: 1_000_000,
-        }
     }
 }
