@@ -1,6 +1,6 @@
 # Iteration I292: Search Compatible Backend Boundary
 
-> Document status: Active
+> Document status: Complete
 > Published plan date: 2026-10-04
 > Planned objective: Implement SEARCH-001-B's private SearchBackend compatibility boundary without changing production search behavior.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -19,7 +19,7 @@
 | Governance Claim PR | #651 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Governance-only claim+activation PR #651; exact-head CI, both governance validators and merge-time CAS required. |
-| Implementation PR | Not started |
+| Implementation PR | #653 and #656 merged |
 | Last Updated | 2026-10-04 |
 | Handoff / Release Condition | Atomic claim+activation before implementation |
 
@@ -93,18 +93,19 @@ C waits for B delivery. D remains separately unclaimed. No release is authorized
 
 ## Verification Evidence
 
-- Implementation candidate PR #653 adds the private typed boundary and deterministic fixtures; completion remains pending merge.
+- Implementation PR #653 merged as `65066376cc6622b84e11d1f6c45facd27412b92a`, adding the private typed boundary and deterministic fixtures.
+- Follow-up PR #656 merged as `44cdab8a1f2f3f367b3603bf0e294e39f854dd0b`, routing the existing rust-websearch, Tavily, SearXNG and Wikipedia paths through compatibility adapters and preserving the existing formatter and activation policy.
 
 ## Completion Evidence
 
-- Completion Commit: pending
+- Completion Commit: `44cdab8a1f2f3f367b3603bf0e294e39f854dd0b`
 
 ## Variance And Residuals
 
-- SEARCH-001-C remains blocked on this boundary; SEARCH-001-D remains a separate evidence owner.
+- SEARCH-001-C and SEARCH-001-D are now dependency-ready, with their own governance claims still required before implementation.
 
 ## Retrospective
 
-- Outcome: pending
-- Documentation: pending
-- Lessons: none
+- Outcome: Complete; the private boundary and compatibility adapters landed without an intentional model-facing behavior change.
+- Documentation: completion evidence recorded here and in SEARCH-001-B.
+- Lessons: keep the private seam separate from platform Provider terminology and retain the existing optional-provider and Wikipedia fallback policy until router work is separately claimed.

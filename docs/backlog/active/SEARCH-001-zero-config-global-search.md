@@ -69,7 +69,7 @@ The table is a proposal for child **outcomes**, not blanket implementation autho
 | Child | Outcome | Depends on | Issue / State |
 |---|---|---|---|
 | SEARCH-001-A | Code-truth audit, migration matrix, architecture ADR, provider qualification gates | None | [#625](https://github.com/wjhuang88/talos/issues/625), Complete / Claimed; ADR-085 accepted in #629 (`4567bf85`) |
-| SEARCH-001-B | Domain extraction with current-behavior-compatible adapters | A ADR accepted | [#642](https://github.com/wjhuang88/talos/issues/642), Proposed / Unclaimed |
+| SEARCH-001-B | Domain extraction with current-behavior-compatible adapters | A ADR accepted | [#642](https://github.com/wjhuang88/talos/issues/642), Complete / Claimed; I292; #653 and #656 merged |
 | SEARCH-001-C | Talos-owned auto router, deadlines, error semantics, #199 integration | B / A | [#643](https://github.com/wjhuang88/talos/issues/643), Proposed / Unclaimed |
 | SEARCH-001-D | Provider feasibility and real multi-region (incl. mainland China) evidence gate | A; research may overlap B | [#644](https://github.com/wjhuang88/talos/issues/644), Proposed / Unclaimed |
 | SEARCH-001-E | First Talos-native zero-key provider with fixtures | C / D | Proposed only |

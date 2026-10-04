@@ -1,6 +1,6 @@
 # SEARCH-001-B: Compatible SearchBackend Boundary
 
-**Status**: Proposed / Unclaimed
+**Status**: Complete / Claimed
 **Type**: Implementation / Compatibility
 **Parent Epic**: [SEARCH-001](SEARCH-001-zero-config-global-search.md) / [Issue #624](https://github.com/wjhuang88/talos/issues/624)
 
@@ -9,24 +9,26 @@
 | Story ID | SEARCH-001-B |
 | Source Issue | [#642](https://github.com/wjhuang88/talos/issues/642) |
 | Depends on | Accepted ADR-085; SEARCH-001-A / #625 merged as `4567bf85` |
-| Selected Iteration | None; requires a separately selected bounded iteration |
-| Implementation PR | #653 (draft candidate) |
-| Last Updated | 2026-10-03 |
+| Selected Iteration | [I292](../../iterations/I292-search-compatible-backend-boundary.md) |
+| Implementation PR | #653 and #656 merged |
+| Last Updated | 2026-10-04 |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | None; compatibility boundary is dependency-ready but unclaimed |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | GPT-6 Sol / talos开发 session |
+| Work Slice | SEARCH-001-B compatibility boundary and adapter wiring |
+| Claimed At | 2026-10-04 |
 | Source Issue | #642 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
-| Handoff / Release Condition | Select a bounded iteration and establish an effective claim before implementation |
+| Governance Claim PR | #651 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | #651 merged as `6490118fed913521ac9d1875ccd63fb5e3914af1`; #653 and #656 exact-head CI passed before merge |
+| Handoff / Release Condition | B complete; C and D require their own claims and bounded iterations |
+
+Completion Commit: `44cdab8a1f2f3f367b3603bf0e294e39f854dd0b`
 
 ## Goal
 
