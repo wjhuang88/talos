@@ -172,3 +172,21 @@ If compatibility, ABI, platform, fixture, or protected-scope review fails, resto
 ## Completion Evidence
 
 - Completion Commit: pending
+
+### 2026-10-04 Stable Candidate Local Convergence
+
+- Current implementation head: `06fb5717e945bb326339b3dd6e51382a7dbfec0e`, rebased on
+  `main` base `9582733cca444c3ccfe70faf9daff869757c7fcf`.
+- `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`: passed.
+- `cargo check --workspace --all-targets --all-features --locked`: passed, including the
+  Rust 1.95 check.
+- `cargo test --workspace --all-features --locked --quiet`: 430 passed, 0 failed, with real
+  Rust/Python language Bundles supplied through `TALOS_LANGUAGE_BUNDLE_ROOT`.
+- Explicit `talos-tools` minimal, `shell`, and `coding` feature test runs passed.
+- `bash scripts/test_dependency_audit.sh`, both governance validators, and `git diff --check`
+  passed. `./scripts/release_preflight.sh` passed, including the external runtime SDK fixture.
+- The all-feature Clippy correction is test-only diagnostic wording; no production behavior,
+  permission path, process hardening, or sandbox implementation changed.
+
+This checkpoint is local evidence for the new exact candidate. Remote CI/review evidence from
+the prior candidate is not reused and must be refreshed after pushing this head.
