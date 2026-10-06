@@ -161,7 +161,7 @@ deferred behind Desktop. Locale follow-up #590 is Review / Claimed; phase 1 merg
 
 ## Auto Review Locale — 2026-10-03
 
-AUTO-UX-001 / #590: I290 Review / Claimed; I291 Review / Claimed; #652 merged (`9582733c`), acceptance matrix remains open. Owner:
+AUTO-UX-001 / #590: I290 Review / Claimed; I291 Review / Claimed; #662 merged (`1a397cfa`), acceptance matrix remains open. Owner:
 [Story](backlog/active/AUTO-UX-001-review-language.md),
 [iteration](iterations/I290-auto-review-conversation-locale.md). #630 remains a historical
 draft; no completion or permission-policy authority is claimed.

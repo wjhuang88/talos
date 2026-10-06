@@ -80,14 +80,14 @@ SHA; the claim/status commit is not completion evidence.
 | Governance Claim PR | #639 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | User requested completion of #590, authorized publication to wjhuang88/talos and continued work. No independent maintainer is available in this session. Governance exact-head CI, validators and review are required; implementation requires independent API/security review. |
-| Implementation PR | #640 and #652 (merged; I291 acceptance remains open) |
+| Implementation PR | #640, #652 and #662 (merged; I291 product acceptance remains open) |
 | Last Updated | 2026-10-04 |
 | Handoff / Release Condition | Effective claim merge precedes rebuilt implementation; no release/version/permission-policy change. |
 
 
 ## Phase 1 Evidence
 
-Phase 1 implementation commit: `9bb565e09f5e0f3de8602183b4a670bf63f0aefc` (PR #640). Exact-head CI run 2961 passed. I291 remains required for product completion.
+Phase 1 implementation commit: `9bb565e09f5e0f3de8602183b4a670bf63f0aefc` (PR #640). Exact-head CI run 2961 passed. Corrected I291 implementation merged in `1a397cfa1cbbee4cdc435cb450980b0fa6a25011` (PR #662), with exact-head CI run 3011 green and independent API/security review approved. Product acceptance remains open.
 
 ## Follow-up Implementation Evidence
 
