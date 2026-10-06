@@ -49,7 +49,7 @@ No retrospective authorization or completion is claimed.
 | Governance Claim PR | #639 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | User requested completion of #590, authorized publication to wjhuang88/talos and continued work. No independent maintainer is available in this session. Governance exact-head CI, validators and review are required; implementation requires independent API/security review. |
-| Implementation PR | #640 and #652 (merged; I291 acceptance remains open) |
+| Implementation PR | #640, #652 and #662 (merged; I291 acceptance remains open) |
 | Last Updated | 2026-10-04 |
 | Handoff / Release Condition | Effective claim merge precedes rebuilt implementation; no release/version/permission-policy change. |
 
@@ -61,5 +61,6 @@ Completion Commit: `9bb565e09f5e0f3de8602183b4a670bf63f0aefc` (PR #640). Exact-h
 ## Follow-up Implementation Evidence
 
 PR #652 merged at `9582733cca444c3ccfe70faf9daff869757c7fcf`; exact-head CI run 2988 and
-independent API/security review passed. Product status remains Review / Claimed. See I291
+independent API/security review passed. Corrected I291 implementation PR #662 merged at
+`1a397cfa1cbbee4cdc435cb450980b0fa6a25011`; product status remains Review / Claimed. See I291
 Execution Evidence And Remaining Acceptance for the outstanding matrix and resume sequence.
