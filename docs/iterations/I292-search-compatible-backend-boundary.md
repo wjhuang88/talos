@@ -98,7 +98,7 @@ C waits for B delivery. D remains separately unclaimed. No release is authorized
 
 ## Completion Evidence
 
-- Completion Commit: `7728f7681df11a9d715a0e479590c1002c53a26f` (PR #660 squash merge; exact-head CI run `37409618084`)
+- Completion Commit: `7728f7681df11a9d715a0e479590c1002c53a26f` (PR #660 squash merge; exact-head CI run 37409618084)
 
 ## Variance And Residuals
 

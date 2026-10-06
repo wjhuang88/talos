@@ -28,7 +28,7 @@
 | Authorization Evidence | #651 merged as `6490118fed913521ac9d1875ccd63fb5e3914af1`; #653 and #656 exact-head CI passed before merge |
 | Handoff / Release Condition | B complete; C and D require their own claims and bounded iterations |
 
-Completion Commit: `7728f7681df11a9d715a0e479590c1002c53a26f` (PR #660 squash merge; exact-head CI run `37409618084`)
+Completion Commit: `7728f7681df11a9d715a0e479590c1002c53a26f` (PR #660 squash merge; exact-head CI run 37409618084)
 
 ## Goal
 
