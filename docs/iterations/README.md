@@ -9,6 +9,15 @@ The complete pre-closeout index is preserved unchanged at
 [`ITERATIONS-INDEX-pre-I170-closeout-2026-08-01.md`](ITERATIONS-INDEX-pre-I170-closeout-2026-08-01.md).
 That snapshot is historical evidence and not current activation authority.
 
+## Frame-Aware Browser Selection — 2026-10-06
+
+[I295](I295-web007f-frame-aware-browser-contract.md) selects WEB-007-F / #618 for a separately
+negotiated, opt-in host-executed v2 contract. Its claim and activation remain proposed and
+ineffective until the governance PR merges. At selection, I293/I294 remain Active under their
+separate search claims; the maintainer explicitly authorized non-overlapping parallel I295 work
+and owner-first union updates to derived files. I277/I290/I291 remain Review, I249 remains
+deferred Planned and I164 Paused. No status or scope from these owners transfers to I295.
+
 ## TUI History Return Recovery — 2026-10-03
 
 [I289](I289-tui-history-return-to-bottom.md) / TUI-062 is Complete / Closed.

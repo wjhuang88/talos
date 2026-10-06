@@ -7,8 +7,8 @@
 | Parent | WEB-007 / #452 |
 | Source | #618; #520 Request B |
 | Priority | P1 |
-| Status | Intake / Unclaimed |
-| Selected Iteration | None — API/security decisions below require acceptance first |
+| Status | Ready / Unclaimed — proposed I295 activation is ineffective until its governance PR merges |
+| Selected Iteration | I295, proposed |
 | Implementation PR | Not started |
 
 ## Collaboration Claim
@@ -18,23 +18,25 @@
 | Claim State | Unclaimed |
 | Responsible Actor | Not assigned |
 | Executing Agent | Not assigned |
-| Work Slice | Not assigned |
+| Work Slice | WEB-007-F / #618 frame-aware v2 public contract, prepared invocation, browser-specific permission integration and host conformance only |
 | Claimed At | Not applicable |
 | Source Issue | #618 |
-| Governance Claim PR | Not applicable |
+| Governance Claim PR | Pending |
 | Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Authorization Evidence | Maintainer accepted the reviewed v2 contract and non-overlapping parallel I295 scheduling on 2026-10-06; finalized exact-head governance evidence pending. |
 | Implementation PR | Not started |
-| Last Updated | 2026-09-29 |
-| Handoff / Release Condition | Accept versioning, trusted frame-origin admission and stale-reference boundaries through independent API/security review; then select a runnable iteration and merge its claim before code work. |
+| Last Updated | 2026-10-06 |
+| Handoff / Release Condition | Proposed I295 claim/activation has no effect until its finalized governance PR reaches main; implementation begins only afterward. |
 
 ## Goal And Ownership
 
 Embedding products need interactive browser actions inside nested and cross-origin frames without
 copying security-sensitive reference and authorization logic. This child owns the public frame
 protocol, semantic admission, permission binding and shared conformance fixtures under WEB-007.
-The [proposed contract](../../proposals/WEB-007-F-frame-aware-browser-contract.md) is a review
-candidate, not an accepted API or an implementation authorization.
+The [proposed contract](../../proposals/WEB-007-F-frame-aware-browser-contract.md) was accepted
+in direction by the maintainer, and [ADR-086](../../decisions/086-frame-aware-browser-invocation-boundary.md)
+records the decision candidate. Neither is an implemented API or code authorization before the
+I295 claim reaches main.
 
 WEB-007 owns the base browser contract and ManagedBrowserTool. Its separately claimed process
 carrier and native browser delivery stories must consume this child's accepted contract and run
@@ -47,7 +49,7 @@ Hard: closed schema before permission; opaque scoped identity; independent child
 zero execution calls for references already stale at admission/dispatch; exactly-once delegation
 for admitted, authorized, still-current actions; no retry; bounded redacted projections; opt-in.
 
-Proposed Soft choice: separately negotiated frame protocol v2; preserve #452's 20-operation V1
+Selected Soft choice: separately negotiated frame protocol v2; preserve #452's 20-operation V1
 schema. No crate name is reserved. Browser protocol types and fixture specifications belong in
 the eventual WEB-007 protocol package; adapter admission/projection belongs in talos-tools;
 permission integration requires review of talos-core/talos-permission APIs before activation.
@@ -70,12 +72,13 @@ can follow independently and cannot claim completion using only a fake executor.
 
 ## Acceptance And Delivery Gates
 
-- [ ] Independent API/security review accepts the versioned operation schema, identity model,
-  origin resource, admission ticket integration and lifecycle race handling in the proposal.
+- [x] Maintainer accepted the proposed versioned schema, frame-origin resource and one-shot
+  admission direction; independent Agent-role static design review approved the corrected
+  proposal. This does not replace exact-head implementation security/API review.
 - [ ] The complete fixture matrix in the proposal is included unchanged or with reviewed rationale
   in implementation acceptance, for both host and process-backed executors where delivered.
-- [ ] Inventory all Active/Review/Planned/Blocked iterations and record dispositions before selection.
-- [ ] Select a runnable iteration: opt-in host executor composition with deterministic frame state,
+- [x] Inventory Active/Review/Planned/Blocked iterations and record dispositions in I295.
+- [x] Select runnable I295: opt-in host executor composition with deterministic frame state,
   full registry → permission → execution → projection tests and an external consumer example.
 - [ ] Record an effective target-branch Collaboration Claim and actual governance PR number.
 - [ ] Implement and verify each acceptance fixture, pinned locked checks, full workspace tests,
@@ -127,3 +130,18 @@ exclude descendant content and require document-bound backend actions. The revis
 addresses all five; fresh exact-head review remains required. The governance subagent approved
 that original head only as an intake proposal, not accepted contract or implementation delivery.
 Both reviews are independent Agent roles using shared workspace/account, not separate humans.
+
+2026-10-06: independent Agent-role static review of `main@9712d458` returned REQUEST CHANGES.
+The proposal did not account for provider/MCP paths that discard duplicate JSON keys before tool
+admission, the current registry's shallow validation, or broad legacy permission rules. The
+proposal now requires raw-ingress validation or v2 rejection, full v2 admission, and a separate
+fail-closed browser evaluator. This is a design correction only; fresh independent acceptance,
+the selected iteration and effective claim remain pending. No production behavior or #520
+downstream delivery is claimed.
+
+2026-10-06: the same independent Agent role re-reviewed the local corrected proposal and returned
+APPROVE for design only. It confirmed raw-argument fail-closed routing, full v2 admission and
+dedicated browser permission evaluation; it did not review a committed exact head or production
+code. The maintainer then accepted that v2 direction and explicitly authorized non-overlapping
+I295 work alongside I293/I294. I295 is only a proposed selection until its atomic claim and
+activation merge; the implementation and #618 closure gates remain unchecked.
