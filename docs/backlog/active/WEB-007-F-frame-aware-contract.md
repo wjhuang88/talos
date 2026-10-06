@@ -7,26 +7,26 @@
 | Parent | WEB-007 / #452 |
 | Source | #618; #520 Request B |
 | Priority | P1 |
-| Status | Ready / Unclaimed — proposed I295 activation is ineffective until its governance PR merges |
-| Selected Iteration | I295, proposed |
+| Status | Active / Claimed — proposed activation is ineffective until PR #669 merges |
+| Selected Iteration | I295 |
 | Implementation PR | Not started |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / gpt-6 |
 | Work Slice | WEB-007-F / #618 frame-aware v2 public contract, prepared invocation, browser-specific permission integration and host conformance only |
-| Claimed At | Not applicable |
+| Claimed At | 2026-10-06 |
 | Source Issue | #618 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Maintainer accepted the reviewed v2 contract and non-overlapping parallel I295 scheduling on 2026-10-06; finalized exact-head governance evidence pending. |
+| Governance Claim PR | #669 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Maintainer accepted the corrected v2 direction and non-overlapping parallel I295 scheduling on 2026-10-06; independent design review approved the uncommitted contract. Exact-head governance review and CI remain merge gates for PR #669. |
 | Implementation PR | Not started |
 | Last Updated | 2026-10-06 |
-| Handoff / Release Condition | Proposed I295 claim/activation has no effect until its finalized governance PR reaches main; implementation begins only afterward. |
+| Handoff / Release Condition | Proposed I295 claim/activation has no effect until PR #669 reaches main; implementation begins only afterward. |
 
 ## Goal And Ownership
 

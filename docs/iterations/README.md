@@ -12,8 +12,8 @@ That snapshot is historical evidence and not current activation authority.
 ## Frame-Aware Browser Selection — 2026-10-06
 
 [I295](I295-web007f-frame-aware-browser-contract.md) selects WEB-007-F / #618 for a separately
-negotiated, opt-in host-executed v2 contract. Its claim and activation remain proposed and
-ineffective until the governance PR merges. At selection, I293/I294 remain Active under their
+negotiated, opt-in host-executed v2 contract. Its Active / Claimed state is proposed in PR #669
+and remains ineffective until that PR merges. At selection, I293/I294 remain Active under their
 separate search claims; the maintainer explicitly authorized non-overlapping parallel I295 work
 and owner-first union updates to derived files. I277/I290/I291 remain Review, I249 remains
 deferred Planned and I164 Paused. No status or scope from these owners transfers to I295.

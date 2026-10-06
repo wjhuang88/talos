@@ -55,8 +55,8 @@ not supersede WEB-005 or reserve an implementation owner.
 ## Frame-Aware Child Intake
 
 [WEB-007-F](WEB-007-F-frame-aware-contract.md) owns #618 / #520 Request B frame identity,
-origin permission, stale-reference boundaries and shared acceptance fixtures. It is Ready /
-Unclaimed with I295 selected but not yet activated; ADR-086 remains Proposed until governance
+origin permission, stale-reference boundaries and shared acceptance fixtures. I295 proposes an
+Active / Claimed state in #669, ineffective until merge; ADR-086 remains Proposed until governance
 acceptance. Process
 carrier and native-browser delivery must consume the accepted contract rather than invent their
 own frame authorization. Parent #452 V1 is not silently expanded by this child.

@@ -1,6 +1,6 @@
 # Iteration I295: Frame-Aware Browser Host Contract
 
-> Document status: Planned; proposed atomic claim and activation are ineffective until merge.
+> Document status: Active / Claimed; proposed atomic claim and activation are ineffective until PR #669 merges.
 > Published plan date: 2026-10-06
 > Planned objective: deliver an opt-in host-executed frame-aware browser v2 contract with exact admission, origin-bound permission and shared conformance evidence.
 > Baseline rule: preserve this objective and acceptance; different outcomes need a new iteration.
@@ -10,18 +10,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / gpt-6 |
 | Work Slice | WEB-007-F / #618 only; frame-aware v2 public contract, prepared invocation, browser-specific permission integration and host conformance |
-| Claimed At | Not applicable |
+| Claimed At | 2026-10-06 |
 | Source Issue | #618 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Maintainer accepted v2 contract and explicit non-overlapping parallel scheduling on 2026-10-06; exact-head review/CI pending. |
+| Governance Claim PR | #669 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Maintainer accepted the corrected v2 contract and explicit non-overlapping parallel scheduling on 2026-10-06; independent design review approved the uncommitted contract. Exact-head governance review and CI remain merge gates for PR #669. |
 | Implementation PR | Not started |
 | Last Updated | 2026-10-06 |
-| Handoff / Release Condition | Claim and activation require this governance PR on main. Implementation starts only from its merge or later main; no overlap with I293/I294 owners. |
+| Handoff / Release Condition | Claim and activation require PR #669 on main. Implementation starts only from its merge or later main; no overlap with I293/I294 owners. |
 
 ## Published Baseline
 
@@ -98,7 +98,7 @@ acceptance or implementation authority from those items transfers to I295.
 
 | Date | Type | Record |
 |---|---|---|
-| 2026-10-06 | Proposed | Activation and claim are ineffective until the finalized governance PR merges to main. |
+| 2026-10-06 | Proposed | PR #669 proposes atomic claim and activation; both are ineffective until its finalized exact head merges to main. |
 
 ## Verification Evidence
 
