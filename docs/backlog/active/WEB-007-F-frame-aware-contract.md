@@ -38,10 +38,11 @@ in direction by the maintainer, and [ADR-086](../../decisions/086-frame-aware-br
 records the decision candidate. Neither is an implemented API or code authorization before the
 I295 claim reaches main.
 
-WEB-007 owns the base browser contract and ManagedBrowserTool. Its separately claimed process
-carrier and native browser delivery stories must consume this child's accepted contract and run
-its conformance suite. Neither transport nor CDP code may redefine model schemas or authorization.
-Host-supplied executors remain supported without adopting a process plugin.
+WEB-007 retains its unclaimed V1 and native-delivery scope. For separately negotiated v2 only,
+WEB-007-F owns the public browser contract, opt-in ManagedBrowserTool host adapter, prepared
+invocation and permission integration selected by I295. Process carrier and native browser
+delivery remain separate stories that must consume this child's accepted contract and run its
+conformance suite. Neither transport nor CDP code may redefine model schemas or authorization.
 
 ## Scope And Constraints
 
@@ -63,12 +64,15 @@ unsupported operation/document pairs must fail closed, never use global input fa
 
 ## Exclusions And Dependencies
 
-No production code, native dependencies, browser distribution, credentials/profile handling,
-selectors/evaluate, default registration, product UI, replay or new permission bypass.
+The 2026-09-29 proposal/intake phase excluded production code; I295 now selects only the opt-in
+v2 host implementation above, effective after claim merge. Still excluded: native dependencies,
+browser distribution, credentials/profile handling, selectors/evaluate, default registration,
+product UI, replay and any permission bypass.
 WEB-005/BROWSER-001 read-only ingestion and TOOL-014 disclosure retain their own contracts.
-BROWSER-001 completion is not frame-interaction evidence. Base WEB-007 decisions and independent
-API/security acceptance precede a runnable implementation claim; process-plugin/native delivery
-can follow independently and cannot claim completion using only a fake executor.
+BROWSER-001 completion is not frame-interaction evidence. V1 parent intake remains unresolved and
+is not a prerequisite for the separately negotiated v2 host path; I295 still requires its own
+effective claim and independent API/security review. Process-plugin/native delivery can follow
+independently and cannot claim completion using only a fake executor.
 
 ## Acceptance And Delivery Gates
 
