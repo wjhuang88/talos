@@ -1,6 +1,6 @@
 # Iteration I292: Search Compatible Backend Boundary
 
-> Document status: Complete
+> Document status: Review
 > Published plan date: 2026-10-04
 > Planned objective: Implement SEARCH-001-B's private SearchBackend compatibility boundary without changing production search behavior.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -98,7 +98,7 @@ C waits for B delivery. D remains separately unclaimed. No release is authorized
 
 ## Completion Evidence
 
-- Completion Commit: `44cdab8a1f2f3f367b3603bf0e294e39f854dd0b`
+- Completion Commit: pending follow-up acceptance
 
 ## Variance And Residuals
 
@@ -106,6 +106,6 @@ C waits for B delivery. D remains separately unclaimed. No release is authorized
 
 ## Retrospective
 
-- Outcome: Complete; the private boundary and compatibility adapters landed without an intentional model-facing behavior change.
+- Outcome: Review; the private boundary and compatibility adapters landed, with deterministic parser/normalization characterization pending in the follow-up candidate.
 - Documentation: completion evidence recorded here and in SEARCH-001-B.
 - Lessons: keep the private seam separate from platform Provider terminology and retain the existing optional-provider and Wikipedia fallback policy until router work is separately claimed.

@@ -1,6 +1,6 @@
 # SEARCH-001-B: Compatible SearchBackend Boundary
 
-**Status**: Complete / Claimed
+**Status**: Review / Claimed
 **Type**: Implementation / Compatibility
 **Parent Epic**: [SEARCH-001](SEARCH-001-zero-config-global-search.md) / [Issue #624](https://github.com/wjhuang88/talos/issues/624)
 
@@ -28,7 +28,7 @@
 | Authorization Evidence | #651 merged as `6490118fed913521ac9d1875ccd63fb5e3914af1`; #653 and #656 exact-head CI passed before merge |
 | Handoff / Release Condition | B complete; C and D require their own claims and bounded iterations |
 
-Completion Commit: `44cdab8a1f2f3f367b3603bf0e294e39f854dd0b`
+Completion Commit: pending follow-up acceptance
 
 ## Goal
 
