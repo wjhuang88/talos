@@ -24,6 +24,7 @@
 | Claimed At | 2026-10-06 |
 | Source Issue | #644 |
 | Governance Claim PR | #665 |
+| Implementation PR | Not started |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Governance-only claim+activation PR; exact-head CI, governance validators, remote Issue reconciliation and merge-time CAS required. |
 | Last Updated | 2026-10-06 |
