@@ -28,7 +28,7 @@
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Governance-only claim+activation PR; exact-head CI, governance validators, remote Issue reconciliation and merge-time CAS required. |
 | Last Updated | 2026-10-06 |
-| Handoff / Release Condition | Claim activates evidence research only; E/F provider implementation remains gated by the resulting matrix. |
+| Handoff / Release Condition | Claim effective after #665 merge `7019f63d3df3d6eb58473a53a499b9b7e8b98925`; evidence research only, with E/F provider implementation gated by the resulting matrix. |
 
 ## Scope
 
