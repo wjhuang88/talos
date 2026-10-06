@@ -125,3 +125,15 @@ The earlier Stage A+B+C label describes intended scope, not completed acceptance
 configuration integration, incremental history detection, durable resume/rotation integration,
 real assessor prompt/failure evidence, measurements and user documentation remain open.
 Fresh exact-head CI and independent review are required for the corrected candidate.
+
+## Corrected Candidate Merge Evidence (2026-10-06)
+
+PR #662 merged at `1a397cfa1cbbee4cdc435cb450980b0fa6a25011` from exact head
+`2ab3e3b741733548c67b5eb664c1a4b4a2468426`. Exact-head CI run 3011 passed all jobs,
+and independent API/security review approved the head. The merged slice preserves session
+history through repeated approvals, includes valid fallback-locale votes, keeps empty snapshots
+as no-ops, and leaves locale outside permission authority and request identity.
+
+This merge closes the corrected implementation slice, not the product story. AUTO-UX-001,
+I290, I291 and #590 remain Review / Claimed while UI locale wiring, real provider prompt and
+failure-path evidence, performance/prompt-overhead measurements, and user documentation remain.
