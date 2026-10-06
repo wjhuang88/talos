@@ -1,6 +1,6 @@
 # SEARCH-001-D: Native Provider Admission And Regional Evidence
 
-**Status**: Proposed / Unclaimed; selected in I294
+**Status**: Active / Claimed; selected in I294
 **Type**: Research / Evidence Gate
 **Parent Epic**: [SEARCH-001](SEARCH-001-zero-config-global-search.md) / [Issue #624](https://github.com/wjhuang88/talos/issues/624)
 
@@ -17,16 +17,16 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | None; provider evidence gate is dependency-ready but unclaimed |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | GPT-6 Sol / talos开发 session |
+| Work Slice | SEARCH-001-D native provider admission and regional evidence only |
+| Claimed At | 2026-10-06 |
 | Source Issue | #644 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
-| Handoff / Release Condition | Select a bounded research iteration and establish an effective claim before execution |
+| Governance Claim PR | #665 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Governance-only claim+activation PR; exact-head CI, governance validators, remote Issue reconciliation and merge-time CAS required. |
+| Handoff / Release Condition | E/F remain blocked until the candidate matrix and regional evidence gate are accepted. |
 
 ## Goal
 
