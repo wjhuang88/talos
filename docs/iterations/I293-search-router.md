@@ -23,9 +23,10 @@
 | Work Slice | SEARCH-001-C Talos-owned SearchRouter behavior and deterministic characterization only |
 | Claimed At | 2026-10-06 |
 | Source Issue | #643 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #664 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Governance-only claim+activation PR; exact-head CI, governance validators, remote Issue reconciliation and merge-time CAS required. |
+| Last Updated | 2026-10-06 |
 | Handoff / Release Condition | Claim effective only after governance PR merges; implementation remains bounded by ADR-085 and this iteration. |
 
 ## Scope
