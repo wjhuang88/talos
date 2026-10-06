@@ -1,6 +1,6 @@
 # Iteration I293: Talos-Owned SearchRouter
 
-> Document status: Planned
+> Document status: Active
 > Parent: SEARCH-001-C / #643 / SEARCH-001 / #624
 > Objective: implement the accepted ADR-085 first-valid-success router after B, without changing the model-facing contract.
 
@@ -9,9 +9,25 @@
 | Story | SEARCH-001-C |
 | Source Issue | #643 |
 | Depends on | Accepted ADR-085; SEARCH-001-B / #642 complete in #656; NET-001 boundary coordination |
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Implementation PR | Not started |
 | Completion | Pending |
+
+## Collaboration Claim
+
+| Field | Value |
+|---|---|
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | GPT-6 Sol / talos开发 session |
+| Work Slice | SEARCH-001-C Talos-owned SearchRouter behavior and deterministic characterization only |
+| Claimed At | 2026-10-06 |
+| Source Issue | #643 |
+| Governance Claim PR | #664 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Governance-only claim+activation PR; exact-head CI, governance validators, remote Issue reconciliation and merge-time CAS required. |
+| Last Updated | 2026-10-06 |
+| Handoff / Release Condition | Claim effective only after governance PR merges; implementation remains bounded by ADR-085 and this iteration. |
 
 ## Scope
 
