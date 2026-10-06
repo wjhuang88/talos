@@ -27,7 +27,7 @@
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Governance-only claim+activation PR; exact-head CI, governance validators, remote Issue reconciliation and merge-time CAS required. |
 | Last Updated | 2026-10-06 |
-| Handoff / Release Condition | Claim effective only after governance PR merges; implementation remains bounded by ADR-085 and this iteration. |
+| Handoff / Release Condition | Claim effective after #664 merge `d801790454e252699684253166984662ea9dab6a`; implementation remains bounded by ADR-085 and this iteration. |
 
 ## Scope
 
