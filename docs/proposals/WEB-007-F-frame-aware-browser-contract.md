@@ -52,6 +52,13 @@ length checks are supplemented with UTF-8 byte admission checks. Entire request 
 Ingress JSON parsers must reject duplicate keys before conversion to serde_json::Value; a tool
 cannot recover discarded duplicate keys. Generated schema and typed semantic parser must reject
 the same invalid fixture corpus except explicit byte-limit checks enforced by semantic admission.
+The v2 admission boundary owns this full closed-schema check; current ToolRegistry validation is
+not sufficient. Provider adapters must preserve and validate raw tool-argument JSON before
+emitting a v2 tool call (including streamed OpenAI and Anthropic native/compat paths). Any other
+entry point that already receives a parsed Value, including the current standalone MCP handler,
+must keep v2 unregistered or return UnsupportedVersion before permission evaluation until its
+transport can prove duplicate-key rejection at raw ingress. Re-serializing Value is not proof.
+Non-v2 tools retain their existing parsing and registry validation behavior.
 
 `open` navigates only the named tab's top document; it is never a child-frame navigation escape.
 `press` targets the resolved document, never browser-global keyboard focus. An executor unable to
@@ -136,6 +143,12 @@ All browser grants in this initial v2 design are invocation-only, with exact ope
 binding. Existing Network allow rules and session grants do not imply a browser grant; host policy
 may evaluate each new invocation but cannot skip browser admission. Business-write policy remains
 host owned. Denials are final for that invocation.
+The browser evaluator defaults to deny and accepts only an explicit browser-aware policy decision
+on the exact typed resource or a per-invocation human approval. Legacy tool-name, ToolNature,
+Network, path, glob, session and workspace-trust Allow rules cannot satisfy this resource, even
+when they match the browser tool by name or would allow its underlying transport. A browser-aware
+policy may authorize only one admitted invocation and cannot create a reusable grant. If a
+composition root cannot route to this evaluator, it must not register or execute v2.
 
 Navigate authorizes the requested destination origin and current tab context. Automatic cross-origin
 redirects must be blocked before the unapproved request is sent, returning OriginNotAuthorized;
@@ -197,6 +210,8 @@ wrapper forwarding tests. Any composition root not migrated must reject browser 
 execution. Public defaulted AgentTool hooks preserve existing implementers; new resource and
 capability types are separate from existing exhaustive enums/structs. Record an ADR and migration
 plan before code/API publication; no existing path-authority contract is widened by this proposal.
+For MCP, migration includes a raw-argument integrity route before rmcp converts JSON to an object;
+without it, v2 remains unavailable on standalone MCP rather than claiming schema parity.
 
 ## Lifecycle Race And Trust Boundary
 

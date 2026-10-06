@@ -27,6 +27,7 @@ deferred behind Desktop. Locale follow-up #590 is Review / Claimed; phase 1 merg
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
+| I295 Frame-aware browser host contract / WEB-007-F / #618 | Active / Claimed proposed in #669; ineffective until merge | [I295](iterations/I295-web007f-frame-aware-browser-contract.md) / [WEB-007-F](backlog/active/WEB-007-F-frame-aware-contract.md) | Atomic claim+activation PR #669 must merge before implementation; exact-head security/API review and host conformance precede delivery. I293/I294 retain separate authority. |
 | I292 Search compatible backend boundary / SEARCH-001-B | Complete / Claimed | [I292](iterations/I292-search-compatible-backend-boundary.md) / [SEARCH-001-B](backlog/active/SEARCH-001-B-compatible-search-backends.md) / #642 | PR #660 merged as `7728f7681df11a9d715a0e479590c1002c53a26f`; exact-head CI run `37409618084`; no production routing change. |
 | I293 Talos-owned SearchRouter / SEARCH-001-C | Active / Claimed | [I293](iterations/I293-search-router.md) / [SEARCH-001-C](backlog/active/SEARCH-001-C-search-router.md) / #643 | Claim #664 effective at `d801790454e252699684253166984662ea9dab6a`; implementation remains bounded by ADR-085 and I293 acceptance. |
 | I294 Native provider evidence / SEARCH-001-D | Active / Claimed | [I294](iterations/I294-search-provider-evidence.md) / [SEARCH-001-D](backlog/active/SEARCH-001-D-provider-evidence-gate.md) / #644 | Claim #665 effective at `7019f63d3df3d6eb58473a53a499b9b7e8b98925`; E/F remain gated by the evidence matrix. |
@@ -148,7 +149,7 @@ deferred behind Desktop. Locale follow-up #590 is Review / Claimed; phase 1 merg
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| Frame-aware browser contract / #618 | Intake / Unclaimed | [WEB-007-F](backlog/active/WEB-007-F-frame-aware-contract.md) | Independent API/security acceptance, runnable iteration selection and effective claim before implementation. |
+| Frame-aware browser contract / #618 | Active / Claimed proposed in #669; ineffective until merge | [WEB-007-F](backlog/active/WEB-007-F-frame-aware-contract.md) | I295 claim/activation and implementation remain pending target-branch merge; design review alone does not close #618. |
 | SEARCH-001 global zero-config web search / #624 | Intake / Unclaimed; not selected | [SEARCH-001](backlog/active/SEARCH-001-zero-config-global-search.md) / [SEARCH-001-A](backlog/active/SEARCH-001-A-architecture-migration-contract.md) | Architecture child #625 requires normal selection and effective claim; accepted ADR precedes later implementation; no active Board work. |
 | See owner documents and Product Backlog for the full retained historical and future inventory. | Reference | [Product Backlog](backlog/PRODUCT-BACKLOG.md) | Owner docs remain authoritative. |
 
