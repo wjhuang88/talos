@@ -41,3 +41,9 @@ No production behavior change, provider addition, GeoIP routing, CAPTCHA/access-
 ## Acceptance
 
 The candidate matrix has dated evidence links and honest limitations; two independent native zero-key routes are explicitly admitted or remain blocked; E/F authorization is gated by the result.
+
+## Evidence Register
+
+The working candidate matrix, regional observation schema and admission gate are maintained in
+[SEARCH-001-D provider evidence register](../reference/SEARCH-001-D-PROVIDER-EVIDENCE-2026-10-06.md).
+It is a research artifact only; no candidate is admitted by the register itself.

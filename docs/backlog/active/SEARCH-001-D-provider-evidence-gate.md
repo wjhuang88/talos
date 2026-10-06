@@ -34,6 +34,8 @@ Qualify candidate native zero-key routes before E/F. Record terms and automation
 maintainability, parser fixtures, endpoint and failure-domain independence, privacy/query exposure,
 DNS/TLS/HTTP/parser observations, challenge interpretation and provenance-backed regional evidence.
 
+Working evidence register: [SEARCH-001-D provider evidence register](../../reference/SEARCH-001-D-PROVIDER-EVIDENCE-2026-10-06.md).
+
 ## Constraints
 
 - Evidence and research only; do not change production search behavior or add a provider.
