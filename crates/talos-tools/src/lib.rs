@@ -36,6 +36,8 @@
 #[cfg(feature = "shell")]
 pub mod bash_tool;
 #[cfg(feature = "network")]
+pub mod browser_executor;
+#[cfg(feature = "network")]
 pub mod browser_page;
 #[cfg(any(
     feature = "file-write",
@@ -88,6 +90,11 @@ pub mod web_search;
 
 #[cfg(feature = "shell")]
 pub use bash_tool::{BashError, BashInput, BashTool};
+#[cfg(feature = "network")]
+pub use browser_executor::{
+    BROWSER_EXECUTOR_V2, BrowserElementRef, BrowserFrameRef, BrowserOperation,
+    BrowserResourceClass, BrowserSessionRef, BrowserSnapshotRef, BrowserTabRef,
+};
 #[cfg(feature = "network")]
 pub use browser_page::HttpBrowserPageConnector;
 #[cfg(feature = "network")]
