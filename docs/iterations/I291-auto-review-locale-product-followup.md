@@ -90,3 +90,38 @@ Resume in this owner and existing Work Slice: implement and locally test detecto
 and session tracking together, then capture multilingual assessor/surface evidence and measure cost.
 Submit one converged follow-up candidate with fresh exact-head CI and independent review.
 Keep AUTO-UX-001, I290, I291 Review / Claimed and #590 open until all published acceptance rows pass.
+
+## Stage A+B+C Candidate Evidence (2026-10-04)
+
+The first acceptance candidate changes locale aggregation from last-message-wins to a bounded
+majority selection over the observed session window. Detection now records an internal confidence
+level: high/medium script-majority, medium English heuristic, and low for short, code-like,
+ambiguous or unsupported input. Low-confidence observations retain the configured fallback.
+Supported-script fixtures cover `zh`, `en`, `ja`, `ko`, `ru`, `ar` and `hi`; mixed/unsupported
+inputs fall back deterministically. Session-scoped observation tests prove that a foreign session
+cannot mutate the resolver and that a resumed bounded history selects the majority locale.
+
+Local evidence for this candidate:
+
+- `cargo fmt --all -- --check`
+- `CARGO_BUILD_JOBS=2 cargo test -p talos-agent --lib` — 433 passed
+- targeted locale and session-observation tests — passed
+
+This is an in-progress acceptance candidate. UI locale wiring, real assessor prompt capture,
+provider failure-path evidence, performance measurement and user documentation remain open.
+
+
+## Merge Review Correction (2026-10-06)
+
+PR #658 original head `0dcd8b8b` passed CI run 3004 on retry, but merge review found
+that the approval entrypoint could overwrite the history-majority result with a single intent,
+and valid detections equal to the configured locale were excluded from voting. The candidate
+now preserves the observed-history result through repeated approvals, includes all non-low
+confidence votes, and retains single-intent compatibility only before history observation.
+Regression fixtures cover repeated snapshots, empty-snapshot no-op behavior and foreign-session isolation.
+These snapshot fixtures do not establish incremental detection or durable resume acceptance.
+
+The earlier Stage A+B+C label describes intended scope, not completed acceptance. UI locale
+configuration integration, incremental history detection, durable resume/rotation integration,
+real assessor prompt/failure evidence, measurements and user documentation remain open.
+Fresh exact-head CI and independent review are required for the corrected candidate.
