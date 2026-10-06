@@ -125,26 +125,135 @@ impl SearchBackend for CompatibilityBackend<'_> {
                     .await
             }
         }
-        .map_err(|error| {
-            if matches!(self.id, SearchBackendId::Tavily | SearchBackendId::SearXng)
-                && (error.contains("not set") || error.contains("not configured"))
-            {
-                SearchBackendError::NotConfigured
-            } else {
-                SearchBackendError::RequestFailed(error)
-            }
-        })?;
+        .map_err(classify_compatibility_error)?;
 
-        Ok(results
-            .into_iter()
-            .map(|result| SearchBackendResult {
-                backend: self.id,
-                title: result.title,
-                url: result.url,
-                snippet: result.snippet,
-            })
-            .collect())
+        Ok(normalize_compatibility_results(self.id(), results))
     }
+}
+
+fn classify_compatibility_error(error: String) -> SearchBackendError {
+    if error == "TAVILY_API_KEY not set" || error == "SEARXNG_URL not configured" {
+        SearchBackendError::NotConfigured
+    } else if error.starts_with("failed to parse ")
+        || error.starts_with("unexpected Tavily response format:")
+        || error == "SearXNG response missing results array"
+        || error == "unexpected Wikipedia response format"
+    {
+        SearchBackendError::InvalidResponse(error)
+    } else {
+        SearchBackendError::RequestFailed(error)
+    }
+}
+
+fn normalize_compatibility_results(
+    backend: SearchBackendId,
+    results: Vec<WebResult>,
+) -> Vec<SearchBackendResult> {
+    results
+        .into_iter()
+        .map(|result| SearchBackendResult {
+            backend,
+            title: result.title,
+            url: result.url,
+            snippet: result.snippet,
+        })
+        .collect()
+}
+
+fn parse_tavily(body: &Value, max_results: u32) -> Result<Vec<WebResult>, String> {
+    let results_array = body["results"].as_array().ok_or_else(|| {
+        format!(
+            "unexpected Tavily response format: {}",
+            serde_json::to_string_pretty(body).unwrap_or_default()
+        )
+    })?;
+
+    let mut results = Vec::new();
+    for item in results_array.iter().take(max_results as usize) {
+        results.push(WebResult {
+            title: item["title"].as_str().unwrap_or("Untitled").to_string(),
+            url: item["url"].as_str().unwrap_or("").to_string(),
+            snippet: item["content"].as_str().unwrap_or("").to_string(),
+        });
+    }
+
+    if results.is_empty() {
+        return Err("Tavily returned no results".to_string());
+    }
+
+    Ok(results)
+}
+
+fn parse_searxng(body: &Value, max_results: u32) -> Result<Vec<WebResult>, String> {
+    let results_array = body["results"]
+        .as_array()
+        .ok_or_else(|| "SearXNG response missing results array".to_string())?;
+
+    let mut results = Vec::new();
+    for item in results_array.iter().take(max_results as usize) {
+        results.push(WebResult {
+            title: item["title"].as_str().unwrap_or("Untitled").to_string(),
+            url: item["url"].as_str().unwrap_or("").to_string(),
+            snippet: item["content"]
+                .as_str()
+                .or(item["snippet"].as_str())
+                .unwrap_or("")
+                .to_string(),
+        });
+    }
+
+    if results.is_empty() {
+        return Err("SearXNG returned no results".to_string());
+    }
+
+    Ok(results)
+}
+
+fn parse_wikipedia(body: &Value, max_results: u32) -> Result<Vec<WebResult>, String> {
+    let titles = body[1].as_array();
+    let descriptions = body[2].as_array();
+    let urls = body[3].as_array();
+
+    let (Some(titles), Some(descriptions), Some(urls)) = (titles, descriptions, urls) else {
+        return Err("unexpected Wikipedia response format".to_string());
+    };
+
+    let count = titles.len().min(descriptions.len()).min(urls.len());
+    if count == 0 {
+        return Err("Wikipedia returned no results".to_string());
+    }
+
+    let mut results = Vec::new();
+    for i in 0..count.min(max_results as usize) {
+        results.push(WebResult {
+            title: titles[i].as_str().unwrap_or("Untitled").to_string(),
+            url: urls[i].as_str().unwrap_or("").to_string(),
+            snippet: descriptions[i].as_str().unwrap_or("").to_string(),
+        });
+    }
+
+    Ok(results)
+}
+
+fn convert_rust_websearch(
+    results: Vec<rust_websearch::SearchResult>,
+    max_results: u32,
+) -> Result<Vec<WebResult>, String> {
+    let converted: Vec<WebResult> = results
+        .into_iter()
+        .take(max_results as usize)
+        .map(|r| WebResult {
+            title: r.title,
+            url: r.url,
+            snippet: r.snippet,
+        })
+        .collect();
+
+    if converted.is_empty() {
+        return Err("DuckDuckGo returned no results".to_string());
+    }
+
+    Ok(converted)
 }
 
 // ---------------------------------------------------------------------------
@@ -195,22 +304,7 @@ impl WebSearchTool {
             .await
             .map_err(|e| format!("DuckDuckGo search failed: {e}"))?;
 
-        let converted: Vec<WebResult> = results
-            .results
-            .into_iter()
-            .take(max_results as usize)
-            .map(|r| WebResult {
-                title: r.title,
-                url: r.url,
-                snippet: r.snippet,
-            })
-            .collect();
-
-        if converted.is_empty() {
-            return Err("DuckDuckGo returned no results".to_string());
-        }
-
-        Ok(converted)
+        convert_rust_websearch(results.results, max_results)
     }
 
     /// Search Tavily AI-optimized search API.
@@ -255,27 +349,7 @@ impl WebSearchTool {
             .await
             .map_err(|e| format!("failed to parse Tavily response: {e}"))?;
 
-        let results_array = body["results"].as_array().ok_or_else(|| {
-            format!(
-                "unexpected Tavily response format: {}",
-                serde_json::to_string_pretty(&body).unwrap_or_default()
-            )
-        })?;
-
-        let mut results = Vec::new();
-        for item in results_array.iter().take(max_results as usize) {
-            results.push(WebResult {
-                title: item["title"].as_str().unwrap_or("Untitled").to_string(),
-                url: item["url"].as_str().unwrap_or("").to_string(),
-                snippet: item["content"].as_str().unwrap_or("").to_string(),
-            });
-        }
-
-        if results.is_empty() {
-            return Err("Tavily returned no results".to_string());
-        }
-
-        Ok(results)
+        parse_tavily(&body, max_results)
     }
 
     /// Search a self-hosted SearXNG instance.
@@ -312,28 +386,7 @@ impl WebSearchTool {
             .await
             .map_err(|e| format!("failed to parse SearXNG response: {e}"))?;
 
-        let results_array = body["results"]
-            .as_array()
-            .ok_or_else(|| "SearXNG response missing results array".to_string())?;
-
-        let mut results = Vec::new();
-        for item in results_array.iter().take(max_results as usize) {
-            results.push(WebResult {
-                title: item["title"].as_str().unwrap_or("Untitled").to_string(),
-                url: item["url"].as_str().unwrap_or("").to_string(),
-                snippet: item["content"]
-                    .as_str()
-                    .or(item["snippet"].as_str())
-                    .unwrap_or("")
-                    .to_string(),
-            });
-        }
-
-        if results.is_empty() {
-            return Err("SearXNG returned no results".to_string());
-        }
-
-        Ok(results)
+        parse_searxng(&body, max_results)
     }
 
     /// Fallback: Wikipedia OpenSearch.
@@ -368,29 +421,7 @@ impl WebSearchTool {
             .await
             .map_err(|e| format!("failed to parse Wikipedia response: {e}"))?;
 
-        let titles = body[1].as_array();
-        let descriptions = body[2].as_array();
-        let urls = body[3].as_array();
-
-        let (Some(titles), Some(descriptions), Some(urls)) = (titles, descriptions, urls) else {
-            return Err("unexpected Wikipedia response format".to_string());
-        };
-
-        let count = titles.len().min(descriptions.len()).min(urls.len());
-        if count == 0 {
-            return Err("Wikipedia returned no results".to_string());
-        }
-
-        let mut results = Vec::new();
-        for i in 0..count.min(max_results as usize) {
-            results.push(WebResult {
-                title: titles[i].as_str().unwrap_or("Untitled").to_string(),
-                url: urls[i].as_str().unwrap_or("").to_string(),
-                snippet: descriptions[i].as_str().unwrap_or("").to_string(),
-            });
-        }
-
-        Ok(results)
+        parse_wikipedia(&body, max_results)
     }
 
     async fn run_backend(
@@ -650,6 +681,117 @@ impl AgentTool for WebSearchTool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn compatibility_json_fixtures_preserve_defaults_order_and_bounds() {
+        let body = serde_json::json!({"results": [
+            {"title": "Rust", "url": "https://rust-lang.org", "content": "正文", "snippet": "alternate"},
+            {"snippet": "fallback"},
+            {"title": "excluded"}
+        ]});
+        for (id, parsed) in [
+            (SearchBackendId::Tavily, parse_tavily(&body, 2)),
+            (SearchBackendId::SearXng, parse_searxng(&body, 2)),
+        ] {
+            let results = normalize_compatibility_results(id, parsed.expect("fixture parses"));
+            assert_eq!(results.len(), 2);
+            assert!(results.iter().all(|result| result.backend == id));
+            assert_eq!(results[0].title, "Rust");
+            assert_eq!(results[0].url, "https://rust-lang.org");
+            assert_eq!(results[0].snippet, "正文");
+            assert_eq!(results[1].title, "Untitled");
+            assert_eq!(results[1].url, "");
+            assert_eq!(
+                results[1].snippet,
+                if id == SearchBackendId::SearXng {
+                    "fallback"
+                } else {
+                    ""
+                }
+            );
+        }
+    }
+
+    #[test]
+    fn compatibility_wikipedia_fixture_preserves_shortest_array_policy() {
+        let body = serde_json::json!([
+            "rust",
+            ["Rust", null, "extra"],
+            ["text", null],
+            ["https://example.org", null, "extra"]
+        ]);
+        let results = normalize_compatibility_results(
+            SearchBackendId::Wikipedia,
+            parse_wikipedia(&body, 20).expect("fixture parses"),
+        );
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].backend, SearchBackendId::Wikipedia);
+        assert_eq!(results[1].title, "Untitled");
+        assert_eq!(results[1].url, "");
+        assert_eq!(results[1].snippet, "");
+        assert_eq!(parse_wikipedia(&body, 1).expect("fixture parses").len(), 1);
+    }
+
+    #[test]
+    fn compatibility_parser_errors_retain_legacy_message_and_class() {
+        let malformed = serde_json::json!({});
+        for error in [
+            parse_tavily(&malformed, 10).expect_err("malformed"),
+            parse_searxng(&malformed, 10).expect_err("malformed"),
+            parse_wikipedia(&malformed, 10).expect_err("malformed"),
+        ] {
+            assert_eq!(
+                classify_compatibility_error(error.clone()),
+                SearchBackendError::InvalidResponse(error)
+            );
+        }
+        let empty = serde_json::json!({"results": []});
+        assert_eq!(
+            parse_tavily(&empty, 10).expect_err("empty"),
+            "Tavily returned no results"
+        );
+        assert_eq!(
+            parse_searxng(&empty, 10).expect_err("empty"),
+            "SearXNG returned no results"
+        );
+        assert_eq!(
+            parse_wikipedia(&serde_json::json!(["q", [], [], []]), 10).expect_err("empty"),
+            "Wikipedia returned no results"
+        );
+        for message in ["TAVILY_API_KEY not set", "SEARXNG_URL not configured"] {
+            assert_eq!(
+                classify_compatibility_error(message.into()),
+                SearchBackendError::NotConfigured
+            );
+        }
+        let message = "Tavily request failed: not configured by upstream";
+        assert_eq!(
+            classify_compatibility_error(message.into()),
+            SearchBackendError::RequestFailed(message.into())
+        );
+    }
+
+    #[tokio::test]
+    async fn compatibility_unconfigured_adapters_fail_without_network() {
+        let tool = WebSearchTool {
+            duckduckgo_config: rust_websearch::SearchConfig::default(),
+            tavily_api_key: None,
+            searxng_url: None,
+        };
+        for id in [SearchBackendId::Tavily, SearchBackendId::SearXng] {
+            let backend = CompatibilityBackend::new(&tool, id);
+            assert_eq!(backend.id(), id);
+            assert_eq!(
+                backend
+                    .search(SearchBackendRequest {
+                        query: "rust".into(),
+                        max_results: 10
+                    })
+                    .await,
+                Err(SearchBackendError::NotConfigured)
+            );
+        }
+    }
 
     #[test]
     fn test_tool_name() {
