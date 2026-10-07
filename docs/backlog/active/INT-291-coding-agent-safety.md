@@ -156,3 +156,18 @@ low-confidence history observations because the observer re-read `LC_ALL` / `LAN
 follow-up correction stores the validated configured locale as the session fallback and preserves
 it through short, code-only, unsupported, and empty-history paths. Fresh exact-head CI and review
 are required for the corrected candidate.
+
+
+## Configured Locale Wiring Merge Evidence (2026-10-07)
+
+PR #674 merged at `9cd764874074d77892ff92b22123b6dfe67f1440` from exact head
+`8b89b16a7c4348f59a56f6ec49ffff5208d16493`. Exact-head CI run 3042 passed all jobs,
+and independent API/security review approved the exact head. The merged slice wires optional
+validated `auto.locale` through CLI and TUI resolver construction and preserves it as the
+session fallback through low-confidence, short, code-only, unsupported, and empty-history
+observations without changing permission authority, request identity, digest, or assessor
+decision semantics.
+
+This merge closes the configured-locale wiring slice only. Real-provider prompt/failure
+capture, durable incremental resume/rotation evidence, performance/prompt-overhead measurement,
+and final user-facing behavior documentation remain open; I291 and #590 stay Review / Claimed and open.
