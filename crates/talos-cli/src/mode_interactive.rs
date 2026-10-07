@@ -129,7 +129,8 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
                     lease,
                     std::time::Duration::MAX,
                     auto_control,
-                )) as Arc<dyn talos_agent::permission_pipeline::ApprovalResolver>
+                )
+                .with_locale(config.auto.locale.as_deref())) as Arc<dyn talos_agent::permission_pipeline::ApprovalResolver>
             })
             .unwrap_or(fallback);
     let mut agent = Agent::with_security_and_hooks(

@@ -254,6 +254,11 @@ pub struct AutoConfig {
     /// Whether bounded assistance is attempted when a later resolver is available.
     #[serde(default = "default_auto_enabled")]
     pub enabled: bool,
+    /// Optional validated presentation locale for auto-review explanations.
+    ///
+    /// This is presentation-only and never affects permission authority or request identity.
+    #[serde(default)]
+    pub locale: Option<String>,
 }
 
 fn default_auto_enabled() -> bool {
@@ -262,7 +267,7 @@ fn default_auto_enabled() -> bool {
 
 impl Default for AutoConfig {
     fn default() -> Self {
-        Self { enabled: true }
+        Self { enabled: true, locale: None }
     }
 }
 

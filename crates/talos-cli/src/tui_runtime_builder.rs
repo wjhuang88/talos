@@ -236,7 +236,8 @@ impl TuiRuntimeBuilder {
                     lease,
                     std::time::Duration::MAX,
                     auto_control,
-                );
+                )
+                .with_locale(runtime_config.auto.locale.as_deref());
                 let resolver = if let Some(sink) = self.auto_report_sink.as_ref() {
                     resolver.with_report_sink(sink.clone())
                 } else {

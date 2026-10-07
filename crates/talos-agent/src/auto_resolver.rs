@@ -52,6 +52,7 @@ enum LocaleConfidence {
 
 struct SessionLocale {
     selected: ConversationLocale,
+    fallback: ConversationLocale,
     history_observed: bool,
 }
 
@@ -968,11 +969,34 @@ impl AutoPermissionResolver {
             control,
             deadline: deadline.max(Duration::from_millis(1)),
             report_sink: None,
-            locale: Mutex::new(SessionLocale {
-                selected: ConversationLocale::configured(),
-                history_observed: false,
+            locale: Mutex::new({
+                let fallback = ConversationLocale::configured();
+                SessionLocale {
+                    selected: fallback.clone(),
+                    fallback,
+                    history_observed: false,
+                }
             }),
         }
+    }
+
+    /// Applies an optional configured presentation locale after validating its BCP-47-style tag.
+    ///
+    /// Invalid or empty values are ignored and the environment/default locale remains active.
+    /// The locale is presentation-only and never enters request identity or permission policy.
+    #[must_use]
+    pub fn with_locale(self, locale: Option<&str>) -> Self {
+        let Some(locale) = locale.and_then(normalize_locale) else {
+            return self;
+        };
+        if let Ok(mut current) = self.locale.lock() {
+            let locale = ConversationLocale(locale);
+            current.fallback = locale.clone();
+            if !current.history_observed {
+                current.selected = locale;
+            }
+        }
+        self
     }
 
     /// Installs a redacted decision observer for live UI/audit surfaces.
@@ -1742,7 +1766,7 @@ impl AutoPermissionResolver {
         let Ok(mut current) = self.locale.lock() else {
             return;
         };
-        let configured = ConversationLocale::configured();
+        let configured = current.fallback.clone();
         let mut counts: Vec<(ConversationLocale, usize, usize)> = Vec::new();
         for (index, message) in messages.iter().enumerate() {
             let (detected, confidence) =
@@ -3499,6 +3523,7 @@ mod tests {
     fn history_selection_is_stable_across_repeated_approval_intents() {
         let state = SessionLocale {
             selected: ConversationLocale("ja".into()),
+            fallback: ConversationLocale("en-US".into()),
             history_observed: true,
         };
         for intent in [Some("Please read the file"), Some("请检查文件"), None] {
@@ -3506,6 +3531,7 @@ mod tests {
         }
         let compatibility = SessionLocale {
             selected: ConversationLocale("en-US".into()),
+            fallback: ConversationLocale("en-US".into()),
             history_observed: false,
         };
         assert_eq!(
@@ -3513,6 +3539,13 @@ mod tests {
             "zh"
         );
         assert_eq!(compatibility.selected.as_str(), "en-US");
+    }
+
+    #[test]
+    fn configured_locale_override_is_validated_and_presentation_only() {
+        assert_eq!(normalize_locale("zh_CN.UTF-8").as_deref(), Some("zh-CN"));
+        assert_eq!(normalize_locale(""), None);
+        assert_eq!(normalize_locale("not a locale"), None);
     }
 
     #[test]
@@ -3937,5 +3970,24 @@ mod tests {
                 "unsafe composed shell request must remain human-owned: {command}"
             );
         }
+    }
+}
+
+
+#[cfg(test)]
+mod configured_locale_fallback_tests {
+    use super::*;
+
+    #[test]
+    fn configured_locale_remains_fallback_for_low_confidence_history() {
+        let state = SessionLocale {
+            selected: ConversationLocale("zh-CN".into()),
+            fallback: ConversationLocale("zh-CN".into()),
+            history_observed: false,
+        };
+        let (detected, confidence) =
+            ConversationLocale::detect_with_confidence("ls -la ./src", &state.fallback);
+        assert_eq!(detected.as_str(), "zh-CN");
+        assert_eq!(confidence, LocaleConfidence::Low);
     }
 }
