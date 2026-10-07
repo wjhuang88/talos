@@ -137,3 +137,22 @@ as no-ops, and leaves locale outside permission authority and request identity.
 This merge closes the corrected implementation slice, not the product story. AUTO-UX-001,
 I290, I291 and #590 remain Review / Claimed while UI locale wiring, real provider prompt and
 failure-path evidence, performance/prompt-overhead measurements, and user documentation remain.
+
+
+## Next Acceptance Slice: Configured Locale Wiring (2026-10-07)
+
+The next candidate wires an optional validated `auto.locale` configuration into the CLI and TUI
+resolver construction. Invalid values keep the existing environment/default fallback; the value is
+presentation-only and does not enter request identity, permission authority, or assessor decision
+semantics. This slice adds configuration and validation coverage. Provider prompt/failure capture,
+incremental durable resume/rotation evidence, performance measurement, and user-facing behavior
+documentation remain open.
+
+
+## Configured Locale Fallback Correction (2026-10-07)
+
+Independent review of PR #674 found that an explicit `auto.locale` value could be lost after
+low-confidence history observations because the observer re-read `LC_ALL` / `LANG`. The
+follow-up correction stores the validated configured locale as the session fallback and preserves
+it through short, code-only, unsupported, and empty-history paths. Fresh exact-head CI and review
+are required for the corrected candidate.

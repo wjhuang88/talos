@@ -3973,7 +3973,6 @@ mod tests {
     }
 }
 
-
 #[cfg(test)]
 mod configured_locale_fallback_tests {
     use super::*;

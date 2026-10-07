@@ -267,7 +267,10 @@ fn default_auto_enabled() -> bool {
 
 impl Default for AutoConfig {
     fn default() -> Self {
-        Self { enabled: true, locale: None }
+        Self {
+            enabled: true,
+            locale: None,
+        }
     }
 }
 

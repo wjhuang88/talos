@@ -123,14 +123,16 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
                     .map_or(lease.clone(), |capability| {
                         lease.with_atomic_create_capability(capability)
                     });
-                Arc::new(AutoPermissionResolver::new(
-                    Arc::new(ProviderAutoPermissionAssessor::new(provider.clone())),
-                    fallback.clone(),
-                    lease,
-                    std::time::Duration::MAX,
-                    auto_control,
-                )
-                .with_locale(config.auto.locale.as_deref())) as Arc<dyn talos_agent::permission_pipeline::ApprovalResolver>
+                Arc::new(
+                    AutoPermissionResolver::new(
+                        Arc::new(ProviderAutoPermissionAssessor::new(provider.clone())),
+                        fallback.clone(),
+                        lease,
+                        std::time::Duration::MAX,
+                        auto_control,
+                    )
+                    .with_locale(config.auto.locale.as_deref()),
+                ) as Arc<dyn talos_agent::permission_pipeline::ApprovalResolver>
             })
             .unwrap_or(fallback);
     let mut agent = Agent::with_security_and_hooks(
