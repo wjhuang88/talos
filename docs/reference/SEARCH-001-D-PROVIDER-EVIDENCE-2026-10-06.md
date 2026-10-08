@@ -95,3 +95,33 @@ establish permission for a new Talos-native adapter.
 
 E/F remain blocked: this review supplies neither two admitted native routes nor a regional evidence
 packet. SEARCH-001-D remains Active / Claimed with incomplete acceptance.
+
+## Dated Terms Review — 2026-10-08
+
+| Evidence | Official source | Observation | Talos disposition |
+|---|---|---|---|
+| D-003 | [DuckDuckGo Terms](https://duckduckgo.com/terms) and [Acceptable Use Policy](https://duckduckgo.com/acceptable-use) | Terms incorporate the AUP. The AUP restricts displaying portions of the service inside another service, resale, unauthorized access and service disruption. | Whether normalized search results in Talos fall within the display restriction remains unresolved. This review does not establish permission for a distributed HTML/Lite adapter or a blanket ban on every automated query. Keep admission pending. |
+| D-004 | [Microsoft Services Agreement](https://www.microsoft.com/en-us/servicesagreement), Code of Conduct 3.a.vi and Bing/MSN 14.f.i | The retrieved page states publication on July 30, 2026 and effectiveness on September 30, 2026. It restricts circumvention and impermissible scraping; Bing/MSN materials have personal noncommercial-use conditions and qualified conditions for copying, redistribution and building products. | This is a general consumer agreement, not established applicable Bing CN authorization. Record an unresolved product-use/automation and region-specific terms gate; do not infer that every search is prohibited or that consumer access licenses a Talos adapter. |
+
+Dates above record source retrieval; D-004's publication/effective dates are taken from the page.
+No live search query or search-response fixture was acquired in this review.
+
+### Research disposition and next deliverable
+
+The current candidate set has no native zero-key route ready for production admission:
+
+- Mojeek HTML: permission blocker (D-001).
+- DDG HTML/Lite: distribution/display interpretation and automation permission unresolved (D-003),
+  with shared-upstream risk (D-002).
+- Bing CN: applicable regional terms and product-use permission unresolved (D-004),
+  with independence evidence still missing.
+- Credentialed APIs and self-hosted instances remain outside E/F's default zero-key requirement.
+
+The next D deliverable is a route-specific acquisition packet, not a parser implementation:
+identify the applicable terms and permitted interface, record privacy/query exposure and endpoint
+ownership, then acquire authorized fixtures and paired regional observations. Alternative zero-key
+candidates may be researched under I294, but no new provider is admitted by adding it to the queue.
+No provider outreach, enrollment or account creation was performed.
+
+Partial research evidence is merged in #668 and #673. D acceptance remains incomplete; do not mark
+I294 or SEARCH-001-D Complete, and do not close #624.

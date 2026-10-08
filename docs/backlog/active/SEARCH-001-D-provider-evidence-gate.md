@@ -10,8 +10,8 @@
 | Source Issue | [#644](https://github.com/wjhuang88/talos/issues/644) |
 | Depends on | Accepted ADR-085; SEARCH-001-A / #625 merged as `4567bf85` |
 | Selected Iteration | [I294](../../iterations/I294-search-provider-evidence.md) |
-| Implementation PR | None |
-| Last Updated | 2026-10-03 |
+| Implementation PR | #668 and #673 (merged; evidence only) |
+| Last Updated | 2026-10-08 |
 
 ## Collaboration Claim
 
@@ -59,3 +59,12 @@ China availability from an unverified environment.
 
 Keep all unqualified candidates out of the default distribution and retain the accepted
 rust-websearch compatibility path while evidence is incomplete.
+
+## Partial Research Evidence
+
+- #668: evidence register, merged at `08b5bd2188892e3d721d7b5e845fdb35b522af19`.
+- #673: dated source review, merged at `2708db4f56362d626d10b4e5c53fae880e7d3b08`.
+- DDG/Bing terms follow-up: see the register's 2026-10-08 review. No route admitted.
+
+Terms applicability, privacy, authorized fixtures, independent failure domains and genuine regional
+observations remain incomplete. E/F remain gated; this is partial evidence, not completion.
