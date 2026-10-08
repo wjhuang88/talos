@@ -137,3 +137,17 @@ as no-ops, and leaves locale outside permission authority and request identity.
 This merge closes the corrected implementation slice, not the product story. AUTO-UX-001,
 I290, I291 and #590 remain Review / Claimed while UI locale wiring, real provider prompt and
 failure-path evidence, performance/prompt-overhead measurements, and user documentation remain.
+
+
+## Provider Prompt Boundary Merge Evidence (2026-10-08)
+
+PR #677 merged at `807b6bc1a0b7354e499f720a2851713df4a706c9` from corrected exact head
+`6e08b6960c8c5b4ba9aece93db0816d25b8bdccf`. Exact-head CI run 3049 passed all jobs, and
+independent API/security review approved the exact head. The added capture test verifies that the
+bounded provider request contains the presentation locale and current bounded user intent while
+excluding conversation-history text; existing provider failure handling remains human fallback.
+README and config reference now document `auto.locale`, validation and fallback order.
+
+The remaining acceptance rows are warmed detection/prompt overhead measurement and durable
+incremental resume/rotation evidence. Until those rows have evidence, I291 and #590 remain Review /
+Claimed and open.
