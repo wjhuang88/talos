@@ -19,6 +19,13 @@ model = "claude-sonnet-4-20250514"
 # format = "pretty"                     # "pretty" (default) or "compact"
 # filter = "talos_provider=debug"       # Full tracing filter; overrides level when set
 
+# ── Bounded Auto Review ───────────────────────────────────────────────────────
+# [auto]
+# enabled = true                         # attempt bounded model assistance when supported
+# locale = "zh-CN"                       # presentation locale for explanations and decision points
+#                                         # invalid/empty values use LC_ALL, LANG, then en-US
+#                                         # locale never changes Allow/Ask/Deny or request identity
+
 # ── Hooks ─────────────────────────────────────────────────────────────────────
 # [hooks]
 # (placeholder for I009-S2 hook system)
