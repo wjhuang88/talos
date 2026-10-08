@@ -51,12 +51,21 @@ enum LocaleConfidence {
 }
 
 struct SessionLocale {
+    session_id: Option<String>,
     selected: ConversationLocale,
     fallback: ConversationLocale,
     history_observed: bool,
 }
 
 impl SessionLocale {
+    fn bind_session(&mut self, session_id: &str) {
+        if self.session_id.as_deref() != Some(session_id) {
+            self.session_id = Some(session_id.to_owned());
+            self.selected = self.fallback.clone();
+            self.history_observed = false;
+        }
+    }
+
     fn for_assessment(&self, intent: Option<&str>) -> ConversationLocale {
         if self.history_observed {
             return self.selected.clone();
@@ -269,6 +278,13 @@ impl ManagedWorkspaceLease {
                     .session_id()
                     .is_ok_and(|session_id| session_id.stable_id() == candidate)
             },
+        )
+    }
+
+    fn current_session_id(&self) -> Option<String> {
+        self.permission_state.as_ref().map_or_else(
+            || Some(self.session_id.clone()),
+            |state| state.session_id().ok().map(|id| id.stable_id()),
         )
     }
 
@@ -959,6 +975,7 @@ impl AutoPermissionResolver {
         deadline: Duration,
         control: AutoPermissionControl,
     ) -> Self {
+        let session_id = lease.current_session_id();
         Self {
             assessor,
             fallback,
@@ -972,6 +989,7 @@ impl AutoPermissionResolver {
             locale: Mutex::new({
                 let fallback = ConversationLocale::configured();
                 SessionLocale {
+                    session_id,
                     selected: fallback.clone(),
                     fallback,
                     history_observed: false,
@@ -1759,13 +1777,14 @@ fn project_auto_request(
 }
 
 impl AutoPermissionResolver {
-    fn observe_locale(&self, messages: &[String]) {
-        if messages.is_empty() {
-            return;
-        }
+    fn observe_locale(&self, session_id: &str, messages: &[String]) {
         let Ok(mut current) = self.locale.lock() else {
             return;
         };
+        current.bind_session(session_id);
+        if messages.is_empty() {
+            return;
+        }
         let configured = current.fallback.clone();
         let mut counts: Vec<(ConversationLocale, usize, usize)> = Vec::new();
         for (index, message) in messages.iter().enumerate() {
@@ -1795,12 +1814,16 @@ impl AutoPermissionResolver {
 #[async_trait]
 impl ApprovalResolver for AutoPermissionResolver {
     fn observe_user_messages(&self, messages: &[String]) {
-        self.observe_locale(messages);
+        if let Some(session_id) = self.lease.current_session_id() {
+            self.observe_locale(&session_id, messages);
+        }
     }
 
     fn observe_user_messages_for_session(&self, session_id: &str, messages: &[String]) {
         if self.lease.matches_session(session_id) {
-            self.observe_locale(messages);
+            // Keep the verified snapshot identity: a concurrent rebind must not
+            // label old messages with the new Session identity.
+            self.observe_locale(session_id, messages);
         }
     }
 
@@ -1941,9 +1964,17 @@ impl AutoPermissionResolver {
             assessment_request.arguments = input.clone();
         }
         self.sync_reset();
+        let session_id = self.lease.current_session_id();
         let locale = {
             match self.locale.lock() {
-                Ok(current) => current.for_assessment(user_intent),
+                Ok(mut current) => {
+                    if let Some(session_id) = session_id {
+                        current.bind_session(&session_id);
+                        current.for_assessment(user_intent)
+                    } else {
+                        current.fallback.clone()
+                    }
+                }
                 Err(_) => ConversationLocale::configured(),
             }
         };
@@ -2358,6 +2389,102 @@ mod tests {
 
     struct CapturingLocaleModel {
         prompt: Arc<Mutex<Option<String>>>,
+    }
+
+    struct LocaleDecisionModel {
+        payloads: Arc<Mutex<Vec<serde_json::Value>>>,
+        malformed: bool,
+        forbidden_history: String,
+    }
+
+    #[async_trait]
+    impl LanguageModel for LocaleDecisionModel {
+        async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+            assert_eq!(messages.len(), 2);
+            for message in messages {
+                let content = match message {
+                    Message::System { content, .. } | Message::User { content } => content,
+                    _ => panic!("only isolated system/user messages"),
+                };
+                assert!(!content.contains(&self.forbidden_history));
+            }
+            let Message::User { content } = &messages[1] else {
+                panic!("bounded user payload");
+            };
+            let payload: serde_json::Value =
+                serde_json::from_str(content.split_once('\n').expect("payload").1).expect("JSON");
+            self.payloads
+                .lock()
+                .expect("payloads")
+                .push(payload.clone());
+            let (summary, point) = match payload["locale"].as_str().expect("locale") {
+                "zh" | "zh-CN" => ("列出文件", "是否继续？"),
+                "ja" => ("ファイル一覧を表示", "続行しますか？"),
+                "en" | "en-US" => ("List files", "Continue?"),
+                other => panic!("unexpected locale: {other}"),
+            };
+            let raw = if self.malformed {
+                "not-json".to_owned()
+            } else {
+                serde_json::json!({
+                    "schema_version": 1,
+                    "request_digest": payload["request_digest"],
+                    "decision": "human_required",
+                    "effect": "read_only",
+                    "reason_code": "uncertain",
+                    "confidence": "low",
+                    "effect_summary": summary,
+                    "decision_points": [point]
+                })
+                .to_string()
+            };
+            let (tx, rx) = mpsc::channel(2);
+            tx.send(AgentEvent::TextDelta { delta: raw })
+                .await
+                .expect("text");
+            tx.send(AgentEvent::TurnEnd {
+                stop_reason: talos_core::message::StopReason::EndTurn,
+                usage: talos_core::message::Usage::default(),
+            })
+            .await
+            .expect("end");
+            Ok(rx)
+        }
+
+        async fn stream_decision(
+            &self,
+            messages: &[Message],
+            limits: talos_core::provider::DecisionRequestLimits,
+        ) -> ProviderResult<Receiver<AgentEvent>> {
+            assert_eq!(limits.max_retries, 0);
+            self.stream(messages).await
+        }
+    }
+
+    struct ExplanationCapture(Arc<Mutex<Vec<String>>>);
+
+    #[async_trait]
+    impl ApprovalResolver for ExplanationCapture {
+        async fn resolve(
+            &self,
+            _request: PermissionApprovalRequest,
+            _remaining: Duration,
+        ) -> Result<ApprovalChoice, ApprovalResolverError> {
+            Ok(ApprovalChoice::Deny)
+        }
+
+        async fn resolve_with_explanation(
+            &self,
+            _request: PermissionApprovalRequest,
+            _remaining: Duration,
+            explanation: &str,
+        ) -> Result<ApprovalChoice, ApprovalResolverError> {
+            self.0
+                .lock()
+                .expect("explanations")
+                .push(explanation.to_owned());
+            Ok(ApprovalChoice::Deny)
+        }
     }
 
     #[async_trait]
@@ -2879,6 +3006,236 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn detected_locale_reaches_provider_and_human_surface_without_history() {
+        for (history, expected, point) in [
+            ("请检查这个文件", "zh", "是否继续？"),
+            ("このファイルを確認してください", "ja", "続行しますか？"),
+            ("Please read the file and run the tests", "en", "Continue?"),
+        ] {
+            let root = tempfile::tempdir().expect("root");
+            let state = PermissionSessionState::new(PermissionEngine::with_workspace_root(
+                root.path().to_path_buf(),
+            ));
+            let id = state.session_id().expect("id").stable_id();
+            let payloads = Arc::new(Mutex::new(Vec::new()));
+            let explanations = Arc::new(Mutex::new(Vec::new()));
+            let resolver = AutoPermissionResolver::new(
+                Arc::new(ProviderAutoPermissionAssessor::new(Arc::new(
+                    LocaleDecisionModel {
+                        payloads: payloads.clone(),
+                        malformed: false,
+                        forbidden_history: history.to_owned(),
+                    },
+                ))),
+                Arc::new(ExplanationCapture(explanations.clone())),
+                ManagedWorkspaceLease::new(root.path(), id.clone()).expect("lease"),
+                Duration::from_secs(1),
+                AutoPermissionControl::new(true),
+            )
+            .with_locale(Some("en-US"));
+            resolver.observe_user_messages_for_session(&id, &[history.to_owned()]);
+            let request = shell_approval_request(root.path(), &state, "ls -la");
+            assert_eq!(
+                resolver
+                    .resolve_with_auto_assessment(request, Duration::from_secs(2), true, None,)
+                    .await
+                    .expect("human fallback"),
+                ApprovalChoice::Deny
+            );
+            let payloads = payloads.lock().expect("payloads");
+            assert_eq!(payloads.len(), 1, "no extra model call for detection");
+            assert_eq!(payloads[0]["locale"], expected);
+            assert!(!payloads[0].to_string().contains(history));
+            let mut without_hint = payloads[0].clone();
+            without_hint
+                .as_object_mut()
+                .expect("object")
+                .remove("locale");
+            let overhead = payloads[0].to_string().len() - without_hint.to_string().len();
+            assert_eq!(overhead, 12 + expected.len(), "one bounded JSON field");
+            assert!(explanations.lock().expect("explanations")[0].contains(point));
+            assert_eq!(
+                resolver.last_report().expect("report").reason,
+                "human_required"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn provider_locale_malformed_response_requires_human_without_replaying_history() {
+        let root = tempfile::tempdir().expect("root");
+        let state = PermissionSessionState::new(PermissionEngine::with_workspace_root(
+            root.path().to_path_buf(),
+        ));
+        let id = state.session_id().expect("id").stable_id();
+        let payloads = Arc::new(Mutex::new(Vec::new()));
+        let explanations = Arc::new(Mutex::new(Vec::new()));
+        let resolver = AutoPermissionResolver::new(
+            Arc::new(ProviderAutoPermissionAssessor::new(Arc::new(
+                LocaleDecisionModel {
+                    payloads: payloads.clone(),
+                    malformed: true,
+                    forbidden_history: "请检查这个文件".into(),
+                },
+            ))),
+            Arc::new(ExplanationCapture(explanations.clone())),
+            ManagedWorkspaceLease::new(root.path(), id.clone()).expect("lease"),
+            Duration::from_secs(1),
+            AutoPermissionControl::new(true),
+        )
+        .with_locale(Some("zh-CN"));
+        resolver.observe_user_messages_for_session(&id, &["请检查这个文件".into()]);
+        assert_eq!(
+            resolver
+                .resolve_with_auto_assessment(
+                    shell_approval_request(root.path(), &state, "ls -la"),
+                    Duration::from_secs(2),
+                    true,
+                    None,
+                )
+                .await
+                .expect("human fallback"),
+            ApprovalChoice::Deny
+        );
+        assert_eq!(
+            resolver.last_report().expect("report").reason,
+            "malformed_output"
+        );
+        assert_eq!(payloads.lock().expect("payloads").len(), 1);
+        assert!(!explanations.lock().expect("explanations")[0].contains("not-json"));
+    }
+
+    #[tokio::test]
+    async fn permission_session_rotation_resets_locale_before_observation_or_assessment() {
+        for observe_empty_snapshot in [false, true] {
+            let root = tempfile::tempdir().expect("root");
+            let state = Arc::new(PermissionSessionState::new(
+                PermissionEngine::with_workspace_root(root.path().to_path_buf()),
+            ));
+            let old_id = state.session_id().expect("old ID").stable_id();
+            let payloads = Arc::new(Mutex::new(Vec::new()));
+            let resolver = AutoPermissionResolver::new(
+                Arc::new(ProviderAutoPermissionAssessor::new(Arc::new(
+                    LocaleDecisionModel {
+                        payloads: payloads.clone(),
+                        malformed: false,
+                        forbidden_history: "请检查这个文件".into(),
+                    },
+                ))),
+                Arc::new(DenyFallback),
+                ManagedWorkspaceLease::for_permission_session(root.path(), state.clone())
+                    .expect("shared lease"),
+                Duration::from_secs(1),
+                AutoPermissionControl::new(true),
+            )
+            .with_locale(Some("en-US"));
+            resolver.observe_user_messages_for_session(&old_id, &["请检查这个文件".into()]);
+            assert_eq!(
+                resolver.locale.lock().expect("locale").selected.as_str(),
+                "zh"
+            );
+            state.rebind_session().expect("rotate");
+            let new_id = state.session_id().expect("new ID").stable_id();
+            assert_ne!(old_id, new_id);
+            resolver.observe_user_messages_for_session(&old_id, &["请继续检查文件".into()]);
+            if observe_empty_snapshot {
+                resolver.observe_user_messages_for_session(&new_id, &[]);
+                let locale = resolver.locale.lock().expect("locale");
+                assert_eq!(locale.selected.as_str(), "en-US");
+                assert!(!locale.history_observed);
+            }
+            assert_eq!(
+                resolver
+                    .resolve_with_auto_assessment(
+                        shell_approval_request(root.path(), &state, "ls -la"),
+                        Duration::from_secs(2),
+                        true,
+                        None,
+                    )
+                    .await
+                    .expect("fallback"),
+                ApprovalChoice::Deny
+            );
+            assert_eq!(payloads.lock().expect("payloads")[0]["locale"], "en-US");
+            assert_eq!(
+                resolver.last_report().expect("report").reason,
+                "human_required"
+            );
+            resolver.observe_user_messages_for_session(
+                &new_id,
+                &["このファイルを確認してください".into()],
+            );
+            resolver.observe_user_messages_for_session(&old_id, &["请继续检查文件".into()]);
+            assert_eq!(
+                resolver.locale.lock().expect("locale").selected.as_str(),
+                "ja"
+            );
+        }
+    }
+
+    #[test]
+    fn durable_history_reopen_seeds_locale_without_persisting_derived_state() {
+        let root = tempfile::tempdir().expect("root");
+        {
+            let manager = talos_session::SessionManager::with_dir(root.path().join("sessions"));
+            let durable = manager
+                .create_or_open_session("locale-fixture")
+                .expect("create");
+            for text in ["请检查这个文件", "请继续检查项目", "Please read the file"] {
+                durable
+                    .session()
+                    .append(&Message::User {
+                        content: text.into(),
+                    })
+                    .expect("append");
+            }
+        }
+        let reopened = talos_session::SessionManager::with_dir(root.path().join("sessions"))
+            .get_session_by_external_id("locale-fixture")
+            .expect("reopen")
+            .expect("existing");
+        let history: Vec<String> = reopened
+            .read_messages()
+            .expect("history")
+            .into_iter()
+            .filter_map(|message| match message {
+                Message::User { content } => Some(content),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(history.len(), 3);
+        let state =
+            PermissionSessionState::new(PermissionEngine::with_workspace_root(root.path().into()));
+        let id = state.session_id().expect("id").stable_id();
+        let resolver = AutoPermissionResolver::new(
+            Arc::new(ShellAssessor),
+            Arc::new(DenyFallback),
+            ManagedWorkspaceLease::new(root.path(), id.clone()).expect("lease"),
+            Duration::from_secs(1),
+            AutoPermissionControl::new(true),
+        )
+        .with_locale(Some("en-US"));
+        resolver.observe_user_messages_for_session(&id, &history);
+        assert_eq!(
+            resolver.locale.lock().expect("locale").selected.as_str(),
+            "zh"
+        );
+        resolver.observe_user_messages_for_session(&id, &history);
+        assert_eq!(
+            resolver.locale.lock().expect("locale").selected.as_str(),
+            "zh"
+        );
+        resolver.observe_user_messages_for_session(
+            "foreign",
+            &["このファイルを確認してください".into()],
+        );
+        assert_eq!(
+            resolver.locale.lock().expect("locale").selected.as_str(),
+            "zh"
+        );
+    }
+
+    #[tokio::test]
     async fn provider_receives_complete_script_snapshot() {
         let root = tempfile::tempdir().expect("root");
         std::fs::write(root.path().join("check.sh"), "pwd\n").expect("script");
@@ -3184,10 +3541,12 @@ mod tests {
         ));
         let calls = Arc::new(AtomicUsize::new(0));
         let control = AutoPermissionControl::new(false);
-        let lease =
-            ManagedWorkspaceLease::new(root.path(), state.session_id().unwrap().stable_id())
-                .expect("lease")
-                .with_atomic_create_capability(Arc::new(TestCapability));
+        let lease = ManagedWorkspaceLease::new(
+            root.path(),
+            state.session_id().expect("session ID").stable_id(),
+        )
+        .expect("lease")
+        .with_atomic_create_capability(Arc::new(TestCapability));
         let resolver = AutoPermissionResolver::new(
             Arc::new(CountingAssessor {
                 calls: calls.clone(),
@@ -3203,7 +3562,7 @@ mod tests {
             resolver
                 .resolve(request, Duration::from_secs(1))
                 .await
-                .unwrap(),
+                .expect("disabled resolver falls back"),
             ApprovalChoice::Deny
         );
         assert_eq!(calls.load(Ordering::Acquire), 0);
@@ -3214,7 +3573,7 @@ mod tests {
             resolver
                 .resolve(request, Duration::from_secs(1))
                 .await
-                .unwrap(),
+                .expect("enabled resolver assesses"),
             ApprovalChoice::ApproveOnce
         );
         assert_eq!(calls.load(Ordering::Acquire), 1);
@@ -3230,10 +3589,12 @@ mod tests {
         let control = AutoPermissionControl::new(true);
         let started = Arc::new(Notify::new());
         let release = Arc::new(Notify::new());
-        let lease =
-            ManagedWorkspaceLease::new(root.path(), state.session_id().unwrap().stable_id())
-                .expect("lease")
-                .with_atomic_create_capability(Arc::new(TestCapability));
+        let lease = ManagedWorkspaceLease::new(
+            root.path(),
+            state.session_id().expect("session ID").stable_id(),
+        )
+        .expect("lease")
+        .with_atomic_create_capability(Arc::new(TestCapability));
         let resolver = Arc::new(AutoPermissionResolver::new(
             Arc::new(BlockingAssessor {
                 started: started.clone(),
@@ -3577,6 +3938,7 @@ mod tests {
     #[test]
     fn history_selection_is_stable_across_repeated_approval_intents() {
         let state = SessionLocale {
+            session_id: None,
             selected: ConversationLocale("ja".into()),
             fallback: ConversationLocale("en-US".into()),
             history_observed: true,
@@ -3585,6 +3947,7 @@ mod tests {
             assert_eq!(state.for_assessment(intent).as_str(), "ja");
         }
         let compatibility = SessionLocale {
+            session_id: None,
             selected: ConversationLocale("en-US".into()),
             fallback: ConversationLocale("en-US".into()),
             history_observed: false,
@@ -4035,6 +4398,7 @@ mod configured_locale_fallback_tests {
     #[test]
     fn configured_locale_remains_fallback_for_low_confidence_history() {
         let state = SessionLocale {
+            session_id: None,
             selected: ConversationLocale("zh-CN".into()),
             fallback: ConversationLocale("zh-CN".into()),
             history_observed: false,

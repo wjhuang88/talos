@@ -151,3 +151,73 @@ README and config reference now document `auto.locale`, validation and fallback 
 The remaining acceptance rows are warmed detection/prompt overhead measurement and durable
 incremental resume/rotation evidence. Until those rows have evidence, I291 and #590 remain Review /
 Claimed and open.
+
+## Acceptance Evidence Audit And Local Candidate (2026-10-08)
+
+The previous statement that only measurement and resume/rotation remained was premature.
+PR #677 directly supplies `zh-CN` to the assessor; it does not exercise detected multilingual
+history through the resolver or an actual CLI/TUI run. Its negative history assertions do not
+seed history in the fixture. Existing failure handling remains fail-closed, but technical failure
+copy is still English. Do not infer complete localization acceptance from that merge.
+
+This unsubmitted candidate adds resolver-to-provider-to-human-surface fixtures for `zh`, `en`,
+and `ja`, asserting one provider call, absence of the seeded history from the captured payload,
+localized decision points, and exact top-level locale JSON overhead (14 bytes for two-letter
+tags). It also adds malformed-output fallback and a real TLOG close/reopen fixture that rebuilds
+locale from recovered user messages. These are library integration fixtures, not binary walkthroughs;
+local `cargo test --offline --locked -p talos-agent --lib` passed 440 tests with zero failures,
+including these three fixtures. `cargo fmt --all -- --check`, `git diff --check`, and the
+collaboration claim validator passed. Full workspace and exact-head CI are not yet recorded for
+this unsubmitted candidate; project governance validation is still waiting on workspace metadata
+dependencies. Independent static review found no API/security blocker but is not compiled or
+exact-head merge approval.
+
+`scripts/measure_auto_locale.py` extracts the checked-out production detector and compiles it with
+the pinned Rust 1.97.0 compiler at `-O`. It adds no dependency and changes no workspace or lockfile.
+On the local Linux x86_64 container: 100 warmup windows and 1000 measured eight-message windows;
+32 characters/message p50 5909 ns and p95 6000 ns; 4096 characters/message p50 432123 ns and
+p95 883135 ns. The larger synthetic window intentionally stresses eight full character caps and
+can exceed the Agent's 16 KiB aggregate ingress bound. This measures detector CPU time only, not
+snapshot copying, resolver aggregation, CLI latency, provider dispatch, or model tokenizer cost.
+No claim of measured model token usage is made.
+
+Still open at the initial local checkpoint: incremental/deduplicated detection, permission-session rotation reset, localized
+technical-failure copy, malformed locale validation coverage, tokenizer measurement, and actual
+binary acceptance. Keep #590, AUTO-UX-001, I290, and I291 Review / Claimed.
+
+## Session Rotation Local Follow-up (2026-10-08)
+
+The candidate now binds the derived locale to the Permission Session identity. Observation of
+an empty snapshot after a rebind resets to the configured fallback; assessment also resets when
+no new snapshot has been observed. Foreign-session observations remain rejected. Observation
+binds the validated snapshot ID, not a second reading of the current ID, so a concurrent rebind
+cannot relabel old history as new history. Permission identity is read outside the locale mutex.
+The sequential rebind fixture verifies `en-US` fallback and later `ja` selection, including a
+normal provider `human_required` report, not a panic fallback. This is library evidence, not
+CLI/TUI rotation acceptance. Delayed old snapshots may still discard newer presentation history
+and trigger fallback; concurrent-scheduling coverage remains open.
+
+Independent local API/security review identified and verified corrections for the snapshot-ID
+race and a mock's missing region-tag handling. No remaining local review blocker was reported;
+this is not exact-head merge approval. Four pre-existing test `unwrap()` calls were changed to
+descriptive `expect()` calls to satisfy the pinned Clippy policy. Current targeted Clippy with
+`--offline --locked -p talos-agent --lib --tests -- -D warnings` and workspace format check pass.
+
+The initial 441-test run passed, but after the review corrections the latest full-library runs
+are not green: default parallelism yielded 437 passed / 4 session timeouts; two test threads
+yielded 439 / 2; one thread yielded 435 / 6. An isolated paused-submission test passed. Do not
+attribute these failures to load or to the base branch without a baseline comparison. The
+project-governance validator remains blocked by offline workspace metadata download of
+`arborium-c-sharp v2.18.2`; delivery-workflow validation passed 12 cases. No dependencies or
+lockfile were changed. This checkpoint was held locally pending convergence; retain Review / Claimed.
+
+Final isolated candidate rebuild: `cargo test --offline --locked -p talos-agent --lib` passed
+441 / 441 with zero failures at default parallelism. The base branch's isolated session suite
+also passed 35 / 35. Earlier shared-target baseline/candidate execution invalidates the targeted
+57-test result (it ran the base binary); that result is not candidate evidence. The final run
+used a fresh candidate-only crate build with no concurrent baseline compilation. The earlier
+timeouts remain recorded, with no proven root cause. Full workspace validation, exact-head CI,
+remote review, and product binary acceptance are still required before closure.
+
+The stable slice is submitted for exact-head CI and independent remote review after local
+convergence. This submission does not close the product story or waive full workspace validation.
