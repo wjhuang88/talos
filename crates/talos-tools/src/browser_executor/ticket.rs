@@ -1,39 +1,147 @@
 //! Invocation-bound lifecycle ticket. Permission evaluation remains outside this type.
 
-use std::time::{Duration, Instant};
+use std::{
+    collections::BTreeMap,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use super::BrowserRequest;
 
 /// Trusted host lifecycle epochs used to invalidate document-bound work.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct BrowserLifecycle {
+    identity: Arc<()>,
+    outstanding: BTreeMap<u64, Instant>,
+    next_nonce: u64,
     session_epoch: u64,
     document_epoch: u64,
+    available: bool,
 }
 
 impl BrowserLifecycle {
     /// Creates the initial lifecycle state.
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self {
+            identity: Arc::new(()),
+            outstanding: BTreeMap::new(),
+            next_nonce: 0,
             session_epoch: 0,
             document_epoch: 0,
+            available: true,
         }
     }
 
     /// Returns the current session and document epochs.
-    pub const fn epochs(self) -> (u64, u64) {
+    pub const fn epochs(&self) -> (u64, u64) {
         (self.session_epoch, self.document_epoch)
     }
 
     /// Invalidates every outstanding ticket after session replacement or loss.
     pub fn replace_session(&mut self) {
-        self.session_epoch = self.session_epoch.wrapping_add(1);
-        self.document_epoch = self.document_epoch.wrapping_add(1);
+        match self.session_epoch.checked_add(1) {
+            Some(epoch) => self.session_epoch = epoch,
+            None => self.available = false,
+        }
+        self.change_document();
     }
 
     /// Invalidates document-bound tickets after navigation or frame rebuild.
     pub fn change_document(&mut self) {
-        self.document_epoch = self.document_epoch.wrapping_add(1);
+        self.outstanding.clear();
+        match self.document_epoch.checked_add(1) {
+            Some(epoch) => self.document_epoch = epoch,
+            None => self.available = false,
+        }
+    }
+
+    /// Reports whether epoch bookkeeping remains usable.
+    pub const fn is_available(&self) -> bool {
+        self.available
+    }
+
+    /// Disables this domain after loss of trusted host synchronization.
+    /// A new domain is required after host resynchronization.
+    pub fn lose_synchronization(&mut self) {
+        self.available = false;
+        self.outstanding.clear();
+    }
+
+    /// Reserves a local ticket. This performs no origin admission or permission evaluation.
+    pub fn prepare(
+        &mut self,
+        request: BrowserRequest,
+    ) -> Result<BrowserInvocationTicket, BrowserTicketError> {
+        self.prepare_at(request, Instant::now())
+    }
+
+    fn prepare_at(
+        &mut self,
+        request: BrowserRequest,
+        now: Instant,
+    ) -> Result<BrowserInvocationTicket, BrowserTicketError> {
+        if !self.available {
+            return Err(BrowserTicketError::Unavailable);
+        }
+        self.outstanding.retain(|_, expiry| *expiry > now);
+        if self.outstanding.len() >= 256 {
+            return Err(BrowserTicketError::Capacity);
+        }
+        let nonce = self
+            .next_nonce
+            .checked_add(1)
+            .ok_or(BrowserTicketError::Unavailable)?;
+        let expires_at = now
+            .checked_add(Duration::from_secs(120))
+            .ok_or(BrowserTicketError::Unavailable)?;
+        self.next_nonce = nonce;
+        self.outstanding.insert(nonce, expires_at);
+        Ok(BrowserInvocationTicket {
+            request,
+            identity: self.identity.clone(),
+            session_epoch: self.session_epoch,
+            document_epoch: self.document_epoch,
+            nonce,
+            expires_at,
+        })
+    }
+
+    /// Validates the issuing domain, registry membership, expiry and lifecycle.
+    pub fn validate(&self, ticket: &BrowserInvocationTicket) -> Result<(), BrowserTicketError> {
+        self.validate_at(ticket, Instant::now())
+    }
+
+    fn validate_at(
+        &self,
+        ticket: &BrowserInvocationTicket,
+        now: Instant,
+    ) -> Result<(), BrowserTicketError> {
+        if !self.available {
+            return Err(BrowserTicketError::Unavailable);
+        }
+        if !Arc::ptr_eq(&self.identity, &ticket.identity)
+            || self.session_epoch != ticket.session_epoch
+            || self.document_epoch != ticket.document_epoch
+        {
+            return Err(BrowserTicketError::Stale);
+        }
+        if now >= ticket.expires_at {
+            return Err(BrowserTicketError::Expired);
+        }
+        if self.outstanding.get(&ticket.nonce) != Some(&ticket.expires_at) {
+            return Err(BrowserTicketError::Consumed);
+        }
+        Ok(())
+    }
+
+    /// Consumes and invalidates a local reservation, without granting execution authority.
+    /// Returns no executable request; authorized dispatch must use a separate permission gate.
+    pub fn discard(&mut self, ticket: BrowserInvocationTicket) -> Result<(), BrowserTicketError> {
+        let result = self.validate(&ticket);
+        if Arc::ptr_eq(&self.identity, &ticket.identity) {
+            self.outstanding.remove(&ticket.nonce);
+        }
+        result
     }
 }
 
@@ -46,6 +154,15 @@ impl Default for BrowserLifecycle {
 /// Bounded failure while validating or consuming a prepared invocation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum BrowserTicketError {
+    /// Trusted lifecycle synchronization is unavailable or counters are exhausted.
+    #[error("browser context unavailable")]
+    Unavailable,
+    /// The 256 outstanding reservation limit has been reached.
+    #[error("browser ticket capacity exhausted")]
+    Capacity,
+    /// The reservation was already consumed or discarded.
+    #[error("browser ticket already consumed")]
+    Consumed,
     /// The ticket's lifecycle epochs no longer match trusted host state.
     #[error("browser invocation context is stale")]
     Stale,
@@ -57,83 +174,21 @@ pub enum BrowserTicketError {
 /// A non-cloneable, invocation-bound request prepared for the permission composition root.
 ///
 /// This object carries no permission decision and cannot be deserialized from model/plugin
-/// input. Consuming it by value is the one-shot replay boundary.
+/// input. Registry membership prevents reuse; this is not an authorization capability.
 #[derive(Debug)]
 pub struct BrowserInvocationTicket {
+    identity: Arc<()>,
     request: BrowserRequest,
     session_epoch: u64,
     document_epoch: u64,
-    nonce: u128,
+    nonce: u64,
     expires_at: Instant,
 }
 
 impl BrowserInvocationTicket {
-    /// Creates a ticket with the contract's bounded default lifetime.
-    pub fn new(
-        request: BrowserRequest,
-        session_epoch: u64,
-        document_epoch: u64,
-        nonce: u128,
-    ) -> Self {
-        Self::with_ttl(
-            request,
-            session_epoch,
-            document_epoch,
-            nonce,
-            Duration::from_secs(120),
-        )
-    }
-
-    /// Creates a ticket with a caller-supplied testable lifetime.
-    pub fn with_ttl(
-        request: BrowserRequest,
-        session_epoch: u64,
-        document_epoch: u64,
-        nonce: u128,
-        ttl: Duration,
-    ) -> Self {
-        Self {
-            request,
-            session_epoch,
-            document_epoch,
-            nonce,
-            expires_at: Instant::now() + ttl,
-        }
-    }
-
     /// Returns the request bound to this ticket.
     pub fn request(&self) -> &BrowserRequest {
         &self.request
-    }
-
-    /// Returns the invocation nonce for trusted composition bookkeeping.
-    pub const fn nonce(&self) -> u128 {
-        self.nonce
-    }
-
-    /// Verifies expiry and lifecycle epochs before authorization or dispatch.
-    pub fn validate(
-        &self,
-        session_epoch: u64,
-        document_epoch: u64,
-    ) -> Result<(), BrowserTicketError> {
-        if Instant::now() >= self.expires_at {
-            return Err(BrowserTicketError::Expired);
-        }
-        if self.session_epoch != session_epoch || self.document_epoch != document_epoch {
-            return Err(BrowserTicketError::Stale);
-        }
-        Ok(())
-    }
-
-    /// Consumes a ticket after the final trusted lifecycle check.
-    pub fn consume(
-        self,
-        session_epoch: u64,
-        document_epoch: u64,
-    ) -> Result<BrowserRequest, BrowserTicketError> {
-        self.validate(session_epoch, document_epoch)?;
-        Ok(self.request)
     }
 }
 
@@ -148,33 +203,110 @@ mod tests {
 
     #[test]
     fn ticket_binds_epochs_and_consumes_once() {
-        let ticket = BrowserInvocationTicket::new(request(), 4, 9, 42);
-        assert_eq!(ticket.nonce(), 42);
+        let mut host = BrowserLifecycle::new();
+        let ticket = host.prepare(request()).unwrap();
         assert_eq!(ticket.request().operation(), BrowserOperation::TabNew);
-        assert!(ticket.validate(4, 9).is_ok());
-        let request = ticket.consume(4, 9).unwrap();
-        assert_eq!(request.operation(), BrowserOperation::TabNew);
+        let duplicate = BrowserInvocationTicket {
+            identity: ticket.identity.clone(),
+            request: request(),
+            session_epoch: ticket.session_epoch,
+            document_epoch: ticket.document_epoch,
+            nonce: ticket.nonce,
+            expires_at: ticket.expires_at,
+        };
+        assert!(host.discard(ticket).is_ok());
+        assert_eq!(host.discard(duplicate), Err(BrowserTicketError::Consumed));
     }
 
     #[test]
     fn stale_and_expired_tickets_fail_closed() {
-        let stale = BrowserInvocationTicket::new(request(), 4, 9, 1);
-        assert_eq!(stale.validate(5, 9), Err(BrowserTicketError::Stale));
-        let expired = BrowserInvocationTicket::with_ttl(request(), 4, 9, 2, Duration::ZERO);
-        assert_eq!(expired.validate(4, 9), Err(BrowserTicketError::Expired));
+        let mut host = BrowserLifecycle::new();
+        let now = Instant::now();
+        let ticket = host.prepare_at(request(), now).unwrap();
+        assert_eq!(
+            BrowserLifecycle::new().validate(&ticket),
+            Err(BrowserTicketError::Stale)
+        );
+        assert_eq!(
+            host.validate_at(&ticket, now + Duration::from_secs(120)),
+            Err(BrowserTicketError::Expired)
+        );
     }
 
     #[test]
     fn lifecycle_changes_invalidate_document_work() {
         let mut lifecycle = BrowserLifecycle::new();
-        let ticket =
-            BrowserInvocationTicket::new(request(), lifecycle.epochs().0, lifecycle.epochs().1, 3);
+        let ticket = lifecycle.prepare(request()).unwrap();
         lifecycle.change_document();
-        assert_eq!(
-            ticket.validate(lifecycle.epochs().0, lifecycle.epochs().1),
-            Err(BrowserTicketError::Stale)
-        );
+        assert_eq!(lifecycle.validate(&ticket), Err(BrowserTicketError::Stale));
         lifecycle.replace_session();
         assert_eq!(lifecycle.epochs(), (1, 2));
+    }
+
+    #[test]
+    fn epochs_never_wrap_into_old_context() {
+        let mut lifecycle = BrowserLifecycle::new();
+        lifecycle.session_epoch = u64::MAX;
+        lifecycle.document_epoch = u64::MAX;
+        lifecycle.replace_session();
+        assert!(!lifecycle.is_available());
+        assert_eq!(lifecycle.epochs(), (u64::MAX, u64::MAX));
+        assert_eq!(
+            lifecycle.prepare(request()).unwrap_err(),
+            BrowserTicketError::Unavailable
+        );
+    }
+
+    #[test]
+    fn capacity_expiry_and_loss_are_fail_closed() {
+        let mut host = BrowserLifecycle::new();
+        let now = Instant::now();
+        let tickets: Vec<_> = (0..256)
+            .map(|_| host.prepare_at(request(), now).unwrap())
+            .collect();
+        assert_eq!(
+            host.prepare_at(request(), now).unwrap_err(),
+            BrowserTicketError::Capacity
+        );
+        let fresh = host
+            .prepare_at(request(), now + Duration::from_secs(120))
+            .unwrap();
+        assert_eq!(host.outstanding.len(), 1);
+        assert_ne!(tickets[0].nonce, fresh.nonce);
+        host.lose_synchronization();
+        assert_eq!(host.validate(&fresh), Err(BrowserTicketError::Unavailable));
+        assert_eq!(
+            host.prepare(request()).unwrap_err(),
+            BrowserTicketError::Unavailable
+        );
+    }
+
+    #[test]
+    fn foreign_discard_cannot_remove_local_reservation() {
+        let mut first = BrowserLifecycle::new();
+        let mut second = BrowserLifecycle::new();
+        let foreign = first.prepare(request()).unwrap();
+        let local = second.prepare(request()).unwrap();
+        assert_eq!(foreign.nonce, local.nonce);
+        assert_eq!(second.discard(foreign), Err(BrowserTicketError::Stale));
+        assert!(second.validate(&local).is_ok());
+        assert!(second.discard(local).is_ok());
+        assert!(second.outstanding.is_empty());
+    }
+
+    #[test]
+    fn nonce_exhaustion_never_reuses_an_identity() {
+        let mut host = BrowserLifecycle::new();
+        host.next_nonce = u64::MAX;
+        assert_eq!(
+            host.prepare(request()).unwrap_err(),
+            BrowserTicketError::Unavailable
+        );
+        host.replace_session();
+        assert_eq!(
+            host.prepare(request()).unwrap_err(),
+            BrowserTicketError::Unavailable
+        );
+        assert!(host.outstanding.is_empty());
     }
 }
