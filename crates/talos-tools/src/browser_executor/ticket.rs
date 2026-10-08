@@ -4,6 +4,45 @@ use std::time::{Duration, Instant};
 
 use super::BrowserRequest;
 
+/// Trusted host lifecycle epochs used to invalidate document-bound work.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BrowserLifecycle {
+    session_epoch: u64,
+    document_epoch: u64,
+}
+
+impl BrowserLifecycle {
+    /// Creates the initial lifecycle state.
+    pub const fn new() -> Self {
+        Self {
+            session_epoch: 0,
+            document_epoch: 0,
+        }
+    }
+
+    /// Returns the current session and document epochs.
+    pub const fn epochs(self) -> (u64, u64) {
+        (self.session_epoch, self.document_epoch)
+    }
+
+    /// Invalidates every outstanding ticket after session replacement or loss.
+    pub fn replace_session(&mut self) {
+        self.session_epoch = self.session_epoch.wrapping_add(1);
+        self.document_epoch = self.document_epoch.wrapping_add(1);
+    }
+
+    /// Invalidates document-bound tickets after navigation or frame rebuild.
+    pub fn change_document(&mut self) {
+        self.document_epoch = self.document_epoch.wrapping_add(1);
+    }
+}
+
+impl Default for BrowserLifecycle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Bounded failure while validating or consuming a prepared invocation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum BrowserTicketError {
@@ -123,5 +162,19 @@ mod tests {
         assert_eq!(stale.validate(5, 9), Err(BrowserTicketError::Stale));
         let expired = BrowserInvocationTicket::with_ttl(request(), 4, 9, 2, Duration::ZERO);
         assert_eq!(expired.validate(4, 9), Err(BrowserTicketError::Expired));
+    }
+
+    #[test]
+    fn lifecycle_changes_invalidate_document_work() {
+        let mut lifecycle = BrowserLifecycle::new();
+        let ticket =
+            BrowserInvocationTicket::new(request(), lifecycle.epochs().0, lifecycle.epochs().1, 3);
+        lifecycle.change_document();
+        assert_eq!(
+            ticket.validate(lifecycle.epochs().0, lifecycle.epochs().1),
+            Err(BrowserTicketError::Stale)
+        );
+        lifecycle.replace_session();
+        assert_eq!(lifecycle.epochs(), (1, 2));
     }
 }
