@@ -2356,6 +2356,30 @@ mod tests {
 
     struct ScriptInspectingModel;
 
+    struct CapturingLocaleModel {
+        prompt: Arc<Mutex<Option<String>>>,
+    }
+
+    #[async_trait]
+    impl LanguageModel for CapturingLocaleModel {
+        async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+            let Message::User { content } = &messages[1] else {
+                panic!("isolated user payload");
+            };
+            *self.prompt.lock().expect("prompt lock") = Some(content.clone());
+            let (_tx, rx) = mpsc::channel(1);
+            Ok(rx)
+        }
+
+        async fn stream_decision(
+            &self,
+            messages: &[Message],
+            _: talos_core::provider::DecisionRequestLimits,
+        ) -> ProviderResult<Receiver<AgentEvent>> {
+            self.stream(messages).await
+        }
+    }
+
     #[async_trait]
     impl LanguageModel for ScriptInspectingModel {
         async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
@@ -2811,6 +2835,37 @@ mod tests {
             .await
             .expect_err("classifier tool calls must fail closed");
         assert_eq!(error, "tool use is forbidden in auto assessment");
+    }
+
+    #[tokio::test]
+    async fn provider_prompt_carries_locale_without_conversation_history() {
+        let root = tempfile::tempdir().expect("root");
+        let state = PermissionSessionState::new(PermissionEngine::with_workspace_root(
+            root.path().to_path_buf(),
+        ));
+        let lease =
+            ManagedWorkspaceLease::new(root.path(), state.session_id().expect("id").stable_id())
+                .expect("lease");
+        let approval = shell_approval_request(root.path(), &state, "ls -la");
+        let projected = eligible_bash(&approval, &lease, Some("inspect the workspace"))
+            .expect("eligible shell request");
+        let prompt = Arc::new(Mutex::new(None));
+        let assessor = ProviderAutoPermissionAssessor::new(Arc::new(CapturingLocaleModel {
+            prompt: prompt.clone(),
+        }));
+        let _ = assessor
+            .assess_with_context_and_locale(
+                projected.request,
+                projected.context.expect("context"),
+                "zh-CN",
+                Duration::from_secs(1),
+            )
+            .await;
+        let prompt = prompt.lock().expect("prompt lock").clone().expect("prompt");
+        assert!(prompt.contains("\"locale\":\"zh-CN\""));
+        assert!(prompt.contains("inspect the workspace"));
+        assert!(!prompt.contains("previous conversation"));
+        assert!(!prompt.contains("历史原文"));
     }
 
     #[test]
