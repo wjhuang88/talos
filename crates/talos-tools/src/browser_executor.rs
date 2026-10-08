@@ -5,6 +5,9 @@
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+mod request;
+pub use request::{BrowserRequest, BrowserRequestError};
+
 /// The separately negotiated frame-aware browser protocol version.
 pub const BROWSER_EXECUTOR_V2: &str = "talos.browser.executor/v2";
 
