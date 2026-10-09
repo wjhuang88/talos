@@ -969,4 +969,68 @@ mod tests {
 
         assert_eq!(result, Err("fast failure"));
     }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn compatibility_race_accepts_empty_and_invalid_results_before_valid_results() {
+        // Characterize the current first-completion policy, not the ADR-085
+        // target. No production backend is called or replaced by this fixture.
+        for urls in [vec![], vec![""], vec!["javascript:alert(1)"]] {
+            let expected: Vec<SearchBackendResult> = urls
+                .into_iter()
+                .map(|url| SearchBackendResult {
+                    backend: SearchBackendId::DuckDuckGo,
+                    title: "early result".into(),
+                    url: url.into(),
+                    snippet: String::new(),
+                })
+                .collect();
+            let early = async { Ok::<_, SearchBackendError>(expected.clone()) };
+            let valid = async {
+                tokio::task::yield_now().await;
+                Ok::<_, SearchBackendError>(vec![SearchBackendResult {
+                    backend: SearchBackendId::SearXng,
+                    title: "later valid result".into(),
+                    url: "https://example.org/result".into(),
+                    snippet: String::new(),
+                }])
+            };
+            let result = tokio::select! {
+                result = early => result,
+                result = valid => result,
+            };
+            assert_eq!(result, Ok(expected));
+        }
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn compatibility_race_drops_owned_pending_loser_on_completion() {
+        use std::sync::{
+            Arc,
+            atomic::{AtomicBool, Ordering},
+        };
+
+        struct DropFlag(Arc<AtomicBool>);
+        impl Drop for DropFlag {
+            fn drop(&mut self) {
+                self.0.store(true, Ordering::SeqCst);
+            }
+        }
+
+        for winner in [Ok(1_u8), Err("fast failure")] {
+            let dropped = Arc::new(AtomicBool::new(false));
+            let guard = DropFlag(dropped.clone());
+            let loser = async move {
+                let _guard = guard;
+                std::future::pending::<Result<u8, &str>>().await
+            };
+            let result = tokio::select! {
+                result = async { winner } => result,
+                result = loser => result,
+            };
+            assert_eq!(result, winner);
+            assert!(dropped.load(Ordering::SeqCst));
+        }
+        // Dropping an owned future is local cleanup evidence only. It does not
+        // prove transport cancellation or abort work spawned by a dependency.
+    }
 }
