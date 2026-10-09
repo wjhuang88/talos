@@ -179,3 +179,17 @@ failure cannot establish endpoint outage, and successful documentation retrieval
 search success. Regional outcomes, independent failure-domain proof and native fixture acceptance
 remain unknown. No candidate is admitted; D/I294 remains Active / Claimed, E/F remain gated and
 #624 remains open.
+
+## Mwmbl Standard Route Qualification Checkpoint — 2026-10-09
+
+[Detailed packet](SEARCH-001-D-MWMBL-ROUTE-QUALIFICATION.md) extends D-005/D-006 with the pinned
+MMR/LTR/Wikipedia/cache/formatter trace and dated query-free observations on mwmbl.org:
+public v2 schema HTTP 200; missing-q standard route HTTP 422. This verifies a public document
+and an input-validation response only. It does not qualify anonymous valid-query behavior,
+search quality, deployed revision, privacy or regional reachability. The schema and inspected
+source field shapes agree; documented heuristic-ranking wording does not prove deployed LTR.
+
+The source trace exposes upstream retries/circuit/cache and differentiated hit origins. Pending
+M-Q01 through M-Q08 make the remaining contract, provenance, parser, budget, use-condition and
+regional evidence concrete. No live search-response fixture, new native adapter or admission.
+D/I294 remains incomplete; E/F stay gated and #624 open.
