@@ -425,3 +425,25 @@ The integrated standard preflight passes its checks and reaches workspace tests;
 same existing Unix socket fixture with OS error 1 PermissionDenied (runtime: 64 passed, one
 failed). No skip is added, and later packages/SDK remain unclaimed for that local run. Full
 integrated exact-head CI and independent review remain the final merge gates.
+
+## POSIX Acceptance Driver Startup Repair (2026-10-09)
+
+Older component run `37895393833` passed Windows Rust, Linux Desktop and macOS full preflight.
+Its macOS binary step built the CLI in 48.52 seconds and passed all nine REPL cases by
+06:56:38 UTC, then emitted no TUI result before the unchanged 15-minute step limit at 07:10:56.
+No child stack trace establishes the exact stall. The driver used Python `preexec_fn` after
+starting an HTTP thread, a documented pre-exec deadlock risk in
+[Python subprocess guidance](https://docs.python.org/3/library/subprocess.html#subprocess.Popen).
+
+The driver now starts a fresh child interpreter without a Python pre-exec callback, sets the
+controlling PTY there and `execvpe`s the real CLI using the same PID, environment and argument
+list. Startup diagnostics flush before and after process creation. All actual prompt, isolated
+request, Deny, resume and rotation assertions remain; the 25-second observation and 15-minute CI
+limits are unchanged. Nine local TUI cases pass with this startup repair. Darwin verification
+still requires fresh exact-head CI; the earlier Windows/full-preflight results are component
+evidence, not permission to merge an unvalidated repaired head.
+
+The final diagnostic-enabled driver and REPL recapture all eighteen integrated binary requests;
+all cases pass. Thirty-six fresh tokenizations reproduce the same 4–5 / 35–36 content-token
+and 14–17-byte deltas. Rust sources, authority, dependencies and CI/test limits are unchanged
+from the integrated candidate; only the acceptance startup and its truthful owner evidence change.

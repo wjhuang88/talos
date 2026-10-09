@@ -16,6 +16,7 @@ import re
 import selectors
 import struct
 import subprocess
+import sys
 import tempfile
 import termios
 import threading
@@ -31,9 +32,19 @@ class Tui:
         command = [str(binary), "--tui", "--no-init", "--no-context", "-w", str(workspace)]
         if session_id:
             command += ["--session", session_id]
+        # The fixture HTTP server already has threads. Python preexec_fn can
+        # deadlock between fork and exec there, before any wait_for deadline.
+        # Run the controlling-terminal setup in a fresh, single-threaded child
+        # interpreter, then replace it with the real CLI (same PID and PTY).
+        bootstrap = (
+            "import fcntl, os, sys, termios; "
+            "fcntl.ioctl(0, termios.TIOCSCTTY, 0); "
+            "os.execvpe(sys.argv[1], sys.argv[1:], os.environ)"
+        )
         self.process = subprocess.Popen(
-            command, stdin=slave, stdout=slave, stderr=slave, env=task_env, cwd=workspace,
-            start_new_session=True, preexec_fn=lambda: fcntl.ioctl(slave, termios.TIOCSCTTY, 0),
+            [sys.executable, "-c", bootstrap, *command],
+            stdin=slave, stdout=slave, stderr=slave, env=task_env, cwd=workspace,
+            start_new_session=True,
         )
         os.close(slave)
         self.selector = selectors.DefaultSelector()
@@ -126,7 +137,10 @@ locale = "en-US"
                 task_env = dict(os.environ, HOME=str(user_home), NO_PROXY="127.0.0.1,localhost", TERM="xterm-256color")
                 session_id = None
                 for resumed in [False, True]:
+                    phase = "resumed" if resumed else "initial"
+                    print(f"TUI {language} {phase}: starting child", flush=True)
                     client = Tui(args.binary.resolve(), workspace, task_env, session_id)
+                    print(f"TUI {language} {phase}: child started", flush=True)
                     try:
                         client.wait_for("gpt-4o")
                         if not resumed:
@@ -135,7 +149,6 @@ locale = "en-US"
                                 client.send(history)
                                 client.wait_for(completion_marker(server, before, history))
                         request = review(client, server, language)
-                        phase = "resumed" if resumed else "initial"
                         if args.capture_dir:
                             args.capture_dir.mkdir(parents=True, exist_ok=True)
                             (args.capture_dir / f"tui-{language}-{phase}.json").write_text(json.dumps(request, ensure_ascii=False))
