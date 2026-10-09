@@ -252,10 +252,15 @@ unconditional permission. `/auto`, `/auto on`, and `/auto off` inspect or overri
 session without writing configuration or transcript state.
 
 Set `[auto] locale = "zh-CN"` to choose the presentation locale for model explanations and human
-decision points. The value is validated as a BCP-47-style tag; invalid or empty values fall back to
-`LC_ALL`, then `LANG`, then `en-US`. Locale is session-scoped and presentation-only: it never
+decision points. Supported tags use `language[-Script][-REGION]` (for example `zh-Hans-CN`
+or `en-001`); POSIX encoding/modifier suffixes are accepted and discarded. This bounded subset
+rejects variants, extensions, malformed tails, and tags longer than 64 ASCII bytes. Invalid or
+empty values fall back to valid `LC_ALL`, then valid `LANG`, then `en-US`. Locale is session-scoped and presentation-only: it never
 changes Allow/Ask/Deny semantics, request digests, permission authority, or the bounded prompt's
 transcript scope. Short, code-only, mixed, and unsupported observations retain the configured fallback.
+Detection reuses derived digests, language and confidence for the most recent eight bounded user
+messages. The cache retains no transcript text and resets on permission-session rotation; each
+snapshot recomputes votes from its current window rather than accumulating repeated observations.
 
 When auto assistance evaluates a shell approval request, the configured model receives a bounded
 copy of the exact command as untrusted data plus structural risk facts, the current user instruction,

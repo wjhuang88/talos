@@ -50,11 +50,20 @@ enum LocaleConfidence {
     Low,
 }
 
+#[derive(Clone)]
+struct LocaleEvidence {
+    digest: [u8; 32],
+    locale: ConversationLocale,
+    confidence: LocaleConfidence,
+}
+
 struct SessionLocale {
     session_id: Option<String>,
     selected: ConversationLocale,
     fallback: ConversationLocale,
     history_observed: bool,
+    selected_is_fallback: bool,
+    evidence: Vec<LocaleEvidence>,
 }
 
 impl SessionLocale {
@@ -63,6 +72,24 @@ impl SessionLocale {
             self.session_id = Some(session_id.to_owned());
             self.selected = self.fallback.clone();
             self.history_observed = false;
+            self.selected_is_fallback = true;
+            self.evidence.clear();
+        }
+    }
+
+    fn cached_evidence(
+        &self,
+        digest: [u8; 32],
+        detect: impl FnOnce() -> (ConversationLocale, LocaleConfidence),
+    ) -> LocaleEvidence {
+        if let Some(entry) = self.evidence.iter().find(|entry| entry.digest == digest) {
+            return entry.clone();
+        }
+        let (locale, confidence) = detect();
+        LocaleEvidence {
+            digest,
+            locale,
+            confidence,
         }
     }
 
@@ -80,8 +107,12 @@ impl ConversationLocale {
     fn configured() -> Self {
         let configured = std::env::var("LC_ALL")
             .ok()
-            .or_else(|| std::env::var("LANG").ok())
-            .and_then(|value| normalize_locale(&value));
+            .and_then(|value| normalize_locale(&value))
+            .or_else(|| {
+                std::env::var("LANG")
+                    .ok()
+                    .and_then(|value| normalize_locale(&value))
+            });
         Self(configured.unwrap_or_else(|| "en-US".to_owned()))
     }
 
@@ -133,19 +164,47 @@ impl ConversationLocale {
 }
 
 fn normalize_locale(value: &str) -> Option<String> {
-    let language = value
-        .split(['.', '@', '_', '-'])
-        .next()?
-        .to_ascii_lowercase();
-    let region = value.split(['.', '@']).next()?.split(['_', '-']).nth(1);
-    let region = region.filter(|r| r.len() == 2).map(str::to_ascii_uppercase);
-    if language.len() < 2 || !language.chars().all(|c| c.is_ascii_alphabetic()) {
+    if value.len() > 64 || !value.is_ascii() {
         return None;
     }
-    Some(match region {
-        Some(r) => format!("{language}-{r}"),
-        None => language,
-    })
+    let mut suffixes = value.split(['.', '@']);
+    let tag = suffixes.next()?;
+    if suffixes.any(|suffix| {
+        suffix.is_empty()
+            || !suffix
+                .bytes()
+                .all(|c| c.is_ascii_alphanumeric() || c == b'-' || c == b'_')
+    }) {
+        return None;
+    }
+    let mut parts = tag.split(['_', '-']).peekable();
+    let language = parts.next()?;
+    if !(2..=8).contains(&language.len()) || !language.bytes().all(|c| c.is_ascii_alphabetic()) {
+        return None;
+    }
+    let mut normalized = language.to_ascii_lowercase();
+    if parts
+        .peek()
+        .is_some_and(|part| part.len() == 4 && part.bytes().all(|c| c.is_ascii_alphabetic()))
+    {
+        let script = parts.next()?.to_ascii_lowercase();
+        normalized.push('-');
+        normalized.push_str(&script[..1].to_ascii_uppercase());
+        normalized.push_str(&script[1..]);
+    }
+    if let Some(region) = parts.next() {
+        if !(region.len() == 2 && region.bytes().all(|c| c.is_ascii_alphabetic())
+            || region.len() == 3 && region.bytes().all(|c| c.is_ascii_digit()))
+        {
+            return None;
+        }
+        normalized.push('-');
+        normalized.push_str(&region.to_ascii_uppercase());
+    }
+    if parts.next().is_some() {
+        return None;
+    }
+    Some(normalized)
 }
 
 fn looks_like_english(text: &str) -> bool {
@@ -993,6 +1052,8 @@ impl AutoPermissionResolver {
                     selected: fallback.clone(),
                     fallback,
                     history_observed: false,
+                    selected_is_fallback: true,
+                    evidence: Vec::new(),
                 }
             }),
         }
@@ -1010,7 +1071,8 @@ impl AutoPermissionResolver {
         if let Ok(mut current) = self.locale.lock() {
             let locale = ConversationLocale(locale);
             current.fallback = locale.clone();
-            if !current.history_observed {
+            current.evidence.clear();
+            if current.selected_is_fallback {
                 current.selected = locale;
             }
         }
@@ -1787,9 +1849,22 @@ impl AutoPermissionResolver {
         }
         let configured = current.fallback.clone();
         let mut counts: Vec<(ConversationLocale, usize, usize)> = Vec::new();
-        for (index, message) in messages.iter().enumerate() {
-            let (detected, confidence) =
-                ConversationLocale::detect_with_confidence(message, &configured);
+        let mut evidence: Vec<LocaleEvidence> = Vec::new();
+        for (index, message) in messages.iter().rev().take(8).rev().enumerate() {
+            let sample: String = message.chars().take(MAX_USER_INTENT_CHARS).collect();
+            let digest: [u8; 32] = Sha256::digest(sample.as_bytes()).into();
+            let entry = evidence
+                .iter()
+                .find(|entry| entry.digest == digest)
+                .cloned()
+                .unwrap_or_else(|| {
+                    current.cached_evidence(digest, || {
+                        ConversationLocale::detect_with_confidence(&sample, &configured)
+                    })
+                });
+            let detected = entry.locale.clone();
+            let confidence = entry.confidence;
+            evidence.push(entry);
             if confidence == LocaleConfidence::Low {
                 continue;
             }
@@ -1802,12 +1877,14 @@ impl AutoPermissionResolver {
                 counts.push((detected, 1, index));
             }
         }
+        current.selected_is_fallback = counts.is_empty();
         current.selected = counts
             .into_iter()
             .max_by_key(|(_, count, last_index)| (*count, *last_index))
             .map(|(locale, _, _)| locale)
             .unwrap_or(configured);
         current.history_observed = true;
+        current.evidence = evidence;
     }
 }
 
@@ -3942,6 +4019,8 @@ mod tests {
             selected: ConversationLocale("ja".into()),
             fallback: ConversationLocale("en-US".into()),
             history_observed: true,
+            selected_is_fallback: false,
+            evidence: Vec::new(),
         };
         for intent in [Some("Please read the file"), Some("请检查文件"), None] {
             assert_eq!(state.for_assessment(intent).as_str(), "ja");
@@ -3951,6 +4030,8 @@ mod tests {
             selected: ConversationLocale("en-US".into()),
             fallback: ConversationLocale("en-US".into()),
             history_observed: false,
+            selected_is_fallback: true,
+            evidence: Vec::new(),
         };
         assert_eq!(
             compatibility.for_assessment(Some("请检查文件")).as_str(),
@@ -3962,8 +4043,147 @@ mod tests {
     #[test]
     fn configured_locale_override_is_validated_and_presentation_only() {
         assert_eq!(normalize_locale("zh_CN.UTF-8").as_deref(), Some("zh-CN"));
-        assert_eq!(normalize_locale(""), None);
-        assert_eq!(normalize_locale("not a locale"), None);
+        for (input, expected) in [
+            ("zh-Hans-CN", "zh-Hans-CN"),
+            ("EN_us", "en-US"),
+            ("en-001", "en-001"),
+            ("sr-latn", "sr-Latn"),
+        ] {
+            assert_eq!(normalize_locale(input).as_deref(), Some(expected));
+        }
+        for input in [
+            "",
+            "not a locale",
+            "en-",
+            "en--US",
+            "en-U1",
+            "en-US-extra",
+            "en-Hans-US-extra",
+            "e-US",
+            "toolonglang-US",
+            "zh-汉字",
+            "en.UTF-8@",
+            "en/US",
+        ] {
+            assert_eq!(normalize_locale(input), None, "{input}");
+        }
+        assert_eq!(normalize_locale(&"a".repeat(65)), None);
+    }
+
+    #[test]
+    fn locale_evidence_reuses_detection_and_reset_discards_cache() {
+        let mut state = SessionLocale {
+            session_id: Some("first".into()),
+            selected: ConversationLocale("zh".into()),
+            fallback: ConversationLocale("en-US".into()),
+            history_observed: true,
+            selected_is_fallback: false,
+            evidence: Vec::new(),
+        };
+        let mut detections = 0;
+        let entry = state.cached_evidence([1; 32], || {
+            detections += 1;
+            (ConversationLocale("zh".into()), LocaleConfidence::High)
+        });
+        state.evidence.push(entry);
+        let entry = state.cached_evidence([1; 32], || panic!("cached evidence must be reused"));
+        assert_eq!(entry.locale.as_str(), "zh");
+        assert_eq!(detections, 1);
+        state.bind_session("second");
+        assert!(state.evidence.is_empty());
+        assert!(!state.history_observed);
+        assert!(state.selected_is_fallback);
+        assert_eq!(state.selected.as_str(), "en-US");
+    }
+
+    fn locale_test_resolver(root: &Path, state: &PermissionSessionState) -> AutoPermissionResolver {
+        AutoPermissionResolver::new(
+            Arc::new(ShellAssessor),
+            Arc::new(DenyFallback),
+            ManagedWorkspaceLease::new(root, state.session_id().expect("session").stable_id())
+                .expect("lease"),
+            Duration::from_secs(8),
+            AutoPermissionControl::new(true),
+        )
+        .with_locale(Some("en-US"))
+    }
+
+    #[test]
+    fn locale_cache_slides_without_accumulating_votes_or_retaining_evicted_entries() {
+        let root = tempfile::tempdir().expect("root");
+        let state = PermissionSessionState::new(PermissionEngine::with_workspace_root(
+            root.path().to_path_buf(),
+        ));
+        let resolver = locale_test_resolver(root.path(), &state);
+        let id = state.session_id().expect("session").stable_id();
+        resolver.observe_locale(
+            &id,
+            &[
+                "请检查文件".into(),
+                "请检查文件".into(),
+                "Please read the file".into(),
+            ],
+        );
+        assert_eq!(
+            resolver.locale.lock().expect("locale").selected.as_str(),
+            "zh"
+        );
+        for _ in 0..3 {
+            resolver.observe_locale(
+                &id,
+                &[
+                    "请检查文件".into(),
+                    "Please read the file".into(),
+                    "Please read the file".into(),
+                ],
+            );
+            let locale = resolver.locale.lock().expect("locale");
+            assert_eq!(locale.selected.as_str(), "en");
+            assert_eq!(locale.evidence.len(), 3);
+        }
+        let mut history = vec!["请检查文件".into(); 9];
+        history.extend(vec![
+            "このファイルを確認してください".into();
+            8
+        ]);
+        resolver.observe_locale(&id, &history);
+        let locale = resolver.locale.lock().expect("locale");
+        assert_eq!(locale.selected.as_str(), "ja");
+        assert_eq!(locale.evidence.len(), 8);
+        assert!(
+            locale
+                .evidence
+                .iter()
+                .all(|entry| entry.locale.as_str() == "ja")
+        );
+    }
+
+    #[test]
+    fn configured_locale_changes_update_fallback_without_overwriting_detected_history() {
+        let root = tempfile::tempdir().expect("root");
+        let state = PermissionSessionState::new(PermissionEngine::with_workspace_root(
+            root.path().to_path_buf(),
+        ));
+        let resolver = locale_test_resolver(root.path(), &state);
+        let id = state.session_id().expect("session").stable_id();
+        resolver.observe_locale(&id, &["ls -la ./src".into()]);
+        let resolver = resolver.with_locale(Some("ja"));
+        resolver.observe_locale(&id, &[]);
+        {
+            let locale = resolver.locale.lock().expect("locale");
+            assert_eq!(locale.for_assessment(Some("请检查文件")).as_str(), "ja");
+            assert!(locale.evidence.is_empty());
+        }
+        resolver.observe_locale(&id, &["请检查文件".into()]);
+        let resolver = resolver.with_locale(Some("en-001")).with_locale(Some("ko"));
+        assert_eq!(
+            resolver.locale.lock().expect("locale").selected.as_str(),
+            "zh"
+        );
+        resolver.observe_locale(&id, &["ls -la ./src".into()]);
+        let locale = resolver.locale.lock().expect("locale");
+        assert_eq!(locale.selected.as_str(), "ko");
+        assert!(locale.selected_is_fallback);
     }
 
     #[test]
@@ -4402,6 +4622,8 @@ mod configured_locale_fallback_tests {
             selected: ConversationLocale("zh-CN".into()),
             fallback: ConversationLocale("zh-CN".into()),
             history_observed: false,
+            selected_is_fallback: true,
+            evidence: Vec::new(),
         };
         let (detected, confidence) =
             ConversationLocale::detect_with_confidence("ls -la ./src", &state.fallback);

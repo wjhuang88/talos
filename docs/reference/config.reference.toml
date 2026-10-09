@@ -23,6 +23,8 @@ model = "claude-sonnet-4-20250514"
 # [auto]
 # enabled = true                         # attempt bounded model assistance when supported
 # locale = "zh-CN"                       # presentation locale for explanations and decision points
+#                                         # language[-Script][-REGION], e.g. zh-Hans-CN or en-001
+#                                         # unsupported variants/extensions and malformed tails are rejected
 #                                         # invalid/empty values use LC_ALL, LANG, then en-US
 #                                         # locale never changes Allow/Ask/Deny or request identity
 
