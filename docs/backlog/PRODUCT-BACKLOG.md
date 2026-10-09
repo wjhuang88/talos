@@ -24,6 +24,7 @@ deferred behind this cycle, not cancelled.
 
 | Priority | Focus | Current State / Gate | Required Reads |
 |---|---|---|---|
+| 0 | Context budget recovery | I298 proposed Active / Claimed (#690), ineffective until merge; bounded MEM-005-A correction, no full parent completion | [I298](../iterations/I298-context-budget-recovery.md); [ADR-087](../decisions/087-authoritative-context-budget-recovery.md) |
 | 1 | Frame-aware browser contract / #618 | WEB-007-F Complete / Closed; PR #683 merged as `06a5f6e6`; native browser/CDP/process-carrier remains downstream residual. | [WEB-007-F](active/WEB-007-F-frame-aware-contract.md); [I295](../iterations/I295-web007f-frame-aware-browser-contract.md); [ADR-086](../decisions/086-frame-aware-browser-invocation-boundary.md); WEB-007 / #452 |
 | 1 | Desktop week 1: live Runtime host | DESKTOP-001-D4 / I282 Complete; implementation `aaa4c015`, H1/H5 recorded | [D4](active/DESKTOP-001-D4-live-runtime-host.md); [I282](../iterations/I282-live-runtime-host.md); [task](../tasks/2026-09-22-desktop-four-week-delivery.md); ADR-059 |
 | 1 | Desktop week 2: tools and approval | DESKTOP-001-D5 / I283 Complete; H2/H3 observed | [D5](active/DESKTOP-001-D5-live-tools-and-approval.md); [I283](../iterations/I283-live-tools-and-approval.md); task and existing permission contracts |
