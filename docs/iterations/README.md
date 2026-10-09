@@ -9,6 +9,15 @@ The complete pre-closeout index is preserved unchanged at
 [`ITERATIONS-INDEX-pre-I170-closeout-2026-08-01.md`](ITERATIONS-INDEX-pre-I170-closeout-2026-08-01.md).
 That snapshot is historical evidence and not current activation authority.
 
+## Provider Default Reliability Maintenance - 2026-10-09
+
+[I297](I297-provider-default-retry-and-dispatch-window.md) is a separate Planned / Unclaimed urgent
+maintenance slice for PROVIDER-007. It changes only the defaults for retry dispatches (`3 -> 5`) and
+request dispatch/header wait (`60 -> 300` seconds), preserving explicit configuration, retry
+classification, backoff, stream limits and cancellation behavior. It is deliberately independent of
+the unmerged I296 toolchain proposal and NET-001's unclaimed generic-resilience architecture. Claim
+and activation must merge atomically before implementation begins.
+
 ## Frame-Aware Browser Selection — 2026-10-06
 
 [I295](I295-web007f-frame-aware-browser-contract.md) delivered WEB-007-F / #618 as a separately
