@@ -10,7 +10,7 @@
 | Source Issue | #644 |
 | Depends on | Accepted ADR-085; SEARCH-001-A / #625 complete; B adapter boundary available |
 | Claim State | Claimed |
-| Research PR | #668 and #673 (merged; partial evidence) |
+| Research PR | #668, #673 and #676 (merged; partial evidence) |
 | Completion | Pending |
 
 ## Collaboration Claim
@@ -24,10 +24,10 @@
 | Claimed At | 2026-10-06 |
 | Source Issue | #644 |
 | Governance Claim PR | #665 |
-| Implementation PR | #668 and #673 (merged; evidence only) |
+| Implementation PR | #668, #673 and #676 (merged; evidence only) |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Governance-only claim+activation PR; exact-head CI, governance validators, remote Issue reconciliation and merge-time CAS required. |
-| Last Updated | 2026-10-08 |
+| Last Updated | 2026-10-09 |
 | Handoff / Release Condition | Claim effective after #665 merge `7019f63d3df3d6eb58473a53a499b9b7e8b98925`; evidence research only, with E/F provider implementation gated by the resulting matrix. |
 
 ## Scope
@@ -53,6 +53,34 @@ It is a research artifact only; no candidate is admitted by the register itself.
 - #668: evidence register, merged at `08b5bd2188892e3d721d7b5e845fdb35b522af19`.
 - #673: dated source review, merged at `2708db4f56362d626d10b4e5c53fae880e7d3b08`.
 - DDG/Bing terms follow-up: see the register's 2026-10-08 review. No route admitted.
+- #676: terms follow-up, merged at `916bc70bc43dcbae1679ea253eb4f2961c459d39`.
+
+## Independent API Research Stage — 2026-10-09
+
+Base: `c6c545b788c497528133cbab453c0eee1494922e`. The evidence register adds Mwmbl standard
+anonymous JSON search, Purili core API and the parked Stract hosted route. D-005 through D-009
+link current primary evidence and pin Mwmbl source at
+`ff482e225d99c694abbd3337a1b1be93b8c95dd8`. Mwmbl source accepts anonymous standard search;
+keyed/combined routes are separate, and external provenance/privacy still need qualification.
+Purili developer integration claims must be reconciled with general use terms; Stract's archived
+repository/current site do not establish a maintained hosted search route.
+
+The maintainer's technical-first direction (#644 comment `6055213313`) supersedes a blanket
+business-correspondence prerequisite. Published interface conditions are reviewed per route;
+explicit restrictions remain effective. No outreach, account, key, paid use, live query/response
+fixture, production adapter or regional measurement was performed. Inspected upstream tests
+were not executed. Source evidence alone admits no route.
+
+Local documentation convergence passed both governance validators (locked Cargo metadata/SQLite
+consumer boundary included), public-site and installer checks, the 14-case CI classifier suite,
+changed-document relative links and whitespace checks. No new workspace or upstream tests are
+claimed for this source-only stage. Exact-head documentation CI and technical review remain
+remote gates.
+
+Next: verify Mwmbl's deployed anonymous standard route, query fan-out/provenance and applicable
+result-use conditions; then acquire permitted deterministic and controlled regional evidence.
+This is partial D research, not C implementation or E/F authorization. D/I294 remains Active /
+Claimed, completion pending, and #624 stays open.
 
 Terms applicability, privacy, authorized fixtures, independent failure domains and genuine regional
 observations remain incomplete. E/F remain gated; this is partial evidence, not completion.
