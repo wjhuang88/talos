@@ -18,7 +18,7 @@
 | Governance Claim PR | #690 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer requested this repair in single-maintainer mode and accepted ADR-087 on 2026-10-09. No independent human maintainer is available; independent Agent API/privacy review and exact-head gates remain required. |
-| Implementation PR | Not started |
+| Implementation PR | #691 |
 | Last Updated | 2026-10-09 |
 | Handoff / Release Condition | Claim effective through #690 on main; implementation still requires exact-head CI, independent API/privacy review and merge-time CAS. |
 
