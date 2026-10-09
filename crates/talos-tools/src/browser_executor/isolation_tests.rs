@@ -240,7 +240,13 @@ async fn unknown_containment_refuses_before_approval_and_executor_dispatch() {
             }
             Err(error) => error,
         };
-        assert!(matches!(error, BrowserHostError::Rejected { code: BrowserFailureCode::UnsupportedOperation, .. }));
+        assert!(matches!(
+            error,
+            BrowserHostError::Rejected {
+                code: BrowserFailureCode::UnsupportedOperation,
+                ..
+            }
+        ));
         let output = error
             .to_prepared(Some(match operation {
                 "read" => BrowserOperation::Read,
