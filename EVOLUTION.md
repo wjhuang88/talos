@@ -65,6 +65,7 @@ repeating known mistakes.
 | 53 | CI / Dependencies | 离线 all-feature 审计前须显式准备完整锁依赖，默认构建缓存不足 | I277 |
 | 54 | Governance | 新 Issue owner 同步必须包含远端校验使用的状态矩阵 | #618 |
 | 55 | Governance | 本地 claim 提交不是目标分支所有权，validator 通过不能证明授权 | TUI-062 / #628 |
+| 56 | Evidence | 准入前 fixture 证据不能反过来依赖准入，须区分研究 parser 与已交付 adapter | I294 / #687 |
 
 ## Lessons
 
@@ -1064,3 +1065,17 @@ repeating known mistakes.
 - Fix: Record the historical deviation, restore Unclaimed while retaining truthful Review delivery, and prepare a separate governance-only claim before implementation merge. The recovery remains pending until that claim is effective.
 - Prevention: Verify target-branch owner content and claim ancestry before implementation, and verify authorization evidence semantically rather than relying on validator success. Never backdate an activation or selection inventory to conceal a missing preflight.
 - Promoted to rule/check: Existing AGENTS.md Goal-Driven Execution and docs/sop/AGENT-COLLABORATION.md Target-branch truth / Direct-Commit Sequence already require this; no new policy is needed.
+
+## 2026-10-09 - Admission evidence must not depend on prior admission
+
+- Trigger: Local follow-up review of SEARCH-001-D / #687's parser-evidence paragraph.
+- Symptom: The paragraph required an admitted parser before fixtures could prove parser behavior,
+  reversing D's evidence-before-E/F dependency and creating a circular qualification gate.
+- Root cause: Distinguishing research evidence from shipped behavior was expressed as a new
+  prerequisite instead of a limit on what the evidence could establish.
+- Fix: Permit independently authored offline fixtures toward D qualification; require any executed
+  evidence to name the tested implementation and distinguish disposable experiments from shipped
+  adapters and invented fixtures from captured responses.
+- Prevention: Trace every proposed evidence prerequisite against the accepted child dependency
+  order; an honest scope limitation must not create an unapproved reverse dependency.
+- Promoted to rule/check: none; accepted ADR-085 and D/E/F owners already define the stage order.

@@ -70,8 +70,10 @@ These rows describe future evidence, not executed tests or an accepted adapter c
 | M-Q08 | Paired controlled real-network measurements and failure-domain comparison | Verified environment provenance including genuine mainland China; client endpoint success does not prove independent downstreams or global coverage |
 
 Synthetic fixtures can be authored independently from documented field shapes with invented text
-and example-domain URLs. They prove parser behavior only after an admitted parser exists; do not
-publish them as captured provider results. No bulk/raw index acquisition, autocomplete workaround,
+and example-domain URLs. Offline research fixtures can support D qualification before admission.
+Any executed parser evidence must name the tested implementation and distinguish a disposable test-only experiment
+from a shipped adapter; do not publish invented fixtures as captured provider results.
+No bulk/raw index acquisition, autocomplete workaround,
 paid combined route, relay or Wikipedia-only generic fallback is proposed by this packet.
 
 ## Disposition

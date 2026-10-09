@@ -108,6 +108,7 @@ boundary included), public-site/installers, 14 classifier cases, changed-documen
 schema structural checks and whitespace validation. No workspace/upstream tests were rerun.
 Exact-head documentation CI and technical review remain remote gates.
 
-Next: permitted anonymous valid-query evidence and independent synthetic parser fixtures after
-route qualification; hosted privacy/result-use and genuine regional observations remain pending.
+Next: independently authored offline parser evidence toward route qualification, plus permitted
+anonymous valid-query evidence; hosted privacy/result-use and genuine regional observations
+remain pending.
 D/I294 remains Active / Claimed and incomplete; E/F gated, #624 open.
