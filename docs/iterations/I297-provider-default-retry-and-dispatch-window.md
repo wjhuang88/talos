@@ -1,6 +1,6 @@
 # Iteration I297: Provider Default Retry And Dispatch Window
 
-> Document status: Planned
+> Document status: Active (proposed; ineffective until governance PR #689 merges)
 > Published plan date: 2026-10-09
 > Planned objective: Deliver the maintainer-approved urgent default change from three to five provider retry dispatches and from a 60-second to a 300-second request dispatch/header limit.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -10,18 +10,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-6 |
+| Work Slice | I297/PROVIDER-007 only: default `max_attempts` 3 -> 5 and `dispatch_timeout_secs` 60 -> 300 seconds, direct config/provider tests and directly affected docs. No retry taxonomy, backoff, stream-limit, cancellation, dependency, toolchain, version, release or explicit-config behavior change. |
+| Claimed At | 2026-10-09 |
 | Source Issue | None; maintainer urgency request 2026-10-09 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Pending single-maintainer merge |
-| Authorization Evidence | This is expedited normal maintenance, not an emergency override. |
+| Governance Claim PR | #689 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Maintainer selected expedited normal maintenance. Exact-head governance CI, required reliability/API review and merge-time CAS remain mandatory; this is not an emergency override. |
 | Implementation PR | Not started |
 | Last Updated | 2026-10-09 |
-| Handoff / Release Condition | Claim and activation become effective only when the finalized governance record merges to `main`. |
+| Handoff / Release Condition | Proposed claim and activation become effective only when the finalized #689 record merges to `main`. |
 
 ## Published Baseline
 
@@ -102,7 +102,7 @@ created: this is a narrow maintainer-selected child with no external handoff req
 
 | Date | Type | Record |
 |---|---|---|
-| 2026-10-09 | Planning | Published as a separate urgent slice so runtime defaults are not mixed with I296 toolchain maintenance. Claim, activation, implementation and release evidence remain pending. |
+| 2026-10-09 | Proposed atomic claim+activation | #689 proposes I297/PROVIDER-007 as Claimed / Active under a single-maintainer merge path. Both remain ineffective until this exact claim record reaches `main`; no implementation has started. |
 
 ## Verification Evidence
 

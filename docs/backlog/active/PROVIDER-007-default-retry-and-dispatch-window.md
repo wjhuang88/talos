@@ -4,27 +4,27 @@
 |---|---|
 | Story ID | PROVIDER-007 |
 | Parent / Related Owner | PROVIDER-002; NET-001 is related intake only |
-| Status | Ready / Unclaimed |
+| Status | Active / Claimed (proposed; ineffective until governance PR #689 merges) |
 | Priority | P0 urgent reliability maintenance |
 | Source | Maintainer request 2026-10-09; no new GitHub Issue |
-| Selected Iteration | I297 - Planned / Unclaimed |
+| Selected Iteration | I297 - Active / Claimed (proposed; ineffective until governance PR #689 merges) |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-6 |
+| Work Slice | I297/PROVIDER-007 only: default `ProviderTimeoutConfig.max_attempts` 3 -> 5 and `dispatch_timeout_secs` 60 -> 300 seconds; direct config/provider tests and directly affected docs. No retry taxonomy, backoff, stream-limit, cancellation, dependency, toolchain, version, release or explicit-config behavior change. |
+| Claimed At | 2026-10-09 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
-| Authorization Mode | Pending single-maintainer merge |
-| Authorization Evidence | Maintainer selected an expedited, independent release slice; urgency alone is not an emergency override. |
+| Governance Claim PR | #689 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Maintainer selected expedited normal maintenance. Exact-head governance CI, required reliability/API review and merge-time CAS remain mandatory; this is not an emergency override. |
 | Implementation PR | Not started |
 | Last Updated | 2026-10-09 |
-| Handoff / Release Condition | An atomic claim and activation must merge to `main`; a separate implementation candidate then needs exact-head validation, required review and merge-time CAS. |
+| Handoff / Release Condition | Proposed claim and activation are ineffective until #689 merges to `main`; a fresh implementation branch then needs exact-head validation, required review and merge-time CAS. |
 
 ## Goal
 
