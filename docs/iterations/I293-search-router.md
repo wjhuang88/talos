@@ -10,7 +10,7 @@
 | Source Issue | #643 |
 | Depends on | Accepted ADR-085; SEARCH-001-B / #642 complete in #656; NET-001 boundary coordination |
 | Claim State | Claimed |
-| Implementation PR | Not started |
+| Implementation PR | #681 (merged; test-only characterization) |
 | Completion | Pending |
 
 ## Collaboration Claim
@@ -85,9 +85,38 @@ also passed.
 Workspace check and workspace Clippy (`--locked`, `-D warnings`), targeted network-feature test
 Clippy, and the external Runtime SDK fixture in both default and coding modes subsequently passed.
 Public-site, installer, text-boundary and CI-classifier checks passed as well. The local socket
-skip remains the only deferred test; exact-head unskipped CI and merge review remain pending.
+skip was the only deferred test at submission; its final CI/merge disposition is recorded below.
 
 This stage cannot complete C: actual routing, typed failures, invalid-result filtering, bounded
 hedging, enclosing deadline/cancellation, bounded query-free health, NET-001 coordination and
 binary integration/rollback evidence remain pending. I293 remains Active / Claimed, completion
 pending; #643 and #624 stay open. D business correspondence is not required for offline tests.
+
+## Merged Test Evidence And Integration Plan — 2026-10-09
+
+PR #681 merged at `41381f8055b66d54de42988e2b936a12e5af3ac3`, after exact-head
+`6474eb4fae47984ef4c0785ea694b57bac76874a` CI3057 / run `37878864053` completed success.
+Full macOS release preflight (including the unchanged Unix socket fixture), Windows workspace
+tests and governance validation passed; Linux Desktop validation also passed. The preflight runner
+is macOS, not Linux. Independent agent technical review APPROVE, shared-GitHub-identity limitation,
+single-maintainer reason and merge-time CAS are recorded in #681 comment `6074280675`.
+Issue #643 synchronization is recorded in comment `6074282962`. This is existing partial test
+evidence, not a C completion commit or transport-cancellation proof.
+
+[Router integration and acceptance plan](../reference/SEARCH-001-C-ROUTER-INTEGRATION-PLAN.md)
+pins the merged baseline and audits the private seam, AgentTool dispatch, Session task-abort path,
+per-request timeouts and unclaimed NET-001 boundary. It proposes concrete routing transitions,
+typed-error/health ownership, caller-context gates and C-V01 through C-V11 acceptance rows.
+All those rows remain pending. No production implementation, numeric policy, public-API change,
+optional-provider activation or native admission is delivered by the plan.
+
+The documentation-only candidate passed both governance validators (including locked Cargo
+metadata/SQLite consumer validation), public-site and installer checks, the 14-case CI classifier
+suite, changed-document/source link verification and diff whitespace validation locally. No new
+workspace-test execution is claimed for this prose-only stage; exact-head documentation CI and
+technical review remain its remote gates.
+
+Next: converge the caller deadline/cancellation and explicit-selection seams with their owners,
+then implement the router only within a production-authorized stage. Until then, architecture
+and offline characterization can proceed; generic retry/circuit ownership stays with NET-001.
+I293 remains Active / Claimed, Completion Pending; #643 and #624 remain open.
