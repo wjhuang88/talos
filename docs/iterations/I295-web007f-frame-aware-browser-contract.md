@@ -1,6 +1,6 @@
 # Iteration I295: Frame-Aware Browser Host Contract
 
-> Document status: Review / Claimed; effective through PR #669 merge on 2026-10-06. Local implementation is complete; remote merge gates remain pending.
+> Document status: Complete / Closed; implementation merged by PR #683. Native browser/CDP remains an explicit downstream residual.
 > Published plan date: 2026-10-06
 > Planned objective: deliver an opt-in host-executed frame-aware browser v2 contract with exact admission, origin-bound permission and shared conformance evidence.
 > Baseline rule: preserve this objective and acceptance; different outcomes need a new iteration.
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / gpt-6 |
 | Work Slice | WEB-007-F / #618 only; frame-aware v2 public contract, prepared invocation, browser-specific permission integration and host conformance |
@@ -18,10 +18,10 @@
 | Source Issue | #618 |
 | Governance Claim PR | #669 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Maintainer accepted the corrected v2 contract and explicit non-overlapping parallel scheduling on 2026-10-06; independent design review approved the uncommitted contract. Exact-head governance review and CI remain merge gates for PR #669. |
-| Implementation PR | Not started; local stable candidate pending first push |
+| Authorization Evidence | PR #683 exact head CI passed; Agent-role security/API review approved the exact candidate; merge-time CAS completed before merge. |
+| Implementation PR | #683 (merged) |
 | Last Updated | 2026-10-09 |
-| Handoff / Release Condition | Claim is effective at 10f3715a77c4b1215455e89d26252d6b8bfa48e3. Complete implementation, protected review and main closeout before handoff; no overlap with I293/I294 owners. |
+| Handoff / Release Condition | Implementation complete; native browser/CDP/process-carrier remains a downstream residual outside this slice. |
 
 ## Published Baseline
 
@@ -287,3 +287,17 @@ evidence. Generated build artifacts were cleaned. The complete rerun then passed
 compilation disabled, debug symbols disabled and two build jobs; no tests or gates were removed.
 Remote CI, merge-time CAS, implementation merge and owner-first closeout remain outstanding. No
 completion is claimed.
+
+### Owner-First Closeout (2026-10-09)
+
+PR #683 merged to `main` as `06a5f6e6244f1b3dc9719033090f87ef485b1860` after all six exact-head
+CI jobs passed and the merge-time CAS confirmed unchanged head `1385a7e72c1261596f6fd8b49a9535fc71fbb3b8`,
+base `9a7b4b8cf014058c04d6b83fa5d9a35e7236ec03`, effective claim #669, no overlapping blocker,
+and the required review evidence. The implementation acceptance matrix and local/remote validation
+are complete for the published host contract.
+
+Completion Commit: `06a5f6e6244f1b3dc9719033090f87ef485b1860`
+
+This completion applies only to the opt-in host contract and deterministic conformance boundary.
+No native Chromium/CDP browser or process carrier is claimed; that downstream work remains
+explicitly residual.
