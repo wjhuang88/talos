@@ -1,6 +1,6 @@
 # Iteration I298: Authoritative Context Budget And Overflow Recovery
 
-> Document status: Planned
+> Document status: Active (proposed; effective only when PR #690 merges)
 > Published plan date: 2026-10-09
 > Planned objective: Fix misleading zero context usage and recover bounded tool loops before request budget overflow.
 > MVP deliverable: A TUI session with missing provider usage displays request-budget estimates and continues after recoverable context pressure without losing durable tool results.
@@ -9,15 +9,15 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | I298 / MEM-005-A: authoritative request budget telemetry, bounded request-only overflow recovery, TUI estimate/unknown display, regression tests and migration documentation. |
 | Claimed At | 2026-10-09 |
 | Source Issue | None; maintainer incident and explicit repair request |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #690 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Maintainer requested this repair in single-maintainer mode; independent Agent API/privacy review and exact-head gates remain required. |
+| Authorization Evidence | Maintainer requested this repair in single-maintainer mode and accepted ADR-087 on 2026-10-09. No independent human maintainer is available; independent Agent API/privacy review and exact-head gates remain required. |
 | Implementation PR | Not started |
 | Last Updated | 2026-10-09 |
 | Handoff / Release Condition | Claim and activation ineffective until finalized governance candidate merges to main. |

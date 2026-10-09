@@ -27,7 +27,7 @@ deferred behind Desktop. Locale follow-up #590 is Review / Claimed; phase 1 merg
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| I298 context budget recovery / MEM-005-A | Planned / Unclaimed | [I298](iterations/I298-context-budget-recovery.md) | Atomic claim/activation, local recovery and UI tests, API/privacy review; no release yet. |
+| I298 context budget recovery / MEM-005-A | Active / Claimed (proposed) | [I298](iterations/I298-context-budget-recovery.md) | #690 ineffective until merge; local recovery and UI tests, API/privacy review; no release yet. |
 | I292 Search compatible backend boundary / SEARCH-001-B | Complete / Claimed | [I292](iterations/I292-search-compatible-backend-boundary.md) / [SEARCH-001-B](backlog/active/SEARCH-001-B-compatible-search-backends.md) / #642 | PR #660 merged as `7728f7681df11a9d715a0e479590c1002c53a26f`; exact-head CI run `37409618084`; no production routing change. |
 | I293 Talos-owned SearchRouter / SEARCH-001-C | Active / Claimed | [I293](iterations/I293-search-router.md) / [SEARCH-001-C](backlog/active/SEARCH-001-C-search-router.md) / #643 | Claim #664 effective; #681 test-only evidence merged at `41381f8055b66d54de42988e2b936a12e5af3ac3`. Caller-context integration and C acceptance remain pending; see owner-linked router plan. |
 | I294 Native provider evidence / SEARCH-001-D | Active / Claimed | [I294](iterations/I294-search-provider-evidence.md) / [SEARCH-001-D](backlog/active/SEARCH-001-D-provider-evidence-gate.md) / #644 | Claim #665 effective at `7019f63d3df3d6eb58473a53a499b9b7e8b98925`; E/F remain gated by the evidence matrix. |
