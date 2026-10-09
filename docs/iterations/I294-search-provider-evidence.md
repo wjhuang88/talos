@@ -10,7 +10,7 @@
 | Source Issue | #644 |
 | Depends on | Accepted ADR-085; SEARCH-001-A / #625 complete; B adapter boundary available |
 | Claim State | Claimed |
-| Research PR | #668, #673 and #676 (merged; partial evidence) |
+| Research PR | #668, #673, #676 and #686 (merged; partial evidence) |
 | Completion | Pending |
 
 ## Collaboration Claim
@@ -24,7 +24,7 @@
 | Claimed At | 2026-10-06 |
 | Source Issue | #644 |
 | Governance Claim PR | #665 |
-| Implementation PR | #668, #673 and #676 (merged; evidence only) |
+| Implementation PR | #668, #673, #676 and #686 (merged; evidence only) |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Governance-only claim+activation PR; exact-head CI, governance validators, remote Issue reconciliation and merge-time CAS required. |
 | Last Updated | 2026-10-09 |
@@ -84,3 +84,31 @@ Claimed, completion pending, and #624 stays open.
 
 Terms applicability, privacy, authorized fixtures, independent failure domains and genuine regional
 observations remain incomplete. E/F remain gated; this is partial evidence, not completion.
+
+## Standard Route Trace And Query-Free Diagnostics — 2026-10-09
+
+Previous source stage #686 merged at `fecc9583992ccf2c0678b58e902f4a3bdcf19d2b`, after
+exact-head CI3067 / run `37893403091` and independent Agent technical APPROVE. The unchanged
+trusted documentation route passed; no new full-workspace test execution was claimed.
+
+[Mwmbl route qualification packet](../reference/SEARCH-001-D-MWMBL-ROUTE-QUALIFICATION.md)
+traces the pinned standard endpoint through MMR/LTR, local retrieval, Wikipedia helper,
+upstream cache and wire provenance. It records one public-schema GET (HTTP 200) and one
+missing-query GET (HTTP 422), with UTC times/body hashes and no credentials, retries,
+redirect following, search query or geographic inference. Public schema matches the inspected
+field shapes; input validation is not anonymous valid-query/search-success evidence.
+
+Upstream Wikipedia retries/circuit/cache are explicitly distinguished from Talos budgets and
+cleanup. Per-hit origin is distinct from backend identity, and source/policy/deployment differences
+remain qualification work. M-Q01 through M-Q08 are pending fixture/acceptance rows, not delivered
+tests. No result-response fixture, provider admission or production code change.
+
+Local convergence passed both governance validators (offline locked Cargo metadata/SQLite
+boundary included), public-site/installers, 14 classifier cases, changed-document links, observed
+schema structural checks and whitespace validation. No workspace/upstream tests were rerun.
+Exact-head documentation CI and technical review remain remote gates.
+
+Next: independently authored offline parser evidence toward route qualification, plus permitted
+anonymous valid-query evidence; hosted privacy/result-use and genuine regional observations
+remain pending.
+D/I294 remains Active / Claimed and incomplete; E/F gated, #624 open.
