@@ -7,9 +7,9 @@
 | Parent | WEB-007 / #452 |
 | Source | #618; #520 Request B |
 | Priority | P1 |
-| Status | Active / Claimed — effective through PR #669; implementation incomplete |
+| Status | Review / Claimed — effective through PR #669; local stable candidate awaits remote gates |
 | Selected Iteration | I295 |
-| Implementation PR | Not started |
+| Implementation PR | Not started; local stable candidate pending first push |
 
 ## Collaboration Claim
 

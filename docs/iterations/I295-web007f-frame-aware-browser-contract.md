@@ -1,6 +1,6 @@
 # Iteration I295: Frame-Aware Browser Host Contract
 
-> Document status: Active / Claimed; effective through PR #669 merge on 2026-10-06. Implementation remains incomplete.
+> Document status: Review / Claimed; effective through PR #669 merge on 2026-10-06. Local implementation is complete; remote merge gates remain pending.
 > Published plan date: 2026-10-06
 > Planned objective: deliver an opt-in host-executed frame-aware browser v2 contract with exact admission, origin-bound permission and shared conformance evidence.
 > Baseline rule: preserve this objective and acceptance; different outcomes need a new iteration.
@@ -19,8 +19,8 @@
 | Governance Claim PR | #669 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer accepted the corrected v2 contract and explicit non-overlapping parallel scheduling on 2026-10-06; independent design review approved the uncommitted contract. Exact-head governance review and CI remain merge gates for PR #669. |
-| Implementation PR | Not started |
-| Last Updated | 2026-10-06 |
+| Implementation PR | Not started; local stable candidate pending first push |
+| Last Updated | 2026-10-09 |
 | Handoff / Release Condition | Claim is effective at 10f3715a77c4b1215455e89d26252d6b8bfa48e3. Complete implementation, protected review and main closeout before handoff; no overlap with I293/I294 owners. |
 
 ## Published Baseline
@@ -260,3 +260,30 @@ allowing bytes, references or paths into durable messages, display, persistence 
 Native descendant pixel masking remains host evidence, not a fake-executor claim. Full
 conformance, external consumer validation, preflight, exact-head CI/review, merge and
 owner-first closeout remain pending.
+
+### Local Candidate Verification (2026-10-09)
+
+Candidate `4aa0f8779f933eb373b4416ee0d50490acfb0fdf` incorporates the ephemeral-image
+carrier, request-budget and visual-capability admission, bounded provider delivery deadline,
+child-document isolation fixtures and external host composition. It is rebased onto
+`9a7b4b8cf014058c04d6b83fa5d9a35e7236ec03`; all nine I295 patches were preserved.
+The Runtime SDK remains independently consumable with one direct Talos dependency; the
+separate browser-host fixture explicitly imports Runtime and Tools. Native-browser evidence
+remains excluded and must be supplied by a downstream real host implementation.
+
+Local locked verification passed: 71 browser tests, two Runtime host integration tests,
+the Provider suite, the Agent suite (447 unit tests plus integration and documentation tests),
+the standalone MCP original-only refusal test, both external consumer executions and focused
+six-crate all-target Clippy. The Agent source-contract test was corrected to check the actual
+sealed ephemeral dispatch and carried protocol; runtime behavior was unchanged. The Runtime
+SDK validation script also passed. Both governance validators reported zero warnings.
+
+Independent Agent-role security/API review approved the exact candidate and base above with
+no blocking findings. This reviewer shares the workspace/account and is not an independent
+human. Its incremental review verified patch identity after rebase and the test-only correction.
+
+The first full preflight failed during workspace test linking with ENOSPC; it is not passing
+evidence. Generated build artifacts were cleaned. The complete rerun then passed with incremental
+compilation disabled, debug symbols disabled and two build jobs; no tests or gates were removed.
+Remote CI, merge-time CAS, implementation merge and owner-first closeout remain outstanding. No
+completion is claimed.
