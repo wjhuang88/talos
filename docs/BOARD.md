@@ -148,7 +148,7 @@ deferred behind Desktop. Locale follow-up #590 is Review / Claimed; phase 1 merg
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| Frame-aware browser contract / #618 | Review / Claimed | [WEB-007-F](backlog/active/WEB-007-F-frame-aware-contract.md) | I295 claim effective through #669; local host integration and conformance candidate passed preflight and Agent-role security/API review. Exact-head CI, merge-time CAS and owner-first closeout remain required. |
+| Frame-aware browser contract / #618 | Complete / Closed | [WEB-007-F](backlog/active/WEB-007-F-frame-aware-contract.md) | PR #683 merged as `06a5f6e6`; exact-head CI and Agent-role security/API review passed. Native browser/CDP/process-carrier remains downstream residual. |
 | SEARCH-001 global zero-config web search / #624 | Intake / Unclaimed; not selected | [SEARCH-001](backlog/active/SEARCH-001-zero-config-global-search.md) / [SEARCH-001-A](backlog/active/SEARCH-001-A-architecture-migration-contract.md) | Architecture child #625 requires normal selection and effective claim; accepted ADR precedes later implementation; no active Board work. |
 | See owner documents and Product Backlog for the full retained historical and future inventory. | Reference | [Product Backlog](backlog/PRODUCT-BACKLOG.md) | Owner docs remain authoritative. |
 

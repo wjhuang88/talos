@@ -1,5 +1,7 @@
 # WEB-007-F: Frame-Aware Browser Contract
 
+Status: Complete
+
 | Field | Value |
 |---|---|
 | Story ID | WEB-007-F |
@@ -7,15 +9,15 @@
 | Parent | WEB-007 / #452 |
 | Source | #618; #520 Request B |
 | Priority | P1 |
-| Status | Review / Claimed — effective through PR #669; local stable candidate awaits remote gates |
+| Status | Complete / Closed — implementation merged by PR #683; native browser/CDP remains downstream residual |
 | Selected Iteration | I295 |
-| Implementation PR | Not started; local stable candidate pending first push |
+| Implementation PR | #683 (merged) |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / gpt-6 |
 | Work Slice | WEB-007-F / #618 frame-aware v2 public contract, prepared invocation, browser-specific permission integration and host conformance only |
@@ -23,10 +25,10 @@
 | Source Issue | #618 |
 | Governance Claim PR | #669 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Maintainer accepted the corrected v2 direction and non-overlapping parallel I295 scheduling on 2026-10-06; independent design review approved the uncommitted contract. Exact-head governance review and CI remain merge gates for PR #669. |
-| Implementation PR | Not started |
-| Last Updated | 2026-10-06 |
-| Handoff / Release Condition | Claim effective through #669 merge 10f3715a; complete I295 implementation, protected review and main closeout before handoff. |
+| Authorization Evidence | PR #683 exact-head CI and Agent-role security/API review passed; merge-time CAS completed. |
+| Implementation PR | #683 (merged) |
+| Last Updated | 2026-10-09 |
+| Handoff / Release Condition | Host contract complete; native browser/CDP/process-carrier remains downstream residual. |
 
 ## Goal And Ownership
 
@@ -121,8 +123,18 @@ Clippy passing. This is neither an implementation approval nor #618 completion.
 
 2026-10-08 current checkpoint: #669 merged on 2026-10-06; I295 claim is effective.
 Local protocol/request/ticket code remains partial, unpushed and unintegrated with execution.
-The maintainer requests completion and merge before handoff. The I295 closure ledger owns all
-remaining host-contract acceptance; no native-browser delivery or #618 completion is claimed.
+The maintainer requested completion and merge before handoff. The I295 closure ledger owns the
+host-contract acceptance; no native-browser delivery is claimed.
+
+## Completion Evidence
+
+PR #683 merged all implementation changes to `main` as `06a5f6e6244f1b3dc9719033090f87ef485b1860`.
+All six exact-head CI jobs passed for head `1385a7e72c1261596f6fd8b49a9535fc71fbb3b8` against
+base `9a7b4b8cf014058c04d6b83fa5d9a35e7236ec03`; required Agent-role security/API review approved
+the exact candidate. The accepted scope is the opt-in host contract and conformance boundary.
+Native Chromium/CDP/process-carrier delivery remains a separately owned residual.
+
+Completion Commit: `06a5f6e6244f1b3dc9719033090f87ef485b1860`
 
 2026-09-29: #618 and #452 inspected; no open PR reported at investigation time. Repository
 AgentTool execution_admission and permission_profile inspected: both are synchronous, and the
