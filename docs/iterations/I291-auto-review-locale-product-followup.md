@@ -60,7 +60,7 @@ Completion Commit. Until then the parent remains Review / Claimed.
 | Governance Claim PR | #650 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | User explicitly requested execution of the product follow-up and authorized GitHub publication. Independent API/security review and exact-head CI remain required. |
-| Implementation PR | #652, #662, #674, #677, #679 (merged; product acceptance remains open) |
+| Implementation PR | #652, #662, #674, #677, #679, #680 (merged; product acceptance remains open) |
 | Last Updated | 2026-10-09 |
 | Handoff / Release Condition | Effective claim merge precedes implementation; no release or permission-policy change. |
 
@@ -269,3 +269,48 @@ changed to bypass the host blockers.
 Dependencies and Cargo.lock remain unchanged. Product residuals remain: localized technical-error
 copy, actual CLI/TUI multilingual resume/rotation acceptance, concurrent delayed-snapshot evidence,
 and model tokenizer measurements. I291, AUTO-UX-001 and #590 remain Review / Claimed and open.
+
+## Incremental Merge And Technical Failure Copy (2026-10-09)
+
+PR #680 merged at `9a7b4b8cf014058c04d6b83fa5d9a35e7236ec03` from exact head
+`a9b91dc7cb2719c85c9032d0e9d66a79e3c058e0`. CI3055 run `37868494810` passed Linux/Windows
+workspace tests, Clippy, standard release preflight, Desktop and governance. The Issue/owner
+reconciliation job also passed after reopening #590 to match the owner's Review/Claimed state.
+Independent exact-head Agent technical/API/security review approved; shared GitHub identity does
+not constitute a formal approval from a distinct collaborator. Remote full tests cover the local
+host blockers; local full preflight is not retroactively claimed green.
+
+The next local slice translates fixed technical-failure explanations for configured zh/ja tags,
+including region/script tags. Other configured locales use fixed English copy. This is a bounded
+translation fallback, not coverage of every detected language. Valid model-produced explanations
+continue using detected history locale; model failures and unverified results use configured
+fallback locale. Reason codes, deadlines, report digests and permission outcomes are unchanged.
+No arbitrary provider error or transcript content is interpolated into these prompts.
+
+The slice covers missing trusted execution directory, rejected complete/sensitive inputs, missing
+context, ineligible tools, incomplete assessment, mode/context changes, malformed output and
+unverified request binding. New integration fixtures cover malformed/wrong-digest output with
+history different from configured zh/ja/en and unsupported-language fallback, and three-language
+timeouts with the original budget and human-required outcome. Exact-head remote validation and
+review are pending; this slice is not completion evidence. Actual CLI/TUI acceptance,
+concurrent delayed-snapshot evidence and tokenizer measurement remain open.
+Independent local technical/API/security review found no blocker in this slice. Bare resolver
+fallback paths add no new explanation, and the direct execution-directory-change error remains
+English; neither is claimed localized by this fixed human-prompt slice. Binary acceptance must
+check the actual visible surfaces rather than infer translation completeness from unit fixtures.
+
+Local validation: pinned Rust 1.97.0, compact debug environment and disabled incremental builds;
+`cargo test --offline --locked -p talos-agent --lib` passed 446/446, and the workspace test phase
+also passed all 446 Agent tests. `cargo clippy --offline --locked -p talos-agent --lib --tests
+-- -D warnings` passed. Standard preflight passed governance/claims, site/installers, format,
+text-boundary/classifier, workspace check and workspace Clippy. Workspace tests stopped at the
+existing runtime socket fixture: 64 passed / 1 PermissionDenied, OS error 1 at
+crates/talos-runtime/src/lib.rs:2035. SDK fixture and later workspace packages were not reached.
+No test was skipped; per existing user authorization, full exact-head CI must cover the host
+restriction before merge. Cargo.lock, toolchain and dependencies remain unchanged.
+
+The first 446-test run yielded 445 passed / one new timeout-fixture failure (elapsed 0 ns).
+Without user intent, script evidence marks uncertainty and SlowAssessor's inherited adapter
+returns unsupported before its delayed contextual implementation. The fixture now supplies the
+current intent and asserts review_timeout before elapsed time; all three locale cases pass.
+This was a fixture-path correction, not a production permission or deadline change.
