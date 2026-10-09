@@ -81,16 +81,19 @@ independently and cannot claim completion using only a fake executor.
 - [x] Maintainer accepted the proposed versioned schema, frame-origin resource and one-shot
   admission direction; independent Agent-role static design review approved the corrected
   proposal. This does not replace exact-head implementation security/API review.
-- [ ] The complete fixture matrix in the proposal is included unchanged or with reviewed rationale
-  in implementation acceptance, for both host and process-backed executors where delivered.
+- [x] The host fixture matrix is covered by `browser_executor` context/host/isolation tests and
+  external host fixtures in #683. Process-backed executors are not delivered by I295; their
+  conformance remains mandatory for downstream native/process delivery.
 - [x] Inventory Active/Review/Planned/Blocked iterations and record dispositions in I295.
 - [x] Select runnable I295: opt-in host executor composition with deterministic frame state,
   full registry → permission → execution → projection tests and an external consumer example.
 - [x] Record an effective target-branch Collaboration Claim and actual governance PR number: #669 merged as 10f3715a77c4b1215455e89d26252d6b8bfa48e3.
-- [ ] Implement and verify each acceptance fixture, pinned locked checks, full workspace tests,
-  release preflight and independent exact-head API/security review before merge.
-- [ ] Record implementation PRs and existing merged completion SHA(s) before Complete; only then
-  reconcile #618/#520 downstream delivery. Neither this document nor a proposal closes #618.
+- [x] Applicable host fixtures, pinned locked checks, full workspace tests and release preflight
+  passed (I295 Local Candidate Verification). Independent Agent-role review approved exact head
+  `1385a7e72c1261596f6fd8b49a9535fc71fbb3b8` / base `9a7b4b8cf014058c04d6b83fa5d9a35e7236ec03`;
+  all six jobs of CI `37881384818` passed before merge.
+- [x] PR #683 and its existing merge SHA are recorded in Completion Evidence below. Reconcile
+  #618 after closeout merge; #520 native production fulfillment remains excluded.
 
 ## State Owners, Documentation And Residuals
 
@@ -123,8 +126,8 @@ Clippy passing. This is neither an implementation approval nor #618 completion.
 
 2026-10-08 current checkpoint: #669 merged on 2026-10-06; I295 claim is effective.
 Local protocol/request/ticket code remains partial, unpushed and unintegrated with execution.
-The maintainer requested completion and merge before handoff. The I295 closure ledger owns the
-host-contract acceptance; no native-browser delivery is claimed.
+The maintainer requests completion and merge before handoff. The I295 closure ledger owns all
+remaining host-contract acceptance; no native-browser delivery or #618 completion is claimed.
 
 ## Completion Evidence
 
