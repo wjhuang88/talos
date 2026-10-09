@@ -2,7 +2,7 @@
 
 ## Purpose
 
-I298 context-budget repair is Review / Claimed through merged #690; see
+I298 context-budget repair is Complete / Closed through implementation #691 (`8d4ad50e`); see
 [I298](I298-context-budget-recovery.md) for the incident, selection inventory and bounded scope.
 I296/I297 remain separate unmerged candidates; no publication authority transfers to this repair.
 
