@@ -19,6 +19,14 @@ separate search claims; the maintainer explicitly authorized non-overlapping par
 and owner-first union updates to derived files. I277/I290/I291 remain Review, I249 remains
 deferred Planned and I164 Paused. No status or scope from these owners transfers to I295.
 
+## Rust 1.99 Toolchain Maintenance — 2026-10-09
+
+[I296](I296-rust-199-toolchain-maintenance.md) / TOOLCHAIN-001 is a proposed, unclaimed
+maintenance slice for a Rust 1.99 development/CI/release pin. It does not activate until its
+atomic governance claim reaches `main`; it excludes the Rust 1.95 MSRV, dependency graph,
+lockfile and release activity. I293/I294 remain Active under independent Search claims; I290/I291
+remain Review, DEPENDENCY-003-A remains Review/Claimed, I249 remains Planned and I164 Paused.
+
 ## TUI History Return Recovery — 2026-10-03
 
 [I289](I289-tui-history-return-to-bottom.md) / TUI-062 is Complete / Closed.
