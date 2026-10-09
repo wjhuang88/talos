@@ -60,8 +60,8 @@ Completion Commit. Until then the parent remains Review / Claimed.
 | Governance Claim PR | #650 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | User explicitly requested execution of the product follow-up and authorized GitHub publication. Independent API/security review and exact-head CI remain required. |
-| Implementation PR | #652 (merged; product acceptance remains open) |
-| Last Updated | 2026-10-04 |
+| Implementation PR | #652, #662, #674, #677, #679 (merged; product acceptance remains open) |
+| Last Updated | 2026-10-09 |
 | Handoff / Release Condition | Effective claim merge precedes implementation; no release or permission-policy change. |
 
 ## Execution Evidence And Remaining Acceptance (2026-10-04)
@@ -221,3 +221,51 @@ remote review, and product binary acceptance are still required before closure.
 
 The stable slice is submitted for exact-head CI and independent remote review after local
 convergence. This submission does not close the product story or waive full workspace validation.
+
+## Incremental Locale Candidate And Recovery (2026-10-09)
+
+PR #679 merged at `270911c071961a79c85af742a4daf62d4ad6735a` from exact head
+`6024cc51b0bd8a35118601149960ac844d44fdc5`. CI run 3053
+(`37772348144`) passed all jobs, including workspace tests and release preflight; independent
+exact-head API/security review approved with the shared GitHub identity limitation disclosed.
+This is merge evidence for the rotation/provider slice, not product closure evidence.
+
+The next candidate reuses detector results for the latest eight bounded user messages by derived
+SHA-256 digest, language and confidence. It retains no raw transcript in the cache. Each snapshot
+votes only for its own window, including repeated occurrences; repeated observations never accrue
+votes. Session rotation clears the cache. Changing configured fallback clears cached low-confidence
+evidence and updates fallback-derived selection without overwriting a detected history language.
+Hashing, bounded sampling and vote aggregation still run per snapshot; no end-to-end latency or
+tokenizer improvement is claimed.
+
+Locale normalization accepts at most 64 ASCII bytes using language[-Script][-REGION], with
+validated POSIX encoding/modifier suffixes discarded. Variants, extensions and malformed tails
+are rejected rather than truncated. Invalid LC_ALL falls through to valid LANG. README and config
+reference describe this supported subset; it is not a complete BCP-47 implementation.
+
+The previous unpublished local candidate passed 444 talos-agent library tests, workspace check,
+Clippy and governance validators. Its full preflight first exhausted disk while linking default
+debug tests; a compact debug retry reached talos-runtime with 64 passed and one host failure:
+`runtime_evidence_rejects_directory_symlinks_and_socket_entries`, UnixListener::bind at
+crates/talos-runtime/src/lib.rs:2035, OS error 1 PermissionDenied (Operation not permitted).
+No test was skipped or permission restriction bypassed; later preflight fixtures were not reached.
+The user confirmed publication for GitHub CI full acceptance on 2026-10-09.
+
+Workspace maintenance removed that unpublished checkout and its local commits. This candidate
+was reconstructed from the merged #679 base and retained implementation notes, not recovered
+byte-for-byte. Prior test results do not validate the reconstructed tree. Its pure production
+locale self-tests pass 6/6. Fresh `cargo test --offline --locked -p talos-agent --lib` passed
+444/444, including observer cache/configuration fixtures; both governance validators passed
+with zero warnings. Independent static API/security review found no blocker but is not exact-head
+merge approval. Standard release preflight used compact dev/test debug information and disabled
+incremental compilation as environment settings; repository build profiles are unchanged. Site,
+installer, governance, claims, text-boundary, classifier and format checks passed, but workspace
+check stopped compiling arborium-swift with No space left on device. The shared 32 GiB filesystem
+was full; this task's target occupied about 1.4 GiB while another worktree target occupied about
+26 GiB. Only this task's target was cleaned using cargo clean. Workspace check, Clippy, full tests
+and SDK fixture are not green for this reconstructed tree. Per user confirmation, exact-head
+GitHub CI must complete full acceptance before merge; no tests or dependency versions were
+changed to bypass the host blockers.
+Dependencies and Cargo.lock remain unchanged. Product residuals remain: localized technical-error
+copy, actual CLI/TUI multilingual resume/rotation acceptance, concurrent delayed-snapshot evidence,
+and model tokenizer measurements. I291, AUTO-UX-001 and #590 remain Review / Claimed and open.
