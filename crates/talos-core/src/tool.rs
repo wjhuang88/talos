@@ -6,11 +6,18 @@
 
 mod agent_tool;
 mod authorization;
+mod browser_arguments;
+mod prepared;
 mod protocol;
 mod registry;
 mod result_presentation;
 
 pub use self::{agent_tool::*, authorization::*, protocol::*, registry::*, result_presentation::*};
+pub use browser_arguments::{BrowserRawArguments, BrowserRawArgumentsError};
+pub use prepared::{
+    AuthorizedToolInvocation, PreparedExecutionOutput, PreparedFailureCode,
+    PreparedInvocationError, PreparedToolInvocation,
+};
 
 /// Helper macro to generate a JSON Schema value from a type that implements
 /// `schemars::JsonSchema`.

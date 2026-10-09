@@ -11,8 +11,8 @@ use provider::FixtureProvider as MockProvider;
 use talos_runtime::{
     AgentTool, ApprovalChoice, ApprovalHandler, LanguageModel, PermissionDecision, PermissionRule,
     RuntimeBuilder, RuntimeError, RuntimeTurnCompletionStatus, SandboxFallbackPolicy,
-    SessionManager, ShutdownOptions, ToolNature, ToolResult, collect_until_turn_completed,
-    create_sandbox,
+    SessionManager, ShutdownOptions, ToolNature, ToolProtocol, ToolResult,
+    collect_until_turn_completed, create_sandbox,
 };
 
 struct ReadOnlyGreeting;
@@ -191,6 +191,9 @@ async fn main() -> Result<()> {
 
 async fn run() -> Result<()> {
     api_surface::verify();
+    verify_legacy_content_surface();
+    verify_ephemeral_default_refusal().await?;
+    verify_browser_is_opt_in().await?;
     run_minimal_runtime().await?;
     run_durable_session().await?;
     #[cfg(feature = "coding")]
@@ -198,5 +201,92 @@ async fn run() -> Result<()> {
     validate_fallback_policies();
     safety::run().await?;
     println!("talos-runtime external fixture passed");
+    Ok(())
+}
+
+struct InventoryProvider(MockProvider);
+
+#[async_trait]
+impl LanguageModel for InventoryProvider {
+    async fn stream(
+        &self,
+        messages: &[talos_runtime::Message],
+    ) -> talos_runtime::ProviderResult<talos_runtime::Receiver<talos_runtime::AgentEvent>> {
+        self.0.stream(messages).await
+    }
+
+    async fn stream_with_tools(
+        &self,
+        messages: &[talos_runtime::Message],
+        tools: &[talos_runtime::ToolDefinition],
+    ) -> talos_runtime::ProviderResult<talos_runtime::Receiver<talos_runtime::AgentEvent>> {
+        assert!(!tools.iter().any(|tool| tool.name == "browser"));
+        self.0.stream(messages).await
+    }
+}
+
+async fn verify_browser_is_opt_in() -> Result<()> {
+    let builder = RuntimeBuilder::new().provider(Arc::new(InventoryProvider(
+        MockProvider::new().with_response("default inventory excludes browser"),
+    )));
+    #[cfg(feature = "coding")]
+    let builder = builder.coding_preset();
+    let mut runtime = builder.build()?;
+    runtime.submit("inventory probe").await?;
+    assert!(matches!(
+        collect_until_turn_completed(&mut runtime).await,
+        Some(RuntimeTurnCompletionStatus::Success { .. })
+    ));
+    runtime.shutdown().await?;
+    Ok(())
+}
+
+fn verify_legacy_content_surface() {
+    // Downstream exhaustive matches and struct literals must remain source-compatible.
+    let part = talos_runtime::ContentPart::Text {
+        text: "legacy".into(),
+    };
+    let text = match part {
+        talos_runtime::ContentPart::Text { text } => text,
+        talos_runtime::ContentPart::Image {
+            path,
+            mime,
+            byte_count,
+            content_digest,
+        } => {
+            format!("{path:?}{mime}{byte_count}{content_digest:?}")
+        }
+    };
+    let output = talos_runtime::ToolExecutionOutput {
+        result: ToolResult::success(text),
+        next_provider_parts: vec![],
+    };
+    let prepared: talos_runtime::PreparedExecutionOutput = output.into();
+    assert!(prepared.images.is_empty());
+}
+
+async fn verify_ephemeral_default_refusal() -> Result<()> {
+    let provider = MockProvider::new().with_response("not consumed by refusal");
+    let image = talos_runtime::EphemeralImage::png(
+        vec![137, 80, 78, 71, 13, 10, 26, 10],
+        std::time::Instant::now() + Duration::from_secs(10),
+    )
+    .expect("valid carrier header");
+    let (progress, _) = tokio::sync::mpsc::unbounded_channel();
+    assert!(
+        provider
+            .stream_with_ephemeral_images(
+                &[],
+                &[],
+                ToolProtocol::Native,
+                progress,
+                &[],
+                vec![image],
+            )
+            .await
+            .is_err()
+    );
+    // The legacy provider queue remains untouched: refusal happened before dispatch.
+    assert!(provider.stream(&[]).await.is_ok());
     Ok(())
 }

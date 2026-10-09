@@ -36,6 +36,7 @@ impl TalosMcpHandler {
         self.tool_registry
             .list()
             .into_iter()
+            .filter(|tool| !tool.requires_original_invocation())
             .map(to_mcp_tool)
             .collect()
     }
@@ -58,7 +59,10 @@ impl ServerHandler for TalosMcpHandler {
     }
 
     fn get_tool(&self, name: &str) -> Option<Tool> {
-        self.tool_registry.get(name).map(to_mcp_tool)
+        self.tool_registry
+            .get(name)
+            .filter(|tool| !tool.requires_original_invocation())
+            .map(to_mcp_tool)
     }
 
     async fn call_tool(
@@ -74,6 +78,14 @@ impl ServerHandler for TalosMcpHandler {
                 None,
             ));
         };
+        // MCP has already parsed arguments, so duplicate-key evidence is irrecoverable.
+        if tool.requires_original_invocation() {
+            return Err(McpError::new(
+                ErrorCode::METHOD_NOT_FOUND,
+                "tool unavailable through standalone MCP".to_owned(),
+                None,
+            ));
+        }
 
         let input = request
             .arguments

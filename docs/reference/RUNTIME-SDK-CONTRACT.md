@@ -440,3 +440,31 @@ changed by I216.
 accept responsibility for restoring any identity guidance they intentionally replace. Hook
 contributions are additive prompt modifications and must not be used to erase runtime safety or
 protocol sections.
+
+### Opt-in frame-aware browser host (I295 / WEB-007-F)
+
+See [I295 migration and dependency boundaries](I295-BROWSER-HOST-MIGRATION.md).
+Browser host types are supplied by an explicit `talos-tools` dependency with `network` enabled;
+they are not all re-exported by the Runtime facade. This is a local candidate, not a release claim.
+
+The frame-aware browser v2 contract is an explicit host composition, not part of the default
+Runtime inventory. A trusted host creates a `BrowserHost` with a bound `BrowserExecutor`, records
+its tab/frame lifecycle state, and registers `ManagedBrowserTool` only when it can route original
+argument bytes through the prepared invocation and browser-specific permission resolver. The
+default resolver denies; generic tool-name, Network, path, session, or workspace grants do not
+authorize browser calls. An approved invocation is one-shot and bound to its exact normalized
+request, executor, document/frame epochs, and expiry.
+
+Hosts must treat `BrowserExecutor` as a trusted implementation boundary: it must perform
+document-bound actions and reject navigation or lifecycle changes before mutation or observation
+release. A deterministic example is available as
+`crates/talos-tools/examples/i295_browser_host.rs` and can be run with:
+
+```text
+cargo run -p talos-tools --locked --features network --example i295_browser_host
+```
+
+The example proves child-frame discovery, exact authorization, one action, and stale-reference
+rejection; it is not native Chromium/CDP evidence. Standalone MCP does not advertise or execute
+v2 until its raw-ingress duplicate-key proof is available. Existing tools and default Runtime
+composition remain unchanged.

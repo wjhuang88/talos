@@ -67,7 +67,7 @@ mod tests {
             query: "rust async".into(),
             max_results: 2,
         };
-        let results = vec![
+        let results = [
             SearchBackendResult {
                 backend: SearchBackendId::DuckDuckGo,
                 title: "Rust".into(),

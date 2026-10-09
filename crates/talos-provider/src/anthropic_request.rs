@@ -18,6 +18,7 @@ pub fn anthropic_request_debug_snapshot(
     base_url: Option<&str>,
     messages: &[Message],
 ) -> Value {
+    let messages = crate::image_io::preview_messages(messages);
     json!({
         "method": "POST",
         "url": base_url.unwrap_or(ANTHROPIC_API_URL),
@@ -26,7 +27,7 @@ pub fn anthropic_request_debug_snapshot(
             "anthropic-version": ANTHROPIC_VERSION,
             "content-type": "application/json",
         },
-        "body": build_request_body(model, messages, &[], None, None),
+        "body": build_request_body(model, &messages, &[], None, None),
     })
 }
 

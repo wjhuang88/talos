@@ -6,10 +6,115 @@ use futures_util::StreamExt;
 use serde::Deserialize;
 use serde_json::Value;
 use talos_core::message::{AgentEvent, ReasoningBlock, StopReason, ToolCall, Usage};
-use talos_core::tool::ToolProvenance;
 use tokio::sync::mpsc;
 
-use crate::{anthropic_stream::parse_protocol_text_calls, stream_utf8::Utf8StreamDecoder};
+use crate::{anthropic_stream::parse_invocation_text_calls, stream_utf8::Utf8StreamDecoder};
+
+pub(crate) enum InvocationSender {
+    Legacy(mpsc::Sender<AgentEvent>),
+    Original {
+        tx: mpsc::Sender<talos_core::provider::ProviderInvocationEvent>,
+        browser_tools: Vec<String>,
+    },
+}
+
+impl InvocationSender {
+    pub(crate) fn buffers_compat_text(&self, protocol: talos_core::tool::ToolProtocol) -> bool {
+        protocol != talos_core::tool::ToolProtocol::Native
+            && matches!(self, Self::Original { browser_tools, .. } if !browser_tools.is_empty())
+    }
+
+    pub(crate) async fn release_compat_text(
+        &self,
+        text: &str,
+        protocol: talos_core::tool::ToolProtocol,
+    ) -> Result<(), ()> {
+        if self.buffers_compat_text(protocol) {
+            let delta = crate::browser_text_arguments::outside_tool_blocks(text).map_err(|_| ())?;
+            if !delta.is_empty() {
+                self.send(AgentEvent::TextDelta { delta }).await?;
+            }
+        }
+        Ok(())
+    }
+    pub(crate) async fn send_invocation(
+        &self,
+        event: talos_core::provider::ProviderInvocationEvent,
+    ) -> Result<(), ()> {
+        match (self, event) {
+            (Self::Original { tx, .. }, event) => tx.send(event).await.map_err(|_| ()),
+            (Self::Legacy(tx), talos_core::provider::ProviderInvocationEvent::Legacy(event)) => {
+                tx.send(event).await.map_err(|_| ())
+            }
+            _ => Err(()),
+        }
+    }
+    pub(crate) async fn closed(&self) {
+        match self {
+            Self::Legacy(tx) => tx.closed().await,
+            Self::Original { tx, .. } => tx.closed().await,
+        }
+    }
+
+    pub(crate) async fn send(&self, event: AgentEvent) -> Result<(), ()> {
+        match self {
+            Self::Legacy(tx) => tx.send(event).await.map_err(|_| ()),
+            Self::Original { tx, .. } => tx
+                .send(talos_core::provider::ProviderInvocationEvent::Legacy(event))
+                .await
+                .map_err(|_| ()),
+        }
+    }
+
+    pub(crate) fn is_browser(&self, name: &str) -> bool {
+        matches!(self, Self::Original { browser_tools, .. } if browser_tools.iter().any(|tool| tool == name))
+    }
+
+    pub(crate) async fn native_call(&self, id: String, name: String, raw: &str) -> Result<(), ()> {
+        if let Self::Original { tx, browser_tools } = self
+            && browser_tools.contains(&name)
+        {
+            let arguments = match talos_core::tool::BrowserRawArguments::parse_original(raw) {
+                Ok(arguments) => arguments,
+                Err(_) => {
+                    let _ = self
+                        .send(AgentEvent::Error {
+                            message: "invalid original browser arguments".into(),
+                        })
+                        .await;
+                    return Err(());
+                }
+            };
+            return tx
+                .send(
+                    talos_core::provider::ProviderInvocationEvent::BrowserToolCall {
+                        id,
+                        name,
+                        arguments,
+                    },
+                )
+                .await
+                .map_err(|_| ());
+        }
+        let input = match serde_json::from_str(raw) {
+            Ok(input) => input,
+            Err(_) => {
+                let _ = self
+                    .send(AgentEvent::Error {
+                        message: "invalid tool arguments JSON".into(),
+                    })
+                    .await;
+                return Err(());
+            }
+        };
+        self.send(AgentEvent::ToolCall {
+            call: ToolCall { id, name, input },
+            provenance: Default::default(),
+            summary_fields: vec![],
+        })
+        .await
+    }
+}
 
 /// OpenAI stream chunk for SSE response parsing.
 #[derive(Debug, Clone, Deserialize)]
@@ -84,6 +189,23 @@ pub(crate) async fn parse_sse_stream(
 pub(crate) async fn parse_sse_stream_with_mode(
     response: reqwest::Response,
     tx: mpsc::Sender<AgentEvent>,
+    first_packet_timeout: Duration,
+    idle_timeout: Duration,
+    protocol: talos_core::tool::ToolProtocol,
+) {
+    parse_sse_stream_with_integrity(
+        response,
+        InvocationSender::Legacy(tx),
+        first_packet_timeout,
+        idle_timeout,
+        protocol,
+    )
+    .await;
+}
+
+pub(crate) async fn parse_sse_stream_with_integrity(
+    response: reqwest::Response,
+    tx: InvocationSender,
     first_packet_timeout: Duration,
     idle_timeout: Duration,
     protocol: talos_core::tool::ToolProtocol,
@@ -174,7 +296,7 @@ pub(crate) async fn parse_sse_stream_with_mode(
             // OpenAI sends `data: [DONE]` at the end
             if data.as_str().map(|s| s.trim()) == Some("[DONE]") {
                 let text_calls = if protocol != talos_core::tool::ToolProtocol::Native {
-                    match parse_protocol_text_calls(&text_accumulator, protocol) {
+                    match parse_invocation_text_calls(&text_accumulator, protocol, &tx) {
                         Ok(calls) => calls,
                         Err(message) => {
                             let _ = tx
@@ -189,14 +311,17 @@ pub(crate) async fn parse_sse_stream_with_mode(
                     Vec::new()
                 };
                 let has_text_tool_calls = !text_calls.is_empty();
+                if tx
+                    .release_compat_text(&text_accumulator, protocol)
+                    .await
+                    .is_err()
+                {
+                    return;
+                }
                 for call in text_calls {
-                    let _ = tx
-                        .send(AgentEvent::ToolCall {
-                            call,
-                            provenance: ToolProvenance::Native,
-                            summary_fields: vec![],
-                        })
-                        .await;
+                    if tx.send_invocation(call).await.is_err() {
+                        return;
+                    }
                 }
                 // Emit accumulated native tool calls. Some OpenAI-compatible
                 // providers stream function name/arguments but close the stream
@@ -208,28 +333,17 @@ pub(crate) async fn parse_sse_stream_with_mode(
                 for i in 0..tool_call_ids.len() {
                     if !tool_call_names[i].is_empty() {
                         let tool_call_id = finalized_tool_call_id(&tool_call_ids[i], i);
-                        let args: Value = match serde_json::from_str(&tool_call_args[i]) {
-                            Ok(args) => args,
-                            Err(_) => {
-                                let _ = tx
-                                    .send(AgentEvent::Error {
-                                        message: "invalid tool arguments JSON".into(),
-                                    })
-                                    .await;
-                                return;
-                            }
-                        };
-                        let _ = tx
-                            .send(AgentEvent::ToolCall {
-                                call: ToolCall {
-                                    id: tool_call_id,
-                                    name: tool_call_names[i].clone(),
-                                    input: args,
-                                },
-                                provenance: Default::default(),
-                                summary_fields: vec![],
-                            })
-                            .await;
+                        if tx
+                            .native_call(
+                                tool_call_id,
+                                tool_call_names[i].clone(),
+                                &tool_call_args[i],
+                            )
+                            .await
+                            .is_err()
+                        {
+                            return;
+                        }
                     }
                 }
                 if !reasoning_text.is_empty() {
@@ -286,11 +400,13 @@ pub(crate) async fn parse_sse_stream_with_mode(
                 && !text.is_empty()
             {
                 text_accumulator.push_str(text);
-                let _ = tx
-                    .send(AgentEvent::TextDelta {
-                        delta: text.clone(),
-                    })
-                    .await;
+                if !tx.buffers_compat_text(protocol) {
+                    let _ = tx
+                        .send(AgentEvent::TextDelta {
+                            delta: text.clone(),
+                        })
+                        .await;
+                }
             }
 
             if let Some(reasoning_content) = choice
@@ -380,33 +496,22 @@ pub(crate) async fn parse_sse_stream_with_mode(
                 for i in 0..tool_call_ids.len() {
                     if !tool_call_names[i].is_empty() {
                         let tool_call_id = finalized_tool_call_id(&tool_call_ids[i], i);
-                        let args: Value = match serde_json::from_str(&tool_call_args[i]) {
-                            Ok(args) => args,
-                            Err(_) => {
-                                let _ = tx
-                                    .send(AgentEvent::Error {
-                                        message: "invalid tool arguments JSON".into(),
-                                    })
-                                    .await;
-                                return;
-                            }
-                        };
-                        let _ = tx
-                            .send(AgentEvent::ToolCall {
-                                call: ToolCall {
-                                    id: tool_call_id,
-                                    name: tool_call_names[i].clone(),
-                                    input: args,
-                                },
-                                provenance: Default::default(),
-                                summary_fields: vec![],
-                            })
-                            .await;
+                        if tx
+                            .native_call(
+                                tool_call_id,
+                                tool_call_names[i].clone(),
+                                &tool_call_args[i],
+                            )
+                            .await
+                            .is_err()
+                        {
+                            return;
+                        }
                     }
                 }
 
                 let text_calls = if protocol != talos_core::tool::ToolProtocol::Native {
-                    match parse_protocol_text_calls(&text_accumulator, protocol) {
+                    match parse_invocation_text_calls(&text_accumulator, protocol, &tx) {
                         Ok(calls) => calls,
                         Err(message) => {
                             let _ = tx
@@ -420,14 +525,17 @@ pub(crate) async fn parse_sse_stream_with_mode(
                 } else {
                     Vec::new()
                 };
+                if tx
+                    .release_compat_text(&text_accumulator, protocol)
+                    .await
+                    .is_err()
+                {
+                    return;
+                }
                 for call in text_calls {
-                    let _ = tx
-                        .send(AgentEvent::ToolCall {
-                            call,
-                            provenance: ToolProvenance::Native,
-                            summary_fields: vec![],
-                        })
-                        .await;
+                    if tx.send_invocation(call).await.is_err() {
+                        return;
+                    }
                 }
 
                 if !reasoning_text.is_empty() {
@@ -2324,6 +2432,134 @@ mod i168_terminal_outcome_tests {
     use super::*;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::TcpListener;
+
+    #[tokio::test]
+    async fn browser_original_sse_covers_finish_and_done_with_fragmented_arguments() {
+        use talos_core::provider::ProviderInvocationEvent;
+        for finish in [true, false] {
+            for duplicate in [true, false] {
+                let mut server = mockito::Server::new_async().await;
+                let fragments = if duplicate {
+                    [r#"{"text":"first","te\u00"#, r#"78t":"second"}"#]
+                } else {
+                    [r#"{"text":"ori"#, r#"ginal"}"#]
+                };
+                let mut body = String::new();
+                for (index, fragment) in fragments.iter().enumerate() {
+                    let function = if index == 0 {
+                        serde_json::json!({"name":"browser","arguments":fragment})
+                    } else {
+                        serde_json::json!({"arguments":fragment})
+                    };
+                    let chunk = serde_json::json!({"choices":[{"index":0,"delta":{"tool_calls":[{
+                        "index":0,"function":function
+                    }]},"finish_reason":null}]});
+                    body.push_str(&format!("data: {chunk}\n\n"));
+                }
+                if finish {
+                    body.push_str("data: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"tool_calls\"}]}\n\n");
+                }
+                body.push_str("data: [DONE]\n\n");
+                let mock = server
+                    .mock("GET", "/stream")
+                    .with_status(200)
+                    .with_header("content-type", "text/event-stream")
+                    .with_body(body)
+                    .create_async()
+                    .await;
+                let response = reqwest::get(format!("{}/stream", server.url()))
+                    .await
+                    .expect("fixture");
+                let (tx, mut rx) = mpsc::channel(16);
+                parse_sse_stream_with_integrity(
+                    response,
+                    InvocationSender::Original {
+                        tx,
+                        browser_tools: vec!["browser".into()],
+                    },
+                    Duration::from_secs(5),
+                    Duration::from_secs(5),
+                    talos_core::tool::ToolProtocol::Native,
+                )
+                .await;
+                let (mut calls, mut errors, mut endings) = (0, 0, 0);
+                while let Some(event) = rx.recv().await {
+                    match event {
+                        ProviderInvocationEvent::BrowserToolCall {
+                            arguments,
+                            id,
+                            name,
+                        } => {
+                            calls += 1;
+                            assert!(!id.is_empty());
+                            assert_eq!(name, "browser");
+                            assert_eq!(arguments.fields()["text"], "original");
+                        }
+                        ProviderInvocationEvent::Legacy(AgentEvent::ToolCall { .. }) => {
+                            panic!("browser call must retain original evidence");
+                        }
+                        ProviderInvocationEvent::Legacy(AgentEvent::Error { message }) => {
+                            errors += 1;
+                            assert_eq!(message, "invalid original browser arguments");
+                        }
+                        ProviderInvocationEvent::Legacy(AgentEvent::TurnEnd { .. }) => endings += 1,
+                        _ => {}
+                    }
+                }
+                assert_eq!(calls, usize::from(!duplicate));
+                assert_eq!(errors, usize::from(duplicate));
+                assert_eq!(endings, usize::from(!duplicate));
+                mock.assert_async().await;
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn browser_original_ingress_rejects_duplicate_keys_before_value_conversion() {
+        use talos_core::provider::ProviderInvocationEvent;
+        for raw in [
+            r#"{"text":"first","text":"second"}"#,
+            r#"{"text":"first","te\u0078t":"second"}"#,
+        ] {
+            let (tx, mut rx) = mpsc::channel(4);
+            let sender = InvocationSender::Original {
+                tx,
+                browser_tools: vec!["browser".into()],
+            };
+            assert!(
+                sender
+                    .native_call("id".into(), "browser".into(), raw)
+                    .await
+                    .is_err()
+            );
+            assert!(matches!(
+                rx.recv().await,
+                Some(ProviderInvocationEvent::Legacy(AgentEvent::Error { .. }))
+            ));
+            assert!(rx.try_recv().is_err());
+        }
+        let (tx, mut rx) = mpsc::channel(4);
+        let sender = InvocationSender::Original {
+            tx,
+            browser_tools: vec!["browser".into()],
+        };
+        sender
+            .native_call("id".into(), "browser".into(), r#"{"text":"original"}"#)
+            .await
+            .expect("original accepted");
+        assert!(
+            matches!(rx.recv().await, Some(ProviderInvocationEvent::BrowserToolCall { arguments, .. })
+            if arguments.fields()["text"] == "original")
+        );
+        sender
+            .native_call("legacy".into(), "other".into(), r#"{"nested":{"x":1}}"#)
+            .await
+            .expect("legacy parsing unchanged");
+        assert!(matches!(
+            rx.recv().await,
+            Some(ProviderInvocationEvent::Legacy(AgentEvent::ToolCall { .. }))
+        ));
+    }
 
     async fn parse_raw_body(body: Vec<u8>) -> Vec<AgentEvent> {
         let listener = TcpListener::bind("127.0.0.1:0")

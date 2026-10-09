@@ -9,7 +9,8 @@ use talos_core::message::{
     ReasoningBlock, StopReason, ToolCall, Usage,
 };
 use talos_core::provider::{
-    LanguageModel, ProviderError, ProviderProgress, ProviderResult, ToolDefinition,
+    LanguageModel, ProviderError, ProviderInvocationEvent, ProviderInvocationStream,
+    ProviderProgress, ProviderResult, ToolDefinition,
 };
 use talos_core::tool::{
     AgentTool, ToolBackend, ToolContinuation, ToolExecutionOutput, ToolFamily, ToolNature,
@@ -37,6 +38,404 @@ use crate::{
     SandboxFallbackDecision, SandboxFallbackHandler, SandboxFallbackPolicy, ToolDescription,
 };
 type Receiver<T> = mpsc::Receiver<T>;
+
+struct ProtectedBrowserFixture {
+    calls: Arc<std::sync::atomic::AtomicUsize>,
+}
+
+#[async_trait]
+impl AgentTool for ProtectedBrowserFixture {
+    fn name(&self) -> &str {
+        "browser"
+    }
+
+    fn description(&self) -> &str {
+        "Protected browser fixture"
+    }
+
+    fn parameters(&self) -> Value {
+        serde_json::json!({"type":"object"})
+    }
+
+    fn requires_original_invocation(&self) -> bool {
+        true
+    }
+
+    async fn execute(&self, _: Value) -> ToolExecutionResult {
+        self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        ToolExecutionResult::success("should never execute")
+    }
+}
+
+struct ProtectedBrowserModel {
+    original: bool,
+    requested_names: Arc<Mutex<Vec<String>>>,
+}
+
+#[async_trait]
+impl LanguageModel for ProtectedBrowserModel {
+    async fn stream(&self, _: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+        Err(ProviderError::InvalidResponse(
+            "legacy provider entry point must not be used".into(),
+        ))
+    }
+
+    async fn stream_with_invocation_integrity(
+        &self,
+        _: &[Message],
+        _: &[ToolDefinition],
+        _: talos_core::tool::ToolProtocol,
+        _: mpsc::UnboundedSender<ProviderProgress>,
+        browser_tools: &[String],
+    ) -> ProviderResult<ProviderInvocationStream> {
+        *self.requested_names.lock().await = browser_tools.to_vec();
+        let (tx, rx) = mpsc::channel(1);
+        let event = if self.original {
+            ProviderInvocationEvent::BrowserToolCall {
+                id: "browser-call".into(),
+                name: "browser".into(),
+                arguments: talos_core::tool::BrowserRawArguments::parse_original(
+                    r#"{"text":"private-browser-payload"}"#,
+                )
+                .expect("original fixture"),
+            }
+        } else {
+            ProviderInvocationEvent::Legacy(AgentEvent::ToolCall {
+                call: ToolCall {
+                    id: "browser-call".into(),
+                    name: "browser".into(),
+                    input: serde_json::json!({"text":"private-browser-payload"}),
+                },
+                provenance: talos_core::tool::ToolProvenance::Native,
+                summary_fields: Vec::new(),
+            })
+        };
+        tx.send(event).await.expect("receiver live");
+        Ok(ProviderInvocationStream::original(rx))
+    }
+}
+
+#[tokio::test]
+async fn protected_browser_events_never_reach_legacy_tool_execution_or_observers() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    for original in [false, true] {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let requested_names = Arc::new(Mutex::new(Vec::new()));
+        let mut tools = ToolRegistry::new();
+        tools.register(Arc::new(ProtectedBrowserFixture {
+            calls: calls.clone(),
+        }));
+        let agent = Agent::with_security(
+            Arc::new(ProtectedBrowserModel {
+                original,
+                requested_names: requested_names.clone(),
+            }),
+            tools,
+            None,
+            None,
+            PathBuf::from("."),
+        );
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let result = agent
+            .run_streaming("browser action".into(), vec![], tx)
+            .await;
+        assert!(matches!(result, Err(AgentError::UnexpectedEvent(_))));
+        assert_eq!(*requested_names.lock().await, vec!["browser"]);
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
+        while let Ok(event) = rx.try_recv() {
+            assert!(!matches!(event, AgentEvent::ToolCall { .. }));
+            assert!(!format!("{event:?}").contains("private-browser-payload"));
+        }
+    }
+}
+
+struct PreparedFixture {
+    executions: Arc<std::sync::atomic::AtomicUsize>,
+    approvals: Arc<std::sync::atomic::AtomicUsize>,
+}
+
+#[async_trait]
+impl AgentTool for PreparedFixture {
+    fn name(&self) -> &str {
+        "prepared_fixture"
+    }
+    fn description(&self) -> &str {
+        "prepared fixture"
+    }
+    fn parameters(&self) -> Value {
+        serde_json::json!({"type":"object"})
+    }
+    fn requires_original_invocation(&self) -> bool {
+        true
+    }
+    fn project_result(
+        &self,
+        result: &ToolExecutionResult,
+    ) -> talos_core::tool::ToolResultProjection {
+        talos_core::tool::ToolResultProjection {
+            model_content: result.content.clone(),
+            display_content: "prepared display summary".into(),
+            persistence_content: "prepared persistence summary".into(),
+        }
+    }
+    async fn execute(&self, _: Value) -> ToolExecutionResult {
+        panic!("legacy execution must not be called")
+    }
+    async fn prepare_original_invocation(
+        &self,
+        _: talos_core::tool::BrowserRawArguments,
+    ) -> Result<
+        Box<dyn talos_core::tool::PreparedToolInvocation>,
+        talos_core::tool::PreparedInvocationError,
+    > {
+        Ok(Box::new(Self {
+            executions: self.executions.clone(),
+            approvals: self.approvals.clone(),
+        }))
+    }
+}
+
+#[async_trait]
+impl talos_core::tool::PreparedToolInvocation for PreparedFixture {
+    async fn authorize(
+        self: Box<Self>,
+    ) -> Result<
+        Box<dyn talos_core::tool::AuthorizedToolInvocation>,
+        talos_core::tool::PreparedInvocationError,
+    > {
+        self.approvals
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        Ok(self)
+    }
+}
+
+#[async_trait]
+impl talos_core::tool::AuthorizedToolInvocation for PreparedFixture {
+    async fn execute(self: Box<Self>) -> ToolExecutionOutput {
+        self.executions
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        ToolExecutionOutput::success("executed")
+    }
+}
+
+struct PreparedFinalGate(bool);
+
+struct PreparedObservationCounter(Arc<std::sync::atomic::AtomicUsize>);
+
+#[async_trait]
+impl HookHandler for PreparedObservationCounter {
+    fn name(&self) -> &str {
+        "prepared-observation-counter"
+    }
+    fn subscribed(&self) -> &'static [HookEventKind] {
+        &[HookEventKind::OnToolResultObserved]
+    }
+    async fn on_event(&self, _: &HookContext, event: &mut HookEvent<'_>) -> HookResult {
+        if let HookEvent::OnToolResultObserved { observation } = event {
+            assert_eq!(observation.call.id, "roundtrip-id");
+            assert!(!format!("{observation:?}").contains("private-original-token"));
+            self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        }
+        HookResult::Continue
+    }
+}
+
+struct PreparedRoundtripModel {
+    requests: std::sync::atomic::AtomicUsize,
+    denied: bool,
+}
+
+#[async_trait]
+impl LanguageModel for PreparedRoundtripModel {
+    async fn stream(&self, _: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+        panic!("original ingress required")
+    }
+
+    async fn stream_with_invocation_integrity(
+        &self,
+        messages: &[Message],
+        _: &[ToolDefinition],
+        _: talos_core::tool::ToolProtocol,
+        _: mpsc::UnboundedSender<ProviderProgress>,
+        protected: &[String],
+    ) -> ProviderResult<ProviderInvocationStream> {
+        use std::sync::atomic::Ordering;
+        assert!(protected.iter().any(|name| name == "prepared_fixture"));
+        let (tx, rx) = mpsc::channel(4);
+        if self.requests.fetch_add(1, Ordering::SeqCst) == 0 {
+            tx.send(ProviderInvocationEvent::BrowserToolCall {
+                id: "roundtrip-id".into(),
+                name: "prepared_fixture".into(),
+                arguments: talos_core::tool::BrowserRawArguments::parse_original(
+                    r#"{"text":"private-original-token"}"#,
+                )
+                .expect("original arguments"),
+            })
+            .await
+            .expect("receiver");
+            tx.send(ProviderInvocationEvent::Legacy(AgentEvent::TurnEnd {
+                stop_reason: StopReason::ToolUse,
+                usage: Usage::default(),
+            }))
+            .await
+            .expect("receiver");
+        } else {
+            let result = messages
+                .iter()
+                .find_map(|message| match message {
+                    Message::Tool { result } if result.tool_use_id == "roundtrip-id" => {
+                        Some(result)
+                    }
+                    _ => None,
+                })
+                .expect("tool result reaches next request");
+            assert_eq!(result.is_error, self.denied);
+            assert!(!result.content.contains("try a different approach"));
+            if !self.denied {
+                assert_eq!(result.content, "executed");
+            }
+            assert!(!format!("{messages:?}").contains("private-original-token"));
+            tx.send(ProviderInvocationEvent::Legacy(AgentEvent::TextDelta {
+                delta: "finished".into(),
+            }))
+            .await
+            .expect("receiver");
+            tx.send(ProviderInvocationEvent::Legacy(AgentEvent::TurnEnd {
+                stop_reason: StopReason::EndTurn,
+                usage: Usage::default(),
+            }))
+            .await
+            .expect("receiver");
+        }
+        Ok(ProviderInvocationStream::original(rx))
+    }
+}
+
+#[tokio::test]
+async fn prepared_provider_roundtrip_preserves_result_pairing_and_final_gate() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    for denied in [false, true] {
+        let executions = Arc::new(AtomicUsize::new(0));
+        let approvals = Arc::new(AtomicUsize::new(0));
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(PreparedFixture {
+            executions: executions.clone(),
+            approvals: approvals.clone(),
+        }));
+        let mut hooks = HookRegistry::new();
+        hooks.register(Arc::new(PreparedFinalGate(denied)));
+        let observations = Arc::new(AtomicUsize::new(0));
+        hooks.register(Arc::new(PreparedObservationCounter(observations.clone())));
+        let model = Arc::new(PreparedRoundtripModel {
+            requests: AtomicUsize::new(0),
+            denied,
+        });
+        let agent = Agent::with_security_and_hooks(
+            model.clone(),
+            registry,
+            None,
+            None,
+            PathBuf::from("."),
+            Arc::new(hooks),
+        );
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let result = agent
+            .run_streaming("execute fixture".into(), vec![], tx)
+            .await
+            .expect("completed roundtrip");
+        assert_eq!(result.0, "finished");
+        assert_eq!(model.requests.load(Ordering::SeqCst), 2);
+        assert_eq!(approvals.load(Ordering::SeqCst), 1);
+        assert_eq!(executions.load(Ordering::SeqCst), usize::from(!denied));
+        assert_eq!(observations.load(Ordering::SeqCst), 1);
+        let mut results = 0;
+        let mut calls = 0;
+        while let Ok(event) = rx.try_recv() {
+            assert!(!format!("{event:?}").contains("private-original-token"));
+            if matches!(&event, AgentEvent::ToolCall { .. }) {
+                assert_eq!(results, 0);
+                calls += 1;
+            }
+            if let AgentEvent::ToolResult { result } = event {
+                assert_eq!(calls, 1);
+                assert_eq!(result.tool_use_id, "roundtrip-id");
+                assert_eq!(result.is_error, denied);
+                assert_eq!(result.content, "prepared display summary");
+                results += 1;
+            }
+        }
+        assert_eq!(results, 1);
+    }
+}
+
+#[async_trait]
+impl HookHandler for PreparedFinalGate {
+    fn name(&self) -> &str {
+        "prepared-final-gate"
+    }
+    fn subscribed(&self) -> &'static [HookEventKind] {
+        &[HookEventKind::AfterPermissionCheck]
+    }
+    async fn on_event(&self, _: &HookContext, _: &mut HookEvent<'_>) -> HookResult {
+        if self.0 {
+            HookResult::Skip
+        } else {
+            HookResult::Continue
+        }
+    }
+}
+
+#[tokio::test]
+async fn prepared_execution_obeys_final_gate_and_never_replays() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    for denied in [false, true] {
+        let executions = Arc::new(AtomicUsize::new(0));
+        let approvals = Arc::new(AtomicUsize::new(0));
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(PreparedFixture {
+            executions: executions.clone(),
+            approvals: approvals.clone(),
+        }));
+        let mut hooks = HookRegistry::new();
+        hooks.register(Arc::new(PreparedFinalGate(denied)));
+        let agent = Agent::with_security_and_hooks(
+            Arc::new(MockModel::new(vec![])),
+            registry,
+            None,
+            None,
+            PathBuf::from("."),
+            Arc::new(hooks),
+        );
+        let context = HookContext::new(TurnId::new(), PathBuf::from("."));
+        let call = ToolCall {
+            id: "prepared-id".into(),
+            name: "prepared_fixture".into(),
+            input: serde_json::json!({"protocolVersion":2}),
+        };
+        let first = agent
+            .execute_original_tool(
+                &context,
+                &call,
+                talos_core::tool::BrowserRawArguments::parse_original("{}").expect("arguments"),
+            )
+            .await;
+        assert_eq!(first.output.result.is_error, denied);
+        assert_eq!(approvals.load(Ordering::SeqCst), 1);
+        assert_eq!(executions.load(Ordering::SeqCst), usize::from(!denied));
+        if !denied {
+            let replay = agent
+                .execute_original_tool(
+                    &context,
+                    &call,
+                    talos_core::tool::BrowserRawArguments::parse_original("{}").expect("arguments"),
+                )
+                .await;
+            assert!(replay.output.result.is_error);
+            assert_eq!(executions.load(Ordering::SeqCst), 1);
+        }
+    }
+}
 
 /// Mock language model that returns a predefined sequence of event batches,
 /// one batch per call to `stream`.
@@ -4899,6 +5298,220 @@ async fn continuation_image_consumed_after_second_call() {
         !calls[2].iter().any(|m| matches!(m, Message::Multimodal { parts } if parts.iter().any(|p| matches!(p, ContentPart::Image { .. })))),
         "third call must NOT have image (consumed)"
     );
+}
+
+struct TestEphemeralImageTool;
+
+#[async_trait]
+impl AgentTool for TestEphemeralImageTool {
+    fn name(&self) -> &str {
+        "prepared_fixture"
+    }
+    fn description(&self) -> &str {
+        "ephemeral fixture"
+    }
+    fn parameters(&self) -> Value {
+        serde_json::json!({"type":"object"})
+    }
+    fn requires_original_invocation(&self) -> bool {
+        true
+    }
+    async fn execute(&self, _: Value) -> ToolExecutionResult {
+        panic!("legacy route forbidden")
+    }
+    async fn prepare_original_invocation(
+        &self,
+        _: talos_core::tool::BrowserRawArguments,
+    ) -> Result<
+        Box<dyn talos_core::tool::PreparedToolInvocation>,
+        talos_core::tool::PreparedInvocationError,
+    > {
+        Ok(Box::new(Self))
+    }
+}
+
+#[async_trait]
+impl talos_core::tool::PreparedToolInvocation for TestEphemeralImageTool {
+    async fn authorize(
+        self: Box<Self>,
+    ) -> Result<
+        Box<dyn talos_core::tool::AuthorizedToolInvocation>,
+        talos_core::tool::PreparedInvocationError,
+    > {
+        Ok(self)
+    }
+}
+
+#[async_trait]
+impl talos_core::tool::AuthorizedToolInvocation for TestEphemeralImageTool {
+    async fn execute(self: Box<Self>) -> ToolExecutionOutput {
+        ToolExecutionOutput::success("image delivered")
+    }
+    async fn execute_with_attachments(
+        self: Box<Self>,
+    ) -> talos_core::tool::PreparedExecutionOutput {
+        talos_core::tool::PreparedExecutionOutput {
+            output: ToolExecutionOutput::success("image delivered"),
+            images: vec![
+                talos_core::provider::EphemeralImage::png(
+                    b"\x89PNG\r\n\x1a\nprivate-image".to_vec(),
+                    std::time::Instant::now() + std::time::Duration::from_secs(120),
+                )
+                .expect("carrier"),
+            ],
+        }
+    }
+}
+
+struct EphemeralCapturingModel {
+    requests: std::sync::atomic::AtomicUsize,
+    counts: Arc<Mutex<Vec<usize>>>,
+}
+
+#[async_trait]
+impl LanguageModel for EphemeralCapturingModel {
+    async fn stream(&self, _: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+        panic!("prepared route")
+    }
+    async fn stream_with_ephemeral_images(
+        &self,
+        messages: &[Message],
+        _: &[ToolDefinition],
+        _: talos_core::tool::ToolProtocol,
+        _: mpsc::UnboundedSender<ProviderProgress>,
+        _: &[String],
+        images: Vec<talos_core::provider::EphemeralImage>,
+    ) -> ProviderResult<ProviderInvocationStream> {
+        assert!(
+            !serde_json::to_string(messages)
+                .expect("durable history")
+                .contains("private-image")
+        );
+        self.counts.lock().await.push(images.len());
+        for image in images {
+            assert!(image.into_live_png().is_some());
+        }
+        let (tx, rx) = mpsc::channel(4);
+        if self
+            .requests
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+            == 0
+        {
+            tx.send(ProviderInvocationEvent::BrowserToolCall {
+                id: "image-call".into(),
+                name: "prepared_fixture".into(),
+                arguments: talos_core::tool::BrowserRawArguments::parse_original(
+                    r#"{"operation":"screenshot"}"#,
+                )
+                .expect("original"),
+            })
+            .await
+            .expect("receiver");
+            tx.send(ProviderInvocationEvent::Legacy(AgentEvent::TurnEnd {
+                stop_reason: StopReason::ToolUse,
+                usage: Usage::default(),
+            }))
+            .await
+            .expect("receiver");
+        } else {
+            for event in text_done_events("done") {
+                tx.send(ProviderInvocationEvent::Legacy(event))
+                    .await
+                    .expect("receiver");
+            }
+        }
+        Ok(ProviderInvocationStream::original(rx))
+    }
+}
+
+#[tokio::test]
+async fn ephemeral_image_is_one_request_only_and_absent_from_returned_history() {
+    let counts = Arc::new(Mutex::new(Vec::new()));
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(TestEphemeralImageTool));
+    let mut agent = Agent::with_security(
+        Arc::new(EphemeralCapturingModel {
+            requests: std::sync::atomic::AtomicUsize::new(0),
+            counts: counts.clone(),
+        }),
+        registry,
+        None,
+        None,
+        PathBuf::from("/tmp"),
+    );
+    agent.set_image_input_supported(true);
+    let (tx, _) = mpsc::unbounded_channel();
+    let first = agent
+        .run_streaming("image".into(), vec![], tx)
+        .await
+        .expect("first turn");
+    assert!(!format!("{first:?}").contains("private-image"));
+    let (tx, _) = mpsc::unbounded_channel();
+    agent
+        .run_streaming("next".into(), vec![], tx)
+        .await
+        .expect("next turn");
+    assert_eq!(*counts.lock().await, vec![0, 1, 0]);
+}
+
+#[tokio::test]
+async fn ephemeral_image_refuses_nonvisual_provider_without_second_dispatch() {
+    let counts = Arc::new(Mutex::new(Vec::new()));
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(TestEphemeralImageTool));
+    let agent = Agent::with_security(
+        Arc::new(EphemeralCapturingModel {
+            requests: std::sync::atomic::AtomicUsize::new(0),
+            counts: counts.clone(),
+        }),
+        registry,
+        None,
+        None,
+        PathBuf::from("/tmp"),
+    );
+    let (tx, _) = mpsc::unbounded_channel();
+    assert!(
+        matches!(agent.run_streaming("image".into(), vec![], tx).await,
+        Err(AgentError::ToolError(message)) if message.contains("does not support image input"))
+    );
+    assert_eq!(*counts.lock().await, vec![0]);
+}
+
+#[test]
+fn ephemeral_image_budget_is_admitted_before_dispatch() {
+    let mut agent = Agent::with_security(
+        Arc::new(EphemeralCapturingModel {
+            requests: std::sync::atomic::AtomicUsize::new(0),
+            counts: Arc::new(Mutex::new(Vec::new())),
+        }),
+        ToolRegistry::new(),
+        None,
+        None,
+        PathBuf::from("/tmp"),
+    );
+    agent.set_image_input_supported(true);
+    let images = vec![
+        talos_core::provider::EphemeralImage::png(
+            b"\x89PNG\r\n\x1a\nprivate-image".to_vec(),
+            std::time::Instant::now() + std::time::Duration::from_secs(120),
+        )
+        .expect("image"),
+    ];
+    let mut plan = crate::request_plan::ProviderRequestPlan {
+        messages: vec![],
+        tool_definitions: vec![],
+        estimated_tokens: 100,
+        tool_protocol: talos_core::tool::ToolProtocol::Native,
+    };
+    assert!(matches!(
+        agent.admit_ephemeral_images(&mut plan, &images, Some(100)),
+        Err(AgentError::ContextBudgetExceeded { .. })
+    ));
+    assert_eq!(plan.estimated_tokens, 100);
+    agent
+        .admit_ephemeral_images(&mut plan, &images, Some(10_000))
+        .expect("budget");
+    assert!(plan.estimated_tokens > 1124);
 }
 
 #[tokio::test]

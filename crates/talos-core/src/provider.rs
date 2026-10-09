@@ -6,6 +6,11 @@ use tokio::sync::mpsc;
 
 use crate::message::{AgentEvent, Message};
 
+mod invocation;
+pub use invocation::{ProviderInvocationEvent, ProviderInvocationStream};
+mod ephemeral;
+pub use ephemeral::EphemeralImage;
+
 pub type Receiver<T> = mpsc::Receiver<T>;
 
 /// Non-secret, request-local progress reported by a language-model provider.
@@ -111,6 +116,49 @@ impl ToolDefinition {
 
 #[async_trait::async_trait]
 pub trait LanguageModel: Send + Sync {
+    /// Dispatches one request with nonpersistent image attachments.
+    /// Unsupported adapters refuse attachments before any transport dispatch.
+    async fn stream_with_ephemeral_images(
+        &self,
+        messages: &[Message],
+        tools: &[ToolDefinition],
+        protocol: crate::tool::ToolProtocol,
+        progress_tx: mpsc::UnboundedSender<ProviderProgress>,
+        browser_tools: &[String],
+        images: Vec<EphemeralImage>,
+    ) -> ProviderResult<ProviderInvocationStream> {
+        if !images.is_empty() {
+            return Err(ProviderError::InvalidResponse(
+                "provider has no ephemeral image adapter".into(),
+            ));
+        }
+        self.stream_with_invocation_integrity(messages, tools, protocol, progress_tx, browser_tools)
+            .await
+    }
+
+    /// Streams request-local original argument evidence for explicitly registered browser tools.
+    ///
+    /// Names come from trusted registry metadata, never model arguments. Adapters must preserve
+    /// original bytes and bind evidence to the same call. The default rejects browser composition
+    /// before dispatch; ordinary tools retain the existing protocol path.
+    async fn stream_with_invocation_integrity(
+        &self,
+        messages: &[Message],
+        tools: &[ToolDefinition],
+        protocol: crate::tool::ToolProtocol,
+        progress_tx: mpsc::UnboundedSender<ProviderProgress>,
+        browser_tools: &[String],
+    ) -> ProviderResult<ProviderInvocationStream> {
+        if !browser_tools.is_empty() {
+            return Err(ProviderError::InvalidResponse(
+                "provider has no original browser argument adapter".into(),
+            ));
+        }
+        self.stream_with_protocol(messages, tools, protocol, progress_tx)
+            .await
+            .map(ProviderInvocationStream::legacy)
+    }
+
     /// Dispatches an isolated text decision with no tools or inherited reasoning settings.
     ///
     /// Implementations must enforce the supplied token and retry limits. Unsupported
@@ -230,6 +278,73 @@ mod tests {
             let (_, rx) = mpsc::channel(1);
             Ok(rx)
         }
+    }
+
+    #[tokio::test]
+    async fn legacy_adapter_refuses_ephemeral_images_without_dispatch() {
+        let model = CountingLegacyModel(std::sync::atomic::AtomicUsize::new(0));
+        let image = EphemeralImage::png(
+            b"\x89PNG\r\n\x1a\n".to_vec(),
+            std::time::Instant::now() + std::time::Duration::from_secs(120),
+        )
+        .expect("bounded carrier");
+        let (tx, _) = mpsc::unbounded_channel();
+        assert!(
+            model
+                .stream_with_ephemeral_images(
+                    &[],
+                    &[],
+                    crate::tool::ToolProtocol::Native,
+                    tx,
+                    &[],
+                    vec![image],
+                )
+                .await
+                .is_err()
+        );
+        assert_eq!(model.0.load(std::sync::atomic::Ordering::SeqCst), 0);
+        let (tx, _) = mpsc::unbounded_channel();
+        assert!(
+            model
+                .stream_with_ephemeral_images(
+                    &[],
+                    &[],
+                    crate::tool::ToolProtocol::Native,
+                    tx,
+                    &[],
+                    vec![],
+                )
+                .await
+                .is_ok()
+        );
+        assert_eq!(model.0.load(std::sync::atomic::Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn legacy_integrity_entrypoint_refuses_browser_before_transport() {
+        use crate::tool::ToolProtocol;
+        let model = CountingLegacyModel(std::sync::atomic::AtomicUsize::new(0));
+        let (tx, _) = mpsc::unbounded_channel();
+        assert!(
+            model
+                .stream_with_invocation_integrity(
+                    &[],
+                    &[],
+                    ToolProtocol::Native,
+                    tx,
+                    &["browser".into()],
+                )
+                .await
+                .is_err()
+        );
+        assert_eq!(model.0.load(std::sync::atomic::Ordering::SeqCst), 0);
+        let (tx, _) = mpsc::unbounded_channel();
+        let mut stream = model
+            .stream_with_invocation_integrity(&[], &[], ToolProtocol::Native, tx, &[])
+            .await
+            .expect("legacy tools preserved");
+        assert!(stream.recv().await.is_none());
+        assert_eq!(model.0.load(std::sync::atomic::Ordering::SeqCst), 1);
     }
 
     #[tokio::test]

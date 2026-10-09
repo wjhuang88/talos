@@ -14,6 +14,10 @@ struct CountingTool {
     calls: Arc<AtomicUsize>,
 }
 
+struct OriginalOnlyTool {
+    calls: Arc<AtomicUsize>,
+}
+
 struct SkipFinalPermissionHook;
 
 struct SkipProposalPermissionHook;
@@ -109,6 +113,69 @@ impl AgentTool for CountingTool {
     fn is_read_only(&self) -> bool {
         true
     }
+}
+
+#[async_trait]
+impl AgentTool for OriginalOnlyTool {
+    fn name(&self) -> &str {
+        "original_only"
+    }
+
+    fn description(&self) -> &str {
+        "requires original arguments"
+    }
+
+    fn parameters(&self) -> serde_json::Value {
+        serde_json::json!({"type": "object"})
+    }
+
+    fn requires_original_invocation(&self) -> bool {
+        true
+    }
+
+    async fn execute(&self, _input: serde_json::Value) -> ToolResult {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        ToolResult::success("unexpected")
+    }
+}
+
+#[tokio::test]
+async fn standalone_mcp_never_advertises_or_executes_original_only_tools() {
+    let calls = Arc::new(AtomicUsize::new(0));
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(OriginalOnlyTool {
+        calls: calls.clone(),
+    }));
+    let gate = Arc::new(McpPermissionGate::new(
+        Arc::new(PermissionEngine::new()),
+        Arc::new(HookRegistry::new()),
+    ));
+    let handler = TalosMcpHandler::new(Arc::new(registry), gate);
+    let (client_io, server_io) = tokio::io::duplex(1024 * 64);
+    let (client_read, client_write) = tokio::io::split(client_io);
+    let (server_read, server_write) = tokio::io::split(server_io);
+    let server_task = tokio::spawn(async move {
+        let running = handler
+            .serve((server_read, server_write))
+            .await
+            .expect("server starts");
+        let _ = running.waiting().await;
+    });
+    let client = ().serve((client_read, client_write)).await.expect("client starts");
+    let listed = client
+        .peer()
+        .list_tools(Some(PaginatedRequestParams::default()))
+        .await
+        .expect("list tools");
+    assert!(listed.tools.iter().all(|tool| tool.name != "original_only"));
+    client
+        .peer()
+        .call_tool(CallToolRequestParams::new("original_only"))
+        .await
+        .expect_err("original argument evidence is unavailable in MCP");
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    let _ = client.cancel().await;
+    let _ = server_task.await;
 }
 
 #[tokio::test]
