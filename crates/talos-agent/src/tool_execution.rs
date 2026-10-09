@@ -290,86 +290,108 @@ impl Agent {
                 )
                 .await?;
             all_parts.extend(parts);
-            if let Some(tool) = self.tools.get(&pending.call.name) {
-                private_tokens.extend(tool.model_private_tokens(&result));
-            }
-            let mut projected_call = self.project_tool_call(&pending.call);
-            private_tokens.project_value(&mut projected_call.input);
-            let mut projected_result = self.project_tool_result(&pending.call.name, &result);
-            projected_result.content = private_tokens.project(&projected_result.content);
-            let observation = ToolObservation {
-                call: projected_call.clone(),
-                result: projected_result.clone(),
-            };
-            let observed = match self
-                .run_hook(
+            results.push(
+                self.observe_tool_result(
                     hook_ctx,
-                    HookEvent::OnToolResultObserved {
-                        observation: &observation,
-                    },
-                )
-                .await
-            {
-                Ok(HookOutcome::Continue(HookEvent::OnToolResultObserved { observation }))
-                | Ok(HookOutcome::Skip(HookEvent::OnToolResultObserved { observation })) => {
-                    observation.clone()
-                }
-                Ok(_) => observation,
-                Err(error) => return Err(error),
-            };
-            let observed = ToolObservation {
-                call: Self::restore_private_call_if_unchanged(
                     &pending.call,
-                    &projected_call,
-                    &observed.call,
-                ),
-                result: Self::restore_private_result_if_unchanged(
-                    &result,
-                    &projected_result,
-                    &observed.result,
-                ),
-            };
-
-            let projection = self
-                .tools
-                .get(&observed.call.name)
-                .map(|tool| tool.project_result(&observed.result))
-                .unwrap_or_else(|| {
-                    talos_core::tool::ToolResultProjection::shared(observed.result.content.clone())
-                });
-            let ui_result = MessageToolResult {
-                tool_use_id: observed.call.id.clone(),
-                content: private_tokens.project(&projection.display_content),
-                is_error: observed.result.is_error,
-            };
-            let llm_result = if observed.result.is_error {
-                MessageToolResult {
-                    content: format!(
-                        "{}\n\n[Analyze the error above and try a different approach.]",
-                        projection.model_content
-                    ),
-                    ..ui_result.clone()
-                }
-            } else if self.bash_compression_enabled
-                && matches!(observed.call.name.as_str(), "bash" | "powershell")
-            {
-                let compressed = BashOutputCompressor::new().compress(&projection.model_content);
-                MessageToolResult {
-                    content: compressed.content,
-                    ..ui_result.clone()
-                }
-            } else {
-                MessageToolResult {
-                    content: projection.model_content,
-                    ..ui_result.clone()
-                }
-            };
-            messages.push(Message::Tool { result: llm_result });
-            let _ = event_tx.send(AgentEvent::ToolResult { result: ui_result });
-            results.push(observed.result);
+                    result,
+                    event_tx,
+                    messages,
+                    private_tokens,
+                )
+                .await?,
+            );
         }
 
         Ok((results, all_parts))
+    }
+
+    pub(crate) async fn observe_tool_result(
+        &self,
+        hook_ctx: &HookContext,
+        call: &ToolCall,
+        result: ToolExecutionResult,
+        event_tx: &mpsc::UnboundedSender<AgentEvent>,
+        messages: &mut Vec<Message>,
+        private_tokens: &mut PrivateTokens,
+    ) -> AgentResult<ToolExecutionResult> {
+        if let Some(tool) = self.tools.get(&call.name) {
+            private_tokens.extend(tool.model_private_tokens(&result));
+        }
+        let mut projected_call = self.project_tool_call(call);
+        private_tokens.project_value(&mut projected_call.input);
+        let mut projected_result = self.project_tool_result(&call.name, &result);
+        projected_result.content = private_tokens.project(&projected_result.content);
+        let observation = ToolObservation {
+            call: projected_call.clone(),
+            result: projected_result.clone(),
+        };
+        let observed = match self
+            .run_hook(
+                hook_ctx,
+                HookEvent::OnToolResultObserved {
+                    observation: &observation,
+                },
+            )
+            .await
+        {
+            Ok(HookOutcome::Continue(HookEvent::OnToolResultObserved { observation }))
+            | Ok(HookOutcome::Skip(HookEvent::OnToolResultObserved { observation })) => {
+                observation.clone()
+            }
+            Ok(_) => observation,
+            Err(error) => return Err(error),
+        };
+        let observed = ToolObservation {
+            call: Self::restore_private_call_if_unchanged(call, &projected_call, &observed.call),
+            result: Self::restore_private_result_if_unchanged(
+                &result,
+                &projected_result,
+                &observed.result,
+            ),
+        };
+
+        let projection = self
+            .tools
+            .get(&observed.call.name)
+            .map(|tool| tool.project_result(&observed.result))
+            .unwrap_or_else(|| {
+                talos_core::tool::ToolResultProjection::shared(observed.result.content.clone())
+            });
+        let ui_result = MessageToolResult {
+            tool_use_id: observed.call.id.clone(),
+            content: private_tokens.project(&projection.display_content),
+            is_error: observed.result.is_error,
+        };
+        let original_only = self
+            .tools
+            .get(&call.name)
+            .is_some_and(|tool| tool.requires_original_invocation());
+        let llm_result = if observed.result.is_error && !original_only {
+            MessageToolResult {
+                content: format!(
+                    "{}\n\n[Analyze the error above and try a different approach.]",
+                    projection.model_content
+                ),
+                ..ui_result.clone()
+            }
+        } else if self.bash_compression_enabled
+            && matches!(observed.call.name.as_str(), "bash" | "powershell")
+        {
+            let compressed = BashOutputCompressor::new().compress(&projection.model_content);
+            MessageToolResult {
+                content: compressed.content,
+                ..ui_result.clone()
+            }
+        } else {
+            MessageToolResult {
+                content: projection.model_content,
+                ..ui_result.clone()
+            }
+        };
+        messages.push(Message::Tool { result: llm_result });
+        let _ = event_tx.send(AgentEvent::ToolResult { result: ui_result });
+        Ok(observed.result)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -420,6 +442,12 @@ impl Agent {
                 ));
             }
         };
+        if tool.requires_original_invocation() {
+            return Ok((
+                ToolExecutionResult::error("protected tool requires original prepared invocation"),
+                Vec::new(),
+            ));
+        }
         if self.enforce_tool_presentation_policy && !presented_tool_names.contains(&call.name) {
             return Ok((
                 ToolExecutionResult::error(format!(

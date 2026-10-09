@@ -34,9 +34,10 @@ fn actor_and_provider_dispatch_share_the_sealed_plan() {
     for required in [
         "let mut initial_plan = Some(initial_plan);",
         "if let Some(plan) = initial_plan.take()",
-        "stream_with_tools_and_progress(",
+        "stream_with_ephemeral_images(",
         "&plan.messages,",
         "&plan.tool_definitions,",
+        "plan.tool_protocol,",
     ] {
         assert!(
             agent.contains(required),

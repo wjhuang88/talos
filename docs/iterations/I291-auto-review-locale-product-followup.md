@@ -397,3 +397,31 @@ test budgets are unchanged. The main preflight CI job now runs both real binary 
 
 The local matrix is ready for independent technical/API/security review and fresh exact-head CI.
 Until those pass and the implementation is merged, retain Review / Claimed and #590 open.
+
+## Relevant Main Integration Refresh (2026-10-09)
+
+Candidate `ea83c6918370a68e0c653ee6e9115d9c36bc4922` received independent Agent
+technical/API/security approval with all nine remote blobs verified against the reviewed index.
+Its CI run `37895393833` belongs to the older integration base and is not final merge evidence.
+Merge-time synchronization found main `fecc9583992ccf2c0678b58e902f4a3bdcf19d2b`, including
+browser implementation #683 and its completed #618 owner, plus non-overlapping search work.
+The inherited #618 matrix failure is resolved by that existing owner closeout, not by reopening
+the Issue or weakening reconciliation.
+
+Independent review identified #683's provider invocation and shared tool-result projection paths
+as relevant to real CLI/TUI locale, manual Deny and private-token acceptance. Under ADR-071,
+the candidate integrates that main without conflicts and requires fresh exact-head CI/review.
+Pinned workspace check and Clippy pass on the integrated tree. Agent validation passes all
+453 unit tests plus its integration and doc tests. The Chinese user guide now records locale
+configuration, supported detector heuristics, session/fallback behavior and translation limits.
+No dependency version changes beyond the already-merged main are introduced by this Work Slice.
+
+The rebuilt integrated CLI passes all nine REPL and nine POSIX TUI cases again, including
+language switching, durable resume, `/new` fallback, isolated review requests and actual tool
+denial. Both governance validators, formatting, whitespace, Python compilation and the fourteen
+CI classifier cases pass on this integration. Prior token/CPU measurements remain the explicitly
+bounded component evidence above; no provider billing or end-to-end latency claim is added.
+The integrated standard preflight passes its checks and reaches workspace tests; it stops at the
+same existing Unix socket fixture with OS error 1 PermissionDenied (runtime: 64 passed, one
+failed). No skip is added, and later packages/SDK remain unclaimed for that local run. Full
+integrated exact-head CI and independent review remain the final merge gates.

@@ -34,6 +34,43 @@ pub(crate) struct PreparedSessionTurn {
 }
 
 impl Agent {
+    pub(super) fn admit_ephemeral_images(
+        &self,
+        plan: &mut ProviderRequestPlan,
+        images: &[talos_core::provider::EphemeralImage],
+        limit: Option<u32>,
+    ) -> AgentResult<()> {
+        if !images.is_empty() && !self.image_input_supported {
+            return Err(AgentError::ToolError(
+                "selected model does not support image input".into(),
+            ));
+        }
+        // Match the existing provider-independent durable-image reserve. Only metadata
+        // participates in admission; bytes never enter messages, hooks or previews.
+        let image_tokens = images.iter().fold(0_u32, |total, image| {
+            total.saturating_add(
+                u32::try_from(image.byte_count().div_ceil(3))
+                    .unwrap_or(u32::MAX)
+                    .saturating_add(crate::token::TokenEstimator::estimate_text("image/png"))
+                    .saturating_add(1024),
+            )
+        });
+        let margin = u64::from(image_tokens)
+            .saturating_mul(u64::from(self.request_budget_spec.input_safety_margin_bps))
+            .div_ceil(10_000);
+        let estimated = plan
+            .estimated_tokens
+            .saturating_add(image_tokens)
+            .saturating_add(u32::try_from(margin).unwrap_or(u32::MAX));
+        if let Some(limit) = limit
+            && estimated > limit
+        {
+            return Err(AgentError::ContextBudgetExceeded { estimated, limit });
+        }
+        plan.estimated_tokens = estimated;
+        Ok(())
+    }
+
     pub(super) fn structured_session_inputs(items: &[SubmissionItem]) -> (String, Vec<Message>) {
         let memory_query = items
             .iter()

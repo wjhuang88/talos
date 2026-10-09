@@ -1,0 +1,15 @@
+[package]
+name = "talos-browser-host-external-fixture"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# Explicit opt-in browser embedding, independent from the runtime-only SDK fixture.
+[workspace]
+
+[dependencies]
+async-trait = "0.1"
+serde_json = "1"
+talos-runtime = { version = "0.10.1", path = "../../../crates/talos-runtime" }
+talos-tools = { version = "0.10.1", path = "../../../crates/talos-tools", default-features = false, features = ["network"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"] }

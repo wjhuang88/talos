@@ -23,6 +23,7 @@ mod stream_utf8;
 
 mod anthropic_request;
 mod anthropic_stream;
+mod browser_text_arguments;
 
 use std::time::Duration;
 
@@ -201,10 +202,42 @@ impl AnthropicProvider {
         body: &Value,
         progress_tx: Option<&mpsc::UnboundedSender<ProviderProgress>>,
     ) -> ProviderResult<reqwest::Response> {
+        self.send_request_with_deadline(body, progress_tx, None)
+            .await
+    }
+
+    async fn send_request_with_deadline(
+        &self,
+        body: &Value,
+        progress_tx: Option<&mpsc::UnboundedSender<ProviderProgress>>,
+        deadline: Option<std::time::Instant>,
+    ) -> ProviderResult<reqwest::Response> {
+        let request = self.send_request_before_deadline(body, progress_tx, deadline);
+        match deadline {
+            Some(expires) => tokio::time::timeout_at(expires.into(), request)
+                .await
+                .map_err(|_| {
+                    ProviderError::InvalidResponse("ephemeral image expired during request".into())
+                })?,
+            None => request.await,
+        }
+    }
+
+    async fn send_request_before_deadline(
+        &self,
+        body: &Value,
+        progress_tx: Option<&mpsc::UnboundedSender<ProviderProgress>>,
+        deadline: Option<std::time::Instant>,
+    ) -> ProviderResult<reqwest::Response> {
         let max_attempts = self.timeout_config.max_attempts;
         let dispatch_timeout = Duration::from_secs(self.timeout_config.dispatch_timeout_secs);
         let mut attempt = 0u32;
         loop {
+            if deadline.is_some_and(|expires| std::time::Instant::now() >= expires) {
+                return Err(ProviderError::InvalidResponse(
+                    "ephemeral image expired before dispatch".into(),
+                ));
+            }
             emit_progress(
                 progress_tx,
                 if attempt == 0 {
@@ -228,7 +261,16 @@ impl AnthropicProvider {
                 .json(&body)
                 .send();
 
-            let response = match tokio::time::timeout(dispatch_timeout, request_fut).await {
+            let remaining = deadline
+                .map(|expires| expires.saturating_duration_since(std::time::Instant::now()));
+            let response = match tokio::time::timeout(
+                remaining.map_or(dispatch_timeout, |remaining| {
+                    remaining.min(dispatch_timeout)
+                }),
+                request_fut,
+            )
+            .await
+            {
                 Ok(result) => result,
                 Err(_) => {
                     let error = ProviderError::NetworkError(format!(
@@ -452,6 +494,81 @@ impl LanguageModel for AnthropicProvider {
         talos_core::tool::CapabilityProbe::Unknown
     }
 
+    async fn stream_with_invocation_integrity(
+        &self,
+        messages: &[Message],
+        tools: &[ToolDefinition],
+        protocol: talos_core::tool::ToolProtocol,
+        progress_tx: mpsc::UnboundedSender<ProviderProgress>,
+        browser_tools: &[String],
+    ) -> ProviderResult<talos_core::provider::ProviderInvocationStream> {
+        self.stream_with_ephemeral_images(
+            messages,
+            tools,
+            protocol,
+            progress_tx,
+            browser_tools,
+            vec![],
+        )
+        .await
+    }
+
+    async fn stream_with_ephemeral_images(
+        &self,
+        messages: &[Message],
+        tools: &[ToolDefinition],
+        protocol: talos_core::tool::ToolProtocol,
+        progress_tx: mpsc::UnboundedSender<ProviderProgress>,
+        browser_tools: &[String],
+        images: Vec<talos_core::provider::EphemeralImage>,
+    ) -> ProviderResult<talos_core::provider::ProviderInvocationStream> {
+        use talos_core::provider::ProviderInvocationStream;
+        if browser_tools.is_empty() && images.is_empty() {
+            return self
+                .stream_with_protocol(messages, tools, protocol, progress_tx)
+                .await
+                .map(ProviderInvocationStream::legacy);
+        }
+        if protocol == talos_core::tool::ToolProtocol::Auto
+            || browser_tools
+                .iter()
+                .any(|name| !tools.iter().any(|tool| tool.name == *name))
+        {
+            return Err(ProviderError::InvalidResponse(
+                "original browser arguments unavailable for this protocol or tool inventory".into(),
+            ));
+        }
+        let native = protocol == talos_core::tool::ToolProtocol::Native;
+        let projected = if native {
+            messages.to_vec()
+        } else {
+            compatibility_messages(messages)
+        };
+        let mut body = anthropic_request::build_request_body(
+            &self.model,
+            &projected,
+            if native { tools } else { &[] },
+            self.reasoning.as_ref(),
+            self.output_limit,
+        );
+        let deadline = crate::image_io::append_ephemeral_images(&mut body, images, true)?;
+        let response = self
+            .send_request_with_deadline(&body, Some(&progress_tx), deadline)
+            .await?;
+        let (tx, rx) = mpsc::channel(32);
+        tokio::spawn(anthropic_stream::parse_sse_stream_with_integrity(
+            response,
+            openai_sse::InvocationSender::Original {
+                tx,
+                browser_tools: browser_tools.to_vec(),
+            },
+            Duration::from_secs(self.timeout_config.first_packet_timeout_secs),
+            Duration::from_secs(self.timeout_config.stream_idle_timeout_secs),
+            protocol,
+        ));
+        Ok(ProviderInvocationStream::original(rx))
+    }
+
     async fn stream_with_protocol(
         &self,
         messages: &[Message],
@@ -562,9 +679,10 @@ impl LanguageModel for AnthropicProvider {
     }
 
     fn request_preview(&self, messages: &[Message]) -> Option<Value> {
+        let messages = crate::image_io::preview_messages(messages);
         let body = anthropic_request::build_request_body(
             &self.model,
-            messages,
+            &messages,
             &[],
             self.reasoning.as_ref(),
             self.output_limit,
@@ -584,3 +702,6 @@ impl LanguageModel for AnthropicProvider {
 
 pub use anthropic_request::anthropic_request_debug_snapshot;
 use anthropic_request::redact_secret;
+
+#[cfg(test)]
+mod ephemeral_deadline_tests;
