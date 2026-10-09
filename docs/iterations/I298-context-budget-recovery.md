@@ -1,6 +1,6 @@
 # Iteration I298: Authoritative Context Budget And Overflow Recovery
 
-> Document status: Active (proposed; effective only when PR #690 merges)
+> Document status: Review
 > Published plan date: 2026-10-09
 > Planned objective: Fix misleading zero context usage and recover bounded tool loops before request budget overflow.
 > MVP deliverable: A TUI session with missing provider usage displays request-budget estimates and continues after recoverable context pressure without losing durable tool results.
@@ -18,9 +18,9 @@
 | Governance Claim PR | #690 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer requested this repair in single-maintainer mode and accepted ADR-087 on 2026-10-09. No independent human maintainer is available; independent Agent API/privacy review and exact-head gates remain required. |
-| Implementation PR | Not started |
+| Implementation PR | #691 |
 | Last Updated | 2026-10-09 |
-| Handoff / Release Condition | Claim and activation ineffective until finalized governance candidate merges to main. |
+| Handoff / Release Condition | Claim effective through #690 on main; implementation still requires exact-head CI, independent API/privacy review and merge-time CAS. |
 
 ## Published Baseline
 
@@ -58,6 +58,17 @@ Focused locked tests for core/agent/conversation/TUI and affected runtime adapte
 Update README.md, README.zh-CN.md and ADR-087 migration guidance; owner first, indexes second.
 Rollback is a source revert; no session migration or deletion is necessary.
 
+## Activation Checkpoint — 2026-10-09
+
+Claim PR #690 merged as `f4a70729`; implementation started from that main baseline.
+Governance head: `19df7b7ebd150909ea91d1a8bf06ee47d31f1ab5`;
+base: `9e376155ddc7b6c3644bf65f69b4c388956c1b5c`.
+Independent Agent document/API/privacy review approved the governance candidate only.
+CI `37908264351` passed applicable documentation-route checks; Windows Rust and Linux Desktop
+were skipped. The executing agent did not check CI or record CAS before merging #690.
+Later CI verification is after-the-fact evidence, not retroactive premerge CAS. Implementation
+must obtain fresh code review and CI and perform CAS before merge.
+
 ## Selection Inventory — 2026-10-09
 
 Baseline: main `9e376155ddc7b6c3644bf65f69b4c388956c1b5c`.
@@ -90,4 +101,20 @@ continuation budget rejection. Storage compaction markers are not semantic summa
 - Validation: project governance and Collaboration Claim validators passed with 0 warnings;
   `git diff --check` passed before the review clarifications. No code validation claimed.
 - Completion Commit: Pending.
+- 2026-10-09 local checkpoint: request-plan tests 11/11 and Agent library tests 455/455 passed
+  (`cargo test -p talos-agent --locked --lib`). Admission/billing and session-reset regression
+  passed in talos-conversation. TUI tests and Clippy failed to build because disk space was
+  exhausted, not because verification passed. Authorized `cargo clean` removed 13 GiB of
+  rebuildable artifacts. Full validation, remaining regression coverage and code review are
+  pending; implementation is not complete.
 - Residual: broader MEM-005 policy and archival semantic-summary design remain with their owners.
+- 2026-10-09 stable local candidate: authoritative numeric budget events, correlated pre-start
+  rejection, projection-only recovery and unknown/estimated TUI display implemented. Focused
+  Agent/conversation/TUI suites passed 456/178/595 tests; CLI identity regression passed.
+  `CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0
+  ./scripts/release_preflight.sh` exited 0, including locked workspace check, Clippy,
+  all workspace tests/doctests and both external Runtime SDK fixture configurations.
+  Governance and Collaboration Claim checks reported 0 warnings. Low-debug environment settings
+  conserve disk only; repository profiles and the pinned 1.97.0 toolchain are unchanged.
+  Independent Agent pre-review found no remaining API/privacy blockers after real continuation
+  and identity-correlation tests; final exact-head approval, remote CI and CAS remain pending.

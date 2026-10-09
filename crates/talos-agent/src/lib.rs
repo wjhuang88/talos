@@ -779,7 +779,10 @@ impl Agent {
             .await
         {
             Ok(prepared) => prepared,
-            Err(error) => return (Err(error), Vec::new()),
+            Err(error) => {
+                self.emit_budget_rejection(&error, event_tx.as_ref());
+                return (Err(error), Vec::new());
+            }
         };
         self.run_prepared_inner(prepared, event_tx, None, None, None)
             .await
@@ -874,14 +877,35 @@ impl Agent {
                     .await
                 {
                     Ok(plan) => plan,
-                    Err(error) => break (Err(error), TurnStatus::Denied),
+                    Err(error) => {
+                        self.emit_budget_rejection(&error, event_tx.as_ref());
+                        break (Err(error), TurnStatus::Denied);
+                    }
                 }
             };
             let mut plan = plan;
             if let Err(error) =
                 self.admit_ephemeral_images(&mut plan, &pending_images, request_context_limit)
             {
+                if let Some(tx) = &event_tx {
+                    let _ = tx.send(AgentEvent::ContextBudget {
+                        budget: talos_core::message::ContextBudget {
+                            estimated_tokens: plan.estimated_tokens,
+                            limit: request_context_limit,
+                            omitted_tool_exchanges: plan.omitted_tool_exchanges,
+                        },
+                    });
+                }
                 break (Err(error), TurnStatus::Denied);
+            }
+            if let Some(tx) = &event_tx {
+                let _ = tx.send(AgentEvent::ContextBudget {
+                    budget: talos_core::message::ContextBudget {
+                        estimated_tokens: plan.estimated_tokens,
+                        limit: request_context_limit,
+                        omitted_tool_exchanges: plan.omitted_tool_exchanges,
+                    },
+                });
             }
             if let Some(protocol) = protocol_override.take() {
                 plan.tool_protocol = protocol;
@@ -1101,6 +1125,7 @@ impl Agent {
                                 .collect();
                             let _ = tx.send(AgentEvent::ReasoningComplete { blocks: projected });
                         }
+                        AgentEvent::ContextBudget { .. } => {}
                         _ => {
                             let _ = tx.send(event.clone());
                         }
