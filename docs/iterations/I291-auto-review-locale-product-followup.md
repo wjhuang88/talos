@@ -60,7 +60,7 @@ Completion Commit. Until then the parent remains Review / Claimed.
 | Governance Claim PR | #650 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | User explicitly requested execution of the product follow-up and authorized GitHub publication. Independent API/security review and exact-head CI remain required. |
-| Implementation PR | #652, #662, #674, #677, #679, #680 (merged; product acceptance remains open) |
+| Implementation PR | #652, #662, #674, #677, #679, #680 (merged), #682 (review; product acceptance remains open) |
 | Last Updated | 2026-10-09 |
 | Handoff / Release Condition | Effective claim merge precedes implementation; no release or permission-policy change. |
 
@@ -314,3 +314,86 @@ Without user intent, script evidence marks uncertainty and SlowAssessor's inheri
 returns unsupported before its delayed contextual implementation. The fixture now supplies the
 current intent and asserts review_timeout before elapsed time; all three locale cases pass.
 This was a fixture-path correction, not a production permission or deadline change.
+
+## CI Repair And Acceptance Recovery (2026-10-09)
+
+PR #682 initial head `1d92c2e0cb2a16fb1cb53e9a6a7f93c3a6d4e42f`, CI3058 run
+`37879789223`, failed in the macOS projection fixture (445/446 Agent tests) because a random
+temporary path contained private marker `s1`. Production redaction was correct; the expected
+display path was wrong. The repaired fixture forces the collision and checks redaction while
+retaining the original execution-input assertion. Windows timed out in the existing Desktop
+auto-allow fixture. Its unchanged-head rerun was cancelled; the cause is still unproved.
+The fixture now supplies diagnostic state, preserving 15-second flow and 10-second shutdown
+budgets and all permission assertions. No tests are skipped and no production redaction is loosened.
+
+The local follow-up also rejects delayed presentation bindings using the permission snapshot's
+monotonic store generation. Snapshot capture stays outside the locale mutex. Older observations
+and assessments cannot reset newer session history; same-session newer generations preserve it.
+A channel-controlled thread regression exercises the production capture-to-mutex boundary.
+Same-generation snapshots within one session still follow arrival order; no transcript sequencing
+or permission authority is introduced.
+
+Before workspace maintenance removed that checkout, Agent tests passed 447/447 and independent
+Agent static review found no blocker. An exploratory real CLI REPL probe passed zh/en/ja history
+to assessor, visible localized human prompt, manual Deny and durable close/reopen restoration;
+the isolated Auto request did not contain the seeded history. These are historical results for
+the lost tree. The reusable `scripts/accept_auto_locale.py` and source were reconstructed, not
+recovered byte-for-byte; they require fresh verification. Fresh extracted production locale
+self-tests pass 6/6. Rust 1.97.0 and dependency versions remain pinned; Cargo.lock is unchanged.
+
+One local preflight result collection was rejected by automatic approval review for unexpected
+`new.example.com` egress. Source inspection traced it to the existing isolated-HOME provider
+registration fixture, using literal dummy `new-key` for a `/models` GET without transcript or
+file payload. No complete preflight pass is claimed from the interrupted execution. A subsequent
+attempt and its logs were removed by workspace maintenance. Full exact-head CI remains required.
+
+Other-session #681 merged at `41381f8055b66d54de42988e2b936a12e5af3ac3`; search-only tests
+and its owners do not overlap this Work Slice. Actual TUI/rotation and captured-request tokenizer
+evidence remain open. #590, I291 and AUTO-UX-001 stay Review / Claimed.
+
+## Reconstructed Candidate Fresh Acceptance (2026-10-09)
+
+Recovery object `14a8e0bff32cdda5ed05f02b7f9776c99195c665` preserves the reconstructed
+source checkpoint without changing the PR head. Subsequent local convergence adds reusable
+TUI/token measurement scripts and CI acceptance. These results are fresh, not reused from the
+lost checkout. Both isolated Agent tests and the workspace test phase pass 447/447.
+Standard preflight passes site/installers, governance/claims, text/classifier, format, workspace
+check and Clippy. Workspace tests stop at the unchanged runtime Unix socket fixture: 64 passed,
+one OS error 1 PermissionDenied. Later packages/SDK are not claimed covered by that run; no test
+is skipped. Full unskipped exact-head CI remains a merge gate.
+
+| Acceptance | Fresh local evidence |
+|---|---|
+| Delayed old-session snapshot | Channel-controlled thread regression rejects the older generation; newer history and same-session cache survive |
+| Real CLI REPL | zh/en/ja initial and durable resumed sessions, plus zh→ja, en→ja and ja→en window switching, all pass |
+| Real POSIX TUI | zh/en/ja initial and resumed prompts pass; `/new` resets each to configured en-US before new language evidence |
+| Permission and transcript boundary | Each binary case verifies localized prompt emission, actual denied tool result, one isolated two-message Auto request, and no seeded history in either message |
+| Prompt cost | 18 actual binary-captured synthetic requests, 36 tokenizations: locale field adds 14–17 bytes and 4–5 content tokens; field plus existing locale instruction adds 35–36 content tokens |
+| Detection CPU | Fresh pinned `rustc -O` extraction, 100 warmup / 1000 eight-message windows: 32 chars/message p50 6094 ns, p95 6184 ns; 4096 chars/message p50 448644 ns, p95 2142175 ns |
+
+Build with `cargo build --locked -p talos-cli`. Run `python3 scripts/accept_auto_locale.py
+target/debug/talos --capture-dir /tmp/auto-locale-captures` and `python3
+scripts/accept_auto_locale_tui.py target/debug/talos --capture-dir /tmp/auto-locale-captures`.
+The TUI driver uses a disposable POSIX controlling PTY and respects the existing 50ms slash-picker
+IME guard. Unique per-turn response markers prevent old history redraws from satisfying a new
+turn's completion check. It checks emitted text independently of spacing/layout, not manual visual
+QA. All endpoints are loopback, credentials are fixed placeholders, and HOME/workspace are disposable.
+These deterministic provider fixtures test the real binary/transport/surface contract, not the
+translation quality or compliance of every external model.
+
+`scripts/measure_auto_locale_tokens.py` uses measurement-only tiktoken 0.12.0 with cl100k_base
+and o200k_base. The baseline removes only the captured locale field, or that field plus the exact
+locale guidance from the captured system message. Counts cover message content, excluding provider
+chat framing and billed usage. The stress detector window can exceed the Agent's 16 KiB aggregate
+ingress cap; it measures detector CPU, not copying/hash aggregation, UI or provider latency.
+No runtime, Cargo manifest, lockfile or toolchain dependency changes are made.
+
+Windows retry job `113669376409` on the unchanged initial head passed the formerly failing
+approval test and all 106 Desktop tests at 04:42:32 UTC. The complete job was cancelled at
+04:56:20, about 30 minutes after 04:26:15 startup, consistent with its configured 30-minute
+job limit. That does not establish the first test timeout's cause. The candidate raises only
+the Windows CI job limit to 45 minutes so workspace/audit/smoke gates can finish; permission and
+test budgets are unchanged. The main preflight CI job now runs both real binary acceptance scripts.
+
+The local matrix is ready for independent technical/API/security review and fresh exact-head CI.
+Until those pass and the implementation is merged, retain Review / Claimed and #590 open.

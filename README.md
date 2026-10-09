@@ -261,6 +261,7 @@ transcript scope. Short, code-only, mixed, and unsupported observations retain t
 Detection reuses derived digests, language and confidence for the most recent eight bounded user
 messages. The cache retains no transcript text and resets on permission-session rotation; each
 snapshot recomputes votes from its current window rather than accumulating repeated observations.
+Delayed observations from older permission-session generations cannot reset newer language evidence.
 Technical failures use fixed, content-free prompts in the configured fallback locale, independently
 of detected history. Chinese (`zh`) and Japanese (`ja`) fixed copy is available; other locales use
 English for these prompts. Diagnostic reason codes and permission decisions remain unchanged.

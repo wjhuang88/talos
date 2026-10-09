@@ -132,7 +132,11 @@ async fn exercise_auto(enabled: bool, allow: bool) {
     })
     .await
     .expect("host shutdown completes");
-    outcome.expect("approval flow completes");
+    assert!(
+        outcome.is_ok(),
+        "approval flow times out: assessments={}, reports={reports:?}, approvals={approvals}, results={results:?}, explanations={explanations:?}",
+        provider.assessments.load(Ordering::SeqCst),
+    );
     assert_eq!(results.len(), 1, "one authoritative tool result");
     assert_eq!(approvals, usize::from(!(enabled && allow)));
     if !allow {

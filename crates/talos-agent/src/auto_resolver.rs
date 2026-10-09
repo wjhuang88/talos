@@ -59,6 +59,7 @@ struct LocaleEvidence {
 
 struct SessionLocale {
     session_id: Option<String>,
+    session_revision: u64,
     selected: ConversationLocale,
     fallback: ConversationLocale,
     history_observed: bool,
@@ -67,7 +68,13 @@ struct SessionLocale {
 }
 
 impl SessionLocale {
-    fn bind_session(&mut self, session_id: &str) {
+    fn bind_session(&mut self, session_id: &str, revision: u64) -> bool {
+        // Rebind increases the permission store generation. Delayed older
+        // snapshots must not discard newer presentation history.
+        if revision < self.session_revision {
+            return false;
+        }
+        self.session_revision = revision;
         if self.session_id.as_deref() != Some(session_id) {
             self.session_id = Some(session_id.to_owned());
             self.selected = self.fallback.clone();
@@ -75,6 +82,7 @@ impl SessionLocale {
             self.selected_is_fallback = true;
             self.evidence.clear();
         }
+        true
     }
 
     fn cached_evidence(
@@ -344,6 +352,20 @@ impl ManagedWorkspaceLease {
         self.permission_state.as_ref().map_or_else(
             || Some(self.session_id.clone()),
             |state| state.session_id().ok().map(|id| id.stable_id()),
+        )
+    }
+
+    fn locale_session_binding(&self) -> Option<(String, u64)> {
+        self.permission_state.as_ref().map_or_else(
+            || Some((self.session_id.clone(), 0)),
+            |state| {
+                state.state_snapshot().ok().map(|snapshot| {
+                    (
+                        snapshot.session_id.stable_id(),
+                        snapshot.revisions.as_array()[5],
+                    )
+                })
+            },
         )
     }
 
@@ -1142,6 +1164,7 @@ impl AutoPermissionResolver {
                 let fallback = ConversationLocale::configured();
                 SessionLocale {
                     session_id,
+                    session_revision: 0,
                     selected: fallback.clone(),
                     fallback,
                     history_observed: false,
@@ -1933,10 +1956,22 @@ fn project_auto_request(
 
 impl AutoPermissionResolver {
     fn observe_locale(&self, session_id: &str, messages: &[String]) {
+        let Some((current_id, revision)) = self.lease.locale_session_binding() else {
+            return;
+        };
+        if current_id != session_id {
+            return;
+        }
+        self.observe_locale_at(session_id, revision, messages);
+    }
+
+    fn observe_locale_at(&self, session_id: &str, revision: u64, messages: &[String]) {
         let Ok(mut current) = self.locale.lock() else {
             return;
         };
-        current.bind_session(session_id);
+        if !current.bind_session(session_id, revision) {
+            return;
+        }
         if messages.is_empty() {
             return;
         }
@@ -2151,13 +2186,16 @@ impl AutoPermissionResolver {
         }
         self.sync_reset();
         let failure_locale = self.failure_locale();
-        let session_id = self.lease.current_session_id();
+        let session_binding = self.lease.locale_session_binding();
         let locale = {
             match self.locale.lock() {
                 Ok(mut current) => {
-                    if let Some(session_id) = session_id {
-                        current.bind_session(&session_id);
-                        current.for_assessment(user_intent)
+                    if let Some((session_id, revision)) = session_binding {
+                        if current.bind_session(&session_id, revision) {
+                            current.for_assessment(user_intent)
+                        } else {
+                            current.fallback.clone()
+                        }
                     } else {
                         current.fallback.clone()
                     }
@@ -4244,6 +4282,7 @@ mod tests {
     fn history_selection_is_stable_across_repeated_approval_intents() {
         let state = SessionLocale {
             session_id: None,
+            session_revision: 0,
             selected: ConversationLocale("ja".into()),
             fallback: ConversationLocale("en-US".into()),
             history_observed: true,
@@ -4255,6 +4294,7 @@ mod tests {
         }
         let compatibility = SessionLocale {
             session_id: None,
+            session_revision: 0,
             selected: ConversationLocale("en-US".into()),
             fallback: ConversationLocale("en-US".into()),
             history_observed: false,
@@ -4302,6 +4342,7 @@ mod tests {
     fn locale_evidence_reuses_detection_and_reset_discards_cache() {
         let mut state = SessionLocale {
             session_id: Some("first".into()),
+            session_revision: 0,
             selected: ConversationLocale("zh".into()),
             fallback: ConversationLocale("en-US".into()),
             history_observed: true,
@@ -4317,11 +4358,70 @@ mod tests {
         let entry = state.cached_evidence([1; 32], || panic!("cached evidence must be reused"));
         assert_eq!(entry.locale.as_str(), "zh");
         assert_eq!(detections, 1);
-        state.bind_session("second");
+        assert!(state.bind_session("second", 1));
         assert!(state.evidence.is_empty());
         assert!(!state.history_observed);
         assert!(state.selected_is_fallback);
         assert_eq!(state.selected.as_str(), "en-US");
+    }
+
+    #[test]
+    fn delayed_locale_snapshot_cannot_discard_rebound_history() {
+        let root = tempfile::tempdir().expect("root");
+        let permission = Arc::new(PermissionSessionState::new(
+            PermissionEngine::with_workspace_root(root.path().to_path_buf()),
+        ));
+        let resolver = AutoPermissionResolver::new(
+            Arc::new(ShellAssessor),
+            Arc::new(DenyFallback),
+            ManagedWorkspaceLease::for_permission_session(root.path(), permission.clone())
+                .expect("lease"),
+            Duration::from_secs(1),
+            AutoPermissionControl::new(true),
+        )
+        .with_locale(Some("en-US"));
+        let (captured_tx, captured_rx) = std::sync::mpsc::channel();
+        let (release_tx, release_rx) = std::sync::mpsc::channel();
+        std::thread::scope(|scope| {
+            let resolver_ref = &resolver;
+            let old = scope.spawn(move || {
+                // Pause at the production capture-to-locale-lock boundary.
+                let (id, revision) = resolver_ref
+                    .lease
+                    .locale_session_binding()
+                    .expect("old stamp");
+                captured_tx.send((id.clone(), revision)).expect("captured");
+                release_rx.recv().expect("release old snapshot");
+                resolver_ref.observe_locale_at(&id, revision, &["请检查项目文件".into()]);
+            });
+            let (old_id, old_revision) = captured_rx.recv().expect("stamp captured");
+            permission.rebind_session().expect("rebind");
+            let new_id = permission.session_id().expect("new id").stable_id();
+            resolver.observe_user_messages_for_session(
+                &new_id,
+                &["このプロジェクトのファイルを確認してください".into()],
+            );
+            release_tx.send(()).expect("release");
+            old.join().expect("delayed observer");
+            let mut locale = resolver.locale.lock().expect("locale");
+            assert_eq!(locale.session_id.as_deref(), Some(new_id.as_str()));
+            assert_eq!(locale.selected.as_str(), "ja");
+            assert!(locale.history_observed);
+            assert_eq!(locale.evidence.len(), 1);
+            assert!(
+                !locale.bind_session(&old_id, old_revision),
+                "stale assessment stamp"
+            );
+            assert_eq!(locale.selected.as_str(), "ja");
+            let newer_revision = locale.session_revision + 1;
+            assert!(locale.bind_session(&new_id, newer_revision));
+            assert_eq!(
+                locale.selected.as_str(),
+                "ja",
+                "same-session revisions retain history"
+            );
+            assert_eq!(locale.evidence.len(), 1);
+        });
     }
 
     fn locale_test_resolver(root: &Path, state: &PermissionSessionState) -> AutoPermissionResolver {
@@ -4847,6 +4947,7 @@ mod configured_locale_fallback_tests {
     fn configured_locale_remains_fallback_for_low_confidence_history() {
         let state = SessionLocale {
             session_id: None,
+            session_revision: 0,
             selected: ConversationLocale("zh-CN".into()),
             fallback: ConversationLocale("zh-CN".into()),
             history_observed: false,

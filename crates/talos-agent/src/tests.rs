@@ -333,7 +333,11 @@ impl ApprovalResolver for CaptureApprovalProjection {
 
 #[tokio::test]
 async fn approval_projection_redacts_private_tokens_without_changing_execution() {
-    let root = tempfile::tempdir().expect("workspace");
+    // Exercise a private marker in the path deterministically.
+    let root = tempfile::Builder::new()
+        .prefix("s1-projection-")
+        .tempdir()
+        .expect("workspace");
     let input = serde_json::json!({
         "path": root.path().join("approved.txt"),
         "content": "ordinary content 中文",
@@ -397,6 +401,12 @@ async fn approval_projection_redacts_private_tokens_without_changing_execution()
     );
     assert_eq!(requests[0].tool_name, "approval_projection_probe");
     let mut expected = input.clone();
+    expected["path"] = Value::String(
+        input["path"]
+            .as_str()
+            .expect("fixture path")
+            .replace("s1", "[private]"),
+    );
     expected["coordination"] = serde_json::json!({"snapshot": "[private]", "anchor": "[private]"});
     assert_eq!(requests[0].arguments, expected);
     assert_eq!(
