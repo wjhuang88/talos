@@ -1,0 +1,93 @@
+# Iteration I298: Authoritative Context Budget And Overflow Recovery
+
+> Document status: Planned
+> Published plan date: 2026-10-09
+> Planned objective: Fix misleading zero context usage and recover bounded tool loops before request budget overflow.
+> MVP deliverable: A TUI session with missing provider usage displays request-budget estimates and continues after recoverable context pressure without losing durable tool results.
+
+## Collaboration Claim
+
+| Field | Value |
+|---|---|
+| Claim State | Unclaimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-6 |
+| Work Slice | I298 / MEM-005-A: authoritative request budget telemetry, bounded request-only overflow recovery, TUI estimate/unknown display, regression tests and migration documentation. |
+| Claimed At | 2026-10-09 |
+| Source Issue | None; maintainer incident and explicit repair request |
+| Governance Claim PR | Pending |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Maintainer requested this repair in single-maintainer mode; independent Agent API/privacy review and exact-head gates remain required. |
+| Implementation PR | Not started |
+| Last Updated | 2026-10-09 |
+| Handoff / Release Condition | Claim and activation ineffective until finalized governance candidate merges to main. |
+
+## Published Baseline
+
+### Selected Stories
+
+MEM-005-A is a bounded corrective child of MEM-005, related to TUI-017. It does not
+claim completion of MEM-005, MEM-003 or MEM-007.
+
+### Scope And Acceptance
+
+- Derive transient budget facts from the exact request admission calculation, including input,
+  tools, safety margin and output reservation. Missing provider usage must not mean zero context.
+- Check initial and continuation requests. When over budget, compact only the model-facing
+  request projection using bounded deterministic recovery. Preserve system/instruction messages,
+  user intent, complete tool call/result identity and the most recent usable tool evidence.
+- Recalculate after recovery; dispatch only within the actual limit. Impossible requests fail
+  clearly without increasing the limit, silently dropping instructions or replaying tools.
+- Preserve raw UI/export/durable history, hidden-output boundaries and permission decisions.
+- Test long multi-tool turns, missing usage, irreducible requests, Unicode, tool pairing,
+  raw-history preservation and cancellation. No real provider or private log fixture required.
+- Record additive core event and any presentation API migration in ADR-087. Breaking Rust
+  presentation constructors require the next pre-1.0 minor release, never the I297 patch.
+
+### Non-Goals
+
+No provider retry/timeout defaults, model catalog inference, dependency/toolchain changes,
+permissions policy, automatic tool replay, persistent schema change, new compression model,
+manual compact command, or release publication. No rewriting old completion evidence.
+
+### Validation And Documentation
+
+Focused locked tests for core/agent/conversation/TUI and affected runtime adapters; full
+`./scripts/release_preflight.sh` before implementation merge. Run both governance validators,
+`git diff --check`, independent Agent API/privacy review, exact-head CI and merge-time CAS.
+Update README.md, README.zh-CN.md and ADR-087 migration guidance; owner first, indexes second.
+Rollback is a source revert; no session migration or deletion is necessary.
+
+## Selection Inventory — 2026-10-09
+
+Baseline: main `9e376155ddc7b6c3644bf65f69b4c388956c1b5c`.
+I293/I294 remain Active for search only. I277 remains Review with deferred device acceptance;
+I290/I291 remain Review for Auto locale. I249 remains deferred Planned and I164 Paused.
+I296 (#688) and I297 (#689) remain separate unmerged governance candidates; this maintainer's
+repair request takes priority in this session, not their implementation or release authority.
+Open PR #682 touches Auto locale, not request budgeting. Shared agent tests and README updates
+must be union-merged with that work. No overlapping context-budget PR was found.
+Historic nonterminal wording in completed iteration checkpoints is not reactivation authority.
+
+## Incident Evidence And Limits
+
+The maintainer supplied a private session log: 190 valid records, 58 tool-result records,
+approximately 112 KB of tool-result text, and a turn with 17 tool-use responses followed by a
+provider error. The log does not contain request budget decomposition or usage and cannot prove
+the exact cause of the reported 128006/128000 rejection. Do not commit the private log.
+Source inspection confirms usage-based display, history-only pre-turn compaction, and immediate
+continuation budget rejection. Storage compaction markers are not semantic summaries.
+
+## Execution And Completion
+
+- 2026-10-09: Maintainer accepted ADR-087, including the presentation API change and next-minor
+  release boundary. Effective claim and implementation validation remain pending.
+- 2026-10-09: Repair requested; governance candidate prepared. Implementation not started.
+- 2026-10-09: Independent Agent design review identified protected Context/multimodal/reasoning,
+  atomic tool-exchange removal, final image reservation and legacy precompaction boundaries.
+  ADR-087 now records these constraints. New recovery must not mutate raw history; existing
+  pre-turn compaction is unchanged and is not covered by a broader no-compaction promise.
+- Validation: project governance and Collaboration Claim validators passed with 0 warnings;
+  `git diff --check` passed before the review clarifications. No code validation claimed.
+- Completion Commit: Pending.
+- Residual: broader MEM-005 policy and archival semantic-summary design remain with their owners.

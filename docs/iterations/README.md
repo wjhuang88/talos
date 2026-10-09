@@ -2,6 +2,10 @@
 
 ## Purpose
 
+I298 context-budget repair is Planned / Unclaimed; see
+[I298](I298-context-budget-recovery.md) for the incident, selection inventory and bounded scope.
+I296/I297 remain separate unmerged candidates; no publication authority transfers to this repair.
+
 Track current iteration plans, execution state, verification evidence, and retrospectives. Each
 iteration's own document is authoritative for its scope and lifecycle.
 
