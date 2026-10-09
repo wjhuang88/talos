@@ -1,6 +1,6 @@
 # Iteration I298: Authoritative Context Budget And Overflow Recovery
 
-> Document status: Review
+> Document status: Complete
 > Published plan date: 2026-10-09
 > Planned objective: Fix misleading zero context usage and recover bounded tool loops before request budget overflow.
 > MVP deliverable: A TUI session with missing provider usage displays request-budget estimates and continues after recoverable context pressure without losing durable tool results.
@@ -9,7 +9,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | I298 / MEM-005-A: authoritative request budget telemetry, bounded request-only overflow recovery, TUI estimate/unknown display, regression tests and migration documentation. |
@@ -18,9 +18,9 @@
 | Governance Claim PR | #690 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer requested this repair in single-maintainer mode and accepted ADR-087 on 2026-10-09. No independent human maintainer is available; independent Agent API/privacy review and exact-head gates remain required. |
-| Implementation PR | #691 |
+| Implementation PR | #691 (merged) |
 | Last Updated | 2026-10-09 |
-| Handoff / Release Condition | Claim effective through #690 on main; implementation still requires exact-head CI, independent API/privacy review and merge-time CAS. |
+| Handoff / Release Condition | Implementation merged with exact-head CI, independent Agent API/privacy approval and CAS; ship only in the next minor release under ADR-087, not the I297 patch. |
 
 ## Published Baseline
 
@@ -100,7 +100,7 @@ continuation budget rejection. Storage compaction markers are not semantic summa
   pre-turn compaction is unchanged and is not covered by a broader no-compaction promise.
 - Validation: project governance and Collaboration Claim validators passed with 0 warnings;
   `git diff --check` passed before the review clarifications. No code validation claimed.
-- Completion Commit: Pending.
+- Completion Commit: 8d4ad50e4f8e9bc5c620db2641056b1c1118183d.
 - 2026-10-09 local checkpoint: request-plan tests 11/11 and Agent library tests 455/455 passed
   (`cargo test -p talos-agent --locked --lib`). Admission/billing and session-reset regression
   passed in talos-conversation. TUI tests and Clippy failed to build because disk space was
@@ -118,3 +118,24 @@ continuation budget rejection. Storage compaction markers are not semantic summa
   conserve disk only; repository profiles and the pinned 1.97.0 toolchain are unchanged.
   Independent Agent pre-review found no remaining API/privacy blockers after real continuation
   and identity-correlation tests; final exact-head approval, remote CI and CAS remain pending.
+
+## Implementation Acceptance And Closeout — 2026-10-09
+
+PR #691 merged to main as `8d4ad50e4f8e9bc5c620db2641056b1c1118183d`.
+Final head `90f63c092f913d4b45bf1b9060e0b78fce3562e5`, base
+`f4a707298993a994585311ad9dc8e8c8504ec642`. CI `37914111373` passed all six jobs,
+including macOS full preflight, Windows workspace and Linux Desktop. Independent Agent
+API/privacy/security APPROVE: PR #691 comment `6078582512`; no blockers, Agent identity
+disclosed (not human approval). Merge-time CAS: comment `6079057562`, unchanged head/base,
+effective claim, no competing slice, clean mergeability and all gates passed before merge.
+
+Acceptance uses deterministic provider/tool fixtures: missing billing still yields admission
+facts, initial rejection is identity-correlated, continuation recovery executes each tool once,
+preserves durable results, protects instructions/reasoning/latest exchange and refuses
+irreducible requests. TUI regressions cover unknown and estimated/over-limit labels. Existing
+cancellation tests passed in full workspace validation. No private incident log is distributed.
+These checks establish local admission behavior, not exact provider tokenizer equivalence.
+
+No residual within MEM-005-A. Broader compaction policy, semantic summaries and manual commands
+remain MEM-005 work; existing pre-turn compaction is unchanged. No release performed. Next-minor
+publication must include ADR-087 StatusSnapshot migration; I297 patch must exclude this API change.
