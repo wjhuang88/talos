@@ -1004,7 +1004,17 @@ impl AppServerSession {
                     .await
                 {
                     Ok(prepared) => Some(prepared),
-                    Err(crate::AgentError::ContextBudgetExceeded { .. }) => {
+                    Err(crate::AgentError::ContextBudgetExceeded { estimated, limit }) => {
+                        let _ = self.eq_tx.send(SessionEvent::SubmissionContextBudget {
+                            session_id: self.session_id.clone(),
+                            session_generation: self.session_generation,
+                            submission_id: submission.id.clone(),
+                            budget: talos_core::message::ContextBudget {
+                                estimated_tokens: estimated,
+                                limit: Some(limit),
+                                omitted_tool_exchanges: 0,
+                            },
+                        });
                         let terminal = self.pause_before_start(
                             &submission,
                             SubmissionRejectionReason::ContextBudgetExceeded,
@@ -1155,6 +1165,18 @@ impl AppServerSession {
             match prepare_result {
                 Ok(prepared) => Some(prepared),
                 Err(error) => {
+                    if let crate::AgentError::ContextBudgetExceeded { estimated, limit } = &error {
+                        let _ = self.eq_tx.send(SessionEvent::SubmissionContextBudget {
+                            session_id: self.session_id.clone(),
+                            session_generation: self.session_generation,
+                            submission_id: submission.id.clone(),
+                            budget: talos_core::message::ContextBudget {
+                                estimated_tokens: *estimated,
+                                limit: Some(*limit),
+                                omitted_tool_exchanges: 0,
+                            },
+                        });
+                    }
                     let _ = self.eq_tx.send(SessionEvent::Error {
                         message: format!(
                             "failed to seal Provider request plan for {}: {error}",

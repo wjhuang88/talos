@@ -11,7 +11,8 @@
 ## Problem
 
 2026-10-09: [I298](../../iterations/I298-context-budget-recovery.md) selects a bounded
-MEM-005-A repair for request-budget telemetry and overflow recovery. Its claim is pending;
+MEM-005-A repair for request-budget telemetry and overflow recovery. Its claim is effective
+through merged #690; local implementation and full preflight passed, I298 is Review;
 the parent's broader policy, manual command and model-assisted strategy remain separate.
 
 Talos has context compaction mechanisms, but the product-level policy is not

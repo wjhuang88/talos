@@ -30,6 +30,9 @@ The numeric budget is an authoritative local admission estimate, not exact provi
 Include reasoning in the estimator and ephemeral image reservation in the final admission facts.
 Emit visible budget facts on rejection as well as successful admission; clear stale facts on
 model/session changes. Requests still exceeding the limit after bounded recovery are not sent.
+Each recovery pass considers at most 64 oldest complete exchanges. If no acceptable projection
+is found, the request stays unchanged and rejection reports that original request's estimate,
+not an uncommitted recovery candidate. Omission is not a semantic summary of removed evidence.
 
 ## Compatibility And Migration
 
@@ -38,6 +41,13 @@ field is added to StatusSnapshot, external struct literals must supply None or u
 that source-breaking presentation change must ship in a pre-1.0 minor release. Older providers
 need not implement new methods or report usage. Existing billing usage retains its meaning.
 I297 retry/timeout patch publication must exclude this incompatible presentation surface.
+
+Initial admission can reject before a turn starts. A correlated, numeric-only
+`SessionEvent::SubmissionContextBudget` carries session ID, generation and submission ID without
+inventing a started turn; SessionEvent is already non-exhaustive. Presentation must discard stale
+session/submission facts. `AgentEvent::ContextBudget` carries admitted and continuation-rejected
+request estimates. External `StatusSnapshot` literals supply `context_budget: None` until
+admission evidence exists. Neither event contains message bodies, tool output or reasoning.
 
 ## Evidence And Reversal
 
