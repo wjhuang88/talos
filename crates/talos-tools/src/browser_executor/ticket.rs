@@ -2,7 +2,10 @@
 
 use std::{
     collections::BTreeMap,
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
     time::{Duration, Instant},
 };
 
@@ -12,11 +15,27 @@ use super::BrowserRequest;
 #[derive(Debug)]
 pub struct BrowserLifecycle {
     identity: Arc<()>,
-    outstanding: BTreeMap<u64, Instant>,
+    outstanding: BTreeMap<u64, Reservation>,
     next_nonce: u64,
     session_epoch: u64,
     document_epoch: u64,
     available: bool,
+}
+
+#[derive(Debug)]
+struct Reservation {
+    expires_at: Instant,
+    validity: Validity,
+}
+
+/// Either owner dropping this guard revokes all copies of the challenge.
+#[derive(Debug)]
+struct Validity(Arc<AtomicBool>);
+
+impl Drop for Validity {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::Release);
+    }
 }
 
 impl BrowserLifecycle {
@@ -83,7 +102,9 @@ impl BrowserLifecycle {
         if !self.available {
             return Err(BrowserTicketError::Unavailable);
         }
-        self.outstanding.retain(|_, expiry| *expiry > now);
+        self.outstanding.retain(|_, reservation| {
+            reservation.expires_at > now && reservation.validity.0.load(Ordering::Acquire)
+        });
         if self.outstanding.len() >= 256 {
             return Err(BrowserTicketError::Capacity);
         }
@@ -95,7 +116,14 @@ impl BrowserLifecycle {
             .checked_add(Duration::from_secs(120))
             .ok_or(BrowserTicketError::Unavailable)?;
         self.next_nonce = nonce;
-        self.outstanding.insert(nonce, expires_at);
+        let live = Arc::new(AtomicBool::new(true));
+        self.outstanding.insert(
+            nonce,
+            Reservation {
+                expires_at,
+                validity: Validity(live.clone()),
+            },
+        );
         Ok(BrowserInvocationTicket {
             request,
             identity: self.identity.clone(),
@@ -103,6 +131,7 @@ impl BrowserLifecycle {
             document_epoch: self.document_epoch,
             nonce,
             expires_at,
+            validity: Validity(live),
         })
     }
 
@@ -128,7 +157,9 @@ impl BrowserLifecycle {
         if now >= ticket.expires_at {
             return Err(BrowserTicketError::Expired);
         }
-        if self.outstanding.get(&ticket.nonce) != Some(&ticket.expires_at) {
+        if !ticket.validity.0.load(Ordering::Acquire)
+            || self.outstanding.get(&ticket.nonce).map(|r| r.expires_at) != Some(ticket.expires_at)
+        {
             return Err(BrowserTicketError::Consumed);
         }
         Ok(())
@@ -142,6 +173,18 @@ impl BrowserLifecycle {
             self.outstanding.remove(&ticket.nonce);
         }
         result
+    }
+
+    pub(crate) fn consume(
+        &mut self,
+        ticket: BrowserInvocationTicket,
+    ) -> Result<BrowserRequest, BrowserTicketError> {
+        let result = self.validate(&ticket);
+        if Arc::ptr_eq(&self.identity, &ticket.identity) {
+            self.outstanding.remove(&ticket.nonce);
+        }
+        result?;
+        Ok(ticket.request)
     }
 }
 
@@ -177,6 +220,7 @@ pub enum BrowserTicketError {
 /// input. Registry membership prevents reuse; this is not an authorization capability.
 #[derive(Debug)]
 pub struct BrowserInvocationTicket {
+    validity: Validity,
     identity: Arc<()>,
     request: BrowserRequest,
     session_epoch: u64,
@@ -185,7 +229,46 @@ pub struct BrowserInvocationTicket {
     expires_at: Instant,
 }
 
+/// Private identity copied into an authorization challenge, never supplied by a caller.
+#[derive(Debug, Clone)]
+pub(crate) struct InvocationBinding {
+    live: Arc<AtomicBool>,
+    identity: Arc<()>,
+    nonce: u64,
+    session_epoch: u64,
+    document_epoch: u64,
+    expires_at: Instant,
+}
+
+impl PartialEq for InvocationBinding {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.identity, &other.identity)
+            && self.nonce == other.nonce
+            && self.session_epoch == other.session_epoch
+            && self.document_epoch == other.document_epoch
+            && self.expires_at == other.expires_at
+    }
+}
+
+impl Eq for InvocationBinding {}
+
+impl InvocationBinding {
+    pub(crate) fn is_live(&self) -> bool {
+        self.live.load(Ordering::Acquire) && Instant::now() < self.expires_at
+    }
+}
+
 impl BrowserInvocationTicket {
+    pub(crate) fn binding(&self) -> InvocationBinding {
+        InvocationBinding {
+            live: self.validity.0.clone(),
+            identity: self.identity.clone(),
+            nonce: self.nonce,
+            session_epoch: self.session_epoch,
+            document_epoch: self.document_epoch,
+            expires_at: self.expires_at,
+        }
+    }
     /// Returns the request bound to this ticket.
     pub fn request(&self) -> &BrowserRequest {
         &self.request
@@ -198,15 +281,17 @@ mod tests {
     use crate::browser_executor::BrowserOperation;
 
     fn request() -> BrowserRequest {
-        BrowserRequest::parse_raw(r#"{"protocolVersion":2,"operation":"tab-new"}"#).unwrap()
+        BrowserRequest::parse_raw(r#"{"protocolVersion":2,"operation":"tab-new"}"#)
+            .expect("valid test fixture")
     }
 
     #[test]
     fn ticket_binds_epochs_and_consumes_once() {
         let mut host = BrowserLifecycle::new();
-        let ticket = host.prepare(request()).unwrap();
+        let ticket = host.prepare(request()).expect("valid test fixture");
         assert_eq!(ticket.request().operation(), BrowserOperation::TabNew);
         let duplicate = BrowserInvocationTicket {
+            validity: Validity(ticket.validity.0.clone()),
             identity: ticket.identity.clone(),
             request: request(),
             session_epoch: ticket.session_epoch,
@@ -219,10 +304,40 @@ mod tests {
     }
 
     #[test]
+    fn dropped_or_invalidated_owners_revoke_challenges_immediately() {
+        let mut host = BrowserLifecycle::new();
+        for _ in 0..512 {
+            let ticket = host
+                .prepare(request())
+                .expect("dropped tickets free capacity");
+            let binding = ticket.binding();
+            assert!(binding.is_live());
+            drop(ticket);
+            assert!(!binding.is_live());
+        }
+        let ticket = host.prepare(request()).expect("ticket");
+        let binding = ticket.binding();
+        host.change_document();
+        assert!(!binding.is_live());
+        drop(ticket);
+
+        let ticket = host.prepare(request()).expect("ticket");
+        let binding = ticket.binding();
+        host.discard(ticket).expect("discard");
+        assert!(!binding.is_live());
+
+        let ticket = host.prepare(request()).expect("ticket");
+        let binding = ticket.binding();
+        drop(host);
+        assert!(!binding.is_live());
+        drop(ticket);
+    }
+
+    #[test]
     fn stale_and_expired_tickets_fail_closed() {
         let mut host = BrowserLifecycle::new();
         let now = Instant::now();
-        let ticket = host.prepare_at(request(), now).unwrap();
+        let ticket = host.prepare_at(request(), now).expect("valid test fixture");
         assert_eq!(
             BrowserLifecycle::new().validate(&ticket),
             Err(BrowserTicketError::Stale)
@@ -236,7 +351,7 @@ mod tests {
     #[test]
     fn lifecycle_changes_invalidate_document_work() {
         let mut lifecycle = BrowserLifecycle::new();
-        let ticket = lifecycle.prepare(request()).unwrap();
+        let ticket = lifecycle.prepare(request()).expect("valid test fixture");
         lifecycle.change_document();
         assert_eq!(lifecycle.validate(&ticket), Err(BrowserTicketError::Stale));
         lifecycle.replace_session();
@@ -252,7 +367,9 @@ mod tests {
         assert!(!lifecycle.is_available());
         assert_eq!(lifecycle.epochs(), (u64::MAX, u64::MAX));
         assert_eq!(
-            lifecycle.prepare(request()).unwrap_err(),
+            lifecycle
+                .prepare(request())
+                .expect_err("invalid test fixture must be rejected"),
             BrowserTicketError::Unavailable
         );
     }
@@ -262,21 +379,23 @@ mod tests {
         let mut host = BrowserLifecycle::new();
         let now = Instant::now();
         let tickets: Vec<_> = (0..256)
-            .map(|_| host.prepare_at(request(), now).unwrap())
+            .map(|_| host.prepare_at(request(), now).expect("valid test fixture"))
             .collect();
         assert_eq!(
-            host.prepare_at(request(), now).unwrap_err(),
+            host.prepare_at(request(), now)
+                .expect_err("invalid test fixture must be rejected"),
             BrowserTicketError::Capacity
         );
         let fresh = host
             .prepare_at(request(), now + Duration::from_secs(120))
-            .unwrap();
+            .expect("valid test fixture");
         assert_eq!(host.outstanding.len(), 1);
         assert_ne!(tickets[0].nonce, fresh.nonce);
         host.lose_synchronization();
         assert_eq!(host.validate(&fresh), Err(BrowserTicketError::Unavailable));
         assert_eq!(
-            host.prepare(request()).unwrap_err(),
+            host.prepare(request())
+                .expect_err("invalid test fixture must be rejected"),
             BrowserTicketError::Unavailable
         );
     }
@@ -285,8 +404,8 @@ mod tests {
     fn foreign_discard_cannot_remove_local_reservation() {
         let mut first = BrowserLifecycle::new();
         let mut second = BrowserLifecycle::new();
-        let foreign = first.prepare(request()).unwrap();
-        let local = second.prepare(request()).unwrap();
+        let foreign = first.prepare(request()).expect("valid test fixture");
+        let local = second.prepare(request()).expect("valid test fixture");
         assert_eq!(foreign.nonce, local.nonce);
         assert_eq!(second.discard(foreign), Err(BrowserTicketError::Stale));
         assert!(second.validate(&local).is_ok());
@@ -299,12 +418,14 @@ mod tests {
         let mut host = BrowserLifecycle::new();
         host.next_nonce = u64::MAX;
         assert_eq!(
-            host.prepare(request()).unwrap_err(),
+            host.prepare(request())
+                .expect_err("invalid test fixture must be rejected"),
             BrowserTicketError::Unavailable
         );
         host.replace_session();
         assert_eq!(
-            host.prepare(request()).unwrap_err(),
+            host.prepare(request())
+                .expect_err("invalid test fixture must be rejected"),
             BrowserTicketError::Unavailable
         );
         assert!(host.outstanding.is_empty());

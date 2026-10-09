@@ -36,6 +36,10 @@ shell = [
 ]
 git = ["dep:gix", "dep:similar", "tokio/fs", "tokio/process", "tokio/time"]
 network = [
+    "dep:image",
+    "tokio/macros",
+    "tokio/sync",
+    "dep:sha2",
     "dep:reqwest",
     "dep:rust-websearch",
     "dep:scraper",
@@ -102,14 +106,19 @@ windows-sys = { version = "0.61.2", optional = true, features = [
 ] }
 
 [dev-dependencies]
+jsonschema = { version = "0.58.6", default-features = false }
 talos-plugin = { version = "0.10.1", path = "../talos-plugin", features = ["wasm", "code-intelligence"] }
 talos-permission = { version = "0.10.1", path = "../talos-permission" }
 tempfile = "3"
-tokio = { version = "1.53.1", features = ["fs", "macros", "rt", "rt-multi-thread"] }
+tokio = { version = "1.53.1", features = ["fs", "macros", "rt", "rt-multi-thread", "test-util"] }
 
 [[test]]
 name = "installed_language_plugins"
 required-features = ["plugin-acceptance"]
+
+[[example]]
+name = "i295_browser_host"
+required-features = ["network"]
 
 [[test]]
 name = "document_boundaries"

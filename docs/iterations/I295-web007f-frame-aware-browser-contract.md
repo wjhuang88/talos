@@ -1,6 +1,6 @@
 # Iteration I295: Frame-Aware Browser Host Contract
 
-> Document status: Active / Claimed; proposed atomic claim and activation are ineffective until PR #669 merges.
+> Document status: Active / Claimed; effective through PR #669 merge on 2026-10-06. Implementation remains incomplete.
 > Published plan date: 2026-10-06
 > Planned objective: deliver an opt-in host-executed frame-aware browser v2 contract with exact admission, origin-bound permission and shared conformance evidence.
 > Baseline rule: preserve this objective and acceptance; different outcomes need a new iteration.
@@ -21,7 +21,7 @@
 | Authorization Evidence | Maintainer accepted the corrected v2 contract and explicit non-overlapping parallel scheduling on 2026-10-06; independent design review approved the uncommitted contract. Exact-head governance review and CI remain merge gates for PR #669. |
 | Implementation PR | Not started |
 | Last Updated | 2026-10-06 |
-| Handoff / Release Condition | Claim and activation require PR #669 on main. Implementation starts only from its merge or later main; no overlap with I293/I294 owners. |
+| Handoff / Release Condition | Claim is effective at 10f3715a77c4b1215455e89d26252d6b8bfa48e3. Complete implementation, protected review and main closeout before handoff; no overlap with I293/I294 owners. |
 
 ## Published Baseline
 
@@ -99,17 +99,164 @@ acceptance or implementation authority from those items transfers to I295.
 | Date | Type | Record |
 |---|---|---|
 | 2026-10-06 | Proposed | PR #669 proposes atomic claim and activation; both are ineffective until its finalized exact head merges to main. |
+| 2026-10-08 | Activation verified | GitHub confirms #669 head c9bfe6e746282e9390d0ff52513057af005dff99, base 1a397cfa1cbbee4cdc435cb450980b0fa6a25011, merged at 2026-10-06T06:28:43Z as 10f3715a77c4b1215455e89d26252d6b8bfa48e3. This establishes claim, not implementation completion. |
+| 2026-10-08 | Local convergence | Maintainer requests branch closure into main before handoff. Six unpublished local implementation commits were rebased onto origin/main 3eee0caa. Protocol vocabulary, scalar raw-request validation and ticket bookkeeping exist; no executor, permission or Runtime composition is delivered yet. |
+
+### Closure Ledger
+
+- Requested outcome: finish the published I295 host contract, merge verified implementation and synchronize owners before branch cleanup/handoff.
+- Assets preserved: Published Baseline, ADR-086 boundary, legacy tools, other sessions' work and all local implementation changes.
+- Required implementation: typed request/schema parity and normalization; trusted per-frame identity/origin state; exact invocation permission; prepared dispatch and host executor; bounded output; provider ingress and wrapper routing; deterministic conformance and external host example.
+- Required evidence: focused and workspace locked checks, preflight, governance validators, exact-head CI and independent permission/security/API review, followed by merge-time CAS.
+- State synchronization: I295 owner first, WEB-007-F second, derived views and Issue #618 after authoritative evidence. No Complete state until acceptance and existing implementation SHA are available.
+- Residual destination: this owner until its published acceptance is fulfilled. Native browser/process carrier remain the published non-goals, not substitutes for incomplete host integration.
 
 ## Verification Evidence
 
-None yet for implementation. Design-only Agent-role review approved the corrected proposal on
+Local pre-rebase head `2bbe082f` passed 15 focused `browser_executor` tests with
+`cargo test -p talos-tools --features network --locked browser_executor` and focused Clippy with
+`cargo clippy -p talos-tools --features network --locked -- -D warnings`. These test raw request
+validation and reservation bookkeeping only; they do not establish permission, executor,
+provider ingress, schema parity or runtime acceptance. Final candidate evidence remains pending.
+
+Design-only Agent-role review approved the corrected proposal on
 an uncommitted diff over `9712d458`; it is not exact-head code review or runtime evidence.
 
 ## Completion Evidence
+
+### Local Protocol Checkpoint (2026-10-08, not delivery evidence)
+
+The local candidate now includes typed command branches and a generated closed wire schema,
+default normalization, and actual schema-validator comparisons for 21 branches plus abusive
+scalar values. `jsonschema 0.58.6` was verified with `cargo search`/`cargo info` and added only as
+a dev dependency with default features disabled (no HTTP/file reference retrieval). The lockfile
+update records its transitive test dependencies; no browser/native transport is added.
+
+Eighteen focused browser tests passed. Earlier in the same local cycle all 128 network-feature
+tool tests passed; final full-candidate checks remain pending. Independent incremental pre-review
+identified schema/URL mismatch, lexical integer handling and public structural-schema ambiguity.
+URL credential rejection and integer normalization were corrected and covered by real schema
+evaluation. Full URL semantic equivalence and common-layer API placement remain review items;
+this checkpoint is not an implementation APPROVE or complete host conformance.
+
+The broader `--all-targets` Clippy run also exposed test unwraps in the new browser modules;
+these were corrected. An existing `useless_vec` finding in `search_backend.rs` belongs to the
+search surface and must be reconciled before final workspace validation, without silently
+overwriting concurrent search work.
 
 Pending. A future owner-first closeout must cite an already-existing implementation SHA.
 
 ## Variance And Residuals
 
+Local context follow-up: `BrowserContext` now owns bounded tab/frame state and its observation
+ticket registry together. Parent/child origins are distinct, Pending/opaque observations reject,
+and navigation/tab close/lost synchronization invalidate reservations. Checked reference counters
+prevent within-domain reuse after eviction; UUID generation has panic containment. Twenty-five
+focused browser tests and library Clippy passed. These are local, uncommitted checks, not final
+candidate evidence. Observation preparation is not authorization or executor dispatch.
+
+Independent Agent-role pre-review identified context/ticket synchronization, generation scope,
+opaque-versus-unknown origin distinction, random-source containment and URL normalization as
+integration risks. Unified ownership and invalidation are implemented; complete origin-state
+variants, snapshot/element state, permission capabilities, executor and composition-root wiring
+still require implementation and fresh review. No change to the Published Baseline is implied.
+
 Native iframe operation, V1 base contract and standalone MCP raw-ingress support remain separate
 gates. The owner cannot claim them delivered from host fake-executor tests.
+
+### Local Admission Checkpoint (2026-10-08, uncommitted)
+
+All 21 command branches now prepare an invocation with an operation-family typed target and
+revalidate it against current host state. Session bootstrap needs no frame reference; unknown
+origin evidence rejects navigation, while an explicitly host-verified opaque document can be
+navigated but not observed. Element-targeted requests validate the exact snapshot/element tuple.
+Session replacement revokes old references and outstanding tickets, including same-numbered
+nonces in a new domain. Authorization challenges bind the canonical JSON digest and actual
+ticket identity/epochs/expiry, rather than a caller-supplied nonce.
+
+`cargo test -p talos-tools --features network --locked` passed 143 tests, including 32 browser
+tests. `cargo clippy -p talos-tools --features network --locked -- -D warnings` failed on the
+unused authorization-consumption field/methods: final dispatch is still absent. No lint
+suppression was added. Formatting and `git diff --check` passed. A provisional executor API
+was removed before publication because dispatch-time executor substitution and its output
+types did not satisfy the contract. Required next work is fixed host/executor ownership,
+complete output validation/projection and authorized one-shot dispatch, then the published
+composition/ingress/conformance scope. This checkpoint is not stable-candidate or completion
+evidence; Active/Claimed remains unchanged.
+
+### Local Host And Raw-Ingress Checkpoint (2026-10-08, uncommitted)
+
+The fixed host now owns its executor and serializes one-shot authorized dispatch. Backend
+readiness precedes permission; final context validation, cancellation, deadline and panic
+containment guard dispatch. Observation release revalidates document identity and rejects
+foreign snapshot, URL-origin and inventory metadata. These host fixtures do not establish
+native-browser conformance or completion of the mandatory isolation matrix.
+
+Core now provides a bounded original-argument carrier that rejects duplicate decoded keys,
+non-scalar fields and trailing JSON without exposing arguments through Debug. Host admission
+accepts this carrier directly and repeats semantic validation; provider transport integration
+is still absent. Reserializing a parsed Value remains explicitly insufficient ingress proof.
+
+Ticket and registry ownership now share revocation state: dropping an invocation, discarding
+it, clearing lifecycle reservations or destroying the host invalidates its old authorization
+challenge immediately. Abandoned reservations are reclaimed on subsequent admission. Tests
+exercise 512 abandoned requests without capacity exhaustion or executor execution.
+
+Observed local checks: 50 browser tests passed using
+`cargo test -p talos-tools --features network --locked --lib browser_executor`; focused library
+Clippy passed with `-D warnings`; `git diff --check` passed. Core raw-argument test and four
+I179 public-path/source-layout tests passed before the host-only follow-ups. Fetch confirmed
+the branch contains origin/main (six local commits ahead, zero behind at inspection).
+
+Remaining delivery work: common-layer prepared API and dedicated permission composition,
+ManagedBrowserTool, Agent/Runtime/provider routing, standalone MCP refusal, transient artifact
+ownership and confidentiality fixtures, complete conformance matrix, runnable external example
+and migration documentation. Full workspace/preflight, exact-head CI, independent security/API
+review, merge and owner-first closeout have not occurred. State remains Active / Claimed.
+
+### Local Integration Review Checkpoint (2026-10-08, uncommitted)
+
+Provider original-argument carriers, prepared Agent execution, explicit ManagedBrowserTool
+composition, actual Runtime integration and standalone MCP refusal now exist locally. The
+deterministic `i295_browser_host` example runs child discovery, one exact authorized action and
+stale-reference rejection. Tools 166 unit tests, Agent 440 unit tests and two Runtime integration
+tests passed during this local cycle. These supersede the earlier implementation-gap inventory
+only where named; they do not establish full conformance.
+
+Independent Agent-role inspection of the uncommitted candidate returned REQUEST CHANGES:
+compat/strict original arguments, screenshot capability ownership/delivery, an externally usable
+trusted lifecycle update handle, complete isolation/barrier fixtures, and typed failure outputs.
+The reviewer shares the workspace/account and is not an independent human or final exact-head
+approval. None of these gates is waived.
+
+The compat/strict follow-up now extracts protected arguments from the original text block using
+RawValue, rejecting duplicate routing fields and duplicate decoded argument keys. Both provider
+adapters use the transient event route, preserving ordinary calls. Provider 137 unit tests and
+library Clippy with `-D warnings` passed; actual SSE coverage for these new text paths and fresh
+review remain necessary. Formatting and `git diff --check` passed. The independent Runtime SDK
+fixture boundary check passed; it was check-only, not external browser execution evidence.
+
+[Browser migration](../reference/I295-BROWSER-HOST-MIGRATION.md) records the explicit tools
+dependency, default denial, cancellation and trusted-executor responsibilities. The screenshot,
+lifecycle, typed failure and full conformance findings remain local implementation work, followed
+by external host consumption, full preflight, stable candidate commit/push, exact-head CI/review,
+merge and owner-first closeout. No implementation PR or completion evidence is claimed here.
+
+### Local Lifecycle And Screenshot Checkpoint (2026-10-09, uncommitted)
+
+The host lifecycle handle is lock-independent and wakes parked dispatches on invalidation;
+per-poll and final release generation fences prevent stale results from being released. Trusted
+context rebuilds replace the session and fail closed on concurrent invalidation or panic. The
+artifact store validates actual PNG decoding and IHDR dimensions under bounded allocation,
+enforces 120-second expiry, entry/byte limits, invocation-resource and generation ownership,
+one-shot consumption, and failure/session reclamation. Host fixtures cover successful capture,
+metadata mismatch, navigation during capture, replay, wrong generation, expiry, corruption and
+capacity.
+
+This remains a local checkpoint, not delivery evidence: the provider-neutral message model
+currently carries path-backed images, while browser screenshots are transient in-memory bytes.
+A new ephemeral image carrier must be added across Agent and both provider adapters without
+allowing bytes, references or paths into durable messages, display, persistence or replay.
+Native descendant pixel masking remains host evidence, not a fake-executor claim. Full
+conformance, external consumer validation, preflight, exact-head CI/review, merge and
+owner-first closeout remain pending.

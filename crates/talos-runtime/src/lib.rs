@@ -815,8 +815,8 @@ pub use talos_core::message::{
     ReasoningBlock, StopReason, SystemCacheMarker, SystemCacheType, ToolCall, Usage,
 };
 pub use talos_core::provider::{
-    DecisionRequestLimits, LanguageModel, ProviderError, ProviderProgress, ProviderResult,
-    Receiver, ToolDefinition,
+    DecisionRequestLimits, EphemeralImage, LanguageModel, ProviderError, ProviderInvocationEvent,
+    ProviderInvocationStream, ProviderProgress, ProviderResult, Receiver, ToolDefinition,
 };
 pub use talos_core::session::TurnCompletionStatus as RuntimeTurnCompletionStatus;
 pub use talos_core::session::{SessionEvent, TurnCompletionStatus, TurnEventPayload};
@@ -825,10 +825,12 @@ pub use talos_core::submission::{
     SubmissionReceiptDisposition, SubmissionRejectionReason, SubmissionSource,
 };
 pub use talos_core::tool::{
-    AgentTool, AtomicCreateCapability, CapabilityProbe, ProtocolCapabilities,
-    SharedAtomicCreateCapability, ToolAuthorizationScope, ToolBackend, ToolContinuation,
-    ToolExecutionAuthorization, ToolExecutionOutput, ToolFamily, ToolNature, ToolPermissionFacet,
-    ToolProtocol, ToolProvenance, ToolResourceKind, ToolResult, ToolResultProjection,
+    AgentTool, AtomicCreateCapability, AuthorizedToolInvocation, BrowserRawArguments,
+    CapabilityProbe, PreparedExecutionOutput, PreparedFailureCode, PreparedInvocationError,
+    PreparedToolInvocation, ProtocolCapabilities, SharedAtomicCreateCapability,
+    ToolAuthorizationScope, ToolBackend, ToolContinuation, ToolExecutionAuthorization,
+    ToolExecutionOutput, ToolFamily, ToolNature, ToolPermissionFacet, ToolProtocol, ToolProvenance,
+    ToolResourceKind, ToolResult, ToolResultProjection,
 };
 /// Permission evaluation mode selected by the embedding application.
 pub use talos_permission::PermissionMode;
@@ -1107,6 +1109,12 @@ impl RuntimeBuilder {
     }
 
     /// Registers a tool with runtime-level permission gating.
+    ///
+    /// Original-argument tools use their dedicated prepared authorization route. They require
+    /// a provider implementing [`LanguageModel::stream_with_invocation_integrity`]; generic
+    /// permission rules and [`ApprovalHandler`] do not grant browser authority. Compose an
+    /// explicit browser resolver on the host tool before registration. No browser is included
+    /// by default or added by a preset.
     #[must_use]
     pub fn tool(mut self, tool: Arc<dyn AgentTool>) -> Self {
         self.tools.push(tool);

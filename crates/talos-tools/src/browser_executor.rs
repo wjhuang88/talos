@@ -5,7 +5,31 @@
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+mod admission;
+mod authorization;
+pub use admission::{BrowserDocumentOrigin, BrowserPermissionTarget, PreparedBrowserInvocation};
+mod command;
+mod context;
+pub use authorization::{
+    BrowserAuthorizationError, BrowserInvocationAuthorization, BrowserPermissionEvaluator,
+    BrowserPermissionResolver, BrowserPermissionResource, DenyBrowserPermissionEvaluator,
+    ExactBrowserPermissionEvaluator,
+};
+pub use context::BrowserSnapshotIdentity;
+pub use context::{
+    BrowserContext, BrowserContextError, BrowserFrameScope, BrowserOrigin,
+    PreparedBrowserObservation,
+};
+mod host;
+mod managed;
+mod output;
+pub use host::{
+    BoundBrowserInvocation, BrowserExecutor, BrowserHost, BrowserHostError, BrowserLifecycleHandle,
+};
+pub use managed::ManagedBrowserTool;
 mod request;
+pub use command::{BrowserCommand, Direction, PressKey, Visibility};
+pub use output::*;
 pub use request::{BrowserRequest, BrowserRequestError};
 mod ticket;
 pub use ticket::{BrowserInvocationTicket, BrowserLifecycle, BrowserTicketError};
@@ -13,12 +37,32 @@ pub use ticket::{BrowserInvocationTicket, BrowserLifecycle, BrowserTicketError};
 /// The separately negotiated frame-aware browser protocol version.
 pub const BROWSER_EXECUTOR_V2: &str = "talos.browser.executor/v2";
 
+/// Bounded reference-format failure, without copying untrusted input.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum BrowserReferenceError {
+    /// Reference length is outside the 1..=128-byte range.
+    #[error("browser reference must contain 1..=128 bytes")]
+    Length,
+    /// Only ASCII letters, digits, underscores and hyphens are permitted.
+    #[error("browser reference contains an invalid character")]
+    Character,
+}
+
 /// Opaque identity for a browser resource. Values are identifiers, not authority.
 macro_rules! browser_ref {
     ($name:ident, $doc:literal) => {
         #[doc = $doc]
         #[derive(Debug, Clone, PartialEq, Eq, Hash)]
         pub struct $name(String);
+
+        impl schemars::JsonSchema for $name {
+            fn schema_name() -> std::borrow::Cow<'static, str> {
+                stringify!($name).into()
+            }
+            fn json_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
+                schemars::json_schema!({"type":"string", "minLength":1, "maxLength":128, "not":{"pattern":"[^A-Za-z0-9_-]"}})
+            }
+        }
 
         impl Serialize for $name {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -41,16 +85,16 @@ macro_rules! browser_ref {
 
         impl $name {
             /// Creates an opaque reference after enforcing the wire-format bounds.
-            pub fn try_new(value: impl Into<String>) -> Result<Self, String> {
+            pub fn try_new(value: impl Into<String>) -> Result<Self, BrowserReferenceError> {
                 let value = value.into();
                 if value.is_empty() || value.len() > 128 {
-                    return Err("browser reference must contain 1..=128 bytes".to_owned());
+                    return Err(BrowserReferenceError::Length);
                 }
                 if !value
                     .bytes()
                     .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
                 {
-                    return Err("browser reference contains an invalid character".to_owned());
+                    return Err(BrowserReferenceError::Character);
                 }
                 Ok(Self(value))
             }
@@ -79,8 +123,13 @@ browser_ref!(
     "Opaque identity for an element bound to one snapshot generation."
 );
 
+browser_ref!(
+    BrowserArtifactRef,
+    "Opaque transient screenshot identity; never a filesystem path."
+);
+
 /// Closed v2 operation vocabulary. Unknown values fail deserialization.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum BrowserOperation {
     Open,
@@ -154,10 +203,11 @@ mod tests {
 
     #[test]
     fn closed_operation_vocabulary_round_trips() {
-        let json = serde_json::to_string(&BrowserOperation::WaitForElement).unwrap();
+        let json =
+            serde_json::to_string(&BrowserOperation::WaitForElement).expect("valid test fixture");
         assert_eq!(json, "\"wait-for-element\"");
         assert_eq!(
-            serde_json::from_str::<BrowserOperation>(&json).unwrap(),
+            serde_json::from_str::<BrowserOperation>(&json).expect("valid test fixture"),
             BrowserOperation::WaitForElement
         );
     }
@@ -189,9 +239,10 @@ mod tests {
 
     #[test]
     fn opaque_refs_serialize_as_values_without_exposing_structure() {
-        let session = BrowserSessionRef::try_new("session-generation-1").unwrap();
+        let session =
+            BrowserSessionRef::try_new("session-generation-1").expect("valid test fixture");
         assert_eq!(
-            serde_json::to_string(&session).unwrap(),
+            serde_json::to_string(&session).expect("valid test fixture"),
             "\"session-generation-1\""
         );
     }
@@ -204,3 +255,5 @@ mod tests {
         assert!(serde_json::from_str::<BrowserSessionRef>("\"bad/ref\"").is_err());
     }
 }
+#[cfg(test)]
+mod isolation_tests;

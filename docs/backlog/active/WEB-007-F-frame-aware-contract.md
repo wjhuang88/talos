@@ -7,7 +7,7 @@
 | Parent | WEB-007 / #452 |
 | Source | #618; #520 Request B |
 | Priority | P1 |
-| Status | Active / Claimed — proposed activation is ineffective until PR #669 merges |
+| Status | Active / Claimed — effective through PR #669; implementation incomplete |
 | Selected Iteration | I295 |
 | Implementation PR | Not started |
 
@@ -26,7 +26,7 @@
 | Authorization Evidence | Maintainer accepted the corrected v2 direction and non-overlapping parallel I295 scheduling on 2026-10-06; independent design review approved the uncommitted contract. Exact-head governance review and CI remain merge gates for PR #669. |
 | Implementation PR | Not started |
 | Last Updated | 2026-10-06 |
-| Handoff / Release Condition | Proposed I295 claim/activation has no effect until PR #669 reaches main; implementation begins only afterward. |
+| Handoff / Release Condition | Claim effective through #669 merge 10f3715a; complete I295 implementation, protected review and main closeout before handoff. |
 
 ## Goal And Ownership
 
@@ -84,7 +84,7 @@ independently and cannot claim completion using only a fake executor.
 - [x] Inventory Active/Review/Planned/Blocked iterations and record dispositions in I295.
 - [x] Select runnable I295: opt-in host executor composition with deterministic frame state,
   full registry → permission → execution → projection tests and an external consumer example.
-- [ ] Record an effective target-branch Collaboration Claim and actual governance PR number.
+- [x] Record an effective target-branch Collaboration Claim and actual governance PR number: #669 merged as 10f3715a77c4b1215455e89d26252d6b8bfa48e3.
 - [ ] Implement and verify each acceptance fixture, pinned locked checks, full workspace tests,
   release preflight and independent exact-head API/security review before merge.
 - [ ] Record implementation PRs and existing merged completion SHA(s) before Complete; only then
@@ -112,6 +112,17 @@ examples. Exact existing doc paths must be selected with the implementation iter
 - [Testing SOP](../../sop/TESTING.md)
 
 ## Evidence
+
+2026-10-08 integration follow-up: local Agent/provider/Runtime/MCP paths and runnable deterministic
+host example now exist. Independent uncommitted review returned REQUEST CHANGES; the current
+I295 checkpoint records the remaining screenshot, lifecycle, typed-error and conformance gaps.
+Provider compat/strict raw ingress received a local correction with 137 provider tests and
+Clippy passing. This is neither an implementation approval nor #618 completion.
+
+2026-10-08 current checkpoint: #669 merged on 2026-10-06; I295 claim is effective.
+Local protocol/request/ticket code remains partial, unpushed and unintegrated with execution.
+The maintainer requests completion and merge before handoff. The I295 closure ledger owns all
+remaining host-contract acceptance; no native-browser delivery or #618 completion is claimed.
 
 2026-09-29: #618 and #452 inspected; no open PR reported at investigation time. Repository
 AgentTool execution_admission and permission_profile inspected: both are synchronous, and the

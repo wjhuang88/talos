@@ -30,6 +30,21 @@ pub trait AgentTool: Send + Sync {
     /// custom schema.
     fn parameters(&self) -> Value;
 
+    /// Requires original provider argument evidence and a separate prepared invocation path.
+    /// Ordinary tools retain the existing parsed-JSON dispatch by default.
+    fn requires_original_invocation(&self) -> bool {
+        false
+    }
+
+    /// Admits original transport arguments into a separately authorized one-shot route.
+    /// Default deny keeps existing tools and unmigrated wrappers off this protected path.
+    async fn prepare_original_invocation(
+        &self,
+        _arguments: super::BrowserRawArguments,
+    ) -> Result<Box<dyn super::PreparedToolInvocation>, super::PreparedInvocationError> {
+        Err(super::PreparedInvocationError::Denied)
+    }
+
     /// Selects and validates the execution mode before permission evaluation.
     ///
     /// Schema validation remains owned by [`ToolRegistry`](super::ToolRegistry).

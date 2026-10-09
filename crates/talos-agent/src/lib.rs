@@ -43,6 +43,7 @@ pub(crate) mod bounded_model;
 pub mod compaction;
 pub mod compression;
 mod execution_ledger;
+mod prepared_execution;
 mod process_tool;
 pub mod token;
 mod tool_output;
@@ -74,7 +75,7 @@ use talos_core::message::{
     AgentEvent, AssistantReasoning, Message, MessageToolResult, ReasoningBlock, StopReason,
     ToolCall,
 };
-use talos_core::provider::{LanguageModel, ProviderError};
+use talos_core::provider::{LanguageModel, ProviderError, ProviderInvocationEvent};
 use talos_core::tool::{
     ProtocolFailureDisposition, classify_protocol_failure, parse_recovery_decision,
 };
@@ -805,6 +806,7 @@ impl Agent {
         let mut total_tool_calls: usize = 0;
         let mut doom_tracker: HashMap<(String, String), u32> = HashMap::new();
         let mut pending_continuation_parts: Vec<talos_core::message::ContentPart> = Vec::new();
+        let mut pending_images = Vec::new();
         let mut initial_plan = Some(initial_plan);
         // Recovery is bounded to one decision and one retry for a sealed request.
         // It cannot become a recursive model/tool loop.
@@ -876,6 +878,11 @@ impl Agent {
                 }
             };
             let mut plan = plan;
+            if let Err(error) =
+                self.admit_ephemeral_images(&mut plan, &pending_images, request_context_limit)
+            {
+                break (Err(error), TurnStatus::Denied);
+            }
             if let Some(protocol) = protocol_override.take() {
                 plan.tool_protocol = protocol;
             }
@@ -885,13 +892,23 @@ impl Agent {
             );
 
             let (progress_tx, mut progress_rx) = mpsc::unbounded_channel();
-            // The sealed plan is dispatched exactly once through the provider's
-            // protocol adapter (whose native fallback is stream_with_tools_and_progress().
-            let provider_request = self.provider.stream_with_protocol(
+            let browser_tool_names: Vec<String> = plan
+                .tool_definitions
+                .iter()
+                .filter(|definition| {
+                    self.tools
+                        .get(&definition.name)
+                        .is_some_and(|tool| tool.requires_original_invocation())
+                })
+                .map(|definition| definition.name.clone())
+                .collect();
+            let provider_request = self.provider.stream_with_ephemeral_images(
                 &plan.messages,
                 &plan.tool_definitions,
                 plan.tool_protocol,
                 progress_tx,
+                &browser_tool_names,
+                std::mem::take(&mut pending_images),
             );
             tokio::pin!(provider_request);
             let provider_result = loop {
@@ -981,6 +998,7 @@ impl Agent {
             };
 
             let mut turn_tool_calls: Vec<PendingToolCall> = Vec::new();
+            let mut original_calls = std::collections::HashMap::new();
             // Buffers belong to this provider attempt. A failed attempt must
             // never prefix the recovered response with an incomplete fragment.
             let mut observed_text_pending = String::new();
@@ -993,7 +1011,49 @@ impl Agent {
             let mut usage = talos_core::message::Usage::default();
             let mut stream_protocol_error: Option<String> = None;
 
-            while let Some(event) = rx.recv().await {
+            while let Some(invocation_event) = rx.recv().await {
+                let original_event = matches!(
+                    &invocation_event,
+                    ProviderInvocationEvent::BrowserToolCall { .. }
+                );
+                let event = match invocation_event {
+                    ProviderInvocationEvent::Legacy(event) => event,
+                    ProviderInvocationEvent::BrowserToolCall {
+                        id,
+                        name,
+                        arguments,
+                    } => {
+                        if !browser_tool_names.contains(&name) || original_calls.contains_key(&id) {
+                            break 'turn_loop (
+                                Err(AgentError::UnexpectedEvent(
+                                    "browser invocation identity is invalid".into(),
+                                )),
+                                TurnStatus::UnexpectedEvent,
+                            );
+                        }
+                        original_calls.insert(id.clone(), (name.clone(), arguments));
+                        AgentEvent::ToolCall {
+                            call: ToolCall {
+                                id,
+                                name,
+                                input: serde_json::json!({"protocolVersion":2}),
+                            },
+                            provenance: ToolProvenance::Native,
+                            summary_fields: Vec::new(),
+                        }
+                    }
+                };
+                if let AgentEvent::ToolCall { call, .. } = &event
+                    && browser_tool_names.contains(&call.name)
+                    && !original_event
+                {
+                    break 'turn_loop (
+                        Err(AgentError::UnexpectedEvent(
+                            "browser tool call lacks original argument evidence".into(),
+                        )),
+                        TurnStatus::UnexpectedEvent,
+                    );
+                }
                 if let Some(ref tx) = event_tx
                     && !matches!(event, AgentEvent::ToolCall { .. })
                 {
@@ -1373,7 +1433,79 @@ impl Agent {
             };
             messages.push(assistant_msg);
 
-            let tool_results = if let Some(ref tx) = event_tx {
+            let tool_results = if !original_calls.is_empty() {
+                let user_intent = messages.iter().rev().find_map(|message| match message {
+                    Message::User { content } => Some(content.clone()),
+                    _ => None,
+                });
+                let (silent_tx, _silent_rx) = mpsc::unbounded_channel();
+                let tx = event_tx.as_ref().unwrap_or(&silent_tx);
+                let mut results = Vec::new();
+                for call in &effective_tool_calls {
+                    if let Some((name, arguments)) = original_calls.remove(&call.id) {
+                        let mut visible_call = call.clone();
+                        private_tokens.project_value(&mut visible_call.input);
+                        let _ =
+                            tx.send(self.tool_call_event(&visible_call, &ToolProvenance::Native));
+                        let unchanged = name == call.name
+                            && turn_tool_calls.iter().any(|pending| pending.call == *call);
+                        let output = if unchanged {
+                            self.execute_original_tool(&hook_ctx, call, arguments).await
+                        } else {
+                            talos_core::tool::PreparedInvocationError::Failure {
+                                code: talos_core::tool::PreparedFailureCode::InvalidReference,
+                                operation: arguments.fields().get("operation")
+                                    .and_then(serde_json::Value::as_str)
+                                    .and_then(talos_core::tool::PreparedInvocationError::browser_operation),
+                            }
+                            .into_output()
+                            .into()
+                        };
+                        let result = match self
+                            .observe_tool_result(
+                                &hook_ctx,
+                                call,
+                                output.output.result,
+                                tx,
+                                &mut messages,
+                                &mut private_tokens,
+                            )
+                            .await
+                        {
+                            Ok(result) => result,
+                            Err(error) => break 'turn_loop (Err(error), TurnStatus::Denied),
+                        };
+                        pending_continuation_parts.extend(output.output.next_provider_parts);
+                        pending_images.extend(output.images);
+                        results.push(result);
+                    } else {
+                        let pending = self.pending_calls_with_provenance(
+                            std::slice::from_ref(call),
+                            &turn_tool_calls,
+                        );
+                        match self
+                            .execute_tools_for_ui_with_presentation(
+                                &hook_ctx,
+                                &pending,
+                                tx,
+                                &mut messages,
+                                user_intent.as_deref(),
+                                &active_tool_presentation_policy,
+                                &active_presented_tool_names,
+                                &mut private_tokens,
+                            )
+                            .await
+                        {
+                            Ok((result, parts)) => {
+                                results.extend(result);
+                                pending_continuation_parts.extend(parts);
+                            }
+                            Err(error) => break 'turn_loop (Err(error), TurnStatus::Denied),
+                        }
+                    }
+                }
+                results
+            } else if let Some(ref tx) = event_tx {
                 let effective_pending =
                     self.pending_calls_with_provenance(&effective_tool_calls, &turn_tool_calls);
                 let user_intent = messages
