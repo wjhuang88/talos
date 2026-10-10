@@ -19,7 +19,7 @@
 | Governance Claim PR | #688 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer authorized serial I297 then I296 closeout on 2026-10-10. No independent human maintainer is available; independent Agent review, exact-head CI, both validators and merge-time CAS remain mandatory. #688 merged as `7097f1b5`; review/CAS comment `6093090485` and CI `38018790824` establish effective activation. |
-| Implementation PR | Pending stable candidate publication |
+| Implementation PR | #695 |
 | Last Updated | 2026-10-10 |
 | Handoff / Release Condition | Atomic claim+activation must merge before code/configuration commits are created. |
 
