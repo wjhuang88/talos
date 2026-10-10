@@ -490,3 +490,29 @@ No test is skipped; later workspace packages and the SDK fixture are not claimed
 The new exact-head full CI must validate the whole unskipped sequence and Darwin TUI acceptance.
 The integrated Agent test binary reports 459 unit tests passed, with its integration groups also
 passing before the runtime fixture stop. Agent doctests are not inferred from this stopped run.
+
+## Continuous PTY Pump During Provider Wait (2026-10-10)
+
+Run `38024351320` / CI3098 at `90126a9759408daa29cbb4b2ee212391e0aeb6e8` passes
+reconciliation, installer, Linux Desktop and the complete macOS release preflight (including
+external SDK). Nine macOS REPL cases pass. The first TUI child reaches the model header and
+`LOCALEFIXTUREDONE1X`; the next seed fails the existing 20-second current-turn HTTP wait.
+Cleanup also reaches both five-second process waits. This is a bounded diagnostic failure,
+not the earlier unbounded 15-minute silence and not passing Darwin acceptance.
+
+The shared marker helper previously slept while polling the HTTP fixture without reading the
+TUI's PTY. A child still painting or waiting for a cursor response can therefore block before
+it handles the next input/provider request. The TUI now supplies a pump callback during that
+same 20-second wait; normal marker observation remains 25 seconds. Cursor queries split across
+read chunks are answered. Failure includes a bounded synthetic terminal tail. Cleanup hangs
+up the PTY before signaling/waiting, removing dependence on an output reader that has stopped.
+The exact Darwin child stack is still unavailable; this identifies and repairs a concrete
+fixture backpressure boundary without claiming the OS stall's exact root cause.
+
+A disposable child writes 1 MiB to the PTY before making its current-turn HTTP request; the
+continuous pump reaches that request and its unique response marker, then exits cleanly.
+Both production-binary drivers again pass nine REPL and nine TUI cases on the unchanged compiled
+integrated source; eighteen new captures again produce 36 token records with the same 4–5 /
+35–36 token and 14–17-byte deltas. All request, Deny, language, resume and rotation assertions
+remain, with no deadline increase, test skip, Rust/API/authority or dependency change. Fresh
+exact-head full CI and independent review remain required before merge.

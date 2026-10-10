@@ -65,17 +65,30 @@ class Tui:
             # text emission independently of screen layout and spacing.
             if "".join(marker.split()) in "".join(text.split()):
                 return
-            for _ in self.selector.select(0.2):
-                try:
-                    data = os.read(self.master, 65536)
-                except BlockingIOError:
-                    continue
-                if not data:
-                    raise RuntimeError(f"PTY closed while waiting for {marker}: {text}")
-                self.transcript.extend(data)
-                if b"\x1b[6n" in data:
-                    self.write(b"\x1b[1;1R", until)
+            self.pump(until)
         raise RuntimeError(f"waiting for {marker}: {text}")
+
+    def pump(self, until):
+        for _ in self.selector.select(min(0.2, max(0, until - time.monotonic()))):
+            try:
+                data = os.read(self.master, 65536)
+            except BlockingIOError:
+                continue
+            if not data:
+                raise RuntimeError("PTY closed while waiting for interaction")
+            previous = bytes(self.transcript[-3:])
+            self.transcript.extend(data)
+            if b"\x1b[6n" in previous + data:
+                self.write(b"\x1b[1;1R", until)
+
+    def wait_for_turn(self, server, before, history=None):
+        print("TUI waiting for current-turn HTTP continuation", flush=True)
+        try:
+            marker = completion_marker(server, before, history, pump=self.pump)
+        except RuntimeError as error:
+            tail = self.transcript[-8000:].decode(errors="replace")
+            raise RuntimeError(f"{error}; terminal tail: {tail}") from error
+        self.wait_for(marker)
 
     def write(self, data, until):
         while data:
@@ -99,14 +112,16 @@ class Tui:
             self.write(b"\r", until)
 
     def close(self):
+        # Hang up the PTY before waiting: a child blocked writing terminal
+        # output must not depend on a reader that has already stopped pumping.
+        self.selector.close()
+        os.close(self.master)
         self.process.terminate()
         try:
             self.process.wait(timeout=5)
         except subprocess.TimeoutExpired:
             self.process.kill()
             self.process.wait(timeout=5)
-        self.selector.close()
-        os.close(self.master)
 
 
 def review(client, server, expected):
@@ -122,7 +137,7 @@ def review(client, server, expected):
     content = json.dumps(request["messages"], ensure_ascii=False)
     assert all(history not in content for history in HISTORIES.values())
     client.send("3", enter=False)
-    client.wait_for(completion_marker(server, before))
+    client.wait_for_turn(server, before)
     assert any(
         message.get("role") == "tool" and "denied" in str(message.get("content", "")).lower()
         for body in server.conversations[before:] for message in body["messages"]
@@ -168,7 +183,7 @@ locale = "en-US"
                             for _ in range(3):
                                 before = len(server.conversations)
                                 client.send(history)
-                                client.wait_for(completion_marker(server, before, history))
+                                client.wait_for_turn(server, before, history)
                         request = review(client, server, language)
                         if args.capture_dir:
                             args.capture_dir.mkdir(parents=True, exist_ok=True)

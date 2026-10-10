@@ -1086,6 +1086,6 @@ repeating known mistakes.
 - Trigger: I291 macOS real-TUI locale acceptance repeatedly exceeded the 15-minute CI step limit after successful full preflight and nine REPL cases.
 - Symptom: The fresh-interpreter startup repair emitted child-start diagnostics, then no interaction result; exact blocking operation is unknown without a child stack.
 - Root cause: Not established for the CI stall. The driver contained blocking PTY reads/writes after readiness and an unbounded forced-child wait, so its nominal interaction deadline did not cover every operation. Python also documents preexec_fn as unsafe after threads start.
-- Fix: Run controlling-terminal setup in a fresh child interpreter, use a nonblocking master and select-based selector, bound input/cursor responses and forced cleanup, and log every expected marker.
+- Fix: Run controlling-terminal setup in a fresh child interpreter, use a nonblocking master and select-based selector, bound input/cursor responses and forced cleanup, continuously pump output while awaiting provider requests, hang up the PTY before cleanup waits, and log every expected marker.
 - Prevention: Verify missing-marker and saturated-input deadlines with disposable PTY children; keep fresh Darwin real-binary acceptance mandatory rather than infer cross-platform success from Linux or a bootstrap repair.
 - Promoted to rule/check: scripts/accept_auto_locale_tui.py; existing 25-second interaction and 15-minute CI limits retained.

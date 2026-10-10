@@ -107,7 +107,7 @@ class Repl:
         self.selector.close()
 
 
-def completion_marker(server, before, history=None):
+def completion_marker(server, before, history=None, pump=None):
     """Match this turn's HTTP continuation, avoiding old TUI history redraws."""
     until = time.monotonic() + 20
     while time.monotonic() < until:
@@ -118,7 +118,12 @@ def completion_marker(server, before, history=None):
             )
             if matches:
                 return f"LOCALEFIXTUREDONE{index + 1}X"
-        time.sleep(0.01)
+        if pump:
+            # A real terminal must keep draining output and answering cursor
+            # queries while waiting for the provider's current-turn request.
+            pump(until)
+        else:
+            time.sleep(0.01)
     raise RuntimeError("this turn's user/denied-tool continuation was not received")
 
 
