@@ -1,0 +1,14 @@
+{
+  "query": "independently invented fixture Ω",
+  "number_of_results": 6,
+  "monthly_usage": null,
+  "monthly_limit": null,
+  "results": [
+    {"url":"https://example.invalid/index","title":"独立编造 Ω <b>literal</b>","content":"synthetic snippet — 非真实搜索结果","title_highlights":["Ω"],"content_highlights":[],"engine":"mwmbl","score":1.0},
+    {"url":"https://example.invalid/reference","title":"Invented reference","content":"Synthetic reference origin","title_highlights":[],"content_highlights":[],"engine":"wikipedia","score":0.5},
+    {"url":"https://example.invalid/curated-google","title":"Invented curation","content":"Not a live Google result","title_highlights":[],"content_highlights":[],"engine":"google","score":0.3333333333333333},
+    {"url":"http://example.invalid/user","title":"Invented submission","content":"Not an upstream user submission","title_highlights":[],"content_highlights":[],"engine":"user","score":0.25},
+    {"url":"https://example.invalid/external","title":"Invented external label","content":"Not proof of combined-route participation","title_highlights":[],"content_highlights":[],"engine":"eusp","score":0.2},
+    {"url":"https://example.invalid/unknown","title":"Invented future origin","content":"Unknown wire label retained","title_highlights":[],"content_highlights":[],"engine":"future-engine","score":0.16666666666666666}
+  ]
+}

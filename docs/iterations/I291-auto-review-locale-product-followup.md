@@ -516,3 +516,58 @@ integrated source; eighteen new captures again produce 36 token records with the
 35–36 token and 14–17-byte deltas. All request, Deny, language, resume and rotation assertions
 remain, with no deadline increase, test skip, Rust/API/authority or dependency change. Fresh
 exact-head full CI and independent review remain required before merge.
+
+## Slash Input Consumer-Time Guard Recovery (2026-10-10)
+
+Run `38025111929` / CI3099 at `3c597ab50a1b8a65949fe9a328da7034a2ba6447`
+passes Windows Rust workspace, Linux Desktop, installer, reconciliation and macOS complete
+release preflight including external SDK. Nine macOS REPL cases pass. Darwin TUI passes the
+Chinese initial and durable resumed localized prompt with actual manual Deny; `/new` then
+fails its unchanged 25-second marker observation. Cleanup exits within its bounds. Plugin,
+audit and Desktop checks after that failed macOS step are skipped, not claimed passed.
+
+The slash driver formerly wrote the whole command then slept 150ms without pumping output.
+The product's existing 50ms IME guard begins when it consumes the last character, so delayed
+repaint/cursor-query handling can consume the final character and Enter together despite that
+parent-side sleep. This is a concrete fixture timing flaw; no child stack proves that it is the
+sole Darwin cause. Slash characters now each receive a 150ms pumping interval before the next
+key or Enter, within the same 25-second input budget. This reduces output accumulation; it
+does not guarantee consumer timing under arbitrary scheduling, so the real `/new` assertion
+remains the acceptance gate. Normal message input, actual assertions,
+production IME protection, permission authority, Rust APIs and dependencies are unchanged.
+
+A disposable controlling-PTY child emits 256KiB and a cursor-position query after each slash
+character (1MiB total), checks the actual `/new` input and requires Enter at least 50ms after
+consuming the final character. This controlled probe passes with continuous input pacing.
+Fresh real-binary acceptance and new exact-head Darwin full CI remain mandatory before merge.
+
+Cross-session merge coordination is recorded in PR comments `6094155370` and `6094378177`:
+#695 may merge first after its own gates. I291 then reconciles actual target main, retaining
+both Desktop stage/pre-cleanup timing diagnostics and its explanations, and revalidates/reviews
+the resulting head. I291 neither merges #695 nor overwrites that separately owned branch.
+
+Local fixture-stage validation passes both governance validators with zero warnings, all
+fourteen classifier cases, text boundaries, site/installers, Python compilation, whitespace
+and pinned-toolchain formatting. These checks do not substitute for real-binary acceptance
+or new-head full CI. The effective I291 claim remains #650 / Review / Claimed.
+
+Main `e63e0ee3793e2e8fd914f676224f982c6cae5593` merges #693's synthetic search
+wire-characterization evidence. It changes no production CLI/locale source or toolchain.
+Its evidence and owners are retained; the sole conflict is resolved by preserving both
+EVOLUTION lessons, with main's disk-budget lesson 57 and I291's PTY lesson 58. Search
+qualification and #624/#644 completion are not claimed by this locale integration.
+
+Fresh pinned Rust 1.97.0 `cargo build --locked -p talos-cli` succeeds in 9m18s after
+reconstructing the toolchain and locked public dependencies (local debug=0, incremental off,
+two jobs). All nine REPL and nine POSIX TUI cases pass on this integrated source and paced
+input driver, including Chinese/English/Japanese initial and durable resumed localized
+prompts, actual manual Deny, isolated requests, bounded-window switching and `/new` configured
+fallback. Eighteen fresh requests are captured. Integrated governance/claims again pass with
+zero warnings, text boundaries and fourteen classifier cases pass. No new whole-workspace
+local preflight or Darwin pass is inferred from this fixture-stage validation; new exact-head
+full CI and independent review remain mandatory, and #590 remains Review / Claimed.
+
+Thirty-six fresh tiktoken 0.12.0 measurements of those eighteen actual requests reproduce
+4–5 content tokens / 14–17 bytes for the locale field and 35–36 content tokens for field plus
+fixed guidance (cl100k_base/o200k_base). Chat framing, billing and all-model quality remain
+outside this synthetic measurement boundary.

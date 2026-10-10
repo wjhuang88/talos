@@ -103,12 +103,18 @@ class Tui:
     def send(self, value, enter=True):
         self.offset = len(self.transcript)
         until = time.monotonic() + 25
-        self.write(value.encode(), until)
+        if enter and value.startswith("/"):
+            # The 50ms IME guard starts when the app consumes a character,
+            # not when we write it. Pump between keys so repaint/cursor-query
+            # backpressure can drain before the next key or Enter.
+            for character in value:
+                self.write(character.encode(), until)
+                settled = min(until, time.monotonic() + 0.15)
+                while time.monotonic() < settled:
+                    self.pump(settled)
+        else:
+            self.write(value.encode(), until)
         if enter:
-            if value.startswith("/"):
-                # Existing slash picker suppresses Enter inside its 50ms IME
-                # window. Let typed text settle like ordinary user key input.
-                time.sleep(0.15)
             self.write(b"\r", until)
 
     def close(self):
