@@ -13,6 +13,215 @@ use tokio::sync::mpsc;
 use super::*;
 use crate::RequestBudgetSpec;
 
+fn tool_exchange(id: &str, content: &str) -> Vec<Message> {
+    vec![
+        Message::Assistant {
+            content: String::new(),
+            tool_calls: vec![talos_core::message::ToolCall {
+                id: id.into(),
+                name: "read".into(),
+                input: serde_json::json!({"path":"test"}),
+            }],
+            reasoning: None,
+        },
+        Message::Tool {
+            result: talos_core::message::MessageToolResult {
+                tool_use_id: id.into(),
+                content: content.into(),
+                is_error: false,
+            },
+        },
+    ]
+}
+
+fn budget_test_agent() -> Agent {
+    let (model, _) = CapturingModel::new();
+    let mut agent = Agent::with_security_and_hooks(
+        Arc::new(model),
+        ToolRegistry::new(),
+        None,
+        None,
+        PathBuf::from("/tmp"),
+        Arc::new(HookRegistry::new()),
+    );
+    agent.set_request_budget_spec(RequestBudgetSpec::new(1));
+    agent
+}
+
+fn budget_plan(agent: &Agent, messages: Vec<Message>) -> ProviderRequestPlan {
+    ProviderRequestPlan {
+        estimated_tokens: agent.estimate_provider_request_tokens(&messages, &[]),
+        messages,
+        tool_definitions: Vec::new(),
+        omitted_tool_exchanges: 0,
+        tool_protocol: talos_core::tool::ToolProtocol::Native,
+    }
+}
+
+#[test]
+fn recovery_preserves_instructions_latest_exchange_and_original_history() {
+    let agent = budget_test_agent();
+    let mut history = vec![
+        Message::System {
+            content: "immutable system".into(),
+            cache_markers: Vec::new(),
+        },
+        Message::Context {
+            content: "workspace instructions".into(),
+        },
+        Message::User {
+            content: "用户意图🙂".into(),
+        },
+    ];
+    history.extend(tool_exchange("old", &"旧证据".repeat(10_000)));
+    history.push(Message::Multimodal {
+        parts: vec![ContentPart::Text {
+            text: "new user intent".into(),
+        }],
+    });
+    history.extend(tool_exchange("latest", "latest useful result"));
+    let original = history.clone();
+    let mut plan = budget_plan(&agent, history.clone());
+    agent
+        .recover_request_budget(&mut plan, Some(2_000), 0)
+        .expect("bounded recovery");
+    assert!(plan.estimated_tokens <= 2_000);
+    assert_eq!(plan.omitted_tool_exchanges, 1);
+    assert_eq!(history, original);
+    for message in [
+        &original[0],
+        &original[1],
+        &original[2],
+        &original[5],
+        &original[6],
+        &original[7],
+    ] {
+        assert!(plan.messages.contains(message));
+    }
+    assert!(!plan.messages.contains(&original[3]));
+    assert!(!plan.messages.contains(&original[4]));
+}
+
+#[test]
+fn recovery_refuses_incomplete_or_duplicate_tool_results() {
+    let agent = budget_test_agent();
+    let mut malformed = tool_exchange("old", &"x".repeat(20_000));
+    malformed.push(malformed[1].clone());
+    malformed.extend(tool_exchange("latest", "latest"));
+    assert_eq!(complete_tool_exchanges(&malformed), vec![3..5]);
+    let mut plan = budget_plan(&agent, malformed.clone());
+    assert!(
+        agent
+            .recover_request_budget(&mut plan, Some(1_000), 0)
+            .is_err()
+    );
+    assert_eq!(plan.messages, malformed);
+    assert_eq!(plan.omitted_tool_exchanges, 0);
+}
+
+#[test]
+fn recovery_removes_parallel_calls_and_results_atomically() {
+    let agent = budget_test_agent();
+    let mut history = tool_exchange("a", &"x".repeat(20_000));
+    let other = tool_exchange("b", "second result");
+    if let Message::Assistant { tool_calls, .. } = &other[0]
+        && let Message::Assistant {
+            tool_calls: calls, ..
+        } = &mut history[0]
+    {
+        calls.extend(tool_calls.clone());
+    }
+    history.push(other[1].clone());
+    history.extend(tool_exchange("latest", "latest"));
+    assert_eq!(complete_tool_exchanges(&history), vec![0..3, 3..5]);
+    let mut plan = budget_plan(&agent, history);
+    agent
+        .recover_request_budget(&mut plan, Some(1_000), 0)
+        .expect("recovery");
+    assert_eq!(complete_tool_exchanges(&plan.messages), vec![0..2]);
+    assert!(!plan.messages.iter().any(|message| matches!(message, Message::Tool { result } if result.tool_use_id == "a" || result.tool_use_id == "b")));
+}
+
+#[test]
+fn replay_reasoning_is_counted_and_never_removed() {
+    use talos_core::message::{AssistantReasoning, ReasoningBlock};
+    let agent = budget_test_agent();
+    let mut history = tool_exchange("signed", "old");
+    let before = agent.estimate_provider_request_tokens(&history, &[]);
+    if let Message::Assistant { reasoning, .. } = &mut history[0] {
+        *reasoning = Some(AssistantReasoning {
+            provider: "fixture".into(),
+            model: "fixture".into(),
+            blocks: vec![
+                ReasoningBlock::Thinking {
+                    text: "reasoning".repeat(10_000),
+                    signature: Some("opaque-signature".into()),
+                },
+                ReasoningBlock::Redacted {
+                    data: "opaque".into(),
+                },
+            ],
+        });
+    }
+    assert!(agent.estimate_provider_request_tokens(&history, &[]) > before);
+    history.extend(tool_exchange("latest", "latest"));
+    let mut plan = budget_plan(&agent, history.clone());
+    assert!(
+        agent
+            .recover_request_budget(&mut plan, Some(1_000), 0)
+            .is_err()
+    );
+    assert_eq!(plan.messages, history);
+}
+
+#[tokio::test]
+async fn prepared_recovery_dispatches_once_and_preserves_durable_projection() {
+    let (model, requests) = CapturingModel::new();
+    let mut agent = Agent::with_security_and_hooks(
+        Arc::new(model),
+        ToolRegistry::new(),
+        None,
+        None,
+        PathBuf::from("/tmp"),
+        Arc::new(HookRegistry::new()),
+    );
+    agent.set_request_budget_spec(RequestBudgetSpec::new(1));
+    let mut history = tool_exchange("old", &"x".repeat(40_000));
+    history.extend(tool_exchange("latest", "usable"));
+    let items = vec![SubmissionItem {
+        id: "recovery".into(),
+        enqueue_sequence: 0,
+        kind: SubmissionKind::UserTurn,
+        text: "continue without replay".into(),
+        attachments: Vec::new(),
+    }];
+    let prepared = agent
+        .prepare_session_turn(&items, history.clone(), 8_000)
+        .await
+        .expect("prepared recovery");
+    assert_eq!(prepared.initial_plan.omitted_tool_exchanges, 1);
+    for message in &history {
+        assert!(prepared.messages.contains(message));
+    }
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    let (result, _) = agent
+        .run_prepared_session_turn(prepared, tx, None, None, None)
+        .await;
+    assert_eq!(result.expect("response"), "done");
+    let requests = requests.lock().expect("requests");
+    assert_eq!(requests.len(), 1);
+    assert!(!requests[0].messages.contains(&history[1]));
+    let mut budget = None;
+    while let Ok(event) = rx.try_recv() {
+        if let AgentEvent::ContextBudget { budget: facts } = event {
+            budget = Some(facts);
+        }
+    }
+    let budget = budget.expect("missing billing usage must not suppress admission facts");
+    assert!(budget.estimated_tokens <= 8_000);
+    assert_eq!(budget.omitted_tool_exchanges, 1);
+}
+
 #[derive(Clone)]
 struct CapturedRequest {
     messages: Vec<Message>,

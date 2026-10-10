@@ -10,8 +10,8 @@
 | Source Issue | [#644](https://github.com/wjhuang88/talos/issues/644) |
 | Depends on | Accepted ADR-085; SEARCH-001-A / #625 merged as `4567bf85` |
 | Selected Iteration | [I294](../../iterations/I294-search-provider-evidence.md) |
-| Implementation PR | #668 and #673 (merged; evidence only) |
-| Last Updated | 2026-10-08 |
+| Implementation PR | #668, #673, #676 and #686 (merged; evidence only) |
+| Last Updated | 2026-10-09 |
 
 ## Collaboration Claim
 
@@ -65,6 +65,18 @@ rust-websearch compatibility path while evidence is incomplete.
 - #668: evidence register, merged at `08b5bd2188892e3d721d7b5e845fdb35b522af19`.
 - #673: dated source review, merged at `2708db4f56362d626d10b4e5c53fae880e7d3b08`.
 - DDG/Bing terms follow-up: see the register's 2026-10-08 review. No route admitted.
+- #676: terms follow-up, merge `916bc70bc43dcbae1679ea253eb4f2961c459d39`.
+- 2026-10-09 independent-API source review: Mwmbl anonymous standard search is the next technical
+  candidate; Purili applicable-use conditions remain unresolved; Stract hosted route is parked.
+  Source inspection and published policy review only; no live query or regional measurement.
 
 Terms applicability, privacy, authorized fixtures, independent failure domains and genuine regional
 observations remain incomplete. E/F remain gated; this is partial evidence, not completion.
+
+## Standard Route Qualification Checkpoint
+
+#686 source stage merged at `fecc9583992ccf2c0678b58e902f4a3bdcf19d2b`.
+[Mwmbl route packet](../../reference/SEARCH-001-D-MWMBL-ROUTE-QUALIFICATION.md) adds a pinned
+source call-chain/provenance audit and bounded query-free public-schema/input-validation evidence.
+No search query, result response, production behavior or native admission. Source/policy/deployment,
+fixtures, failure-domain and real regional acceptance remain pending; this is partial D evidence.

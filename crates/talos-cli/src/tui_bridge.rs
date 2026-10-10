@@ -817,6 +817,33 @@ async fn handle_session_event(
                 }
             }
         }
+        SessionEvent::SubmissionContextBudget {
+            session_id,
+            session_generation,
+            submission_id,
+            budget,
+        } => {
+            let correlated = matches!(turn_state,
+                BridgeTurnState::AcceptedByActor {
+                    session_id: active_session,
+                    session_generation: active_generation,
+                    submission_id: active_submission,
+                    ..
+                } | BridgeTurnState::StructuredRunning {
+                    session_id: active_session,
+                    session_generation: active_generation,
+                    submission_id: active_submission,
+                    ..
+                } if active_session == &session_id && *active_generation == session_generation
+                    && active_submission == &submission_id);
+            if correlated {
+                for output in engine
+                    .handle_agent_event(&talos_core::message::AgentEvent::ContextBudget { budget })
+                {
+                    let _ = ui_tx.send(output);
+                }
+            }
+        }
         SessionEvent::SubmissionPaused {
             session_id,
             session_generation,
@@ -1653,6 +1680,70 @@ fn handle_structured_turn_event(
 #[cfg(test)]
 mod completion_continuation_tests {
     use super::*;
+
+    #[tokio::test]
+    async fn submission_budget_requires_all_identity_fields_before_and_after_start() {
+        for started in [false, true] {
+            for mismatch in 0..4 {
+                let (mut sender, mut commands) = tokio::sync::mpsc::channel(8);
+                let (_watch_tx, watch_rx) = tokio::sync::watch::channel(sender.clone());
+                let (ui_tx, mut ui_rx) = tokio::sync::mpsc::unbounded_channel();
+                let mut engine = ConversationEngine::new("model".into(), "provider".into());
+                engine.enqueue_steering("test request".into());
+                let submission = engine.prepare_steering_submission().expect("submission");
+                let mut state = if started {
+                    BridgeTurnState::StructuredRunning {
+                        session_id: "session".into(),
+                        session_generation: 7,
+                        submission_id: "submission".into(),
+                        receipt_id: "receipt".into(),
+                        turn_id: "turn".into(),
+                        next_structured_sequence: 1,
+                        next_legacy_sequence: 1,
+                        progress_mode: ProgressMode::Unknown,
+                    }
+                } else {
+                    BridgeTurnState::AcceptedByActor {
+                        session_id: "session".into(),
+                        session_generation: 7,
+                        submission_id: "submission".into(),
+                        receipt_id: "receipt".into(),
+                        submission,
+                        projected: false,
+                        cancel_requested: false,
+                    }
+                };
+                let budget = talos_core::message::ContextBudget {
+                    estimated_tokens: 128006,
+                    limit: Some(128000),
+                    omitted_tool_exchanges: 0,
+                };
+                handle_session_event(
+                    SessionEvent::SubmissionContextBudget {
+                        session_id: if mismatch == 1 { "other" } else { "session" }.into(),
+                        session_generation: if mismatch == 2 { 8 } else { 7 },
+                        submission_id: if mismatch == 3 { "other" } else { "submission" }.into(),
+                        budget,
+                    },
+                    &mut engine,
+                    &mut state,
+                    &mut None,
+                    &mut None,
+                    &watch_rx,
+                    &mut sender,
+                    &mut 7,
+                    &ui_tx,
+                )
+                .await;
+                assert_eq!(
+                    engine.status_snapshot().context_budget,
+                    (mismatch == 0).then_some(budget)
+                );
+                assert_eq!(ui_rx.try_recv().is_ok(), mismatch == 0);
+                assert!(commands.try_recv().is_err());
+            }
+        }
+    }
 
     #[test]
     fn only_success_or_requested_cancellation_allows_queued_continuation() {

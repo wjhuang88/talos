@@ -81,6 +81,7 @@ pub struct ConversationEngine {
     next_steering_sequence: u64,
     pub(crate) followup_queue: Vec<String>,
     pub(crate) usage: Usage,
+    context_budget: Option<talos_core::message::ContextBudget>,
     pub(crate) current_thinking_text: String,
     pub(crate) model_name: String,
     pub(crate) provider_name: String,
@@ -122,6 +123,7 @@ impl ConversationEngine {
             next_steering_sequence: 0,
             followup_queue: Vec::new(),
             usage: Usage::default(),
+            context_budget: None,
             current_thinking_text: String::new(),
             model_name,
             provider_name,
@@ -185,6 +187,7 @@ impl ConversationEngine {
 
     /// Clears the non-persistent override when a session runtime is replaced.
     pub fn reset_auto_override(&mut self) {
+        self.context_budget = None;
         self.auto_override = None;
         if let Some(callback) = &self.auto_mode_callback {
             callback(self.auto_config_enabled);
@@ -227,6 +230,7 @@ impl ConversationEngine {
             provider: self.provider_name.clone(),
             workspace_path: String::new(),
             usage: self.usage.clone(),
+            context_budget: self.context_budget,
             branch_id: self.branch_id.clone(),
             steering_count: self.steering_queue.len(),
             followup_count: self.followup_queue.len(),
@@ -241,6 +245,7 @@ impl ConversationEngine {
     }
 
     pub fn set_model_info(&mut self, info: &crate::types::ModelInfo) {
+        self.context_budget = None;
         self.model_name = info.model_name.clone();
         self.provider_name = info.provider.clone();
         self.context_limit = info.context_limit;
@@ -256,6 +261,7 @@ impl ConversationEngine {
 
     /// Applies the authoritative session-level start of a user turn.
     pub fn handle_turn_started(&mut self) -> Vec<UiOutput> {
+        self.context_budget = None;
         self.pending_tool_calls.clear();
         self.is_processing = true;
         self.current_phase = Some(TurnPhase::Connecting);
@@ -420,6 +426,10 @@ impl ConversationEngine {
         let mut outputs = Vec::new();
 
         match event {
+            AgentEvent::ContextBudget { budget } => {
+                self.context_budget = Some(*budget);
+                outputs.push(UiOutput::Status(self.status_snapshot()));
+            }
             AgentEvent::TurnStart => {
                 outputs.push(UiOutput::ToolActivity(crate::ToolActivity::ResponseStarted));
                 self.pending_tool_calls.clear();

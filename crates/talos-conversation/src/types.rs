@@ -178,6 +178,8 @@ pub struct StatusSnapshot {
     pub provider: String,
     pub workspace_path: String,
     pub usage: Usage,
+    /// Latest complete local request estimate; None means no admission evidence yet.
+    pub context_budget: Option<talos_core::message::ContextBudget>,
     pub branch_id: Option<String>,
     pub steering_count: usize,
     pub followup_count: usize,
