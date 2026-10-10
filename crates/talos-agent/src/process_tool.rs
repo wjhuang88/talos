@@ -51,6 +51,10 @@ impl AgentTool for ProcessTool {
         "Inspect or cancel a Talos-supervised background command owned by this session. Use process(read) with the returned byte cursor, bounded wait_ms, and do not busy-poll; cancel jobs when no longer needed."
     }
 
+    fn summary_fields(&self) -> &'static [&'static str] {
+        &["action", "job_id", "cursor", "max_bytes", "wait_ms"]
+    }
+
     fn parameters(&self) -> Value {
         serde_json::to_value(schemars::schema_for!(ProcessInput))
             .unwrap_or_else(|_| serde_json::json!({}))
@@ -137,6 +141,10 @@ mod tests {
         let (event_tx, _event_rx) = mpsc::unbounded_channel();
         let supervisor = BackgroundJobSupervisor::new(event_tx, "session".to_owned(), 1);
         let tool = ProcessTool::new(supervisor);
+        assert_eq!(
+            tool.summary_fields(),
+            &["action", "job_id", "cursor", "max_bytes", "wait_ms"]
+        );
         let schema = tool.parameters();
         assert_eq!(schema["required"][0], "action");
         assert!(schema["properties"]["max_bytes"].is_object());
