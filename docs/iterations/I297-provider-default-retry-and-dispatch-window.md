@@ -130,6 +130,15 @@ created: this is a narrow maintainer-selected child with no external handoff req
 
 ## Variance And Residuals
 
+- 2026-10-10 bounded CI follow-up: run `38012251384`, Windows job `114096073540`,
+  passed every validation step but exceeded the 30-minute job limit during rust-cache
+  post-job compression. GitHub's annotation explicitly reports the job timeout.
+  Raise only the Windows aggregate budget to 45 minutes to accommodate validation plus
+  cache cleanup; individual step deadlines and all acceptance gates remain unchanged.
+  This mechanical CI follow-up is kept in #694 under the existing-PR maintenance rule;
+  it does not authorize toolchain or provider-scope expansion. Fresh exact-head CI and
+  independent review are required; the cancelled run is not merge approval.
+
 - NET-001 remains the owner for generic retry/circuit-breaker policy and no such architecture is
   selected here.
 - The observed pre-send context-budget telemetry mismatch is a separate residual; it does not
