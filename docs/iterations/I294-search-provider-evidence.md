@@ -10,7 +10,7 @@
 | Source Issue | #644 |
 | Depends on | Accepted ADR-085; SEARCH-001-A / #625 complete; B adapter boundary available |
 | Claim State | Claimed |
-| Research PR | #668, #673, #676, #686 and #687 (merged; partial evidence) |
+| Research PR | #668, #673, #676, #686 and #687 (merged); #693 (Review; partial offline evidence) |
 | Completion | Pending |
 
 ## Collaboration Claim
@@ -24,7 +24,7 @@
 | Claimed At | 2026-10-06 |
 | Source Issue | #644 |
 | Governance Claim PR | #665 |
-| Implementation PR | #668, #673, #676, #686 and #687 (merged; evidence only) |
+| Implementation PR | #668, #673, #676, #686 and #687 (merged); #693 (Review; offline evidence only) |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Governance-only claim+activation PR; exact-head CI, governance validators, remote Issue reconciliation and merge-time CAS required. |
 | Last Updated | 2026-10-10 |
@@ -144,7 +144,7 @@ pinned Rust 1.97.0, locked dependencies, debug=0 for dev/test, no incremental st
 The Oct9 default-debug attempt exhausted disk and was cleaned; these local environment overrides
 do not change source profiles, tests, dependencies, release configuration or CI.
 
-### Local Stage Validation
+### Initial Local Stage Validation
 
 - Focused locked network-feature integration target: nine passed, no skips; targeted Clippy with
   `-D warnings` passed. The locked workspace test run also discovered and passed all nine.
@@ -163,3 +163,40 @@ do not change source profiles, tests, dependencies, release configuration or CI.
   only; D claim, acceptance and search code are unchanged.
 - Qualification packet's local links and `git diff --check` passed. At this local checkpoint, stage submission and
   exact-head CI/review remain pending; whole D acceptance remains pending.
+
+## #693 Baseline Refresh — 2026-10-10
+
+Initial head `75870a360432405c163fafdd580d16d1f4a04dce` received Agent technical APPROVE
+(comment6091964103). CI3088/run38011578886 attempt two passed full unskipped macOS preflight,
+optional language Plugin acceptance, offline dependency audit and Desktop validation. The nine
+new tests and original socket fixture passed. The first-attempt TUI highlighting failure and
+passing focused local retest remain recorded; the precise failure branch is unknown.
+
+Windows attempts one and two were cancelled at the existing 30-minute job cap. Attempt two
+reached workspace test execution but did not finish. Format/check/Clippy/Desktop, focused
+process/permission/timeout tests and I170 walkthrough passed; subsequent test/governance/audit/
+smoke completion is not claimed. These attempts are partial evidence, not a passing CI gate.
+
+The candidate now integrates target `7097f1b503063539a2205e17ae29aed09c7ae32e`, including
+#694's existing 45-minute Windows job budget and independently merged provider-default work,
+and #688's governance-only I296 activation. Rust remains pinned at 1.97.0; the toolchain
+implementation is not part of this slice. No Search claim, acceptance, dependency/lockfile,
+production search or test semantics change. Main's production changes are upstream context,
+not implementation authored by #693. Local checkout/cache was again absent on continuation;
+restored source is verified against the published candidate, and fresh validation is required.
+
+Stage #693 remains in Review; whole D/I294 stays Active/Claimed and incomplete. Fresh exact-head
+CI/Agent review and final CAS supersede old-head approval for merge. E/F gated; #644/#624 open.
+
+### Refreshed Local Checkpoint
+
+- Pinned Rust 1.97.0, locked dependencies, local dev/test debug=0, incremental disabled,
+  four jobs. Standard preflight passed site/installers, both governance validators, text,
+  classifier, formatting, workspace check and Clippy; stopped at the unchanged socket fixture
+  (64 runtime tests passed, one PermissionDenied/OS error 1). No full local preflight pass claimed.
+- With only the previously authorized local socket deferral, locked workspace tests passed:
+  3,576 passed, zero failed/ignored and one filtered; all nine I294 tests included and passed.
+- Independent SDK default and coding validator runs passed. No dependency or lockfile changed.
+- Old candidate parser/fixture are byte-identical. Fresh target Clippy with `-D warnings` and
+  final governance/claim validators passed (zero warnings); changed-file links and diff checks
+  passed. Remote exact-head CI/review and final CAS remain mandatory before merge.

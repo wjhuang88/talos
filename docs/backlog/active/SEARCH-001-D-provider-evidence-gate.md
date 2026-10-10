@@ -10,7 +10,7 @@
 | Source Issue | [#644](https://github.com/wjhuang88/talos/issues/644) |
 | Depends on | Accepted ADR-085; SEARCH-001-A / #625 merged as `4567bf85` |
 | Selected Iteration | [I294](../../iterations/I294-search-provider-evidence.md) |
-| Implementation PR | #668, #673, #676, #686 and #687 (merged; evidence only) |
+| Implementation PR | #668, #673, #676, #686 and #687 (merged); #693 (Review; offline evidence only) |
 | Last Updated | 2026-10-10 |
 
 ## Collaboration Claim
@@ -88,3 +88,7 @@ integration-test parser and independently invented fixture for partial M-Q02..M-
 No production adapter, live response, request, admission or whole-row acceptance. Experimental
 policies still require production review; hosted execution/privacy/use, transport, failure-domain
 and genuine regional qualification remain pending. D stays Active/Claimed and incomplete.
+
+#693 is the current offline evidence review stage. Its old-head macOS gate passed on rerun,
+but two Windows attempts exceeded the 30-minute job cap. Baseline refresh integrates the
+already-merged #694 CI budget fix; fresh full CI/review remain required. No whole-D completion.

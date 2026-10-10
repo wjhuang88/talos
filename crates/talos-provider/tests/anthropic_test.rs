@@ -162,11 +162,11 @@ async fn test_successful_progress_protocol_matches_openai_contract() {
         vec![
             ProviderProgress::InitialDispatch {
                 attempt: 0,
-                max_attempts: 3,
+                max_attempts: 5,
             },
             ProviderProgress::FirstPacketWait {
                 attempt: 0,
-                max_attempts: 3,
+                max_attempts: 5,
             },
         ]
     );

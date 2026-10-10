@@ -4,7 +4,9 @@
 
 I298 context-budget repair is Complete / Closed through implementation #691 (`8d4ad50e`); see
 [I298](I298-context-budget-recovery.md) for the incident, selection inventory and bounded scope.
-I296/I297 remain separate unmerged candidates; no publication authority transfers to this repair.
+I297 is Complete / Closed through #694 (`97b29bd8`); #688 proposes I296 atomic activation
+and remains ineffective until merge.
+The 2026-10-10 serial closeout schedule lives in I297; no publication authority transfers.
 
 Track current iteration plans, execution state, verification evidence, and retrospectives. Each
 iteration's own document is authoritative for its scope and lifecycle.
@@ -12,6 +14,16 @@ iteration's own document is authoritative for its scope and lifecycle.
 The complete pre-closeout index is preserved unchanged at
 [`ITERATIONS-INDEX-pre-I170-closeout-2026-08-01.md`](ITERATIONS-INDEX-pre-I170-closeout-2026-08-01.md).
 That snapshot is historical evidence and not current activation authority.
+
+## Provider Default Reliability Maintenance - 2026-10-09
+
+[I297](I297-provider-default-retry-and-dispatch-window.md) is a separate urgent maintenance slice for
+PROVIDER-007; #694 merged as `97b29bd8`; owner state is Complete / Closed. It
+changes only the defaults for retry dispatches (`3 -> 5`) and
+request dispatch/header wait (`60 -> 300` seconds), preserving explicit configuration, retry
+classification, backoff, stream limits and cancellation behavior. It is deliberately independent of
+the unmerged I296 toolchain proposal and NET-001's unclaimed generic-resilience architecture.
+Full preflight, six exact-head CI jobs, independent Agent review and CAS passed.
 
 ## Frame-Aware Browser Selection — 2026-10-06
 
@@ -22,6 +34,14 @@ delivery remains a downstream residual. At selection, I293/I294 remain Active un
 separate search claims; the maintainer explicitly authorized non-overlapping parallel I295 work
 and owner-first union updates to derived files. I277/I290/I291 remain Review, I249 remains
 deferred Planned and I164 Paused. No status or scope from these owners transfers to I295.
+
+## Rust 1.99 Toolchain Maintenance — 2026-10-09
+
+[I296](I296-rust-199-toolchain-maintenance.md) / TOOLCHAIN-001 proposes Active / Claimed in #688
+for a Rust 1.99 development/CI/release pin. It does not activate until its
+atomic governance claim reaches `main`; it excludes the Rust 1.95 MSRV, dependency graph,
+lockfile and release activity. I293/I294 remain Active under independent Search claims; I290/I291
+remain Review, DEPENDENCY-003-A remains Review/Claimed, I249 remains Planned and I164 Paused.
 
 ## TUI History Return Recovery — 2026-10-03
 
