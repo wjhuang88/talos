@@ -167,3 +167,11 @@ evidence/status commit does not self-certify completion. Issue #316 remains sepa
 
 Completion Commit: `5a1709cbcdb4ec1960fae637bfe48cd93e817d87`. The commit predates this
 status update and contains the implementation code merged through PR #318.
+
+## Follow-up Requirement — 2026-10-09
+
+The maintainer requested catalog inference for image input, reasoning and output limits in addition
+to context windows. [MODEL-014](MODEL-014-catalog-capability-inference.md) owns this expanded scope
+and its future acceptance. This document and I212 retain their completed context-only baseline;
+the exclusions above describe that delivered slice. MODEL-014 remains Refinement / Unclaimed,
+and MODEL-011 / #124 continues to own active endpoint probing.

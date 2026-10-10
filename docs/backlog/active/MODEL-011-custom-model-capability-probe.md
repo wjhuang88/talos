@@ -74,3 +74,11 @@ Refine a decision covering probe protocol/versioning, adapter-specific capabilit
 ## Residual Destination
 
 Extended maximum-context probing, automated fleet probing and provider-specific benchmark suites require separate owners and cost/privacy decisions.
+
+## Related Catalog Inference — 2026-10-09
+
+[MODEL-014](MODEL-014-catalog-capability-inference.md) records the maintainer-requested expansion
+of local catalog inference to image input, reasoning and output limits. It remains Refinement /
+Unclaimed and must coordinate evidence precedence with this Story. Inferred metadata is not
+endpoint-tested evidence; MODEL-014 neither implements nor completes MODEL-011 / #124. The probe
+workflow, explicit cost confirmation and evidence freshness requirements above remain unchanged.
