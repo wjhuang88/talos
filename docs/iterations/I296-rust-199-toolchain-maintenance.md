@@ -1,6 +1,6 @@
 # Iteration I296: Rust 1.99 Toolchain Maintenance
 
-> Document status: Review
+> Document status: Complete
 > Published plan date: 2026-10-09
 > Planned objective: advance the pinned development, CI and release compiler to Rust 1.99 without changing the Rust 1.95 workspace MSRV or dependency graph.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | I296/TOOLCHAIN-001 only: Rust 1.99 development/CI/release pins, matching docs/assertion and compiler-required source compatibility. Preserve MSRV 1.95, lockfile, dependencies, behavior and release version. |
@@ -21,7 +21,7 @@
 | Authorization Evidence | Maintainer authorized serial I297 then I296 closeout on 2026-10-10. No independent human maintainer is available; independent Agent review, exact-head CI, both validators and merge-time CAS remain mandatory. #688 merged as `7097f1b5`; review/CAS comment `6093090485` and CI `38018790824` establish effective activation. |
 | Implementation PR | #695 |
 | Last Updated | 2026-10-10 |
-| Handoff / Release Condition | Atomic claim+activation must merge before code/configuration commits are created. |
+| Handoff / Release Condition | Implementation #695 merged; owner closeout requires its own exact-head checks, independent review and CAS. No release authorized. |
 
 ## Published Baseline
 
@@ -90,7 +90,7 @@
 
 ## Completion Evidence
 
-- Completion Commit: pending
+- Completion Commit: 435b6cf5f3cb11ebb34271bd666a614c4bc8092b
 
 ## Atomic Activation Checkpoint - 2026-10-10
 
@@ -171,3 +171,52 @@ The final diagnostic-only patch preserves existing pass/fail criteria. Its full
 macOS Desktop feature suite passed (112 tests, locked resolution). Final-head
 review/CI remain pending; the earlier complete workspace preflight still covers
 the unchanged production code.
+
+## Implementation Merge And Owner-First Closeout - 2026-10-10
+
+PR #695 merged into `main` as `435b6cf5f3cb11ebb34271bd666a614c4bc8092b`.
+This existing implementation merge, not the later status-only commit, is completion evidence.
+Published Baseline and historical checkpoints above are unchanged; their pending statements
+are superseded by this checkpoint.
+
+- Final exact head: `63b0c1e4b125cf0f20196ac997d76050c53325dc`.
+- Final exact base: `e63e0ee3793e2e8fd914f676224f982c6cae5593` (#693).
+- Exact-head CI: `38029259357`, all six jobs successful, including macOS full
+  preflight and Windows workspace (44m44s), Desktop features and CLI smoke.
+- Independent Agent technical/API/governance APPROVE: #695 comment `6094474271`,
+  bound to that head/base; no blockers. Reviewer was implementation-uninvolved,
+  not an independent human or separate GitHub identity, and did not rerun tests.
+- Merge-time CAS: #695 comment `6094762104`; effective #688 claim, unchanged
+  head/base, green CI, review and feedback checked. #696 was non-overlapping.
+- #682's actual assertion overlap was disclosed and its owner acknowledged
+  #695-first order in comment `6094378177`. #682 owns subsequent reconciliation,
+  retaining stage/pre-cleanup timing plus `explanations`, with fresh CI/review.
+- Rebase from `7097f1b5` to `e63e0ee3` preserved the three implementation commits'
+  patches (range-diff checked). Earlier CI/reviews are historical, not final-head proof.
+- Post-rebase local Desktop cold compilation exhausted disk; authorized `cargo clean`
+  removed 4.0 GiB. No post-rebase local Desktop pass is claimed; final-head remote
+  CI supplies that evidence. Earlier full local preflight and 112 Desktop tests
+  remain dated component evidence.
+
+Acceptance is satisfied: development/CI/release pins, locale assertion and both
+installation pages agree on Rust 1.99; locked checks, Clippy, tests and preflight
+passed; both direct atomic renames retain semantics and passed the isolated 1.95
+compatibility harness. This does not claim a full-workspace Rust 1.95 test run.
+No dependency graph, lockfile, MSRV, public API, permission policy or version changed.
+The earlier Windows watchdog failure remains an unproven timing incident; diagnostics
+and a green final run are not a root-cause repair claim. Transitive `block v0.1.6`
+future-incompatibility remains the existing out-of-scope dependency residual.
+
+Final implementation inventory (14 files): `.github/workflows/ci.yml`,
+`.github/workflows/release.yml`, `rust-toolchain.toml`,
+`crates/talos-desktop/src/runtime_host.rs`,
+`crates/talos-desktop/src/runtime_host/auto_tests.rs`,
+`crates/talos-tools/src/browser_executor/host.rs`, `scripts/measure_auto_locale.py`,
+`site/install.html`, `site/zh/install.html`, this owner, the TOOLCHAIN-001 owner,
+`docs/BOARD.md`, `docs/backlog/PRODUCT-BACKLOG.md`, and `docs/iterations/README.md`.
+
+Closeout scope: this owner first, TOOLCHAIN-001 second, then the three derived
+views; documentation-only validators, exact-head CI, independent review and CAS.
+No source Issue exists to close. Other owners and stashes are preserved; no new
+iteration, release, tag or publication is activated. Complete/Closed becomes
+target-branch truth only when this closeout merges.

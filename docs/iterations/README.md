@@ -5,7 +5,8 @@
 I298 context-budget repair is Complete / Closed through implementation #691 (`8d4ad50e`); see
 [I298](I298-context-budget-recovery.md) for the incident, selection inventory and bounded scope.
 I297 is Complete / Closed through #694 (`97b29bd8`); #688 merged as `7097f1b5`,
-closing I297 and establishing I296 atomic activation.
+closing I297 and establishing I296 atomic activation. I296 now records Complete / Closed
+using implementation #695 merge `435b6cf5` in its owner-first closeout.
 The 2026-10-10 serial closeout schedule lives in I297; no publication authority transfers.
 
 Track current iteration plans, execution state, verification evidence, and retrospectives. Each
@@ -37,10 +38,12 @@ deferred Planned and I164 Paused. No status or scope from these owners transfers
 
 ## Rust 1.99 Toolchain Maintenance — 2026-10-09
 
-[I296](I296-rust-199-toolchain-maintenance.md) / TOOLCHAIN-001 is Review / Claimed through
-#688 merge `7097f1b5` for a Rust 1.99 development/CI/release pin. Local implementation
-and full local preflight passed; exact-head CI/review remain pending. It excludes the Rust 1.95 MSRV, dependency graph,
-lockfile and release activity. I293/I294 remain Active under independent Search claims; I290/I291
+[I296](I296-rust-199-toolchain-maintenance.md) / TOOLCHAIN-001 is Complete / Closed through
+implementation #695 merge `435b6cf5` for a Rust 1.99 development/CI/release pin.
+Full local preflight and final exact-head CI `38029259357` (six jobs), independent Agent
+APPROVE and CAS passed. The owner preserves the earlier Windows failure and dependency
+warning without claiming a timing root-cause repair. It excludes the Rust 1.95 MSRV,
+dependency graph, lockfile and release activity. I293/I294 remain Active under independent Search claims; I290/I291
 remain Review, DEPENDENCY-003-A remains Review/Claimed, I249 remains Planned and I164 Paused.
 
 ## TUI History Return Recovery — 2026-10-03

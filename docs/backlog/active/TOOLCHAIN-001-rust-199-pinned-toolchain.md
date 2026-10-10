@@ -1,20 +1,20 @@
 # TOOLCHAIN-001: Rust 1.99 Pinned Toolchain Maintenance
 
-> Document status: Review / Claimed
+> Document status: Complete / Closed
 
 | Field | Value |
 |---|---|
 | Type | Toolchain and CI maintenance |
 | Priority | P2 |
 | Source | Maintainer-authorized maintenance request |
-| Selected Iteration | I296 (Review; #688 merged as `7097f1b5`) |
+| Selected Iteration | I296 (Complete; implementation #695 merged as `435b6cf5`) |
 | Depends On | Current `main`; effective I296 Collaboration Claim |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | I296/TOOLCHAIN-001: Rust 1.99 pins, matching docs/assertion and compiler-required source compatibility; no MSRV, dependency, lockfile, behavior or release change. |
@@ -25,7 +25,7 @@
 | Authorization Evidence | Maintainer authorized serial I297/I296 closeout on 2026-10-10. Independent human unavailable; Agent review, exact-head CI, validators and CAS required. #688 merged as `7097f1b5`; review/CAS comment `6093090485` and CI `38018790824` establish the effective claim. |
 | Implementation PR | #695 |
 | Last Updated | 2026-10-10 |
-| Handoff / Release Condition | Atomic claim+activation must merge to `main` before implementation begins. |
+| Handoff / Release Condition | Implementation merged; owner-first closeout needs its own checks, review and CAS. No release authorized. |
 
 ## Scope
 
@@ -68,5 +68,21 @@ wording records the proposal stage, not a remaining activation blocker.
 
 - Windows CI watchdog failure and bounded test-only diagnostic follow-up are
   recorded in I296's Windows Validation Follow-up checkpoint. Production behavior
-  is unchanged; final-head Windows acceptance remains required before merge.
+  is unchanged; final-head Windows acceptance passed in CI `38029259357`.
 - Existing third-party future-incompatibility notice for transitive `block v0.1.6` is not changed by this maintenance slice.
+
+## Completion - 2026-10-10
+
+- Completion Commit: 435b6cf5f3cb11ebb34271bd666a614c4bc8092b
+- Implementation #695 merged with exact head `63b0c1e4b125cf0f20196ac997d76050c53325dc`
+  and base `e63e0ee3793e2e8fd914f676224f982c6cae5593`.
+- CI `38029259357`: all six jobs passed. Independent Agent APPROVE is #695
+  comment `6094474271`; merge-time CAS is comment `6094762104`.
+- Pins, locale assertion and bilingual installation docs agree on Rust 1.99;
+  locked full validation passed. Atomic changes preserve behavior and passed an
+  isolated Rust 1.95 harness; no full-workspace MSRV test is claimed.
+- I296 records the complete inventory, original Windows failure, diagnostic-only
+  follow-up, rebase evidence, local disk limitation and #682 serial coordination.
+  Earlier pending statements above are historical and superseded by this checkpoint.
+- No lockfile, dependency, MSRV, public API, runtime policy or release change.
+  Complete/Closed takes effect on main with the separately validated closeout merge.
