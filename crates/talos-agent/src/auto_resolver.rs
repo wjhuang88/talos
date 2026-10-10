@@ -59,6 +59,7 @@ struct LocaleEvidence {
 
 struct SessionLocale {
     session_id: Option<String>,
+    session_revision: u64,
     selected: ConversationLocale,
     fallback: ConversationLocale,
     history_observed: bool,
@@ -67,7 +68,13 @@ struct SessionLocale {
 }
 
 impl SessionLocale {
-    fn bind_session(&mut self, session_id: &str) {
+    fn bind_session(&mut self, session_id: &str, revision: u64) -> bool {
+        // Rebind increases the permission store generation. Delayed older
+        // snapshots must not discard newer presentation history.
+        if revision < self.session_revision {
+            return false;
+        }
+        self.session_revision = revision;
         if self.session_id.as_deref() != Some(session_id) {
             self.session_id = Some(session_id.to_owned());
             self.selected = self.fallback.clone();
@@ -75,6 +82,7 @@ impl SessionLocale {
             self.selected_is_fallback = true;
             self.evidence.clear();
         }
+        true
     }
 
     fn cached_evidence(
@@ -347,6 +355,20 @@ impl ManagedWorkspaceLease {
         )
     }
 
+    fn locale_session_binding(&self) -> Option<(String, u64)> {
+        self.permission_state.as_ref().map_or_else(
+            || Some((self.session_id.clone(), 0)),
+            |state| {
+                state.state_snapshot().ok().map(|snapshot| {
+                    (
+                        snapshot.session_id.stable_id(),
+                        snapshot.revisions.as_array()[5],
+                    )
+                })
+            },
+        )
+    }
+
     fn allows(&self, path: &Path) -> bool {
         if self.atomic_create.is_none() {
             return false;
@@ -603,6 +625,99 @@ struct AutoPermissionWireResponse {
     effect_summary: Option<String>,
     #[serde(default)]
     decision_points: Vec<String>,
+}
+
+/// Fixed, content-free failure copy. Diagnostic reason codes remain language-independent.
+fn technical_review_explanation(reason: &str, locale: &str) -> &'static str {
+    let language = locale.split('-').next().unwrap_or(locale);
+    match (reason, language) {
+        ("execution_context_unavailable", "zh") => {
+            "模型评估无法开始：工具未提供可信的执行目录。未读取任何脚本文件；请先检查工具上下文，再作决定。"
+        }
+        ("execution_context_unavailable", "ja") => {
+            "モデル評価を開始できませんでした。ツールが信頼できる実行ディレクトリを提供していません。スクリプトは読み込まれていません。判断する前にツールの実行環境を確認してください。"
+        }
+        ("execution_context_unavailable", _) => {
+            "Model assessment could not start: the tool did not provide a trusted execution directory. No script files were read; review the tool context before deciding."
+        }
+        ("review_input_limit", "zh") => {
+            "模型评估无法开始：命令超过完整输入长度限制。未提交截断的命令；请检查完整命令，再作决定。"
+        }
+        ("review_input_limit", "ja") => {
+            "モデル評価を開始できませんでした。コマンドが完全入力の長さ制限を超えています。切り詰めたコマンドは送信していません。判断する前にコマンド全体を確認してください。"
+        }
+        ("review_input_limit", _) => {
+            "Model assessment could not start: the command exceeds the complete-input limit. No truncated command was submitted. Review the full command before deciding."
+        }
+        ("review_sensitive_input", "zh") => {
+            "模型评估无法开始：命令可能包含凭据，未发送给评估器。请在本地检查命令，并确认预期目标和影响。"
+        }
+        ("review_sensitive_input", "ja") => {
+            "モデル評価を開始できませんでした。コマンドに認証情報が含まれる可能性があるため、評価器には送信していません。ローカルでコマンドを確認し、対象と影響を確かめてください。"
+        }
+        ("review_sensitive_input", _) => {
+            "Model assessment could not start: the command may contain credentials. It was not sent to the assessor. Review it locally and confirm the intended targets and effects."
+        }
+        ("review_context_unavailable", "zh") => {
+            "模型评估无法开始：缺少完整可信的执行上下文。未产生安全结论。"
+        }
+        ("review_context_unavailable", "ja") => {
+            "モデル評価を開始できませんでした。完全で信頼できる実行環境の情報がありません。安全性の判定は行われていません。"
+        }
+        ("review_context_unavailable", _) => {
+            "Model assessment could not start: complete trusted execution context is unavailable. No safety verdict was produced."
+        }
+        ("classifier_not_eligible", "zh") => {
+            "此工具请求无法进行自动评估。请检查目标和影响，再作决定。"
+        }
+        ("classifier_not_eligible", "ja") => {
+            "このツール要求では自動評価を利用できません。判断する前に対象と影響を確認してください。"
+        }
+        ("classifier_not_eligible", _) => {
+            "Automatic assessment is unavailable for this tool request. Review its targets and effects before deciding."
+        }
+        ("session_mode_changed", "zh") => "评估期间自动模式已改变。旧的模型结果不能授权此请求。",
+        ("session_mode_changed", "ja") => {
+            "評価中に自動モードが変更されました。以前のモデル結果ではこの要求を許可できません。"
+        }
+        ("session_mode_changed", _) => {
+            "Auto mode changed during assessment. The old model result cannot authorize this request."
+        }
+        ("assessment_context_changed", "zh") => {
+            "评估期间执行上下文或脚本证据已改变。先前的模型结果已失效；请检查当前命令，再作决定。"
+        }
+        ("assessment_context_changed", "ja") => {
+            "評価中に実行環境またはスクリプトの証拠が変更されました。以前のモデル結果は無効です。判断する前に現在のコマンドを確認してください。"
+        }
+        ("assessment_context_changed", _) => {
+            "Execution context or script evidence changed during assessment. The previous model result is no longer valid; review the current command before deciding."
+        }
+        ("malformed_output", "zh") => {
+            "模型评估返回了无效响应。没有经过验证的安全结论；请独立检查命令。"
+        }
+        ("malformed_output", "ja") => {
+            "モデル評価が無効な応答を返しました。検証済みの安全性判定はありません。コマンドを独立して確認してください。"
+        }
+        ("malformed_output", _) => {
+            "Model assessment returned an invalid response. No verified safety verdict is available; review the command independently."
+        }
+        ("validation_failed", "zh") => {
+            "无法验证模型评估是否适用于此请求。请独立检查命令，再作决定。"
+        }
+        ("validation_failed", "ja") => {
+            "この要求に対するモデル評価を検証できませんでした。判断する前にコマンドを独立して確認してください。"
+        }
+        ("validation_failed", _) => {
+            "Model assessment could not be verified for this request. Review the command independently before deciding."
+        }
+        (_, "zh") => "模型评估未完成。没有可用的模型安全结论；请检查命令及其影响，再作决定。",
+        (_, "ja") => {
+            "モデル評価は完了しませんでした。モデルによる安全性判定は利用できません。判断する前にコマンドとその影響を確認してください。"
+        }
+        (_, _) => {
+            "Model assessment did not complete. No model safety verdict is available; review the command and its effects before deciding."
+        }
+    }
 }
 
 fn human_review_explanation(
@@ -1049,6 +1164,7 @@ impl AutoPermissionResolver {
                 let fallback = ConversationLocale::configured();
                 SessionLocale {
                     session_id,
+                    session_revision: 0,
                     selected: fallback.clone(),
                     fallback,
                     history_observed: false,
@@ -1840,10 +1956,22 @@ fn project_auto_request(
 
 impl AutoPermissionResolver {
     fn observe_locale(&self, session_id: &str, messages: &[String]) {
+        let Some((current_id, revision)) = self.lease.locale_session_binding() else {
+            return;
+        };
+        if current_id != session_id {
+            return;
+        }
+        self.observe_locale_at(session_id, revision, messages);
+    }
+
+    fn observe_locale_at(&self, session_id: &str, revision: u64, messages: &[String]) {
         let Ok(mut current) = self.locale.lock() else {
             return;
         };
-        current.bind_session(session_id);
+        if !current.bind_session(session_id, revision) {
+            return;
+        }
         if messages.is_empty() {
             return;
         }
@@ -1885,6 +2013,13 @@ impl AutoPermissionResolver {
             .unwrap_or(configured);
         current.history_observed = true;
         current.evidence = evidence;
+    }
+
+    fn failure_locale(&self) -> ConversationLocale {
+        self.locale
+            .lock()
+            .map(|current| current.fallback.clone())
+            .unwrap_or_else(|_| ConversationLocale::configured())
     }
 }
 
@@ -1976,8 +2111,17 @@ impl ApprovalResolver for AutoPermissionResolver {
                 evaluator: self.assessor.identity().into(),
                 request_digest: "unavailable".into(),
             });
-            return self.fallback.resolve_with_explanation(request, remaining,
-                "Model assessment could not start: the tool did not provide a trusted execution directory. No script files were read; review the tool context before deciding.").await;
+            return self
+                .fallback
+                .resolve_with_explanation(
+                    request,
+                    remaining,
+                    technical_review_explanation(
+                        "execution_context_unavailable",
+                        self.failure_locale().as_str(),
+                    ),
+                )
+                .await;
         };
         let cwd = Some(working_directory)
             .and_then(|path| path.canonicalize().ok())
@@ -2041,13 +2185,17 @@ impl AutoPermissionResolver {
             assessment_request.arguments = input.clone();
         }
         self.sync_reset();
-        let session_id = self.lease.current_session_id();
+        let failure_locale = self.failure_locale();
+        let session_binding = self.lease.locale_session_binding();
         let locale = {
             match self.locale.lock() {
                 Ok(mut current) => {
-                    if let Some(session_id) = session_id {
-                        current.bind_session(&session_id);
-                        current.for_assessment(user_intent)
+                    if let Some((session_id, revision)) = session_binding {
+                        if current.bind_session(&session_id, revision) {
+                            current.for_assessment(user_intent)
+                        } else {
+                            current.fallback.clone()
+                        }
                     } else {
                         current.fallback.clone()
                     }
@@ -2089,30 +2237,22 @@ impl AutoPermissionResolver {
             project_auto_request(&assessment_request, &self.lease, user_intent)
         else {
             let shell = matches!(assessment_request.tool_name.as_str(), "bash" | "powershell");
-            let (reason, explanation) = if shell {
+            let reason = if shell {
                 match assessment_request
                     .arguments
                     .get("command")
                     .and_then(serde_json::Value::as_str)
                 {
-                    Some(command) if command.len() > MAX_SHELL_COMMAND_BYTES => (
-                        "review_input_limit",
-                        "Model assessment could not start: the command exceeds the complete-input limit. No truncated command was submitted. Review the full command before deciding.",
-                    ),
-                    Some(command) if contains_secret_like_shell_input(command) => (
-                        "review_sensitive_input",
-                        "Model assessment could not start: the command may contain credentials. It was not sent to the assessor. Review it locally and confirm the intended targets and effects.",
-                    ),
-                    _ => (
-                        "review_context_unavailable",
-                        "Model assessment could not start: complete trusted execution context is unavailable. No safety verdict was produced.",
-                    ),
+                    Some(command) if command.len() > MAX_SHELL_COMMAND_BYTES => {
+                        "review_input_limit"
+                    }
+                    Some(command) if contains_secret_like_shell_input(command) => {
+                        "review_sensitive_input"
+                    }
+                    _ => "review_context_unavailable",
                 }
             } else {
-                (
-                    "classifier_not_eligible",
-                    "Automatic assessment is unavailable for this tool request. Review its targets and effects before deciding.",
-                )
+                "classifier_not_eligible"
             };
             self.report(AutoDecisionReport {
                 outcome: "human_required".into(),
@@ -2122,7 +2262,11 @@ impl AutoPermissionResolver {
             });
             return self
                 .fallback
-                .resolve_with_explanation(request, remaining, explanation)
+                .resolve_with_explanation(
+                    request,
+                    remaining,
+                    technical_review_explanation(reason, failure_locale.as_str()),
+                )
                 .await;
         };
         let budget = remaining.min(self.deadline);
@@ -2204,8 +2348,9 @@ impl AutoPermissionResolver {
                 return self
                     .fallback
                     .resolve_with_explanation(
-                        request, remaining.saturating_sub(started.elapsed()),
-                        "Model assessment did not complete. No model safety verdict is available; review the command and its effects before deciding.",
+                        request,
+                        remaining.saturating_sub(started.elapsed()),
+                        technical_review_explanation(reason, failure_locale.as_str()),
                     )
                     .await;
             }
@@ -2222,8 +2367,9 @@ impl AutoPermissionResolver {
             return self
                 .fallback
                 .resolve_with_explanation(
-                    request, remaining.saturating_sub(started.elapsed()),
-                    "Auto mode changed during assessment. The old model result cannot authorize this request.",
+                    request,
+                    remaining.saturating_sub(started.elapsed()),
+                    technical_review_explanation("session_mode_changed", failure_locale.as_str()),
                 )
                 .await;
         }
@@ -2239,8 +2385,12 @@ impl AutoPermissionResolver {
             return self
                 .fallback
                 .resolve_with_explanation(
-                    request, remaining.saturating_sub(started.elapsed()),
-                    "Execution context or script evidence changed during assessment. The previous model result is no longer valid; review the current command before deciding.",
+                    request,
+                    remaining.saturating_sub(started.elapsed()),
+                    technical_review_explanation(
+                        "assessment_context_changed",
+                        failure_locale.as_str(),
+                    ),
                 )
                 .await;
         }
@@ -2266,8 +2416,9 @@ impl AutoPermissionResolver {
                 return self
                     .fallback
                     .resolve_with_explanation(
-                        request, remaining.saturating_sub(started.elapsed()),
-                        "Model assessment returned an invalid response. No verified safety verdict is available; review the command independently.",
+                        request,
+                        remaining.saturating_sub(started.elapsed()),
+                        technical_review_explanation("malformed_output", failure_locale.as_str()),
                     )
                     .await;
             }
@@ -2348,7 +2499,8 @@ impl AutoPermissionResolver {
             let explanation = if response_bound {
                 human_review_explanation(&response, !auto_assessment_allowed, locale.as_str())
             } else {
-                "Model assessment could not be verified for this request. Review the command independently before deciding.".to_owned()
+                technical_review_explanation("validation_failed", failure_locale.as_str())
+                    .to_owned()
             };
             self.fallback
                 .resolve_with_explanation(
@@ -3831,6 +3983,120 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn technical_failure_copy_uses_configured_fallback_not_detected_history() {
+        for (locale, marker) in [
+            ("zh-Hans-CN", "模型评估"),
+            ("ja-JP", "モデル評価"),
+            ("en-001", "Model assessment"),
+            ("fr-FR", "Model assessment"),
+        ] {
+            for (raw, reason) in [
+                ("not-json", "malformed_output"),
+                (
+                    r#"{"schema_version":1,"request_digest":"sha256:wrong","decision":"allow_once","effect":"read_only","reason_code":"bounded_read_only_command","confidence":"high"}"#,
+                    "validation_failed",
+                ),
+            ] {
+                let root = tempfile::tempdir().expect("root");
+                let state = PermissionSessionState::new(PermissionEngine::with_workspace_root(
+                    root.path().to_path_buf(),
+                ));
+                let captured = Arc::new(Mutex::new(Vec::new()));
+                let resolver = AutoPermissionResolver::new(
+                    Arc::new(RawAssessor(raw)),
+                    Arc::new(ExplanationCapture(captured.clone())),
+                    ManagedWorkspaceLease::new(
+                        root.path(),
+                        state.session_id().expect("session").stable_id(),
+                    )
+                    .expect("lease"),
+                    Duration::from_secs(8),
+                    AutoPermissionControl::new(true),
+                )
+                .with_locale(Some(locale));
+                // Force history selection to differ from the configured failure language.
+                let history = if locale.starts_with("ja") {
+                    "请检查文件"
+                } else {
+                    "このファイルを確認してください"
+                };
+                resolver.observe_user_messages(&[history.to_owned()]);
+                assert_ne!(
+                    resolver.locale.lock().expect("locale").selected.as_str(),
+                    locale.split('-').next().expect("language")
+                );
+                let request = shell_approval_request(root.path(), &state, "ls -la");
+                assert_eq!(
+                    resolver
+                        .resolve_with_auto_assessment(
+                            request,
+                            Duration::from_secs(1),
+                            true,
+                            Some("Please inspect the file")
+                        )
+                        .await
+                        .expect("human fallback"),
+                    ApprovalChoice::Deny
+                );
+                let report = resolver.last_report().expect("report");
+                assert_eq!(report.outcome, "human_required");
+                assert_eq!(report.reason, reason);
+                let explanations = captured.lock().expect("explanations");
+                assert_eq!(explanations.len(), 1);
+                assert!(explanations[0].contains(marker), "{}", explanations[0]);
+                assert!(!explanations[0].contains(history));
+                assert!(!explanations[0].contains(raw));
+            }
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn technical_timeout_copy_keeps_budget_reason_and_human_authority() {
+        for (locale, marker) in [
+            ("zh-CN", "模型评估未完成"),
+            ("ja-JP", "モデル評価は完了しませんでした"),
+            ("en-US", "Model assessment did not complete"),
+        ] {
+            let root = tempfile::tempdir().expect("root");
+            let state = PermissionSessionState::new(PermissionEngine::with_workspace_root(
+                root.path().to_path_buf(),
+            ));
+            let captured = Arc::new(Mutex::new(Vec::new()));
+            let resolver = AutoPermissionResolver::new(
+                Arc::new(SlowAssessor),
+                Arc::new(ExplanationCapture(captured.clone())),
+                ManagedWorkspaceLease::new(
+                    root.path(),
+                    state.session_id().expect("session").stable_id(),
+                )
+                .expect("lease"),
+                Duration::from_millis(10),
+                AutoPermissionControl::new(true),
+            )
+            .with_locale(Some(locale));
+            let request = shell_approval_request(root.path(), &state, "ls -la");
+            let started = tokio::time::Instant::now();
+            assert_eq!(
+                resolver
+                    .resolve_with_auto_assessment(
+                        request,
+                        Duration::from_secs(1),
+                        true,
+                        Some("inspect the workspace"),
+                    )
+                    .await
+                    .expect("human fallback"),
+                ApprovalChoice::Deny
+            );
+            let report = resolver.last_report().expect("report");
+            assert_eq!(report.reason, "review_timeout");
+            assert_eq!(report.outcome, "human_required");
+            assert_eq!(started.elapsed(), Duration::from_millis(10));
+            assert!(captured.lock().expect("explanations")[0].contains(marker));
+        }
+    }
+
+    #[tokio::test]
     async fn malformed_or_wrong_digest_output_falls_back() {
         for (raw, expected_reason) in [
             ("not-json", "malformed_output"),
@@ -4016,6 +4282,7 @@ mod tests {
     fn history_selection_is_stable_across_repeated_approval_intents() {
         let state = SessionLocale {
             session_id: None,
+            session_revision: 0,
             selected: ConversationLocale("ja".into()),
             fallback: ConversationLocale("en-US".into()),
             history_observed: true,
@@ -4027,6 +4294,7 @@ mod tests {
         }
         let compatibility = SessionLocale {
             session_id: None,
+            session_revision: 0,
             selected: ConversationLocale("en-US".into()),
             fallback: ConversationLocale("en-US".into()),
             history_observed: false,
@@ -4074,6 +4342,7 @@ mod tests {
     fn locale_evidence_reuses_detection_and_reset_discards_cache() {
         let mut state = SessionLocale {
             session_id: Some("first".into()),
+            session_revision: 0,
             selected: ConversationLocale("zh".into()),
             fallback: ConversationLocale("en-US".into()),
             history_observed: true,
@@ -4089,11 +4358,70 @@ mod tests {
         let entry = state.cached_evidence([1; 32], || panic!("cached evidence must be reused"));
         assert_eq!(entry.locale.as_str(), "zh");
         assert_eq!(detections, 1);
-        state.bind_session("second");
+        assert!(state.bind_session("second", 1));
         assert!(state.evidence.is_empty());
         assert!(!state.history_observed);
         assert!(state.selected_is_fallback);
         assert_eq!(state.selected.as_str(), "en-US");
+    }
+
+    #[test]
+    fn delayed_locale_snapshot_cannot_discard_rebound_history() {
+        let root = tempfile::tempdir().expect("root");
+        let permission = Arc::new(PermissionSessionState::new(
+            PermissionEngine::with_workspace_root(root.path().to_path_buf()),
+        ));
+        let resolver = AutoPermissionResolver::new(
+            Arc::new(ShellAssessor),
+            Arc::new(DenyFallback),
+            ManagedWorkspaceLease::for_permission_session(root.path(), permission.clone())
+                .expect("lease"),
+            Duration::from_secs(1),
+            AutoPermissionControl::new(true),
+        )
+        .with_locale(Some("en-US"));
+        let (captured_tx, captured_rx) = std::sync::mpsc::channel();
+        let (release_tx, release_rx) = std::sync::mpsc::channel();
+        std::thread::scope(|scope| {
+            let resolver_ref = &resolver;
+            let old = scope.spawn(move || {
+                // Pause at the production capture-to-locale-lock boundary.
+                let (id, revision) = resolver_ref
+                    .lease
+                    .locale_session_binding()
+                    .expect("old stamp");
+                captured_tx.send((id.clone(), revision)).expect("captured");
+                release_rx.recv().expect("release old snapshot");
+                resolver_ref.observe_locale_at(&id, revision, &["请检查项目文件".into()]);
+            });
+            let (old_id, old_revision) = captured_rx.recv().expect("stamp captured");
+            permission.rebind_session().expect("rebind");
+            let new_id = permission.session_id().expect("new id").stable_id();
+            resolver.observe_user_messages_for_session(
+                &new_id,
+                &["このプロジェクトのファイルを確認してください".into()],
+            );
+            release_tx.send(()).expect("release");
+            old.join().expect("delayed observer");
+            let mut locale = resolver.locale.lock().expect("locale");
+            assert_eq!(locale.session_id.as_deref(), Some(new_id.as_str()));
+            assert_eq!(locale.selected.as_str(), "ja");
+            assert!(locale.history_observed);
+            assert_eq!(locale.evidence.len(), 1);
+            assert!(
+                !locale.bind_session(&old_id, old_revision),
+                "stale assessment stamp"
+            );
+            assert_eq!(locale.selected.as_str(), "ja");
+            let newer_revision = locale.session_revision + 1;
+            assert!(locale.bind_session(&new_id, newer_revision));
+            assert_eq!(
+                locale.selected.as_str(),
+                "ja",
+                "same-session revisions retain history"
+            );
+            assert_eq!(locale.evidence.len(), 1);
+        });
     }
 
     fn locale_test_resolver(root: &Path, state: &PermissionSessionState) -> AutoPermissionResolver {
@@ -4619,6 +4947,7 @@ mod configured_locale_fallback_tests {
     fn configured_locale_remains_fallback_for_low_confidence_history() {
         let state = SessionLocale {
             session_id: None,
+            session_revision: 0,
             selected: ConversationLocale("zh-CN".into()),
             fallback: ConversationLocale("zh-CN".into()),
             history_observed: false,

@@ -143,6 +143,16 @@ jobs:
         if: needs.classify-changes.result != 'success' || needs.classify-changes.outputs.full_validation != 'false'
         run: ./scripts/release_preflight.sh
 
+      - name: Real CLI and TUI Auto locale acceptance
+        if: needs.classify-changes.result != 'success' || needs.classify-changes.outputs.full_validation != 'false'
+        timeout-minutes: 15
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --locked -p talos-cli
+          python3 scripts/accept_auto_locale.py target/debug/talos
+          python3 scripts/accept_auto_locale_tui.py target/debug/talos
+
       - name: Optional language Plugin acceptance
         if: needs.classify-changes.result != 'success' || needs.classify-changes.outputs.full_validation != 'false'
         timeout-minutes: 15

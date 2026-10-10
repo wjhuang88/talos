@@ -139,7 +139,7 @@ async fn exercise_auto(enabled: bool, allow: bool) {
     if outcome.is_err() {
         // Preserve evidence even if the independent cleanup watchdog also fails.
         eprintln!(
-            "Auto test watchdog: stages={stages:?}, assessments={}, reports={reports:?}, approvals={approvals}, results={results:?}",
+            "Auto test watchdog: stages={stages:?}, assessments={}, reports={reports:?}, approvals={approvals}, results={results:?}, explanations={explanations:?}",
             provider.assessments.load(Ordering::SeqCst),
         );
     }
@@ -151,7 +151,7 @@ async fn exercise_auto(enabled: bool, allow: bool) {
     .expect("host shutdown completes");
     assert!(
         outcome.is_ok(),
-        "approval flow timed out: stages={stages:?}, assessments={}, reports={reports:?}, approvals={approvals}, results={results:?}",
+        "approval flow timed out: stages={stages:?}, assessments={}, reports={reports:?}, approvals={approvals}, results={results:?}, explanations={explanations:?}",
         provider.assessments.load(Ordering::SeqCst),
     );
     assert_eq!(results.len(), 1, "one authoritative tool result");

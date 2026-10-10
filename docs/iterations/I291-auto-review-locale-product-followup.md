@@ -60,8 +60,8 @@ Completion Commit. Until then the parent remains Review / Claimed.
 | Governance Claim PR | #650 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | User explicitly requested execution of the product follow-up and authorized GitHub publication. Independent API/security review and exact-head CI remain required. |
-| Implementation PR | #652, #662, #674, #677, #679 (merged; product acceptance remains open) |
-| Last Updated | 2026-10-09 |
+| Implementation PR | #652, #662, #674, #677, #679, #680 (merged), #682 (review; product acceptance remains open) |
+| Last Updated | 2026-10-10 |
 | Handoff / Release Condition | Effective claim merge precedes implementation; no release or permission-policy change. |
 
 ## Execution Evidence And Remaining Acceptance (2026-10-04)
@@ -269,3 +269,360 @@ changed to bypass the host blockers.
 Dependencies and Cargo.lock remain unchanged. Product residuals remain: localized technical-error
 copy, actual CLI/TUI multilingual resume/rotation acceptance, concurrent delayed-snapshot evidence,
 and model tokenizer measurements. I291, AUTO-UX-001 and #590 remain Review / Claimed and open.
+
+## Incremental Merge And Technical Failure Copy (2026-10-09)
+
+PR #680 merged at `9a7b4b8cf014058c04d6b83fa5d9a35e7236ec03` from exact head
+`a9b91dc7cb2719c85c9032d0e9d66a79e3c058e0`. CI3055 run `37868494810` passed Linux/Windows
+workspace tests, Clippy, standard release preflight, Desktop and governance. The Issue/owner
+reconciliation job also passed after reopening #590 to match the owner's Review/Claimed state.
+Independent exact-head Agent technical/API/security review approved; shared GitHub identity does
+not constitute a formal approval from a distinct collaborator. Remote full tests cover the local
+host blockers; local full preflight is not retroactively claimed green.
+
+The next local slice translates fixed technical-failure explanations for configured zh/ja tags,
+including region/script tags. Other configured locales use fixed English copy. This is a bounded
+translation fallback, not coverage of every detected language. Valid model-produced explanations
+continue using detected history locale; model failures and unverified results use configured
+fallback locale. Reason codes, deadlines, report digests and permission outcomes are unchanged.
+No arbitrary provider error or transcript content is interpolated into these prompts.
+
+The slice covers missing trusted execution directory, rejected complete/sensitive inputs, missing
+context, ineligible tools, incomplete assessment, mode/context changes, malformed output and
+unverified request binding. New integration fixtures cover malformed/wrong-digest output with
+history different from configured zh/ja/en and unsupported-language fallback, and three-language
+timeouts with the original budget and human-required outcome. Exact-head remote validation and
+review are pending; this slice is not completion evidence. Actual CLI/TUI acceptance,
+concurrent delayed-snapshot evidence and tokenizer measurement remain open.
+Independent local technical/API/security review found no blocker in this slice. Bare resolver
+fallback paths add no new explanation, and the direct execution-directory-change error remains
+English; neither is claimed localized by this fixed human-prompt slice. Binary acceptance must
+check the actual visible surfaces rather than infer translation completeness from unit fixtures.
+
+Local validation: pinned Rust 1.97.0, compact debug environment and disabled incremental builds;
+`cargo test --offline --locked -p talos-agent --lib` passed 446/446, and the workspace test phase
+also passed all 446 Agent tests. `cargo clippy --offline --locked -p talos-agent --lib --tests
+-- -D warnings` passed. Standard preflight passed governance/claims, site/installers, format,
+text-boundary/classifier, workspace check and workspace Clippy. Workspace tests stopped at the
+existing runtime socket fixture: 64 passed / 1 PermissionDenied, OS error 1 at
+crates/talos-runtime/src/lib.rs:2035. SDK fixture and later workspace packages were not reached.
+No test was skipped; per existing user authorization, full exact-head CI must cover the host
+restriction before merge. Cargo.lock, toolchain and dependencies remain unchanged.
+
+The first 446-test run yielded 445 passed / one new timeout-fixture failure (elapsed 0 ns).
+Without user intent, script evidence marks uncertainty and SlowAssessor's inherited adapter
+returns unsupported before its delayed contextual implementation. The fixture now supplies the
+current intent and asserts review_timeout before elapsed time; all three locale cases pass.
+This was a fixture-path correction, not a production permission or deadline change.
+
+## CI Repair And Acceptance Recovery (2026-10-09)
+
+PR #682 initial head `1d92c2e0cb2a16fb1cb53e9a6a7f93c3a6d4e42f`, CI3058 run
+`37879789223`, failed in the macOS projection fixture (445/446 Agent tests) because a random
+temporary path contained private marker `s1`. Production redaction was correct; the expected
+display path was wrong. The repaired fixture forces the collision and checks redaction while
+retaining the original execution-input assertion. Windows timed out in the existing Desktop
+auto-allow fixture. Its unchanged-head rerun was cancelled; the cause is still unproved.
+The fixture now supplies diagnostic state, preserving 15-second flow and 10-second shutdown
+budgets and all permission assertions. No tests are skipped and no production redaction is loosened.
+
+The local follow-up also rejects delayed presentation bindings using the permission snapshot's
+monotonic store generation. Snapshot capture stays outside the locale mutex. Older observations
+and assessments cannot reset newer session history; same-session newer generations preserve it.
+A channel-controlled thread regression exercises the production capture-to-mutex boundary.
+Same-generation snapshots within one session still follow arrival order; no transcript sequencing
+or permission authority is introduced.
+
+Before workspace maintenance removed that checkout, Agent tests passed 447/447 and independent
+Agent static review found no blocker. An exploratory real CLI REPL probe passed zh/en/ja history
+to assessor, visible localized human prompt, manual Deny and durable close/reopen restoration;
+the isolated Auto request did not contain the seeded history. These are historical results for
+the lost tree. The reusable `scripts/accept_auto_locale.py` and source were reconstructed, not
+recovered byte-for-byte; they require fresh verification. Fresh extracted production locale
+self-tests pass 6/6. Rust 1.97.0 and dependency versions remain pinned; Cargo.lock is unchanged.
+
+One local preflight result collection was rejected by automatic approval review for unexpected
+`new.example.com` egress. Source inspection traced it to the existing isolated-HOME provider
+registration fixture, using literal dummy `new-key` for a `/models` GET without transcript or
+file payload. No complete preflight pass is claimed from the interrupted execution. A subsequent
+attempt and its logs were removed by workspace maintenance. Full exact-head CI remains required.
+
+Other-session #681 merged at `41381f8055b66d54de42988e2b936a12e5af3ac3`; search-only tests
+and its owners do not overlap this Work Slice. Actual TUI/rotation and captured-request tokenizer
+evidence remain open. #590, I291 and AUTO-UX-001 stay Review / Claimed.
+
+## Reconstructed Candidate Fresh Acceptance (2026-10-09)
+
+Recovery object `14a8e0bff32cdda5ed05f02b7f9776c99195c665` preserves the reconstructed
+source checkpoint without changing the PR head. Subsequent local convergence adds reusable
+TUI/token measurement scripts and CI acceptance. These results are fresh, not reused from the
+lost checkout. Both isolated Agent tests and the workspace test phase pass 447/447.
+Standard preflight passes site/installers, governance/claims, text/classifier, format, workspace
+check and Clippy. Workspace tests stop at the unchanged runtime Unix socket fixture: 64 passed,
+one OS error 1 PermissionDenied. Later packages/SDK are not claimed covered by that run; no test
+is skipped. Full unskipped exact-head CI remains a merge gate.
+
+| Acceptance | Fresh local evidence |
+|---|---|
+| Delayed old-session snapshot | Channel-controlled thread regression rejects the older generation; newer history and same-session cache survive |
+| Real CLI REPL | zh/en/ja initial and durable resumed sessions, plus zh→ja, en→ja and ja→en window switching, all pass |
+| Real POSIX TUI | zh/en/ja initial and resumed prompts pass; `/new` resets each to configured en-US before new language evidence |
+| Permission and transcript boundary | Each binary case verifies localized prompt emission, actual denied tool result, one isolated two-message Auto request, and no seeded history in either message |
+| Prompt cost | 18 actual binary-captured synthetic requests, 36 tokenizations: locale field adds 14–17 bytes and 4–5 content tokens; field plus existing locale instruction adds 35–36 content tokens |
+| Detection CPU | Fresh pinned `rustc -O` extraction, 100 warmup / 1000 eight-message windows: 32 chars/message p50 6094 ns, p95 6184 ns; 4096 chars/message p50 448644 ns, p95 2142175 ns |
+
+Build with `cargo build --locked -p talos-cli`. Run `python3 scripts/accept_auto_locale.py
+target/debug/talos --capture-dir /tmp/auto-locale-captures` and `python3
+scripts/accept_auto_locale_tui.py target/debug/talos --capture-dir /tmp/auto-locale-captures`.
+The TUI driver uses a disposable POSIX controlling PTY and respects the existing 50ms slash-picker
+IME guard. Unique per-turn response markers prevent old history redraws from satisfying a new
+turn's completion check. It checks emitted text independently of spacing/layout, not manual visual
+QA. All endpoints are loopback, credentials are fixed placeholders, and HOME/workspace are disposable.
+These deterministic provider fixtures test the real binary/transport/surface contract, not the
+translation quality or compliance of every external model.
+
+`scripts/measure_auto_locale_tokens.py` uses measurement-only tiktoken 0.12.0 with cl100k_base
+and o200k_base. The baseline removes only the captured locale field, or that field plus the exact
+locale guidance from the captured system message. Counts cover message content, excluding provider
+chat framing and billed usage. The stress detector window can exceed the Agent's 16 KiB aggregate
+ingress cap; it measures detector CPU, not copying/hash aggregation, UI or provider latency.
+No runtime, Cargo manifest, lockfile or toolchain dependency changes are made.
+
+Windows retry job `113669376409` on the unchanged initial head passed the formerly failing
+approval test and all 106 Desktop tests at 04:42:32 UTC. The complete job was cancelled at
+04:56:20, about 30 minutes after 04:26:15 startup, consistent with its configured 30-minute
+job limit. That does not establish the first test timeout's cause. The candidate raises only
+the Windows CI job limit to 45 minutes so workspace/audit/smoke gates can finish; permission and
+test budgets are unchanged. The main preflight CI job now runs both real binary acceptance scripts.
+
+The local matrix is ready for independent technical/API/security review and fresh exact-head CI.
+Until those pass and the implementation is merged, retain Review / Claimed and #590 open.
+
+## Relevant Main Integration Refresh (2026-10-09)
+
+Candidate `ea83c6918370a68e0c653ee6e9115d9c36bc4922` received independent Agent
+technical/API/security approval with all nine remote blobs verified against the reviewed index.
+Its CI run `37895393833` belongs to the older integration base and is not final merge evidence.
+Merge-time synchronization found main `fecc9583992ccf2c0678b58e902f4a3bdcf19d2b`, including
+browser implementation #683 and its completed #618 owner, plus non-overlapping search work.
+The inherited #618 matrix failure is resolved by that existing owner closeout, not by reopening
+the Issue or weakening reconciliation.
+
+Independent review identified #683's provider invocation and shared tool-result projection paths
+as relevant to real CLI/TUI locale, manual Deny and private-token acceptance. Under ADR-071,
+the candidate integrates that main without conflicts and requires fresh exact-head CI/review.
+Pinned workspace check and Clippy pass on the integrated tree. Agent validation passes all
+453 unit tests plus its integration and doc tests. The Chinese user guide now records locale
+configuration, supported detector heuristics, session/fallback behavior and translation limits.
+No dependency version changes beyond the already-merged main are introduced by this Work Slice.
+
+The rebuilt integrated CLI passes all nine REPL and nine POSIX TUI cases again, including
+language switching, durable resume, `/new` fallback, isolated review requests and actual tool
+denial. Both governance validators, formatting, whitespace, Python compilation and the fourteen
+CI classifier cases pass on this integration. Prior token/CPU measurements remain the explicitly
+bounded component evidence above; no provider billing or end-to-end latency claim is added.
+The integrated standard preflight passes its checks and reaches workspace tests; it stops at the
+same existing Unix socket fixture with OS error 1 PermissionDenied (runtime: 64 passed, one
+failed). No skip is added, and later packages/SDK remain unclaimed for that local run. Full
+integrated exact-head CI and independent review remain the final merge gates.
+
+## POSIX Acceptance Driver Startup Repair (2026-10-09)
+
+Older component run `37895393833` passed Windows Rust, Linux Desktop and macOS full preflight.
+Its macOS binary step built the CLI in 48.52 seconds and passed all nine REPL cases by
+06:56:38 UTC, then emitted no TUI result before the unchanged 15-minute step limit at 07:10:56.
+No child stack trace establishes the exact stall. The driver used Python `preexec_fn` after
+starting an HTTP thread, a documented pre-exec deadlock risk in
+[Python subprocess guidance](https://docs.python.org/3/library/subprocess.html#subprocess.Popen).
+
+The driver now starts a fresh child interpreter without a Python pre-exec callback, sets the
+controlling PTY there and `execvpe`s the real CLI using the same PID, environment and argument
+list. Startup diagnostics flush before and after process creation. All actual prompt, isolated
+request, Deny, resume and rotation assertions remain; the 25-second observation and 15-minute CI
+limits are unchanged. Nine local TUI cases pass with this startup repair. Darwin verification
+still requires fresh exact-head CI; the earlier Windows/full-preflight results are component
+evidence, not permission to merge an unvalidated repaired head.
+
+The final diagnostic-enabled driver and REPL recapture all eighteen integrated binary requests;
+all cases pass. Thirty-six fresh tokenizations reproduce the same 4–5 / 35–36 content-token
+and 14–17-byte deltas. Rust sources, authority, dependencies and CI/test limits are unchanged
+from the integrated candidate; only the acceptance startup and its truthful owner evidence change.
+
+## Bounded PTY Interaction Recovery (2026-10-10)
+
+Exact-head run `37898886433` for `ae350c88f4801e6e55bef87784dea619b61ebf89`
+passes Windows Rust workspace, Linux Desktop, installer, reconciliation and macOS full release
+preflight. All nine macOS REPL cases pass. The TUI prints both startup diagnostics at 07:53:31
+UTC but emits no further result before the unchanged 15-minute step timeout at 08:08:10.
+This rules out a stall inside parent process creation for that attempt; no stack trace identifies
+which subsequent operation blocked. The earlier bootstrap repair alone does not establish Darwin
+acceptance and this run is not merge evidence.
+
+The PTY driver now uses the portable select-based selector and a nonblocking master descriptor.
+Readiness races retry without blocking; all user input and cursor-query responses have bounded
+writes, and forced child cleanup also has a bounded wait. Each observation logs its expected
+marker before reading, so fresh Darwin CI can identify the stalled interaction. Prompt, request,
+Deny, history isolation, resume and rotation assertions remain unchanged, as do the 25-second
+interaction and 15-minute CI limits. A disposable PTY child locally verifies output, cursor-query
+response and expiry of a missing-marker deadline. Fresh real-binary and exact-head Darwin results
+remain required; no assumption about kqueue or the product is presented as a proven root cause.
+
+Current target integration is `7097f1b503063539a2205e17ae29aed09c7ae32e` (#688).
+The intervening context-budget, session and TUI changes affect actual acceptance paths and are
+included before fresh validation. The only textual merge conflict is the Windows job timeout
+comment: target wording is retained and both sides already use 45 minutes. The target toolchain
+remains Rust 1.97.0; #688 establishes a future toolchain-maintenance claim without changing it.
+
+Fresh local integrated verification: `cargo build --locked -p talos-cli` passes with pinned
+Rust 1.97.0 in 4m17s (local debug=0, incremental off, two jobs). Both real-binary drivers pass
+all nine REPL and nine TUI cases on the integrated tree. Eighteen freshly captured requests
+produce 36 tokenizer records (tiktoken 0.12.0, cl100k_base/o200k_base), again adding 4–5 content
+tokens / 14–17 bytes for the field and 35–36 content tokens for field plus fixed guidance.
+These are synthetic message-content measurements, not framing, billing or every model's quality.
+Missing-marker and saturated-input PTY deadline probes pass. No Cargo manifest, lockfile or
+pinned-toolchain changes are introduced relative to the integrated target.
+
+The fresh standard `scripts/release_preflight.sh` passes site/installers, zero-warning governance
+and claims, text boundaries, 14 classifier cases, formatting, locked workspace check (2m55s)
+and Clippy (16.64s), then stops at the unchanged runtime Unix socket fixture in
+`crates/talos-runtime/src/lib.rs:2043` with OS error 1 / PermissionDenied (64 pass, one fail).
+No test is skipped; later workspace packages and the SDK fixture are not claimed passed locally.
+The new exact-head full CI must validate the whole unskipped sequence and Darwin TUI acceptance.
+The integrated Agent test binary reports 459 unit tests passed, with its integration groups also
+passing before the runtime fixture stop. Agent doctests are not inferred from this stopped run.
+
+## Continuous PTY Pump During Provider Wait (2026-10-10)
+
+Run `38024351320` / CI3098 at `90126a9759408daa29cbb4b2ee212391e0aeb6e8` passes
+reconciliation, installer, Linux Desktop and the complete macOS release preflight (including
+external SDK). Nine macOS REPL cases pass. The first TUI child reaches the model header and
+`LOCALEFIXTUREDONE1X`; the next seed fails the existing 20-second current-turn HTTP wait.
+Cleanup also reaches both five-second process waits. This is a bounded diagnostic failure,
+not the earlier unbounded 15-minute silence and not passing Darwin acceptance.
+
+The shared marker helper previously slept while polling the HTTP fixture without reading the
+TUI's PTY. A child still painting or waiting for a cursor response can therefore block before
+it handles the next input/provider request. The TUI now supplies a pump callback during that
+same 20-second wait; normal marker observation remains 25 seconds. Cursor queries split across
+read chunks are answered. Failure includes a bounded synthetic terminal tail. Cleanup hangs
+up the PTY before signaling/waiting, removing dependence on an output reader that has stopped.
+The exact Darwin child stack is still unavailable; this identifies and repairs a concrete
+fixture backpressure boundary without claiming the OS stall's exact root cause.
+
+A disposable child writes 1 MiB to the PTY before making its current-turn HTTP request; the
+continuous pump reaches that request and its unique response marker, then exits cleanly.
+Both production-binary drivers again pass nine REPL and nine TUI cases on the unchanged compiled
+integrated source; eighteen new captures again produce 36 token records with the same 4–5 /
+35–36 token and 14–17-byte deltas. All request, Deny, language, resume and rotation assertions
+remain, with no deadline increase, test skip, Rust/API/authority or dependency change. Fresh
+exact-head full CI and independent review remain required before merge.
+
+## Slash Input Consumer-Time Guard Recovery (2026-10-10)
+
+Run `38025111929` / CI3099 at `3c597ab50a1b8a65949fe9a328da7034a2ba6447`
+passes Windows Rust workspace, Linux Desktop, installer, reconciliation and macOS complete
+release preflight including external SDK. Nine macOS REPL cases pass. Darwin TUI passes the
+Chinese initial and durable resumed localized prompt with actual manual Deny; `/new` then
+fails its unchanged 25-second marker observation. Cleanup exits within its bounds. Plugin,
+audit and Desktop checks after that failed macOS step are skipped, not claimed passed.
+
+The slash driver formerly wrote the whole command then slept 150ms without pumping output.
+The product's existing 50ms IME guard begins when it consumes the last character, so delayed
+repaint/cursor-query handling can consume the final character and Enter together despite that
+parent-side sleep. This is a concrete fixture timing flaw; no child stack proves that it is the
+sole Darwin cause. Slash characters now each receive a 150ms pumping interval before the next
+key or Enter, within the same 25-second input budget. This reduces output accumulation; it
+does not guarantee consumer timing under arbitrary scheduling, so the real `/new` assertion
+remains the acceptance gate. Normal message input, actual assertions,
+production IME protection, permission authority, Rust APIs and dependencies are unchanged.
+
+A disposable controlling-PTY child emits 256KiB and a cursor-position query after each slash
+character (1MiB total), checks the actual `/new` input and requires Enter at least 50ms after
+consuming the final character. This controlled probe passes with continuous input pacing.
+Fresh real-binary acceptance and new exact-head Darwin full CI remain mandatory before merge.
+
+Cross-session merge coordination is recorded in PR comments `6094155370` and `6094378177`:
+#695 may merge first after its own gates. I291 then reconciles actual target main, retaining
+both Desktop stage/pre-cleanup timing diagnostics and its explanations, and revalidates/reviews
+the resulting head. I291 neither merges #695 nor overwrites that separately owned branch.
+
+Local fixture-stage validation passes both governance validators with zero warnings, all
+fourteen classifier cases, text boundaries, site/installers, Python compilation, whitespace
+and pinned-toolchain formatting. These checks do not substitute for real-binary acceptance
+or new-head full CI. The effective I291 claim remains #650 / Review / Claimed.
+
+Main `e63e0ee3793e2e8fd914f676224f982c6cae5593` merges #693's synthetic search
+wire-characterization evidence. It changes no production CLI/locale source or toolchain.
+Its evidence and owners are retained; the sole conflict is resolved by preserving both
+EVOLUTION lessons, with main's disk-budget lesson 57 and I291's PTY lesson 58. Search
+qualification and #624/#644 completion are not claimed by this locale integration.
+
+Fresh pinned Rust 1.97.0 `cargo build --locked -p talos-cli` succeeds in 9m18s after
+reconstructing the toolchain and locked public dependencies (local debug=0, incremental off,
+two jobs). All nine REPL and nine POSIX TUI cases pass on this integrated source and paced
+input driver, including Chinese/English/Japanese initial and durable resumed localized
+prompts, actual manual Deny, isolated requests, bounded-window switching and `/new` configured
+fallback. Eighteen fresh requests are captured. Integrated governance/claims again pass with
+zero warnings, text boundaries and fourteen classifier cases pass. No new whole-workspace
+local preflight or Darwin pass is inferred from this fixture-stage validation; new exact-head
+full CI and independent review remain mandatory, and #590 remains Review / Claimed.
+
+Thirty-six fresh tiktoken 0.12.0 measurements of those eighteen actual requests reproduce
+4–5 content tokens / 14–17 bytes for the locale field and 35–36 content tokens for field plus
+fixed guidance (cl100k_base/o200k_base). Chat framing, billing and all-model quality remain
+outside this synthetic measurement boundary.
+
+## Rust 1.99 Actual-Target Integration (2026-10-10)
+
+Exact `8902b850e82418f76e2b747ef4bffbaafe30ce43` completes CI3103 /
+[run38029709544](https://github.com/wjhuang88/talos/actions/runs/38029709544) with all six
+jobs successful. Darwin full preflight/workspace/external SDK, actual nine REPL and nine TUI
+cases including `/new`, Plugin, offline dependency audit and Desktop all pass. Windows Rust,
+Linux Desktop, installer, reconciliation and classifier also pass. Independent technical/API/
+security review is recorded in PR comment6094491020; product audit finds no unmet published
+requirement. These are valid evidence for that head, not the ensuing compiler integration.
+
+Per cross-session acknowledgment, #695 merges first as
+`435b6cf5f3cb11ebb34271bd666a614c4bc8092b` after exact63b0 / CI3102 and independent
+review/CAS. Git comparison confirms its actual main tree equals the locally previewed peer
+candidate tree `d645cb2699f39c11e75c2f283eaa3be35e39a05e`. I291 formally integrates that
+actual target with pinned Rust1.99.0. Cargo manifests/lockfile and GPUI versions are identical
+to target. The Desktop overlap retains stage timings and pre-cleanup diagnostics and adds
+explanations to both failure diagnostics; 15-second flow and 10-second cleanup deadlines,
+actual authority assertions and production behavior are unchanged by the resolution.
+
+The initial offline standard preflight stops during the SQLite-consumer governance fixture
+because its separate temporary dependency graph needs an uncached package. It is not a
+source/test failure or a passing preflight; the normal network-enabled standard preflight is
+rerun without dependency changes or skips. Fresh integrated real-binary/compiler results and
+new exact-head full CI/review remain required before merge. No completion is inferred from
+prior head CI or the disposable preview; owners remain Review / Claimed.
+
+Fresh actual-target source validation: pinned Rust1.99 locked CLI build passes in 5m57s
+(local debug=0, incremental off, two jobs). Nine REPL and nine POSIX TUI cases pass, with
+18 new captured requests, including durable resume, language-window switching, isolated
+review payloads, actual manual Deny and configured `/new` fallback. Six extracted production
+locale tests pass. The warmed pinned-rustc detector harness records eight-message windows:
+32chars/message p50 10698ns/p95 12029ns;4096chars/message p50 783787ns/p95 1122986ns
+(100warmup/1000samples, measured during local workspace-check load). This is component
+elapsed-time evidence, not a controlled cross-compiler comparison or end-to-end latency;
+the stress window can exceed the Agent16KiB aggregate cap. Normal preflight resolves the
+uncached ahash0.8.12 fixture dependency and both governance validators again pass with zero
+warnings; format/text/site/installers/Python boundaries and fourteen classifier cases pass.
+Whole-workspace compiler/test checks and exact-head remote validation are still in progress.
+
+The eighteen Rust1.99 captures produce 36 tiktoken0.12.0 records again: locale field adds
+4–5 content tokens/14–17bytes and field plus fixed guidance adds35–36 content tokens.
+The same representative-encoding/content-only bounds apply. Independent static integration
+review confirms both Desktop diagnostic sets and complete upstream Rust1.99 inheritance;
+exact published-head approval remains pending alongside its new complete CI.
+
+Pinned Rust1.99 workspace check passes in 4m49s and Clippy with `-D warnings` passes
+in 24.84s. Local standard preflight subsequently runs workspace tests, but its execution
+is stopped by automatic approval review over an existing provider-registration test's
+`https://new.example.com/v1` discovery request. Source inspection locates the fixture in
+`crates/talos-cli/src/mode_runners_tests.rs` and discovery call in
+`session_handlers/provider_model.rs`; no bypass or skipped test is used. Partial passing
+test output does not establish a complete workspace test result, and the subsequent SDK
+fixture is not claimed. This is a local execution limitation; the newly published actual
+Rust1.99 integration still requires complete exact-head GitHub CI and independent review.
