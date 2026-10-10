@@ -18,9 +18,9 @@
 | Source Issue | None; maintainer urgency request 2026-10-09 |
 | Governance Claim PR | #689 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Maintainer selected expedited normal maintenance. Exact-head governance CI, required reliability/API review and merge-time CAS remain mandatory; this is not an emergency override. |
+| Authorization Evidence | Maintainer selected expedited normal maintenance and explicitly requested I297 then I296 closeout on 2026-10-10 in single-maintainer mode. No independent human maintainer is available; independent Agent reliability/API review, exact-head CI and merge-time CAS remain mandatory. This is not an emergency override. |
 | Implementation PR | Not started |
-| Last Updated | 2026-10-09 |
+| Last Updated | 2026-10-10 |
 | Handoff / Release Condition | Proposed claim and activation become effective only when the finalized #689 record merges to `main`. |
 
 ## Published Baseline
@@ -124,3 +124,39 @@ created: this is a narrow maintainer-selected child with no external handoff req
 - Outcome: Pending.
 - Documentation: pending implementation evidence.
 - Lessons: pending.
+
+## Closeout Schedule And Startup Contract — 2026-10-10
+
+Requested outcome: close I297, then independently claim and close I296. Standard work mode;
+no deferred human rows or validation tracker. This record coordinates sequencing only and does
+not establish I296 ownership. The maintainer selected these non-overlapping maintenance slices;
+Search and Auto locale remain with their other sessions. Published Baseline above is unchanged.
+
+Fresh target: main `6b4bfb8d3f20faa6e711b218d1631603da53b572`. Inventory:
+I293/I294 Active, I277/I290/I291 Review, I249 Planned/deferred, I164 Paused: retain their owners
+and scopes. I296 is an unmerged Planned/Unclaimed proposal in #688, scheduled after I297.
+I298 Complete/Closed through #691/#692; context-budget residual has its own completed bounded
+owner. No current Blocked iteration header was found; historical checkpoints in Complete owners
+are not activation authority. Open #682 owns Auto locale; no provider-default overlap found.
+
+| Item | Expected output | Dependency | Completion gate | Failure fallback |
+|---|---|---|---|---|
+| P1 | Effective I297 claim | #689 refreshed to target | Docs CI, validators, Agent review and CAS before merge | Correct locally; no implementation before claim |
+| P2 | Default 5/300 with explicit-config compatibility | P1 | Baseline checks, full preflight and actual CLI config evidence | Batch corrections in the same candidate |
+| P3 | Merged implementation and owner-first I297 closure | P2 | Exact-head CI/review/CAS; existing main Completion Commit | Keep Review while a required gate is missing |
+| P4 | Independent I296 claim, implementation and closure | P3 | I296's preserved plan and own claim/checks/review/CAS | Preserve stash; report genuine blocker without claiming completion |
+
+Artifacts: I297 and PROVIDER-007 owners first; README/configuration docs, Board, Backlog and
+iteration index second. Use one worktree, separate serial branches, append a checkpoint after
+each stage. Authorized actions: scoped edits, local checks, commits, candidate pushes and normal
+PR merges under the recorded single-maintainer path. No tag/publication, credential access,
+deployment, spending, user-data deletion, main force-push or new per-step Issue is authorized.
+Preserve both stashes and other-session branches. Toolchain remains pinned 1.97.0 during I297.
+Conserve disk with low-debug build environment; inspect space before expensive checks, do not
+discard caches/user data without scoped authorization. Retry transient observation of the same
+live CI handle; do not restart or cancel valid runs just because a poll times out.
+
+Default decisions: explicit timeout values win; max_attempts retains retry-ordinal semantics;
+no first-packet/idle change. No API widening or release-version decision here. ADR-087's
+next-minor boundary prevents publishing I298 in an I297 patch. Broader resilience remains NET-001.
+Next gate: finalize #689 governance candidate and merge only after fresh exact-head evidence.

@@ -1855,6 +1855,11 @@ mod tests {
                 ..Default::default()
             },
             context_limit: Some(200_000),
+            context_budget: Some(talos_core::message::ContextBudget {
+                estimated_tokens: 80_000,
+                limit: Some(200_000),
+                omitted_tool_exchanges: 0,
+            }),
             branch_id: None,
             steering_count: 0,
             followup_count: 0,
@@ -1864,7 +1869,8 @@ mod tests {
         let text = build_status_text(&status, 120);
         let content = format!("{:?}", text);
         assert!(content.contains("200k ctx"));
-        assert!(content.contains("30%"));
+        assert!(content.contains("~40%"));
+        assert!(!content.contains("30%"));
     }
 
     #[test]
@@ -1879,6 +1885,11 @@ mod tests {
                 ..Default::default()
             },
             context_limit: Some(100_000),
+            context_budget: Some(talos_core::message::ContextBudget {
+                estimated_tokens: 65_000,
+                limit: Some(100_000),
+                omitted_tool_exchanges: 0,
+            }),
             branch_id: None,
             steering_count: 0,
             followup_count: 0,
@@ -2056,6 +2067,25 @@ mod tests {
             content.contains("200k ctx"),
             "status bar must show context limit, got: {content}"
         );
+        assert!(content.contains("?"));
+        assert!(!content.contains("~0%"));
+    }
+
+    #[test]
+    fn test_status_bar_shows_rejected_admission_budget_without_billing() {
+        let status = StatusSnapshot {
+            model_name: "model".into(),
+            context_limit: Some(200_000),
+            context_budget: Some(talos_core::message::ContextBudget {
+                estimated_tokens: 150_000,
+                limit: Some(100_000),
+                omitted_tool_exchanges: 0,
+            }),
+            ..Default::default()
+        };
+        let content = format!("{:?}", build_status_text(&status, 120));
+        assert!(content.contains("100k ctx"));
+        assert!(content.contains("~150%"));
     }
 
     #[test]
@@ -2094,6 +2124,7 @@ mod tests {
                 output_tokens: 500_000,
                 ..Default::default()
             },
+            context_budget: None,
             branch_id: None,
             steering_count: 0,
             followup_count: 0,
@@ -2141,6 +2172,7 @@ mod tests {
                 output_tokens: 500_000,
                 ..Default::default()
             },
+            context_budget: None,
             branch_id: None,
             steering_count: 0,
             followup_count: 0,

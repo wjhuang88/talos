@@ -85,6 +85,17 @@ pub enum SessionOp {
 #[serde(tag = "type", rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum SessionEvent {
+    /// Pre-start admission failure, correlated without inventing a started turn.
+    SubmissionContextBudget {
+        /// Owning session identity.
+        session_id: String,
+        /// Owning runtime generation.
+        session_generation: u64,
+        /// Submission whose admission was rejected.
+        submission_id: String,
+        /// Local numeric budget facts; never request content.
+        budget: crate::message::ContextBudget,
+    },
     /// One live-session background job reached its unique terminal state.
     /// This event is not persisted and never starts a provider turn.
     BackgroundJobTerminal {

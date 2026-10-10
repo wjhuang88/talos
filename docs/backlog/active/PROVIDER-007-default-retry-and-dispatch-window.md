@@ -21,9 +21,9 @@
 | Source Issue | None |
 | Governance Claim PR | #689 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Maintainer selected expedited normal maintenance. Exact-head governance CI, required reliability/API review and merge-time CAS remain mandatory; this is not an emergency override. |
+| Authorization Evidence | Maintainer selected expedited normal maintenance and explicitly requested serial I297/I296 closeout on 2026-10-10. No independent human maintainer is available; independent Agent reliability/API review, exact-head CI and CAS remain mandatory. This is not an emergency override. |
 | Implementation PR | Not started |
-| Last Updated | 2026-10-09 |
+| Last Updated | 2026-10-10 |
 | Handoff / Release Condition | Proposed claim and activation are ineffective until #689 merges to `main`; a fresh implementation branch then needs exact-head validation, required review and merge-time CAS. |
 
 ## Goal
@@ -112,3 +112,8 @@ to select stricter values.
 - Request-context budget accounting and pre-send compaction telemetry are a separate product defect
   discovered during this selection. They must receive their own owner before implementation; they
   do not block PROVIDER-007.
+
+2026-10-10 checkpoint: the separate bounded context-budget repair I298 is Complete through
+#691/#692. Broader MEM-005 policy remains separately owned; this does not change the default-only
+scope or transfer ADR-087's next-minor API change into a patch release. I297's owner records the
+serial closeout contract; I296 remains separately unclaimed until its own target-branch claim.

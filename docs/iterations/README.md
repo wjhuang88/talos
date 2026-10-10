@@ -2,6 +2,11 @@
 
 ## Purpose
 
+I298 context-budget repair is Complete / Closed through implementation #691 (`8d4ad50e`); see
+[I298](I298-context-budget-recovery.md) for the incident, selection inventory and bounded scope.
+I297's updated #689 proposes its default-only claim; I296's #688 remains separately Planned.
+The 2026-10-10 serial closeout schedule lives in I297; no publication authority transfers.
+
 Track current iteration plans, execution state, verification evidence, and retrospectives. Each
 iteration's own document is authoritative for its scope and lifecycle.
 

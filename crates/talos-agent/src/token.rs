@@ -120,14 +120,29 @@ impl TokenEstimator {
                 Message::Assistant {
                     content,
                     tool_calls,
-                    ..
+                    reasoning,
                 } => tool_calls
                     .iter()
                     .fold(Self::estimate_text(content), |tokens, call| {
                         tokens
                             .saturating_add(Self::estimate_text(&call.name))
                             .saturating_add(Self::estimate_text(&call.input.to_string()))
-                    }),
+                    })
+                    .saturating_add(reasoning.as_ref().map_or(0, |reasoning| {
+                        reasoning.blocks.iter().fold(0_u32, |total, block| {
+                            use talos_core::message::ReasoningBlock;
+                            let tokens = match block {
+                                ReasoningBlock::Plain { text } => Self::estimate_text(text),
+                                ReasoningBlock::Thinking { text, signature } => {
+                                    Self::estimate_text(text).saturating_add(
+                                        signature.as_deref().map_or(0, Self::estimate_text),
+                                    )
+                                }
+                                ReasoningBlock::Redacted { data } => Self::estimate_text(data),
+                            };
+                            total.saturating_add(tokens)
+                        })
+                    })),
                 Message::Tool { result } => Self::estimate_text(&result.content)
                     .saturating_add(Self::estimate_text(&result.tool_use_id)),
                 Message::Multimodal { parts } => parts.iter().fold(0_u32, |tokens, part| {
