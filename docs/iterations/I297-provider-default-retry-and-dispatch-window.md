@@ -19,7 +19,7 @@
 | Governance Claim PR | #689 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer selected expedited normal maintenance and explicitly requested I297 then I296 closeout on 2026-10-10 in single-maintainer mode. No independent human maintainer is available; independent Agent reliability/API review, exact-head CI and merge-time CAS remain mandatory. This is not an emergency override. |
-| Implementation PR | Not started |
+| Implementation PR | #694 |
 | Last Updated | 2026-10-10 |
 | Handoff / Release Condition | Claim effective through #689; implementation requires exact-head validation, independent Agent review and merge-time CAS. |
 
