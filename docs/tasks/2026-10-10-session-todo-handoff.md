@@ -6,6 +6,17 @@ Source: Maintainer requested a durable handoff and explicitly stopped further im
 Baseline: local `main`, HEAD `63c3ab6` (merge PR #697). Recheck HEAD and both staged/unstaged diffs before resuming.
 Completion evidence: None for this pending task. This document is a handoff, not an effective Collaboration Claim or implementation authorization.
 
+## Latest Preservation Checkpoint
+
+The maintainer subsequently requested committing and pushing all remaining worktree changes. The receiving agent should use branch `handoff/session-worktree-20261010`, not only `main`, to recover the complete work. The earlier dirty-worktree statements below are historical snapshots.
+
+- `e58e2678`: handoff and recovery documents; successfully pushed to `origin/main`.
+- `0a0622c0`: existing TUI activity, queue and result-rendering changes plus regressions.
+- `3af78f04`: process-tool summary fields and regression assertion.
+- `1bda5181`: MODEL-014 intake and related owner/index references.
+
+The last three commits are preserved on the handoff branch; this checkpoint accompanies their push. Verify remote branch state before resuming. No merge into main, feature activation, claim repair, or completion of tasks 1-7 is implied. Full workspace validation remains blocked by the previously recorded CLI compilation allocation failure. Both governance validators were rerun successfully, and the process-tool filtered agent suite passed 5 tests. The structured Git mutation defect remains unresolved; staging/commit/push used the maintainer-authorized host Git fallback. Read-only structured staged-diff output also disagreed with host Git during this operation (reporting the untracked MODEL-014 file instead of the staged code); inspect that separately when investigating task 7.
+
 ## Start Here
 
 1. Preserve the dirty worktree listed below. Review staged and unstaged changes separately; do not reset, clean, overwrite, or assume that every change belongs to this agent.
