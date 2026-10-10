@@ -263,6 +263,17 @@ pub struct Usage {
     pub reasoning_tokens: u32,
 }
 
+/// Local request admission facts, distinct from provider billing usage.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, schemars::JsonSchema, PartialEq, Eq)]
+pub struct ContextBudget {
+    /// Estimated complete request cost, including output reservation and safety margin.
+    pub estimated_tokens: u32,
+    /// Configured admission limit, if available.
+    pub limit: Option<u32>,
+    /// Number of older complete tool exchanges omitted from this request only.
+    pub omitted_tool_exchanges: u32,
+}
+
 /// Events emitted during a turn for streaming.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -270,6 +281,11 @@ pub struct Usage {
 pub enum AgentEvent {
     /// Turn has started.
     TurnStart,
+    /// Transient local budget estimate for an admitted or rejected request.
+    ContextBudget {
+        /// Numeric facts only; no request or private output content.
+        budget: ContextBudget,
+    },
     /// Transient, typed provider dispatch/retry progress for the active request.
     ProviderProgress {
         /// Provider-owned progress facts. This event is never a transcript message.

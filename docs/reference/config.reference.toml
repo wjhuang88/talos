@@ -117,6 +117,16 @@ model = "claude-sonnet-4-20250514"
 #   replay         Replay reasoning in request history (default: true)
 #                  Disabling trades provider correctness for token savings.
 
+# Provider request timeout/retry defaults (explicit values override defaults):
+# [providers.my-gateway.timeout]
+# dispatch_timeout_secs = 300       # Dispatch through response headers only.
+# first_packet_timeout_secs = 30
+# stream_idle_timeout_secs = 90
+# max_attempts = 5                  # Retries after the initial request.
+# backoff_base_ms = 500
+# backoff_max_ms = 8000
+# Retries retain the existing pre-stream failure boundary; no replay after output.
+
 # ── Example: Built-in Anthropic (env-var mode) ────────────────────────────────
 # provider = "anthropic"
 # model = "claude-sonnet-4-20250514"

@@ -10,7 +10,7 @@
 | Source Issue | [#644](https://github.com/wjhuang88/talos/issues/644) |
 | Depends on | Accepted ADR-085; SEARCH-001-A / #625 merged as `4567bf85` |
 | Selected Iteration | [I294](../../iterations/I294-search-provider-evidence.md) |
-| Implementation PR | #668, #673 and #676 (merged; evidence only) |
+| Implementation PR | #668, #673, #676 and #686 (merged; evidence only) |
 | Last Updated | 2026-10-09 |
 
 ## Collaboration Claim
@@ -72,3 +72,11 @@ rust-websearch compatibility path while evidence is incomplete.
 
 Terms applicability, privacy, authorized fixtures, independent failure domains and genuine regional
 observations remain incomplete. E/F remain gated; this is partial evidence, not completion.
+
+## Standard Route Qualification Checkpoint
+
+#686 source stage merged at `fecc9583992ccf2c0678b58e902f4a3bdcf19d2b`.
+[Mwmbl route packet](../../reference/SEARCH-001-D-MWMBL-ROUTE-QUALIFICATION.md) adds a pinned
+source call-chain/provenance audit and bounded query-free public-schema/input-validation evidence.
+No search query, result response, production behavior or native admission. Source/policy/deployment,
+fixtures, failure-domain and real regional acceptance remain pending; this is partial D evidence.

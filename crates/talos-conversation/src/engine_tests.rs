@@ -17,6 +17,30 @@ fn new_engine() -> ConversationEngine {
 }
 
 #[test]
+fn admission_budget_is_independent_of_billing_and_resets_with_session() {
+    let mut engine = new_engine();
+    assert_eq!(engine.status_snapshot().context_budget, None);
+    let budget = talos_core::message::ContextBudget {
+        estimated_tokens: 128006,
+        limit: Some(128000),
+        omitted_tool_exchanges: 0,
+    };
+    engine.handle_agent_event(&AgentEvent::ContextBudget { budget });
+    engine.handle_agent_event(&AgentEvent::TurnStart);
+    engine.handle_agent_event(&AgentEvent::TurnEnd {
+        stop_reason: StopReason::EndTurn,
+        usage: Usage::default(),
+    });
+    assert_eq!(engine.status_snapshot().context_budget, Some(budget));
+    assert!(!engine.transcript_markdown().contains("128006"));
+    engine.handle_turn_started();
+    assert_eq!(engine.status_snapshot().context_budget, None);
+    engine.handle_agent_event(&AgentEvent::ContextBudget { budget });
+    engine.reset_auto_override();
+    assert_eq!(engine.status_snapshot().context_budget, None);
+}
+
+#[test]
 fn reasoning_presentation_does_not_change_copy_and_export_defaults() {
     let mut engine = new_engine();
     engine.handle_agent_event(&AgentEvent::TurnStart);

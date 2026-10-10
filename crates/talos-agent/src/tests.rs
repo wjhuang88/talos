@@ -545,6 +545,11 @@ async fn run_streaming_emits_error_event_on_provider_dispatch_timeout() {
         .await;
 
     assert!(matches!(result, Err(AgentError::ProviderError(_))));
+    let budget = tokio::time::timeout(std::time::Duration::from_secs(1), event_rx.recv())
+        .await
+        .expect("budget event should be emitted")
+        .expect("budget event should be present");
+    assert!(matches!(budget, AgentEvent::ContextBudget { .. }));
     let event = tokio::time::timeout(std::time::Duration::from_secs(1), event_rx.recv())
         .await
         .expect("error event should be emitted")
@@ -1736,8 +1741,11 @@ async fn test_run_streaming_forwards_events() {
     while let Ok(event) = rx.try_recv() {
         received.push(event);
     }
-    assert_eq!(received.len(), events.len());
-    assert_eq!(received, events);
+    assert!(matches!(
+        received.first(),
+        Some(AgentEvent::ContextBudget { .. })
+    ));
+    assert_eq!(&received[1..], events.as_slice());
 }
 
 #[tokio::test]
@@ -1799,6 +1807,7 @@ async fn test_run_streaming_forwards_provider_progress_before_content() {
     assert!(matches!(
         received.as_slice(),
         [
+            AgentEvent::ContextBudget { .. },
             AgentEvent::ProviderProgress {
                 progress: ProviderProgress::InitialDispatch { attempt: 0, .. }
             },
@@ -2071,6 +2080,109 @@ async fn test_tool_execution_loop_single_call() {
         .await
         .expect("operation should succeed");
     assert_eq!(response, "The result is: hello");
+}
+
+#[tokio::test]
+#[allow(deprecated)]
+async fn continuation_budget_recovers_without_reexecuting_tools_or_losing_history() {
+    let mut responses = Vec::new();
+    for index in 0..3 {
+        responses.push(vec![
+            AgentEvent::TurnStart,
+            AgentEvent::ToolCall {
+                call: ToolCall {
+                    id: format!("call_{index}"),
+                    name: "echo".into(),
+                    input: serde_json::json!({"message": index}),
+                },
+                provenance: Default::default(),
+                summary_fields: vec![],
+            },
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::ToolUse,
+                usage: Default::default(),
+            },
+        ]);
+    }
+    responses.push(vec![
+        AgentEvent::TextDelta {
+            delta: "done".into(),
+        },
+        AgentEvent::TurnEnd {
+            stop_reason: StopReason::EndTurn,
+            usage: Default::default(),
+        },
+    ]);
+    let executions = Arc::new(Mutex::new(Vec::new()));
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(TimedMockTool {
+        tool_name: "echo".into(),
+        read_only: true,
+        delay_ms: 0,
+        result: ToolExecutionResult::success("x".repeat(12000)),
+        execution_log: executions.clone(),
+    }));
+    let mut agent = Agent::new(Arc::new(MockModel::new(responses)), registry);
+    agent.set_request_budget_spec(crate::RequestBudgetSpec::new(1));
+    let prepared = agent
+        .prepare_turn_start(
+            "run".into(),
+            vec![Message::User {
+                content: "run".into(),
+            }],
+            vec![],
+            Some(11000),
+        )
+        .await
+        .expect("prepare");
+    let (events_tx, mut events_rx) = mpsc::unbounded_channel();
+    let (snapshots_tx, mut snapshots_rx) = mpsc::unbounded_channel();
+    let (result, history) = agent
+        .run_prepared_session_turn(prepared, events_tx, Some(snapshots_tx), None, None)
+        .await;
+    assert_eq!(result.expect("recovered continuation"), "done");
+    let execution_log = executions.lock().await;
+    assert_eq!(
+        execution_log
+            .iter()
+            .filter(|entry| entry.starts_with("start:"))
+            .count(),
+        3
+    );
+    assert_eq!(
+        execution_log
+            .iter()
+            .filter(|entry| entry.starts_with("end:"))
+            .count(),
+        3
+    );
+    assert_eq!(
+        history
+            .iter()
+            .filter(|message| matches!(message, Message::Tool { .. }))
+            .count(),
+        3
+    );
+    let mut recovered = false;
+    while let Ok(event) = events_rx.try_recv() {
+        if let AgentEvent::ContextBudget { budget } = event {
+            assert!(budget.estimated_tokens <= 11000);
+            recovered |= budget.omitted_tool_exchanges > 0;
+        }
+    }
+    assert!(recovered, "must exercise recovery during live continuation");
+    let mut complete_snapshot = false;
+    while let Ok(snapshot) = snapshots_rx.try_recv() {
+        complete_snapshot |= snapshot
+            .iter()
+            .filter(|message| matches!(message, Message::Tool { .. }))
+            .count()
+            == 3;
+    }
+    assert!(
+        complete_snapshot,
+        "durable projection retains all three results"
+    );
 }
 
 #[tokio::test]
@@ -5511,13 +5623,14 @@ fn ephemeral_image_budget_is_admitted_before_dispatch() {
         messages: vec![],
         tool_definitions: vec![],
         estimated_tokens: 100,
+        omitted_tool_exchanges: 0,
         tool_protocol: talos_core::tool::ToolProtocol::Native,
     };
     assert!(matches!(
         agent.admit_ephemeral_images(&mut plan, &images, Some(100)),
         Err(AgentError::ContextBudgetExceeded { .. })
     ));
-    assert_eq!(plan.estimated_tokens, 100);
+    assert!(plan.estimated_tokens > 1124);
     agent
         .admit_ephemeral_images(&mut plan, &images, Some(10_000))
         .expect("budget");

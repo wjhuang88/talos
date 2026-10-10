@@ -30,8 +30,7 @@ pub(crate) fn build_status_text(
     let workspace = &status.workspace_path;
     let variant = &status.variant;
 
-    let total_tokens = (status.usage.input_tokens + status.usage.output_tokens) as u64;
-    let context_label = format_context_label(status.context_limit, total_tokens);
+    let context_label = format_context_label(status.context_limit, status.context_budget);
     let output_usage_label =
         format_output_usage(status.usage.output_tokens, status.usage.reasoning_tokens);
 
@@ -208,15 +207,20 @@ fn format_context_limit(limit: Option<u32>) -> String {
     }
 }
 
-fn format_context_label(limit: Option<u32>, total_tokens: u64) -> String {
+fn format_context_label(
+    limit: Option<u32>,
+    budget: Option<talos_core::message::ContextBudget>,
+) -> String {
+    let limit = budget.and_then(|budget| budget.limit).or(limit);
     let limit_label = format_context_limit(limit);
     if limit_label.is_empty() {
         return limit_label;
     }
 
-    match context_usage_percent(limit, total_tokens) {
-        Some(percent) => format!("{limit_label} · {percent}%"),
-        None => limit_label,
+    match budget.and_then(|budget| context_usage_percent(limit, u64::from(budget.estimated_tokens)))
+    {
+        Some(percent) => format!("{limit_label} · ~{percent}%"),
+        None => format!("{limit_label} · ?"),
     }
 }
 

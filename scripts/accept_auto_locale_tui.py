@@ -47,12 +47,17 @@ class Tui:
             start_new_session=True,
         )
         os.close(slave)
-        self.selector = selectors.DefaultSelector()
+        # PTYs are not ordinary sockets: readiness can be stale, and the
+        # platform default (kqueue on Darwin) has different terminal semantics.
+        # Never let a blocking read/write bypass the interaction deadline.
+        os.set_blocking(self.master, False)
+        self.selector = selectors.SelectSelector()
         self.selector.register(self.master, selectors.EVENT_READ)
         self.transcript = bytearray()
         self.offset = 0
 
     def wait_for(self, marker, timeout=25):
+        print(f"TUI waiting for {marker!r}", flush=True)
         until = time.monotonic() + timeout
         while time.monotonic() < until:
             text = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", self.transcript[self.offset:].decode(errors="replace"))
@@ -61,21 +66,37 @@ class Tui:
             if "".join(marker.split()) in "".join(text.split()):
                 return
             for _ in self.selector.select(0.2):
-                data = os.read(self.master, 65536)
+                try:
+                    data = os.read(self.master, 65536)
+                except BlockingIOError:
+                    continue
+                if not data:
+                    raise RuntimeError(f"PTY closed while waiting for {marker}: {text}")
                 self.transcript.extend(data)
                 if b"\x1b[6n" in data:
-                    os.write(self.master, b"\x1b[1;1R")
+                    self.write(b"\x1b[1;1R", until)
         raise RuntimeError(f"waiting for {marker}: {text}")
+
+    def write(self, data, until):
+        while data:
+            if time.monotonic() >= until:
+                raise RuntimeError("PTY input deadline exceeded")
+            try:
+                written = os.write(self.master, data)
+                data = data[written:]
+            except BlockingIOError:
+                time.sleep(0.01)
 
     def send(self, value, enter=True):
         self.offset = len(self.transcript)
-        os.write(self.master, value.encode())
+        until = time.monotonic() + 25
+        self.write(value.encode(), until)
         if enter:
             if value.startswith("/"):
                 # Existing slash picker suppresses Enter inside its 50ms IME
                 # window. Let typed text settle like ordinary user key input.
                 time.sleep(0.15)
-            os.write(self.master, b"\r")
+            self.write(b"\r", until)
 
     def close(self):
         self.process.terminate()
@@ -83,7 +104,7 @@ class Tui:
             self.process.wait(timeout=5)
         except subprocess.TimeoutExpired:
             self.process.kill()
-            self.process.wait()
+            self.process.wait(timeout=5)
         self.selector.close()
         os.close(self.master)
 

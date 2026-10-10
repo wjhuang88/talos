@@ -197,8 +197,8 @@ jobs:
     needs: classify-changes
     if: always() && (needs.classify-changes.result != 'success' || needs.classify-changes.outputs.full_validation != 'false')
     runs-on: windows-latest
-    # Full Desktop feature builds plus workspace/audit/smoke exceeded 30m on
-    # the #682 retry even after the formerly failing approval fixture passed.
+    # Cold validation can take 27 minutes; allow bounded cache post-job cleanup too.
+    # Individual validation steps retain their own timeout limits.
     timeout-minutes: 45
 
     steps:

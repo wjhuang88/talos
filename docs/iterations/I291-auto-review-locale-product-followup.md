@@ -61,7 +61,7 @@ Completion Commit. Until then the parent remains Review / Claimed.
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | User explicitly requested execution of the product follow-up and authorized GitHub publication. Independent API/security review and exact-head CI remain required. |
 | Implementation PR | #652, #662, #674, #677, #679, #680 (merged), #682 (review; product acceptance remains open) |
-| Last Updated | 2026-10-09 |
+| Last Updated | 2026-10-10 |
 | Handoff / Release Condition | Effective claim merge precedes implementation; no release or permission-policy change. |
 
 ## Execution Evidence And Remaining Acceptance (2026-10-04)
@@ -447,3 +447,46 @@ The final diagnostic-enabled driver and REPL recapture all eighteen integrated b
 all cases pass. Thirty-six fresh tokenizations reproduce the same 4–5 / 35–36 content-token
 and 14–17-byte deltas. Rust sources, authority, dependencies and CI/test limits are unchanged
 from the integrated candidate; only the acceptance startup and its truthful owner evidence change.
+
+## Bounded PTY Interaction Recovery (2026-10-10)
+
+Exact-head run `37898886433` for `ae350c88f4801e6e55bef87784dea619b61ebf89`
+passes Windows Rust workspace, Linux Desktop, installer, reconciliation and macOS full release
+preflight. All nine macOS REPL cases pass. The TUI prints both startup diagnostics at 07:53:31
+UTC but emits no further result before the unchanged 15-minute step timeout at 08:08:10.
+This rules out a stall inside parent process creation for that attempt; no stack trace identifies
+which subsequent operation blocked. The earlier bootstrap repair alone does not establish Darwin
+acceptance and this run is not merge evidence.
+
+The PTY driver now uses the portable select-based selector and a nonblocking master descriptor.
+Readiness races retry without blocking; all user input and cursor-query responses have bounded
+writes, and forced child cleanup also has a bounded wait. Each observation logs its expected
+marker before reading, so fresh Darwin CI can identify the stalled interaction. Prompt, request,
+Deny, history isolation, resume and rotation assertions remain unchanged, as do the 25-second
+interaction and 15-minute CI limits. A disposable PTY child locally verifies output, cursor-query
+response and expiry of a missing-marker deadline. Fresh real-binary and exact-head Darwin results
+remain required; no assumption about kqueue or the product is presented as a proven root cause.
+
+Current target integration is `7097f1b503063539a2205e17ae29aed09c7ae32e` (#688).
+The intervening context-budget, session and TUI changes affect actual acceptance paths and are
+included before fresh validation. The only textual merge conflict is the Windows job timeout
+comment: target wording is retained and both sides already use 45 minutes. The target toolchain
+remains Rust 1.97.0; #688 establishes a future toolchain-maintenance claim without changing it.
+
+Fresh local integrated verification: `cargo build --locked -p talos-cli` passes with pinned
+Rust 1.97.0 in 4m17s (local debug=0, incremental off, two jobs). Both real-binary drivers pass
+all nine REPL and nine TUI cases on the integrated tree. Eighteen freshly captured requests
+produce 36 tokenizer records (tiktoken 0.12.0, cl100k_base/o200k_base), again adding 4–5 content
+tokens / 14–17 bytes for the field and 35–36 content tokens for field plus fixed guidance.
+These are synthetic message-content measurements, not framing, billing or every model's quality.
+Missing-marker and saturated-input PTY deadline probes pass. No Cargo manifest, lockfile or
+pinned-toolchain changes are introduced relative to the integrated target.
+
+The fresh standard `scripts/release_preflight.sh` passes site/installers, zero-warning governance
+and claims, text boundaries, 14 classifier cases, formatting, locked workspace check (2m55s)
+and Clippy (16.64s), then stops at the unchanged runtime Unix socket fixture in
+`crates/talos-runtime/src/lib.rs:2043` with OS error 1 / PermissionDenied (64 pass, one fail).
+No test is skipped; later workspace packages and the SDK fixture are not claimed passed locally.
+The new exact-head full CI must validate the whole unskipped sequence and Darwin TUI acceptance.
+The integrated Agent test binary reports 459 unit tests passed, with its integration groups also
+passing before the runtime fixture stop. Agent doctests are not inferred from this stopped run.

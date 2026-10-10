@@ -10,6 +10,12 @@
 
 ## Requirement
 
+2026-10-10 default-policy update: [I297](../../iterations/I297-provider-default-retry-and-dispatch-window.md)
+changes the dispatch/header default to 300 seconds and `max_attempts` to 5 retries after the initial
+request. Explicit configuration remains authoritative; first-packet/idle limits and backoff remain
+unchanged. The original requirements and dated implementation evidence below are historical;
+their 60-second dispatch and three-attempt wording do not describe the I297 defaults.
+
 Provider calls must not leave the user staring at an indeterminate "processing" state when the
 network, gateway, or model is slow or failing. Talos needs bounded timeout detection, retry/backoff,
 and user-visible retry/failure states.
