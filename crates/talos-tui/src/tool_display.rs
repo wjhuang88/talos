@@ -392,28 +392,29 @@ pub(crate) fn build_tool_result_scrollback_lines(
         return build_head_tail_scrollback_lines(display, &all_lines, icon, color, viewport_width);
     }
 
-    let diff_aware = is_diff_content(&display.content, display.tool_name.as_deref());
+    let diff_aware =
+        !display.is_error && is_diff_content(&display.content, display.tool_name.as_deref());
     let mut lines = Vec::with_capacity(all_lines.len());
     for (idx, line) in all_lines.iter().enumerate() {
-        let wrapped = crate::scrollback::wrap_to_display_width(line, budget);
-        let (line_color, attrs) = if diff_aware {
-            diff_line_style(line).unwrap_or_else(|| result_line_style(display, idx, color))
-        } else {
-            result_line_style(display, idx, color)
-        };
+        let (line, active_todo) = todo_display_line(display, line);
+        let wrapped = crate::scrollback::wrap_to_display_width(&line, budget);
+        let (line_color, attrs, bg) =
+            displayed_result_style(display, &line, idx, color, diff_aware, active_todo);
+        let fill = bg.map(|_| HistorySegment::styled(" ", line_color, attrs));
         for (sub_idx, sub_line) in wrapped.iter().enumerate() {
             let prefix = if sub_idx == 0 {
                 result_line_prefix(icon, idx == 0)
             } else {
                 result_line_prefix(icon, false)
             };
-            lines.push(ScrollbackLine::styled(
+            lines.push(ScrollbackLine::styled_with_fill(
                 vec![HistorySegment::styled(
                     format!("{prefix}{sub_line}"),
                     line_color,
                     attrs,
                 )],
-                None,
+                bg,
+                fill.clone(),
             ));
         }
     }
@@ -432,18 +433,24 @@ fn build_head_tail_scrollback_lines(
     let budget = (viewport_width as usize).saturating_sub(prefix_len).max(20);
     let secondary = secondary_result_color();
     let mut lines = Vec::with_capacity(HEAD_LINES + 1 + TAIL_LINES);
+    let diff_aware =
+        !display.is_error && is_diff_content(&display.content, display.tool_name.as_deref());
 
     for (idx, line) in all_lines.iter().take(HEAD_LINES).enumerate() {
-        let wrapped = crate::scrollback::wrap_to_display_width(line, budget);
-        let (line_color, attrs) = result_line_style(display, idx, color);
+        let (line, active_todo) = todo_display_line(display, line);
+        let wrapped = crate::scrollback::wrap_to_display_width(&line, budget);
+        let (line_color, attrs, bg) =
+            displayed_result_style(display, &line, idx, color, diff_aware, active_todo);
+        let fill = bg.map(|_| HistorySegment::styled(" ", line_color, attrs));
         for sub_line in &wrapped {
-            lines.push(ScrollbackLine::styled(
+            lines.push(ScrollbackLine::styled_with_fill(
                 vec![HistorySegment::styled(
                     format!("{}{sub_line}", result_line_prefix(icon, idx == 0)),
                     line_color,
                     attrs,
                 )],
-                None,
+                bg,
+                fill.clone(),
             ));
         }
     }
@@ -463,20 +470,20 @@ fn build_head_tail_scrollback_lines(
 
     let tail_start = all_lines.len().saturating_sub(TAIL_LINES);
     for line in all_lines.iter().skip(tail_start) {
-        let wrapped = crate::scrollback::wrap_to_display_width(line, budget);
-        let (line_color, attrs) = if display.is_error {
-            (color, primary_result_attrs())
-        } else {
-            (secondary, secondary_result_attrs())
-        };
+        let (line, active_todo) = todo_display_line(display, line);
+        let wrapped = crate::scrollback::wrap_to_display_width(&line, budget);
+        let (line_color, attrs, bg) =
+            displayed_result_style(display, &line, tail_start, color, diff_aware, active_todo);
+        let fill = bg.map(|_| HistorySegment::styled(" ", line_color, attrs));
         for sub_line in &wrapped {
-            lines.push(ScrollbackLine::styled(
+            lines.push(ScrollbackLine::styled_with_fill(
                 vec![HistorySegment::styled(
                     format!("{}{sub_line}", result_line_prefix(icon, false)),
                     line_color,
                     attrs,
                 )],
-                None,
+                bg,
+                fill.clone(),
             ));
         }
     }
@@ -484,6 +491,89 @@ fn build_head_tail_scrollback_lines(
     lines
 }
 
+/// Presentation-only projection of the stable native todo text format. Never
+/// rewrite descriptions, arbitrary checkboxes in other tools, or error output.
+fn todo_display_line<'a>(
+    display: &ToolResultDisplay,
+    line: &'a str,
+) -> (std::borrow::Cow<'a, str>, bool) {
+    if display.is_error
+        || !matches!(
+            display.tool_name.as_deref(),
+            Some(
+                "todo_query"
+                    | "todo_create"
+                    | "todo_update"
+                    | "todo_update_status"
+                    | "todo_create_batch"
+                    | "todo_update_batch"
+                    | "todo_delete"
+                    | "todo_add_dependency"
+                    | "todo_remove_dependency"
+            )
+        )
+    {
+        return (line.into(), false);
+    }
+    for prefix in ["  ", "Created: ", "Updated: "] {
+        if let Some(rest) = line.strip_prefix(prefix) {
+            for status in ["[ ]", "[~]", "[x]", "[!]"] {
+                if let Some(title) = rest
+                    .strip_prefix(status)
+                    .and_then(|rest| rest.strip_prefix(' '))
+                {
+                    return (
+                        format!("{prefix}{} {title}", crate::app::status_display(status)).into(),
+                        status == "[~]",
+                    );
+                }
+            }
+        }
+    }
+    (line.into(), false)
+}
+
+fn displayed_result_style(
+    display: &ToolResultDisplay,
+    line: &str,
+    index: usize,
+    color: Option<CColor>,
+    diff_aware: bool,
+    active_todo: bool,
+) -> (Option<CColor>, HistoryAttrs, Option<CColor>) {
+    if active_todo {
+        return (
+            to_crossterm_color(semantic::TODO_ACTIVE_FG),
+            HistoryAttrs::default(),
+            None,
+        );
+    }
+    if diff_aware {
+        // Terminal backgrounds have no alpha channel. These theme tints provide
+        // the subdued overlay appearance, without changing the source result.
+        if display.tool_name.as_deref() == Some("edit") {
+            let bg = if line.starts_with('+') && !line.starts_with("+++") {
+                Some(semantic::DIFF_ADDED_BG)
+            } else if line.starts_with('-') && !line.starts_with("---") {
+                Some(semantic::DIFF_REMOVED_BG)
+            } else {
+                None
+            };
+            if let Some(bg) = bg {
+                return (
+                    to_crossterm_color(semantic::TEXT_PRIMARY),
+                    HistoryAttrs::default(),
+                    to_crossterm_color(bg),
+                );
+            }
+        }
+        if let Some((fg, attrs)) = diff_line_style(line) {
+            return (fg, attrs, None);
+        }
+    }
+    let (fg, attrs) = result_line_style(display, index, color);
+    (fg, attrs, None)
+}
 fn is_diff_content(content: &str, tool_name: Option<&str>) -> bool {
     match tool_name {
         Some("edit") | Some("diff") => true,
@@ -900,17 +990,16 @@ mod tests {
         // "diff:" — not a diff line, default styling
         assert_eq!(lines[1].segments[0].fg, secondary_result_color());
 
-        // "- old line" — removed, red foreground
-        assert_eq!(
-            lines[2].segments[0].fg,
-            to_crossterm_color(semantic::TEXT_ERROR)
-        );
-
-        // "+ new line" — added, green foreground
-        assert_eq!(
-            lines[3].segments[0].fg,
-            to_crossterm_color(semantic::TEXT_SUCCESS)
-        );
+        // Keep normal text contrast; only backgrounds distinguish changes.
+        for line in &lines[2..] {
+            assert_eq!(
+                line.segments[0].fg,
+                to_crossterm_color(semantic::TEXT_PRIMARY)
+            );
+        }
+        assert_eq!(lines[2].bg, to_crossterm_color(semantic::DIFF_REMOVED_BG));
+        assert_eq!(lines[3].bg, to_crossterm_color(semantic::DIFF_ADDED_BG));
+        assert!(lines[..2].iter().all(|line| line.bg.is_none()));
     }
 
     #[test]
@@ -1189,6 +1278,134 @@ mod tests {
     }
 
     // TUI-035 Fix 1: tool-call summary is viewport-width-aware.
+
+    #[test]
+    fn process_arguments_use_readable_fields_for_each_action() {
+        for action in ["read", "status", "list", "cancel"] {
+            let arguments = if action == "list" {
+                serde_json::json!({"action": action})
+            } else {
+                serde_json::json!({"action": action, "job_id": "job_example", "cursor": 12,
+                    "max_bytes": 2000, "wait_ms": 1000})
+            };
+            let display = ToolCallDisplay {
+                tool_name: "process".into(),
+                arguments,
+                provenance: ToolProvenance::Native,
+                summary_fields: crate::scrollback::summary_fields_for("process"),
+            };
+            let summary = summarize_tool_args(
+                "process",
+                &display.arguments.to_string(),
+                &display.summary_fields,
+            );
+            if action != "list" {
+                assert!(summary.contains("job_id: job_example"));
+            }
+            for width in [40, 80, 160] {
+                let lines = build_tool_call_scrollback_lines(&display, width);
+                let text = lines
+                    .iter()
+                    .map(|line| line.text.as_str())
+                    .collect::<String>();
+                assert!(text.contains(&format!("action: {action}")));
+                assert!(!text.contains('{') && !text.contains('"'));
+            }
+        }
+    }
+
+    #[test]
+    fn todo_tool_status_glyphs_and_highlight_are_display_only() {
+        let content = "Updated: [~] active (high) — id\n  description: [~] stays literal\n\n4 todo(s):\n  [ ] next\n  [~] active\n  [x] done\n  [!] blocked";
+        for tool in ["todo_query", "todo_update_status"] {
+            let display = ToolResultDisplay {
+                tool_name: Some(tool.into()),
+                content: content.into(),
+                is_error: false,
+            };
+            let lines = build_tool_result_scrollback_lines(&display, "", None, 120);
+            let text = lines
+                .iter()
+                .map(|line| line.text.as_str())
+                .collect::<Vec<_>>()
+                .join("\n");
+            assert!(text.contains("Updated: ● active"));
+            assert!(text.contains("○ next"));
+            assert!(text.contains("✓ done"));
+            assert!(text.contains("! blocked"));
+            assert!(text.contains("description: [~] stays literal"));
+            assert_eq!(display.content, content);
+            for line in lines.iter().filter(|line| line.text.contains("● active")) {
+                assert_eq!(
+                    line.segments[0].fg,
+                    to_crossterm_color(semantic::TODO_ACTIVE_FG)
+                );
+            }
+            let unrelated = ToolResultDisplay {
+                tool_name: Some("bash".into()),
+                ..display.clone()
+            };
+            assert_eq!(
+                todo_display_line(&unrelated, "  [~] active"),
+                ("  [~] active".into(), false)
+            );
+            let error = ToolResultDisplay {
+                is_error: true,
+                ..display
+            };
+            assert_eq!(
+                todo_display_line(&error, "  [~] active"),
+                ("  [~] active".into(), false)
+            );
+        }
+    }
+
+    #[test]
+    fn edit_tints_survive_wrapping_and_head_tail_but_not_errors() {
+        for count in [2, 40] {
+            let display = ToolResultDisplay {
+                tool_name: Some("edit".into()),
+                content: (0..count)
+                    .map(|i| {
+                        format!(
+                            "{} {}",
+                            if i % 2 == 0 { '-' } else { '+' },
+                            "中文 long line ".repeat(8)
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+                is_error: false,
+            };
+            for width in [20, 40, 120] {
+                let lines = build_tool_result_scrollback_lines(&display, "", None, width);
+                assert!(lines.len() > 2);
+                for line in &lines {
+                    if line.text.contains("lines omitted") {
+                        assert!(line.bg.is_none());
+                    } else {
+                        assert!(
+                            line.bg == to_crossterm_color(semantic::DIFF_ADDED_BG)
+                                || line.bg == to_crossterm_color(semantic::DIFF_REMOVED_BG)
+                        );
+                        assert_eq!(
+                            line.segments[0].fg,
+                            to_crossterm_color(semantic::TEXT_PRIMARY)
+                        );
+                    }
+                }
+                let error = ToolResultDisplay {
+                    is_error: true,
+                    ..display.clone()
+                };
+                assert!(
+                    build_tool_result_scrollback_lines(&error, "✗", Some(CColor::Red), width)
+                        .iter()
+                        .all(|line| line.bg.is_none())
+                );
+            }
+        }
+    }
 
     fn long_call_display() -> ToolCallDisplay {
         ToolCallDisplay {

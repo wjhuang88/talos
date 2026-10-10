@@ -164,7 +164,8 @@ impl ToolActivityLayoutCache {
 }
 
 pub(crate) struct ToolActivityComponent<'a> {
-    pub(crate) entries: Vec<(String, &'a str, &'a ToolActivityLayoutCache, bool)>,
+    pub(crate) entries: Vec<(String, &'a str, &'a ToolActivityLayoutCache, bool, bool)>,
+    pub(crate) animation_frame: Option<usize>,
     pub(crate) max_height: u16,
 }
 
@@ -186,8 +187,8 @@ impl ToolActivityComponent<'_> {
         let entries = &self.entries[start..];
         let mut remaining_body = capacity.saturating_sub(entries.len());
         let mut plans = Vec::new();
-        for (title, body, cache, collapsed) in entries.iter().rev() {
-            let plan = if content_width == 0 {
+        for (title, body, cache, collapsed, pending) in entries.iter().rev() {
+            let mut plan = if content_width == 0 {
                 PreviewLayoutPlan {
                     rows: vec![PreviewLayoutRow {
                         prefix: prefix.clone(),
@@ -218,6 +219,13 @@ impl ToolActivityComponent<'_> {
                 }
                 plan
             };
+            if *pending
+                && let Some(animation_frame) = self.animation_frame
+                && let Some(title_row) = plan.rows.first_mut()
+            {
+                let (padding, _) = preview_spinner_padding(animation_frame);
+                title_row.prefix = take_display_prefix(&padding, usize::from(width.min(3)));
+            }
             remaining_body = remaining_body.saturating_sub(plan.rows.len().saturating_sub(1));
             plans.push(plan);
         }
@@ -798,7 +806,7 @@ impl QueuePreviewComponent<'_> {
 
         let entries_if_full = available.min(content_budget);
         let would_hide = steering_total.saturating_sub(entries_if_full);
-        let reserve_summary = would_hide > 0;
+        let reserve_summary = would_hide > 0 && content_budget > 1;
         let entry_budget = if reserve_summary {
             content_budget.saturating_sub(1)
         } else {
@@ -846,7 +854,7 @@ impl QueuePreviewComponent<'_> {
             }
         }
         let hidden_count = steering_total.saturating_sub(entries_to_show);
-        let show_summary = hidden_count > 0;
+        let show_summary = hidden_count > 0 && used_rows < content_budget;
 
         let remaining = content_budget
             .saturating_sub(used_rows)
@@ -1888,7 +1896,7 @@ pub(crate) fn stream_padding_for(
 
     match source {
         Some(MessageSource::User) => " > ",
-        Some(MessageSource::Assistant) => " ● ",
+        Some(MessageSource::Assistant) => " • ",
         Some(MessageSource::System) => " # ",
         Some(MessageSource::Error) => " ! ",
         Some(MessageSource::Reasoning) => " ◇ ",
@@ -1945,6 +1953,10 @@ pub(crate) fn summary_fields_for(tool_name: &str) -> Vec<String> {
     match tool_name {
         "read" | "write" | "edit" | "delete" | "ls" | "stat" => vec!["path".to_string()],
         "bash" => vec!["command".to_string()],
+        "process" => ["action", "job_id", "cursor", "max_bytes", "wait_ms"]
+            .into_iter()
+            .map(String::from)
+            .collect(),
         "grep" => vec!["pattern".to_string()],
         "glob" => vec!["pattern".to_string()],
         "fetch_url" => vec!["url".to_string(), "mode".to_string()],

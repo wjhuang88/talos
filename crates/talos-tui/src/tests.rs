@@ -479,11 +479,19 @@ mod tests {
         assert_eq!(stream_padding_for(Some(&MessageSource::User), 1), "   ");
         assert_eq!(
             stream_padding_for(Some(&MessageSource::Assistant), 0),
-            " ● "
+            " • "
         );
         assert_eq!(
             stream_padding_for(Some(&MessageSource::Assistant), 1),
             "   "
+        );
+        assert_eq!(
+            unicode_width::UnicodeWidthStr::width(stream_padding_for(
+                Some(&MessageSource::Assistant),
+                0
+            )),
+            3,
+            "assistant bullet preserves the three-column prefix"
         );
         assert_eq!(stream_padding_for(Some(&MessageSource::System), 0), " # ");
         assert_eq!(stream_padding_for(Some(&MessageSource::System), 1), "   ");

@@ -665,18 +665,24 @@ fn project_line_chunks(line: &ScrollbackLine, width: u16) -> Vec<ProjectedLineCh
             logical_end: 0,
         });
     }
-    if let Some(fill) = &line.fill
-        && let Some(last) = rows.last_mut()
-    {
-        let used = UnicodeWidthStr::width(last.line.text.as_str());
-        if let Some(fill) = project_fill_segment(fill, capacity.saturating_sub(used)) {
-            last.line.segments.push(fill);
-            last.line.text = last
-                .line
-                .segments
-                .iter()
-                .map(|segment| segment.text.as_str())
-                .collect();
+    if let Some(fill) = &line.fill {
+        let last_index = rows.len().saturating_sub(1);
+        for (index, row) in rows.iter_mut().enumerate() {
+            // Background padding covers every visual row, including the spare
+            // cell before a wide character wraps. Decorative fills stay last-only.
+            if index != last_index && fill.text != " " {
+                continue;
+            }
+            let used = UnicodeWidthStr::width(row.line.text.as_str());
+            if let Some(fill) = project_fill_segment(fill, capacity.saturating_sub(used)) {
+                row.line.segments.push(fill);
+                row.line.text = row
+                    .line
+                    .segments
+                    .iter()
+                    .map(|segment| segment.text.as_str())
+                    .collect();
+            }
         }
     }
     rows
@@ -731,6 +737,44 @@ fn project_fill_segment(fill: &HistorySegment, available_cells: usize) -> Option
 mod tests {
     use super::*;
     use crate::inline_terminal::HistoryAttrs;
+
+    #[test]
+    fn edit_background_fills_every_projected_row() {
+        use talos_conversation::ToolResultDisplay;
+        for count in [2, 40] {
+            let display = ToolResultDisplay {
+                tool_name: Some("edit".into()),
+                content: (0..count)
+                    .map(|i| format!("{} 中文中文中文", if i % 2 == 0 { '+' } else { '-' }))
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+                is_error: false,
+            };
+            let lines = crate::tool_display::build_tool_result_scrollback_lines(
+                &display,
+                "",
+                None,
+                u16::MAX,
+            );
+            for width in [7, 20, 80] {
+                for line in &lines {
+                    let original = line.text.clone();
+                    for row in project_line(line, width) {
+                        if line.bg.is_some() {
+                            assert_eq!(
+                                UnicodeWidthStr::width(row.text.as_str()),
+                                usize::from(width)
+                            );
+                            assert_eq!(row.bg, line.bg);
+                        } else {
+                            assert!(line.fill.is_none());
+                        }
+                    }
+                    assert_eq!(line.text, original);
+                }
+            }
+        }
+    }
 
     #[test]
     fn cache_reuses_full_projection_for_stable_transcript_and_width() {

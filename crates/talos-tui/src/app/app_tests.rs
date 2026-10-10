@@ -29,6 +29,42 @@ fn state_line(text: &str) -> ScrollbackLine {
 }
 
 #[test]
+fn queued_body_remains_visible_beside_pending_tool_animation() {
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.first_message_dispatched = true;
+    tui.state.status.is_processing = true;
+    tui.state.steering_queue_snapshot = Some(talos_conversation::SteeringQueueSnapshot {
+        entries: vec![talos_conversation::SteeringQueueEntry {
+            text: "queued body 中文".into(),
+            truncated: false,
+        }],
+        total_count: 1,
+        omitted_count: 0,
+    });
+    tui.tool_activities
+        .update(talos_conversation::ToolActivity::Requested {
+            call_id: "pending".into(),
+            name: "read".into(),
+            body: "{}".into(),
+        });
+    for height in [8, 24] {
+        tui.terminal
+            .set_test_size(ratatui::layout::Size::new(80, height));
+        tui.draw_frame().expect("initial frame");
+        let first = tui.terminal.test_rendered_text();
+        assert!(first.contains("queued body 中"), "{first}");
+        assert!(first.contains('文'), "CJK body remains visible: {first}");
+        assert!(first.contains("read #1 · requested"));
+        tui.advance_processing_frame();
+        tui.draw_frame().expect("animated frame");
+        let next = tui.terminal.test_rendered_text();
+        assert!(next.contains("queued body 中"));
+        assert!(next.contains('文'));
+        assert_ne!(first, next);
+    }
+}
+
+#[test]
 fn history_return_shortcut_restores_tail_without_cancelling_or_editing() {
     let (tx, mut rx) = mpsc::unbounded_channel();
     let mut tui = crate::app::Tui::for_test(TuiState::new(), Some(tx));
@@ -310,7 +346,11 @@ fn todo_panel_renders_read_only_history_lines() {
 
     assert_eq!(lines[0].text, "   TODO Session Todos");
     assert!(lines[1].text.contains("abc12345"));
-    assert!(lines[1].text.contains("[~]"));
+    assert!(lines[1].text.contains("● [high]"));
+    assert_eq!(
+        lines[1].segments[3].fg,
+        to_crossterm_color(semantic::TODO_ACTIVE_FG)
+    );
     assert!(lines[1].text.contains("Wire slash view"));
     assert_eq!(lines[2].text, "      1 item");
 }
@@ -342,7 +382,11 @@ fn todo_panel_unknown_status_uses_bracket_fallback() {
         }],
         footer: Some("1 item".to_string()),
     });
-    assert!(lines2[1].text.contains("[x]"));
+    assert!(lines2[1].text.contains("✓ [low]"));
+    assert_eq!(
+        lines2[1].segments[3].fg,
+        to_crossterm_color(semantic::TEXT_PRIMARY)
+    );
 }
 
 #[test]
@@ -381,7 +425,7 @@ fn stream_render_state_tracks_lines_and_preview() {
     let mut state = StreamRenderState::default();
     assert!(state.start(MessageSource::Assistant).is_empty());
 
-    assert_eq!(state.push_chunk("first\nsec"), vec![state_line(" ● first")]);
+    assert_eq!(state.push_chunk("first\nsec"), vec![state_line(" • first")]);
     assert_eq!(state.preview(), "sec");
     assert_eq!(
         state.push_chunk("ond\nthird"),
@@ -420,7 +464,7 @@ fn assistant_stream_drops_leading_empty_prefix_row() {
     let lines = state.push_chunk("\nactual response\n");
 
     assert_eq!(lines.len(), 1);
-    assert_eq!(lines[0].text, " ● actual response");
+    assert_eq!(lines[0].text, " • actual response");
 }
 
 #[test]
@@ -440,7 +484,7 @@ fn stream_render_state_can_hold_complete_lines_until_finish() {
     assert_eq!(
         state.finish(),
         vec![
-            state_line(" ● first"),
+            state_line(" • first"),
             state_line("   second"),
             state_line("   third")
         ]
@@ -639,7 +683,7 @@ fn stream_render_state_recovers_markdown_after_unterminated_code_fence() {
     let lines = state.finish();
 
     assert_eq!(lines.len(), 3);
-    assert_eq!(lines[0].text, " ● ```");
+    assert_eq!(lines[0].text, " • ```");
     assert_eq!(lines[2].text, "   Recovered Heading");
     assert!(
         lines[2]
@@ -691,7 +735,7 @@ fn stream_render_state_renders_inline_markdown_segments() {
     let lines = state.push_chunk("# Title with **strong** and `code`\n");
 
     assert_eq!(lines.len(), 1);
-    assert_eq!(lines[0].text, " ● Title with strong and code");
+    assert_eq!(lines[0].text, " • Title with strong and code");
     assert!(lines[0].segments.iter().any(|segment| segment.attrs.bold));
     assert!(
         lines[0]
@@ -711,7 +755,7 @@ fn stream_render_state_renders_horizontal_rule() {
 
     assert_eq!(lines.len(), 1);
     assert!(
-        lines[0].text.starts_with(" ● ─"),
+        lines[0].text.starts_with(" • ─"),
         "horizontal rule with prefix and dashes"
     );
     assert!(
@@ -739,7 +783,7 @@ fn stream_render_state_styles_block_markdown_rows() {
     let lines = state.finish();
 
     assert_eq!(lines.len(), 2);
-    assert_eq!(lines[0].text, " ● - first");
+    assert_eq!(lines[0].text, " • - first");
     assert_eq!(lines[1].text, "   - second");
     assert!(
         lines[0]
@@ -825,7 +869,7 @@ fn render_history_message_reuses_completed_stream_rendering() {
     );
 
     assert_eq!(stream_count, 1);
-    assert_eq!(lines[0].text, " ● hello");
+    assert_eq!(lines[0].text, " • hello");
     assert!(lines.iter().any(|line| line.text.contains("╭")));
     assert!(
         lines
@@ -855,7 +899,7 @@ fn hydrate_history_preserves_prefixes_and_stream_count() {
     let texts: Vec<&str> = lines.iter().map(|line| line.text.as_str()).collect();
     assert!(texts.contains(&" > first"));
     assert!(texts.contains(&"   second"));
-    assert!(texts.contains(&" ● reply"));
+    assert!(texts.contains(&" • reply"));
     assert_eq!(stream_count, 2);
 }
 

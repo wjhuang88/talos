@@ -103,9 +103,11 @@ impl ToolActivities {
                         call.body.as_str(),
                         &call.layout,
                         call.result.is_some() || approval_visible,
+                        call.result.is_none(),
                     )
                 })
                 .collect(),
+            animation_frame: None,
             max_height: u16::MAX,
         }
     }
@@ -114,6 +116,37 @@ impl ToolActivities {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pending_titles_animate_without_rewrapping_or_animating_finished_calls() {
+        let mut calls = ToolActivities::default();
+        for id in ["a", "b"] {
+            calls.update(ToolActivity::Requested {
+                call_id: id.into(),
+                name: "bash".into(),
+                body: "{}".into(),
+            });
+        }
+        calls.update(ToolActivity::Finished {
+            call_id: "b".into(),
+            is_error: false,
+            body: "done".into(),
+        });
+        let mut component = calls.component_for_approval(true);
+        component.animation_frame = Some(0);
+        let first = component.plan(80);
+        component.animation_frame = Some(1);
+        let second = component.plan(80);
+        assert_ne!(first.rows[0].prefix, second.rows[0].prefix);
+        assert_eq!(first.rows[0].content, second.rows[0].content);
+        assert_eq!(first.rows[1], second.rows[1]);
+        assert_eq!(calls.calls[0].layout.builds(), 1);
+        for width in 0..=3 {
+            assert!(component.plan(width).rows.iter().all(|row| {
+                unicode_width::UnicodeWidthStr::width(row.prefix.as_str()) <= usize::from(width)
+            }));
+        }
+    }
 
     #[test]
     fn approval_collapses_requested_arguments_without_losing_call_state() {

@@ -704,11 +704,15 @@ pub(crate) fn preview_text_for_state(
 }
 
 /// Map a panel row status string to its display form.
-/// Known checkbox icons (`[ ]`, `[~]`, `[x]`, `[!]`) pass through as-is.
+/// Known checkbox statuses render as compact, distinct glyphs; the active
+/// state uses a filled circle paired with the pending state's empty circle.
 /// Unknown strings get the bracket fallback `[{status}]`.
-fn status_display(status: &str) -> String {
+pub(crate) fn status_display(status: &str) -> String {
     match status {
-        "[ ]" | "[~]" | "[x]" | "[!]" => status.to_string(),
+        "[ ]" => "○".to_string(),
+        "[~]" => "●".to_string(),
+        "[x]" => "✓".to_string(),
+        "[!]" => "!".to_string(),
         other => format!("[{other}]"),
     }
 }
@@ -748,32 +752,43 @@ pub(crate) fn build_todo_panel_lines(data: &TodoPanelData) -> Vec<ScrollbackLine
         ));
     } else {
         for row in &data.rows {
+            let active = row.status == "[~]";
+            let detail_color = if active {
+                semantic::TEXT_PRIMARY
+            } else {
+                semantic::DIM_TEXT
+            };
+            let title_color = if active {
+                semantic::TODO_ACTIVE_FG
+            } else {
+                semantic::TEXT_PRIMARY
+            };
             let mut segments = vec![
                 HistorySegment::styled(
                     format!("   {} ", row.id),
-                    to_crossterm_color(semantic::DIM_TEXT),
+                    to_crossterm_color(detail_color),
                     HistoryAttrs::default(),
                 ),
                 HistorySegment::styled(
-                    status_display(&row.status),
+                    format!("{} ", status_display(&row.status)),
                     to_crossterm_color(semantic::TEXT_ACCENT),
                     HistoryAttrs::default(),
                 ),
                 HistorySegment::styled(
                     format!("[{}] ", row.priority),
-                    to_crossterm_color(semantic::DIM_TEXT),
+                    to_crossterm_color(detail_color),
                     HistoryAttrs::default(),
                 ),
                 HistorySegment::styled(
                     row.title.clone(),
-                    to_crossterm_color(semantic::TEXT_PRIMARY),
+                    to_crossterm_color(title_color),
                     HistoryAttrs::default(),
                 ),
             ];
             if let Some(detail) = &row.detail {
                 segments.push(HistorySegment::styled(
                     format!(" — {detail}"),
-                    to_crossterm_color(semantic::DIM_TEXT),
+                    to_crossterm_color(detail_color),
                     HistoryAttrs::default(),
                 ));
             }
