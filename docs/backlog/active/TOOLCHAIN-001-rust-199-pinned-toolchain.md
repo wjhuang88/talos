@@ -66,4 +66,7 @@ wording records the proposal stage, not a remaining activation blocker.
 
 ## Residuals
 
+- Windows CI watchdog failure and bounded test-only diagnostic follow-up are
+  recorded in I296's Windows Validation Follow-up checkpoint. Production behavior
+  is unchanged; final-head Windows acceptance remains required before merge.
 - Existing third-party future-incompatibility notice for transitive `block v0.1.6` is not changed by this maintenance slice.

@@ -149,3 +149,25 @@ preserved. Authorized Cargo cache cleanup removed 10.6 GiB before rebuilding.
 ## Variance And Residuals
 
 - Existing transitive `block v0.1.6` future-incompatibility notice remains outside scope.
+
+### Windows Validation Follow-up - 2026-10-10
+
+PR #695 head `270141e0`, base `7097f1b5`, CI `38020014141` passed five
+jobs but failed Windows Desktop Auto acceptance: 105 tests passed and
+`enabled_auto_allow_once_reports_without_manual_approval` exceeded its 15-second
+test watchdog. The failure did not record the last runtime stage, so neither
+PowerShell startup delay nor a production deadlock is established. A failed-job
+rerun is diagnostic evidence, not a repair claim.
+
+Bounded validation follow-up: preserve the real shell, permission pipeline and
+existing execution/test deadlines, and record event timing, assessment counts and results
+on failure, including before cleanup. Execution timeout remains a failing result;
+no production timeout, permission or API behavior is changed. This strengthens
+the existing locked-validation acceptance rather than adding product scope.
+An exploratory five-second fixture command budget passed local tests but was
+removed after independent review: it would impose an unsupported tighter Windows
+performance assumption, and the execution deadline begins after process launch.
+The final diagnostic-only patch preserves existing pass/fail criteria. Its full
+macOS Desktop feature suite passed (112 tests, locked resolution). Final-head
+review/CI remain pending; the earlier complete workspace preflight still covers
+the unchanged production code.
