@@ -887,7 +887,7 @@ impl DesktopApprovalHandler {
         }
         let Ok(request_id) =
             NEXT_APPROVAL_ID
-                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
+                .try_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
         else {
             return ApprovalChoice::Deny;
         };

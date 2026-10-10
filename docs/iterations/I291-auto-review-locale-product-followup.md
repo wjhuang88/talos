@@ -571,3 +571,58 @@ Thirty-six fresh tiktoken 0.12.0 measurements of those eighteen actual requests 
 4–5 content tokens / 14–17 bytes for the locale field and 35–36 content tokens for field plus
 fixed guidance (cl100k_base/o200k_base). Chat framing, billing and all-model quality remain
 outside this synthetic measurement boundary.
+
+## Rust 1.99 Actual-Target Integration (2026-10-10)
+
+Exact `8902b850e82418f76e2b747ef4bffbaafe30ce43` completes CI3103 /
+[run38029709544](https://github.com/wjhuang88/talos/actions/runs/38029709544) with all six
+jobs successful. Darwin full preflight/workspace/external SDK, actual nine REPL and nine TUI
+cases including `/new`, Plugin, offline dependency audit and Desktop all pass. Windows Rust,
+Linux Desktop, installer, reconciliation and classifier also pass. Independent technical/API/
+security review is recorded in PR comment6094491020; product audit finds no unmet published
+requirement. These are valid evidence for that head, not the ensuing compiler integration.
+
+Per cross-session acknowledgment, #695 merges first as
+`435b6cf5f3cb11ebb34271bd666a614c4bc8092b` after exact63b0 / CI3102 and independent
+review/CAS. Git comparison confirms its actual main tree equals the locally previewed peer
+candidate tree `d645cb2699f39c11e75c2f283eaa3be35e39a05e`. I291 formally integrates that
+actual target with pinned Rust1.99.0. Cargo manifests/lockfile and GPUI versions are identical
+to target. The Desktop overlap retains stage timings and pre-cleanup diagnostics and adds
+explanations to both failure diagnostics; 15-second flow and 10-second cleanup deadlines,
+actual authority assertions and production behavior are unchanged by the resolution.
+
+The initial offline standard preflight stops during the SQLite-consumer governance fixture
+because its separate temporary dependency graph needs an uncached package. It is not a
+source/test failure or a passing preflight; the normal network-enabled standard preflight is
+rerun without dependency changes or skips. Fresh integrated real-binary/compiler results and
+new exact-head full CI/review remain required before merge. No completion is inferred from
+prior head CI or the disposable preview; owners remain Review / Claimed.
+
+Fresh actual-target source validation: pinned Rust1.99 locked CLI build passes in 5m57s
+(local debug=0, incremental off, two jobs). Nine REPL and nine POSIX TUI cases pass, with
+18 new captured requests, including durable resume, language-window switching, isolated
+review payloads, actual manual Deny and configured `/new` fallback. Six extracted production
+locale tests pass. The warmed pinned-rustc detector harness records eight-message windows:
+32chars/message p50 10698ns/p95 12029ns;4096chars/message p50 783787ns/p95 1122986ns
+(100warmup/1000samples, measured during local workspace-check load). This is component
+elapsed-time evidence, not a controlled cross-compiler comparison or end-to-end latency;
+the stress window can exceed the Agent16KiB aggregate cap. Normal preflight resolves the
+uncached ahash0.8.12 fixture dependency and both governance validators again pass with zero
+warnings; format/text/site/installers/Python boundaries and fourteen classifier cases pass.
+Whole-workspace compiler/test checks and exact-head remote validation are still in progress.
+
+The eighteen Rust1.99 captures produce 36 tiktoken0.12.0 records again: locale field adds
+4–5 content tokens/14–17bytes and field plus fixed guidance adds35–36 content tokens.
+The same representative-encoding/content-only bounds apply. Independent static integration
+review confirms both Desktop diagnostic sets and complete upstream Rust1.99 inheritance;
+exact published-head approval remains pending alongside its new complete CI.
+
+Pinned Rust1.99 workspace check passes in 4m49s and Clippy with `-D warnings` passes
+in 24.84s. Local standard preflight subsequently runs workspace tests, but its execution
+is stopped by automatic approval review over an existing provider-registration test's
+`https://new.example.com/v1` discovery request. Source inspection locates the fixture in
+`crates/talos-cli/src/mode_runners_tests.rs` and discovery call in
+`session_handlers/provider_model.rs`; no bypass or skipped test is used. Partial passing
+test output does not establish a complete workspace test result, and the subsequent SDK
+fixture is not claimed. This is a local execution limitation; the newly published actual
+Rust1.99 integration still requires complete exact-head GitHub CI and independent review.
