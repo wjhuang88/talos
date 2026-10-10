@@ -4,10 +4,10 @@
 |---|---|
 | Story ID | PROVIDER-007 |
 | Parent / Related Owner | PROVIDER-002; NET-001 is related intake only |
-| Status | Active / Claimed (proposed; ineffective until governance PR #689 merges) |
+| Status | Review / Claimed |
 | Priority | P0 urgent reliability maintenance |
 | Source | Maintainer request 2026-10-09; no new GitHub Issue |
-| Selected Iteration | I297 - Active / Claimed (proposed; ineffective until governance PR #689 merges) |
+| Selected Iteration | I297 - Review / Claimed |
 
 ## Collaboration Claim
 
@@ -24,7 +24,7 @@
 | Authorization Evidence | Maintainer selected expedited normal maintenance and explicitly requested serial I297/I296 closeout on 2026-10-10. No independent human maintainer is available; independent Agent reliability/API review, exact-head CI and CAS remain mandatory. This is not an emergency override. |
 | Implementation PR | Not started |
 | Last Updated | 2026-10-10 |
-| Handoff / Release Condition | Proposed claim and activation are ineffective until #689 merges to `main`; a fresh implementation branch then needs exact-head validation, required review and merge-time CAS. |
+| Handoff / Release Condition | Claim effective through #689 merge `71fc8bce8e80c32a7fc9b9b641d482c57dc70544`; implementation needs exact-head validation, required review and merge-time CAS. |
 
 ## Goal
 
