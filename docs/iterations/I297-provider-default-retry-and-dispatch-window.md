@@ -1,6 +1,6 @@
 # Iteration I297: Provider Default Retry And Dispatch Window
 
-> Document status: Review
+> Document status: Complete
 > Published plan date: 2026-10-09
 > Planned objective: Deliver the maintainer-approved urgent default change from three to five provider retry dispatches and from a 60-second to a 300-second request dispatch/header limit.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | I297/PROVIDER-007 only: default `max_attempts` 3 -> 5 and `dispatch_timeout_secs` 60 -> 300 seconds, direct config/provider tests and directly affected docs. No retry taxonomy, backoff, stream-limit, cancellation, dependency, toolchain, version, release or explicit-config behavior change. |
@@ -126,7 +126,16 @@ created: this is a narrow maintainer-selected child with no external handoff req
 
 ## Completion Evidence
 
-- Completion Commit: Pending. A status-only documentation commit cannot be used as completion evidence.
+- Completion Commit: 97b29bd8c0762b780c4ab97b9bd42fd9cc106303
+- Implementation #694 merged on 2026-10-10. Exact head
+  `03c2bb77d0a4cf2a16e798388222226bdfb65cc4`, base
+  `71fc8bce8e80c32a7fc9b9b641d482c57dc70544`; CI `38016189313`
+  completed successfully with all six jobs green, including Windows in 31 minutes.
+- Independent Agent APPROVE: #694 comment `6092606598`; merge-time CAS PASS:
+  comment `6092949030`. Reviewer was a read-only sub-agent, not an independent human.
+- All baseline acceptance passed: default/omitted/partial configuration uses 300/5,
+  explicit overrides remain authoritative, and existing provider boundary tests pass.
+  No release or tag was created. This closeout cites existing main implementation evidence.
 
 ## Variance And Residuals
 
@@ -146,9 +155,10 @@ created: this is a narrow maintainer-selected child with no external handoff req
 
 ## Retrospective
 
-- Outcome: Pending.
-- Documentation: pending implementation evidence.
-- Lessons: pending.
+- Outcome: Default-only maintenance delivered; no stream, retry taxonomy or API-shape change.
+- Documentation: configuration reference and related owners synchronized.
+- Lessons: include bounded cache finalization in aggregate CI job budgets; a cancelled
+  job is not successful evidence even when validation steps passed.
 
 ## Closeout Schedule And Startup Contract — 2026-10-10
 
