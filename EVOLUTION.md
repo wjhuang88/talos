@@ -66,6 +66,7 @@ repeating known mistakes.
 | 54 | Governance | 新 Issue owner 同步必须包含远端校验使用的状态矩阵 | #618 |
 | 55 | Governance | 本地 claim 提交不是目标分支所有权，validator 通过不能证明授权 | TUI-062 / #628 |
 | 56 | Evidence | 准入前 fixture 证据不能反过来依赖准入，须区分研究 parser 与已交付 adapter | I294 / #687 |
+| 57 | Validation | 临时环境的全库 debug 产物可耗尽磁盘；本地降低调试信息，不修改源码或 CI | I294 |
 
 ## Lessons
 
@@ -1079,3 +1080,16 @@ repeating known mistakes.
 - Prevention: Trace every proposed evidence prerequisite against the accepted child dependency
   order; an honest scope limitation must not create an unapproved reverse dependency.
 - Promoted to rule/check: none; accepted ADR-085 and D/E/F owners already define the stage order.
+
+## 2026-10-10 - Budget temporary workspace build artifacts
+
+- Trigger: I294 validation on a 32 GiB temporary filesystem, followed by checkout/log cleanup.
+- Symptom: Default-debug workspace test linking exhausted disk; the later compact preflight result
+  was unavailable after the temporary checkout/log disappeared.
+- Root cause: Underestimated accumulated debug/incremental/feature-variant artifacts; unobserved
+  final results could not be safely recovered from an ephemeral worktree.
+- Fix: Clean only the checkout's build cache; restore and revalidate with local dev/test debug=0,
+  incremental disabled and bounded jobs. Do not infer missing test results.
+- Prevention: Budget disk before warming target variants and checkpoint verified stages promptly
+  to the authorized repository; retain exact validation evidence in owner/PR records.
+- Promoted to rule/check: none; no source profile, dependency, test or CI policy change.

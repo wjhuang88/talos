@@ -1,6 +1,6 @@
 # SEARCH-001-D: Mwmbl Standard Route Qualification
 
-> Status: Partial source and query-free diagnostic evidence; no backend admission.
+> Status: Partial source, query-free diagnostic and synthetic offline evidence; no backend admission.
 > Owner: I294 / SEARCH-001-D / #644; effective claim #665.
 > Talos baseline: `fecc9583992ccf2c0678b58e902f4a3bdcf19d2b`.
 > Inspected upstream: `ff482e225d99c694abbd3337a1b1be93b8c95dd8`.
@@ -85,3 +85,21 @@ external query/result processing more broadly than this pinned standard trace; t
 [service terms](https://mwmbl.org/terms) remain a separate source of use conditions. Neither a
 source trace nor a query-free diagnostic resolves those questions. Mwmbl remains a research
 candidate, not an admitted native backend. D/I294 stays Active / Claimed, E/F gated, #624 open.
+
+## Independent Offline Wire Experiment — 2026-10-10
+
+The [integration test](../../crates/talos-tools/tests/i294_mwmbl_wire_characterization.rs) uses an
+[independently invented fixture](../../crates/talos-tools/tests/fixtures/i294_mwmbl_synthetic.json).
+This is a disposable test-binary parser, not a shipped adapter. Field names follow the documented
+schema; text/URLs were authored locally. Nothing is a captured provider result or copied server code.
+
+| Row | Offline experiment | Remaining limit |
+|---|---|---|
+| M-Q02 | Mixed, curated, unknown and Wikipedia-only origin labels retained | No live provenance, hosting independence or native-route credit |
+| M-Q03 | Required fields/types, optional usage, unknown extras, count mismatch and distinct malformed/empty/invalid-only outcomes | Strict rejection/integer widths are experimental; unknown labels are observations |
+| M-Q04 | Unicode/plain text and wire order preserved, highlights/score not interpreted | No public renderer integration or relevance measurement |
+| M-Q05 | Invalid/non-HTTP/credential URLs filtered before output cap, pre-parse byte bound | No result fetch, endpoint/redirect/SSRF, transport buffering or production numeric policy |
+
+All nine tests are offline. No HTTP client, credentials, provider selection or router changes;
+whole-row acceptance and deployed qualification remain pending. Executed results identify only
+this experiment and must not be reported as native backend or model-facing integration acceptance.
