@@ -158,6 +158,7 @@ source-level facts (no live search/probe was executed):
 
 These findings refine the earlier opaque-internals audit without closing C-V05/C-V07/C-V10.
 Transport cancellation, caller budget propagation and production integration remain unproven.
+
 Every behavioral stage requires fresh local convergence, exact-head CI and applicable API/security
 review. The current session authorizes this packet and test-only work; it does not authorize these
 production stages merely because their plan is written down.

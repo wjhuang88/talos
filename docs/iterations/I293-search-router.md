@@ -10,7 +10,7 @@
 | Source Issue | #643 |
 | Depends on | Accepted ADR-085; SEARCH-001-B / #642 complete in #656; NET-001 boundary coordination |
 | Claim State | Claimed |
-| Implementation PR | #681 / #685 (merged partial evidence); offline scheduling candidate Not started |
+| Implementation PR | #681 / #685 (merged partial evidence); #696 (Review; offline experiment) |
 | Completion | Pending |
 
 ## Collaboration Claim
