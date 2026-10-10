@@ -1,8 +1,19 @@
 # AUTO-UX-001: Conversation-Language Auto Review Explanations
 
-**Status**: Review / Claimed (follow-up I291 required)
+**Status**: Complete / Closed
 **Type**: Product Story
 **Source Issue**: #590
+
+## Current Product Closure — 2026-10-11
+
+Completion Commit: `a3a4753d6e42123e33ead1d7e6f769a96f85f37e` (implementation PR #682).
+
+All original product acceptance is complete after exact-head
+[CI3109](https://github.com/wjhuang88/talos/actions/runs/38032860943), independent Agent/API/security
+review and CAS. The [I291 final matrix](../../iterations/I291-auto-review-locale-product-followup.md#final-product-acceptance-and-closure)
+records real multilingual surfaces, session behavior, deterministic fallback, authority/API checks
+and bounded cost measurements. Earlier scheduling and phase checkpoints below remain historical,
+not current pending work. The phase1 Completion Commit is not the final product completion evidence.
 
 ## Goal And Scope
 
@@ -40,7 +51,7 @@ No retrospective authorization or completion is claimed.
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | AUTO-UX-001 / #590: session-local conversation locale and Auto review presentation only |
@@ -49,8 +60,8 @@ No retrospective authorization or completion is claimed.
 | Governance Claim PR | #639 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | User requested completion of #590, authorized publication to wjhuang88/talos and continued work. No independent maintainer is available in this session. Governance exact-head CI, validators and review are required; implementation requires independent API/security review. |
-| Implementation PR | #640, #652 and #662 (merged; I291 acceptance remains open) |
-| Last Updated | 2026-10-04 |
+| Implementation PR | #640, #652, #662, #674, #677, #679, #680, #682 (merged; product acceptance complete) |
+| Last Updated | 2026-10-11 |
 | Handoff / Release Condition | Effective claim merge precedes rebuilt implementation; no release/version/permission-policy change. |
 
 

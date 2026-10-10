@@ -1,9 +1,18 @@
 # Iteration I291: Auto Review Locale Product Acceptance Follow-up
 
-> Document status: Review
+> Document status: Complete
 > Published plan date: 2026-10-03
 > Parent: AUTO-UX-001 / #590 / I290
 > MVP deliverable: session-level locale inference and acceptance evidence that satisfies the original product story without changing permission authority.
+
+## Current Product Closure — 2026-10-11
+
+Completion Commit: `a3a4753d6e42123e33ead1d7e6f769a96f85f37e` (implementation PR #682).
+
+All published acceptance is complete. See the [final acceptance matrix](#final-product-acceptance-and-closure).
+Earlier remaining-work tables, Review checkpoints and recovery inventories are dated historical
+evidence superseded by that matrix, not current outstanding #590 acceptance. The original
+objectives, exclusions, acceptance and unsuccessful validation history remain preserved.
 
 ## Why This Follow-up Exists
 
@@ -51,7 +60,7 @@ Completion Commit. Until then the parent remains Review / Claimed.
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | AUTO-UX-001 / #590: product acceptance follow-up for session locale inference |
@@ -60,8 +69,8 @@ Completion Commit. Until then the parent remains Review / Claimed.
 | Governance Claim PR | #650 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | User explicitly requested execution of the product follow-up and authorized GitHub publication. Independent API/security review and exact-head CI remain required. |
-| Implementation PR | #652, #662, #674, #677, #679, #680 (merged), #682 (review; product acceptance remains open) |
-| Last Updated | 2026-10-10 |
+| Implementation PR | #652, #662, #674, #677, #679, #680, #682 (merged; product acceptance complete) |
+| Last Updated | 2026-10-11 |
 | Handoff / Release Condition | Effective claim merge precedes implementation; no release or permission-policy change. |
 
 ## Execution Evidence And Remaining Acceptance (2026-10-04)
@@ -626,3 +635,49 @@ is stopped by automatic approval review over an existing provider-registration t
 test output does not establish a complete workspace test result, and the subsequent SDK
 fixture is not claimed. This is a local execution limitation; the newly published actual
 Rust1.99 integration still requires complete exact-head GitHub CI and independent review.
+
+## Final Product Acceptance And Closure
+
+Implementation PR #682 merged as `a3a4753d6e42123e33ead1d7e6f769a96f85f37e` after
+exact head `66d420f3d8133d5f417f8c4f56dea875942d9710` completed
+[CI3109](https://github.com/wjhuang88/talos/actions/runs/38032860943) successfully.
+All six final job records are successful; mandatory functional checks are not skipped.
+[Independent Agent/API/security APPROVE](https://github.com/wjhuang88/talos/pull/682#issuecomment-6094904570)
+and [latest-main CAS review](https://github.com/wjhuang88/talos/pull/682#issuecomment-6099556215)
+cover the unchanged candidate and relevant target. Main's intervening #697/#698/handoff updates
+are documentation-only; their records are retained in the merge, with no locale takeover.
+
+| Acceptance area | Final evidence and boundary |
+|---|---|
+| Conversation language and human surface | Nine real REPL and nine POSIX TUI cases cover zh/en/ja initial and resumed prompts and actual manual Deny; representative third-language acceptance, not every model's translation quality |
+| Durable history and rotation | Exact persisted-session resume, zh-to-ja/en-to-ja/ja-to-en bounded-window switches and TUI `/new` configured en-US fallback pass |
+| Bounded incremental observation | Eight-turn evidence/cache, once-per-turn updates, duplicate approval events, unsupported/mixed/short/code-only fallback and same-session cache fixtures pass in full workspace CI |
+| Session-generation isolation | Channel-controlled stale-snapshot regression rejects an older session generation without resetting newer history/cache |
+| Config and technical failure | Validated tags/environment precedence, configured fallback, malformed/wrong-digest/timeout and zh/ja fixed technical-copy fixtures preserve reason codes and Deny |
+| Assessor, authority and API | Every binary capture verifies one two-message request, exact locale hint, no seeded transcript and actual denied tool result; digest, execution inputs and additive/defaulted public API compatibility retain independent review |
+| Prompt cost | Eighteen real synthetic captures / 36 tiktoken0.12.0 records: locale field adds 4–5 content tokens / 14–17 bytes; locale plus fixed guidance adds 35–36 tokens with cl100k_base/o200k_base; excludes framing, billing and all-model claims |
+| Detector CPU | Pinned Rust1.99 warmed eight-message harness, 100 warmup/1000 samples: 32 chars/message p50 10698ns/p95 12029ns; 4096 chars/message p50 783787ns/p95 1122986ns, measured during workspace-check load; component elapsed time only, not end-to-end or controlled cross-compiler comparison; stress window may exceed the Agent16KiB aggregate cap |
+| Guides and responsibility | README.md/README.zh-CN.md document actual seven-language detector coverage, ambiguity/fallback, bounded session-local evidence/cache, translation ownership and English fallback |
+| Platform gate | CI3109 passes full locked Windows/macOS workspace tests, external Runtime SDK, Desktop/Plugin/dependency checks and Darwin's real nine REPL/nine TUI cases |
+| Review and authorization | Effective claim #650 / Single-maintainer merge; independent Agent technical/API/security APPROVE, shared GitHub identity disclosed, not formal approval by a different natural person/collaborator |
+
+CI3109 Windows attempt1 failed the existing Desktop Auto allow-once fixture (105 passed/1 failed,
+job114157265192): AutoDecision at 577.9406ms, ToolStarted at 584.5438ms and no ToolResult before
+the 15-second flow watchdog. ToolStarted precedes execution and does not prove process spawn.
+ONE unchanged-head complete Windows rerun, job114164241652, passes every functional step,
+workspace tests, Desktop/PowerShell/direct walkthrough, governance, offline audit and CLI smoke.
+No timeout, ignore, filter or assertion was changed. This establishes that attempt's gates,
+not a repaired timing cause; the intermittent original stall remains unknown and preserved in
+[the public investigation](https://github.com/wjhuang88/talos/pull/682#issuecomment-6095058839)
+and I296's existing variance history. Earlier failed CI attempts remain historical diagnostics.
+
+Local full preflight was stopped by automatic approval review over the existing provider-discovery
+fixture's external endpoint; complete remote workspace/SDK CI supplies the gate without a local
+bypass, skip or inferred pass. Workspace maintenance later pruned the disposable local captures,
+logs and toolchains; published source, measurement records in this owner, review and CI remain
+recoverable from GitHub. No recapture or new local benchmark is inferred from checkout recovery.
+
+I291, I290 and AUTO-UX-001 are Complete / Closed using the already-existing implementation
+commit above. The focused governance closeout synchronizes the index, Backlog and Board; only
+after it reaches main is Issue #590 reconciled and closed. No Search #624/#644 completion,
+release, GPUI or Cargo dependency upgrade is claimed by this locale closure.
