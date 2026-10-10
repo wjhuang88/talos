@@ -2,9 +2,9 @@
 
 ## Purpose
 
-[I299](I299-preserved-presentation-recovery.md) is a draft Planned / Unclaimed C0 recovery
-candidate. Claim and activation remain ineffective until its governance PR is finalized and
-merged; I293/I294 retain separate ownership under explicit non-overlapping parallel authorization.
+[I299](I299-preserved-presentation-recovery.md) proposes Active / Claimed through #698 for C0 recovery.
+Claim and activation remain ineffective until #698 merges; I293/I294 retain separate ownership
+under explicit non-overlapping parallel authorization.
 The seven session-handoff requirements remain pending outside this bounded presentation slice.
 
 I298 context-budget repair is Complete / Closed through implementation #691 (`8d4ad50e`); see

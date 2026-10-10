@@ -1,6 +1,6 @@
 # Iteration I299: Preserved Presentation Recovery
 
-> Document status: Planned
+> Document status: Active (proposed; ineffective until #698 merges)
 > Published plan date: 2026-10-10
 > Planned objective: recover effective ownership and deliver the preserved C0 presentation candidate.
 > MVP deliverable: truthful process summaries and readable live TUI activity, queued bodies and tool results.
@@ -9,22 +9,21 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | C0 preserved TUI activity, queue, edit/Todo result presentation and process-tool summaries; associated regression repairs only. |
 | Claimed At | 2026-10-10 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #698 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer authorized serial implementation, stable publication, independent Agent review and gated merge; explicitly permitted non-overlapping concurrency with I293/I294. No separate maintainer reviewer is available; exact-head CI, Agent review, validators and CAS remain required. |
 | Implementation PR | Not started |
 | Last Updated | 2026-10-10 |
 | Handoff / Release Condition | Deliver only after effective claim, local convergence, native acceptance and exact-head gates; retain incomplete work in the handoff ledger. |
 
-Draft record only: no claim or activation is effective. Backfill the actual governance PR number,
-then propose Active / Claimed in this same governance-only candidate. Implementation starts from
-the claim merge or later target commit.
+PR #698 proposes Active / Claimed atomically; neither is effective until this finalized
+governance-only record reaches main. Implementation starts from that merge or later target commit.
 
 ## Published Baseline
 
