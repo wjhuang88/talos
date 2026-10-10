@@ -115,6 +115,49 @@ for deterministic synthetic adapter fixtures.
 Implementation sequence within I293: (1) agree context/selection seams and parameter bounds;
 (2) private typed router plus deterministic fixtures; (3) adapters classify actual failures;
 (4) wire tool/caller path and prove C-V10/C-V11 with rollback. Stage (2) alone cannot complete C.
+
+## Partial Offline Scheduling Evidence — 2026-10-10
+
+`crates/talos-tools/tests/i293_router_policy_experiment.rs` is a disposable twelve-case model;
+production never calls it. Already-eligible lazy candidates return synthetic Failed/Empty/Invalid/
+Valid outcomes. Paused Tokio time and owned-future counters verify finite starts, a fixture cap
+of two, delayed hedging, immediate failure replacement, valid-winner selection, deadline and
+cancellation boundaries, and local drop cleanup. Candidate polls that make cancellation ready
+are checked again before replacement/hedge launch and before returning a winner.
+
+This is partial evidence for C-V01/C-V03/C-V04 and the scheduling/owned-future portions of
+C-V05/C-V06/C-V07. It does not test actual parsing or mixed-result filtering (C-V02), validation
+budget, spawned task ownership, health, explicit-selection policy, real caller dispatch, binary
+wiring or rollback. All full acceptance rows above remain Pending. Numeric timings, cap, oneshot
+sender-drop interpretation and deadline/success tie ordering are experimental parameters;
+simultaneous cancellation/deadline precedence is not accepted policy. Consult I293 for exact
+source provenance and validation. No production router or native admission follows from this model.
+
+### Pinned compatibility dependency source audit
+
+Read-only local audit of Cargo.lock's `rust-websearch 0.1.2`, registry checksum
+`06b90d9a9ad9e7e347c4cd85c3fb37189256703db4fab1d6c6fb963ae1eed0ee`, establishes these
+source-level facts (no live search/probe was executed):
+
+- Talos `crates/talos-tools/src/web_search.rs` initializes SearchConfig with dependency defaults.
+  Its dependency file `types.rs` defaults to a 15-second request timeout and 3000-ms probe timeout.
+- Dependency `searcher.rs::search` awaits a global rate-limiter, then request-time `probe_all` when
+  enabled; reachable routes are attempted sequentially. DDG uses Lite, Instant Answer and HTML;
+  then Bing CN and configured SearXNG are compatibility fallbacks. This is existing dependency
+  behavior, not the proposed Talos router, generic native admission or a startup probe.
+- Dependency `probe.rs` owns parallel probe futures through `join_all`, caches reachability for 30 seconds,
+  and uses HEAD with a possible GET fallback. The search coordinator/probe code inspected does
+  not spawn application tasks. This does not prove that reqwest/DNS internals stop on drop.
+- Lite/HTML/Bing/SearXNG call dependency `anti_detection/mod.rs::retry_request` with one retry, on
+  Timeout/Network errors, including a 500-ms wait; Instant Answer directly awaits its request.
+  Per-request limits therefore do not establish one enclosing search budget. A router must not
+  silently add transport replay around this compatibility chain.
+- The subprocess spawn found in dependency `fetcher.rs` belongs to the separate `fetch_page` path;
+  the inspected search chain does not call that path. This is a bounded call-path observation,
+  not blanket dependency task/process isolation evidence.
+
+These findings refine the earlier opaque-internals audit without closing C-V05/C-V07/C-V10.
+Transport cancellation, caller budget propagation and production integration remain unproven.
 Every behavioral stage requires fresh local convergence, exact-head CI and applicable API/security
 review. The current session authorizes this packet and test-only work; it does not authorize these
 production stages merely because their plan is written down.

@@ -10,7 +10,7 @@
 | Source Issue | #643 |
 | Depends on | Accepted ADR-085; SEARCH-001-B / #642 complete in #656; NET-001 boundary coordination |
 | Claim State | Claimed |
-| Implementation PR | #681 (merged; test-only characterization) |
+| Implementation PR | #681 / #685 (merged partial evidence); offline scheduling candidate Not started |
 | Completion | Pending |
 
 ## Collaboration Claim
@@ -26,7 +26,7 @@
 | Governance Claim PR | #664 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Governance-only claim+activation PR; exact-head CI, governance validators, remote Issue reconciliation and merge-time CAS required. |
-| Last Updated | 2026-10-09 |
+| Last Updated | 2026-10-10 |
 | Handoff / Release Condition | Claim effective after #664 merge `d801790454e252699684253166984662ea9dab6a`; implementation remains bounded by ADR-085 and this iteration. |
 
 ## Scope
@@ -120,3 +120,84 @@ Next: converge the caller deadline/cancellation and explicit-selection seams wit
 then implement the router only within a production-authorized stage. Until then, architecture
 and offline characterization can proceed; generic retry/circuit ownership stays with NET-001.
 I293 remains Active / Claimed, Completion Pending; #643 and #624 remain open.
+
+## Offline Scheduling Experiment — 2026-10-10
+
+This stage continues the effective #664 claim, without activating production routing. The runnable
+deliverable is `crates/talos-tools/tests/i293_router_policy_experiment.rs`, a disposable experiment
+with twelve paused-clock tests. Its affected reference documentation is the router integration
+plan. This is an explicit infrastructure-only exception: no user-visible behavior is delivered.
+
+Dependency correction to the preserved published table: canonical B owner
+`docs/backlog/active/SEARCH-001-B-compatible-search-backends.md` is Complete / Claimed with
+Completion Commit `7728f7681df11a9d715a0e479590c1002c53a26f` (#660), and its iteration is
+`I292-search-compatible-backend-boundary.md`. The separate planned/unclaimed compatible-adapters
+document is an alias, not evidence that the effective B dependency remains incomplete. Global
+alias reconciliation is outside this C slice.
+
+Selection inventory on base `e63e0ee3793e2e8fd914f676224f982c6cae5593`: I293 continues C;
+I294 remains Active under independent D ownership (#693 merged partial evidence); I296 remains
+Active under TOOLCHAIN-001; I290/I291 remain Review under locale owners; I277 remains Review with
+deferred human validation; I249 remains Planned and is not activated. TEMPLATE is excluded.
+No new iteration, claim or overlapping implementation is introduced.
+
+The experiment owns lazy candidate futures directly, takes already-eligible candidates with
+already-classified synthetic outcomes, and tests first-valid success, immediate replacement,
+delayed bounded hedging, finite all-fail/no-eligible outcomes, one enclosing monotonic deadline,
+pre/in-flight cancellation, external future drop, fast primary success and slow-primary survival
+after hedge failure. An adversarial candidate poll signals cancellation while returning failure,
+remaining pending at the hedge boundary, or returning success: no replacement or success escapes
+the checked control boundary. Started and dropped futures and peak concurrency are observed.
+
+The two-future cap, timing values, oneshot sender-drop semantics and deadline-versus-success tie
+are fixture parameters, not shipping policy. Simultaneous cancellation/deadline ordering is not
+established. No production SearchBackend, WebSearchTool, AgentTool, network/socket, environment
+key, config, manifest, lockfile or CI policy changes occur. Future drop does not prove transport,
+DNS or dependency-spawned work termination. Full C-V01 through C-V11 remain Pending; this supplies
+only partial C-V01/C-V03 through C-V07 model evidence.
+
+Recovery provenance: unpublished local checkpoints `7023c98ff4b75eefe4f03cf10e48cbb01eee1c90`
+and `7c41d6ec` were lost with the temporary worktree. They are not pushed implementation or
+completion evidence. The restored test blob is byte-identical to the final prior source:
+`a58ddfa0b698d6f2c9634ec280adbb51568da2be`. Historically observed local results were twelve
+targeted tests/strict Clippy, sequential workspace tests (3579 passed, zero failed/ignored, one
+authorized socket filter), both Runtime SDK modes and zero-warning governance/claim validation.
+An earlier cross-checkout shared target produced StableCrateId/crate-resolution failures; an
+overlapping workspace run produced five existing Session elapsed-time failures. Isolated cache
+and sequential rerun passed; the precise timeout cause is unknown. These are historical results,
+not fresh validation for the restored candidate.
+
+Fresh recovery uses the current merged main above. Old registered Rust 1.97 executables failed
+with SIGBUS; a separate rustup home was installed and actual `rustc`/`rustfmt` execution verified
+against the unchanged repository pin. Compact local profiles, bounded jobs and an isolated target
+are retained. The standard preflight and fresh results are recorded below before submission.
+Only the previously authorized unchanged Unix socket fixture may be filtered locally; full exact
+head CI must run it. I293 stays Active / Claimed, Completion Pending; #643/#624 stay open.
+
+Fresh restored-tree observations: standard release preflight passed site/installer/text/classifier,
+format, locked workspace check/strict Clippy and both governance validators (zero warnings), then
+stopped at the unchanged socket fixture (runtime 64 passed / 1 OS-1 PermissionDenied). The first
+filtered workspace run reached the new twelve tests (all passed), then failed one existing TUI
+grammar assertion (594 passed / 1 failed). Its exact targeted rerun passed; the fallback has a
+500-ms boundary, but the precise original branch is unknown. A following cached workspace run
+failed five existing Session waits; single-test-thread diagnosis failed four Session assertions
+or waits. None is represented as a full-workspace success.
+
+Source inspection established that these Session fixtures write `/tmp/.talos/runtime` sidecars
+using process ID and instance number. Repeated cached sandbox invocations reused PID 16;
+read-only SQLite state counts showed prior pending/terminal rows. Only the 66 identified
+`runtime_16_*.pending.sqlite*` current-run artifacts (mtime within this validation window) were
+reversibly archived. Without changing source, assertions, thresholds or default test concurrency,
+the next locked workspace run exited 0: 114 suite summaries, **3588 passed, zero failed/ignored,
+one filtered socket test**. This supports stale fixture-state reuse for this fresh sequence;
+it does not establish the cause of historical failures. No additional CI filter is permitted.
+
+Final local convergence: network-feature Clippy for the new integration test passed with
+`-D warnings`; the external Runtime SDK fixture passed in both default and coding modes.
+Both governance validators passed with zero warnings, format and diff-whitespace checks passed,
+and changed-document local links resolved. An initial final governance check rejected three
+dependency file labels as missing repository paths; explicit external-dependency labels corrected
+the prose before the successful rerun. Independent local Agent review found no blockers, including
+the pinned dependency source audit. It did not execute tests and is not remote exact-head approval.
+The offline stage enters Review on submission; overall C remains Active / Claimed, incomplete.
+Remote exact-head full CI, independent technical review and merge-time CAS remain required.
