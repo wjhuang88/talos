@@ -187,7 +187,9 @@ jobs:
     needs: classify-changes
     if: always() && (needs.classify-changes.result != 'success' || needs.classify-changes.outputs.full_validation != 'false')
     runs-on: windows-latest
-    timeout-minutes: 30
+    # Cold validation can take 27 minutes; allow bounded cache post-job cleanup too.
+    # Individual validation steps retain their own timeout limits.
+    timeout-minutes: 45
 
     steps:
       - uses: actions/checkout@v4

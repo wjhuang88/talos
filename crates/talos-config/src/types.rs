@@ -111,7 +111,7 @@ pub struct ProviderTimeoutConfig {
     /// hang indefinitely. This timeout covers only the dispatch → headers phase;
     /// stream parsing after headers is protected by `first_packet_timeout_secs`
     /// and `stream_idle_timeout_secs`.
-    /// Default: 60 seconds.
+    /// Default: 300 seconds.
     pub dispatch_timeout_secs: u64,
     /// Maximum seconds from request dispatch to first stream event.
     /// Default: 30 seconds.
@@ -120,7 +120,7 @@ pub struct ProviderTimeoutConfig {
     /// Default: 90 seconds.
     pub stream_idle_timeout_secs: u64,
     /// Maximum number of retry attempts for retryable provider failures.
-    /// Default: 3 attempts.
+    /// Default: 5 retries after the initial request.
     pub max_attempts: u32,
     /// Base delay in milliseconds for exponential backoff.
     /// Default: 500ms.
@@ -133,10 +133,10 @@ pub struct ProviderTimeoutConfig {
 impl Default for ProviderTimeoutConfig {
     fn default() -> Self {
         Self {
-            dispatch_timeout_secs: 60,
+            dispatch_timeout_secs: 300,
             first_packet_timeout_secs: 30,
             stream_idle_timeout_secs: 90,
-            max_attempts: 3,
+            max_attempts: 5,
             backoff_base_ms: 500,
             backoff_max_ms: 8_000,
         }

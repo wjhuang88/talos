@@ -1672,11 +1672,33 @@ discover_shared = true
 #[test]
 fn test_provider_timeout_config_defaults() {
     let timeout = ProviderTimeoutConfig::default();
+    assert_eq!(timeout.dispatch_timeout_secs, 300);
     assert_eq!(timeout.first_packet_timeout_secs, 30);
     assert_eq!(timeout.stream_idle_timeout_secs, 90);
-    assert_eq!(timeout.max_attempts, 3);
+    assert_eq!(timeout.max_attempts, 5);
     assert_eq!(timeout.backoff_base_ms, 500);
     assert_eq!(timeout.backoff_max_ms, 8_000);
+}
+
+#[test]
+fn test_provider_timeout_config_omitted_or_partial_toml() {
+    for timeout_block in [
+        "",
+        "[providers.openai.timeout]",
+        "[providers.openai.timeout]\nmax_attempts = 2",
+    ] {
+        let source =
+            format!("provider = \"openai\"\nmodel = \"test\"\n[providers.openai]\n{timeout_block}");
+        let config: Config = toml::from_str(&source).expect("valid provider configuration");
+        let timeout = &config.providers["openai"].timeout;
+        assert_eq!(timeout.dispatch_timeout_secs, 300);
+        assert_eq!(
+            timeout.max_attempts,
+            if timeout_block.contains("= 2") { 2 } else { 5 }
+        );
+        assert_eq!(timeout.first_packet_timeout_secs, 30);
+        assert_eq!(timeout.stream_idle_timeout_secs, 90);
+    }
 }
 
 #[test]
@@ -1690,6 +1712,7 @@ fn test_provider_timeout_config_parsed_from_toml() {
             api_key_env = "OPENAI_API_KEY"
 
             [providers.openai.timeout]
+            dispatch_timeout_secs = 17
             first_packet_timeout_secs = 12
             stream_idle_timeout_secs = 34
             max_attempts = 4
@@ -1700,6 +1723,7 @@ fn test_provider_timeout_config_parsed_from_toml() {
     .expect("operation should succeed");
 
     let timeout = &config.providers["openai"].timeout;
+    assert_eq!(timeout.dispatch_timeout_secs, 17);
     assert_eq!(timeout.first_packet_timeout_secs, 12);
     assert_eq!(timeout.stream_idle_timeout_secs, 34);
     assert_eq!(timeout.max_attempts, 4);

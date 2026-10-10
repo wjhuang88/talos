@@ -1,6 +1,6 @@
 # Iteration I297: Provider Default Retry And Dispatch Window
 
-> Document status: Active (proposed; ineffective until governance PR #689 merges)
+> Document status: Review
 > Published plan date: 2026-10-09
 > Planned objective: Deliver the maintainer-approved urgent default change from three to five provider retry dispatches and from a 60-second to a 300-second request dispatch/header limit.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -19,9 +19,9 @@
 | Governance Claim PR | #689 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer selected expedited normal maintenance and explicitly requested I297 then I296 closeout on 2026-10-10 in single-maintainer mode. No independent human maintainer is available; independent Agent reliability/API review, exact-head CI and merge-time CAS remain mandatory. This is not an emergency override. |
-| Implementation PR | Not started |
+| Implementation PR | #694 |
 | Last Updated | 2026-10-10 |
-| Handoff / Release Condition | Proposed claim and activation become effective only when the finalized #689 record merges to `main`. |
+| Handoff / Release Condition | Claim effective through #689; implementation requires exact-head validation, independent Agent review and merge-time CAS. |
 
 ## Published Baseline
 
@@ -103,16 +103,41 @@ created: this is a narrow maintainer-selected child with no external handoff req
 | Date | Type | Record |
 |---|---|---|
 | 2026-10-09 | Proposed atomic claim+activation | #689 proposes I297/PROVIDER-007 as Claimed / Active under a single-maintainer merge path. Both remain ineffective until this exact claim record reaches `main`; no implementation has started. |
+| 2026-10-10 | Effective activation | #689 merged as `71fc8bce8e80c32a7fc9b9b641d482c57dc70544`; head `82b71aecfd1a41653663a14ceb17446caaf82964`, base `6b4bfb8d3f20faa6e711b218d1631603da53b572`, CI `38010968762`, independent Agent review comment `6091864356`, merge-time CAS comment `6091887597`. Implementation starts from this merge on `fix/i297-provider-defaults`. |
 
 ## Verification Evidence
 
-- Pending effective claim and implementation.
+- 2026-10-10 local implementation: defaults now dispatch/header 300 seconds and five retries
+  after initial dispatch. Explicit TOML overrides and first-packet/idle/backoff remain unchanged.
+- `cargo test -p talos-config --locked`: 226 unit tests and one doctest passed.
+- `cargo test -p talos-provider --locked` (low-debug environment): passed, including both
+  protocols' dispatch limits, retry progress and stream-boundary tests.
+- `CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 ./scripts/release_preflight.sh`:
+  passed; includes workspace check, Clippy, all workspace tests/doctests, external Runtime SDK
+  fixture in both modes, site/installer checks and both governance validators (zero warnings).
+- Locked all-target workspace check and all-target/all-feature Clippy with `-D warnings`: passed.
+  Existing transitive `block v0.1.6` future-compatibility notice remains outside this slice.
+- Actual CLI `config list`, using an isolated temporary configuration, reported defaults
+  `dispatch_timeout_secs=300`, `max_attempts=5`; explicit 17/2 remained 17/2. The nested
+  `config get` key is not supported by the existing CLI; evidence uses parsed `config list` TOML.
+- Independent local Agent review identified the Anthropic default progress test's old expectation;
+  corrected to 5. OpenAI's explicit three-retry fixture remains unchanged. Final exact-head
+  review and remote CI are still required before merge.
 
 ## Completion Evidence
 
 - Completion Commit: Pending. A status-only documentation commit cannot be used as completion evidence.
 
 ## Variance And Residuals
+
+- 2026-10-10 bounded CI follow-up: run `38012251384`, Windows job `114096073540`,
+  passed every validation step but exceeded the 30-minute job limit during rust-cache
+  post-job compression. GitHub's annotation explicitly reports the job timeout.
+  Raise only the Windows aggregate budget to 45 minutes to accommodate validation plus
+  cache cleanup; individual step deadlines and all acceptance gates remain unchanged.
+  This mechanical CI follow-up is kept in #694 under the existing-PR maintenance rule;
+  it does not authorize toolchain or provider-scope expansion. Fresh exact-head CI and
+  independent review are required; the cancelled run is not merge approval.
 
 - NET-001 remains the owner for generic retry/circuit-breaker policy and no such architecture is
   selected here.
@@ -159,4 +184,5 @@ live CI handle; do not restart or cancel valid runs just because a poll times ou
 Default decisions: explicit timeout values win; max_attempts retains retry-ordinal semantics;
 no first-packet/idle change. No API widening or release-version decision here. ADR-087's
 next-minor boundary prevents publishing I298 in an I297 patch. Broader resilience remains NET-001.
-Next gate: finalize #689 governance candidate and merge only after fresh exact-head evidence.
+2026-10-10 execution update: #689 is merged; local implementation and preflight passed.
+Next gate: stable implementation candidate, exact-head CI and independent review, then merge-time CAS.
