@@ -95,12 +95,15 @@ async fn exercise_auto(enabled: bool, allow: bool) {
     let mut approvals = 0;
     let mut results = Vec::new();
     let mut explanations = Vec::new();
+    let started = std::time::Instant::now();
+    let mut stages = Vec::new();
     let outcome = tokio::time::timeout(Duration::from_secs(15), async {
         loop {
             match host.recv().await.expect("host event") {
                 RuntimeOutput::AutoDecision {
                     outcome, evaluator, ..
                 } => {
+                    stages.push(("auto_decision", started.elapsed()));
                     reports.push((outcome, evaluator));
                 }
                 RuntimeOutput::ApprovalRequested {
@@ -108,6 +111,7 @@ async fn exercise_auto(enabled: bool, allow: bool) {
                     explanation,
                     ..
                 } => {
+                    stages.push(("approval_requested", started.elapsed()));
                     approvals += 1;
                     explanations.push(explanation);
                     host.try_send(RuntimeCommand::ApprovalResponse {
@@ -118,7 +122,13 @@ async fn exercise_auto(enabled: bool, allow: bool) {
                 }
                 RuntimeOutput::ToolResult {
                     is_error, content, ..
-                } => results.push((is_error, content)),
+                } => {
+                    stages.push(("tool_result", started.elapsed()));
+                    results.push((is_error, content));
+                }
+                RuntimeOutput::ToolStarted { .. } => {
+                    stages.push(("tool_requested", started.elapsed()));
+                }
                 RuntimeOutput::Completed { .. } => break,
                 RuntimeOutput::Error(error) => panic!("host failed: {error}"),
                 _ => {}
@@ -126,13 +136,24 @@ async fn exercise_auto(enabled: bool, allow: bool) {
         }
     })
     .await;
+    if outcome.is_err() {
+        // Preserve evidence even if the independent cleanup watchdog also fails.
+        eprintln!(
+            "Auto test watchdog: stages={stages:?}, assessments={}, reports={reports:?}, approvals={approvals}, results={results:?}",
+            provider.assessments.load(Ordering::SeqCst),
+        );
+    }
     host.try_send(RuntimeCommand::Shutdown).expect("shutdown");
     tokio::time::timeout(Duration::from_secs(10), async {
         while !matches!(host.recv().await, Some(RuntimeOutput::Stopped) | None) {}
     })
     .await
     .expect("host shutdown completes");
-    outcome.expect("approval flow completes");
+    assert!(
+        outcome.is_ok(),
+        "approval flow timed out: stages={stages:?}, assessments={}, reports={reports:?}, approvals={approvals}, results={results:?}",
+        provider.assessments.load(Ordering::SeqCst),
+    );
     assert_eq!(results.len(), 1, "one authoritative tool result");
     assert_eq!(approvals, usize::from(!(enabled && allow)));
     if !allow {

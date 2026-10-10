@@ -21,7 +21,7 @@ def main():
     end = source.index("/// Captures the directory object", start)
     rustc = os.environ.get("RUSTC", "rustc")
     version = subprocess.check_output([rustc, "--version"], text=True).strip()
-    assert version.startswith("rustc 1.97.0 "), version
+    assert version.startswith("rustc 1.99.0 "), version
     harness = r'''
 use std::hint::black_box;
 use std::time::Instant;

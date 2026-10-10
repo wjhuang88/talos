@@ -4,8 +4,8 @@
 
 I298 context-budget repair is Complete / Closed through implementation #691 (`8d4ad50e`); see
 [I298](I298-context-budget-recovery.md) for the incident, selection inventory and bounded scope.
-I297 is Complete / Closed through #694 (`97b29bd8`); #688 proposes I296 atomic activation
-and remains ineffective until merge.
+I297 is Complete / Closed through #694 (`97b29bd8`); #688 merged as `7097f1b5`,
+closing I297 and establishing I296 atomic activation.
 The 2026-10-10 serial closeout schedule lives in I297; no publication authority transfers.
 
 Track current iteration plans, execution state, verification evidence, and retrospectives. Each
@@ -22,7 +22,7 @@ PROVIDER-007; #694 merged as `97b29bd8`; owner state is Complete / Closed. It
 changes only the defaults for retry dispatches (`3 -> 5`) and
 request dispatch/header wait (`60 -> 300` seconds), preserving explicit configuration, retry
 classification, backoff, stream limits and cancellation behavior. It is deliberately independent of
-the unmerged I296 toolchain proposal and NET-001's unclaimed generic-resilience architecture.
+the I296 toolchain implementation and NET-001's unclaimed generic-resilience architecture.
 Full preflight, six exact-head CI jobs, independent Agent review and CAS passed.
 
 ## Frame-Aware Browser Selection — 2026-10-06
@@ -37,9 +37,9 @@ deferred Planned and I164 Paused. No status or scope from these owners transfers
 
 ## Rust 1.99 Toolchain Maintenance — 2026-10-09
 
-[I296](I296-rust-199-toolchain-maintenance.md) / TOOLCHAIN-001 proposes Active / Claimed in #688
-for a Rust 1.99 development/CI/release pin. It does not activate until its
-atomic governance claim reaches `main`; it excludes the Rust 1.95 MSRV, dependency graph,
+[I296](I296-rust-199-toolchain-maintenance.md) / TOOLCHAIN-001 is Review / Claimed through
+#688 merge `7097f1b5` for a Rust 1.99 development/CI/release pin. Local implementation
+and full local preflight passed; exact-head CI/review remain pending. It excludes the Rust 1.95 MSRV, dependency graph,
 lockfile and release activity. I293/I294 remain Active under independent Search claims; I290/I291
 remain Review, DEPENDENCY-003-A remains Review/Claimed, I249 remains Planned and I164 Paused.
 
