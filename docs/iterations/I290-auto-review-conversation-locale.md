@@ -1,8 +1,18 @@
 # Iteration I290: Auto Review Conversation Locale
 
-> Document status: Review
+> Document status: Complete
 > Published plan date: 2026-10-03
 > MVP deliverable: Auto review effect summaries and human decision prompts follow locally detected conversation language, with deterministic configured UI-locale fallback.
+
+## Current Product Closure — 2026-10-11
+
+Completion Commit: `a3a4753d6e42123e33ead1d7e6f769a96f85f37e` (implementation PR #682).
+
+AUTO-UX-001 and I290/I291 product acceptance are complete after exact-head
+[CI3109](https://github.com/wjhuang88/talos/actions/runs/38032860943), independent Agent/API/security
+review and CAS. See the [I291 final matrix](I291-auto-review-locale-product-followup.md#final-product-acceptance-and-closure)
+for runtime acceptance, measured cost and retained limitations. Recovery inventories and earlier
+pending-product checkpoints below are dated historical evidence, superseded for current #590 status.
 
 ## Scope And Non-Goals
 
@@ -71,7 +81,7 @@ SHA; the claim/status commit is not completion evidence.
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | AUTO-UX-001 / #590: session-local conversation locale and Auto review presentation only |
@@ -80,8 +90,8 @@ SHA; the claim/status commit is not completion evidence.
 | Governance Claim PR | #639 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | User requested completion of #590, authorized publication to wjhuang88/talos and continued work. No independent maintainer is available in this session. Governance exact-head CI, validators and review are required; implementation requires independent API/security review. |
-| Implementation PR | #640, #652 and #662 (merged; I291 product acceptance remains open) |
-| Last Updated | 2026-10-04 |
+| Implementation PR | #640, #652, #662, #674, #677, #679, #680, #682 (merged; product acceptance complete) |
+| Last Updated | 2026-10-11 |
 | Handoff / Release Condition | Effective claim merge precedes rebuilt implementation; no release/version/permission-policy change. |
 
 

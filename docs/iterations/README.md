@@ -38,7 +38,7 @@ negotiated, opt-in host-executed v2 contract. This owner-first closeout records 
 PR #683 merge `06a5f6e6`; exact-head CI and Agent-role security/API review passed. Native browser/CDP/process-carrier
 delivery remains a downstream residual. At selection, I293/I294 remain Active under their
 separate search claims; the maintainer explicitly authorized non-overlapping parallel I295 work
-and owner-first union updates to derived files. I277/I290/I291 remain Review, I249 remains
+and owner-first union updates to derived files. At that selection snapshot, I277/I290/I291 were Review, I249 was
 deferred Planned and I164 Paused. No status or scope from these owners transfers to I295.
 
 ## Rust 1.99 Toolchain Maintenance — 2026-10-09
@@ -48,8 +48,9 @@ implementation #695 merge `435b6cf5` for a Rust 1.99 development/CI/release pin.
 Full local preflight and final exact-head CI `38029259357` (six jobs), independent Agent
 APPROVE and CAS passed. The owner preserves the earlier Windows failure and dependency
 warning without claiming a timing root-cause repair. It excludes the Rust 1.95 MSRV,
-dependency graph, lockfile and release activity. I293/I294 remain Active under independent Search claims; I290/I291
-remain Review, DEPENDENCY-003-A remains Review/Claimed, I249 remains Planned and I164 Paused.
+dependency graph, lockfile and release activity. I293/I294 retain independent Search claims;
+I290/I291 are now Complete / Closed (locale closure below). DEPENDENCY-003-A remains Review/Claimed,
+I249 remains Planned and I164 Paused.
 
 ## TUI History Return Recovery — 2026-10-03
 
@@ -61,17 +62,16 @@ preflight, all six CI checks, exact-head Agent review and native acceptance pass
 The recovery-time inventory and dispositions of I249, I277, I288 and paused I164
 are recorded in I289; it does not claim a retrospective selection preflight.
 
-## Auto Review Locale Recovery — 2026-10-03
+## Auto Review Locale Product Closure — 2026-10-11
 
-[I290](I290-auto-review-conversation-locale.md) / AUTO-UX-001 proposes a bounded locale
-implementation slice for #590. Phase 1 claim and implementation are merged; product completion remains pending I291;
-#630 is historical draft evidence only. I290 records selection inventory, compatibility
-and localization responsibilities before rebuilt implementation.
-
-
-## Auto Review Locale Product Follow-up — 2026-10-03
-
-[I291](I291-auto-review-locale-product-followup.md) is the corrective product-acceptance slice for #590. It owns session-level evidence aggregation, extensible language detection, compatibility-preserving API integration, and the deterministic acceptance matrix. PR #652 merged (`9582733c`); I291 remains Review / Claimed with outstanding acceptance recorded in its owner. No permission semantics, GPUI version, or release behavior changes are authorized.
+[I290](I290-auto-review-conversation-locale.md), [I291](I291-auto-review-locale-product-followup.md)
+and AUTO-UX-001 / #590 are Complete / Closed. PR #682 merged as
+`a3a4753d6e42123e33ead1d7e6f769a96f85f37e` after
+[exact-head full CI3109](https://github.com/wjhuang88/talos/actions/runs/38032860943),
+independent Agent/API/security review and CAS. The I291 final matrix records real zh/en/ja
+REPL/TUI acceptance, bounded session detection, configured fallback, authority/API compatibility
+and measured cost. #630 and prior remaining-work checkpoints stay historical evidence.
+No permission semantics, GPUI/Cargo dependency version or release behavior changes are claimed.
 
 ## Lifecycle
 
@@ -124,7 +124,7 @@ Current cycle: [I281](I281-auto-shell-review-and-windows-timing.md), Complete/Cl
 Model-first shell Ask review, Windows I226 timing repair and UX follow-up merged in
 #588/#591 as `a1cb869b`/`bfdf8b67`; code CI, independent Agent security/API review and
 composed UI/test/execution-boundary acceptance passed. MODEL-007 was next; Desktop now precedes it;
-#590 is separate intake.
+#590 is Complete / Closed; see the I291 final acceptance matrix above.
 
 I280 / RUNTIME-006 / #234 is Complete/Closed at implementation merge `007ca29d`; closeout `ade0b68c`.
 The maintainer selects this SDK slice before unclaimed MODEL-007; I277 deferred acceptance,
