@@ -27,6 +27,7 @@ deferred behind Desktop. Locale follow-up #590 is Review / Claimed; phase 1 merg
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
+| I299 preserved presentation recovery / C0 | Planned / Unclaimed | [I299](iterations/I299-preserved-presentation-recovery.md) | Draft governance claim; finalize actual PR number and merge before rebuilding implementation. Native acceptance and fresh exact-head gates pending; seven handoff requirements remain separate. |
 | I298 context budget recovery / MEM-005-A | Complete / Closed | [I298](iterations/I298-context-budget-recovery.md) | #691 merged as `8d4ad50e`; full preflight, six CI jobs, independent Agent review and CAS passed; next-minor only, no parent MEM-005 completion. |
 | I292 Search compatible backend boundary / SEARCH-001-B | Complete / Claimed | [I292](iterations/I292-search-compatible-backend-boundary.md) / [SEARCH-001-B](backlog/active/SEARCH-001-B-compatible-search-backends.md) / #642 | PR #660 merged as `7728f7681df11a9d715a0e479590c1002c53a26f`; exact-head CI run `37409618084`; no production routing change. |
 | I293 Talos-owned SearchRouter / SEARCH-001-C | Active / Claimed | [I293](iterations/I293-search-router.md) / [SEARCH-001-C](backlog/active/SEARCH-001-C-search-router.md) / #643 | Claim #664 effective; #681 test-only evidence merged at `41381f8055b66d54de42988e2b936a12e5af3ac3`. Caller-context integration and C acceptance remain pending; see owner-linked router plan. |
