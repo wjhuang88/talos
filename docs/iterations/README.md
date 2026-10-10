@@ -4,7 +4,8 @@
 
 I298 context-budget repair is Complete / Closed through implementation #691 (`8d4ad50e`); see
 [I298](I298-context-budget-recovery.md) for the incident, selection inventory and bounded scope.
-I296/I297 remain separate unmerged candidates; no publication authority transfers to this repair.
+I297's updated #689 proposes its default-only claim; I296's #688 remains separately Planned.
+The 2026-10-10 serial closeout schedule lives in I297; no publication authority transfers.
 
 Track current iteration plans, execution state, verification evidence, and retrospectives. Each
 iteration's own document is authoritative for its scope and lifecycle.
@@ -12,6 +13,16 @@ iteration's own document is authoritative for its scope and lifecycle.
 The complete pre-closeout index is preserved unchanged at
 [`ITERATIONS-INDEX-pre-I170-closeout-2026-08-01.md`](ITERATIONS-INDEX-pre-I170-closeout-2026-08-01.md).
 That snapshot is historical evidence and not current activation authority.
+
+## Provider Default Reliability Maintenance - 2026-10-09
+
+[I297](I297-provider-default-retry-and-dispatch-window.md) is a separate urgent maintenance slice for
+PROVIDER-007; governance PR #689 proposes Active / Claimed but it is ineffective until merge. It
+changes only the defaults for retry dispatches (`3 -> 5`) and
+request dispatch/header wait (`60 -> 300` seconds), preserving explicit configuration, retry
+classification, backoff, stream limits and cancellation behavior. It is deliberately independent of
+the unmerged I296 toolchain proposal and NET-001's unclaimed generic-resilience architecture. Claim
+and activation must merge atomically before implementation begins.
 
 ## Frame-Aware Browser Selection — 2026-10-06
 
