@@ -1,30 +1,30 @@
 # TOOLCHAIN-001: Rust 1.99 Pinned Toolchain Maintenance
 
-> Document status: Planned / Unclaimed
+> Document status: Active / Claimed
 
 | Field | Value |
 |---|---|
 | Type | Toolchain and CI maintenance |
 | Priority | P2 |
 | Source | Maintainer-authorized maintenance request |
-| Selected Iteration | I296 (proposed; activation pending) |
+| Selected Iteration | I296 (Active on #688 merge; activation pending) |
 | Depends On | Current `main`; effective I296 Collaboration Claim |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-6 |
+| Work Slice | I296/TOOLCHAIN-001: Rust 1.99 pins, matching docs/assertion and compiler-required source compatibility; no MSRV, dependency, lockfile, behavior or release change. |
+| Claimed At | 2026-10-10 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Maintainer authorized preparation on 2026-10-09; implementation remains prohibited until an effective target-branch claim exists. |
+| Governance Claim PR | #688 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Maintainer authorized serial I297/I296 closeout on 2026-10-10. Independent human unavailable; Agent review, exact-head CI, validators and CAS required. Proposed claim remains ineffective until #688 merges. |
 | Implementation PR | Not started |
-| Last Updated | 2026-10-09 |
+| Last Updated | 2026-10-10 |
 | Handoff / Release Condition | Atomic claim+activation must merge to `main` before implementation begins. |
 
 ## Scope

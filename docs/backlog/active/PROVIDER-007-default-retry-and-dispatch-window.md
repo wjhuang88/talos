@@ -1,19 +1,21 @@
 # PROVIDER-007: Default Retry And Dispatch Window
 
+> Document status: Complete / Closed
+
 | Field | Value |
 |---|---|
 | Story ID | PROVIDER-007 |
 | Parent / Related Owner | PROVIDER-002; NET-001 is related intake only |
-| Status | Review / Claimed |
+| Status | Complete / Closed |
 | Priority | P0 urgent reliability maintenance |
 | Source | Maintainer request 2026-10-09; no new GitHub Issue |
-| Selected Iteration | I297 - Review / Claimed |
+| Selected Iteration | I297 - Complete / Closed |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | I297/PROVIDER-007 only: default `ProviderTimeoutConfig.max_attempts` 3 -> 5 and `dispatch_timeout_secs` 60 -> 300 seconds; direct config/provider tests and directly affected docs. No retry taxonomy, backoff, stream-limit, cancellation, dependency, toolchain, version, release or explicit-config behavior change. |
@@ -104,6 +106,15 @@ to select stricter values.
 - I297 owns execution, validation and release-candidate evidence for this slice.
 - `docs/backlog/PRODUCT-BACKLOG.md`, `docs/iterations/README.md` and `docs/BOARD.md` are derived
   views and do not authorize implementation.
+
+## Completion Evidence
+
+- Completion Commit: 97b29bd8c0762b780c4ab97b9bd42fd9cc106303
+- #694 merged after exact-head CI `38016189313` (six jobs successful), independent
+  Agent APPROVE comment `6092606598` and CAS comment `6092949030`.
+- I297 records full locked preflight, config/provider tests and actual CLI override
+  evidence. Defaults are 300 seconds and five retries after initial dispatch;
+  explicit configuration and stream limits remain unchanged. No publication.
 
 ## Residuals
 

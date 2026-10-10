@@ -1,6 +1,6 @@
 # Iteration I296: Rust 1.99 Toolchain Maintenance
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-10-09
 > Planned objective: advance the pinned development, CI and release compiler to Rust 1.99 without changing the Rust 1.95 workspace MSRV or dependency graph.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -10,17 +10,17 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-6 |
+| Work Slice | I296/TOOLCHAIN-001 only: Rust 1.99 development/CI/release pins, matching docs/assertion and compiler-required source compatibility. Preserve MSRV 1.95, lockfile, dependencies, behavior and release version. |
+| Claimed At | 2026-10-10 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Maintainer authorized the maintenance request on 2026-10-09. This proposal establishes no ownership; implementation waits for an effective target-branch claim. |
+| Governance Claim PR | #688 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Maintainer authorized serial I297 then I296 closeout on 2026-10-10. No independent human maintainer is available; independent Agent review, exact-head CI, both validators and merge-time CAS remain mandatory. Proposed activation is ineffective until #688 merges. |
 | Implementation PR | Not started |
-| Last Updated | 2026-10-09 |
+| Last Updated | 2026-10-10 |
 | Handoff / Release Condition | Atomic claim+activation must merge before code/configuration commits are created. |
 
 ## Published Baseline
@@ -91,6 +91,24 @@
 ## Completion Evidence
 
 - Completion Commit: pending
+
+## Atomic Activation Checkpoint - 2026-10-10
+
+This candidate closes I297 owner-first using existing main implementation
+`97b29bd8c0762b780c4ab97b9bd42fd9cc106303` and then proposes I296 activation.
+No I296 implementation is included. The Published Baseline remains unchanged.
+Target main is `97b29bd8`; #694 has all six CI jobs successful, Agent APPROVE
+`6092606598` and CAS `6092949030`.
+
+Current inventory: I293/I294 Active, I277/I290/I291 Review, I249 Planned/deferred,
+I164 Paused, I295/I298 Complete: retain their ownership and non-overlapping scopes.
+I297 is Complete in this proposed closeout; it becomes terminal on main when this
+candidate merges. Open #682 and #693 own Auto locale and synthetic Search evidence;
+neither changes toolchain pins. No blocked owner is selected or overridden.
+
+Implementation starts only from this claim merge or later main. Recreate validation
+from that baseline; pre-claim experiments are not completion evidence. Preserve both
+existing stashes and other-session work. No release/tag/publication is authorized.
 
 ## Variance And Residuals
 
