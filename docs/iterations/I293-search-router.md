@@ -236,3 +236,42 @@ run. Current logs are `/tmp/i293-recovery199-preflight.log`, `/tmp/i293-recovery
 `/tmp/i293-recovery199-clippy.log` and `/tmp/i293-recovery199-sdk.log` (temporary, not durable links).
 Independent source review also reread restored locked dependency source and found no blockers.
 Final exact-head remote review, unfiltered CI and merge-time CAS are still pending.
+
+### Concurrent main integration checkpoint (2026-10-10 UTC)
+
+Head `40d9f66146327cbc3cddb8aae061fc2bad7546f3` CI3111/run38061417205 initially passed five jobs,
+including unfiltered macOS preflight, the original socket, twelve new cases, both SDK modes and
+zero-warning governance/claims. Windows failed the unchanged Desktop Auto allow-once fixture:
+105 passed / 1 failed, with a 15-second watchdog after the decision/report and tool-request stages,
+but no tool result. Exact cause is unknown. One bounded same-head Windows rerun passed that
+Desktop stage and full workspace tests; the remaining governance/audit/claims/smoke steps then
+completed successfully. CI3111 is six-job SUCCESS after that one rerun. The original failure
+remains recorded, and this successful old-head result is not refreshed-head merge evidence.
+No skip, assertion, timeout or CI budget was changed by SEARCH.
+
+During that rerun, independent #682 and its closeout advanced main to
+`45892e7ddf5985aba8fdd5804b364611e1cc7173`. Final CAS found an actual EVOLUTION merge conflict.
+The refresh preserves upstream PTY lesson 58 and both SEARCH lessons (renumbered 59/60), including
+all three full lesson bodies. Other accepted upstream changes are incorporated unchanged; the
+SEARCH diff remains five test/doc files and the experiment blob remains byte-identical. Prior
+exact-head review/CI are historical for the refreshed head; fresh validation/review/CI are required.
+C/I293 and Epic remain incomplete/open, with no production search change or native admission.
+
+Fresh integrated-main checkpoint: actual Rust 1.99 execution, workspace check and strict Clippy
+passed. Standard preflight passed site/installers, governance/claims, text/classifier and format,
+then began workspace tests before the execution approval layer rejected the action over a request
+to unverified `api.example.com`. The exact intercepted test/request was not established from the
+captured partial log; do not call this a completed workspace run or an ordinary test failure.
+No retry, alternate network route, added filter or CI workaround was used after that rejection.
+
+Read-only source audit found existing CLI provider-registration fixtures using explicit sample
+endpoints and literal test keys, isolated HOME, and model discovery that sends GET /models with
+authentication headers and no request body. This identifies a concrete fixture exposure, not proof
+of the specific intercepted request or approval to send real credentials/repository data. Resuming
+that blocked execution requires a narrow maintainer decision; any broader fixture repair needs
+its own scope rather than changing unrelated production code in SEARCH.
+
+Unaffected checks passed: twelve network-feature scheduling tests, target strict Clippy, external
+SDK default/coding modes, and final zero-warning governance/claims plus format/diff checks.
+The conflict-resolved candidate remains unsubmitted while that authorization is unresolved. The remote
+PR head stays `40d9f661`; do not move its ref or use the successful old-head CI to merge this refresh.

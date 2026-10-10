@@ -67,8 +67,9 @@ repeating known mistakes.
 | 55 | Governance | 本地 claim 提交不是目标分支所有权，validator 通过不能证明授权 | TUI-062 / #628 |
 | 56 | Evidence | 准入前 fixture 证据不能反过来依赖准入，须区分研究 parser 与已交付 adapter | I294 / #687 |
 | 57 | Validation | 临时环境的全库 debug 产物可耗尽磁盘；本地降低调试信息，不修改源码或 CI | I294 |
-| 58 | Async tests | Candidate poll 可使取消就绪；在启动和成功出口重新检查控制信号 | I293 |
-| 59 | Validation | 隔离 checkout target 并串行执行全库验证；工具链登记不等于可执行 | I293 |
+| 58 | Testing / PTY | 交互 deadline 必须覆盖 PTY 读写与清理，逐阶段诊断不能证明超时根因 | I291 / #590 |
+| 59 | Async tests | Candidate poll 可使取消就绪；在启动和成功出口重新检查控制信号 | I293 |
+| 60 | Validation | 隔离 checkout target 并串行执行全库验证；工具链登记不等于可执行 | I293 |
 
 ## Lessons
 
@@ -1123,3 +1124,12 @@ repeating known mistakes.
 - Prevention: Preserve observed failures separately from successful reruns; do not change test
   thresholds, assertions, repository toolchain pin or CI coverage to repair local artifacts.
 - Promoted to rule/check: none; local validation procedure within existing locked-build rules.
+
+## 2026-10-10 - PTY readiness must not bypass acceptance deadlines
+
+- Trigger: I291 macOS real-TUI locale acceptance repeatedly exceeded the 15-minute CI step limit after successful full preflight and nine REPL cases.
+- Symptom: The fresh-interpreter startup repair emitted child-start diagnostics, then no interaction result; exact blocking operation is unknown without a child stack.
+- Root cause: Not established for the CI stall. The driver contained blocking PTY reads/writes after readiness and an unbounded forced-child wait, so its nominal interaction deadline did not cover every operation. Python also documents preexec_fn as unsafe after threads start. A later `/new` failure exposed blind parent-side sleep without output pumping, which does not observe the app's consumer-time IME interval.
+- Fix: Run controlling-terminal setup in a fresh child interpreter, use a nonblocking master and select-based selector, bound input/cursor responses and forced cleanup, continuously pump output while awaiting provider requests, hang up the PTY before cleanup waits, pace slash keys while pumping so the consumer-time IME guard can expire, and log every expected marker.
+- Prevention: Verify missing-marker and saturated-input deadlines plus consumer-time slash submission under output/cursor backpressure with disposable PTY children; keep fresh Darwin real-binary acceptance mandatory rather than infer cross-platform success from Linux or a bootstrap repair.
+- Promoted to rule/check: scripts/accept_auto_locale_tui.py; existing 25-second interaction and 15-minute CI limits retained.

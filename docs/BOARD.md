@@ -23,10 +23,12 @@ I286 closed H1 and I287's authoritative source merged as `f0e16e85` with exact-h
 I282/I284/I285/I287 owners now record Complete after #634 privacy correction merged as
 `8f795d65` with all six CI jobs and independent Agent-role review passed. Mission-level Delivery
 success is not an additional H6 requirement; I277 deferred device rows are non-blocking. MODEL-007 is
-deferred behind Desktop. Locale follow-up #590 is Review / Claimed; phase 1 merged via PR #640 (`9bb565e0`), I291 owns remaining acceptance.
+deferred behind Desktop. Locale #590 / AUTO-UX-001 / I290 / I291 are Complete / Closed;
+PR #682 merged as `a3a4753d6e42123e33ead1d7e6f769a96f85f37e`, with final acceptance in I291.
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
+| I299 preserved presentation recovery / C0 | Active / Claimed proposed; ineffective | [I299](iterations/I299-preserved-presentation-recovery.md) | #698 must merge before rebuilding implementation. Native acceptance and fresh exact-head gates pending; seven handoff requirements remain separate. |
 | I298 context budget recovery / MEM-005-A | Complete / Closed | [I298](iterations/I298-context-budget-recovery.md) | #691 merged as `8d4ad50e`; full preflight, six CI jobs, independent Agent review and CAS passed; next-minor only, no parent MEM-005 completion. |
 | I292 Search compatible backend boundary / SEARCH-001-B | Complete / Claimed | [I292](iterations/I292-search-compatible-backend-boundary.md) / [SEARCH-001-B](backlog/active/SEARCH-001-B-compatible-search-backends.md) / #642 | PR #660 merged as `7728f7681df11a9d715a0e479590c1002c53a26f`; exact-head CI run `37409618084`; no production routing change. |
 | I293 Talos-owned SearchRouter / SEARCH-001-C | Active / Claimed | [I293](iterations/I293-search-router.md) / [SEARCH-001-C](backlog/active/SEARCH-001-C-search-router.md) / #643 | Claim #664 effective; #681 test-only evidence merged at `41381f8055b66d54de42988e2b936a12e5af3ac3`. Caller-context integration and C acceptance remain pending; see owner-linked router plan. |
@@ -162,9 +164,12 @@ deferred behind Desktop. Locale follow-up #590 is Review / Claimed; phase 1 merg
 - Issue #136 remains independently Open and non-blocking for direct `/delete` recovery-command wording.
 - Recovery PR #120 and its branch remain immutable archival evidence.
 
-## Auto Review Locale — 2026-10-03
+## Auto Review Locale — 2026-10-11
 
-AUTO-UX-001 / #590: I290 Review / Claimed; I291 Review / Claimed; #662 merged (`1a397cfa`), acceptance matrix remains open. Owner:
-[Story](backlog/active/AUTO-UX-001-review-language.md),
-[iteration](iterations/I290-auto-review-conversation-locale.md). #630 remains a historical
-draft; no completion or permission-policy authority is claimed.
+AUTO-UX-001 / #590 / I290 / I291: Complete / Closed. PR #682 merged as
+`a3a4753d6e42123e33ead1d7e6f769a96f85f37e` after
+[full exact-head CI3109](https://github.com/wjhuang88/talos/actions/runs/38032860943),
+independent Agent/API/security review and CAS. [Story](backlog/active/AUTO-UX-001-review-language.md),
+[I290](iterations/I290-auto-review-conversation-locale.md) and
+[I291 final matrix](iterations/I291-auto-review-locale-product-followup.md#final-product-acceptance-and-closure)
+record all published acceptance and measured cost boundaries. #630 remains historical draft evidence.
