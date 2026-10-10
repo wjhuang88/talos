@@ -138,7 +138,7 @@ impl BrowserLifecycleHandle {
     pub fn invalidate_pending(&self) {
         let _ = self
             .generation
-            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |value| {
+            .try_update(Ordering::AcqRel, Ordering::Acquire, |value| {
                 Some(value.saturating_add(1))
             });
         self.changed.notify_waiters();

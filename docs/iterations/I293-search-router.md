@@ -201,3 +201,38 @@ the prose before the successful rerun. Independent local Agent review found no b
 the pinned dependency source audit. It did not execute tests and is not remote exact-head approval.
 The offline stage enters Review on submission; overall C remains Active / Claimed, incomplete.
 Remote exact-head full CI, independent technical review and merge-time CAS remain required.
+
+### Rust 1.99 baseline refresh and second checkout recovery (2026-10-10)
+
+The accepted toolchain update #695 and owner closeout #697 advanced the relevant baseline to
+`63c3ab658592e51fe19786547d1e6da597bbffc1` (Rust 1.99.0). This stage incorporates that accepted
+main, rather than treating the old Rust 1.97 CI as final evidence. The subsequent main commit
+`e58e26783e2f48416b871a394b17ac79b642bb1f` adds two unrelated session-handoff documents only.
+Those upstream changes are preserved; the SEARCH slice remains the same five test/doc files.
+
+Before the second temporary-checkout loss, actual Rust 1.99.0 execution was observed. Standard
+preflight passed check, strict workspace Clippy, format and zero-warning governance/claims, then
+stopped only at the unchanged OS-1 socket fixture. The authorized local-filter workspace run
+passed 3588 tests, zero failed/ignored, one filtered, across 114 summaries. Target-test strict
+Clippy and external SDK default/coding modes passed. Twenty identified prior-run PID-16 sidecars
+were reversibly archived within their verified run window; no test or CI policy was changed.
+These are historical observations from the lost checkout, not freshly recovered logs or a new
+full-preflight success. The unpublished refresh commit/tree cannot be verified from that checkout.
+
+Recovery restores the published #696 head `540f98091f1057cd7a8ee4981c818ce01bcb228b` and merges
+current main cleanly. The experiment blob remains `a58ddfa0b698d6f2c9634ec280adbb51568da2be`.
+Old-head CI run 38030606949 is Cancelled and cannot authorize merge. Fresh local governance,
+fresh exact-head unfiltered CI and independent technical review are required for this refreshed
+candidate. C/I293 stays Active / Claimed / incomplete; every full C-V01..C-V11 stays Pending.
+
+Fresh recovered-checkout validation: actual rustc 1.99.0 execution passed. Standard preflight
+passed site/installers, text/classifier, format, locked workspace check and strict workspace
+Clippy, plus both governance validators with zero warnings, then stopped at the unchanged
+runtime socket fixture (64 passed / 1 OS-1 PermissionDenied). The authorized local-filter
+workspace command exited 0: 114 summaries, 3588 passed, zero failed/ignored, one filtered;
+all twelve new experiment cases passed. Network-feature experiment Clippy (`-D warnings`) and
+external Runtime SDK default/coding modes passed. No fixture archive was needed for this fresh
+run. Current logs are `/tmp/i293-recovery199-preflight.log`, `/tmp/i293-recovery199-workspace.log`,
+`/tmp/i293-recovery199-clippy.log` and `/tmp/i293-recovery199-sdk.log` (temporary, not durable links).
+Independent source review also reread restored locked dependency source and found no blockers.
+Final exact-head remote review, unfiltered CI and merge-time CAS are still pending.

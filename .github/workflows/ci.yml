@@ -134,7 +134,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         if: needs.classify-changes.result != 'success' || needs.classify-changes.outputs.full_validation != 'false'
         with:
-          toolchain: 1.97.0
+          toolchain: 1.99.0
 
       - uses: Swatinem/rust-cache@v2
         if: needs.classify-changes.result != 'success' || needs.classify-changes.outputs.full_validation != 'false'
@@ -199,7 +199,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.97.0
+          toolchain: 1.99.0
 
       - uses: Swatinem/rust-cache@v2
 
@@ -323,7 +323,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.97.0
+          toolchain: 1.99.0
       - uses: Swatinem/rust-cache@v2
       - name: Native display and font development dependencies
         run: |
