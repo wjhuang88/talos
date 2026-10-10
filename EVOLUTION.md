@@ -67,6 +67,8 @@ repeating known mistakes.
 | 55 | Governance | 本地 claim 提交不是目标分支所有权，validator 通过不能证明授权 | TUI-062 / #628 |
 | 56 | Evidence | 准入前 fixture 证据不能反过来依赖准入，须区分研究 parser 与已交付 adapter | I294 / #687 |
 | 57 | Validation | 临时环境的全库 debug 产物可耗尽磁盘；本地降低调试信息，不修改源码或 CI | I294 |
+| 58 | Async tests | Candidate poll 可使取消就绪；在启动和成功出口重新检查控制信号 | I293 |
+| 59 | Validation | 隔离 checkout target 并串行执行全库验证；工具链登记不等于可执行 | I293 |
 
 ## Lessons
 
@@ -1093,3 +1095,31 @@ repeating known mistakes.
 - Prevention: Budget disk before warming target variants and checkpoint verified stages promptly
   to the authorized repository; retain exact validation evidence in owner/PR records.
 - Promoted to rule/check: none; no source profile, dependency, test or CI policy change.
+
+## 2026-10-10 - Recheck control signals after candidate polling
+
+- Trigger: Independent local review of the disposable I293 scheduler.
+- Symptom: A candidate poll could signal cancellation after select had polled its control branch,
+  allowing a replacement launch or valid winner to escape the earlier check.
+- Root cause: Select branch priority does not guard side effects of later candidate polling.
+- Fix: Reenter a checked launch boundary and check control again before returning a winner.
+- Prevention: Exercise cancellation raised during Failed, Pending and Valid candidate polls.
+- Promoted to rule/check: `crates/talos-tools/tests/i293_router_policy_experiment.rs`; test model
+  only, not a production cancellation guarantee.
+
+## 2026-10-10 - Isolate and verify local build environments
+
+- Trigger: Restoring the I293 experiment and its lost temporary build environment.
+- Symptom: Shared targets across checkout roots produced crate-resolution/StableCrateId failures;
+  overlapping workspace runs had five Session elapsed-time failures. Later registered Rust 1.97
+  executables failed with SIGBUS despite rustup metadata reporting the expected toolchain.
+- Root cause: Cache/toolchain integrity was not established by registration or prior results.
+  Fresh repeated cached runs reused process ID 16 and `/tmp` Session sidecars keyed by PID and
+  instance; prior pending/terminal rows were observed. Earlier timeout and SIGBUS causes remain
+  unknown; do not retroactively attribute them to this newly established fixture mechanism.
+- Fix: Use an isolated target, serialize workspace runs and install a separate pinned rustup home;
+  verify actual compiler/formatter execution before fresh validation. Archive only identified
+  current-run fixture sidecars before rerunning; restored default-concurrency workspace passed.
+- Prevention: Preserve observed failures separately from successful reruns; do not change test
+  thresholds, assertions, repository toolchain pin or CI coverage to repair local artifacts.
+- Promoted to rule/check: none; local validation procedure within existing locked-build rules.
