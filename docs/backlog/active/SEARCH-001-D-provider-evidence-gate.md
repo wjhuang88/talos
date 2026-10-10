@@ -10,8 +10,8 @@
 | Source Issue | [#644](https://github.com/wjhuang88/talos/issues/644) |
 | Depends on | Accepted ADR-085; SEARCH-001-A / #625 merged as `4567bf85` |
 | Selected Iteration | [I294](../../iterations/I294-search-provider-evidence.md) |
-| Implementation PR | #668, #673, #676 and #686 (merged; evidence only) |
-| Last Updated | 2026-10-09 |
+| Implementation PR | #668, #673, #676, #686 and #687 (merged; evidence only) |
+| Last Updated | 2026-10-10 |
 
 ## Collaboration Claim
 
@@ -80,3 +80,11 @@ observations remain incomplete. E/F remain gated; this is partial evidence, not 
 source call-chain/provenance audit and bounded query-free public-schema/input-validation evidence.
 No search query, result response, production behavior or native admission. Source/policy/deployment,
 fixtures, failure-domain and real regional acceptance remain pending; this is partial D evidence.
+
+## Offline Wire Evidence Stage — 2026-10-10
+
+#687 merged at `9e376155ddc7b6c3644bf65f69b4c388956c1b5c`. I294 now owns a disposable
+integration-test parser and independently invented fixture for partial M-Q02..M-Q05 evidence.
+No production adapter, live response, request, admission or whole-row acceptance. Experimental
+policies still require production review; hosted execution/privacy/use, transport, failure-domain
+and genuine regional qualification remain pending. D stays Active/Claimed and incomplete.

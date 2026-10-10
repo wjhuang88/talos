@@ -10,7 +10,7 @@
 | Source Issue | #644 |
 | Depends on | Accepted ADR-085; SEARCH-001-A / #625 complete; B adapter boundary available |
 | Claim State | Claimed |
-| Research PR | #668, #673, #676 and #686 (merged; partial evidence) |
+| Research PR | #668, #673, #676, #686 and #687 (merged; partial evidence) |
 | Completion | Pending |
 
 ## Collaboration Claim
@@ -24,10 +24,10 @@
 | Claimed At | 2026-10-06 |
 | Source Issue | #644 |
 | Governance Claim PR | #665 |
-| Implementation PR | #668, #673, #676 and #686 (merged; evidence only) |
+| Implementation PR | #668, #673, #676, #686 and #687 (merged; evidence only) |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Governance-only claim+activation PR; exact-head CI, governance validators, remote Issue reconciliation and merge-time CAS required. |
-| Last Updated | 2026-10-09 |
+| Last Updated | 2026-10-10 |
 | Handoff / Release Condition | Claim effective after #665 merge `7019f63d3df3d6eb58473a53a499b9b7e8b98925`; evidence research only, with E/F provider implementation gated by the resulting matrix. |
 
 ## Scope
@@ -112,3 +112,54 @@ Next: independently authored offline parser evidence toward route qualification,
 anonymous valid-query evidence; hosted privacy/result-use and genuine regional observations
 remain pending.
 D/I294 remains Active / Claimed and incomplete; E/F gated, #624 open.
+
+## Offline Wire Experiment — 2026-10-10
+
+Base: `6b4bfb8d3f20faa6e711b218d1631603da53b572`. #687 qualification packet merged at
+`9e376155ddc7b6c3644bf65f69b4c388956c1b5c` after exact-head CI3072/run37897478071 and Agent
+technical APPROVE. New main context-budget work does not change D's source, claim or tool code.
+D remains Active/Claimed under effective #665 and its original acceptance.
+
+The disposable implementation is `crates/talos-tools/tests/i294_mwmbl_wire_characterization.rs`,
+with independently authored `tests/fixtures/i294_mwmbl_synthetic.json`. It compiles only into a
+network-feature integration-test binary; reqwest is used only for URL parsing. No SearchBackend,
+public API, provider registration, request, credentials, config or production helper is introduced.
+The fixture uses invented text and example.invalid URLs, not captured responses or upstream code.
+
+Nine experiments cover required fields/types and optional nullable usage, mixed/unknown/reference/
+curated labels, plain Unicode and inert highlights, wire order independent of score, malformed/
+empty/invalid-only outcomes, invalid URLs filtered before truncation, advertised-count mismatch
+and explicit body/output bounds. Integer widths, whole-response schema rejection, URL policy and
+limits are experimental choices, not accepted production defaults. A byte check on an already
+received body does not prove transport buffering, deadlines, cancellation or endpoint/SSRF policy.
+
+No wire label proves hosting independence, a live upstream call or native-route credit. These
+experiments supply partial offline M-Q02..M-Q05 evidence only; no row is fully accepted. Hosted
+anonymous execution/provenance/use conditions, transport parts of M-Q06 and genuine regional
+M-Q08 remain pending. D/I294 remains incomplete; E/F gated, #644/#624 open.
+
+The previous temporary checkout/log was removed before its final preflight result could be read.
+The restored candidate is validated afresh; no inferred result is carried forward. Local builds use
+pinned Rust 1.97.0, locked dependencies, debug=0 for dev/test, no incremental state and four jobs.
+The Oct9 default-debug attempt exhausted disk and was cleaned; these local environment overrides
+do not change source profiles, tests, dependencies, release configuration or CI.
+
+### Local Stage Validation
+
+- Focused locked network-feature integration target: nine passed, no skips; targeted Clippy with
+  `-D warnings` passed. The locked workspace test run also discovered and passed all nine.
+- Standard `./scripts/release_preflight.sh`: public-site/installers, both governance validators
+  (zero warnings), text boundary, 14 classifier cases, formatting, locked workspace check and
+  Clippy passed. It stopped at the unchanged runtime Unix-socket fixture: 64 passed, one local
+  `PermissionDenied` / OS error 1. Full preflight is therefore not claimed passed.
+- Under the maintainer's existing local-only deferral, `cargo test --locked --workspace -- --skip
+  tests::runtime_evidence_rejects_directory_symlinks_and_socket_entries` passed: successful
+  summaries total 3,575 passed, zero failed/ignored and one filtered. No test or CI source changed;
+  full unskipped exact-head CI is mandatory before merge.
+- Independent SDK fixture validator passed both default and coding runs. Initial offline attempt
+  lacked its separately locked `core_detect` index entry; fetching unchanged dependencies resolved
+  the cache gap. Neither lockfile changed.
+- Latest target check: `71fc8bce8e80c32a7fc9b9b641d482c57dc70544` adds unrelated I297 governance
+  only; D claim, acceptance and search code are unchanged.
+- Qualification packet's local links and `git diff --check` passed. At this local checkpoint, stage submission and
+  exact-head CI/review remain pending; whole D acceptance remains pending.
