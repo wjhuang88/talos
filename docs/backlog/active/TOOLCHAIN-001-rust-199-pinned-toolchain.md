@@ -1,13 +1,13 @@
 # TOOLCHAIN-001: Rust 1.99 Pinned Toolchain Maintenance
 
-> Document status: Active / Claimed
+> Document status: Review / Claimed
 
 | Field | Value |
 |---|---|
 | Type | Toolchain and CI maintenance |
 | Priority | P2 |
 | Source | Maintainer-authorized maintenance request |
-| Selected Iteration | I296 (Active on #688 merge; activation pending) |
+| Selected Iteration | I296 (Review; #688 merged as `7097f1b5`) |
 | Depends On | Current `main`; effective I296 Collaboration Claim |
 
 ## Collaboration Claim
@@ -22,8 +22,8 @@
 | Source Issue | None |
 | Governance Claim PR | #688 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Maintainer authorized serial I297/I296 closeout on 2026-10-10. Independent human unavailable; Agent review, exact-head CI, validators and CAS required. Proposed claim remains ineffective until #688 merges. |
-| Implementation PR | Not started |
+| Authorization Evidence | Maintainer authorized serial I297/I296 closeout on 2026-10-10. Independent human unavailable; Agent review, exact-head CI, validators and CAS required. #688 merged as `7097f1b5`; review/CAS comment `6093090485` and CI `38018790824` establish the effective claim. |
+| Implementation PR | Pending stable candidate publication |
 | Last Updated | 2026-10-10 |
 | Handoff / Release Condition | Atomic claim+activation must merge to `main` before implementation begins. |
 
@@ -53,6 +53,16 @@
 - `./scripts/release_preflight.sh`
 - `./scripts/validate_public_site.sh v0.10.1`
 - `./scripts/validate_installers.sh`
+
+## Effective Activation - 2026-10-10
+
+Claim #688 merged as `7097f1b503063539a2205e17ae29aed09c7ae32e` after
+exact-head CI, independent Agent review and CAS passed. I296 implementation is
+now authorized from that merge; full local release preflight passed, including
+workspace tests and the external Runtime SDK fixture. All-target locked check and
+all-feature Clippy passed; direct atomic compatibility edits also passed an isolated
+Rust 1.95 harness. Exact-head remote CI and independent review remain pending. Earlier claim
+wording records the proposal stage, not a remaining activation blocker.
 
 ## Residuals
 

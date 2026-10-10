@@ -1,6 +1,6 @@
 # Iteration I296: Rust 1.99 Toolchain Maintenance
 
-> Document status: Active
+> Document status: Review
 > Published plan date: 2026-10-09
 > Planned objective: advance the pinned development, CI and release compiler to Rust 1.99 without changing the Rust 1.95 workspace MSRV or dependency graph.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -18,8 +18,8 @@
 | Source Issue | None |
 | Governance Claim PR | #688 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Maintainer authorized serial I297 then I296 closeout on 2026-10-10. No independent human maintainer is available; independent Agent review, exact-head CI, both validators and merge-time CAS remain mandatory. Proposed activation is ineffective until #688 merges. |
-| Implementation PR | Not started |
+| Authorization Evidence | Maintainer authorized serial I297 then I296 closeout on 2026-10-10. No independent human maintainer is available; independent Agent review, exact-head CI, both validators and merge-time CAS remain mandatory. #688 merged as `7097f1b5`; review/CAS comment `6093090485` and CI `38018790824` establish effective activation. |
+| Implementation PR | Pending stable candidate publication |
 | Last Updated | 2026-10-10 |
 | Handoff / Release Condition | Atomic claim+activation must merge before code/configuration commits are created. |
 
@@ -109,6 +109,42 @@ neither changes toolchain pins. No blocked owner is selected or overridden.
 Implementation starts only from this claim merge or later main. Recreate validation
 from that baseline; pre-claim experiments are not completion evidence. Preserve both
 existing stashes and other-session work. No release/tag/publication is authorized.
+
+## Effective Activation And Local Implementation - 2026-10-10
+
+#688 merged as `7097f1b503063539a2205e17ae29aed09c7ae32e`; the claim and
+activation are now effective. Independent Agent APPROVE and merge-time CAS are
+recorded in comment `6093090485`; exact-head CI `38018790824` passed all
+applicable checks. Implementation branch `chore/i296-rust-199` starts from that
+merge. Published Baseline and earlier proposed checkpoints remain unchanged.
+
+The implementation updates compiler pins and matching documentation/assertion.
+Validation is in progress on the real pinned Rust 1.99.0 toolchain. No completion
+or release is claimed. Existing exploration and provider-experiment stashes are
+preserved. Authorized Cargo cache cleanup removed 10.6 GiB before rebuilding.
+
+### Local Verification Checkpoint - 2026-10-10
+
+- `rustc --version`: `rustc 1.99.0 (b940084d7 2026-09-28)`.
+- `cargo fmt --all -- --check`: passed.
+- `cargo check --workspace --all-targets --locked`: passed.
+- `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`: passed.
+- Rust 1.99 initially reported deprecated `AtomicU64::fetch_update`. Two direct
+  replacements use its renamed `try_update` with unchanged closures, orderings and
+  result handling. A standalone Rust 1.95.0 harness compiled and executed both
+  closure/order combinations, including approval-ID overflow rejection.
+- `python3 scripts/measure_auto_locale.py --self-test`: six tests passed on Rust 1.99.
+- `./scripts/validate_public_site.sh v0.10.1`: 16 HTML files, zero errors/warnings.
+- `./scripts/validate_installers.sh`: zero errors.
+- Both governance validators passed with zero warnings during preflight; text
+  boundary validation and all 14 CI classifier tests passed.
+- `scripts/assess_project_scale.sh .`: high-risk / release-managed / on-demand,
+  one worktree; no profile change required.
+- Complete `./scripts/release_preflight.sh` passed (exit 0), including workspace
+  tests and the independently rooted external Runtime SDK fixture with locked resolution.
+- Independent read-only Agent inspection found no code blockers; stable-head
+  approval and remote CI remain pending. Cargo.lock, MSRV and release version
+  remain unchanged. Delivery is Review / Claimed; remote gates remain pending.
 
 ## Variance And Residuals
 
