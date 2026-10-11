@@ -18,6 +18,12 @@ still follow their full requirements, not treat this governance checkpoint as cl
 
 ### Current C0 checkpoint (supersedes earlier implementation-pending notes)
 
+Latest acceptance: the maintainer completed all four native observations on `b19fc58e`,
+ending with “符合预期，已退出”. I299 is Review / Claimed, ready for stable publication;
+the previous manual gate is satisfied. Remaining: final-head review, remote CI/CAS/merge
+and owner-first closure. The seven original deliverables remain incomplete. Earlier
+pending-human statements below are preserved checkpoint history, not current blockers.
+
 The local ADR-088 chain is now implemented from native Todo formatting through permission
 wrappers, Runtime/Agent events and ConversationEngine to TUI rendering. The migration record
 is `docs/reference/I299-TODO-PRESENTATION-MIGRATION.md`. Independent incremental dirty-tree

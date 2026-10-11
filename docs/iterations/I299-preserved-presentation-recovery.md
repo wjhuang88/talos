@@ -1,6 +1,6 @@
 # Iteration I299: Preserved Presentation Recovery
 
-> Document status: Active
+> Document status: Review
 > Published plan date: 2026-10-10
 > Planned objective: recover effective ownership and deliver the preserved C0 presentation candidate.
 > MVP deliverable: truthful process summaries and readable live TUI activity, queued bodies and tool results.
@@ -283,16 +283,23 @@ no filesystem edit or subprocess tool. It does not load user configuration or se
 
 Advance with `next`, exit with `quit`. Record the candidate SHA with each observation:
 
-- [ ] Activity animation and queued message bodies remain visible in a short/narrow window;
+- [x] Activity animation and queued message bodies remain visible in a short/narrow window;
       process summary includes supported parameters; this is no process-execution evidence.
-- [ ] Edit soft red/green backgrounds cover CJK/ASCII wrapped rows; selection text is correct
+- [x] Edit soft red/green backgrounds cover CJK/ASCII wrapped rows; selection text is correct
       and body bullets preserve the intended small appearance.
-- [ ] All four real Todo statuses are decorated, active item highlighting is correct and
+- [x] All four real Todo statuses are decorated, active item highlighting is correct and
       forged status text in multiline titles remains literal, including after resize.
-- [ ] Long Todo output preserves head/tail presentation without an orphan highlight;
+- [x] Long Todo output preserves head/tail presentation without an orphan highlight;
       scrolling/selection and terminal restoration on exit remain correct.
 
-All four rows are pending; automatic fixture success cannot check them off.
+The maintainer replied “完成了” to the stage 1 animation/queue check for candidate
+`b19fc58ed8531122a5f0865beb54a7d356971d6b` (code unchanged from `e96438eb`). This records
+stage 1. The maintainer subsequently replied “符合预期” to stage 2's wrapped edit backgrounds
+and drag-selection check on the same candidate, then confirmed “符合预期” for stage 3's four
+Todo glyphs, active highlight, literal forged title row and narrow-window wrapping.
+The maintainer then confirmed “符合预期，已退出” for stage 4, including head/tail truncation,
+absence of orphan highlight, scrolling/selection and terminal restoration. All four native
+observations passed on this candidate; these are human reports, not inferred automatic results.
 
 ### Stable local candidate validation (2026-10-11)
 
@@ -334,3 +341,13 @@ before merge; they do not imply a rerun of unchanged Rust code is necessary.
 Next action: collect the four observations sequentially, fix any failure locally, then record
 the final candidate and publish only after the stable-stage gate. All seven original handoff
 deliverables remain incomplete; C0 acceptance does not terminate the long task.
+
+### Native acceptance complete; stable publication ready
+
+The sequential human reports above complete the four required native observations on
+`b19fc58ed8531122a5f0865beb54a7d356971d6b` (implementation `e96438eb`). Independent Agent
+review also approved `b19fc58e` against `2f9420f9` after its documentation-only increment.
+This checkpoint supersedes earlier pending-human statements. Delivery is now Review;
+remote implementation CI, final-head review, merge-time CAS, merge and owner-first closure
+remain required. No release or completion is claimed. Subsequent edits here are acceptance
+records only; the validated Rust implementation and acceptance executable remain unchanged.
