@@ -28,6 +28,8 @@ PR #682 merged as `a3a4753d6e42123e33ead1d7e6f769a96f85f37e`, with final accepta
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
+| I300 structured Git repair / T7 | Active / Claimed (proposed) | [I300](iterations/I300-structured-git-repair.md) | #704 proposes atomic claim/activation under accepted ADR-089; ineffective until merge, no implementation yet. |
+| All-built-in Auto review | Refinement / Unclaimed | [PERM-007-H](backlog/active/PERM-007-H-all-builtin-auto-review.md) | Added by maintainer; next serial slice after I300, reconcile higher-risk #563 scope before activation. |
 | I299 preserved presentation recovery / C0 | Complete / Closed | [I299](iterations/I299-preserved-presentation-recovery.md) | #701 merged as `69092675`; full preflight, independent API/privacy review, all four native observations, exact-head CI and CAS passed. Seven handoff requirements remain incomplete and separately scheduled. |
 | I298 context budget recovery / MEM-005-A | Complete / Closed | [I298](iterations/I298-context-budget-recovery.md) | #691 merged as `8d4ad50e`; full preflight, six CI jobs, independent Agent review and CAS passed; next-minor only, no parent MEM-005 completion. |
 | I292 Search compatible backend boundary / SEARCH-001-B | Complete / Claimed | [I292](iterations/I292-search-compatible-backend-boundary.md) / [SEARCH-001-B](backlog/active/SEARCH-001-B-compatible-search-backends.md) / #642 | PR #660 merged as `7728f7681df11a9d715a0e479590c1002c53a26f`; exact-head CI run `37409618084`; no production routing change. |

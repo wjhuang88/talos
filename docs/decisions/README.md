@@ -23,6 +23,7 @@ silently rewrite the reason or boundary that governed an earlier implementation.
 
 | ADR | State | Current Boundary / Gate |
 |---|---|---|
+| [089: Structured Git Effect Authorization](089-structured-git-effect-authorization.md) | Accepted / I300 activation proposed (#704) | Maintainer accepted 2026-10-11; literal paths, actual repository/index effects, configured execution authorization and diff fidelity. Claim and activation effective only upon #704 merge. |
 | [088: Trusted Todo Result Presentation](088-trusted-todo-result-presentation.md) | Accepted / I299 Complete | Producer-owned bounded transient spans; exact-text/invocation binding, literal fallback and raw-history preservation delivered by #701 (`69092675`). Public Rust API migration remains required for the next pre-1.0 minor release; no release authorized. |
 | [087: Authoritative Context Budget And Recovery](087-authoritative-context-budget-recovery.md) | Accepted / I298 | Shared admission telemetry, bounded request-only recovery, raw-history preservation and presentation API migration. |
 | [086: Frame-Aware Browser Invocation Boundary](086-frame-aware-browser-invocation-boundary.md) | Proposed / I295 | Separate opt-in v2, one-shot prepared invocation, dedicated fail-closed browser permission and raw-argument integrity; claim/activation and implementation evidence pending. |
