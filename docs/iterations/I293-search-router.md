@@ -10,7 +10,7 @@
 | Source Issue | #643 |
 | Depends on | Accepted ADR-085; SEARCH-001-B / #642 complete in #656; NET-001 boundary coordination |
 | Claim State | Claimed |
-| Implementation PR | #681 / #685 (merged partial evidence); #696 (Review; offline experiment) |
+| Implementation PR | #681 / #685 / #696 (merged partial evidence); result-admission stage Review (PR number not yet assigned) |
 | Completion | Pending |
 
 ## Collaboration Claim
@@ -26,7 +26,7 @@
 | Governance Claim PR | #664 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Governance-only claim+activation PR; exact-head CI, governance validators, remote Issue reconciliation and merge-time CAS required. |
-| Last Updated | 2026-10-10 |
+| Last Updated | 2026-10-11 |
 | Handoff / Release Condition | Claim effective after #664 merge `d801790454e252699684253166984662ea9dab6a`; implementation remains bounded by ADR-085 and this iteration. |
 
 ## Scope
@@ -349,3 +349,54 @@ production cause. No assertion, timeout, additional skip or CI policy changed.
 Network-feature experiment Clippy with `-D warnings` passed; external Runtime SDK default and
 coding modes both passed, and format/diff checks passed. Fresh exact-head remote review and
 full unfiltered CI are still required before merge; no full C acceptance follows from these checks.
+
+### Merged scheduling stage and next result-admission experiment (2026-10-11)
+
+#696 merged at `444a8137f054b33802f26bffdb55fb0f83a7a861`, reviewed head
+`f26cc53ae1e3c2b73d292da832dc6d5089095f96`, after all six exact-head CI3129 /
+run38118573173 jobs succeeded without reruns. Complete macOS and Windows network-feature
+workspace logs each show twelve experiment tests passing. macOS also passed the original socket
+test, both Runtime SDK fixture builds and release preflight; Windows passed workspace, governance,
+claims, audit and CLI smoke. Both governance validators reported zero warnings. Independent Agent
+technical review and the single-maintainer reason are in #696 comment `6106314437`; final CAS is
+`6106425480`. Shared identity is not a second natural-person review. The accepted merge preserves
+unrelated #703 documentation; tree `36227f9c2721ba17fa41198a18dfee4288a205c8` matched the preview.
+This supersedes earlier pending-stage instructions, not the preserved historical failures.
+
+The next bounded stage starts from that merge under the same effective #664 claim. Runnable
+deliverable: `crates/talos-tools/tests/i293_result_admission_experiment.rs`, an eight-case disposable
+offline experiment. It supplies partial C-V02 and validation-boundary C-V05 evidence, not full
+acceptance. Already-normalized synthetic hits use the locked reqwest URL parser; no adapter,
+HTTP, DNS, key/config, permission, router, dependency, public API or CI behavior changes.
+
+The experiment distinguishes empty/invalid-only responses, filters before truncation, preserves
+backend identity/order/display fields, and checks fixture input-count, URL-byte and output-count
+bounds. An injected monotonic clock exercises pre/post-parse budget checks, including expiry on
+the final parse and between entries without returning a partial winner. It does not measure parse
+duration or interrupt synchronous parsing, bound transport allocation or title/snippet bytes,
+compose with the scheduling model, propagate caller cancellation, or qualify backend eligibility.
+Limits (8 input hits / 256 URL bytes / 1..3 output hits) and terminal ordering are experimental.
+
+The WHATWG parser's repair behavior is explicitly characterized: parse success can accept strings
+such as `https:example.invalid/path`, extra slashes or embedded newline, and loopback result URLs.
+Preserving their original display text is not strict raw-syntax validation or permission to fetch.
+Production must separately review strictness/canonicalization and endpoint/redirect/SSRF controls;
+this stage does not change those policies or promote the proposed predicate to accepted policy.
+
+Affected documentation: router integration plan and C Story. Infrastructure-only/test-only stage;
+no user-visible delivery. C/I293 remains Active / Claimed / incomplete, all full C-V01..C-V11
+Pending, #643/#624 open; D remains independent, E/F gated.
+
+Fresh local convergence on pinned Rust 1.99: eight focused network-feature tests passed without
+skips; target Clippy with `-D warnings`, format and whitespace checks passed. Standard preflight
+passed site/installers, governance/claims (zero warnings), text/classifier checks, workspace check
+and strict Clippy, then stopped only at the unchanged OS-1 socket fixture (64 passed / 1 failed).
+It is not reported as a full preflight pass. Under the existing exact local-only deferral, locked
+workspace tests passed across 116 summaries: 3620 passed, zero failed/ignored, one socket filter;
+all eight new experiments passed in that run. Independent Runtime SDK default and coding builds
+both passed. No fixture archive, extra skip, assertion/timeout or CI-policy change was needed.
+
+Independent read-only Agent preview found no blockers, but is not final exact-head approval or
+natural-person review. Before merge obtain fresh exact-head technical review, full unfiltered CI,
+authorized single-maintainer reason and final current-main/claim/overlap/review CAS. Source and
+validation limitations above remain effective even after this partial test stage merges.
