@@ -165,6 +165,25 @@ production stages merely because their plan is written down.
 
 ## Current Disposition
 
+### Result-admission experiment — 2026-10-11
+
+The separate test-only `crates/talos-tools/tests/i293_result_admission_experiment.rs` exercises
+actual locked URL parsing on invented already-normalized hits. Eight cases distinguish empty and
+invalid-only outcomes, reject relative/unsupported/malformed/credential-bearing inputs, filter
+before truncation, preserve source/order/display fields, and bound input count, URL bytes and
+output count. Injected monotonic-clock readings check admission boundaries before/after parsing
+without resetting the deadline or allowing an expired partial winner. This supplies partial
+C-V02/C-V05 evidence; neither this experiment nor #696 calls the production router.
+
+The parsed-URL predicate is not a strict raw-syntax or fetch-safety gate. WHATWG repairs of missing
+slashes and embedded newline, and syntactically valid loopback URLs, are deliberately retained as
+observations. Raw display text is preserved. Strictness/canonicalization needs separate policy
+review; displaying a result still grants no endpoint/redirect/SSRF fetch authority. The test does
+not perform HTTP/DNS, bound already-materialized title/snippet allocation, preempt synchronous
+parsing, measure actual parse time, test caller cancellation or establish native admission.
+Fixture limits and terminal ordering are not production defaults. Every full C acceptance row
+remains Pending; validation and exact stage disposition are recorded in I293.
+
 #681 is merged at `41381f8055b66d54de42988e2b936a12e5af3ac3`. Its exact-head CI3057 passed
 full macOS release preflight and Windows workspace/governance checks; Linux Desktop validation
 also passed. No CI skip was introduced for the locally restricted Unix socket fixture. Independent

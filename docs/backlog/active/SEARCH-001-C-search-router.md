@@ -28,3 +28,10 @@ paused-clock, launch/drop and bounded-concurrency observations. It exercises alr
 synthetic outcomes and control-boundary races; it does not call production search or establish
 HTTP cancellation, admission, caller-context, health or binary integration. All full C acceptance
 rows remain pending. See the iteration owner for recovery provenance and current validation.
+
+#696 scheduling stage merged at `444a8137f054b33802f26bffdb55fb0f83a7a861` with full
+exact-head CI3129 and independent Agent technical review. The next bounded test-only stage
+experiments with URL admission/filtering/truncation and injected-clock validation boundaries.
+It also records URL-parser repair behavior as a policy gap, not strict syntax or fetch safety.
+Neither stage integrates production search or completes C-V02/C-V05; full C acceptance remains
+pending. The iteration owner retains validation, limits and remaining integration gates.
