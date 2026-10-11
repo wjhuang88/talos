@@ -1,10 +1,20 @@
 # Next Task: Session Todo Handoff
 
-Status: Pending handoff / not activated.
-Responsible recipient: To be assigned by maintainer.
+Status: Handoff received; serial execution authorized; I299 original C0 claim effective.
+Responsible recipient: Codex under maintainer direction; product claims remain separate.
 Source: Maintainer requested a durable handoff and explicitly stopped further implementation in this session.
 Baseline: local `main`, HEAD `63c3ab6` (merge PR #697). Recheck HEAD and both staged/unstaged diffs before resuming.
-Completion evidence: None for this pending task. This document is a handoff, not an effective Collaboration Claim or implementation authorization.
+Completion evidence: None for this long task. This document is a handoff, not an effective Collaboration Claim or implementation authorization.
+
+## 2026-10-11 Receiving Checkpoint
+
+I299's original C0 claim became effective when #698 merged at `50781eab`. The
+maintainer accepted ADR-088's producer-owned, transient Todo display metadata contract;
+its cross-crate scope amendment is proposed in a separate governance-only PR and remains
+ineffective until target-branch merge. Preserved local C0 implementation stays on
+`feat/i299-presentation`; no implementation merge or native acceptance is claimed.
+All seven numbered deliverables below remain incomplete. The receiving session must
+still follow their full requirements, not treat this governance checkpoint as closure.
 
 ## Start Here
 
