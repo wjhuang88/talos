@@ -434,9 +434,64 @@ fn dashboard_failure_remains_an_error_tip() {
     ));
 }
 
+/// Own a loopback endpoint and deterministically fail discovery without contacting
+/// example hosts or assuming that a fixed local port is unused.
+async fn spawn_failed_registration_discovery(
+    base_path: &str,
+) -> (String, tokio::task::JoinHandle<String>) {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("bind registration discovery fixture");
+    let base_url = format!(
+        "http://{}{base_path}",
+        listener.local_addr().expect("fixture address")
+    );
+    let server = tokio::spawn(async move {
+        tokio::time::timeout(std::time::Duration::from_secs(10), async move {
+            let (mut socket, _) = listener.accept().await.expect("accept discovery request");
+            let mut request = Vec::new();
+            let mut chunk = [0u8; 1024];
+            while !request.windows(4).any(|bytes| bytes == b"\r\n\r\n") {
+                let count = socket.read(&mut chunk).await.expect("read discovery request");
+                assert_ne!(count, 0, "discovery request must contain complete headers");
+                request.extend_from_slice(&chunk[..count]);
+                assert!(request.len() <= 8192, "discovery request header limit");
+            }
+            socket
+                .write_all(b"HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+                .await
+                .expect("write failed discovery response");
+            String::from_utf8(request).expect("HTTP fixture request is UTF-8")
+        })
+        .await
+        .expect("registration discovery fixture must finish within its bound")
+    });
+    (base_url, server)
+}
+
+async fn assert_failed_registration_discovery(
+    server: tokio::task::JoinHandle<String>,
+    models_path: &str,
+    credential_header: &str,
+) {
+    let request = server
+        .await
+        .expect("registration discovery fixture must join");
+    let (headers, body) = request.split_once("\r\n\r\n").expect("complete headers");
+    assert_eq!(
+        headers.lines().next(),
+        Some(format!("GET {models_path} HTTP/1.1").as_str())
+    );
+    assert!(headers.lines().any(|line| line == credential_header));
+    assert!(body.is_empty(), "model discovery GET must not send a body");
+}
+
 #[tokio::test]
 async fn handle_register_custom_provider_openai_chat_succeeds() {
     let _lock = HOME_ENV_MUTEX.lock().await;
+    let (base_url, server) = spawn_failed_registration_discovery("/v1").await;
     let new_config = with_isolated_home(|| async {
         let (tx, mut rx) = mpsc::unbounded_channel::<UiOutput>();
         let config = Config::default();
@@ -445,7 +500,7 @@ async fn handle_register_custom_provider_openai_chat_succeeds() {
             &config,
             "my-gateway",
             "openai-chat",
-            "https://api.example.com/v1",
+            &base_url,
             "gw-secret-key",
         )
         .await;
@@ -455,6 +510,12 @@ async fn handle_register_custom_provider_openai_chat_succeeds() {
     })
     .await
     .expect("registration must succeed");
+    assert_failed_registration_discovery(
+        server,
+        "/v1/models",
+        "authorization: Bearer gw-secret-key",
+    )
+    .await;
 
     let provider = new_config
         .providers
@@ -462,15 +523,17 @@ async fn handle_register_custom_provider_openai_chat_succeeds() {
         .expect("my-gateway entry created");
     assert_eq!(provider.api_key.as_deref(), Some("gw-secret-key"));
     assert_eq!(provider.api_key_env.as_deref(), Some("MY-GATEWAY_API_KEY"));
-    assert_eq!(
-        provider.base_url.as_deref(),
-        Some("https://api.example.com/v1")
+    assert!(
+        provider.models.is_empty(),
+        "failed discovery must not add models"
     );
+    assert_eq!(provider.base_url.as_deref(), Some(base_url.as_str()));
 }
 
 #[tokio::test]
 async fn handle_register_custom_provider_anthropic_messages_succeeds() {
     let _lock = HOME_ENV_MUTEX.lock().await;
+    let (base_url, server) = spawn_failed_registration_discovery("/anthropic/v1").await;
     let new_config = with_isolated_home(|| async {
         let (tx, mut rx) = mpsc::unbounded_channel::<UiOutput>();
         let config = Config::default();
@@ -479,7 +542,7 @@ async fn handle_register_custom_provider_anthropic_messages_succeeds() {
             &config,
             "anthropic-gw",
             "anthropic-messages",
-            "https://api.example.com/anthropic/v1",
+            &base_url,
             "sk-ant-secret",
         )
         .await;
@@ -489,15 +552,25 @@ async fn handle_register_custom_provider_anthropic_messages_succeeds() {
     })
     .await
     .expect("registration must succeed");
+    assert_failed_registration_discovery(
+        server,
+        "/anthropic/v1/models",
+        "x-api-key: sk-ant-secret",
+    )
+    .await;
 
     let provider = new_config
         .providers
         .get("anthropic-gw")
         .expect("anthropic-gw entry created");
     assert_eq!(provider.api_key.as_deref(), Some("sk-ant-secret"));
+    assert!(
+        provider.models.is_empty(),
+        "failed discovery must not add models"
+    );
     assert_eq!(
         provider.base_url.as_deref(),
-        Some("https://api.example.com/anthropic/v1/messages")
+        Some(format!("{base_url}/messages").as_str())
     );
 }
 
@@ -584,6 +657,7 @@ async fn handle_register_custom_provider_empty_key_no_partial_write() {
 #[tokio::test]
 async fn handle_register_custom_provider_update_preserves_unrelated_providers() {
     let _lock = HOME_ENV_MUTEX.lock().await;
+    let (base_url, server) = spawn_failed_registration_discovery("/v1").await;
     let new_config = with_isolated_home(|| async {
         let (tx, mut rx) = mpsc::unbounded_channel::<UiOutput>();
         let mut config = Config::default();
@@ -608,7 +682,7 @@ async fn handle_register_custom_provider_update_preserves_unrelated_providers() 
             &config,
             "existing-gw",
             "openai-chat",
-            "https://new.example.com/v1",
+            &base_url,
             "new-key",
         )
         .await;
@@ -618,16 +692,19 @@ async fn handle_register_custom_provider_update_preserves_unrelated_providers() 
     })
     .await
     .expect("update must succeed");
+    assert_failed_registration_discovery(server, "/v1/models", "authorization: Bearer new-key")
+        .await;
 
     let updated = new_config
         .providers
         .get("existing-gw")
         .expect("existing-gw still present");
     assert_eq!(updated.api_key.as_deref(), Some("new-key"));
-    assert_eq!(
-        updated.base_url.as_deref(),
-        Some("https://new.example.com/v1")
+    assert!(
+        updated.models.is_empty(),
+        "failed discovery must not add models"
     );
+    assert_eq!(updated.base_url.as_deref(), Some(base_url.as_str()));
 
     let other = new_config
         .providers
@@ -639,6 +716,7 @@ async fn handle_register_custom_provider_update_preserves_unrelated_providers() 
 #[tokio::test]
 async fn handle_register_custom_provider_loopback_http_allowed() {
     let _lock = HOME_ENV_MUTEX.lock().await;
+    let (base_url, server) = spawn_failed_registration_discovery("/v1").await;
     let new_config = with_isolated_home(|| async {
         let (tx, mut rx) = mpsc::unbounded_channel::<UiOutput>();
         let config = Config::default();
@@ -647,7 +725,7 @@ async fn handle_register_custom_provider_loopback_http_allowed() {
             &config,
             "local-gw",
             "openai-chat",
-            "http://127.0.0.1:8080/v1",
+            &base_url,
             "local-key",
         )
         .await;
@@ -657,15 +735,18 @@ async fn handle_register_custom_provider_loopback_http_allowed() {
     })
     .await
     .expect("loopback HTTP must succeed");
+    assert_failed_registration_discovery(server, "/v1/models", "authorization: Bearer local-key")
+        .await;
 
     let provider = new_config
         .providers
         .get("local-gw")
         .expect("local-gw entry created");
-    assert_eq!(
-        provider.base_url.as_deref(),
-        Some("http://127.0.0.1:8080/v1")
+    assert!(
+        provider.models.is_empty(),
+        "failed discovery must not add models"
     );
+    assert_eq!(provider.base_url.as_deref(), Some(base_url.as_str()));
 }
 
 /// R9 regression: when discovery succeeds, the discovered model IDs
