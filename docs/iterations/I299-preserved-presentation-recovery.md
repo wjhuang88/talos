@@ -1,6 +1,7 @@
 # Iteration I299: Preserved Presentation Recovery
 
-> Document status: Review
+> Document status: Complete / Closed
+> Completion Commit: 690926759229818fcec92b1487d0cffef1bf5fcb
 > Published plan date: 2026-10-10
 > Planned objective: recover effective ownership and deliver the preserved C0 presentation candidate.
 > MVP deliverable: truthful process summaries and readable live TUI activity, queued bodies and tool results.
@@ -9,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | C0 preserved TUI activity, queue, edit/Todo result presentation and process-tool summaries; trusted native Todo display metadata through core, session, agent, conversation, runtime and TUI carriers under ADR-088; associated regression repairs only. |
@@ -354,3 +355,27 @@ records only; the validated Rust implementation and acceptance executable remain
 
 Stable implementation candidate published as PR #701. Final-head CI, incremental independent
 review and merge-time CAS remain pending; publication is not completion evidence on main.
+
+### Implementation merged and owner-first closure — 2026-10-11
+
+PR #701 merged into main as `690926759229818fcec92b1487d0cffef1bf5fcb`.
+Its final head was `58e7461341908589ee68caf6b51e6b1486eef21a`, with base
+`2f9420f95cd2db3654de463c928debe592a89845`. Exact-head CI run `38115866825`
+passed all six jobs, including full macOS validation, Windows Rust workspace and
+Linux Desktop explicit-feature validation. Independent Agent API/privacy review
+approved the same head/base in comment `6105965862`; merge-time CAS was recorded
+in comment `6106128866`. This was the authorized single-maintainer path with
+independent Agent-role review, not a separate human/GitHub reviewer identity.
+
+Both governance validators passed with zero warnings immediately before merge.
+All four native observations passed on the unchanged implementation, as recorded
+above. This checkpoint supersedes earlier pending-publication, pending-review,
+pending-human and pending-merge statements without rewriting their history.
+The existing main implementation SHA above is the completion evidence, not this
+status-only closeout commit. Delivery is Complete and the claim is Closed.
+
+No remaining acceptance exists within I299. ADR-088's documented public Rust API
+migration must be honored by the next pre-1.0 minor release; no release is made
+or authorized by this closure. The seven original handoff requirements remain
+incomplete and separately scheduled, starting with T7 Git repair. Other-session
+Search/provider work and retained recovery assets are unchanged.

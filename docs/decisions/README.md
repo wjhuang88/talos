@@ -23,7 +23,7 @@ silently rewrite the reason or boundary that governed an earlier implementation.
 
 | ADR | State | Current Boundary / Gate |
 |---|---|---|
-| [088: Trusted Todo Result Presentation](088-trusted-todo-result-presentation.md) | Accepted / I299 | Producer-owned bounded transient spans; exact-text/invocation binding, literal fallback, raw-history preservation and public API migration. Expanded claim effective through #700; implementation evidence pending. |
+| [088: Trusted Todo Result Presentation](088-trusted-todo-result-presentation.md) | Accepted / I299 Complete | Producer-owned bounded transient spans; exact-text/invocation binding, literal fallback and raw-history preservation delivered by #701 (`69092675`). Public Rust API migration remains required for the next pre-1.0 minor release; no release authorized. |
 | [087: Authoritative Context Budget And Recovery](087-authoritative-context-budget-recovery.md) | Accepted / I298 | Shared admission telemetry, bounded request-only recovery, raw-history preservation and presentation API migration. |
 | [086: Frame-Aware Browser Invocation Boundary](086-frame-aware-browser-invocation-boundary.md) | Proposed / I295 | Separate opt-in v2, one-shot prepared invocation, dedicated fail-closed browser permission and raw-argument integrity; claim/activation and implementation evidence pending. |
 | [085: Talos-Owned Web Search Routing And Backend Boundary](085-talos-owned-search-routing-boundary.md) | Proposed / I288 | Keep `web_search` stable; use private SearchBackend strategies under the built-in Search Provider, Talos-owned first-valid-success routing, no startup probes or GeoIP routing, explicit premium selection, and no new `talos-search` crate until reuse justifies extraction. |
