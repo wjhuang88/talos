@@ -113,7 +113,7 @@ async fn installed_language_tool_obeys_production_agent_deny() {
                 .expect("agent turn");
             let mut results = Vec::new();
             while let Ok(event) = rx.try_recv() {
-                if let AgentEvent::ToolResult { result } = event {
+                if let AgentEvent::ToolResult { result, .. } = event {
                     results.push(result);
                 }
             }

@@ -3,8 +3,8 @@
 ## Purpose
 
 [I299](I299-preserved-presentation-recovery.md) is Active / Claimed after #698 merged at
-`50781eab`; its original C0 scope is effective. The ADR-088 cross-crate Todo metadata
-amendment remains ineffective until its governance PR merges. I293/I294 retain separate
+`50781eab`; #700 expanded its effective scope under ADR-088 at `2f9420f9`.
+Cross-crate Todo metadata is implemented locally; final validation, native acceptance and delivery remain pending. I293/I294 retain separate
 ownership under explicit non-overlapping parallel authorization.
 The seven session-handoff requirements remain pending outside this bounded presentation slice.
 

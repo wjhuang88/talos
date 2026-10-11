@@ -374,6 +374,10 @@ impl AgentTool for TuiPermissionAwareTool {
     fn project_result(&self, result: &ToolResult) -> talos_core::tool::ToolResultProjection {
         self.inner.project_result(result)
     }
+
+    fn produces_todo_presentation(&self) -> bool {
+        self.inner.produces_todo_presentation()
+    }
 }
 
 /// Permission-aware tool wrapper that checks the permission engine before
@@ -545,6 +549,10 @@ impl AgentTool for PermissionAwareTool {
 
     fn project_result(&self, result: &ToolResult) -> talos_core::tool::ToolResultProjection {
         self.inner.project_result(result)
+    }
+
+    fn produces_todo_presentation(&self) -> bool {
+        self.inner.produces_todo_presentation()
     }
 }
 

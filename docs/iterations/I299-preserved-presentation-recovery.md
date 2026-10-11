@@ -23,9 +23,13 @@
 | Handoff / Release Condition | Deliver only after effective claim, local convergence, native acceptance and exact-head gates; retain incomplete work in the handoff ledger. |
 
 PR #698 established Active / Claimed atomically at main commit
-`50781eab529e424894d11e7b1c502fb1d0cb50f5`. The original C0 scope is effective.
-The ADR-088 cross-crate scope amendment in this governance candidate is **not** effective
-until its own PR merges to main. No cross-crate implementation may be committed before then.
+`50781eab529e424894d11e7b1c502fb1d0cb50f5`. Implementation branch
+`feat/i299-presentation` starts from that merge. Claim CI passed at exact head
+`791b521673b579f338d644b1ded5b608920589a5`; independent Agent review approved that
+head against base `e58e26783e2f48416b871a394b17ac79b642bb1f`.
+PR #700 expanded the effective claim under ADR-088 at
+`2f9420f95cd2db3654de463c928debe592a89845`; the implementation branch was fast-forwarded
+to that merge before restoring the preserved candidate.
 
 ## Published Baseline
 
@@ -111,8 +115,13 @@ actual public Rust API migration for the next pre-1.0 minor release. Tests must 
 multiline spoofing, every list item, head/tail projection, concurrent calls, redaction and
 hook mutation. Independent API/privacy review and native terminal acceptance remain gates.
 
-PR #700 proposes this claim amendment. Exact-head CI, independent review and merge-time CAS
-remain pending; the proposed Work Slice has no target-branch effect until merge.
+PR #700 merged at `2f9420f95cd2db3654de463c928debe592a89845`. Exact head
+`be35835ab14f24f9e1b2c4c97393519352b2733c` / base
+`45892e7ddf5985aba8fdd5804b364611e1cc7173` passed documentation CI `38110279048`
+(four successful jobs; two Rust platform jobs correctly skipped). Independent Agent
+APPROVE is recorded in comment `6105271021`; merge-time CAS in `6105289052`.
+Both repository validators and the skill validator passed with zero warnings.
+This establishes scope only, not implementation completion or native acceptance.
 
 At amendment selection, target `main@45892e7d` has I293 and I294 Active under separate
 Search claims, I277 Review with deferred human checks, I249 Planned and I164 Paused.
@@ -121,10 +130,187 @@ The Todo result display carrier work does not change Search routing, provider ev
 Desktop or dependency work. The maintainer's earlier non-overlap authorization remains
 limited to these separate slices; shared derived documents are synchronized owner-first.
 
+### Local implementation checkpoint
+
+Preserved presentation changes have been reapplied after the effective claim. Independent
+technical assessment confirms that plain-text Todo results have no structured row provenance.
+The conservative implementation converts only the initial producer-owned status position for
+create/update/query; subsequent rows stay literal, including genuine later items. It never
+re-synchronizes on user-controlled headers, blank lines or UUIDs. Full-list status decoration
+remains unimplemented pending trusted provenance; no producer output, storage or public API is
+changed. This limitation must remain visible at acceptance rather than being reported complete.
+
+Focused locked TUI validation passed: 603 unit tests, 2 integration tests and 2 doctests,
+including 34 tool-display tests. Command:
+`CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p talos-tui --locked -- --quiet`.
+The same resource settings with `cargo test -p talos-agent --locked process_tool -- --quiet`
+passed all 5 process-tool tests. Both governance validators passed with zero warnings.
+Targeted `cargo clippy -p talos-tui -p talos-agent --all-targets --locked -- -D warnings`
+also passed with the same resource settings. No validation process remains running at this
+checkpoint. These focused checks do not replace full preflight or native acceptance.
+Native acceptance and rebuilt full
+preflight have not yet passed. The maintainer accepted structured display provenance on
+2026-10-11 under ADR-088; #700 now establishes the expanded effective claim. Cross-crate
+implementation remains pending.
+No scope reduction is assumed.
+
 Historical candidate `0b396c48865b74e4cf3e7d0f711ccb208f264afd` passed full standardized
 preflight on 2026-10-10 with debug-free, single-job, non-incremental profiles. Independent Agent
 review identified the Todo defect above; it is not approval. Rebuilt candidate requires fresh gates.
 
 ## Completion Evidence
 
+### Decision history: complete Todo result decoration
+
+The following proposal was accepted on 2026-10-11; ADR-088 records the binding contract.
+Acceptance alone does not expand the effective claim. The existing structured Todo panel already
+supports status decoration; the gap is tool-result history containing multiple items.
+
+Source inspection: `ToolResult` carries text/error/continuations; `ToolResultProjection`
+separates model/display/persistence strings; `ToolResultDisplay` carries name/error/text.
+There is no trusted per-item status channel. Continuations are tool-disclosure requests, so
+using them as formatting metadata would violate their contract. Re-querying the Todo database
+while rendering would show current state instead of the recorded execution result and is not
+an acceptable replacement. Escaping producer text would change model and durable output.
+
+Recommended contract for a separately accepted ADR:
+
+- Native Todo formatting captures typed status spans while assembling the successful result,
+  before arbitrary title/description/tag text is appended. Never recover spans by parsing text.
+- Only the registered native Todo producer and known semantic metadata type are eligible.
+  A tool name supplied by MCP, a plugin or caller text is not authority; wrappers preserve
+  source eligibility, and errors discard decorations.
+- Carry bounded optional presentation metadata with that exact result and invocation ID through
+  permission wrappers, agent events, conversation projection and TUI history. Rendering cannot
+  execute tools, query mutable storage or grant permissions.
+- Validate UTF-8 boundaries, ordering, non-overlap and exact status text. Bind metadata to its
+  source content; if hooks, redaction or other projections change that content without an explicit
+  remap, discard metadata and render literally. Never retain stale offsets after sanitization.
+- Use checked UTF-8 byte offsets with explicit metadata count/size caps. Invalid metadata
+  falls back as a whole, never by guessing missing rows. Bind against final visible content
+  using strong digest plus length or equivalently verified identity, without carrying a second
+  hidden raw payload into UI metadata.
+- Map wrapping and head/tail truncation from validated original positions; omitted spans cannot
+  leave orphan decorations. Distinguish the status replacement span from the item-owned row
+  highlight span; multiline user text is not itself status provenance.
+- Preserve model-facing text, raw durable transcript and exports byte-for-byte. Legacy restored
+  results lacking provenance remain literal; persistence of display metadata is a separate
+  explicit decision, not an implicit transcript migration.
+- An additive optional field still breaks external Rust struct literals, and an added event
+  variant affects exhaustive matches. Inventory each public carrier, document constructors and
+  migration, and select the next compatible release boundary before implementing or publishing.
+- Prove all-item decoration with multiline titles/descriptions/tags, forged headers/UUIDs,
+  normal/head/tail display, concurrent calls, error/unrelated tools, hook mutation, private-token
+  redaction and raw export equivalence. Independent API/privacy review is required.
+
+Alternative requiring explicit scope acceptance: keep complete glyphs in the structured panel,
+but conservatively decorate only the initial unambiguous tool-result status. This alternative
+does not fulfill complete tool-result list decoration and cannot silently close that requirement.
+
+No new API implementation begins until the maintainer accepts the boundary and an effective
+claim covers the affected cross-crate paths. The seven-task handoff remains active.
+
+Independent Agent design assessment found this direction viable with the trust, bounds,
+invalidation and row-span clarifications above. This is not accepted ADR authority or
+implementation approval. The maintainer subsequently accepted this boundary on 2026-10-11.
+
+### Accepted implementation-boundary amendment (2026-10-11)
+
+[ADR-088](../decisions/088-trusted-todo-result-presentation.md) authorizes trusted transient
+Todo result metadata to fulfill the existing complete-list acceptance, not a new product
+objective. Preserve the published baseline above. Prepare an effective claim amendment for
+the required core/session/agent/conversation/runtime/TUI carriers before cross-crate code
+implementation. The current claim remains limited to its target-branch scope until that
+amendment merges. Inventory actual public API changes and publish migration instructions;
+no release or durable-schema change is authorized.
+
+Closure ledger: update ADR/index, this owner and handoff checkpoint; preserve all local
+presentation code and historical commits; validate both governance harnesses and diff;
+record expanded-claim, API migration, full implementation/tests and native acceptance as
+remaining I299 work. I299 remains Active / Claimed, not Complete.
+
+### ADR-088 local foundation checkpoint (2026-10-11)
+
+The local candidate adds transient Todo status/item byte ranges and whole-set geometry
+validation (UTF-8 boundaries, ordering, exact token, count and content-size limits), plus
+a SHA-256/length binding carrier without source-text retention or new dependencies.
+Native formatting records item positions while appending output; forged multiline titles,
+descriptions and tags do not create extra spans. Exact output preservation has focused tests.
+
+`cargo test -p talos-core --locked todo_presentation` passed 4 tests;
+`cargo test -p talos-session --locked todo::` passed 41 tests;
+`cargo clippy -p talos-core -p talos-session --all-targets --locked -- -D warnings` passed.
+All used single-job, debug-free, non-incremental profiles. The first session test attempt
+failed because the new fixture used a nonexistent priority default; it now uses Medium.
+This is not end-to-end evidence: production formatter entrypoints still return text only.
+Digest computation, producer eligibility, wrapper/event correlation, invalidation and TUI
+consumption remain to wire, along with API migration, full preflight and native acceptance.
+
 Pending. No target-branch implementation or native acceptance is claimed.
+
+### ADR-088 composed-chain checkpoint (2026-10-11)
+
+This supersedes the implementation-pending statements in the foundation checkpoint above;
+the published baseline and its historical validation remain preserved. Native producers now
+emit bound metadata, registered wrappers forward eligibility, execution and observation discard
+invalid/error/redacted metadata, and conversation/TUI consume only final-visible-content-bound
+spans. Legacy serialized events remain literal. Public API migration is documented in
+`docs/reference/I299-TODO-PRESENTATION-MIGRATION.md`.
+
+The independent local review requested a real composed-chain regression and a fix for orphan
+highlighting when truncation hides the status line of a multiline item. The orphan fix has a
+passing focused `omitted_status` regression. The new CLI integration test
+`native_todo_through_permission_runtime_preserves_durable_and_export_text` runs the native
+Todo adapter through Runtime's permission wrapper and event loop into ConversationEngine,
+verifies transient display metadata reaches the UI output, reads the durable session, and
+compares both export modes against serialized/replayed events without presentation authority.
+It passed with `cargo test -p talos-cli --test todo_presentation_chain --locked` (1 test).
+The test uses an isolated temporary database and mock model; it is not native terminal rendering
+or human acceptance evidence. No new dependency was added.
+
+Remaining: incremental independent review, full preflight of the final candidate, native TUI
+acceptance, stable implementation commit/PR gates and owner-first closeout. The full handoff's
+seven original deliverables remain in scope; this checkpoint does not complete the long task.
+
+### Native terminal acceptance plan
+
+Build `cargo build -p talos-cli --example i299_presentation_acceptance --locked`, then the
+maintainer runs `target/debug/examples/i299_presentation_acceptance` in their own terminal.
+`--check` exercises only the two real native Todo fixture runs; it does not open or verify a
+terminal. The program uses a mock provider, temporary Todo databases and the production
+Runtime permission wrapper. Edit/process stages are explicitly display fixtures and execute
+no filesystem edit or subprocess tool. It does not load user configuration or sessions.
+
+Advance with `next`, exit with `quit`. Record the candidate SHA with each observation:
+
+- [ ] Activity animation and queued message bodies remain visible in a short/narrow window;
+      process summary includes supported parameters; this is no process-execution evidence.
+- [ ] Edit soft red/green backgrounds cover CJK/ASCII wrapped rows; selection text is correct
+      and body bullets preserve the intended small appearance.
+- [ ] All four real Todo statuses are decorated, active item highlighting is correct and
+      forged status text in multiline titles remains literal, including after resize.
+- [ ] Long Todo output preserves head/tail presentation without an orphan highlight;
+      scrolling/selection and terminal restoration on exit remain correct.
+
+All four rows are pending; automatic fixture success cannot check them off.
+
+### Stable local candidate validation (2026-10-11)
+
+`CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 ./scripts/release_preflight.sh`
+exited 0 with `release preflight: passed`. This includes workspace check/Clippy/tests and
+doctests, external Runtime SDK default/coding fixtures, site/installers, classifier/text-boundary
+checks and both governance validators (zero warnings). The TUI suite contains 605 passing
+unit tests, including the orphan-highlight regression. No test gate is waived.
+
+The dedicated acceptance example's `--check` run passed for normal and long native Todo
+results. It checks all four real spans and confirms the long fixture's active status lies
+in the omitted middle while its continuation reaches the tail. Targeted Clippy for the example
+and composed-chain integration test passed with `--locked -- -D warnings`.
+The example was refined during workspace validation; its final build/self-check and targeted
+Clippy are separate evidence, not an assertion that preflight exercised native drawing.
+
+Independent reviewer `/root/i299_amendment_review` approved the incremental dirty-tree
+changes without new blocking findings. Stable-commit review remains required. Remote refresh
+confirmed `main@2f9420f95cd2db3654de463c928debe592a89845`; the only open PR is other-session
+#696 (Search), with no overlap in this candidate. Native acceptance remains pending, so this
+owner stays Active; no remote implementation push or completion is claimed.

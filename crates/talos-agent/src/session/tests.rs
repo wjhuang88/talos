@@ -2342,7 +2342,7 @@ async fn exercise_boundary_injection_with_gate(
         .iter()
         .position(|event| {
             matches!(progress_event(event),
-                Some(AgentEvent::ToolResult { result }) if result.tool_use_id == "probe-1"
+                Some(AgentEvent::ToolResult { result, .. }) if result.tool_use_id == "probe-1"
             )
         })
         .expect("first tool result event");

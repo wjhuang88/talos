@@ -195,6 +195,8 @@ impl Agent {
             content,
             is_error: result.is_error,
             continuations: result.continuations.clone(),
+            // Observer hooks do not receive or manufacture trusted display geometry.
+            todo_presentation: None,
         }
     }
 
@@ -220,9 +222,16 @@ impl Agent {
                 content: original.content.clone(),
                 is_error: original.is_error,
                 continuations: observed.continuations.clone(),
+                todo_presentation: if !original.is_error && original.content == projected.content {
+                    original.todo_presentation.clone()
+                } else {
+                    None
+                },
             }
         } else {
-            observed.clone()
+            let mut result = observed.clone();
+            result.todo_presentation = None;
+            result
         }
     }
 
@@ -390,7 +399,30 @@ impl Agent {
             }
         };
         messages.push(Message::Tool { result: llm_result });
-        let _ = event_tx.send(AgentEvent::ToolResult { result: ui_result });
+        let todo_presentation = if !ui_result.is_error
+            && observed.call == *call
+            && self.tools.get(&call.name).is_some_and(|tool| {
+                tool.produces_todo_presentation()
+                    && tool.provenance() == talos_core::tool::ToolProvenance::Native
+            }) {
+            use sha2::{Digest, Sha256};
+            observed
+                .result
+                .todo_presentation
+                .as_ref()
+                .and_then(|metadata| {
+                    metadata.bind_visible_content(
+                        ui_result.content.clone(),
+                        Sha256::digest(ui_result.content.as_bytes()).into(),
+                    )
+                })
+        } else {
+            None
+        };
+        let _ = event_tx.send(AgentEvent::ToolResult {
+            result: ui_result,
+            todo_presentation,
+        });
         Ok(observed.result)
     }
 
@@ -708,7 +740,7 @@ impl Agent {
 
         let normalized_input = call.input.clone();
 
-        let (result, parts) = if call.name == "bash" {
+        let (mut result, parts) = if call.name == "bash" {
             if let Some(sb) = self.sandbox.as_deref() {
                 if sb.is_available() {
                     (
@@ -817,6 +849,15 @@ impl Agent {
             };
             (output.result, output.next_provider_parts)
         };
+
+        // Eligibility is an explicit registered producer capability, never a
+        // match on a tool name or data supplied by an extension.
+        if result.is_error
+            || !tool.produces_todo_presentation()
+            || tool.provenance() != talos_core::tool::ToolProvenance::Native
+        {
+            result.todo_presentation = None;
+        }
 
         self.execution_ledger.complete(hook_ctx.turn_id, &call);
 
@@ -978,6 +1019,7 @@ impl Agent {
             content,
             is_error: result.exit_code != 0,
             continuations: Vec::new(),
+            todo_presentation: None,
         }
     }
 }

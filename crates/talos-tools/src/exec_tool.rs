@@ -259,6 +259,7 @@ impl ExecTool {
             content: format_step_output(&step, &result),
             is_error: !result.success,
             continuations: Vec::new(),
+            todo_presentation: None,
         }
     }
 
@@ -303,6 +304,7 @@ impl ExecTool {
             content,
             is_error,
             continuations: Vec::new(),
+            todo_presentation: None,
         }
     }
 
@@ -369,6 +371,7 @@ impl ExecTool {
             content,
             is_error,
             continuations: Vec::new(),
+            todo_presentation: None,
         }
     }
 
@@ -413,6 +416,7 @@ impl ExecTool {
             content,
             is_error,
             continuations: Vec::new(),
+            todo_presentation: None,
         }
     }
 
@@ -466,6 +470,7 @@ impl ExecTool {
             content,
             is_error,
             continuations: Vec::new(),
+            todo_presentation: None,
         }
     }
 

@@ -388,6 +388,7 @@ mod tests {
         }));
         tui.handle_ui_output(UiOutput::Content(ContentOutput::End));
         tui.handle_ui_output(UiOutput::ToolResult(ToolResultDisplay {
+            todo_presentation: None,
             tool_name: Some("read_file".into()),
             is_error: false,
             content: "done".into(),
@@ -450,6 +451,7 @@ mod tests {
             response,
         });
         tui.handle_ui_output(UiOutput::ToolResult(ToolResultDisplay {
+            todo_presentation: None,
             tool_name: None,
             is_error: true,
             content: "permission denied".into(),

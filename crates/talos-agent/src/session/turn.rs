@@ -135,7 +135,7 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                                     };
                                 }
                             }
-                            if let AgentEvent::ToolResult { result } = &event
+                            if let AgentEvent::ToolResult { result, .. } = &event
                                 && let Ok(mut outputs) = progress_raw_tool_outputs.lock()
                             {
                                 outputs.insert(

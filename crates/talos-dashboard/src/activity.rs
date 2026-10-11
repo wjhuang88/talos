@@ -207,7 +207,7 @@ impl DashboardActivityFeed {
                 AgentEvent::ToolCall { call, .. } => {
                     self.remember_tool(session_id, &call.id, &call.name);
                 }
-                AgentEvent::ToolResult { result } => {
+                AgentEvent::ToolResult { result, .. } => {
                     if let Some(name) = self.take_tool(session_id, &result.tool_use_id) {
                         self.push_activity(ActivityPayload::Tool {
                             session_id: bounded_redacted(session_id, SUMMARY_FIELD_LIMIT),
@@ -824,6 +824,7 @@ mod tests {
                 ],
             },
             AgentEvent::ToolResult {
+                todo_presentation: None,
                 result: MessageToolResult {
                     tool_use_id: "call-secret".to_string(),
                     content: "tool-result-secret".to_string(),
@@ -948,6 +949,7 @@ mod tests {
             "session-1",
             &SessionEvent::AgentEvent {
                 event: AgentEvent::ToolResult {
+                    todo_presentation: None,
                     result: MessageToolResult {
                         tool_use_id: "secret-call-id".to_string(),
                         content: "private tool output".to_string(),

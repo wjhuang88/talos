@@ -60,6 +60,15 @@ title; the completed result body is not repeated below it.
 
 These I279 changes passed native-terminal acceptance and first shipped in v0.10.0.
 
+The current development candidate animates pending tool activity and keeps queued message
+bodies visible in constrained-height layouts. Process summaries include the requested action,
+job ID and read/wait bounds. Edit results use soft red/green backgrounds that cover wrapped
+rows, including CJK text; raw stored results and exports remain unchanged.
+Live native Todo results use producer-recorded status glyphs and active-item highlighting.
+Multiline user text cannot create additional status tokens. Restored results without transient
+metadata remain literal. Rust SDK callers should follow the
+[I299 migration notes](docs/reference/I299-TODO-PRESENTATION-MIGRATION.md).
+
 ### Shared text semantics
 
 `talos-text` exposes renderer-independent language IDs, highlight spans and streaming Markdown

@@ -53,6 +53,7 @@ fn call(id: &str, label: &str) -> AgentEvent {
 
 fn result(id: &str, is_error: bool) -> AgentEvent {
     AgentEvent::ToolResult {
+        todo_presentation: None,
         result: MessageToolResult {
             tool_use_id: id.into(),
             content: (1..=18)

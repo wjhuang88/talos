@@ -72,6 +72,7 @@ impl Tui {
         // them collapsed for the whole pending lifecycle, including model assessment, so the
         // activity preview never flashes a second JSON representation before the panel opens.
         let mut tool_preview = self.tool_activities.component_for_approval(true);
+        tool_preview.animation_frame = status.is_processing.then_some(self.processing_frame);
         let preview_text_color = hold_status
             .as_ref()
             .map(|_| crate::scrollback::hold_preview_color(self.processing_frame));

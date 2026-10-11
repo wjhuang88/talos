@@ -328,6 +328,10 @@ pub enum AgentEvent {
     ToolResult {
         /// The tool result.
         result: MessageToolResult,
+        /// Transient display metadata for this exact invocation and visible result.
+        /// Omitted from serialization so replay never recovers presentation authority.
+        #[serde(skip)]
+        todo_presentation: Option<crate::tool::VisibleTodoPresentation>,
     },
     /// Turn has ended.
     TurnEnd {
@@ -414,6 +418,7 @@ mod tests {
                 summary_fields: vec![],
             },
             AgentEvent::ToolResult {
+                todo_presentation: None,
                 result: MessageToolResult {
                     tool_use_id: "c1".into(),
                     content: "file.rs".into(),

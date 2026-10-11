@@ -1648,7 +1648,7 @@ fn project_event(event: SessionEvent) -> Vec<RuntimeOutput> {
                 },
             ],
             talos_runtime::TurnEventPayload::Progress {
-                event: AgentEvent::ToolResult { result },
+                event: AgentEvent::ToolResult { result, .. },
             } => vec![RuntimeOutput::ToolResult {
                 call_id: result.tool_use_id,
                 content: result.content,

@@ -133,6 +133,15 @@ pub trait AgentTool: Send + Sync {
         ToolResultProjection::shared(result.content.clone())
     }
 
+    /// Whether this registered implementation produces native Todo display geometry.
+    ///
+    /// Defaults to false, including for extensions with a Todo-like name. Only native
+    /// Todo producers and known wrappers forwarding their inner producer opt in.
+    /// This grants no execution or permission authority; content must still validate.
+    fn produces_todo_presentation(&self) -> bool {
+        false
+    }
+
     /// Returns concrete transient strings that may appear only in the active
     /// provider context and must be removed from observer projections.
     fn model_private_tokens(&self, _result: &ToolResult) -> Vec<String> {
