@@ -15,7 +15,7 @@
 | Work Slice | C0 preserved TUI activity, queue, edit/Todo result presentation and process-tool summaries; trusted native Todo display metadata through core, session, agent, conversation, runtime and TUI carriers under ADR-088; associated regression repairs only. |
 | Claimed At | 2026-10-10 |
 | Source Issue | None |
-| Governance Claim PR | #698 |
+| Governance Claim PR | #700 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer authorized serial implementation, stable publication, independent Agent review and gated merge; explicitly permitted non-overlapping concurrency with I293/I294. No separate maintainer reviewer is available; exact-head CI, Agent review, validators and CAS remain required. |
 | Implementation PR | Not started |
@@ -111,8 +111,8 @@ actual public Rust API migration for the next pre-1.0 minor release. Tests must 
 multiline spoofing, every list item, head/tail projection, concurrent calls, redaction and
 hook mutation. Independent API/privacy review and native terminal acceptance remain gates.
 
-This claim amendment's PR number, exact head/base, CI, review and CAS will be recorded after
-remote creation; the proposed Work Slice has no target-branch effect until merge.
+PR #700 proposes this claim amendment. Exact-head CI, independent review and merge-time CAS
+remain pending; the proposed Work Slice has no target-branch effect until merge.
 
 At amendment selection, target `main@45892e7d` has I293 and I294 Active under separate
 Search claims, I277 Review with deferred human checks, I249 Planned and I164 Paused.
