@@ -275,3 +275,33 @@ Unaffected checks passed: twelve network-feature scheduling tests, target strict
 SDK default/coding modes, and final zero-warning governance/claims plus format/diff checks.
 The conflict-resolved candidate remains unsubmitted while that authorization is unresolved. The remote
 PR head stays `40d9f661`; do not move its ref or use the successful old-head CI to merge this refresh.
+
+### Authorized fixture remedy and recovered local candidate (2026-10-11)
+
+The maintainer authorized an independent, bounded test-only local-mock remedy for the
+example-endpoint discovery exposure. Maintenance PR #702 has head
+`2faca9af7ac5e4db9a3908bab78eabd3cdc839c8`, based on main
+`2f9420f95cd2db3654de463c928debe592a89845`. It changes only the CLI test module:
+four discovery fixtures own ephemeral loopback endpoints with deterministic HTTP 503;
+original assertions remain, and production, dependency and CI policy are unchanged.
+This is authorization for that remedy, not permission to contact the rejected external host.
+
+Fresh maintenance validation on actual Rust 1.99: eight registration tests passed; standard
+preflight passed workspace check, strict Clippy and zero-warning governance/claims, then stopped
+only at the unchanged OS-1 Unix socket fixture (64 passed / 1 failed). The previously authorized
+local-only exact socket filter passed 3579 tests, zero failed/ignored, one filtered, across 113
+summaries. External Runtime SDK default and coding modes passed. Independent Agent exact-head
+technical review found no blockers; this is not natural-person approval. Full unfiltered CI3123 /
+run38116500414 and merge-time CAS remain pending. No fixture-fix merge is claimed here.
+
+Recovery restored GitHub checkpoint `69bbe5377fd8b9182e2b86b7d225869946be3570` and incorporated
+accepted main `2f9420f9` locally. The SEARCH diff remains five test/doc files; experiment blob
+`a58ddfa0b698d6f2c9634ec280adbb51568da2be` is unchanged. Fresh network-feature experiment tests
+passed all twelve cases; target Clippy with `-D warnings` passed. These are focused checks, not
+full validation of the refreshed SEARCH candidate. #696 still publishes head `40d9f661`.
+
+Resume only after #702 review/CI/CAS and merge: integrate the actual accepted fixture-fix main,
+refresh complete local validation, converge owner evidence, then publish one stable #696 candidate
+with fresh exact-head review/unfiltered CI and final CAS. C/I293 remains Active / Claimed /
+incomplete; C-V01..C-V11 remain Pending, and #643/#624 stay open. No production search behavior,
+native admission or paid selection is changed.

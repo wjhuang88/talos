@@ -2,9 +2,10 @@
 
 ## Purpose
 
-[I299](I299-preserved-presentation-recovery.md) proposes Active / Claimed through #698 for C0 recovery.
-Claim and activation remain ineffective until #698 merges; I293/I294 retain separate ownership
-under explicit non-overlapping parallel authorization.
+[I299](I299-preserved-presentation-recovery.md) is Active / Claimed after #698 merged at
+`50781eab`; its original C0 scope is effective. The ADR-088 cross-crate Todo metadata
+amendment remains ineffective until its governance PR merges. I293/I294 retain separate
+ownership under explicit non-overlapping parallel authorization.
 The seven session-handoff requirements remain pending outside this bounded presentation slice.
 
 I298 context-budget repair is Complete / Closed through implementation #691 (`8d4ad50e`); see
