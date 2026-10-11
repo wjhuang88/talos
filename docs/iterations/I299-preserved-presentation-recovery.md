@@ -1,6 +1,6 @@
 # Iteration I299: Preserved Presentation Recovery
 
-> Document status: Active (proposed; ineffective until #698 merges)
+> Document status: Active
 > Published plan date: 2026-10-10
 > Planned objective: recover effective ownership and deliver the preserved C0 presentation candidate.
 > MVP deliverable: truthful process summaries and readable live TUI activity, queued bodies and tool results.
@@ -12,18 +12,20 @@
 | Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
-| Work Slice | C0 preserved TUI activity, queue, edit/Todo result presentation and process-tool summaries; associated regression repairs only. |
+| Work Slice | C0 preserved TUI activity, queue, edit/Todo result presentation and process-tool summaries; trusted native Todo display metadata through core, session, agent, conversation, runtime and TUI carriers under ADR-088; associated regression repairs only. |
 | Claimed At | 2026-10-10 |
 | Source Issue | None |
-| Governance Claim PR | #698 |
+| Governance Claim PR | #700 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer authorized serial implementation, stable publication, independent Agent review and gated merge; explicitly permitted non-overlapping concurrency with I293/I294. No separate maintainer reviewer is available; exact-head CI, Agent review, validators and CAS remain required. |
 | Implementation PR | Not started |
-| Last Updated | 2026-10-10 |
+| Last Updated | 2026-10-11 |
 | Handoff / Release Condition | Deliver only after effective claim, local convergence, native acceptance and exact-head gates; retain incomplete work in the handoff ledger. |
 
-PR #698 proposes Active / Claimed atomically; neither is effective until this finalized
-governance-only record reaches main. Implementation starts from that merge or later target commit.
+PR #698 established Active / Claimed atomically at main commit
+`50781eab529e424894d11e7b1c502fb1d0cb50f5`. The original C0 scope is effective.
+The ADR-088 cross-crate scope amendment in this governance candidate is **not** effective
+until its own PR merges to main. No cross-crate implementation may be committed before then.
 
 ## Published Baseline
 
@@ -93,6 +95,31 @@ Resolve provenance conservatively and seek an ADR if required, rather than guess
 Retain historical commits and revert only this bounded implementation if regression occurs.
 
 ## Verification Evidence
+
+### Change-control amendment: trusted Todo provenance (2026-10-11)
+
+The maintainer accepted [ADR-088](../decisions/088-trusted-todo-result-presentation.md)
+to satisfy the existing complete-list Todo display acceptance. This is a correction to the
+means of delivering C0, not a second product objective. The published baseline above remains
+intact. The amendment extends only trusted, transient native Todo presentation metadata
+across the listed carriers; it does not authorize permission, sandbox, tool execution,
+durable-schema, MCP/plugin trust or release changes.
+
+The resulting implementation must decorate every genuine item without parsing user text,
+keep model/persistence/export bytes unchanged, reject stale/invalid metadata and document
+actual public Rust API migration for the next pre-1.0 minor release. Tests must cover
+multiline spoofing, every list item, head/tail projection, concurrent calls, redaction and
+hook mutation. Independent API/privacy review and native terminal acceptance remain gates.
+
+PR #700 proposes this claim amendment. Exact-head CI, independent review and merge-time CAS
+remain pending; the proposed Work Slice has no target-branch effect until merge.
+
+At amendment selection, target `main@45892e7d` has I293 and I294 Active under separate
+Search claims, I277 Review with deferred human checks, I249 Planned and I164 Paused.
+I290/I291 are now Complete / Closed; #696 is the only open PR and belongs to I293.
+The Todo result display carrier work does not change Search routing, provider evidence,
+Desktop or dependency work. The maintainer's earlier non-overlap authorization remains
+limited to these separate slices; shared derived documents are synchronized owner-first.
 
 Historical candidate `0b396c48865b74e4cf3e7d0f711ccb208f264afd` passed full standardized
 preflight on 2026-10-10 with debug-free, single-job, non-incremental profiles. Independent Agent
