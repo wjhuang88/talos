@@ -135,6 +135,69 @@ fn make_tool_result(content: &str, is_error: bool) -> MessageToolResult {
 }
 
 #[test]
+fn todo_metadata_is_invocation_local_and_never_restored_from_serialized_events() {
+    use talos_core::tool::{TodoDisplaySpan, TodoDisplayStatus, TodoPresentation};
+    let content = "[~] item";
+    let metadata = TodoPresentation::new(
+        content,
+        [0; 32],
+        vec![TodoDisplaySpan {
+            status_range: 0..3,
+            item_range: 0..content.len(),
+            status: TodoDisplayStatus::InProgress,
+        }],
+    )
+    .expect("fixture geometry")
+    .bind_visible_content(content.into(), [0; 32])
+    .expect("fixture binding");
+    let mut engine = new_engine();
+    for id in ["first", "second"] {
+        engine.handle_agent_event(&AgentEvent::ToolCall {
+            call: ToolCall {
+                id: id.into(),
+                name: "todo_query".into(),
+                input: serde_json::json!({}),
+            },
+            provenance: ToolProvenance::Native,
+            summary_fields: vec![],
+        });
+    }
+    for (id, supplied) in [("second", Some(metadata.clone())), ("first", None)] {
+        let outputs = engine.handle_agent_event(&AgentEvent::ToolResult {
+            result: MessageToolResult {
+                tool_use_id: id.into(),
+                content: content.into(),
+                is_error: false,
+            },
+            todo_presentation: supplied.clone(),
+        });
+        let display = outputs
+            .iter()
+            .find_map(|output| match output {
+                UiOutput::ToolResult(display) => Some(display),
+                _ => None,
+            })
+            .expect("result display");
+        assert_eq!(display.todo_presentation.is_some(), supplied.is_some());
+        assert_eq!(display.content, content);
+    }
+    let event = AgentEvent::ToolResult {
+        result: make_tool_result(content, false),
+        todo_presentation: Some(metadata),
+    };
+    let encoded = serde_json::to_value(&event).expect("serialize event");
+    assert!(encoded.get("todo_presentation").is_none());
+    let restored: AgentEvent = serde_json::from_value(encoded).expect("restore event");
+    assert!(matches!(
+        restored,
+        AgentEvent::ToolResult {
+            todo_presentation: None,
+            ..
+        }
+    ));
+}
+
+#[test]
 fn activity_preserves_same_name_call_ids_and_reverse_result_order() {
     use crate::ToolActivity;
     let mut engine = new_engine();
@@ -161,6 +224,7 @@ fn activity_preserves_same_name_call_ids_and_reverse_result_order() {
     }
     for (id, is_error) in [("second", true), ("first", false)] {
         let outputs = engine.handle_agent_event(&AgentEvent::ToolResult {
+            todo_presentation: None,
             result: MessageToolResult {
                 tool_use_id: id.into(),
                 content: id.into(),
@@ -463,6 +527,7 @@ async fn tool_result_produces_stream_and_updates_message() {
     });
 
     let outputs = engine.handle_agent_event(&AgentEvent::ToolResult {
+        todo_presentation: None,
         result: make_tool_result("file contents", false),
     });
 
@@ -499,6 +564,7 @@ async fn tool_result_error_flag_propagates() {
     });
 
     let outputs = engine.handle_agent_event(&AgentEvent::ToolResult {
+        todo_presentation: None,
         result: make_tool_result("command not found", true),
     });
 
@@ -547,6 +613,7 @@ fn tool_result_marks_only_explicit_background_calls_without_changing_public_shap
             summary_fields: vec![],
         });
         let outputs = engine.handle_agent_event(&AgentEvent::ToolResult {
+            todo_presentation: None,
             result: make_tool_result(r#"{"job_id":"job_1","state":"running"}"#, false),
         });
 
@@ -582,6 +649,7 @@ fn interleaved_tool_results_pair_by_tool_use_id() {
     }
 
     let background_outputs = engine.handle_agent_event(&AgentEvent::ToolResult {
+        todo_presentation: None,
         result: MessageToolResult {
             tool_use_id: "background-1".into(),
             content: r#"{"job_id":"job_1","state":"running"}"#.into(),
@@ -594,6 +662,7 @@ fn interleaved_tool_results_pair_by_tool_use_id() {
     );
 
     let foreground_outputs = engine.handle_agent_event(&AgentEvent::ToolResult {
+        todo_presentation: None,
         result: MessageToolResult {
             tool_use_id: "foreground-1".into(),
             content: "file contents".into(),
@@ -645,6 +714,7 @@ fn assert_reused_tool_id_binds_only_to_new_turn(terminalize: impl FnOnce(&mut Co
         summary_fields: vec![],
     });
     let outputs = engine.handle_agent_event(&AgentEvent::ToolResult {
+        todo_presentation: None,
         result: MessageToolResult {
             tool_use_id: "reused-id".into(),
             content: "new result".into(),
@@ -731,6 +801,7 @@ fn tool_use_stop_preserves_pending_identity_but_terminal_stop_discards_it() {
         usage: Usage::default(),
     });
     let result = engine.handle_agent_event(&AgentEvent::ToolResult {
+        todo_presentation: None,
         result: MessageToolResult {
             tool_use_id: "call-1".into(),
             content: "ok".into(),
@@ -1911,6 +1982,7 @@ async fn transcript_plain_text_includes_tool_call_details() {
         summary_fields: vec![],
     });
     engine.handle_agent_event(&AgentEvent::ToolResult {
+        todo_presentation: None,
         result: make_tool_result("output", false),
     });
 
@@ -1929,6 +2001,7 @@ async fn transcript_markdown_includes_tool_call_details() {
         summary_fields: vec![],
     });
     engine.handle_agent_event(&AgentEvent::ToolResult {
+        todo_presentation: None,
         result: make_tool_result("output", false),
     });
 
@@ -2319,6 +2392,7 @@ async fn full_turn_lifecycle() {
     assert_eq!(display.tool_name, "calculator");
 
     let outputs = engine.handle_agent_event(&AgentEvent::ToolResult {
+        todo_presentation: None,
         result: make_tool_result("4", false),
     });
     let result_display = find_tool_result(&outputs).expect("operation should succeed");
@@ -2377,6 +2451,7 @@ fn canonical_tool_loop_uses_one_fifo_content_protocol_without_legacy_streams() {
         usage: Usage::default(),
     }));
     outputs.extend(engine.handle_agent_event(&AgentEvent::ToolResult {
+        todo_presentation: None,
         result: make_tool_result("tool output", false),
     }));
     outputs.extend(engine.handle_agent_event(&AgentEvent::TurnStart));
@@ -2775,6 +2850,7 @@ fn error_after_tool_result_clears_processing() {
         summary_fields: vec![],
     });
     engine.handle_agent_event(&AgentEvent::ToolResult {
+        todo_presentation: None,
         result: make_tool_result("ok", false),
     });
     assert!(engine.is_processing(), "still processing after ToolResult");
@@ -2815,6 +2891,7 @@ fn error_sets_visible_terminal_phase() {
     let mut engine = new_engine();
     engine.handle_agent_event(&AgentEvent::TurnStart);
     engine.handle_agent_event(&AgentEvent::ToolResult {
+        todo_presentation: None,
         result: make_tool_result("done", false),
     });
 

@@ -317,6 +317,7 @@ impl BashTool {
             content: output,
             is_error,
             continuations: Vec::new(),
+            todo_presentation: None,
         }
     }
 

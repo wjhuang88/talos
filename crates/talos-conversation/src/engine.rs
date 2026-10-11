@@ -550,7 +550,10 @@ impl ConversationEngine {
                 }));
                 outputs.push(UiOutput::Status(self.status_snapshot()));
             }
-            AgentEvent::ToolResult { result } => {
+            AgentEvent::ToolResult {
+                result,
+                todo_presentation,
+            } => {
                 self.close_content(&mut outputs);
                 let tool_name = self.set_tool_result(result);
                 outputs.push(UiOutput::ToolActivity(crate::ToolActivity::Finished {
@@ -559,6 +562,14 @@ impl ConversationEngine {
                     body: result.content.clone(),
                 }));
                 outputs.push(UiOutput::ToolResult(ToolResultDisplay {
+                    todo_presentation: todo_presentation
+                        .as_ref()
+                        .filter(|metadata| {
+                            !result.is_error
+                                && tool_name.is_some()
+                                && metadata.spans_for(&result.content).is_some()
+                        })
+                        .cloned(),
                     tool_name,
                     is_error: result.is_error,
                     content: result.content.clone(),

@@ -11,12 +11,17 @@ mod prepared;
 mod protocol;
 mod registry;
 mod result_presentation;
+mod todo_presentation;
 
 pub use self::{agent_tool::*, authorization::*, protocol::*, registry::*, result_presentation::*};
 pub use browser_arguments::{BrowserRawArguments, BrowserRawArgumentsError};
 pub use prepared::{
     AuthorizedToolInvocation, PreparedExecutionOutput, PreparedFailureCode,
     PreparedInvocationError, PreparedToolInvocation,
+};
+pub use todo_presentation::{
+    TodoDisplaySpan, TodoDisplayStatus, TodoPresentation, VisibleTodoPresentation,
+    validate_todo_display_spans,
 };
 
 /// Helper macro to generate a JSON Schema value from a type that implements

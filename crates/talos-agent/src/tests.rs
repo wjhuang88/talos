@@ -39,6 +39,128 @@ use crate::{
 };
 type Receiver<T> = mpsc::Receiver<T>;
 
+struct TodoPresentationFixture {
+    eligible: bool,
+    remote: bool,
+}
+
+#[async_trait]
+impl AgentTool for TodoPresentationFixture {
+    fn name(&self) -> &str {
+        "todo_query"
+    }
+    fn description(&self) -> &str {
+        "Todo presentation boundary fixture"
+    }
+    fn parameters(&self) -> Value {
+        serde_json::json!({"type":"object"})
+    }
+    fn produces_todo_presentation(&self) -> bool {
+        self.eligible
+    }
+    fn provenance(&self) -> talos_core::tool::ToolProvenance {
+        if self.remote {
+            talos_core::tool::ToolProvenance::McpRemote {
+                server: "fixture".into(),
+            }
+        } else {
+            talos_core::tool::ToolProvenance::Native
+        }
+    }
+    async fn execute(&self, _: Value) -> ToolExecutionResult {
+        todo_presentation_result()
+    }
+}
+
+fn todo_presentation_result() -> ToolExecutionResult {
+    use sha2::{Digest, Sha256};
+    use talos_core::tool::{TodoDisplaySpan, TodoDisplayStatus, TodoPresentation};
+    let mut result = ToolExecutionResult::success("[~] private-title");
+    result.todo_presentation = TodoPresentation::new(
+        &result.content,
+        Sha256::digest(result.content.as_bytes()).into(),
+        vec![TodoDisplaySpan {
+            status_range: 0..3,
+            item_range: 0..result.content.len(),
+            status: TodoDisplayStatus::InProgress,
+        }],
+    );
+    result
+}
+
+#[tokio::test]
+async fn todo_observation_checks_producer_redaction_error_and_preserves_model_bytes() {
+    for (eligible, remote, redact, error, expected) in [
+        (true, false, false, false, true),
+        (false, false, false, false, false),
+        (true, true, false, false, false),
+        (true, false, true, false, false),
+        (true, false, false, true, false),
+    ] {
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(TodoPresentationFixture { eligible, remote }));
+        let agent = Agent::new(Arc::new(MockModel::new(vec![])), registry);
+        let mut private = crate::transient_text::PrivateTokens::default();
+        if redact {
+            private.extend(["private-title".into()]);
+        }
+        let mut result = todo_presentation_result();
+        result.is_error = error;
+        let call = ToolCall {
+            id: "native-result-id".into(),
+            name: "todo_query".into(),
+            input: serde_json::json!({}),
+        };
+        let context = HookContext::new(TurnId::new(), PathBuf::from("."));
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let mut messages = Vec::new();
+        agent
+            .observe_tool_result(&context, &call, result, &tx, &mut messages, &mut private)
+            .await
+            .expect("observe");
+        let event = rx.try_recv().expect("result event");
+        let AgentEvent::ToolResult {
+            result,
+            todo_presentation,
+        } = event
+        else {
+            panic!("wrong event")
+        };
+        assert_eq!(result.tool_use_id, call.id);
+        assert_eq!(todo_presentation.is_some(), expected);
+        if redact {
+            assert!(!result.content.contains("private-title"));
+        }
+        if !error {
+            assert!(
+                matches!(&messages[0], Message::Tool { result } if result.content == "[~] private-title")
+            );
+        }
+    }
+}
+
+#[test]
+fn todo_hook_replacement_cannot_inject_or_retain_geometry() {
+    let original = todo_presentation_result();
+    let mut projected = original.clone();
+    projected.todo_presentation = None;
+    let unchanged = Agent::restore_private_result_if_unchanged(&original, &projected, &projected);
+    assert!(unchanged.todo_presentation.is_some());
+    let mut changed = original.clone();
+    changed.content.push_str(" changed by hook");
+    assert!(
+        Agent::restore_private_result_if_unchanged(&original, &projected, &changed)
+            .todo_presentation
+            .is_none()
+    );
+    projected.content = "[~] redacted".into();
+    assert!(
+        Agent::restore_private_result_if_unchanged(&original, &projected, &projected)
+            .todo_presentation
+            .is_none()
+    );
+}
+
 struct ProtectedBrowserFixture {
     calls: Arc<std::sync::atomic::AtomicUsize>,
 }
@@ -357,7 +479,7 @@ async fn prepared_provider_roundtrip_preserves_result_pairing_and_final_gate() {
                 assert_eq!(results, 0);
                 calls += 1;
             }
-            if let AgentEvent::ToolResult { result } = event {
+            if let AgentEvent::ToolResult { result, .. } = event {
                 assert_eq!(calls, 1);
                 assert_eq!(result.tool_use_id, "roundtrip-id");
                 assert_eq!(result.is_error, denied);
@@ -3149,7 +3271,7 @@ async fn test_streaming_tool_events_are_interleaved_per_tool() {
             AgentEvent::ToolCall { call, .. } => {
                 sequence.push(format!("call:{}", call.id));
             }
-            AgentEvent::ToolResult { result } => {
+            AgentEvent::ToolResult { result, .. } => {
                 sequence.push(format!("result:{}", result.tool_use_id));
             }
             _ => {}
@@ -5014,7 +5136,7 @@ async fn test_bash_compression_preserves_ui_result_and_compresses_model_context(
 
     let mut ui_tool_result = None;
     while let Ok(event) = rx.try_recv() {
-        if let AgentEvent::ToolResult { result } = event {
+        if let AgentEvent::ToolResult { result, .. } = event {
             ui_tool_result = Some(result);
         }
     }

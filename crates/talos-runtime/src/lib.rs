@@ -1799,6 +1799,10 @@ impl AgentTool for RuntimePermissionAwareTool {
         self.inner.project_result(result)
     }
 
+    fn produces_todo_presentation(&self) -> bool {
+        self.inner.produces_todo_presentation()
+    }
+
     fn provenance(&self) -> talos_core::tool::ToolProvenance {
         self.inner.provenance()
     }

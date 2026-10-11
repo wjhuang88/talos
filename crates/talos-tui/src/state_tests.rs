@@ -992,6 +992,28 @@ fn queue_preview_hidden_count_covers_unrendered_entries() {
 }
 
 #[test]
+fn queue_preview_tiny_budgets_preserve_body_without_overflow() {
+    let s = snap(&["first message", "second message"], 2);
+    for max_rows in 0..=6 {
+        let c = crate::scrollback::QueuePreviewComponent {
+            snapshot: Some(&s),
+            followup_count: 0,
+            max_rows,
+        };
+        let plan = c.plan_with_width(80);
+        assert!(plan.total_rows <= max_rows);
+        if max_rows == 1 {
+            assert!(!plan.show_summary);
+            assert_eq!(plan.entries_to_show, 0);
+        }
+        if max_rows == 2 {
+            assert_eq!(plan.entry_rows, vec![vec!["first message".to_string()]]);
+            assert_eq!(plan.hidden_count, 1);
+        }
+    }
+}
+
+#[test]
 fn queue_preview_no_summary_when_all_fit() {
     let s = snap(&["a", "b"], 2);
     let c = crate::scrollback::QueuePreviewComponent {

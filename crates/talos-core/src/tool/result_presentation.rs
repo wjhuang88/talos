@@ -99,6 +99,9 @@ pub struct ToolResult {
     pub is_error: bool,
     /// Runtime-only continuation hints for later tool presentation.
     pub continuations: Vec<ToolContinuation>,
+    /// Transient native Todo geometry; consumers must validate producer and content.
+    /// Never persisted or included in the model result text.
+    pub todo_presentation: Option<super::TodoPresentation>,
 }
 
 /// Output of an authorized tool execution that may carry a
@@ -185,6 +188,7 @@ impl ToolResult {
             content: content.into(),
             is_error: false,
             continuations: Vec::new(),
+            todo_presentation: None,
         }
     }
 
@@ -194,6 +198,7 @@ impl ToolResult {
             content: content.into(),
             is_error: true,
             continuations: Vec::new(),
+            todo_presentation: None,
         }
     }
 

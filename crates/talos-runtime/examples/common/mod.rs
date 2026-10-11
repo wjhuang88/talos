@@ -60,7 +60,7 @@ pub fn print_event(event: &SessionEvent) {
             AgentEvent::ToolCall { call, .. } => {
                 println!("  [ToolCall] {}({})", call.name, call.input)
             }
-            AgentEvent::ToolResult { result } => {
+            AgentEvent::ToolResult { result, .. } => {
                 let tag = if result.is_error { "ERROR" } else { "OK" };
                 println!("  [ToolResult] [{tag}] {}", result.content);
             }

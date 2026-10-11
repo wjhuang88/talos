@@ -60,6 +60,7 @@ fn continuation_result() -> ToolResult {
         content: "fixture".into(),
         is_error: false,
         continuations: vec![continuation],
+        todo_presentation: None,
     }
 }
 

@@ -453,6 +453,8 @@ pub struct ToolResultDisplay {
     pub tool_name: Option<String>,
     pub is_error: bool,
     pub content: String,
+    /// Validated transient native Todo geometry, absent on replay or modified text.
+    pub todo_presentation: Option<talos_core::tool::VisibleTodoPresentation>,
 }
 
 /// Scope for the `/copy` slash command.
