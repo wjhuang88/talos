@@ -2,6 +2,9 @@
 
 ## Purpose
 
+[I300](I300-structured-git-repair.md) plans handoff T7 Git permission/diff repair.
+It is Planned / Unclaimed; ADR-089 is Accepted. No implementation is activated.
+
 [I299](I299-preserved-presentation-recovery.md) is Complete / Closed through #701,
 Completion Commit `690926759229818fcec92b1487d0cffef1bf5fcb`.
 Full preflight, independent exact-head API/privacy review, all four native observations,
