@@ -305,3 +305,47 @@ refresh complete local validation, converge owner evidence, then publish one sta
 with fresh exact-head review/unfiltered CI and final CAS. C/I293 remains Active / Claimed /
 incomplete; C-V01..C-V11 remain Pending, and #643/#624 stay open. No production search behavior,
 native admission or paid selection is changed.
+
+### Accepted fixture repair and refreshed SEARCH validation (2026-10-11)
+
+Maintenance #702 merged as `72c1c0daef3597df43cf192d39bb3a2381059249` after CI3123 /
+run38116500414 completed all six jobs successfully. Inspected macOS logs confirm full unfiltered
+preflight, all eight registration tests, the original socket test and SDK default/coding; Windows
+passed workspace tests, governance/claims, audit and rebuilt CLI smoke. Both platforms' governance
+validators reported zero warnings. Independent Agent exact-head review and a separate audit of
+accepted #701/current main `69092675` found no fixture-callpath or assertion overlap; GitHub
+reported mergeable with no blocking reviews. A conflict-free local prospective merge passed all
+eight registration tests before final head/main CAS and squash merge. Shared identity was not
+represented as a second natural-person approval; the authorized single-maintainer reason is on #702.
+
+The optional prospective local build first stopped before tests because the remote object was not
+loaded locally, then reported StableCrateId/rlib failures in the shared multi-root target. Neither
+attempt is passing evidence. Cleaning only generated Talos-package artifacts, without source,
+lockfile, assertion or policy changes, preceded the successful eight-test preview. This repeats
+the existing local-build-integrity lesson in EVOLUTION; use one checkout root for final validation.
+
+The refreshed local SEARCH candidate incorporates actual accepted main `72c1c0da`, including
+independently accepted #701 and #702 changes unchanged. Against that main it still changes only
+five SEARCH test/doc files, with experiment blob `a58ddfa0` unchanged. Fresh complete SEARCH
+validation and exact-head remote review/CI/CAS are required; prior #696 evidence remains historical.
+C/I293 and all full acceptance rows remain incomplete/Pending, and #643/#624 stay open.
+
+Fresh single-root convergence: actual Rust 1.99 standard preflight passed site/installers,
+text/classifier, format, locked workspace check and strict workspace Clippy, plus zero-warning
+governance/claims. It stopped only at the unchanged OS-1 runtime socket fixture (64 passed / 1
+failed). The first authorized-filter workspace run had five existing Session elapsed-time failures;
+a prematurely started rerun after the archive guard rejected an unexpected companion-file count
+had six existing Session failures. Neither failed run is passing evidence.
+
+Read-only source/state inspection established PID/instance-derived fixture paths, reused PID 14,
+and prior pending/terminal rows. File mtimes matched this session's earlier 05:51 UTC validation
+and current failure/audit windows. Exactly 21 identified SQLite fixtures and two WAL/SHM companions
+were reversibly archived with a size/mtime/SHA256 manifest; no other PID/data was touched. The
+subsequent unchanged default-concurrency locked workspace run exited 0: **115 summaries, 3612
+passed, zero failed/ignored, one authorized socket filter**. All twelve scheduling experiments
+passed. This supports stale fixture-state reuse for this sequence, not a universal historical or
+production cause. No assertion, timeout, additional skip or CI policy changed.
+
+Network-feature experiment Clippy with `-D warnings` passed; external Runtime SDK default and
+coding modes both passed, and format/diff checks passed. Fresh exact-head remote review and
+full unfiltered CI are still required before merge; no full C acceptance follows from these checks.

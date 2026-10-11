@@ -121,7 +121,7 @@ impl EventLoop {
                     SessionEvent::TurnEvent {
                         payload:
                             TurnEventPayload::Progress {
-                                event: talos_core::message::AgentEvent::ToolResult { result },
+                                event: talos_core::message::AgentEvent::ToolResult { result, .. },
                             },
                         ..
                     } => {

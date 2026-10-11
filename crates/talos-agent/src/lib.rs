@@ -1815,6 +1815,7 @@ impl Agent {
                                 content: result.content.clone(),
                                 is_error: result.is_error,
                                 continuations: Vec::new(),
+                                todo_presentation: None,
                             };
                             tool.project_result(&execution).persistence_content
                         })

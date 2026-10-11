@@ -47,6 +47,10 @@ impl TodoCreateTool {
 
 #[async_trait]
 impl AgentTool for TodoCreateTool {
+    fn produces_todo_presentation(&self) -> bool {
+        true
+    }
+
     fn name(&self) -> &str {
         "todo_create"
     }
@@ -78,7 +82,7 @@ impl AgentTool for TodoCreateTool {
         }) {
             Ok(item) => {
                 let all = repo.list_all(self.session_id).unwrap_or_default();
-                ToolResult::success(format_mutation_result(&format_created(&item), &all))
+                format_mutation_result(format_created(&item), &all).into_result()
             }
             Err(err) => ToolResult::error(err.to_string()),
         }
@@ -132,6 +136,10 @@ impl TodoCreateBatchTool {
 
 #[async_trait]
 impl AgentTool for TodoCreateBatchTool {
+    fn produces_todo_presentation(&self) -> bool {
+        true
+    }
+
     fn name(&self) -> &str {
         "todo_create_batch"
     }
@@ -175,7 +183,7 @@ impl AgentTool for TodoCreateBatchTool {
                 let created_count = items.len();
                 let action = format!("Created {created_count} todo(s)");
                 let all = repo.list_all(self.session_id).unwrap_or_default();
-                ToolResult::success(format_mutation_result(&action, &all))
+                format_mutation_result(action.into(), &all).into_result()
             }
             Err(err) => ToolResult::error(err.to_string()),
         }
@@ -229,6 +237,10 @@ impl TodoUpdateBatchTool {
 
 #[async_trait]
 impl AgentTool for TodoUpdateBatchTool {
+    fn produces_todo_presentation(&self) -> bool {
+        true
+    }
+
     fn name(&self) -> &str {
         "todo_update_batch"
     }
@@ -284,7 +296,7 @@ impl AgentTool for TodoUpdateBatchTool {
         };
         let action = format!("Updated {updated_count} todo(s)");
         let all = repo.list_all(self.session_id).unwrap_or_default();
-        ToolResult::success(format_mutation_result(&action, &all))
+        format_mutation_result(action.into(), &all).into_result()
     }
 
     fn family(&self) -> ToolFamily {
@@ -327,6 +339,10 @@ impl TodoUpdateStatusTool {
 
 #[async_trait]
 impl AgentTool for TodoUpdateStatusTool {
+    fn produces_todo_presentation(&self) -> bool {
+        true
+    }
+
     fn name(&self) -> &str {
         "todo_update_status"
     }
@@ -357,7 +373,7 @@ impl AgentTool for TodoUpdateStatusTool {
         match repo.update_status(self.session_id, id, input.status) {
             Ok(item) => {
                 let all = repo.list_all(self.session_id).unwrap_or_default();
-                ToolResult::success(format_mutation_result(&format_updated(&item), &all))
+                format_mutation_result(format_updated(&item), &all).into_result()
             }
             Err(err) => ToolResult::error(err.to_string()),
         }
@@ -403,6 +419,10 @@ impl TodoUpdateTool {
 
 #[async_trait]
 impl AgentTool for TodoUpdateTool {
+    fn produces_todo_presentation(&self) -> bool {
+        true
+    }
+
     fn name(&self) -> &str {
         "todo_update"
     }
@@ -446,7 +466,7 @@ impl AgentTool for TodoUpdateTool {
         match repo.update(self.session_id, id, update) {
             Ok(item) => {
                 let all = repo.list_all(self.session_id).unwrap_or_default();
-                ToolResult::success(format_mutation_result(&format_updated(&item), &all))
+                format_mutation_result(format_updated(&item), &all).into_result()
             }
             Err(err) => ToolResult::error(err.to_string()),
         }
@@ -492,6 +512,10 @@ impl TodoDeleteTool {
 
 #[async_trait]
 impl AgentTool for TodoDeleteTool {
+    fn produces_todo_presentation(&self) -> bool {
+        true
+    }
+
     fn name(&self) -> &str {
         "todo_delete"
     }
@@ -525,7 +549,7 @@ impl AgentTool for TodoDeleteTool {
                     "Todo item not found (already deleted?)".to_string()
                 };
                 let all = repo.list_all(self.session_id).unwrap_or_default();
-                ToolResult::success(format_mutation_result(&action, &all))
+                format_mutation_result(action.into(), &all).into_result()
             }
             Err(err) => ToolResult::error(err.to_string()),
         }
@@ -571,6 +595,10 @@ impl TodoAddDependencyTool {
 
 #[async_trait]
 impl AgentTool for TodoAddDependencyTool {
+    fn produces_todo_presentation(&self) -> bool {
+        true
+    }
+
     fn name(&self) -> &str {
         "todo_add_dependency"
     }
@@ -602,7 +630,7 @@ impl AgentTool for TodoAddDependencyTool {
             Ok(_dep) => {
                 let action = format!("Added dependency: {} → {}", ids.parent_id, ids.child_id);
                 let all = repo.list_all(self.session_id).unwrap_or_default();
-                ToolResult::success(format_mutation_result(&action, &all))
+                format_mutation_result(action.into(), &all).into_result()
             }
             Err(err) => ToolResult::error(err.to_string()),
         }
@@ -648,6 +676,10 @@ impl TodoRemoveDependencyTool {
 
 #[async_trait]
 impl AgentTool for TodoRemoveDependencyTool {
+    fn produces_todo_presentation(&self) -> bool {
+        true
+    }
+
     fn name(&self) -> &str {
         "todo_remove_dependency"
     }
@@ -683,7 +715,7 @@ impl AgentTool for TodoRemoveDependencyTool {
                     "Dependency edge not found (already removed?)".to_string()
                 };
                 let all = repo.list_all(self.session_id).unwrap_or_default();
-                ToolResult::success(format_mutation_result(&action, &all))
+                format_mutation_result(action.into(), &all).into_result()
             }
             Err(err) => ToolResult::error(err.to_string()),
         }
@@ -729,6 +761,10 @@ impl TodoQueryTool {
 
 #[async_trait]
 impl AgentTool for TodoQueryTool {
+    fn produces_todo_presentation(&self) -> bool {
+        true
+    }
+
     fn name(&self) -> &str {
         "todo_query"
     }
@@ -758,7 +794,7 @@ impl AgentTool for TodoQueryTool {
                 tag: input.tag,
             },
         ) {
-            Ok(items) => ToolResult::success(format_query_result(&items)),
+            Ok(items) => format_query_result(&items).into_result(),
             Err(err) => ToolResult::error(err.to_string()),
         }
     }

@@ -265,6 +265,8 @@ pub(crate) mod semantic {
     use super::{Color, THEME, nord};
 
     pub(crate) const TEXT_PRIMARY: Color = THEME.text_primary;
+    /// Slight emphasis for the currently active todo, without changing its state.
+    pub(crate) const TODO_ACTIVE_FG: Color = THEME.markdown_text_strong;
     pub(crate) const TEXT_ACCENT: Color = THEME.text_accent;
     #[allow(dead_code)]
     pub(crate) const TEXT_SECONDARY_ACCENT: Color = THEME.text_secondary_accent;

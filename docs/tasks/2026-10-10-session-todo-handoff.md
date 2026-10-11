@@ -1,6 +1,6 @@
 # Next Task: Session Todo Handoff
 
-Status: Handoff received; serial execution authorized; I299 original C0 claim effective.
+Status: Handoff received; serial execution authorized; I299 ADR-088 claim effective; local implementation active.
 Responsible recipient: Codex under maintainer direction; product claims remain separate.
 Source: Maintainer requested a durable handoff and explicitly stopped further implementation in this session.
 Baseline: local `main`, HEAD `63c3ab6` (merge PR #697). Recheck HEAD and both staged/unstaged diffs before resuming.
@@ -10,11 +10,272 @@ Completion evidence: None for this long task. This document is a handoff, not an
 
 I299's original C0 claim became effective when #698 merged at `50781eab`. The
 maintainer accepted ADR-088's producer-owned, transient Todo display metadata contract;
-its cross-crate scope amendment is proposed in a separate governance-only PR and remains
-ineffective until target-branch merge. Preserved local C0 implementation stays on
+its cross-crate scope amendment #700 merged at `2f9420f95cd2db3654de463c928debe592a89845`
+after exact-head CI, independent Agent review and merge-time CAS. Preserved local C0 implementation stays on
 `feat/i299-presentation`; no implementation merge or native acceptance is claimed.
 All seven numbered deliverables below remain incomplete. The receiving session must
 still follow their full requirements, not treat this governance checkpoint as closure.
+
+### Current C0 checkpoint (supersedes earlier implementation-pending notes)
+
+Latest acceptance: the maintainer completed all four native observations on `b19fc58e`,
+ending with “符合预期，已退出”. I299 is Review / Claimed, ready for stable publication;
+the previous manual gate is satisfied. Remaining: final-head review, remote CI/CAS/merge
+and owner-first closure. The seven original deliverables remain incomplete. Earlier
+pending-human statements below are preserved checkpoint history, not current blockers.
+
+The local ADR-088 chain is now implemented from native Todo formatting through permission
+wrappers, Runtime/Agent events and ConversationEngine to TUI rendering. The migration record
+is `docs/reference/I299-TODO-PRESENTATION-MIGRATION.md`. Independent incremental dirty-tree
+review found the two previous defects resolved (orphan truncated-item highlight and missing
+real execution/export regression); this is not exact-head merge approval.
+
+`cargo test -p talos-cli --test todo_presentation_chain --locked` passed (1 test), proving
+real native Todo execution through Runtime's permission wrapper, transient UI metadata,
+unchanged durable text and both export modes against literal replay. Both governance
+validators passed with zero warnings. Native drawing/selection acceptance is still outstanding;
+the test ends at UI output. A dedicated offline fixture is being prepared at
+`crates/talos-cli/examples/i299_presentation_acceptance.rs` for that observation.
+Remaining C0 gates: final complete preflight, stable commit and independent exact-head review,
+native acceptance, remote CI/CAS/merge and owner-first closeout. No implementation has been
+published and none of the seven original deliverables is complete.
+
+Subsequent local validation: full standardized preflight exited 0 (`release preflight: passed`),
+including workspace tests and external SDK fixtures. The final I299 acceptance example's
+`--check` and targeted Clippy passed; four native human observations remain unchecked in I299.
+Stable local candidate `e96438eb84066ef178a830ea4b42edb452c78d69` subsequently received independent
+Agent API/privacy APPROVE against base `2f9420f95cd2db3654de463c928debe592a89845`.
+The full task remains active. Next: guide the four native observations before remote publication;
+stage 1 instructions have been sent, but no human result has been received. No T7 or later
+product slice is activated here. Later documentation edits do not broaden that exact-head approval.
+
+## Receiving Checkpoint And Revised Plan - 2026-10-10
+
+Current execution: I299 claim PR #698 merged at
+`50781eab529e424894d11e7b1c502fb1d0cb50f5`; implementation branch
+`feat/i299-presentation` starts from that merge. Preserved code has been reapplied locally.
+The rebuilt TUI suite passed 603 unit tests, 2 integration tests and 2 doctests. Todo
+multiline spoofing now has regression coverage; full-list decoration still needs trusted
+provenance. On 2026-10-11 the maintainer accepted ADR-088's transient, producer-owned,
+exact-text/invocation-bound metadata and API migration boundary. ADR and I299 owner record
+the acceptance; #700 establishes the expanded claim, while cross-crate implementation remains pending.
+The implementation branch is now based on `main@2f9420f9`, including #590 Auto locale work.
+Preserved TUI/process code was compared with recovery stash `4de7707f` after restoration:
+no code difference. Documentation conflicts were reconciled while retaining the full queue.
+The recovery stash retains the original staged/unstaged snapshot until candidate convergence.
+Both governance validators passed with zero warnings for #700.
+Native acceptance, full preflight and implementation
+publication remain pending. All seven original deliverables remain incomplete.
+
+This section governs the receiving session's task order. The original seven deliverables and
+earlier checkpoints below remain preserved requirements and historical evidence, not current
+claims that the checkout is dirty or the handoff is unpublished.
+
+### Goal Execution Ledger - 2026-10-10
+
+Requested outcome: close this entire handoff, including all seven original requirements and
+the preserved TUI/process integration candidate. Documentation refinement is not completion.
+Work mode: Standard. Deferred validation tracker: None; required manual acceptance remains a
+gate until the maintainer explicitly changes the work mode.
+
+Artifacts: this coordinator, each selected Story/iteration owner, implementation and tests,
+user-facing documentation, and applicable ADR/migration records. Preserve all historical
+checkpoints, raw session history, other-session branches and published acceptance.
+Synchronize product owners before derived Backlog, Board and iteration indexes.
+
+| Item | Current execution state | Required closure evidence |
+|---|---|---|
+| C0 preserved TUI/process candidate | Local integration; validation in progress | Effective ownership/authorization reconciliation, locked preflight, exact-head CI/review, merged implementation and owner evidence |
+| T7 structured Git resources/diff | Investigation; no repair committed | Real-wrapper reproduction, cause, approved/denied/escape tests, diff fidelity, protected-boundary review and delivered repair |
+| T2/T3 MODEL-014 | Unactivated; consolidated implementation/test slice | Accepted authority/schema decisions, inference/override/variant/adapter tests, walkthrough, docs and merged evidence |
+| T4 compaction policy/controls | Unactivated | Whole-request policy, safe summary replacement, failure/cancellation tests, observable status, runnable manual command and integrated evidence |
+| T5 Actor compaction/recovery | Unactivated | Safe-boundary model-callable operation, bounded authoritative history recovery, discovery/concurrency/privacy tests and merged evidence |
+| T1 validate/agile tools | Unactivated | Shared services, supported read-only agile summary, gated bounded validation execution, discovery/failure tests and docs |
+| T6 memory parameter | Unactivated | Retained default, explicit units/range/inheritance, foreground/background/composition coverage, platform truth and security review |
+
+Execution environment: pinned Rust 1.99.0; receiving workspace has no `target/` cache and
+approximately 14 GiB available at validation start. Standard preflight started with
+`CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1`.
+These resource settings do not omit any preflight phase or weaken process permissions.
+Site and installer checks passed; remaining phases have no result yet.
+
+External authorization: the maintainer accepted the consolidated contract on 2026-10-10:
+serial implementation, stable-candidate commits/pushes, necessary claim/implementation PRs,
+independent subagent review and gated merges. Human acceptance and new ADR decisions return
+to the maintainer. Release, deletion of other-session branches, paid probing and security
+waivers are excluded. No new product implementation is committed before an effective claim.
+
+Branch/checkpoint plan: preserve the existing four commits unchanged; publish them through one
+reviewable recovery candidate rather than directly pushing local main. New governed slices start
+from their effective claim merge. Use this checkout serially; no extra worktree is required.
+Append actual commands, heads, reviews and closure evidence before moving to each next phase.
+Resource policy: single-concurrency, debug-free local builds; monitor free space, stop before
+disk exhaustion and seek approval for destructive cache cleanup. No paid or sensitive live
+provider test. Retry a failed gate only after inspecting its cause; never waive it for progress.
+Fallback: keep the affected item non-terminal with its owner and diagnosis; independent work may
+proceed only when its dependencies, overlap checks and explicit scheduling authorization hold.
+
+Initial T7 source finding: `GitAddTool` uses the default permission profile, which constructs an
+untyped Write facet; `compile_proposal` requires a supported typed resource for consequential
+facets. This explains a plausible rejection path but is not yet a verified real-wrapper
+reproduction or a complete assessment of related Git tools/pathspec behavior.
+
+Read-only T7 follow-up on `e96438eb` (2026-10-11; no activation or code change):
+
+- `crates/talos-tools/src/git_write.rs` confirms `GitAddTool` has no permission-profile
+  override; the default in `talos-core` supplies Write without resource kind/value.
+  `talos-permission/src/grant.rs` rejects consequential untyped facets when compiling a grant
+  proposal. This matches the recorded error, but active-binary identity and real-wrapper
+  reproduction remain mandatory before claiming the production root cause verified.
+- The same Git add implementation appends caller path strings directly after `git add`,
+  without an option terminator or literal-pathspec boundary. A repair must bind the actual
+  staging effect to approved resources, including option-looking names, Git pathspec syntax,
+  repository/workspace root differences, symlinks and linked worktree index locations.
+  Do not merely mark every request as a workspace-wide write.
+- `GitDiffTool` enumerates index/worktree status for both modes, while reading HEAD as the
+  old side for both. The existing `git_diff_staged_shows_head_vs_index` regression explicitly
+  adds a second unstaged edit so the iterator sees the file. It therefore does not prove the
+  staged-only case. Add independent staged-only, unstaged-only, mixed, new/deleted and binary
+  fixtures; compare staged HEAD/index and default index/worktree semantics separately.
+- These are source facts and test-coverage findings, not a successful execution reproduction
+  or a delivered fix. Retain the original scope, permission gates and independent security
+  review; do not mix this implementation into I299. I299 still awaits four human observations.
+
+Recovery: refresh Git/PR state, inspect the live preflight process before restarting any build,
+record its actual exit result, then resolve C0 ownership and publication gates. Residuals stay
+in their original requirement row; none may be silently dropped to close this coordinator.
+
+### Integration And Validation Truth
+
+- Maintainer requested integrating the preservation branch and reorganizing the handoff.
+  Local `main` fast-forwarded from `e58e2678` to `385a2d6a`; no remote-main push or
+  validated remote merge is claimed. The four preserved commits remain unchanged.
+- Existing TUI/process-tool code is an integration candidate, not completed delivery.
+  Prior focused tests and Clippy passed, but prior full workspace validation failed during
+  CLI compilation. Exact-head remote CI/review and applicable ownership reconciliation remain
+  required before publishing the integrated code to remote main.
+- The receiving shell reports unlimited virtual-address-space limit and approximately 19 GiB
+  free disk. This does not establish the earlier allocation failure's cause. Do not weaken
+  process hardening or require the memory-parameter feature merely to run validation.
+- Receiving preflight passed site, installer, SQLite-consumer, workflow and project-governance
+  checks before being deliberately stopped for this documentation-only refinement. It is NOT
+  a completed workspace preflight or code-validation result.
+- The structured Git permission defect and staged-diff discrepancy remain unresolved. Earlier
+  host-Git publication succeeded; publication recovery is no longer a pending deliverable.
+  Repair the actual Talos wrapper, not this receiving session's unrelated development tools.
+
+### Research Findings That Change The Plan
+
+1. **LLM compaction already runs in production paths.** `session.rs` calls
+   `Compactor::compact(..., self.agent.provider())` in both runtime-managed and compatibility
+   submission paths. MEM-003's statement that layers 4/5 are unwired is stale. Preserve its
+   original acceptance, append corrected current facts, and verify missing integration evidence
+   rather than implementing a second provider wiring path or declaring MEM-003 Complete.
+2. **Current trigger is not whole-request pressure.** `should_compact` estimates history against
+   80% of model context; prompt/tool definitions and request output reservation belong to the
+   separate request-admission calculation. I298 fixes request estimates and bounded overflow
+   recovery, not semantic checkpoint policy. Reuse its admission authority; do not add another
+   token-budget authority or reopen completed I298 scope.
+3. **Summary failure handling needs verification before expansion.** The current summary reader
+   collects text deltas, does not explicitly fail on streamed error events, and substitutes
+   `[No summary generated]` when empty. Test error-only, partial-text-then-error, cancellation,
+   oversized output and failed terminal outcome. An invalid summary must not replace usable
+   history; provider failures must remain observable. This is a source-inspection risk, not a
+   reproduced production data-loss incident.
+4. **Manual API is not a user command.** `manual_compact` exists with unit tests, but inspection
+   found no registered `/compact` command or Actor-owned model-callable compaction operation.
+5. **Existing summaries lack the target semantic contract.** Layers 4/5 use an unstructured
+   summary projected as `Message::User`. Issue #390 proposes structured model-directed
+   checkpoints and bounded current-session history recovery. Coordinate provenance/summary
+   representation with SESSION-011/#612 rather than silently changing transcript semantics.
+6. **Pre-entry compression is separate work.** MEM-007 has default-off deterministic Bash
+   compression with raw UI/export evidence. Other tool strategies, cross-turn dedup and
+   representative measurements remain open; #143 owns related Bash/PowerShell filtering.
+   Do not bundle those expansions into compaction-policy completion.
+7. **Chat thinking transport is proven for one test.** A non-sensitive arithmetic request to
+   the currently configured Codex custom endpoint using `gpt-6-astra`, Chat Completions and
+   `reasoning_effort=low` returned HTTP 200 with nonempty `delta.reasoning_content` (20 characters)
+   and reported 13 reasoning tokens. Talos parses this field. Lack of Responses support alone
+   does not explain absent thinking. Reproduce through actual Talos request/config/UI paths;
+   this observation neither verifies every gateway capability nor authorizes active probing.
+
+### Consolidated Serial Queue
+
+| Order | Deliverable / existing ownership | Original tasks | Exit evidence |
+|---|---|---|---|
+| 0 | Close out the preserved TUI/process integration candidate | Existing local work | Reconcile owner/authorization, review diff, reproduce focused tests, complete locked preflight and obtain exact-head CI/review before remote-main delivery; retain a separate rollback path |
+| 1 | Repair structured Git permission resources and inspect diff fidelity | 7 | Actual wrapper reproduction, root cause, approved/denied/escape regression tests and independent security review; do not repeat already-completed handoff publication |
+| 2 | Custom-model metadata, variant and thinking-path consistency / MODEL-014 | 2 + 3 | Accepted capability precedence; explicit false overrides preserved; unique/ambiguous/unknown matching tests; protocol-compatible output/reasoning/image behavior, provenance display and real Talos walkthrough |
+| 3 | Reliable compaction policy and controls / MEM-005, MEM-003, #390 | 4 | Whole-request budget integration; valid-summary-only atomic replacement; cancellation/fallback; observable before/after and skip/failure; typed `/compact`; long-session integration evidence with recoverable raw history |
+| 4 | Actor-owned model-directed checkpoint and history recovery / #390 | 5 | Bounded schema, session/branch references, safe-boundary application, pressure eligibility, tool discovery, cancellation/concurrency tests and bounded private-history recovery; no second transcript store |
+| 5 | Model-callable validation and read-only agile summary | 1 | Shared business service, typed schemas, permission-gated host execution with deadlines/cancellation/output limits, failure tests and tool documentation; do not imply unsupported agile mutations |
+| 6 | Explicit subprocess memory-limit parameter | 6 | Units/range/default/inheritance specified; 2 GiB default retained; all supported foreground/background paths tested; honest platform enforcement and independent process-security review |
+
+Tasks 2/3 from the original handoff form one implementation-and-regression slice, not two PR
+loops. Compaction stages 3/4 share the MEM-005/#390 roadmap; separate candidates only when
+they are independently runnable and claims/acceptance warrant it. Local corrections, tests and
+documentation updates stay within their candidate. Do not create an Issue per checklist item.
+
+### Compaction Acceptance And Scope Boundaries
+
+- Runtime owns hard admission and safe application; the model owns semantic retention.
+  Checkpoint fields must retain goal, user constraints, decisions, completed/pending work,
+  unresolved failures and next steps with bounded source references.
+- Keep recent complete tool exchanges and instructions; never replay tools as a compression
+  side effect. In-flight batches cannot mutate Actor history directly.
+- Checkpoint provenance must identify covered raw history across repeated checkpoints;
+  summary-of-summary must not become the only recoverable evidence.
+- Preserve raw durable history and stable prompt prefix. Exclude hidden reasoning, private
+  arguments and UI-only output from model-visible recovery unless separately authorized.
+- A TLOG archive marker is storage metadata, not proof of a usable semantic checkpoint.
+- Trigger/target/reservation and observability require initial, continuation, manual,
+  irreducible-budget and missing-usage tests. A successful request after truncation alone does
+  not satisfy semantic preservation acceptance.
+- MEM-007 broader compression, #143 filters, cross-session memory and complete SESSION-011
+  rearchitecture are dependencies or residual owners, not implicit scope additions.
+
+### Existing Iteration Disposition
+
+Receiving inventory of explicit non-terminal iteration headers and open PRs:
+
+| Owner | Observed state | Disposition |
+|---|---|---|
+| I291 / #682 | Review; open Auto locale PR | Other-session work; retain, do not modify or merge under this handoff |
+| I293 / #696 | Active; open Search router PR | Other-session work; retain and recheck overlap before activation |
+| I294 | Active; native Search evidence | Retain external ownership; no takeover; historical #693 wording may need its owner's refresh |
+| I290 | Review; locale baseline | Retain published evidence and follow-up relation to I291; no duplicate locale implementation |
+| I277 | Review; remaining human acceptance Deferred | Keep deferred device/accessibility acceptance with its existing owner |
+| I249 | Planned / Unclaimed | Keep dependency pilot deferred; no dependency upgrade in this queue |
+| I296 / I297 / I298 | Terminal owners; claims closed | Preserve completion evidence; never reuse closed claims for these expanded tasks |
+
+No new iteration or product Collaboration Claim is activated by this plan. Before each selected
+slice, refresh main, all owner statuses and open PRs; record any additional non-terminal owner
+found by full activation inventory and establish the required effective claim. This task document
+coordinates the queue; Story owners remain authoritative for product scope and completion.
+
+### Next Action And Documentation Closure
+
+First finish the preserved code candidate's validation/ownership path. Then prepare the bounded
+Git defect scope, followed by MODEL-014 and the unified MEM-005/#390 sequence above. Decisions
+about capability authority, checkpoint representation and public API changes must be recorded
+before implementation. No release, tag, Issue closure or remote-main direct push is authorized
+by a planning checkpoint.
+
+This refinement changes only the coordination document. Product owner statuses, historical
+acceptance and completion evidence remain unchanged. Run documentation/governance validators
+and diff checks for this edit, not a Rust rebuild. Remaining code-validation and claim gates
+are registered above rather than hidden behind a Complete status.
+
+## Latest Preservation Checkpoint
+
+The maintainer subsequently requested committing and pushing all remaining worktree changes. The receiving agent should use branch `handoff/session-worktree-20261010`, not only `main`, to recover the complete work. The earlier dirty-worktree statements below are historical snapshots.
+
+- `e58e2678`: handoff and recovery documents; successfully pushed to `origin/main`.
+- `0a0622c0`: existing TUI activity, queue and result-rendering changes plus regressions.
+- `3af78f04`: process-tool summary fields and regression assertion.
+- `1bda5181`: MODEL-014 intake and related owner/index references.
+
+The last three commits are preserved on the handoff branch; this checkpoint accompanies their push. Verify remote branch state before resuming. No merge into main, feature activation, claim repair, or completion of tasks 1-7 is implied. Full workspace validation remains blocked by the previously recorded CLI compilation allocation failure. Both governance validators were rerun successfully, and the process-tool filtered agent suite passed 5 tests. The structured Git mutation defect remains unresolved; staging/commit/push used the maintainer-authorized host Git fallback. Read-only structured staged-diff output also disagreed with host Git during this operation (reporting the untracked MODEL-014 file instead of the staged code); inspect that separately when investigating task 7.
 
 ## Start Here
 
@@ -170,6 +431,37 @@ Failed:
 Correction to earlier checkpoint: preflight failure stage was initially unknown because only part of the output was read. Continued cursor reads established the above test-compilation failure; use this document as the latest evidence. The jobs are terminated naturally; no live build remains.
 
 Known fact: the source hardening default is 2 GiB and the current model-visible bash/exec schemas expose no override. Inference only: inherited address-space restriction may explain the allocation failure. Physical memory pressure versus RLIMIT/cgroup/other limits was not measured. Verify the actual execution process limits and memory pressure; do not report 2 GiB as proven root cause or weaken sandbox/permissions to get a green build. A trusted environment with sufficient address space may unblock validation before the memory-parameter feature is delivered.
+
+## Resumed Verification Checkpoint
+
+- Full standardized preflight passed on local candidate
+  `0b396c48865b74e4cf3e7d0f711ccb208f264afd` (2026-10-10):
+  `CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 ./scripts/release_preflight.sh`.
+  This includes workspace check, Clippy, tests/doctests, both governance validators
+  with zero warnings, and the independent Runtime SDK fixture in default and coding configurations.
+  The process exited 0; no build remains running. Earlier allocation failures did
+  not recur, but their root cause remains unproven.
+- Independent preserved-work review found a display-only Todo defect:
+  `tool_display.rs` recognizes status rows by textual prefixes, so a multiline
+  description containing `  [~] literal checklist` can be incorrectly rewritten
+  and highlighted. C0 must repair contextual recognition and cover multiline
+  titles/descriptions, including head/tail truncation, before delivery.
+  This review is not merge approval; native acceptance remains outstanding.
+- Follow-up source inspection confirms both `item.title` and `description` are
+  interpolated without newline escaping in `talos-session/src/todo/formatting.rs`.
+  A suffix/UUID regex alone cannot establish row provenance: user text can mimic
+  that suffix or even a list header. The fix must preserve the raw transcript and
+  avoid interpreting ambiguous user-authored continuation text as status metadata.
+  Regression coverage must include forged list headers and UUID-shaped suffixes,
+  not only ordinary multiline descriptions; evaluate producer-provided display
+  provenance versus conservative rendering before choosing the implementation.
+- Autonomous serial implementation and gated publication are authorized. On
+  2026-10-10 the maintainer explicitly confirmed non-overlapping parallel work
+  with other sessions' Active I293/I294. This queue remains internally serial;
+  other-session ownership and branches remain untouched. Each new slice still
+  requires its effective target-branch claim before committed implementation.
+- This checkpoint records verification only. It does not complete C0 or any of
+  the seven requirements, establish an effective claim, or authorize a release.
 
 ## Delivery And Documentation Gates
 

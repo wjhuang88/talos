@@ -579,6 +579,7 @@ mod tests {
             .expect("operation should succeed");
         agent_tx
             .send(AgentEvent::ToolResult {
+                todo_presentation: None,
                 result: talos_core::message::MessageToolResult {
                     tool_use_id: "tc-1".to_string(),
                     content: "ok".to_string(),

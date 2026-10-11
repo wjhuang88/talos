@@ -118,7 +118,7 @@ async fn collect(runtime: &mut RuntimeHandle) -> Result<bool> {
                     tool_call = true;
                 }
                 TurnEventPayload::Progress {
-                    event: AgentEvent::ToolResult { result },
+                    event: AgentEvent::ToolResult { result, .. },
                 } => {
                     ensure!(result.tool_use_id == "fixture-call");
                     ensure!(

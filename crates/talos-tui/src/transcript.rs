@@ -143,6 +143,7 @@ mod tests {
     #[test]
     fn tool_result_transcript_is_independent_of_current_viewport_width() {
         let display = ToolResultDisplay {
+            todo_presentation: None,
             tool_name: Some("bash".to_string()),
             is_error: false,
             content: "你好\nlong result line".to_string(),

@@ -392,28 +392,29 @@ pub(crate) fn build_tool_result_scrollback_lines(
         return build_head_tail_scrollback_lines(display, &all_lines, icon, color, viewport_width);
     }
 
-    let diff_aware = is_diff_content(&display.content, display.tool_name.as_deref());
+    let diff_aware =
+        !display.is_error && is_diff_content(&display.content, display.tool_name.as_deref());
     let mut lines = Vec::with_capacity(all_lines.len());
     for (idx, line) in all_lines.iter().enumerate() {
-        let wrapped = crate::scrollback::wrap_to_display_width(line, budget);
-        let (line_color, attrs) = if diff_aware {
-            diff_line_style(line).unwrap_or_else(|| result_line_style(display, idx, color))
-        } else {
-            result_line_style(display, idx, color)
-        };
+        let (line, active_todo) = todo_display_line(display, line, idx);
+        let wrapped = crate::scrollback::wrap_to_display_width(&line, budget);
+        let (line_color, attrs, bg) =
+            displayed_result_style(display, &line, idx, color, diff_aware, active_todo);
+        let fill = bg.map(|_| HistorySegment::styled(" ", line_color, attrs));
         for (sub_idx, sub_line) in wrapped.iter().enumerate() {
             let prefix = if sub_idx == 0 {
                 result_line_prefix(icon, idx == 0)
             } else {
                 result_line_prefix(icon, false)
             };
-            lines.push(ScrollbackLine::styled(
+            lines.push(ScrollbackLine::styled_with_fill(
                 vec![HistorySegment::styled(
                     format!("{prefix}{sub_line}"),
                     line_color,
                     attrs,
                 )],
-                None,
+                bg,
+                fill.clone(),
             ));
         }
     }
@@ -432,18 +433,24 @@ fn build_head_tail_scrollback_lines(
     let budget = (viewport_width as usize).saturating_sub(prefix_len).max(20);
     let secondary = secondary_result_color();
     let mut lines = Vec::with_capacity(HEAD_LINES + 1 + TAIL_LINES);
+    let diff_aware =
+        !display.is_error && is_diff_content(&display.content, display.tool_name.as_deref());
 
     for (idx, line) in all_lines.iter().take(HEAD_LINES).enumerate() {
-        let wrapped = crate::scrollback::wrap_to_display_width(line, budget);
-        let (line_color, attrs) = result_line_style(display, idx, color);
+        let (line, active_todo) = todo_display_line(display, line, idx);
+        let wrapped = crate::scrollback::wrap_to_display_width(&line, budget);
+        let (line_color, attrs, bg) =
+            displayed_result_style(display, &line, idx, color, diff_aware, active_todo);
+        let fill = bg.map(|_| HistorySegment::styled(" ", line_color, attrs));
         for sub_line in &wrapped {
-            lines.push(ScrollbackLine::styled(
+            lines.push(ScrollbackLine::styled_with_fill(
                 vec![HistorySegment::styled(
                     format!("{}{sub_line}", result_line_prefix(icon, idx == 0)),
                     line_color,
                     attrs,
                 )],
-                None,
+                bg,
+                fill.clone(),
             ));
         }
     }
@@ -462,21 +469,21 @@ fn build_head_tail_scrollback_lines(
     ));
 
     let tail_start = all_lines.len().saturating_sub(TAIL_LINES);
-    for line in all_lines.iter().skip(tail_start) {
-        let wrapped = crate::scrollback::wrap_to_display_width(line, budget);
-        let (line_color, attrs) = if display.is_error {
-            (color, primary_result_attrs())
-        } else {
-            (secondary, secondary_result_attrs())
-        };
+    for (index, line) in all_lines.iter().enumerate().skip(tail_start) {
+        let (line, active_todo) = todo_display_line(display, line, index);
+        let wrapped = crate::scrollback::wrap_to_display_width(&line, budget);
+        let (line_color, attrs, bg) =
+            displayed_result_style(display, &line, tail_start, color, diff_aware, active_todo);
+        let fill = bg.map(|_| HistorySegment::styled(" ", line_color, attrs));
         for sub_line in &wrapped {
-            lines.push(ScrollbackLine::styled(
+            lines.push(ScrollbackLine::styled_with_fill(
                 vec![HistorySegment::styled(
                     format!("{}{sub_line}", result_line_prefix(icon, false)),
                     line_color,
                     attrs,
                 )],
-                None,
+                bg,
+                fill.clone(),
             ));
         }
     }
@@ -484,6 +491,109 @@ fn build_head_tail_scrollback_lines(
     lines
 }
 
+/// Presentation-only projection of the stable native todo text format. Never
+/// rewrite descriptions, arbitrary checkboxes in other tools, or error output.
+fn todo_display_line<'a>(
+    display: &ToolResultDisplay,
+    line: &'a str,
+    index: usize,
+) -> (std::borrow::Cow<'a, str>, bool) {
+    if display.is_error {
+        return (line.into(), false);
+    }
+    let Some(spans) = display
+        .todo_presentation
+        .as_ref()
+        .and_then(|metadata| metadata.spans_for(&display.content))
+    else {
+        return (line.into(), false);
+    };
+    // Resolve original byte positions before wrapping/truncation. No line prefix,
+    // UUID or header can introduce a new trusted item.
+    let start: usize = display
+        .content
+        .split_inclusive('\n')
+        .take(index)
+        .map(str::len)
+        .sum();
+    let Some(end) = start.checked_add(line.len()) else {
+        return (line.into(), false);
+    };
+    if display.content.get(start..end) != Some(line) {
+        return (line.into(), false);
+    }
+    let active = spans.iter().any(|span| {
+        span.status == talos_core::tool::TodoDisplayStatus::InProgress
+            && span.item_range.start < end
+            && span.item_range.end > start
+            && {
+                let total_lines = display.content.lines().count();
+                let status_line = display.content[..span.status_range.start]
+                    .bytes()
+                    .filter(|byte| *byte == b'\n')
+                    .count();
+                total_lines <= SUMMARIZE_OUTPUT_THRESHOLD_LINES
+                    || status_line < HEAD_LINES
+                    || status_line >= total_lines.saturating_sub(TAIL_LINES)
+            }
+    });
+    if let Some(span) = spans
+        .iter()
+        .find(|span| span.status_range.start >= start && span.status_range.end <= end)
+    {
+        let local_start = span.status_range.start - start;
+        let local_end = span.status_range.end - start;
+        let mut projected = line.to_owned();
+        projected.replace_range(
+            local_start..local_end,
+            &crate::app::status_display(span.status.source_text()),
+        );
+        return (projected.into(), active);
+    }
+    (line.into(), active)
+}
+
+fn displayed_result_style(
+    display: &ToolResultDisplay,
+    line: &str,
+    index: usize,
+    color: Option<CColor>,
+    diff_aware: bool,
+    active_todo: bool,
+) -> (Option<CColor>, HistoryAttrs, Option<CColor>) {
+    if active_todo {
+        return (
+            to_crossterm_color(semantic::TODO_ACTIVE_FG),
+            HistoryAttrs::default(),
+            None,
+        );
+    }
+    if diff_aware {
+        // Terminal backgrounds have no alpha channel. These theme tints provide
+        // the subdued overlay appearance, without changing the source result.
+        if display.tool_name.as_deref() == Some("edit") {
+            let bg = if line.starts_with('+') && !line.starts_with("+++") {
+                Some(semantic::DIFF_ADDED_BG)
+            } else if line.starts_with('-') && !line.starts_with("---") {
+                Some(semantic::DIFF_REMOVED_BG)
+            } else {
+                None
+            };
+            if let Some(bg) = bg {
+                return (
+                    to_crossterm_color(semantic::TEXT_PRIMARY),
+                    HistoryAttrs::default(),
+                    to_crossterm_color(bg),
+                );
+            }
+        }
+        if let Some((fg, attrs)) = diff_line_style(line) {
+            return (fg, attrs, None);
+        }
+    }
+    let (fg, attrs) = result_line_style(display, index, color);
+    (fg, attrs, None)
+}
 fn is_diff_content(content: &str, tool_name: Option<&str>) -> bool {
     match tool_name {
         Some("edit") | Some("diff") => true,
@@ -671,6 +781,7 @@ mod tests {
             summary_fields: vec![],
         });
         let outputs = engine.handle_agent_event(&AgentEvent::ToolResult {
+            todo_presentation: None,
             result: MessageToolResult {
                 tool_use_id: "call-1".into(),
                 content: result.into(),
@@ -720,6 +831,7 @@ mod tests {
     #[test]
     fn tool_result_success_single_line_rendering() {
         let display = ToolResultDisplay {
+            todo_presentation: None,
             tool_name: Some("test_tool".to_string()),
             content: "output line".to_string(),
             is_error: false,
@@ -737,6 +849,7 @@ mod tests {
     #[test]
     fn background_start_is_projected_without_raw_json() {
         let display = ToolResultDisplay {
+            todo_presentation: None,
             tool_name: Some("background:bash".to_string()),
             content: r#"{"job_id":"job_1","state":"running","deadline_secs":30}"#.to_string(),
             is_error: false,
@@ -750,6 +863,7 @@ mod tests {
     #[test]
     fn background_process_read_is_projected_with_cursor() {
         let display = ToolResultDisplay {
+            todo_presentation: None,
             tool_name: Some("background:process".to_string()),
             content: r#"{"job_id":"job_1","state":"running","events":[{"stream":"stderr","text":"warning"}],"next_cursor":7,"eof":false}"#.to_string(),
             is_error: false,
@@ -765,6 +879,7 @@ mod tests {
     #[test]
     fn terminal_process_result_is_neutral_and_omits_raw_output() {
         let display = ToolResultDisplay {
+            todo_presentation: None,
             tool_name: Some("background:process".to_string()),
             content: r#"{"job_id":"job_1","state":"cancelled","events":[{"stream":"stderr","text":"secret-token"}],"next_cursor":7,"eof":true}"#.to_string(),
             is_error: false,
@@ -831,6 +946,7 @@ mod tests {
     #[test]
     fn foreground_json_shape_is_not_projected_as_background() {
         let display = ToolResultDisplay {
+            todo_presentation: None,
             tool_name: Some("bash".to_string()),
             content: r#"{"job_id":"job_1","state":"running"}"#.to_string(),
             is_error: false,
@@ -842,6 +958,7 @@ mod tests {
     #[test]
     fn tool_result_error_rendering_unchanged() {
         let display = ToolResultDisplay {
+            todo_presentation: None,
             tool_name: Some("test_tool".to_string()),
             content: "error line".to_string(),
             is_error: true,
@@ -858,6 +975,7 @@ mod tests {
     #[test]
     fn tool_result_success_special_cases_rendering() {
         let display_empty = ToolResultDisplay {
+            todo_presentation: None,
             tool_name: Some("test_tool".to_string()),
             content: "".to_string(),
             is_error: false,
@@ -871,6 +989,7 @@ mod tests {
         assert!(!lines_empty[0].segments[0].attrs.bold);
 
         let display_suppressed = ToolResultDisplay {
+            todo_presentation: None,
             tool_name: Some("read".to_string()),
             content: "line 1\nline 2".to_string(),
             is_error: false,
@@ -887,6 +1006,7 @@ mod tests {
     #[test]
     fn tool_result_edit_diff_gets_semantic_styling() {
         let display = ToolResultDisplay {
+            todo_presentation: None,
             tool_name: Some("edit".to_string()),
             content: "edited src/main.rs\ndiff:\n- old line\n+ new line".to_string(),
             is_error: false,
@@ -900,22 +1020,22 @@ mod tests {
         // "diff:" — not a diff line, default styling
         assert_eq!(lines[1].segments[0].fg, secondary_result_color());
 
-        // "- old line" — removed, red foreground
-        assert_eq!(
-            lines[2].segments[0].fg,
-            to_crossterm_color(semantic::TEXT_ERROR)
-        );
-
-        // "+ new line" — added, green foreground
-        assert_eq!(
-            lines[3].segments[0].fg,
-            to_crossterm_color(semantic::TEXT_SUCCESS)
-        );
+        // Keep normal text contrast; only backgrounds distinguish changes.
+        for line in &lines[2..] {
+            assert_eq!(
+                line.segments[0].fg,
+                to_crossterm_color(semantic::TEXT_PRIMARY)
+            );
+        }
+        assert_eq!(lines[2].bg, to_crossterm_color(semantic::DIFF_REMOVED_BG));
+        assert_eq!(lines[3].bg, to_crossterm_color(semantic::DIFF_ADDED_BG));
+        assert!(lines[..2].iter().all(|line| line.bg.is_none()));
     }
 
     #[test]
     fn tool_result_unified_diff_gets_semantic_styling() {
         let display = ToolResultDisplay {
+            todo_presentation: None,
             tool_name: Some("git_diff".to_string()),
             content: "diff --git a/foo b/foo\n--- a/foo\n+++ b/foo\n@@ -1 +1 @@\n-old\n+new\n context line".to_string(),
             is_error: false,
@@ -940,6 +1060,7 @@ mod tests {
     #[test]
     fn tool_result_prose_with_dash_not_styled_as_diff() {
         let display = ToolResultDisplay {
+            todo_presentation: None,
             tool_name: Some("bash".to_string()),
             content: "- this is a bullet\n+ another bullet\nnormal text".to_string(),
             is_error: false,
@@ -991,6 +1112,7 @@ mod tests {
     #[test]
     fn schedule_list_buffer_renders_at_all_widths() {
         let display = ToolResultDisplay {
+            todo_presentation: None,
             tool_name: Some("list_scheduled_tasks".to_string()),
             content: "2 active task(s):\n  sched_1 | one-shot | next: 45s\n  sched_2 | recurring (30s) | next: 12s".to_string(),
             is_error: false,
@@ -1016,6 +1138,7 @@ mod tests {
     #[test]
     fn schedule_cancelled_buffer_renders_at_all_widths() {
         let display = ToolResultDisplay {
+            todo_presentation: None,
             tool_name: Some("cancel_scheduled_task".to_string()),
             content: "Task sched_1 cancelled. No further fires will occur.".to_string(),
             is_error: false,
@@ -1037,6 +1160,7 @@ mod tests {
     #[test]
     fn schedule_not_found_buffer_renders_at_all_widths() {
         let display = ToolResultDisplay {
+            todo_presentation: None,
             tool_name: Some("cancel_scheduled_task".to_string()),
             content: "Task sched_99 not found or already completed.".to_string(),
             is_error: false,
@@ -1058,6 +1182,7 @@ mod tests {
     #[test]
     fn schedule_unavailable_buffer_renders_at_all_widths() {
         let display = ToolResultDisplay {
+            todo_presentation: None,
             tool_name: Some("cancel_scheduled_task".to_string()),
             content: "scheduler is not available".to_string(),
             is_error: true,
@@ -1079,6 +1204,7 @@ mod tests {
     #[test]
     fn schedule_empty_list_buffer_renders_at_all_widths() {
         let display = ToolResultDisplay {
+            todo_presentation: None,
             tool_name: Some("list_scheduled_tasks".to_string()),
             content: "No active scheduled tasks.".to_string(),
             is_error: false,
@@ -1099,6 +1225,7 @@ mod tests {
     fn long_line_visible_at_wide_viewport_without_ellipsis() {
         let long = "a".repeat(140);
         let display = ToolResultDisplay {
+            todo_presentation: None,
             tool_name: Some("bash".to_string()),
             content: long.clone(),
             is_error: false,
@@ -1116,6 +1243,7 @@ mod tests {
     fn long_line_wraps_to_continuation_rows_at_narrow_viewport() {
         let long = "a".repeat(200);
         let display = ToolResultDisplay {
+            todo_presentation: None,
             tool_name: Some("bash".to_string()),
             content: long,
             is_error: false,
@@ -1136,6 +1264,7 @@ mod tests {
     #[test]
     fn cjk_output_wraps_at_display_width_boundary() {
         let display = ToolResultDisplay {
+            todo_presentation: None,
             tool_name: Some("bash".to_string()),
             content: "你好".repeat(50),
             is_error: false,
@@ -1159,6 +1288,7 @@ mod tests {
             .collect::<Vec<_>>()
             .join("\n");
         let display = ToolResultDisplay {
+            todo_presentation: None,
             tool_name: Some("bash".to_string()),
             content,
             is_error: false,
@@ -1189,6 +1319,281 @@ mod tests {
     }
 
     // TUI-035 Fix 1: tool-call summary is viewport-width-aware.
+
+    #[test]
+    fn process_arguments_use_readable_fields_for_each_action() {
+        for action in ["read", "status", "list", "cancel"] {
+            let arguments = if action == "list" {
+                serde_json::json!({"action": action})
+            } else {
+                serde_json::json!({"action": action, "job_id": "job_example", "cursor": 12,
+                    "max_bytes": 2000, "wait_ms": 1000})
+            };
+            let display = ToolCallDisplay {
+                tool_name: "process".into(),
+                arguments,
+                provenance: ToolProvenance::Native,
+                summary_fields: crate::scrollback::summary_fields_for("process"),
+            };
+            let summary = summarize_tool_args(
+                "process",
+                &display.arguments.to_string(),
+                &display.summary_fields,
+            );
+            if action != "list" {
+                assert!(summary.contains("job_id: job_example"));
+            }
+            for width in [40, 80, 160] {
+                let lines = build_tool_call_scrollback_lines(&display, width);
+                let text = lines
+                    .iter()
+                    .map(|line| line.text.as_str())
+                    .collect::<String>();
+                assert!(text.contains(&format!("action: {action}")));
+                assert!(!text.contains('{') && !text.contains('"'));
+            }
+        }
+    }
+
+    #[test]
+    fn todo_tool_status_glyphs_and_highlight_are_display_only() {
+        let content = "Updated: [~] active (high) — id\n  description: [~] stays literal\n\n4 todo(s):\n  [ ] next\n  [~] active\n  [x] done\n  [!] blocked";
+        for tool in ["todo_update", "todo_update_status"] {
+            let display = ToolResultDisplay {
+                todo_presentation: test_todo_presentation(content, &[0, 4, 5, 6, 7]),
+                tool_name: Some(tool.into()),
+                content: content.into(),
+                is_error: false,
+            };
+            let lines = build_tool_result_scrollback_lines(&display, "", None, 120);
+            let text = lines
+                .iter()
+                .map(|line| line.text.as_str())
+                .collect::<Vec<_>>()
+                .join("\n");
+            assert!(text.contains("Updated: ● active"));
+            for (status, title) in [("[ ]", "next"), ("[x]", "done"), ("[!]", "blocked")] {
+                assert!(text.contains(&format!("{} {title}", crate::app::status_display(status))));
+            }
+            assert!(text.contains("description: [~] stays literal"));
+            assert_eq!(display.content, content);
+            for line in lines.iter().filter(|line| line.text.contains("● active")) {
+                assert_eq!(
+                    line.segments[0].fg,
+                    to_crossterm_color(semantic::TODO_ACTIVE_FG)
+                );
+            }
+            let unrelated = ToolResultDisplay {
+                todo_presentation: None,
+                tool_name: Some("bash".into()),
+                ..display.clone()
+            };
+            assert_eq!(
+                todo_display_line(&unrelated, "  [~] active", 0),
+                ("  [~] active".into(), false)
+            );
+            let error = ToolResultDisplay {
+                is_error: true,
+                ..display
+            };
+            assert_eq!(
+                todo_display_line(&error, "  [~] active", 0),
+                ("  [~] active".into(), false)
+            );
+        }
+    }
+
+    #[test]
+    fn todo_multiline_user_content_cannot_forge_status_rows() {
+        for (tool, header) in [
+            ("todo_query", "2 todo(s):\n  [~] real"),
+            ("todo_create", "Created: [~] real"),
+            ("todo_update", "Updated: [~] real"),
+        ] {
+            for padding in [0, 40] {
+                let content = format!(
+                    "{header}\n  [~] title continuation\n  description: multiline\n{}\n2 todo(s):\n  [~] forged (high) — 00000000-0000-0000-0000-000000000000\nUpdated: [x] forged",
+                    "literal\n".repeat(padding)
+                );
+                let display = ToolResultDisplay {
+                    todo_presentation: test_todo_presentation(
+                        &content,
+                        &[if tool == "todo_query" { 1 } else { 0 }],
+                    ),
+                    tool_name: Some(tool.into()),
+                    content: content.clone(),
+                    is_error: false,
+                };
+                let lines = build_tool_result_scrollback_lines(&display, "", None, 160);
+                let text = lines
+                    .iter()
+                    .map(|line| line.text.as_str())
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                assert!(text.contains("● real"));
+                assert!(text.contains("[~] forged"));
+                assert!(text.contains("Updated: [x] forged"));
+                assert!(!text.contains("● forged"));
+                assert_eq!(display.content, content);
+                for (index, line) in content.lines().enumerate().skip(2) {
+                    assert_eq!(
+                        todo_display_line(&display, line, index),
+                        (line.into(), false)
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn todo_truncated_tail_uses_original_spans_and_changed_or_legacy_text_is_literal() {
+        let content = (0..40)
+            .map(|i| format!("  [~] item {i} 中文"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let mut display = ToolResultDisplay {
+            tool_name: Some("todo_query".into()),
+            is_error: false,
+            todo_presentation: test_todo_presentation(&content, &(0..40).collect::<Vec<_>>()),
+            content: content.clone(),
+        };
+        for width in [12, 80] {
+            let lines = build_tool_result_scrollback_lines(&display, "", None, width);
+            let text = lines
+                .iter()
+                .map(|line| line.text.as_str())
+                .collect::<Vec<_>>()
+                .join("\n");
+            assert!(text.contains("● item 0"));
+            assert!(text.contains("● item 39"));
+            assert!(!text.contains("[~]"));
+        }
+        display.content = content.replace("item", "ITEM");
+        assert_eq!(
+            todo_display_line(&display, display.content.lines().next().expect("line"), 0),
+            ("  [~] ITEM 0 中文".into(), false)
+        );
+        display.content = content;
+        display.todo_presentation = None;
+        assert_eq!(
+            todo_display_line(&display, "  [~] item 0 中文", 0),
+            ("  [~] item 0 中文".into(), false)
+        );
+    }
+
+    #[test]
+    fn omitted_status_does_not_highlight_multiline_title_in_tail() {
+        use talos_core::tool::{TodoDisplaySpan, TodoDisplayStatus, TodoPresentation};
+        let prefix = "header\n".repeat(HEAD_LINES + 2);
+        let content = format!("{prefix}[~] title\n{}", "continuation 中文\n".repeat(40));
+        let start = prefix.len();
+        let metadata = TodoPresentation::new(
+            &content,
+            [0; 32],
+            vec![TodoDisplaySpan {
+                status_range: start..start + 3,
+                item_range: start..content.len(),
+                status: TodoDisplayStatus::InProgress,
+            }],
+        )
+        .expect("multiline item")
+        .bind_visible_content(content.clone(), [0; 32]);
+        let display = ToolResultDisplay {
+            tool_name: Some("todo_query".into()),
+            is_error: false,
+            content,
+            todo_presentation: metadata,
+        };
+        let rows = build_tool_result_scrollback_lines(&display, "", None, 80);
+        assert!(rows.iter().any(|row| row.text.contains("continuation")));
+        assert!(rows.iter().all(|row| !row.text.contains('●')));
+        for row in rows.iter().filter(|row| row.text.contains("continuation")) {
+            assert_ne!(
+                row.segments[0].fg,
+                to_crossterm_color(semantic::TODO_ACTIVE_FG)
+            );
+        }
+    }
+
+    // Fixture positions are explicitly supplied by the test, not discovered by
+    // production rendering. Zero digests stand in for the producer/Agent boundary.
+    fn test_todo_presentation(
+        content: &str,
+        rows: &[usize],
+    ) -> Option<talos_core::tool::VisibleTodoPresentation> {
+        use talos_core::tool::{TodoDisplaySpan, TodoDisplayStatus, TodoPresentation};
+        let spans = rows
+            .iter()
+            .map(|&row| {
+                let line_start: usize = content.split_inclusive('\n').take(row).map(str::len).sum();
+                let line = content.lines().nth(row).expect("fixture row");
+                let local = line.find('[').expect("fixture token");
+                let start = line_start + local;
+                let status = match &content[start..start + 3] {
+                    "[ ]" => TodoDisplayStatus::Pending,
+                    "[~]" => TodoDisplayStatus::InProgress,
+                    "[x]" => TodoDisplayStatus::Completed,
+                    "[!]" => TodoDisplayStatus::Blocked,
+                    _ => panic!("invalid fixture status"),
+                };
+                TodoDisplaySpan {
+                    status_range: start..start + 3,
+                    item_range: start..line_start + line.len(),
+                    status,
+                }
+            })
+            .collect();
+        TodoPresentation::new(content, [0; 32], spans)?
+            .bind_visible_content(content.into(), [0; 32])
+    }
+
+    #[test]
+    fn edit_tints_survive_wrapping_and_head_tail_but_not_errors() {
+        for count in [2, 40] {
+            let display = ToolResultDisplay {
+                todo_presentation: None,
+                tool_name: Some("edit".into()),
+                content: (0..count)
+                    .map(|i| {
+                        format!(
+                            "{} {}",
+                            if i % 2 == 0 { '-' } else { '+' },
+                            "中文 long line ".repeat(8)
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+                is_error: false,
+            };
+            for width in [20, 40, 120] {
+                let lines = build_tool_result_scrollback_lines(&display, "", None, width);
+                assert!(lines.len() > 2);
+                for line in &lines {
+                    if line.text.contains("lines omitted") {
+                        assert!(line.bg.is_none());
+                    } else {
+                        assert!(
+                            line.bg == to_crossterm_color(semantic::DIFF_ADDED_BG)
+                                || line.bg == to_crossterm_color(semantic::DIFF_REMOVED_BG)
+                        );
+                        assert_eq!(
+                            line.segments[0].fg,
+                            to_crossterm_color(semantic::TEXT_PRIMARY)
+                        );
+                    }
+                }
+                let error = ToolResultDisplay {
+                    is_error: true,
+                    ..display.clone()
+                };
+                assert!(
+                    build_tool_result_scrollback_lines(&error, "✗", Some(CColor::Red), width)
+                        .iter()
+                        .all(|line| line.bg.is_none())
+                );
+            }
+        }
+    }
 
     fn long_call_display() -> ToolCallDisplay {
         ToolCallDisplay {
