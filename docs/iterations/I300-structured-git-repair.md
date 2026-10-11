@@ -1,6 +1,6 @@
 # Iteration I300: Structured Git Permission And Diff Repair
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-10-11
 > Planned objective: deliver the complete T7 structured Git repair from the session handoff.
 > MVP deliverable: approved literal two-file staging through real Agent admission and faithful staged/unstaged built-in diffs.
@@ -9,20 +9,24 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-6 |
 | Work Slice | T7 structured Git typed effect resources, same-family scope defects and staged/unstaged diff fidelity; associated tests and documentation only. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-10-11 |
 | Source Issue | None |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Serial handoff execution authorized; maintainer accepted ADR-089 on 2026-10-11; effective atomic claim/activation remains required. |
+| Governance Claim PR | #704 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Maintainer authorized serial implementation and gated merges, accepted ADR-089, and permitted non-overlap with I293/I294. No separate maintainer reviewer is available; independent Agent security/API review, exact-head CI, validators and CAS are required. |
 | Implementation PR | Not started |
 | Last Updated | 2026-10-11 |
 | Handoff / Release Condition | No implementation before accepted contract and target-branch claim. |
 
 ## Published Baseline
+
+The Active/Claimed values above are proposed atomically by #704 and are ineffective
+until its finalized head merges into main. No implementation branch or committed
+implementation may start before that merge. PERM-007-H remains Unclaimed.
 
 ### Selection And Dependencies
 
@@ -89,6 +93,11 @@ Use existing permission/process boundaries and revert only this bounded repair i
 authorization fidelity regresses. Preserve user files/index and other-session work.
 
 ## Actual Execution And Evidence
+
+2026-10-11: #704 proposes atomic claim and activation after maintainer acceptance
+of ADR-089. Current main is `444a8137f054b33802f26bffdb55fb0f83a7a861`;
+the inventory above remains applicable. No overlapping PR was present at selection.
+Historical Planned baseline below is preserved; activation is effective only on merge.
 
 Read-only source investigation found missing typed facets in add/commit/checkout,
 workspace/repo mismatch in pull, unbounded host helper lifetime and incorrect diff

@@ -97,7 +97,7 @@ Synchronize product owners before derived Backlog, Board and iteration indexes.
 | Item | Current execution state | Required closure evidence |
 |---|---|---|
 | C0 preserved TUI/process candidate | Complete; I299 owner closed | #701 merge `69092675`; full preflight, all native observations, exact-head CI/review and CAS recorded in I299 |
-| T7 structured Git resources/diff | [I300](../iterations/I300-structured-git-repair.md) Planned / Unclaimed; ADR-089 Accepted | Real-wrapper reproduction, cause, approved/denied/escape tests, diff fidelity, protected-boundary review and delivered repair |
+| T7 structured Git resources/diff | [I300](../iterations/I300-structured-git-repair.md) Active / Claimed proposed by #704, ineffective until merge; ADR-089 Accepted | Real-wrapper reproduction, cause, approved/denied/escape tests, diff fidelity, protected-boundary review and delivered repair |
 | T8 all-built-in Auto approval (added 2026-10-11) | [PERM-007-H](../backlog/active/PERM-007-H-all-builtin-auto-review.md) Refinement / Unclaimed; immediately after T7 | Complete native inventory, shared effect-aware model review, real admission/execution tests, policy reconciliation, visible decisions, independent security review and merged evidence |
 | T2/T3 MODEL-014 | Unactivated; consolidated implementation/test slice | Accepted authority/schema decisions, inference/override/variant/adapter tests, walkthrough, docs and merged evidence |
 | T4 compaction policy/controls | Unactivated | Whole-request policy, safe summary replacement, failure/cancellation tests, observable status, runnable manual command and integrated evidence |
