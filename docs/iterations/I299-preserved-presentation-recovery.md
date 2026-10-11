@@ -18,7 +18,7 @@
 | Governance Claim PR | #700 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer authorized serial implementation, stable publication, independent Agent review and gated merge; explicitly permitted non-overlapping concurrency with I293/I294. No separate maintainer reviewer is available; exact-head CI, Agent review, validators and CAS remain required. |
-| Implementation PR | Not started |
+| Implementation PR | #701 |
 | Last Updated | 2026-10-11 |
 | Handoff / Release Condition | Deliver only after effective claim, local convergence, native acceptance and exact-head gates; retain incomplete work in the handoff ledger. |
 
@@ -351,3 +351,6 @@ This checkpoint supersedes earlier pending-human statements. Delivery is now Rev
 remote implementation CI, final-head review, merge-time CAS, merge and owner-first closure
 remain required. No release or completion is claimed. Subsequent edits here are acceptance
 records only; the validated Rust implementation and acceptance executable remain unchanged.
+
+Stable implementation candidate published as PR #701. Final-head CI, incremental independent
+review and merge-time CAS remain pending; publication is not completion evidence on main.
