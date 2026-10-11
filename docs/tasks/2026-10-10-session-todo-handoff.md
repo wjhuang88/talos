@@ -1,6 +1,6 @@
 # Next Task: Session Todo Handoff
 
-Status: Handoff received; serial execution authorized; I299 ADR-088 claim effective; local implementation active.
+Status: Serial execution active; I299/C0 implementation merged and owner closure recorded; all seven original deliverables remain incomplete.
 Responsible recipient: Codex under maintainer direction; product claims remain separate.
 Source: Maintainer requested a durable handoff and explicitly stopped further implementation in this session.
 Baseline: local `main`, HEAD `63c3ab6` (merge PR #697). Recheck HEAD and both staged/unstaged diffs before resuming.
@@ -17,6 +17,17 @@ All seven numbered deliverables below remain incomplete. The receiving session m
 still follow their full requirements, not treat this governance checkpoint as closure.
 
 ### Current C0 checkpoint (supersedes earlier implementation-pending notes)
+
+Completion Commit: 690926759229818fcec92b1487d0cffef1bf5fcb (C0/I299 only;
+not completion evidence for this whole task or any of its seven original deliverables).
+
+PR #701 is merged as `690926759229818fcec92b1487d0cffef1bf5fcb`; I299 is
+Complete / Closed with that existing implementation SHA as evidence. Final head
+`58e74613` passed all six CI jobs in run `38115866825`, independent Agent review
+`6105965862`, and merge-time CAS `6106128866`. All four native observations passed.
+This is the current delivery checkpoint; earlier pending statements below are
+historical. No release occurred. Next is T7, with a new effective claim required
+before implementation. This does not close any of the seven numbered requirements.
 
 Latest acceptance: the maintainer completed all four native observations on `b19fc58e`,
 ending with “符合预期，已退出”. I299 is Review / Claimed, ready for stable publication;
@@ -85,7 +96,7 @@ Synchronize product owners before derived Backlog, Board and iteration indexes.
 
 | Item | Current execution state | Required closure evidence |
 |---|---|---|
-| C0 preserved TUI/process candidate | Local integration; validation in progress | Effective ownership/authorization reconciliation, locked preflight, exact-head CI/review, merged implementation and owner evidence |
+| C0 preserved TUI/process candidate | Complete; I299 owner closed | #701 merge `69092675`; full preflight, all native observations, exact-head CI/review and CAS recorded in I299 |
 | T7 structured Git resources/diff | Investigation; no repair committed | Real-wrapper reproduction, cause, approved/denied/escape tests, diff fidelity, protected-boundary review and delivered repair |
 | T2/T3 MODEL-014 | Unactivated; consolidated implementation/test slice | Accepted authority/schema decisions, inference/override/variant/adapter tests, walkthrough, docs and merged evidence |
 | T4 compaction policy/controls | Unactivated | Whole-request policy, safe summary replacement, failure/cancellation tests, observable status, runnable manual command and integrated evidence |
