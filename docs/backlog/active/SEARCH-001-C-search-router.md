@@ -22,3 +22,9 @@ Existing test evidence: #681 merge `41381f8055b66d54de42988e2b936a12e5af3ac3`.
 The [router integration plan](../../reference/SEARCH-001-C-ROUTER-INTEGRATION-PLAN.md)
 audits the caller-context gap and supplies the pending implementation/acceptance matrix;
 it does not activate a router or complete C.
+
+The 2026-10-10 I293 stage adds a disposable twelve-case offline scheduling experiment, with
+paused-clock, launch/drop and bounded-concurrency observations. It exercises already-classified
+synthetic outcomes and control-boundary races; it does not call production search or establish
+HTTP cancellation, admission, caller-context, health or binary integration. All full C acceptance
+rows remain pending. See the iteration owner for recovery provenance and current validation.
