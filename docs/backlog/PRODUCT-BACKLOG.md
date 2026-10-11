@@ -12,7 +12,8 @@ That snapshot is historical evidence, not current activation authority.
 2026-10-11 session-handoff addition: [PERM-007-H](active/PERM-007-H-all-builtin-auto-review.md)
 will extend Auto review to all built-in tools after I300 Git repair. Refinement /
 Unclaimed; reconcile higher-risk PERM-007-G/#563 policy before implementation.
-ADR-089 for I300 is accepted; neither slice has an effective implementation claim yet.
+ADR-089 for I300 is accepted; its claim becomes effective upon #704 merge.
+PERM-007-H remains Unclaimed and requires a separate iteration.
 
 Current cycle selected 2026-09-21: [I281](../iterations/I281-auto-shell-review-and-windows-timing.md)
 is Complete/Closed: shell Ask model review under ADR-081, Windows I226 timing repair and
