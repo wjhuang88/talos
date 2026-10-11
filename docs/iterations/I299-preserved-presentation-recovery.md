@@ -314,3 +314,23 @@ changes without new blocking findings. Stable-commit review remains required. Re
 confirmed `main@2f9420f95cd2db3654de463c928debe592a89845`; the only open PR is other-session
 #696 (Search), with no overlap in this candidate. Native acceptance remains pending, so this
 owner stays Active; no remote implementation push or completion is claimed.
+
+### Exact-head local review and acceptance handoff (2026-10-11)
+
+Stable local implementation: `e96438eb84066ef178a830ea4b42edb452c78d69`, based on
+`2f9420f95cd2db3654de463c928debe592a89845`. Independent Agent reviewer
+`/root/i299_amendment_review` returned APPROVE for these exact revisions, with no blocking
+API/privacy/scope findings. The reviewer confirmed the prior two defects are fixed and that
+Desktop/Dashboard edits are mechanical event API adaptations only. This is an independent
+Agent technical review, not natural-person acceptance or a separate GitHub identity.
+
+The four native observations above remain unchecked. The maintainer has been asked to run
+`target/debug/examples/i299_presentation_acceptance` and advance to stage 1 with `next`;
+no result has been received. Do not repeat prior I279 acceptance as evidence for these changed
+surfaces. No implementation push, remote CI or merge has occurred. Subsequent documentation
+changes must retain this review's exact revision binding and obtain an incremental rebind
+before merge; they do not imply a rerun of unchanged Rust code is necessary.
+
+Next action: collect the four observations sequentially, fix any failure locally, then record
+the final candidate and publish only after the stable-stage gate. All seven original handoff
+deliverables remain incomplete; C0 acceptance does not terminate the long task.

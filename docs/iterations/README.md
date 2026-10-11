@@ -4,7 +4,8 @@
 
 [I299](I299-preserved-presentation-recovery.md) is Active / Claimed after #698 merged at
 `50781eab`; #700 expanded its effective scope under ADR-088 at `2f9420f9`.
-Cross-crate Todo metadata is implemented locally; final validation, native acceptance and delivery remain pending. I293/I294 retain separate
+Local implementation `e96438eb` passed full preflight and independent exact-head API/privacy review;
+four native observations and remote delivery gates remain pending. I293/I294 retain separate
 ownership under explicit non-overlapping parallel authorization.
 The seven session-handoff requirements remain pending outside this bounded presentation slice.
 

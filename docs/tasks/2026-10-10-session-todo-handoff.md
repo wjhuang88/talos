@@ -37,8 +37,11 @@ published and none of the seven original deliverables is complete.
 Subsequent local validation: full standardized preflight exited 0 (`release preflight: passed`),
 including workspace tests and external SDK fixtures. The final I299 acceptance example's
 `--check` and targeted Clippy passed; four native human observations remain unchecked in I299.
-The full task remains active. Next: stable local candidate/exact-head review, then guide those
-four observations before remote publication. No T7 or later product slice is activated here.
+Stable local candidate `e96438eb84066ef178a830ea4b42edb452c78d69` subsequently received independent
+Agent API/privacy APPROVE against base `2f9420f95cd2db3654de463c928debe592a89845`.
+The full task remains active. Next: guide the four native observations before remote publication;
+stage 1 instructions have been sent, but no human result has been received. No T7 or later
+product slice is activated here. Later documentation edits do not broaden that exact-head approval.
 
 ## Receiving Checkpoint And Revised Plan - 2026-10-10
 
@@ -110,6 +113,27 @@ Initial T7 source finding: `GitAddTool` uses the default permission profile, whi
 untyped Write facet; `compile_proposal` requires a supported typed resource for consequential
 facets. This explains a plausible rejection path but is not yet a verified real-wrapper
 reproduction or a complete assessment of related Git tools/pathspec behavior.
+
+Read-only T7 follow-up on `e96438eb` (2026-10-11; no activation or code change):
+
+- `crates/talos-tools/src/git_write.rs` confirms `GitAddTool` has no permission-profile
+  override; the default in `talos-core` supplies Write without resource kind/value.
+  `talos-permission/src/grant.rs` rejects consequential untyped facets when compiling a grant
+  proposal. This matches the recorded error, but active-binary identity and real-wrapper
+  reproduction remain mandatory before claiming the production root cause verified.
+- The same Git add implementation appends caller path strings directly after `git add`,
+  without an option terminator or literal-pathspec boundary. A repair must bind the actual
+  staging effect to approved resources, including option-looking names, Git pathspec syntax,
+  repository/workspace root differences, symlinks and linked worktree index locations.
+  Do not merely mark every request as a workspace-wide write.
+- `GitDiffTool` enumerates index/worktree status for both modes, while reading HEAD as the
+  old side for both. The existing `git_diff_staged_shows_head_vs_index` regression explicitly
+  adds a second unstaged edit so the iterator sees the file. It therefore does not prove the
+  staged-only case. Add independent staged-only, unstaged-only, mixed, new/deleted and binary
+  fixtures; compare staged HEAD/index and default index/worktree semantics separately.
+- These are source facts and test-coverage findings, not a successful execution reproduction
+  or a delivered fix. Retain the original scope, permission gates and independent security
+  review; do not mix this implementation into I299. I299 still awaits four human observations.
 
 Recovery: refresh Git/PR state, inspect the live preflight process before restarting any build,
 record its actual exit result, then resolve C0 ownership and publication gates. Residuals stay
