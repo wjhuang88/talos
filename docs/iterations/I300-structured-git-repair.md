@@ -34,7 +34,8 @@ Selected requirement: T7 in the [handoff](../tasks/2026-10-10-session-todo-hando
 under the existing [GIT-001](../backlog/active/GIT-001-embedded-git-tools.md) capability.
 Do not reopen historical GIT-001 or TOOL-020 acceptance as though it covered this defect.
 I299 is Complete/Closed through implementation #701 and closure #703. ADR-089 is
-Accepted; this document is planning only, not activation.
+Accepted. At initial plan publication this was planning only; #704 now proposes
+atomic activation, effective only after main merge.
 
 Inventory against main `444a8137`: I293 and I294 Active, retain other-session Search
 ownership under the existing explicit non-overlap authorization; I277 Review with
@@ -97,7 +98,7 @@ authorization fidelity regresses. Preserve user files/index and other-session wo
 2026-10-11: #704 proposes atomic claim and activation after maintainer acceptance
 of ADR-089. Current main is `444a8137f054b33802f26bffdb55fb0f83a7a861`;
 the inventory above remains applicable. No overlapping PR was present at selection.
-Historical Planned baseline below is preserved; activation is effective only on merge.
+Historical Planned baseline above is preserved; activation is effective only on merge.
 
 Read-only source investigation found missing typed facets in add/commit/checkout,
 workspace/repo mismatch in pull, unbounded host helper lifetime and incorrect diff
