@@ -21,6 +21,59 @@ ROOT = Path(__file__).resolve().parents[1]
 BOUNDARY = "crates/talos-tools/src/process_boundary.rs"
 AUTO = "crates/talos-desktop/src/runtime_host/auto_tests.rs"
 END_BY = float("inf")
+CONTROLLED_FIXTURE = '''    #[tokio::test(flavor = "current_thread")]
+    async fn windows_auto_diagnostic_descendant_pipe_hold_is_observable_and_cleanup_bounded() {
+        let script = r#"$child = 'Write-Output "WINDOWS_AUTO_PIPE_HOLDER_READY"; Start-Sleep -Seconds 60'; $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($child)); Start-Process -FilePath "$env:WINDIR\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -ArgumentList @('-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand', $encoded) -NoNewWindow | Out-Null; exit 0"#;
+        let launched = Box::new(powershell(script)).launch().await.expect("owned fixture launch");
+        let control = launched.control;
+        let mut events = launched.events;
+        let readiness = tokio::time::timeout(Duration::from_secs(15), async {
+            let mut bytes = Vec::new();
+            loop {
+                match events.recv().await {
+                    Some(BackgroundProcessEvent::Output(chunk)) => {
+                        bytes.extend_from_slice(&chunk.bytes);
+                        if String::from_utf8_lossy(&bytes).contains("WINDOWS_AUTO_PIPE_HOLDER_READY") {
+                            return Ok(());
+                        }
+                        if bytes.len() > 32768 { return Err("fixture output exceeded bound".to_owned()); }
+                    }
+                    Some(BackgroundProcessEvent::SupervisionFailed(error)) => return Err(error),
+                    Some(BackgroundProcessEvent::Exited(_)) | None => return Err("terminal before readiness".to_owned()),
+                }
+            }
+        }).await;
+        let held = if matches!(&readiness, Ok(Ok(()))) {
+            tokio::time::timeout(Duration::from_millis(500), async {
+                loop {
+                    match events.recv().await {
+                        Some(BackgroundProcessEvent::Output(_)) => {}
+                        _ => break,
+                    }
+                }
+            }).await.is_err()
+        } else { false };
+        eprintln!("WINDOWS_AUTO_DIAG controlled_pipe readiness={:?} pending_while_descendant_holds_pipe={}", readiness, held);
+        // Always clean the owned Job Object before any assertion, including readiness failure.
+        windows_auto_probe("controlled_cleanup_begin", 0);
+        let cleanup = control.force_terminate().await;
+        let terminal = tokio::time::timeout(Duration::from_secs(10), async {
+            loop {
+                match events.recv().await {
+                    Some(BackgroundProcessEvent::Output(_)) => {}
+                    Some(BackgroundProcessEvent::Exited(_)) => return true,
+                    Some(BackgroundProcessEvent::SupervisionFailed(_)) | None => return false,
+                }
+            }
+        }).await;
+        eprintln!("WINDOWS_AUTO_DIAG controlled_pipe cleanup={:?} terminal_after_cleanup={:?}", cleanup, terminal);
+        assert!(matches!(readiness, Ok(Ok(()))), "holder readiness: {readiness:?}");
+        assert!(held, "launcher must not invent completion while descendant holds its pipes");
+        assert!(cleanup.is_ok(), "Job Object termination: {cleanup:?}");
+        assert!(matches!(terminal, Ok(true)), "bounded terminal after cleanup: {terminal:?}");
+    }
+
+'''
 
 
 def replace_once(text: str, old: str, new: str) -> str:
@@ -55,6 +108,7 @@ fn windows_auto_probe(stage: &str, identity: usize) {
         ("        CloseHandle(thread);\n        thread =", "        windows_auto_probe(\"assigned_and_resumed\", process as usize);\n        CloseHandle(thread);\n        thread ="),
     ]:
         boundary = replace_once(boundary, old, new)
+    boundary = replace_once(boundary, "    fn powershell(script: &str) -> WindowsBackgroundLauncher {", CONTROLLED_FIXTURE + "    fn powershell(script: &str) -> WindowsBackgroundLauncher {")
     auto = originals[AUTO]
     auto = replace_once(auto, "    let mut stages = Vec::new();", '''    let mut stages = Vec::new();
     let heartbeat = tokio::spawn(async move {
@@ -98,8 +152,10 @@ def execute(command: list[str], log: Path, timeout: int) -> tuple[int, str]:
     return code, text
 
 
-def build(output: Path, phase: str) -> Path:
-    code, text = execute(["cargo", "test", "-p", "talos-desktop", "--features", "desktop-ui", "--locked", "--no-run", "--message-format=json"], output / f"{phase}-build.log", 1200)
+def build(output: Path, phase: str, tools: bool = False) -> Path:
+    command = ["cargo", "test", "-p", "talos-tools", "--lib"] if tools else ["cargo", "test", "-p", "talos-desktop", "--features", "desktop-ui"]
+    command += ["--locked", "--no-run", "--message-format=json"]
+    code, text = execute(command, output / f"{phase}-build.log", 1200)
     if code:
         raise RuntimeError(f"{phase} build failed: {code}; see artifact build log")
     binaries = []
@@ -108,7 +164,8 @@ def build(output: Path, phase: str) -> Path:
             record = json.loads(line)
         except json.JSONDecodeError:
             continue
-        if record.get("reason") == "compiler-artifact" and record.get("profile", {}).get("test") and record.get("target", {}).get("name") == "talos-desktop-mock" and record.get("executable"):
+        target = "talos_tools" if tools else "talos-desktop-mock"
+        if record.get("reason") == "compiler-artifact" and record.get("profile", {}).get("test") and record.get("target", {}).get("name") == target and record.get("executable"):
             binaries.append(Path(record["executable"]))
     if len(set(binaries)) != 1:
         raise RuntimeError(f"expected exactly one Desktop test executable, found {binaries}")
@@ -174,6 +231,26 @@ def main() -> int:
         for path, text in patched.items():
             (ROOT / path).write_text(text, encoding="utf-8", newline="\n")
         matrix(build(output, "instrumented"), output, "instrumented", results)
+        binary = build(output, "controlled-pipe", tools=True)
+        for index in range(2):
+            label = f"controlled-pipe-{index + 1}"
+            print(f"WINDOWS_AUTO_DIAG case={label}", flush=True)
+            code, text = execute([str(binary), "process_boundary::windows_tests::windows_auto_diagnostic_descendant_pipe_hold_is_observable_and_cleanup_bounded", "--exact", "--test-threads=1", "--nocapture"], output / f"{label}.log", 90)
+            if code == 0 and "1 passed; 0 failed" not in text:
+                code = 125
+            before_cleanup = text.split("stage=controlled_cleanup_begin", 1)[0]
+            if code == 0 and (
+                "stage=controlled_cleanup_begin" not in text
+                or "stage=process_wait_return" not in before_cleanup
+                or "wait_result=0 exit_code=0" not in before_cleanup
+                or "pending_while_descendant_holds_pipe=true" not in before_cleanup
+            ):
+                code = 125
+                print("WINDOWS_AUTO_DIAG controlled leader-exit observation missing; evidence inconclusive", flush=True)
+            results.append({"case": label, "exit_code": code})
+            (output / "results.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
+            if code == 124:
+                raise RuntimeError("controlled pipe watchdog expired; stopped experiment")
     finally:
         for path, data in original_bytes.items():
             (ROOT / path).write_bytes(data)

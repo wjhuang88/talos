@@ -70,3 +70,34 @@ waived. The unchanged full CI route supplies pinned-Cargo governance validation.
 Independent static pre-review requested bounded-budget/cleanup evidence fixes;
 both have been incorporated before remote submission.
 Local Windows execution is unavailable; real evidence must come from Actions.
+
+## First CI Evidence And Controlled Follow-up
+
+Exact head `a7618651d9bc669bdcfe705718c6e74ab6254d77`, CI3132/run
+`38134743253`, diagnostic job `114456206963`: all 26 attempts succeed (1706
+test executions), same Windows image `20260925.250.1` as the historical failure.
+The instrumented Auto result arrives in 0.335263–3.0302286 seconds. Win32 creation
+is 1.8928–150.1078 ms; assignment/resume to process wait return is
+238.6799–1125.4849 ms; wait return to both readers joined is 0.2194–1.1384 ms.
+These use in-process SystemTime intervals (100 ns), not Actions timestamps:
+the runner script replays log lines after each test process finishes.
+
+No historical timeout was reproduced and no root cause is established. Evidence
+artifact `11700882437` retains all 31 files until 2026-10-25, SHA256
+`dfb0076a547c00ac9bb690ec975d176697e2cfd2208c53111edd533b9c1ad61b`.
+Public checkpoint: PR #705 comment `6108531033`. Agent exact-head review
+`6108425990` approved the initial diagnostic design, not a production repair.
+
+The next stable diagnostic candidate adds two runs of a temporary Windows tools
+fixture: a real PowerShell leader starts an owned child in the same window and
+exits; the child emits readiness then holds inherited output handles. The
+existing launcher must stay pending for a bounded observation window. Explicit
+acceptance also requires the native leader wait to report WAIT_OBJECT_0 and
+exit code zero before the cleanup-begin probe. Missing that observation fails
+the diagnostic as inconclusive even if the Rust fixture itself passes. Explicit
+termination of its exact Job Object must unblock pipe readers and return a
+terminal event within ten seconds. Cleanup always precedes assertions.
+No new unsafe site, environment mutation, persistent Rust patch, permission
+change or original-test deadline change is introduced. This synthetic fixture
+tests the EOF-wait/cleanup mechanism only; it cannot establish that the original
+incident involved an inherited writer. Its compilation/execution is pending CI.
