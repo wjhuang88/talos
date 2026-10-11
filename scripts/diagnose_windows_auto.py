@@ -21,6 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 BOUNDARY = "crates/talos-tools/src/process_boundary.rs"
 AUTO = "crates/talos-desktop/src/runtime_host/auto_tests.rs"
 END_BY = float("inf")
+CONTROLLED_TEST = "process_boundary::windows_tests::windows_auto_diagnostic_descendant_pipe_hold_is_observable_and_cleanup_bounded"
 CONTROLLED_FIXTURE = '''    #[tokio::test(flavor = "current_thread")]
     async fn windows_auto_diagnostic_descendant_pipe_hold_is_observable_and_cleanup_bounded() {
         let script = r#"$child = 'Write-Output "WINDOWS_AUTO_PIPE_HOLDER_READY"; Start-Sleep -Seconds 60'; $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($child)); Start-Process -FilePath "$env:WINDIR\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -ArgumentList @('-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand', $encoded) -NoNewWindow | Out-Null; exit 0"#;
@@ -153,7 +154,7 @@ def execute(command: list[str], log: Path, timeout: int) -> tuple[int, str]:
 
 
 def build(output: Path, phase: str, tools: bool = False) -> Path:
-    command = ["cargo", "test", "-p", "talos-tools", "--lib"] if tools else ["cargo", "test", "-p", "talos-desktop", "--features", "desktop-ui"]
+    command = ["cargo", "test", "-p", "talos-tools", "--features", "shell", "--lib"] if tools else ["cargo", "test", "-p", "talos-desktop", "--features", "desktop-ui"]
     command += ["--locked", "--no-run", "--message-format=json"]
     code, text = execute(command, output / f"{phase}-build.log", 1200)
     if code:
@@ -199,6 +200,7 @@ def main() -> int:
     global END_BY
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--self-test", action="store_true")
+    parser.add_argument("--controlled-only", action="store_true", help="run only the controlled mechanism after a retained full matrix")
     args = parser.parse_args()
     original_bytes = {path: (ROOT / path).read_bytes() for path in (BOUNDARY, AUTO)}
     originals = {path: data.decode("utf-8").replace("\r\n", "\n") for path, data in original_bytes.items()}
@@ -221,21 +223,29 @@ def main() -> int:
     END_BY = time.monotonic() + 35 * 60
     output = ROOT / "windows-auto-diagnostics"
     output.mkdir(exist_ok=True)
-    manifest = {"head": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(), "python": sys.version, "runner": {key: os.environ.get(key) for key in ("RUNNER_OS", "RUNNER_ARCH", "ImageOS", "ImageVersion")}, "source_sha256": {path: hashlib.sha256(text.encode()).hexdigest() for path, text in originals.items()}}
+    manifest = {"head": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(), "mode": "controlled-only" if args.controlled_only else "full", "python": sys.version, "runner": {key: os.environ.get(key) for key in ("RUNNER_OS", "RUNNER_ARCH", "ImageOS", "ImageVersion")}, "source_sha256": {path: hashlib.sha256(text.encode()).hexdigest() for path, text in originals.items()}}
     (output / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     overlay = "".join("".join(difflib.unified_diff(originals[path].splitlines(keepends=True), patched[path].splitlines(keepends=True), fromfile=path, tofile=path)) for path in originals)
     (output / "probe-overlay.patch").write_text(overlay, encoding="utf-8")
     results: list[dict] = []
     try:
-        matrix(build(output, "baseline"), output, "baseline", results)
+        if not args.controlled_only:
+            matrix(build(output, "baseline"), output, "baseline", results)
         for path, text in patched.items():
             (ROOT / path).write_text(text, encoding="utf-8", newline="\n")
-        matrix(build(output, "instrumented"), output, "instrumented", results)
+        if not args.controlled_only:
+            matrix(build(output, "instrumented"), output, "instrumented", results)
         binary = build(output, "controlled-pipe", tools=True)
+        code, inventory = execute([str(binary), CONTROLLED_TEST, "--exact", "--list"], output / "controlled-inventory.log", 90)
+        present = f"{CONTROLLED_TEST}: test" in inventory and "1 test, 0 benchmarks" in inventory
+        results.append({"case": "controlled-inventory", "exit_code": code or (0 if present else 125)})
+        (output / "results.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
+        if code or not present:
+            raise RuntimeError("controlled exact fixture missing from compiled test inventory; stopped experiment")
         for index in range(2):
             label = f"controlled-pipe-{index + 1}"
             print(f"WINDOWS_AUTO_DIAG case={label}", flush=True)
-            code, text = execute([str(binary), "process_boundary::windows_tests::windows_auto_diagnostic_descendant_pipe_hold_is_observable_and_cleanup_bounded", "--exact", "--test-threads=1", "--nocapture"], output / f"{label}.log", 90)
+            code, text = execute([str(binary), CONTROLLED_TEST, "--exact", "--test-threads=1", "--nocapture"], output / f"{label}.log", 90)
             if code == 0 and "1 passed; 0 failed" not in text:
                 code = 125
             before_cleanup = text.split("stage=controlled_cleanup_begin", 1)[0]

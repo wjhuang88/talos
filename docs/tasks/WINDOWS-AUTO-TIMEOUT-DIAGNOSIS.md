@@ -101,3 +101,25 @@ No new unsafe site, environment mutation, persistent Rust patch, permission
 change or original-test deadline change is introduced. This synthetic fixture
 tests the EOF-wait/cleanup mechanism only; it cannot establish that the original
 incident involved an inherited writer. Its compilation/execution is pending CI.
+
+## Second CI Evidence And Harness Correction
+
+Head `9f66e76d158cc6eee0b2fee09f1022d32aad1f67`, CI3138/run
+`38136080740`, job `114460107420`: all 26 original attempts pass again.
+Both controlled invocations run zero tests (40 filtered); the script rejects
+them with diagnostic 125 and the job fails. This is a harness feature-selection
+error, not an observed pipe/cleanup failure: `talos-tools` defaults to file-read
+and search, while `process_boundary` requires the explicit `shell` feature.
+Artifact `11701690661`, SHA256
+`c068ec2003e89e9967b0fb00d8757d3925aaa1396ff6204e3cef6880249ad278`,
+expires 2026-10-25. Failed head and skipped fixture evidence remain retained;
+checkpoint comment `6108702060`. No historical root cause or repair is proven.
+
+The corrected tools build explicitly enables `shell`; an exact test-inventory
+check must identify one test before either controlled attempt runs. The latest
+opt-in CI invocation uses `--controlled-only`: two fresh controlled processes,
+not another 26-case matrix. The manifest records this mode; prior matrices on
+the two earlier heads supply 52 processes/3412 original test executions, not
+new-head matrix coverage. The default script invocation still runs the full
+matrix. Production Rust source is unchanged across these candidates and normal
+mandatory full CI continues independently. Corrected Windows execution is pending.
