@@ -140,6 +140,20 @@ fn windows_auto_probe(stage: &str, identity: usize) {
     auto = replace_once(auto, "    if outcome.is_err() {", '''    heartbeat.abort();
     eprintln!("WINDOWS_AUTO_DIAG test_outcome enabled={} allow={} ok={} stages={:?}", enabled, allow, outcome.is_ok(), stages);
     if outcome.is_err() {''')
+    auto = replace_once(auto, "        self.conversation.stream(messages).await", '''        windows_auto_host_stage("conversation_stream_enter");
+        let stream_result = self.conversation.stream(messages).await;
+        windows_auto_host_stage("conversation_stream_return");
+        stream_result''')
+    auto = replace_once(auto, "        self.assessments.fetch_add(1, Ordering::SeqCst);", '        windows_auto_host_stage("auto_review_stream_enter");\n        self.assessments.fetch_add(1, Ordering::SeqCst);')
+    auto = replace_once(auto, '''        MockProvider::new()
+            .with_response(response.to_string())
+            .stream(&[])
+            .await''', '''        let review_stream_result = MockProvider::new()
+            .with_response(response.to_string())
+            .stream(&[])
+            .await;
+        windows_auto_host_stage("auto_review_stream_return");
+        review_stream_result''')
     host = replace_once(originals[HOST], "                        let terminal = executor.block_on(async move {\n                            let (provider, context_limit, auto_enabled) = match provider() {", '''                        let terminal = executor.block_on(async move {
                             windows_auto_host_stage("host_task_enter");
                             // Temporary CI observation of this host executor, not the test executor.
@@ -167,6 +181,8 @@ fn windows_auto_probe(stage: &str, identity: usize) {
         ("    loop {\n        tokio::select! {\n            result = async {", '    windows_auto_host_stage("command_loop_ready");\n    loop {\n        tokio::select! {\n            result = async {'),
         ("                    Some(RuntimeCommand::Submit(message)) => {", '                    Some(RuntimeCommand::Submit(message)) => {\n                        windows_auto_host_stage("submit_received");'),
         ("                        if let Err(error) = handle.submit(message).await\n", '                        windows_auto_host_stage("submit_enter");\n                        let submit_result = handle.submit(message).await;\n                        windows_auto_host_stage("submit_return");\n                        if let Err(error) = submit_result\n'),
+        ("                                    report_output.publish(RuntimeOutput::AutoDecision {", '                                    windows_auto_host_stage("auto_report_publish_enter");\n                                    report_output.publish(RuntimeOutput::AutoDecision {'),
+        ("                                        evaluator: report.evaluator,\n                                    });", '                                        evaluator: report.evaluator,\n                                    });\n                                    windows_auto_host_stage("auto_report_publish_return");'),
     ]:
         host = replace_once(host, old, new)
     return {BOUNDARY: boundary, AUTO: auto, HOST: host}

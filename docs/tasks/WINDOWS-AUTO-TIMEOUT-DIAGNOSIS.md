@@ -274,3 +274,39 @@ No new task, await, process, timeout or shutdown policy is added. The original
 baseline, fixed two fresh runners, counts/budgets, retained failures, byte-for-byte
 restoration and mandatory gates remain unchanged. New bracket compilation and
 actual spans require new-head CI; no root-cause repair/merge/closure is claimed.
+
+## Actual Preparation Spans And Post-Submit Follow-up
+
+CI3149/run `38199125087`, exact `a39bfa24956db8a3e02e7bb23a15d3e4b2ae7e2c`:
+all six ordinary gates SUCCESS. Baseline60processes1097passed13failed, only
+parallel1 fails broader host fixtures; no original Auto watchdog failure in
+this round. Instrumented60processes1110passed0failed. Combined2207passed13failed
+0ignored/2220tests; failures retained. Checkpoint6119744793. Same image/4CPU,
+original source hashes and restoration verified; new brackets actually compiled.
+Artifacts64files each, expires2026-10-26: baseline11725210221 SHA256
+`78db4cfbdab9c96735765ff68312d93701936e70f680b12b88e5099eb19f57bf`;
+instrumented11725165085 SHA256
+`773a5cb20aa0ab7214388703c4fab6c0c31a49cd585dca60cb6555b6ba0642b1`.
+
+Matching the Auto launcher PID/thread yields60 cases. Provider pairs59/60
+intact (one entry interleaved with concurrent output), max19.9971ms; session
+setup max.1645ms, builder setup3.8717ms, builder build64.4404ms, projection
+.2183ms, submit.6304ms. Submit return-to-launch66.6265ms–3.4728618s. Largest
+single22: decision3.481371s/request3.4864706s/result3.6942738s. First-suite
+target succeeds: request2.192847s/result6.6985246s. These successful samples
+put the largest measured preparation interval after submission, not inside
+measured factory/build spans. They do not assign the failing837 sample's10.6s
+to a particular interval or prove any underlying cause.
+
+Next temporary probe brackets the existing AssessmentProvider conversation
+stream call, Auto-review stream call and host Auto-report publication. Same
+time/PID/thread/stage helper; no message/context/response/digest/outcome content.
+Original stream calls/awaits occur once in the original order; existing test
+assertions and returned receivers are preserved. Stream return means receiver
+creation, not completion of asynchronous stream consumption; the subsequent
+return-to-review/report interval includes consumption and request/permission
+preparation. Reports may also describe fallback cases, so correlate only the
+matching original Auto launcher thread and its fixture outcome. No new async
+task, deadline, permanent Rust or fourth source file; budgets, fixed two runners,
+original baseline, restoration and failed retention unchanged. Compilation and
+actual split intervals await new exact-head CI; no repair/merge/closure claim.
