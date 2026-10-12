@@ -42,3 +42,13 @@ dispatch and Session Interrupt using an offline Network stand-in, to characteriz
 the detached coordination token and owned-future cleanup. It does not call WebSearchTool or prove
 HTTP/DNS cancellation, deadline propagation or full C-V10 acceptance. C and Epic remain open;
 the iteration owner records fresh validation and residuals.
+
+
+#707 caller stage merged at `7e817ab59364bf282c49941ec501f82b0c6c40fb` with six successful
+CI3141 jobs and independent exact-head Agent review. The next test-only stage uses the real
+registered WebSearchTool metadata and PermissionSessionState without executing search: default
+Ask cannot compile a typed resource proposal; explicit fixture Allow can admit without a grant.
+Production registration uses the Agent pipeline; the apparent CLI/SDK PermissionAwareTool classes
+are test-only. This records a configuration-specific resource gap, not binary/transport acceptance
+or authorization to repair policy. See I293 and the router plan for source audit and fresh gates.
+All full C acceptance remains Pending; #643/#624 stay open.
