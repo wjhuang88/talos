@@ -165,6 +165,54 @@ production stages merely because their plan is written down.
 
 ## Current Disposition
 
+### Caller boundary — 2026-10-12
+
+Fresh source baseline is #706 merge `4b03149ca452bbaf4e96b580ab74135bc4ac670d`.
+`crates/talos-agent/src/tool_execution.rs` still bounds permission admission with
+`permission_deadline_at`, then awaits authorized tool execution. This is not an enclosing search
+budget. `crates/talos-agent/src/configuration.rs::cancellation_token` returns a new token for caller
+coordination; it does not inject it into the running tool. `crates/talos-agent/src/session/turn.rs`
+aborts and joins the Agent task on Session cancellation before publishing the terminal event.
+These refine C-003 through C-006 without changing their integration gates.
+
+The test-only Agent integration target `i293_caller_cancellation_characterization` drives the real
+permission/Session path with an offline Network stand-in. Its three intended assertions are
+deny-before-start without a resolver, continued execution beyond approval TTL despite cancelling
+the detached token, and owned-future drop before the matching Session Cancelled terminal with no
+returned tool result. Fixtures use controlled readiness, a paused clock for the TTL case, counted
+starts/completions/drops and an owned temporary workspace; no model producer task is left running.
+Current validation is recorded in I293; do not infer a passing run from this plan.
+
+The stand-in declares a synthetic typed Domain resource for real approval admission. This must
+not conceal the actual search resource seam: WebSearchTool inherits the default Network facet
+without a typed resource, while its query input has no URL for generic domain extraction. The
+actual registration/wrapper/approval path remains an audit gate, not a demonstrated production
+failure or an authorization to change permission policy. Coordinate any repair with its owner.
+
+This is partial caller-carrier evidence toward C-V06/C-V07/C-V10, not real search dispatch,
+transport/task cancellation, an execution-context contract, binary wiring or rollback. All full
+C acceptance rows remain Pending. A dropped future cannot promise a returned typed Cancelled
+error; actual WebSearchTool/adapter integration must separately prove that boundary.
+
+### Result-admission experiment — 2026-10-11
+
+The separate test-only `crates/talos-tools/tests/i293_result_admission_experiment.rs` exercises
+actual locked URL parsing on invented already-normalized hits. Eight cases distinguish empty and
+invalid-only outcomes, reject relative/unsupported/malformed/credential-bearing inputs, filter
+before truncation, preserve source/order/display fields, and bound input count, URL bytes and
+output count. Injected monotonic-clock readings check admission boundaries before/after parsing
+without resetting the deadline or allowing an expired partial winner. This supplies partial
+C-V02/C-V05 evidence; neither this experiment nor #696 calls the production router.
+
+The parsed-URL predicate is not a strict raw-syntax or fetch-safety gate. WHATWG repairs of missing
+slashes and embedded newline, and syntactically valid loopback URLs, are deliberately retained as
+observations. Raw display text is preserved. Strictness/canonicalization needs separate policy
+review; displaying a result still grants no endpoint/redirect/SSRF fetch authority. The test does
+not perform HTTP/DNS, bound already-materialized title/snippet allocation, preempt synchronous
+parsing, measure actual parse time, test caller cancellation or establish native admission.
+Fixture limits and terminal ordering are not production defaults. Every full C acceptance row
+remains Pending; validation and exact stage disposition are recorded in I293.
+
 #681 is merged at `41381f8055b66d54de42988e2b936a12e5af3ac3`. Its exact-head CI3057 passed
 full macOS release preflight and Windows workspace/governance checks; Linux Desktop validation
 also passed. No CI skip was introduced for the locally restricted Unix socket fixture. Independent
@@ -175,3 +223,46 @@ C/I293 remains Active / Claimed, Completion Pending. D/I294 remains separately o
 candidate is admitted and E/F remain gated. #643 and Epic #624 stay open. Provider correspondence
 is not a prerequisite for this code-truth audit or offline tests. NET-001's unclaimed intake does
 not authorize C to take over its generic resilience scope.
+
+
+### Actual registered search permission boundary — 2026-10-12
+
+Audited source baseline: #707 merge `7e817ab59364bf282c49941ec501f82b0c6c40fb`.
+The new test-only `i293_registered_search_permission` uses the real network group and registry,
+but deliberately never executes a tool. It complements the admitted stand-in in #707.
+
+| Source at audited baseline | Observation |
+|---|---|
+| `talos-tools/src/contributions.rs::network_tool_contributions` | Constructs WebSearchTool directly, source talos-tools:network; construction reads config without a startup search/probe. |
+| `talos-runtime/src/composition.rs` | Shared groups carry the network contributions into product/MCP/coding selections. |
+| `talos-cli/src/registry.rs` | Product and MCP builders register network contributions directly. PermissionAwareTool is cfg(test), not a live wrapper. |
+| `talos-runtime/src/lib.rs::RuntimeBuilder::build` | Coding preset merges contributions, respects caller overrides and registers tool objects; RuntimePermissionAwareTool is cfg(test). |
+| `talos-cli/src/mode_runners.rs` and `talos-runtime/src/lib.rs` | Actual Agent composition installs PermissionSessionState/context/resolver via with_permission_pipeline; root configuration selects policy/interaction. |
+| `talos-agent/src/tool_execution.rs` | Dispatch reads the actual tool permission_profile and provenance for PermissionAuthorizationRequest. |
+| `talos-tools/src/web_search.rs` and `talos-core/src/tool/agent_tool.rs` | WebSearchTool inherits one Network facet without resource/kind. Query schema has no URL; generic ResourceExtractor cannot derive an endpoint from query input. |
+| `talos-permission/src/session.rs` and `grant.rs` | Ask must compile typed Once/Session scopes; consequential missing resource produces MissingResource(0). Configured Allow compiles identity without that grant requirement. |
+
+Three offline cases validate the real query schema/profile, interactive and headless default-engine
+Ask resource failure, and an explicit policy Allow admission control with zero grants. The mode
+context is diagnostic; this does not establish every host's configured policy, invoke a resolver,
+execute WebSearchTool, or run actual CLI/SDK/MCP binaries. Fresh results are in I293. Explicit
+Allow is not a proposed fix: changing policy to evade the resource gap would not establish truthful
+endpoint authority. Constructor ambient keys are never exercised or logged.
+
+Future repair must bind trusted backend destinations and actual effects before grant compilation,
+and preserve multi-endpoint/fallback scope, explicit paid selection, Deny precedence, stale-evidence
+checks and the unchanged query contract. Query/result URLs must not substitute for outbound backend
+authority. Concrete representation/enforcement needs coordinated permission design and review;
+no Domain wildcard, fabricated endpoint or new public trait is accepted by this packet. Reuse the
+PERM-007-H inventory effort once separately claimed, without broadening I300's Git work.
+All full C acceptance remains Pending; this is partial resource-boundary evidence toward C-V10.
+
+### Endpoint authority design gate — 2026-10-12
+
+#708 merged at `f036111f6e969feea47ad784f3cb3effd7e20a33` with full corrected-head CI and
+independent review; I293 records the evidence. The [endpoint-authority packet](SEARCH-001-C-ENDPOINT-AUTHORITY-PLAN.md)
+audits a second boundary: Domain proposal compilation does not produce a concrete endpoint
+execution capability in the current Path-only authorization carrier. It proposes one owned plan
+across preparation, approval, admission and transport, with compound compatibility coverage and
+separate connection-level gates. This is design/evidence only, not a new permission API or
+production search repair; all full C acceptance remains Pending.

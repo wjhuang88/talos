@@ -2,6 +2,10 @@
 
 Date: 2026-10-11. Baseline: `444a8137f054b33802f26bffdb55fb0f83a7a861`.
 
+Current stage (2026-10-12): post-#711 production-baseline experiment, Windows execution pending.
+Earlier matrices, pending statements and tool availability below are preserved staged history;
+the latest checkpoint defines the current fixed 120-process / 2220-test experiment.
+
 ## Authorization And Scope
 
 The maintainer requested deeper GitHub CI diagnosis of the intermittent Windows
@@ -457,3 +461,76 @@ cases/budgets/deadlines/failed retention/ordinary gates. Independent pre-edit sc
 review permits metadata-only same-PR exception; actual storage or scheduling
 repair requires effective governed claim. New compile/durations await new-head
 CI; older Auto/native-child failures remain unresolved and PR stays unmerged.
+
+
+## Governed Repair And Next Owned-Child Probe — 2026-10-12
+
+The storage finding now has its own effective RUNTIME-010 / I301 claim through #710 merge
+`42b86112`, followed by implementation #711 corrected exact `98fa04cb`. That candidate preserves existing
+journal/path/custody/error/WAL/FULL behavior, including the tested ParentDir conservative route.
+Its full exact-head CI and merge gates remain pending; this diagnostic owner is not Complete.
+The current six-source overlays were checked in memory against that candidate: the missing-sidecar
+return stays inside the typed Result recovery closure and retains total timing. This is an anchor
+check only, not Windows compilation or post-repair timing evidence.
+
+Next temporary metadata probe: GetProcessIoCounters on the same live owned process handle in the
+existing native wait/query site under ADR-068. It uses the already-enabled windows-sys Threading
+binding and explicitly initializes its six u64 fields. BOOL success and immediate GetLastError
+are logged with time/PID/thread/handle, cumulative operation/byte counts only. A failed read's
+zero buffer is not an observed zero; no new process/handle/privilege, memory read, file/command/
+environment logging, unsafe block, dependency/feature or production source change is introduced.
+The Microsoft contract is [GetProcessIoCounters](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-getprocessiocounters).
+
+Counters describe cumulative I/O accounting, not a blocked-I/O reason. Flat values do not rule out
+mapped paging, scheduling, suspension or other waits; progress does not identify Defender/disk or
+assign earlier failures. Existing CPU/wait/exit observations and cancellation interpretation remain.
+Preserve fresh-first baseline, original 15s/10s/120s deadlines, fixed120process/2220test matrix,
+35minute phase budget, byte restoration and all failures. This delta requires independent native
+ABI/security review and actual exact-head Windows CI; it has not been run or published yet.
+
+Local preparation checkpoint: all six temporary overlays parse with pinned Rust 1.99 rustfmt;
+actual original sources are untouched. All exact anchors and unsafe-block counts remain valid
+against the corrected #711 candidate. The candidate pending_submission normalized SHA256 is
+`0fddb124c11b9ccb7969ff37febbc379026e528029cd21564bbda8eee30ac52a`; the other five
+source hashes remain unchanged from the last diagnostic source. These are pre-merge anchor
+checks, not successful Windows compilation, restored-source verification or post-fix timing.
+
+## Post-Repair Production Baseline — 2026-10-12
+
+Implementation #711 merged as `9cad344b8f7adef855ca6b858e6ccc7723103767` after exact
+`98fa04cb` CI3161/run38283574722 succeeded in all six jobs, independent review6129237320
+and merge-time CAS6129422889. Windows202 session unit tests (including both ParentDir cases)
+and real Actor passed. macOS full preflight passed the unchanged Unix-socket fixture; its
+permission gate actually observed PermissionDenied. Failed CI3160 remains retained.
+I301/RUNTIME-010 stay Review/Claimed pending their published startup-comparison acceptance.
+
+This diagnostic branch now integrates that actual main merge. Relative to production main,
+only ci.yml, the temporary diagnostic script and this owner differ. The six original Rust
+files, dependencies, lockfiles and 15s/10s/120s deadlines are production-identical. The pending
+store normalized source SHA256 is `0fddb124c11b9ccb7969ff37febbc379026e528029cd21564bbda8eee30ac52a`;
+the other five normalized original hashes remain identical to CI3153.
+
+The new I/O probe received independent local ABI/security approval. All six temporary overlays
+retain exact anchors, parse under Rust1.99 and keep the same unsafe-block count. A missing-sidecar
+early return exits the typed Result closure only: total recovery timing still executes. These
+local checks do not establish Windows compilation, actual finally-restoration or timing.
+
+Run both fresh-first phases with all original attempts retained. Compare successful
+pending_recover_total / actor_reconcile timings with preserved pre-repair CI3153. For the absent
+fast path, connection/schema/PRAGMA markers should not execute; do not represent absent markers
+as measured zero. Structural regression evidence supports avoided initialization; cross-runner
+latency differences, scheduling and nested observers prevent a controlled causal benchmark.
+Actual new-head manifests, original-source hashes, attempt counts, failed samples and restoration
+markers must be inspected before recording acceptance. No post-repair Windows result is yet claimed.
+
+Native active-child low-CPU delays, the historical early-request/no-result failure, broader host
+waits and existing-journal initialization cost remain independent #705 residuals. Successful
+new samples do not assign those old failures to this storage repair or establish universal speed.
+No release or reopening of #590/I290/I291; I301 closeout follows the measured comparison and
+records the already-existing implementation merge SHA, not a status-only commit.
+
+Local stable-stage preparation passed probe self-test, classifier14, workflow/Python syntax,
+diff checks and both governance validators with zero warnings. Initial project validation
+failed because this shallow clone lacked the already-existing #701 completion object
+`690926759229818fcec92b1487d0cffef1bf5fcb`; GitHub verified it, fetching that real object
+resolved the failure. No unrelated owner or validation rule was changed.

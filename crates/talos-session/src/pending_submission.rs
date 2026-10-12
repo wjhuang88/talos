@@ -36,7 +36,7 @@ pub enum PendingSubmissionError {
     /// Structured payload encoding failed.
     #[error("pending submission payload failed: {0}")]
     Payload(#[from] serde_json::Error),
-    /// Journal directory creation failed.
+    /// Journal filesystem inspection or directory creation failed.
     #[error("pending submission journal I/O failed: {0}")]
     Io(#[from] std::io::Error),
     /// Transcript inspection failed while reconciling a Running record.
@@ -644,6 +644,9 @@ impl PendingSubmissionStore {
         states: &[&str],
     ) -> Result<Vec<PendingSubmissionRecord>, PendingSubmissionError> {
         let _guard = self.guard()?;
+        if !self.sidecar_exists()? {
+            return Ok(Vec::new());
+        }
         let connection = self.connection()?;
         ensure_schema(&connection)?;
         let state_filter = states
@@ -762,6 +765,45 @@ impl PendingSubmissionStore {
             Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => Ok(()),
             Err(error) => Err(error.into()),
         }
+    }
+
+    // Called under the store guard. Absence is a read snapshot, not a custody fence:
+    // another store instance may subsequently create and durably admit work.
+    fn sidecar_exists(&self) -> Result<bool, PendingSubmissionError> {
+        match std::fs::symlink_metadata(self.path.as_ref()) {
+            Ok(_) => return Ok(true),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error.into()),
+        }
+        // Creating missing directories can make a path containing `..` resolve to
+        // an existing journal. Preserve the original SQLite route for those paths.
+        if self
+            .path
+            .components()
+            .any(|part| part == std::path::Component::ParentDir)
+        {
+            return Ok(true);
+        }
+        // NotFound can also mean a dangling ancestor link. Find the nearest existing
+        // parent and follow it before treating missing entries as an empty inbox.
+        for parent in self.path.ancestors().skip(1) {
+            let parent = if parent.as_os_str().is_empty() {
+                Path::new(".")
+            } else {
+                parent
+            };
+            match std::fs::symlink_metadata(parent) {
+                Ok(_) => {
+                    if !std::fs::metadata(parent)?.is_dir() {
+                        return Err(std::io::Error::from(std::io::ErrorKind::NotADirectory).into());
+                    }
+                    return Ok(false);
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => return Err(error.into()),
+            }
+        }
+        Err(std::io::Error::from(std::io::ErrorKind::NotFound).into())
     }
 
     fn connection(&self) -> Result<Connection, PendingSubmissionError> {

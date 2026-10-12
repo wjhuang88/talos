@@ -573,6 +573,10 @@ finalizer。
 注册的工具默认会经过权限包装。在 headless 嵌入模式下，未解决的 `Ask` 决策会被拒绝，
 除非 embedder 提供更窄的 allow-list 规则。
 
+待处理提交的 sidecar 不存在时，启动恢复将其视为空收件箱，不会仅为读取而创建目录或数据库。
+需要持久化的结构化提交仍先写入 journal 再确认；已有 journal 的恢复与错误检查保持有效。
+含 `..` 的路径保守沿用原有的目录和数据库初始化行为。
+
 嵌入方可以把 `RuntimeBuilder` 绑定到 host 指定目录中的 durable Session。每个 turn 会以
 Success、Error 或 Cancelled 终态原子落盘；若已完成的安全工具交换之后发生错误或中断，
 重启会精确恢复一次最近的闭合、安全前缀，并明确保留“该 turn 未正常完成”的结果。若取消

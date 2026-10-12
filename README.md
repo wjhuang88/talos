@@ -345,6 +345,11 @@ let runtime = RuntimeBuilder::new()
     .build()?;
 ```
 
+When the pending-submission sidecar is absent, startup recovery treats it as an empty inbox
+without creating directories or a database. A durable structured submission still creates its
+journal before acknowledgement; existing journals retain their recovery and error checks.
+Paths containing `..` conservatively retain the original database/directory initialization.
+
 Durable runtime turns are finalized atomically with a Success, Error, or Cancelled outcome.
 Rebuilding with the same external ID restores model context automatically. When an error or
 interruption follows a completed tool exchange, Talos retains the latest closed, display-safe

@@ -1133,3 +1133,44 @@ repeating known mistakes.
 - Fix: Run controlling-terminal setup in a fresh child interpreter, use a nonblocking master and select-based selector, bound input/cursor responses and forced cleanup, continuously pump output while awaiting provider requests, hang up the PTY before cleanup waits, pace slash keys while pumping so the consumer-time IME guard can expire, and log every expected marker.
 - Prevention: Verify missing-marker and saturated-input deadlines plus consumer-time slash submission under output/cursor backpressure with disposable PTY children; keep fresh Darwin real-binary acceptance mandatory rather than infer cross-platform success from Linux or a bootstrap repair.
 - Promoted to rule/check: scripts/accept_auto_locale_tui.py; existing 25-second interaction and 15-minute CI limits retained.
+
+## 2026-10-12 - Verify rejection cause in permission characterization
+
+- Trigger: I293 offline caller-boundary fixtures through real Agent permission dispatch.
+- Symptom: A rejection case passed while allowed cases never reached the tool.
+- Root cause: The Network stand-in omitted a typed resource; rejection occurred during permission
+  state/grant validation, before the intended unavailable-approval boundary.
+- Fix: Declare an invented typed Domain resource, observe the denial reason and resolver count,
+  then verify actual tool readiness before testing deadline/cancellation effects.
+- Prevention: A zero-start assertion alone does not prove which gate rejected a call. Pair it with
+  cause-specific observations, and keep synthetic resource admission distinct from production
+  WebSearchTool/wrapper authorization evidence.
+- Promoted to rule/check: I293 caller characterization tests only; no permission policy change.
+
+
+## 2026-10-12 - Audit production registration before attributing wrapper behavior
+
+- Trigger: I293 follow-up on the real WebSearchTool permission profile after stand-in admission.
+- Symptom: Named PermissionAwareTool implementations appeared to be candidate production seams.
+- Root cause: Both CLI and SDK wrappers are cfg(test); live composition registers tool objects
+  directly and installs the Agent permission pipeline. Class names alone do not prove call paths.
+- Fix: Trace feature/cfg conditions, actual contributions, registration and pipeline installation;
+  characterize real tool metadata at the permission state boundary without executing search.
+- Prevention: Distinguish default Ask grant compilation from configured Allow admission, and
+  distinguish source audits/state tests from actual binary/transport acceptance.
+- Promoted to rule/check: I293 registered-search characterization only; no permission repair.
+
+
+## 2026-10-12 - Missing-file optimizations must preserve path materialization semantics
+
+- Trigger: I301 startup recovery optimization after #705 measured SQLite initialization cost.
+- Symptom: A new regression recovered zero records through `missing/../session.tlog`, despite a
+  durable acknowledged journal at the canonical target; the original initialization finds it.
+- Root cause: NotFound is a path observation, not proof that SQLite's original directory-creation
+  route cannot reveal an existing journal. Dangling ancestor links create a related ambiguity.
+- Fix: Verify nearest existing parents and preserve errors; conservatively retain the original
+  SQLite route for ParentDir paths and existing final entries, without path normalization.
+- Prevention: Test actual acknowledged custody, missing parents, ancestor/final links, permissions,
+  relative paths and cross-instance snapshots before publishing storage read optimizations.
+  Observe actual filesystem ErrorKind rather than infer permission-test coverage from UID alone.
+- Promoted to rule/check: bounded pending-submission recovery regressions only; no new policy.

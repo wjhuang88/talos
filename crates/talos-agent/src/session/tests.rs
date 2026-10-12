@@ -3076,3 +3076,44 @@ async fn fixture_durable_cancelled_turn_replays_latest_closed_prefix() {
         )]
     );
 }
+
+#[tokio::test]
+async fn fresh_actor_admits_submit_without_recovery_sidecar_creation() {
+    let dir = tempfile::tempdir().expect("isolated workspace");
+    let agent = make_agent(MockModel::new(vec![success_events("hello")]));
+    let config = SessionConfig {
+        runtime_policy: RuntimePolicy::interactive(),
+        workspace_root: dir.path().to_path_buf(),
+        initial_history: vec![],
+        model_context_limit: 128_000,
+    };
+    let (handle, mut actor) = AppServerSession::new(agent, config);
+    let sidecar = actor.pending_store.path().to_path_buf();
+    let actor_task = tokio::spawn(async move { actor.run().await });
+    handle
+        .sq_tx
+        .send(SessionOp::Submit {
+            message: "hi".into(),
+        })
+        .await
+        .expect("submit");
+    let mut events = handle.eq_rx;
+    let received = collect_until_completions(&mut events, 1).await;
+    assert!(received.iter().any(|event| matches!(
+        completed_status(event),
+        Some(TurnCompletionStatus::Success { .. })
+    )));
+    assert!(
+        !sidecar.exists(),
+        "startup must not create a recovery-only journal"
+    );
+    handle
+        .sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("shutdown");
+    tokio::time::timeout(Duration::from_secs(2), actor_task)
+        .await
+        .expect("bounded shutdown")
+        .expect("actor task");
+}

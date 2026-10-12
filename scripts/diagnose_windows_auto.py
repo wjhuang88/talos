@@ -117,6 +117,13 @@ fn windows_auto_probe(stage: &str, identity: usize) {
                     let times_read_ok = windows_sys::Win32::System::Threading::GetProcessTimes(process, &mut created, &mut exited, &mut kernel, &mut user);
                     let ticks = |value: windows_sys::Win32::Foundation::FILETIME| ((value.dwHighDateTime as u64) << 32) | value.dwLowDateTime as u64;
                     eprintln!("WINDOWS_AUTO_DIAG times_read_ok={} kernel_100ns={} user_100ns={} identity={}", times_read_ok, ticks(kernel), ticks(user), process as usize);
+                    let mut io = windows_sys::Win32::System::Threading::IO_COUNTERS {
+                        ReadOperationCount: 0, WriteOperationCount: 0, OtherOperationCount: 0,
+                        ReadTransferCount: 0, WriteTransferCount: 0, OtherTransferCount: 0,
+                    };
+                    let io_read_ok = windows_sys::Win32::System::Threading::GetProcessIoCounters(process, &mut io);
+                    let io_error = if io_read_ok == 0 { windows_sys::Win32::Foundation::GetLastError() } else { 0 };
+                    eprintln!("WINDOWS_AUTO_DIAG time={:?} pid={} thread={:?} io_read_ok={} io_error={} read_ops={} write_ops={} other_ops={} read_bytes={} write_bytes={} other_bytes={} identity={}", std::time::SystemTime::now(), std::process::id(), std::thread::current().id(), io_read_ok, io_error, io.ReadOperationCount, io.WriteOperationCount, io.OtherOperationCount, io.ReadTransferCount, io.WriteTransferCount, io.OtherTransferCount, process as usize);
                     if observed != windows_sys::Win32::Foundation::WAIT_TIMEOUT { break observed; }
                 };'''),
         ("                windows_sys::Win32::Foundation::CloseHandle(process);", "                windows_auto_probe(\"process_handle_close_begin\", process as usize);\n                windows_sys::Win32::Foundation::CloseHandle(process);\n                windows_auto_probe(\"process_handle_close_return\", process as usize);"),
@@ -409,6 +416,11 @@ def main() -> int:
         assert "WaitForSingleObject(process, 1_000)" in patched[BOUNDARY]
         assert "observed != windows_sys::Win32::Foundation::WAIT_TIMEOUT" in patched[BOUNDARY]
         assert "GetProcessTimes(process," in patched[BOUNDARY]
+        assert patched[BOUNDARY].count("GetProcessIoCounters(process, &mut io)") == 1
+        assert "let io_error = if io_read_ok == 0 { windows_sys::Win32::Foundation::GetLastError() } else { 0 };" in patched[BOUNDARY]
+        assert all(field + ": 0" in patched[BOUNDARY] for field in (
+            "ReadOperationCount", "WriteOperationCount", "OtherOperationCount",
+            "ReadTransferCount", "WriteTransferCount", "OtherTransferCount"))
         assert patched[PLAN].count('windows_auto_turn_stage("prepare_session_enter")') == 1
         assert patched[PLAN].count('windows_auto_turn_stage("initial_seal_return")') == 1
         assert patched[PLAN].count(".await") == originals[PLAN].count(".await")
