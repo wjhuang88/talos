@@ -154,6 +154,18 @@ handle.shutdown().await?;
 bounded Session queue; it does not mean the model turn completed. Once shutdown closes admission,
 new submissions return `RuntimeError::RuntimeClosing` without enqueueing.
 
+### Pending-Journal Startup Recovery
+
+Recovery of a genuinely absent pending-submission sidecar returns an empty inbox without creating
+directories, SQLite, WAL or schema. Paths containing `..` conservatively retain original
+directory/database initialization, since missing-directory creation may resolve them to an
+existing journal. Existing directory entries (including final symlinks) retain
+the original SQLite recovery path; malformed/dangling parent paths and inspection failures remain
+errors. This is an absence snapshot under the store guard, not a cross-instance custody fence.
+A later structured submission still commits its journal before acknowledgement, and a subsequent
+read must recover that acknowledged work. Existing-journal schema, Running custody reconciliation,
+WAL/FULL durability and configured deadlines are unchanged.
+
 ### Session-Owned Background Process Controls
 
 When a live `AppServerSession` is constructed, the model-visible `process` tool is registered for

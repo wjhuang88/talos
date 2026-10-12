@@ -143,6 +143,18 @@ jobs:
         if: needs.classify-changes.result != 'success' || needs.classify-changes.outputs.full_validation != 'false'
         run: ./scripts/release_preflight.sh
 
+      - name: Pending-store permission-denial regression
+        if: needs.classify-changes.result != 'success' || needs.classify-changes.outputs.full_validation != 'false'
+        shell: bash
+        run: |
+          set -euo pipefail
+          result_log="$(mktemp)"
+          cargo test --locked -p talos-session --lib \
+            pending_submission::tests::recovery_preserves_filesystem_permission_errors \
+            -- --exact --nocapture 2>&1 | tee "${result_log}"
+          grep -F 'test result: ok. 1 passed; 0 failed; 0 ignored' "${result_log}"
+          grep -F 'pending-journal permission fixture filesystem_error=PermissionDenied' "${result_log}"
+
       - name: Real CLI and TUI Auto locale acceptance
         if: needs.classify-changes.result != 'success' || needs.classify-changes.outputs.full_validation != 'false'
         timeout-minutes: 15

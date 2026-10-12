@@ -1,6 +1,6 @@
 # RUNTIME-010: Missing Pending-Sidecar Startup Recovery
 
-> Document status: Active
+> Document status: Review
 
 **Type**: Technical / Runtime State Story
 **Parent Epic**: None
@@ -19,7 +19,7 @@
 | Governance Claim PR | #710 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer repeatedly authorized continuing the intermittent-timeout investigation and repair through GitHub CI. No separate maintainer reviewer is available; independent Agent storage/API review, exact-head CI, both validators and merge-time CAS remain required. |
-| Implementation PR | Not started |
+| Implementation PR | #711 (Review) |
 | Last Updated | 2026-10-12 |
 | Handoff / Release Condition | No implementation before this atomic claim and activation merges into main; release only after evidence-bearing closeout or explicit handoff. |
 
@@ -99,3 +99,20 @@ No Complete state without an already-existing implementation SHA and required ev
 The Active/Claimed record is a proposal only until finalized #710 merges into main.
 No production implementation or implementation branch exists. Both validators, relevant exact-head
 CI, independent Agent storage/API review and merge-time CAS are required before merge.
+
+## Implementation Checkpoint — 2026-10-12
+
+Claim #710 is effective at merge `42b861125d78aab0707528fc5fdec5e14ede0d19`.
+Delivery remains Review / Claimed. Source, validation, failed attempts and residual evidence are
+owned by [I301](../../iterations/I301-missing-pending-sidecar-startup.md); no Completion Commit exists.
+
+Conservative acceptance boundary: paths containing `..` retain original directory/database
+initialization. A missing intermediate directory can otherwise hide an already acknowledged journal
+at the resolved target. Preserve that custody behavior instead of claiming the zero-creation fast
+path for an ambiguous path. Final symlinks also retain original SQLite behavior; other missing paths
+require a verified parent and preserve real I/O errors.
+
+Local locked session/Agent tests passed 733 cases including 11 storage regressions and actual Actor
+Submit. Full local preflight is blocked by the unchanged Unix-socket fixture; remote exact-head
+full CI, explicit nonprivileged PermissionDenied evidence and independent storage/API review are
+mandatory before merge. #705 still owns PowerShell latency and historical-failure attribution.
