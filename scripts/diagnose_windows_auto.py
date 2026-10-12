@@ -20,6 +20,7 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 BOUNDARY = "crates/talos-tools/src/process_boundary.rs"
 AUTO = "crates/talos-desktop/src/runtime_host/auto_tests.rs"
+HOST = "crates/talos-desktop/src/runtime_host.rs"
 END_BY = float("inf")
 CONTROLLED_TEST = "process_boundary::windows_tests::windows_auto_diagnostic_descendant_pipe_hold_is_observable_and_cleanup_bounded"
 CONTROLLED_FIXTURE = '''    #[tokio::test(flavor = "current_thread")]
@@ -121,7 +122,17 @@ fn windows_auto_probe(stage: &str, identity: usize) {
     auto = replace_once(auto, "    if outcome.is_err() {", '''    heartbeat.abort();
     eprintln!("WINDOWS_AUTO_DIAG test_outcome enabled={} allow={} ok={} stages={:?}", enabled, allow, outcome.is_ok(), stages);
     if outcome.is_err() {''')
-    return {BOUNDARY: boundary, AUTO: auto}
+    host = replace_once(originals[HOST], "                        let terminal = executor.block_on(async move {\n                            let (provider, context_limit, auto_enabled) = match provider() {", '''                        let terminal = executor.block_on(async move {
+                            // Temporary CI observation of this host executor, not the test executor.
+                            tokio::spawn(async move {
+                                loop {
+                                    eprintln!("WINDOWS_AUTO_DIAG time={:?} pid={} thread={:?} stage=host_heartbeat",
+                                        std::time::SystemTime::now(), std::process::id(), std::thread::current().id());
+                                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                                }
+                            });
+                            let (provider, context_limit, auto_enabled) = match provider() {''')
+    return {BOUNDARY: boundary, AUTO: auto, HOST: host}
 
 
 def execute(command: list[str], log: Path, timeout: int) -> tuple[int, str]:
@@ -173,8 +184,11 @@ def build(output: Path, phase: str, tools: bool = False) -> Path:
     return binaries[0]
 
 
-def matrix(binary: Path, output: Path, phase: str, results: list[dict]) -> None:
+def matrix(binary: Path, output: Path, phase: str, results: list[dict], stress: bool = False) -> None:
     modes = [
+        ("single", ["runtime_host::auto_tests::enabled_auto_allow_once_reports_without_manual_approval", "--exact", "--test-threads=1"], 50),
+        ("suite-parallel", ["--test-threads=32"], 10),
+    ] if stress else [
         ("single", ["runtime_host::auto_tests::enabled_auto_allow_once_reports_without_manual_approval", "--exact", "--test-threads=1"], 5),
         ("suite-serial", ["--test-threads=1"], 3),
         ("suite-parallel", ["--test-threads=16"], 5),
@@ -200,9 +214,11 @@ def main() -> int:
     global END_BY
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--self-test", action="store_true")
-    parser.add_argument("--controlled-only", action="store_true", help="run only the controlled mechanism after a retained full matrix")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--controlled-only", action="store_true", help="run only the controlled mechanism after a retained full matrix")
+    mode.add_argument("--stress", action="store_true", help="bounded original-test sampling with host-runtime heartbeat; no synthetic fixture")
     args = parser.parse_args()
-    original_bytes = {path: (ROOT / path).read_bytes() for path in (BOUNDARY, AUTO)}
+    original_bytes = {path: (ROOT / path).read_bytes() for path in (BOUNDARY, AUTO, HOST)}
     originals = {path: data.decode("utf-8").replace("\r\n", "\n") for path, data in original_bytes.items()}
     patched = probes(originals)
     if args.self_test:
@@ -210,6 +226,7 @@ def main() -> int:
         assert "Duration::from_secs(15)" in patched[AUTO]
         assert "Duration::from_secs(10)" in patched[AUTO]
         assert patched[BOUNDARY].count("windows_auto_probe(") >= 10
+        assert patched[HOST].count("stage=host_heartbeat") == 1
         try:
             replace_once("duplicate duplicate", "duplicate", "replacement")
         except ValueError:
@@ -223,18 +240,20 @@ def main() -> int:
     END_BY = time.monotonic() + 35 * 60
     output = ROOT / "windows-auto-diagnostics"
     output.mkdir(exist_ok=True)
-    manifest = {"head": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(), "mode": "controlled-only" if args.controlled_only else "full", "python": sys.version, "runner": {key: os.environ.get(key) for key in ("RUNNER_OS", "RUNNER_ARCH", "ImageOS", "ImageVersion")}, "source_sha256": {path: hashlib.sha256(text.encode()).hexdigest() for path, text in originals.items()}}
+    manifest = {"head": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(), "mode": "stress" if args.stress else "controlled-only" if args.controlled_only else "full", "python": sys.version, "runner": {key: os.environ.get(key) for key in ("RUNNER_OS", "RUNNER_ARCH", "ImageOS", "ImageVersion")}, "source_sha256": {path: hashlib.sha256(text.encode()).hexdigest() for path, text in originals.items()}}
     (output / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     overlay = "".join("".join(difflib.unified_diff(originals[path].splitlines(keepends=True), patched[path].splitlines(keepends=True), fromfile=path, tofile=path)) for path in originals)
     (output / "probe-overlay.patch").write_text(overlay, encoding="utf-8")
     results: list[dict] = []
     try:
         if not args.controlled_only:
-            matrix(build(output, "baseline"), output, "baseline", results)
+            matrix(build(output, "baseline"), output, "baseline", results, args.stress)
         for path, text in patched.items():
             (ROOT / path).write_text(text, encoding="utf-8", newline="\n")
         if not args.controlled_only:
-            matrix(build(output, "instrumented"), output, "instrumented", results)
+            matrix(build(output, "instrumented"), output, "instrumented", results, args.stress)
+        if args.stress:
+            return int(any(result["exit_code"] != 0 for result in results))
         binary = build(output, "controlled-pipe", tools=True)
         code, inventory = execute([str(binary), CONTROLLED_TEST, "--exact", "--list"], output / "controlled-inventory.log", 90)
         present = f"{CONTROLLED_TEST}: test" in inventory and "1 test, 0 benchmarks" in inventory

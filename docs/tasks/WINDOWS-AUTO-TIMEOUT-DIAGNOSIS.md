@@ -123,3 +123,34 @@ the two earlier heads supply 52 processes/3412 original test executions, not
 new-head matrix coverage. The default script invocation still runs the full
 matrix. Production Rust source is unchanged across these candidates and normal
 mandatory full CI continues independently. Corrected Windows execution is pending.
+
+## Controlled Result And Next Original-Test Capture
+
+CI3140/run `38137043755`, exact head `01cf6bac86569c3cd1a82fc524a5c89e16e9ecef`:
+all seven jobs SUCCESS. Exact fixture inventory and two actual executions pass.
+Leader native wait returns exit zero before descendant readiness; completion stays
+pending until owned-Job cleanup. Cleanup-to-both-pipes-joined is 2.3380/2.0474 ms
+from native 100 ns SystemTime intervals. Independent raw-result review agrees.
+Artifact `11701707026`, SHA256
+`fd83bd6d23a36c289d6ed369d212ff046e281f4d3e0136cec508f04047b2e691`,
+expires 2026-10-25; durable checkpoint comment `6108803418`.
+This proves a synthetic mechanism, not the historical `pwd` timeout.
+
+The next optional invocation uses `--stress`: per baseline/instrumented phase,
+50 fresh isolated original allow-once runs and ten full-suite runs at 32 test
+threads. Planned total: 120 test processes, 2220 test executions if each full
+suite retains 106 tests. Actual counts and every failure must be reported;
+budget exhaustion means incomplete, never success. This phase skips synthetic
+fixture execution because its mechanism is already characterized.
+
+A temporary host-runtime heartbeat is added inside the existing executor's
+async root, with native time, PID and host thread ID matching launcher probes.
+It runs every second and ends when that executor shuts down; it has no command,
+workspace, environment or output contents. Continued test heartbeat alone cannot
+prove host progress. Lost host ticks while test ticks continue can support host
+blocking/scheduling investigation, but cannot by itself establish a cause.
+The heartbeat adds an observer effect, so the unchanged baseline remains required.
+All three original Rust files are restored byte-for-byte. Production Rust remains
+unchanged in Git; original deadlines, total budget and mandatory gates remain.
+Main advanced to `7e817ab` without changing the existing boundary/Auto-test files;
+no stale-main integration or root-cause completion is claimed.

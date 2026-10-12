@@ -339,9 +339,9 @@ jobs:
           save-if: 'false'
       - name: Validate exact temporary probe anchors
         run: python scripts/diagnose_windows_auto.py --self-test
-      - name: Controlled pipe mechanism (prior matrix retained)
+      - name: Original Auto bounded stress and host-runtime heartbeat
         timeout-minutes: 40
-        run: python scripts/diagnose_windows_auto.py --controlled-only
+        run: python scripts/diagnose_windows_auto.py --stress
       - name: Upload every attempt including failures
         if: always()
         uses: actions/upload-artifact@v4
