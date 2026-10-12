@@ -256,3 +256,13 @@ authority. Concrete representation/enforcement needs coordinated permission desi
 no Domain wildcard, fabricated endpoint or new public trait is accepted by this packet. Reuse the
 PERM-007-H inventory effort once separately claimed, without broadening I300's Git work.
 All full C acceptance remains Pending; this is partial resource-boundary evidence toward C-V10.
+
+### Endpoint authority design gate — 2026-10-12
+
+#708 merged at `f036111f6e969feea47ad784f3cb3effd7e20a33` with full corrected-head CI and
+independent review; I293 records the evidence. The [endpoint-authority packet](SEARCH-001-C-ENDPOINT-AUTHORITY-PLAN.md)
+audits a second boundary: Domain proposal compilation does not produce a concrete endpoint
+execution capability in the current Path-only authorization carrier. It proposes one owned plan
+across preparation, approval, admission and transport, with compound compatibility coverage and
+separate connection-level gates. This is design/evidence only, not a new permission API or
+production search repair; all full C acceptance remains Pending.

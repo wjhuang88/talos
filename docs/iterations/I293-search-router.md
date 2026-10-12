@@ -10,7 +10,7 @@
 | Source Issue | #643 |
 | Depends on | Accepted ADR-085; SEARCH-001-B / #642 complete in #656; NET-001 boundary coordination |
 | Claim State | Claimed |
-| Implementation PR | #681 / #685 / #696 / #706 / #707 (merged partial evidence); registered-search permission stage Review (PR not yet assigned) |
+| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 (merged partial evidence); endpoint-authority architecture packet Review (PR not yet assigned) |
 | Completion | Pending |
 
 ## Collaboration Claim
@@ -536,3 +536,50 @@ corrected without closing that Issue or changing any claim. Independent review w
 initial APPROVE pending this correction. Candidate head 102338cd / CI3144 is superseded, not
 final merge evidence; corrected exact-head review and full CI must pass. Test/production code
 is unchanged from the locally verified tree; fresh docs governance/claims and diff checks apply.
+
+### Endpoint-authority architecture packet (2026-10-12)
+
+#708 merged at `f036111f6e969feea47ad784f3cb3effd7e20a33`, corrected reviewed head
+`ad70b76e7696d19d73b0d3c5588b19219430601d`, after all six CI3146/run38195338735 jobs
+succeeded. Complete macOS and Windows logs each execute the three registered-search cases with
+zero failed/ignored/filtered; macOS original socket, both SDK modes and full preflight pass.
+Windows workspace/audit/CLI smoke pass, both platforms governance/claims report zero warnings.
+Corrected independent Agent approval is #708 comment6116601192, final CAS6116824003;
+merge synchronization comments6116831474/6116831628/6116831778. These supersede prior pending
+merge instructions; the initial withdrawn review and candidate/validator failures remain history.
+No full C acceptance row is completed by #708.
+
+This stage starts from that merge under unchanged effective #664, after refreshing open PRs and
+permission owners. I293 continues architecture/evidence only; I294 remains independent/incomplete,
+I300 retains its Git slice, PERM-007-H remains Refinement/Unclaimed. Completed owners retain their
+recorded completion/claim states without reactivation, I277 deferred device acceptance and I249
+Planned retain their scopes; I164 remains Paused/superseded, not reactivated. #705 Windows timeout
+diagnosis is separate and untouched. No new
+selection, activation, claim, production behavior or permission repair occurs.
+
+Deliverable: [endpoint-authority plan](../reference/SEARCH-001-C-ENDPOINT-AUTHORITY-PLAN.md),
+linked from the router plan and C Story. Fresh source audit finds that Domain/Remote proposal
+compilation is distinct from execution authority: current execution_authorizations emits Path
+capabilities only, and default execute_authorized delegates to execute. A Domain facet alone
+cannot establish outbound endpoint enforcement. This is source evidence, not a new transport test
+or exploit claim. The packet proposes an owned invocation-bound destination plan, a carrier/API
+decision gate, compound compatibility coverage and ten planned acceptance rows. It chooses no
+public API and does not generalize the browser prepared route.
+
+Infrastructure-only architecture/evidence exception: no user-visible delivery. All modified files
+are Markdown; no Rust test or production source, Cargo/lockfile, config, permission, provider or CI
+change. Repository documentation-only validation routing applies; previous full #708 Rust/SDK
+results are historical, not newly run validation. Workspace maintenance removed checkout/cache;
+the repository was re-cloned and pinned Rust 1.99 restored for current documentation validators.
+Fresh local reduced checks, independent exact-head architecture/permission-evidence review,
+trusted-base CI routing and final CAS remain submission/merge gates. C/I293 Active/Claimed and
+incomplete, all full C-V01..11 and all EP rows Pending; #643/#624 open, D incomplete/E-F gated.
+
+Fresh documentation-only convergence on actual Rust 1.99 execution: public-site and installer
+checks pass, governance/claims report zero warnings, classifier fixture matrix passes 14 cases,
+format and whitespace checks pass. The SQLite consumer validator used fresh locked Cargo metadata
+and passed its 17-case fixture matrix; delivery workflow validation passed 12 cases. No full Rust
+workspace test/preflight, Clippy or SDK build is claimed for this Markdown-only stage. Independent
+read-only Agent preview found no blockers and confirmed source evidence/proposed API boundaries;
+it is not exact-head merge approval or natural-person review. Repository trusted-base routing,
+exact-head applicable review/CI and final CAS remain required before merge.

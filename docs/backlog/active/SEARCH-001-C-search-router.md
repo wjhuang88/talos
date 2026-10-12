@@ -52,3 +52,11 @@ Production registration uses the Agent pipeline; the apparent CLI/SDK Permission
 are test-only. This records a configuration-specific resource gap, not binary/transport acceptance
 or authorization to repair policy. See I293 and the router plan for source audit and fresh gates.
 All full C acceptance remains Pending; #643/#624 stay open.
+
+#708 merged as `f036111f6e969feea47ad784f3cb3effd7e20a33`, with corrected exact-head review,
+all six CI3146 jobs successful and three cases executed on macOS/Windows without filters.
+The next architecture-only [endpoint-authority packet](../../reference/SEARCH-001-C-ENDPOINT-AUTHORITY-PLAN.md)
+distinguishes proposal compilation from execution enforcement and defines planned carrier,
+compatibility/fallback, redirect/connection and real-dispatch acceptance gates. It changes no
+production behavior or permission API, activates no PERM-007-H work and admits no provider.
+C/I293 and all full acceptance remain incomplete/Pending; #643/#624 remain open.
