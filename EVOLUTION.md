@@ -1159,3 +1159,17 @@ repeating known mistakes.
 - Prevention: Distinguish default Ask grant compilation from configured Allow admission, and
   distinguish source audits/state tests from actual binary/transport acceptance.
 - Promoted to rule/check: I293 registered-search characterization only; no permission repair.
+
+
+## 2026-10-12 - Missing-file optimizations must preserve path materialization semantics
+
+- Trigger: I301 startup recovery optimization after #705 measured SQLite initialization cost.
+- Symptom: A new regression recovered zero records through `missing/../session.tlog`, despite a
+  durable acknowledged journal at the canonical target; the original initialization finds it.
+- Root cause: NotFound is a path observation, not proof that SQLite's original directory-creation
+  route cannot reveal an existing journal. Dangling ancestor links create a related ambiguity.
+- Fix: Verify nearest existing parents and preserve errors; conservatively retain the original
+  SQLite route for ParentDir paths and existing final entries, without path normalization.
+- Prevention: Test actual acknowledged custody, missing parents, ancestor/final links, permissions,
+  relative paths and cross-instance snapshots before publishing storage read optimizations.
+- Promoted to rule/check: bounded pending-submission recovery regressions only; no new policy.
