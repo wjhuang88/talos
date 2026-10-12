@@ -10,7 +10,7 @@
 | Source Issue | #643 |
 | Depends on | Accepted ADR-085; SEARCH-001-B / #642 complete in #656; NET-001 boundary coordination |
 | Claim State | Claimed |
-| Implementation PR | #681 / #685 / #696 / #706 (merged partial evidence); caller-boundary stage Review (PR not yet assigned) |
+| Implementation PR | #681 / #685 / #696 / #706 / #707 (merged partial evidence); registered-search permission stage Review (PR not yet assigned) |
 | Completion | Pending |
 
 ## Collaboration Claim
@@ -468,3 +468,71 @@ Updated independent Agent preview found no blockers; it acknowledged missing the
 resource prerequisite and verified the corrected cause assertions and post-join drain. This is
 not final exact-head approval or natural-person review. Fresh exact-head CI/review and CAS remain
 merge gates; every full C acceptance row is still Pending.
+
+### Registered-search permission characterization stage (2026-10-12)
+
+#707 caller stage merged at `7e817ab59364bf282c49941ec501f82b0c6c40fb`, reviewed head
+`03e9aec27d68ca442de39436c5080afcb3dbf690`, after CI3141 / run38191125400 passed all six
+jobs without reruns. Complete macOS and Windows logs execute all three caller cases; macOS
+original socket, both SDK modes and full preflight passed, Windows workspace/audit/CLI smoke
+passed, governance/claims reported zero warnings. Exact-head independent Agent review and final
+CAS are recorded in #707 comments `6116027416`, `6116181798`; merge synchronization in
+`6116188215`, #643 `6116188388`, #624 `6116188616`. Single-maintainer reason and exact-tree
+publication verification are in `6116021786`. These supersede prior pending merge instructions,
+without completing any full C acceptance row.
+
+This stage starts from that merge under effective #664. Selection disposition: I293 continues
+its existing bounded slice; I294 remains independent; I300 owns Git repair, PERM-007-H is
+Refinement / Unclaimed; I288/I292 retain Complete / Claimed records and are not reactivated;
+I296-I299 retain their recorded completion states; I277 deferred device
+acceptance and DEPENDENCY-003-A retain their own scopes. Open #705 is separate Windows timeout
+diagnosis and is not edited. Board-wide historical row drift is a separately owned governance
+residual, not changed in this implementation batch.
+
+Runnable deliverable: `crates/talos-tools/tests/i293_registered_search_permission.rs`, three
+synchronous tests using the actual exported network contributions and ToolRegistry. They validate
+the public query input, unchanged untyped Network facet, default Ask proposal compilation failure
+in interactive and headless diagnostic contexts, and a narrowly configured policy Allow admission
+control. Constructors may read ambient configuration; no execute/search/adapter, HTTP or DNS call
+is made, and no credential value is printed. No policy grant is committed by the fixture.
+
+Default PermissionEngine Ask evaluates successfully but begin_invocation and both Once/Session
+proposal compilation return exactly GrantError::MissingResource(0), with zero grants. Explicit
+fixture policy Allow instead admits the unchanged profile without an approval grant. This is a
+resource compiler boundary observation, not universal failure across runtime configurations or
+real binary dispatch proof. Allow is a characterization control, not a recommended workaround.
+
+The router integration plan pins the actual registration and Agent pipeline installation audit.
+The CLI PermissionAwareTool and SDK RuntimePermissionAwareTool are cfg(test), not production
+wrappers that can repair WebSearchTool metadata. Runtime permission configuration may differ
+from PermissionEngine defaults; the test does not claim those hosts all default to Ask.
+Any resource/profile/enforcement repair needs permission-owner coordination and separate
+production authorization; PERM-007-H is not activated here and I300's Git slice is not broadened.
+
+Infrastructure-only/test-only exception: affected documentation is the router plan and C Story,
+with no user-visible delivery. No production/API, dependency/lockfile, config, provider-admission,
+CI or permission-policy change. C/I293 remains Active / Claimed / incomplete, all full C-V01..11
+Pending, #643/#624 open; D remains incomplete and E/F gated. Fresh validation, exact-head
+independent Agent review, unfiltered full CI and merge-time CAS remain required.
+
+
+Fresh pinned Rust 1.99 local convergence: three focused network-feature cases passed without
+skips; target Clippy with -D warnings passed. Standard preflight passed site/installers,
+governance/claims (zero warnings), text/classifier, format, locked workspace check and strict
+Clippy; it stopped only at the unchanged OS-1 socket fixture (64 passed / 1 failed), not a full
+preflight pass. Under the existing exact local-only socket deferral, locked workspace tests
+passed across 118 summaries: 3626 passed, zero failed/ignored, one filtered; all three new cases
+executed successfully. External Runtime SDK default and coding builds both passed. No extra skip,
+fixture archive, old assertion/timeout, dependency/lockfile or CI change was needed.
+Independent read-only Agent preview found no blockers; it is not final exact-head merge approval
+or natural-person review. Fresh unfiltered CI, exact-head review and CAS remain merge gates.
+Final governance rerun initially omitted the local Cargo PATH and failed its SQLite validator
+with cargo not found. Restoring the same verified toolchain environment produced zero-warning
+governance/claim passes; the invocation error is not reported as a source failure or a pass.
+
+Merge-time evidence review found the new selection sentence "remain closed" ambiguous: I288
+and I292 retain Complete / Claimed records, and GitHub #625 is still open. The sentence was
+corrected without closing that Issue or changing any claim. Independent review withdrew its
+initial APPROVE pending this correction. Candidate head 102338cd / CI3144 is superseded, not
+final merge evidence; corrected exact-head review and full CI must pass. Test/production code
+is unchanged from the locally verified tree; fresh docs governance/claims and diff checks apply.

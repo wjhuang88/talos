@@ -1146,3 +1146,16 @@ repeating known mistakes.
   cause-specific observations, and keep synthetic resource admission distinct from production
   WebSearchTool/wrapper authorization evidence.
 - Promoted to rule/check: I293 caller characterization tests only; no permission policy change.
+
+
+## 2026-10-12 - Audit production registration before attributing wrapper behavior
+
+- Trigger: I293 follow-up on the real WebSearchTool permission profile after stand-in admission.
+- Symptom: Named PermissionAwareTool implementations appeared to be candidate production seams.
+- Root cause: Both CLI and SDK wrappers are cfg(test); live composition registers tool objects
+  directly and installs the Agent permission pipeline. Class names alone do not prove call paths.
+- Fix: Trace feature/cfg conditions, actual contributions, registration and pipeline installation;
+  characterize real tool metadata at the permission state boundary without executing search.
+- Prevention: Distinguish default Ask grant compilation from configured Allow admission, and
+  distinguish source audits/state tests from actual binary/transport acceptance.
+- Promoted to rule/check: I293 registered-search characterization only; no permission repair.

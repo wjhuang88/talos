@@ -223,3 +223,36 @@ C/I293 remains Active / Claimed, Completion Pending. D/I294 remains separately o
 candidate is admitted and E/F remain gated. #643 and Epic #624 stay open. Provider correspondence
 is not a prerequisite for this code-truth audit or offline tests. NET-001's unclaimed intake does
 not authorize C to take over its generic resilience scope.
+
+
+### Actual registered search permission boundary — 2026-10-12
+
+Audited source baseline: #707 merge `7e817ab59364bf282c49941ec501f82b0c6c40fb`.
+The new test-only `i293_registered_search_permission` uses the real network group and registry,
+but deliberately never executes a tool. It complements the admitted stand-in in #707.
+
+| Source at audited baseline | Observation |
+|---|---|
+| `talos-tools/src/contributions.rs::network_tool_contributions` | Constructs WebSearchTool directly, source talos-tools:network; construction reads config without a startup search/probe. |
+| `talos-runtime/src/composition.rs` | Shared groups carry the network contributions into product/MCP/coding selections. |
+| `talos-cli/src/registry.rs` | Product and MCP builders register network contributions directly. PermissionAwareTool is cfg(test), not a live wrapper. |
+| `talos-runtime/src/lib.rs::RuntimeBuilder::build` | Coding preset merges contributions, respects caller overrides and registers tool objects; RuntimePermissionAwareTool is cfg(test). |
+| `talos-cli/src/mode_runners.rs` and `talos-runtime/src/lib.rs` | Actual Agent composition installs PermissionSessionState/context/resolver via with_permission_pipeline; root configuration selects policy/interaction. |
+| `talos-agent/src/tool_execution.rs` | Dispatch reads the actual tool permission_profile and provenance for PermissionAuthorizationRequest. |
+| `talos-tools/src/web_search.rs` and `talos-core/src/tool/agent_tool.rs` | WebSearchTool inherits one Network facet without resource/kind. Query schema has no URL; generic ResourceExtractor cannot derive an endpoint from query input. |
+| `talos-permission/src/session.rs` and `grant.rs` | Ask must compile typed Once/Session scopes; consequential missing resource produces MissingResource(0). Configured Allow compiles identity without that grant requirement. |
+
+Three offline cases validate the real query schema/profile, interactive and headless default-engine
+Ask resource failure, and an explicit policy Allow admission control with zero grants. The mode
+context is diagnostic; this does not establish every host's configured policy, invoke a resolver,
+execute WebSearchTool, or run actual CLI/SDK/MCP binaries. Fresh results are in I293. Explicit
+Allow is not a proposed fix: changing policy to evade the resource gap would not establish truthful
+endpoint authority. Constructor ambient keys are never exercised or logged.
+
+Future repair must bind trusted backend destinations and actual effects before grant compilation,
+and preserve multi-endpoint/fallback scope, explicit paid selection, Deny precedence, stale-evidence
+checks and the unchanged query contract. Query/result URLs must not substitute for outbound backend
+authority. Concrete representation/enforcement needs coordinated permission design and review;
+no Domain wildcard, fabricated endpoint or new public trait is accepted by this packet. Reuse the
+PERM-007-H inventory effort once separately claimed, without broadening I300's Git work.
+All full C acceptance remains Pending; this is partial resource-boundary evidence toward C-V10.
