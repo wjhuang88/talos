@@ -35,3 +35,10 @@ experiments with URL admission/filtering/truncation and injected-clock validatio
 It also records URL-parser repair behavior as a policy gap, not strict syntax or fetch safety.
 Neither stage integrates production search or completes C-V02/C-V05; full C acceptance remains
 pending. The iteration owner retains validation, limits and remaining integration gates.
+
+#706 result-admission stage merged at `4b03149ca452bbaf4e96b580ab74135bc4ac670d` with full
+CI3136 and independent technical review. The next test-only target drives actual Agent permission
+dispatch and Session Interrupt using an offline Network stand-in, to characterize approval TTL,
+the detached coordination token and owned-future cleanup. It does not call WebSearchTool or prove
+HTTP/DNS cancellation, deadline propagation or full C-V10 acceptance. C and Epic remain open;
+the iteration owner records fresh validation and residuals.

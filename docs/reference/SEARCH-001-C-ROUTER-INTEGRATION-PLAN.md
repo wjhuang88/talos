@@ -165,6 +165,35 @@ production stages merely because their plan is written down.
 
 ## Current Disposition
 
+### Caller boundary — 2026-10-12
+
+Fresh source baseline is #706 merge `4b03149ca452bbaf4e96b580ab74135bc4ac670d`.
+`crates/talos-agent/src/tool_execution.rs` still bounds permission admission with
+`permission_deadline_at`, then awaits authorized tool execution. This is not an enclosing search
+budget. `crates/talos-agent/src/configuration.rs::cancellation_token` returns a new token for caller
+coordination; it does not inject it into the running tool. `crates/talos-agent/src/session/turn.rs`
+aborts and joins the Agent task on Session cancellation before publishing the terminal event.
+These refine C-003 through C-006 without changing their integration gates.
+
+The test-only Agent integration target `i293_caller_cancellation_characterization` drives the real
+permission/Session path with an offline Network stand-in. Its three intended assertions are
+deny-before-start without a resolver, continued execution beyond approval TTL despite cancelling
+the detached token, and owned-future drop before the matching Session Cancelled terminal with no
+returned tool result. Fixtures use controlled readiness, a paused clock for the TTL case, counted
+starts/completions/drops and an owned temporary workspace; no model producer task is left running.
+Current validation is recorded in I293; do not infer a passing run from this plan.
+
+The stand-in declares a synthetic typed Domain resource for real approval admission. This must
+not conceal the actual search resource seam: WebSearchTool inherits the default Network facet
+without a typed resource, while its query input has no URL for generic domain extraction. The
+actual registration/wrapper/approval path remains an audit gate, not a demonstrated production
+failure or an authorization to change permission policy. Coordinate any repair with its owner.
+
+This is partial caller-carrier evidence toward C-V06/C-V07/C-V10, not real search dispatch,
+transport/task cancellation, an execution-context contract, binary wiring or rollback. All full
+C acceptance rows remain Pending. A dropped future cannot promise a returned typed Cancelled
+error; actual WebSearchTool/adapter integration must separately prove that boundary.
+
 ### Result-admission experiment — 2026-10-11
 
 The separate test-only `crates/talos-tools/tests/i293_result_admission_experiment.rs` exercises
