@@ -22,6 +22,7 @@ BOUNDARY = "crates/talos-tools/src/process_boundary.rs"
 AUTO = "crates/talos-desktop/src/runtime_host/auto_tests.rs"
 HOST = "crates/talos-desktop/src/runtime_host.rs"
 PLAN = "crates/talos-agent/src/request_plan.rs"
+SESSION = "crates/talos-agent/src/session.rs"
 END_BY = float("inf")
 CONTROLLED_TEST = "process_boundary::windows_tests::windows_auto_diagnostic_descendant_pipe_hold_is_observable_and_cleanup_bounded"
 CONTROLLED_FIXTURE = '''    #[tokio::test(flavor = "current_thread")]
@@ -207,7 +208,46 @@ fn windows_auto_probe(stage: &str, identity: usize) {
         ("        Ok(PreparedSessionTurn {", '        windows_auto_turn_stage("initial_seal_return");\n        Ok(PreparedSessionTurn {'),
     ]:
         plan = replace_once(plan, old, new)
-    return {BOUNDARY: boundary, AUTO: auto, HOST: host, PLAN: plan}
+    actor_helper = '''fn windows_auto_actor_stage(stage: &str) {
+    eprintln!("WINDOWS_AUTO_DIAG time={:?} pid={} thread={:?} stage={}",
+        std::time::SystemTime::now(), std::process::id(), std::thread::current().id(), stage);
+}
+
+'''
+    session = replace_once(originals[SESSION], "fn immediate_started_turn(", actor_helper + "fn immediate_started_turn(")
+    for old, new in [
+        ("    pub async fn run(&mut self) {\n        self.reconcile_running_submissions();", '    pub async fn run(&mut self) {\n        windows_auto_actor_stage("actor_run_enter");\n        self.reconcile_running_submissions();\n        windows_auto_actor_stage("actor_reconcile_return");'),
+        ("        if recovery_fenced {", '        windows_auto_actor_stage("actor_recover_return");\n        if recovery_fenced {'),
+        ("        let mut paused = self.restore_pending_submissions(", '        windows_auto_actor_stage("actor_restore_enter");\n        let mut paused = self.restore_pending_submissions('),
+        ("        let mut shutting_down = false;", '        windows_auto_actor_stage("actor_restore_return");\n        let mut shutting_down = false;'),
+        ("                let (images, image_bytes) = submission.image_totals();", '                windows_auto_actor_stage("actor_pending_popped");\n                let (images, image_bytes) = submission.image_totals();'),
+        ("                let start_committed = self\n", '                windows_auto_actor_stage("actor_commit_start_enter");\n                let start_committed = self\n'),
+        ("                if !start_committed {", '                windows_auto_actor_stage("actor_commit_start_return");\n                if !start_committed {'),
+        ("                        SessionOp::Submit { message } => {", '                        SessionOp::Submit { message } => {\n                            windows_auto_actor_stage("actor_submit_received");'),
+        ('''                                SubmissionKind::UserTurn,
+                                message,
+                                Vec::new(),
+                            );
+                            if self.accept_submission(''', '''                                SubmissionKind::UserTurn,
+                                message,
+                                Vec::new(),
+                            );
+                            windows_auto_actor_stage("actor_submit_normalized");
+                            if self.accept_submission('''),
+        ('''                                paused = false;
+                            }
+                        }
+                        SessionOp::SubmitMultimodal''', '''                                paused = false;
+                            }
+                            windows_auto_actor_stage("actor_submit_processed");
+                        }
+                        SessionOp::SubmitMultimodal'''),
+        ("        let runtime_managed = self.runtime_admission.is_some();", '        windows_auto_actor_stage("actor_start_submission_enter");\n        let runtime_managed = self.runtime_admission.is_some();'),
+        ("        if runtime_managed && self.compactor.should_compact(&self.history) {", '        windows_auto_actor_stage("actor_compaction_check_enter");\n        if runtime_managed && self.compactor.should_compact(&self.history) {'),
+        ("        let prepared_turn = if !runtime_managed {", '        windows_auto_actor_stage("actor_pre_prepare");\n        let prepared_turn = if !runtime_managed {'),
+    ]:
+        session = replace_once(session, old, new)
+    return {BOUNDARY: boundary, AUTO: auto, HOST: host, PLAN: plan, SESSION: session}
 
 
 def execute(command: list[str], log: Path, timeout: int) -> tuple[int, str]:
@@ -298,7 +338,7 @@ def main() -> int:
     mode.add_argument("--stress", action="store_true", help="bounded original-test sampling with host-runtime heartbeat; no synthetic fixture")
     mode.add_argument("--fresh-phase", choices=("baseline", "instrumented"), help="one phase per fresh runner; full parallel suite before isolated Talos calls")
     args = parser.parse_args()
-    original_bytes = {path: (ROOT / path).read_bytes() for path in (BOUNDARY, AUTO, HOST, PLAN)}
+    original_bytes = {path: (ROOT / path).read_bytes() for path in (BOUNDARY, AUTO, HOST, PLAN, SESSION)}
     originals = {path: data.decode("utf-8").replace("\r\n", "\n") for path, data in original_bytes.items()}
     patched = probes(originals)
     if args.self_test:
@@ -313,6 +353,9 @@ def main() -> int:
         assert patched[PLAN].count('windows_auto_turn_stage("prepare_session_enter")') == 1
         assert patched[PLAN].count('windows_auto_turn_stage("initial_seal_return")') == 1
         assert patched[PLAN].count(".await") == originals[PLAN].count(".await")
+        assert patched[SESSION].count('windows_auto_actor_stage("actor_submit_received")') == 1
+        assert patched[SESSION].count('windows_auto_actor_stage("actor_pre_prepare")') == 1
+        assert patched[SESSION].count(".await") == originals[SESSION].count(".await")
         try:
             replace_once("duplicate duplicate", "duplicate", "replacement")
         except ValueError:

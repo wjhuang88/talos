@@ -362,3 +362,49 @@ original. Self-test checks unique anchors and unchanged await count. Fixed two
 fresh runners,120cases/budgets/failed retention/mandatory gates unchanged. New
 compilation and actual preparation spans await new-head CI. PR remains open,
 unmerged; root cause and risk closure remain unclaimed, #590 stays complete.
+
+## Actual Pre-Prepare Failure And Actor Follow-up
+
+CI3151/run `38221117778`, exact `462a8b1d3ecfb51da96898e7517d946b089b81fb`:
+both diagnostic jobs FAIL, all120cases/2220tests complete, baseline1076passed
+34failed, instrumented1109passed1failed, combined2185passed35failed0ignored.
+Instrumented first suite fails only original Auto allow-once watchdog, decision
+4.5338539s/request4.5409772s/no result by15s. Baselineparallel1 has16 broader
+host failures; parallel2 has18 including all3Auto with stages[]/assessments0.
+These pre-stage failures are distinct from instrumented post-request failure.
+Every failed sample retained. Checkpoint6120405296, independent raw review agrees.
+
+Actual targetPID4208/thread64/child4244/handle408/waiter146: Submit-return-to-
+prepare_session entry4.4746035s; complete prepare7.934ms (definitions3.879ms,
+protocol57.5us/prompt1.1729ms/TurnStart67.1us/seal1.8923ms). Long interval lies
+BEFORE prepare; cannot blame measured protocol/prompt/hook/seal in this sample.
+Ten native wait258/success259 polls, postlaunch host ticks~1s. First7 CPU reads
+flat kernel.03125s/user0, later.203125s before cancellation. This is unsignaled
+at sampled times, not a diagnosis of IO/Defender/suspension/scheduler. After
+watchdog: Jobclose166.6us, then reader EOF and wait0/exit0, finalCPU.25s,
+processclose124.6us. Cleanup exit0 is not natural completion proof. Four-source
+probes compiled, restored and manifest verified. Ordinary gates are tracked
+separately; prior3150success is not current coverage.
+
+Artifacts64files each, same4SHA/image/4CPU, expires2026-10-26:
+baseline11734319284 SHA256
+`30193bd475521d918fc1ad6c7256c5e9be7fbf392777fc3a5e1f54353a6b1e5b`;
+instrumented11733904294 SHA256
+`477c7395c1d59b6cd7b173256d3f50db035f0d99cf5be7e756d092b2b0121438`.
+
+Next overlay adds a fifth temporary original, `crates/talos-agent/src/session.rs`,
+canonical SHA256 `5d877d723974db086fceabc62c1ada3a44af54e4d1ea625b996fe7093b557c39`.
+Native time/PID/thread/stage brackets actor entry/recovery/restore, plain Submit
+receive/normalize/process, pending pop, start commit, start_submission, compaction
+check and pre-prepare boundary. Submit-processed marks return from the original
+accept attempt, not a claimed successful admission; start-return can also mean
+rejection. Missing markers/errors never become invented spans. No message,
+command, session/submission/turn identifier or persistent-store contents printed.
+Original conditions, select/await/task/order/error/permission/queue behavior are
+preserved. No new async point; self-test checks unchanged await count and anchors.
+All five bytes are captured in manifest/overlay and restored in finally; original
+baseline/fixed2runners/120cases/budgets/failed retention/mandatory gates unchanged.
+Independent pre-edit review permits same boundedCI maintenance, not production
+actor/scheduling/budget repair; such repair requires an effective claim first.
+New compilation/spans need new-head CI. Prior failures stay unresolved; no merge
+or risk closure and no #590 reopening.
