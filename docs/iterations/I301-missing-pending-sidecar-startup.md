@@ -1,6 +1,6 @@
 # Iteration I301: Missing Pending-Sidecar Startup Recovery
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-10-12
 > Planned objective: eliminate database initialization during recovery of an absent pending sidecar.
 > MVP deliverable: new/legacy Runtime admits commands without a recovery-only SQLite side effect.
@@ -9,13 +9,13 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | Missing pending-sidecar recovery read fast path, storage/Actor regressions and startup documentation only; no existing-store durability or custody change. |
 | Claimed At | 2026-10-12 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #710 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer repeatedly authorized continuing the intermittent-timeout investigation and repair through GitHub CI. No separate maintainer reviewer is available; independent Agent storage/API review, exact-head CI, both validators and merge-time CAS remain required. |
 | Implementation PR | Not started |
@@ -72,3 +72,9 @@ Pending governance checks and implementation. No Completion Commit exists; not C
 
 #705 retains PowerShell latency, old-failure attribution and existing-store startup cost. This
 iteration does not claim the entire intermittent-timeout investigation is closed.
+
+## Atomic Claim Proposal — #710
+
+The Active/Claimed record is a proposal only until finalized #710 merges into main.
+No production implementation or implementation branch exists. Both validators, relevant exact-head
+CI, independent Agent storage/API review and merge-time CAS are required before merge.

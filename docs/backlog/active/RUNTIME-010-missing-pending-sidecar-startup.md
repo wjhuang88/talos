@@ -1,6 +1,6 @@
 # RUNTIME-010: Missing Pending-Sidecar Startup Recovery
 
-> Document status: Ready
+> Document status: Active
 
 **Type**: Technical / Runtime State Story
 **Parent Epic**: None
@@ -10,13 +10,13 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | Missing pending-sidecar recovery read fast path, storage/Actor regressions and startup documentation only; no existing-store durability or custody change. |
 | Claimed At | 2026-10-12 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #710 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer repeatedly authorized continuing the intermittent-timeout investigation and repair through GitHub CI. No separate maintainer reviewer is available; independent Agent storage/API review, exact-head CI, both validators and merge-time CAS remain required. |
 | Implementation PR | Not started |
@@ -93,3 +93,9 @@ https://github.com/wjhuang88/talos/pull/705#issuecomment-6121305365.
 PowerShell low-CPU active-child latency and attribution of previous failures remain in #705 and
 WINDOWS-AUTO-TIMEOUT-DIAGNOSIS.md. Existing-store initialization latency is outside this first slice.
 No Complete state without an already-existing implementation SHA and required evidence.
+
+## Atomic Claim Proposal — #710
+
+The Active/Claimed record is a proposal only until finalized #710 merges into main.
+No production implementation or implementation branch exists. Both validators, relevant exact-head
+CI, independent Agent storage/API review and merge-time CAS are required before merge.

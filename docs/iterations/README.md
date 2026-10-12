@@ -3,7 +3,7 @@
 ## Purpose
 
 [I301](I301-missing-pending-sidecar-startup.md) proposes a separate RUNTIME-010 missing-sidecar
-startup repair. Its governance claim and activation are ineffective until finalized PR merge.
+startup repair. Its governance claim and activation are ineffective until finalized #710 merge.
 The owner records the full current selection inventory; #705 retains independent diagnostic residuals.
 
 [I300](I300-structured-git-repair.md) plans handoff T7 Git permission/diff repair.
