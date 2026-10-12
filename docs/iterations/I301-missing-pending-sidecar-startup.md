@@ -18,7 +18,7 @@
 | Governance Claim PR | #710 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer repeatedly authorized continuing the intermittent-timeout investigation and repair through GitHub CI. No separate maintainer reviewer is available; independent Agent storage/API review, exact-head CI, both validators and merge-time CAS remain required. |
-| Implementation PR | Not opened (local candidate) |
+| Implementation PR | #711 (Review) |
 | Last Updated | 2026-10-12 |
 | Handoff / Release Condition | No implementation before this atomic claim and activation merges into main; release only after evidence-bearing closeout or explicit handoff. |
 

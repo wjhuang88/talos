@@ -3,8 +3,8 @@
 ## Purpose
 
 [I301](I301-missing-pending-sidecar-startup.md) / RUNTIME-010 is Review / Claimed after #710
-merge `42b86112`. The local candidate preserves ParentDir/error/custody behavior; full validation
-and implementation PR gates remain pending. #705 retains independent diagnostic residuals.
+merge `42b86112`. PR #711 preserves ParentDir/error/custody behavior; full remote CI
+and independent implementation review remain pending. #705 retains independent diagnostic residuals.
 
 [I300](I300-structured-git-repair.md) plans handoff T7 Git permission/diff repair.
 PR #704 proposes Active / Claimed under accepted ADR-089; both are ineffective
