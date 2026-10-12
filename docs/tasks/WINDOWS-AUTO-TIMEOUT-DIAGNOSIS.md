@@ -154,3 +154,31 @@ All three original Rust files are restored byte-for-byte. Production Rust remain
 unchanged in Git; original deadlines, total budget and mandatory gates remain.
 Main advanced to `7e817ab` without changing the existing boundary/Auto-test files;
 no stale-main integration or root-cause completion is claimed.
+
+## Stress Result And Fresh-Runner First-Suite Comparison
+
+CI3143/run `38193977394`, head `71b0c85cd63c99895d27f1a55d5f608217618534`,
+job `114632522478`: all 120 planned processes/2220 actual executions pass.
+Artifact `11722209825` (125 files), SHA256
+`048ab54c5a2a8206a8d52d12c6db15b54c382a1902f6817728aa00d06625bd9c`,
+expires 2026-10-26; checkpoint comment `6116510438`.
+All 60 instrumented cases have exactly one launcher and matching host ticks.
+Request-to-result is 0.1969686–1.1551254 s; CreateProcess 1.6095–69.7418 ms;
+wait-return-to-readers-joined 0.1722–0.3896 ms. Max host tick gap is 3155.7716 ms
+in a successful case, with Auto decision/request at 3.1884095/3.2478974 s and
+result at 3.8599155 s. This does not match the historical early request followed
+by a long post-request stall. No root cause or repair is established.
+
+The next fixed two-entry job matrix isolates baseline and instrumented phases
+on separate fresh Windows jobs. Each invokes `--fresh-phase`: first execute the
+full 32-thread suite, then 50 isolated original calls and nine more full suites
+(60 processes/1110 expected executions per phase if suite106). Instrumented
+sources are overlaid before its first build; baseline never writes probes.
+This removes prior Talos-test warmup before the first full-suite call. It does
+not guarantee OS/Defender/cache coldness; setup actions and VM variability remain.
+Manifest records phase and CPU count. Compare first-suite separately from later
+calls; cross-runner differences alone do not prove a probe effect or root cause.
+Matrix fail-fast is disabled to retain both outcomes; artifact names include
+phase to avoid overwriting. Each runner retains its own unchanged 35/40/45-minute
+limits, original assertions, source restoration and owned-process cleanup.
+Only the optional experiment becomes two jobs; normal mandatory gates are untouched.

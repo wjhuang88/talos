@@ -184,8 +184,12 @@ def build(output: Path, phase: str, tools: bool = False) -> Path:
     return binaries[0]
 
 
-def matrix(binary: Path, output: Path, phase: str, results: list[dict], stress: bool = False) -> None:
+def matrix(binary: Path, output: Path, phase: str, results: list[dict], stress: bool = False, fresh_first: bool = False) -> None:
     modes = [
+        ("suite-first", ["--test-threads=32"], 1),
+        ("single", ["runtime_host::auto_tests::enabled_auto_allow_once_reports_without_manual_approval", "--exact", "--test-threads=1"], 50),
+        ("suite-parallel", ["--test-threads=32"], 9),
+    ] if fresh_first else [
         ("single", ["runtime_host::auto_tests::enabled_auto_allow_once_reports_without_manual_approval", "--exact", "--test-threads=1"], 50),
         ("suite-parallel", ["--test-threads=32"], 10),
     ] if stress else [
@@ -199,7 +203,7 @@ def matrix(binary: Path, output: Path, phase: str, results: list[dict], stress: 
             print(f"WINDOWS_AUTO_DIAG case={label}", flush=True)
             code, text = execute([str(binary), *args, "--nocapture"], output / f"{label}.log", 90)
             # Filtering is experimental only; mandatory full CI is unchanged.
-            if code == 0 and "test result: ok." not in text:
+            if code == 0 and ("test result: ok." not in text or "test result: ok. 0 passed;" in text):
                 code = 125
             if name == "single" and "1 passed; 0 failed" not in text:
                 code = code or 125
@@ -217,6 +221,7 @@ def main() -> int:
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--controlled-only", action="store_true", help="run only the controlled mechanism after a retained full matrix")
     mode.add_argument("--stress", action="store_true", help="bounded original-test sampling with host-runtime heartbeat; no synthetic fixture")
+    mode.add_argument("--fresh-phase", choices=("baseline", "instrumented"), help="one phase per fresh runner; full parallel suite before isolated Talos calls")
     args = parser.parse_args()
     original_bytes = {path: (ROOT / path).read_bytes() for path in (BOUNDARY, AUTO, HOST)}
     originals = {path: data.decode("utf-8").replace("\r\n", "\n") for path, data in original_bytes.items()}
@@ -240,12 +245,18 @@ def main() -> int:
     END_BY = time.monotonic() + 35 * 60
     output = ROOT / "windows-auto-diagnostics"
     output.mkdir(exist_ok=True)
-    manifest = {"head": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(), "mode": "stress" if args.stress else "controlled-only" if args.controlled_only else "full", "python": sys.version, "runner": {key: os.environ.get(key) for key in ("RUNNER_OS", "RUNNER_ARCH", "ImageOS", "ImageVersion")}, "source_sha256": {path: hashlib.sha256(text.encode()).hexdigest() for path, text in originals.items()}}
+    manifest = {"head": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(), "mode": "fresh-" + args.fresh_phase if args.fresh_phase else "stress" if args.stress else "controlled-only" if args.controlled_only else "full", "python": sys.version, "cpu_count": os.cpu_count(), "runner": {key: os.environ.get(key) for key in ("RUNNER_OS", "RUNNER_ARCH", "ImageOS", "ImageVersion")}, "source_sha256": {path: hashlib.sha256(text.encode()).hexdigest() for path, text in originals.items()}}
     (output / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     overlay = "".join("".join(difflib.unified_diff(originals[path].splitlines(keepends=True), patched[path].splitlines(keepends=True), fromfile=path, tofile=path)) for path in originals)
     (output / "probe-overlay.patch").write_text(overlay, encoding="utf-8")
     results: list[dict] = []
     try:
+        if args.fresh_phase:
+            if args.fresh_phase == "instrumented":
+                for path, text in patched.items():
+                    (ROOT / path).write_text(text, encoding="utf-8", newline="\n")
+            matrix(build(output, args.fresh_phase), output, args.fresh_phase, results, fresh_first=True)
+            return int(any(result["exit_code"] != 0 for result in results))
         if not args.controlled_only:
             matrix(build(output, "baseline"), output, "baseline", results, args.stress)
         for path, text in patched.items():
