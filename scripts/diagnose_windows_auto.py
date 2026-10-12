@@ -23,6 +23,7 @@ AUTO = "crates/talos-desktop/src/runtime_host/auto_tests.rs"
 HOST = "crates/talos-desktop/src/runtime_host.rs"
 PLAN = "crates/talos-agent/src/request_plan.rs"
 SESSION = "crates/talos-agent/src/session.rs"
+STORE = "crates/talos-session/src/pending_submission.rs"
 END_BY = float("inf")
 CONTROLLED_TEST = "process_boundary::windows_tests::windows_auto_diagnostic_descendant_pipe_hold_is_observable_and_cleanup_bounded"
 CONTROLLED_FIXTURE = '''    #[tokio::test(flavor = "current_thread")]
@@ -216,7 +217,7 @@ fn windows_auto_probe(stage: &str, identity: usize) {
 '''
     session = replace_once(originals[SESSION], "fn immediate_started_turn(", actor_helper + "fn immediate_started_turn(")
     for old, new in [
-        ("    pub async fn run(&mut self) {\n        self.reconcile_running_submissions();", '    pub async fn run(&mut self) {\n        windows_auto_actor_stage("actor_run_enter");\n        self.reconcile_running_submissions();\n        windows_auto_actor_stage("actor_reconcile_return");'),
+        ("    pub async fn run(&mut self) {\n        self.reconcile_running_submissions();", '    pub async fn run(&mut self) {\n        windows_auto_actor_stage("actor_run_enter");\n        let reconcile_started = std::time::Instant::now();\n        self.reconcile_running_submissions();\n        let reconcile_elapsed = reconcile_started.elapsed();\n        windows_auto_actor_stage("actor_reconcile_return");\n        eprintln!("WINDOWS_AUTO_DIAG actor_reconcile_elapsed_ns={} pid={} thread={:?}", reconcile_elapsed.as_nanos(), std::process::id(), std::thread::current().id());'),
         ("        if recovery_fenced {", '        windows_auto_actor_stage("actor_recover_return");\n        if recovery_fenced {'),
         ("        let mut paused = self.restore_pending_submissions(", '        windows_auto_actor_stage("actor_restore_enter");\n        let mut paused = self.restore_pending_submissions('),
         ("        let mut shutting_down = false;", '        windows_auto_actor_stage("actor_restore_return");\n        let mut shutting_down = false;'),
@@ -247,7 +248,65 @@ fn windows_auto_probe(stage: &str, identity: usize) {
         ("        let prepared_turn = if !runtime_managed {", '        windows_auto_actor_stage("actor_pre_prepare");\n        let prepared_turn = if !runtime_managed {'),
     ]:
         session = replace_once(session, old, new)
-    return {BOUNDARY: boundary, AUTO: auto, HOST: host, PLAN: plan, SESSION: session}
+    store_helper = '''fn windows_auto_store_timing(stage: &str, elapsed: std::time::Duration) {
+    eprintln!("WINDOWS_AUTO_DIAG time={:?} pid={} thread={:?} stage={} elapsed_ns={}",
+        std::time::SystemTime::now(), std::process::id(), std::thread::current().id(), stage, elapsed.as_nanos());
+}
+
+'''
+    store = originals[STORE]
+    begin = store.index("    fn recover_states(")
+    end = store.index("    /// Returns one durable submission record", begin)
+    recover = store[begin:end]
+    body_begin = recover.index("        let _guard = self.guard()?;")
+    body_end = recover.rindex("\n    }")
+    body = recover[body_begin:body_end]
+    for stage, operation in [
+        ("pending_guard", "        let _guard = self.guard()?;"),
+        ("pending_connection", "        let connection = self.connection()?;"),
+        ("pending_schema", "        ensure_schema(&connection)?;"),
+        ("pending_statement", "        let mut statement = connection.prepare(&sql)?;"),
+        ("pending_query_map", "        let rows = statement.query_map([], read_record_tuple)?;"),
+    ]:
+        body = replace_once(body, operation, '        let operation_started = std::time::Instant::now();\n' + operation + f'\n        windows_auto_store_timing("{stage}", operation_started.elapsed());')
+    body = replace_once(body, "        rows.map(|row| tuple_to_record(row?)).collect()", '''        let operation_started = std::time::Instant::now();
+        let records: Result<Vec<PendingSubmissionRecord>, PendingSubmissionError> = rows.map(|row| tuple_to_record(row?)).collect();
+        windows_auto_store_timing("pending_rows_collect", operation_started.elapsed());
+        records''')
+    # Original locals drop inside the closure in their original reverse declaration order.
+    # Total time includes those drops; individual timers capture before their logging.
+    wrapped = recover[:body_begin] + '''        let recovery_started = std::time::Instant::now();
+        let recovery_result: Result<Vec<PendingSubmissionRecord>, PendingSubmissionError> = (|| {
+''' + "\n".join("    " + line for line in body.splitlines()) + '''
+        })();
+        windows_auto_store_timing("pending_recover_total", recovery_started.elapsed());
+        recovery_result
+    }
+
+'''
+    store = replace_once(store, recover, wrapped)
+    connection = '''    fn connection(&self) -> Result<Connection, PendingSubmissionError> {
+        if let Some(parent) = self.path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        let connection = Connection::open(self.path.as_ref())?;
+        connection.busy_timeout(SQLITE_BUSY_TIMEOUT)?;
+        retry_sqlite_busy(SQLITE_BUSY_TIMEOUT, || {
+            connection.execute_batch("PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL;")
+        })?;
+        Ok(connection)
+    }'''
+    timed_connection = connection
+    for stage, operation in [
+        ("pending_directory", "        if let Some(parent) = self.path.parent() {\n            std::fs::create_dir_all(parent)?;\n        }"),
+        ("pending_open", "        let connection = Connection::open(self.path.as_ref())?;"),
+        ("pending_busy_config", "        connection.busy_timeout(SQLITE_BUSY_TIMEOUT)?;"),
+        ("pending_pragma", '        retry_sqlite_busy(SQLITE_BUSY_TIMEOUT, || {\n            connection.execute_batch("PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL;")\n        })?;'),
+    ]:
+        timed_connection = replace_once(timed_connection, operation, '        let operation_started = std::time::Instant::now();\n' + operation + f'\n        windows_auto_store_timing("{stage}", operation_started.elapsed());')
+    store = replace_once(store, connection, timed_connection)
+    store = replace_once(store, "use std::fs::OpenOptions;", store_helper + "use std::fs::OpenOptions;")
+    return {BOUNDARY: boundary, AUTO: auto, HOST: host, PLAN: plan, SESSION: session, STORE: store}
 
 
 def execute(command: list[str], log: Path, timeout: int) -> tuple[int, str]:
@@ -338,7 +397,7 @@ def main() -> int:
     mode.add_argument("--stress", action="store_true", help="bounded original-test sampling with host-runtime heartbeat; no synthetic fixture")
     mode.add_argument("--fresh-phase", choices=("baseline", "instrumented"), help="one phase per fresh runner; full parallel suite before isolated Talos calls")
     args = parser.parse_args()
-    original_bytes = {path: (ROOT / path).read_bytes() for path in (BOUNDARY, AUTO, HOST, PLAN, SESSION)}
+    original_bytes = {path: (ROOT / path).read_bytes() for path in (BOUNDARY, AUTO, HOST, PLAN, SESSION, STORE)}
     originals = {path: data.decode("utf-8").replace("\r\n", "\n") for path, data in original_bytes.items()}
     patched = probes(originals)
     if args.self_test:
@@ -356,6 +415,8 @@ def main() -> int:
         assert patched[SESSION].count('windows_auto_actor_stage("actor_submit_received")') == 1
         assert patched[SESSION].count('windows_auto_actor_stage("actor_pre_prepare")') == 1
         assert patched[SESSION].count(".await") == originals[SESSION].count(".await")
+        assert patched[STORE].count(".await") == originals[STORE].count(".await")
+        assert patched[STORE].count('windows_auto_store_timing("pending_recover_total"') == 1
         try:
             replace_once("duplicate duplicate", "duplicate", "replacement")
         except ValueError:

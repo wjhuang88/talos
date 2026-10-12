@@ -408,3 +408,52 @@ Independent pre-edit review permits same boundedCI maintenance, not production
 actor/scheduling/budget repair; such repair requires an effective claim first.
 New compilation/spans need new-head CI. Prior failures stay unresolved; no merge
 or risk closure and no #590 reopening.
+
+## Actual Actor Recovery Span And Store Follow-up
+
+CI3152/run `38223234443`, exact `383f83a645701710c198c8b037336d78e4526422`:
+both diagnostic jobs SUCCESS, baseline1110passed/instrumented1110passed,
+120processes/2220tests/0failed/0ignored. New sample pass does not repair or replace
+any prior failure. Five originals restored, metadata compiled and manifests/raw
+ZIPs independently verified. Checkpoint6120769770. Ordinary gates are separate.
+
+Matching60 original launcher PID/thread pairs: largest successful target
+parallel5 PID9060/thread72, Submit-return-to-receive5.2138949s, actor-entry-to-
+reconcile-return4.5720454s, subsequent recover63.7013ms/restore574.9591ms,
+Submit-to-prepare5.2147522s, prepare7.2336ms, result6.3385167s. Parallel6/3
+also have4.3507831/4.3735812s entry-to-reconcile.59 complete actor/reconcile
+pairs (one interleaved record); normalize/accept/commit afterward submillisecond.
+This locates a successful sample's main startup span in synchronous initial
+reconcile, not post-accept queue processing; marker spans include scheduling and
+observation/logging, and do not assign older failure gaps to the same operation.
+
+Source call path: reconcile_running_submissions -> pending_store.recover_running
+-> recover_states (mutex, connection, schema, query and record collection).
+Even no-configured-durable-session fixtures construct a workspace sidecar store.
+Connection includes mkdir/open/busy-timeout/WAL+FULL PRAGMAs; current evidence
+does not distinguish these operations, drops, scheduling or filesystem causes.
+Artifacts64files each, same5SHA/image/4CPU, expires2026-10-26:
+baseline11735780513 SHA256
+`a426cb1b74f859548c2568cdb258580e508535cef36c6aff90bb07f7cae48e45`;
+instrumented11735079349 SHA256
+`06ea6edc75f2adfe34dce40d0137f0b7c065840ee97cb24bd35c5c323ddbfb4f`.
+
+Next sixth temporary original: `crates/talos-session/src/pending_submission.rs`,
+canonical SHA256 `8c9c2b92f418cfc3c74d613a37464ba26441f9af01e6b60bad63899573508e62`.
+Constant metadata stages measure guard, connection, schema, statement prepare,
+query creation/record collection and directory/open/busy-config/PRAGMA operations.
+Each Instant elapsed is captured before its own logging, excludes that log call,
+but remains wall time including scheduling/lock/OS waits, not CPU or pure I/O.
+Nested connection timings include internal stage logging; a total closure keeps
+original locals/drop order inside and reports after their original drops, so
+total includes nested logging and cleanup. No eager iterator replay, extra query,
+explicit changed drop order, altered retry/schema/SQL/WAL/guard or error policy.
+Early errors retain original conversions/returns and may omit completion markers.
+Actor reconcile also captures elapsed before its return log, excluding its own
+boundary logging but still including nested observations. No path/SQL/row/input/
+session/command contents logged; only constant stage, time/PID/thread/elapsed_ns.
+Six originals now captured and restored byte-for-byte, same baseline/fixed120
+cases/budgets/deadlines/failed retention/ordinary gates. Independent pre-edit scope
+review permits metadata-only same-PR exception; actual storage or scheduling
+repair requires effective governed claim. New compile/durations await new-head
+CI; older Auto/native-child failures remain unresolved and PR stays unmerged.
