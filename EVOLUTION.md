@@ -1172,4 +1172,5 @@ repeating known mistakes.
   SQLite route for ParentDir paths and existing final entries, without path normalization.
 - Prevention: Test actual acknowledged custody, missing parents, ancestor/final links, permissions,
   relative paths and cross-instance snapshots before publishing storage read optimizations.
+  Observe actual filesystem ErrorKind rather than infer permission-test coverage from UID alone.
 - Promoted to rule/check: bounded pending-submission recovery regressions only; no new policy.

@@ -750,7 +750,7 @@ fn recovery_preserves_filesystem_permission_errors() {
     let parent = dir.path().join("restricted");
     std::fs::create_dir(&parent).expect("restricted directory");
     let store = PendingSubmissionStore::for_session_file(&parent.join("session.tlog"), "session-1");
-    std::fs::set_permissions(&parent, std::fs::Permissions::from_mode(0))
+    std::fs::set_permissions(&parent, std::fs::Permissions::from_mode(0o000))
         .expect("restrict directory");
     let observation = std::fs::symlink_metadata(store.path());
     let running = store.recover_running();
@@ -799,6 +799,8 @@ fn missing_parent_before_dotdot_still_recovers_existing_custody() {
     assert_eq!(recovered.len(), 1);
     assert_eq!(recovered[0].receipt_id, receipt);
     assert_eq!(recovered[0].submission, submission());
+    // Windows may normalize the cancelled component before filesystem access.
+    #[cfg(unix)]
     assert!(
         missing.is_dir(),
         "ParentDir paths retain original directory creation"
@@ -817,6 +819,8 @@ fn absent_parentdir_path_retains_original_sqlite_creation() {
             .expect("original empty SQLite recovery")
             .is_empty()
     );
+    // Creating this intermediate component is the original Unix path behavior.
+    #[cfg(unix)]
     assert!(missing.is_dir());
     assert!(dir.path().join("session-1.pending.sqlite").is_file());
 }

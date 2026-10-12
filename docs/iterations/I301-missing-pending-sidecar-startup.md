@@ -104,8 +104,9 @@ publication. Default-debug baseline full preflight ran out of the local 32GB dis
 linking; only owned generated cache was cleared, interrupted test writes restored from Git, and
 local builds now use environment-only debug=0/incremental=0/jobs=2. No dependency/lock/pin/assertion
 or remote CI policy change. Nonprivileged `runuser` verification was blocked by unavailable group
-switch capability; the local permission fixture exercised privileged NotFound, not PermissionDenied.
-Unix CI must execute the nonprivileged error branch. Full baseline/preflight failures and the
+switch capability. The initial suite did not capture an individual branch result; inferring
+privileged NotFound solely from process identity was unsupported. Later exact fixture output
+explicitly observed PermissionDenied locally; remote CI must independently prove the denied branch. Full baseline/preflight failures and the
 pre-correction ParentDir test failure are retained, never replaced with retry-to-green evidence.
 
 Source/test/doc review and final checks remain required. #705 owns PowerShell active-child latency
@@ -139,3 +140,30 @@ independently locked consumer modes (default and coding), with one direct Talos 
 Root and fixture lockfiles/manifests remain unchanged. Final owner/derived diffs were staged and
 reviewed; project and collaboration validators passed with zero warnings after Review synchronization.
 Candidate publication is for exact-head CI/review, not a local full-preflight success claim.
+
+Pre-merge Windows fixture correction: the two ParentDir regressions incorrectly required the
+intermediate `missing` directory to exist on every platform. Pinned Rust 1.99 Windows path/FS
+code can normalize that cancelled component before filesystem access; this Unix side effect is
+not a Windows contract. Limit only those two new directory-side-effect assertions to Unix;
+all-platform recovered receipt/full submission and canonical database assertions remain. No fixture
+is ignored, no production byte/deadline changes and no original test assertions are removed.
+References: rust-lang/rust 1.99.0 `library/std/src/sys/path/windows.rs`,
+`library/std/src/sys/fs/windows.rs` and `library/std/src/path.rs`. Fresh exact-head review/CI is
+required; prior #342e candidate evidence remains historical and cannot approve the corrected head.
+
+Actual CI3160 Windows failure retained: job `114917790858` failed those two new directory
+assertions (200 session unit tests passed, 2 failed, 0 ignored). Real fresh Actor passed; recovered
+receipt/full submission checks in the existing-ack case passed before its directory assertion,
+while the empty case's later canonical-DB assertion was not reached. Corrected local session233
+passes. Old exact342e review is historical; new exact-head full CI/review is still mandatory.
+
+The batched platform correction passed all 733 affected tests/doctests locally. Additional
+focused `clippy --all-targets` caught the test permission literal's decimal notation; use the
+identical octal `0o000` value. Production source remains byte-identical to the reviewed candidate.
+CI3160 completed with five successful jobs and the retained Windows fixture failure; no rerun
+of that unchanged head replaces it. Publish one corrected stable head for fresh full CI/review.
+
+Corrected stable-stage checks: affected733 tests pass; format and focused session all-targets Clippy
+pass. Exact permission fixture passed one case and printed `filesystem_error=PermissionDenied`
+locally; this supersedes the earlier unsupported root-identity inference. Both governance validators
+passed. No production/dependency byte changed in this correction; full new-head CI remains required.
