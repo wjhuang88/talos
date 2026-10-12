@@ -99,7 +99,25 @@ fn windows_auto_probe(stage: &str, identity: usize) {
         ("        let launched = create_windows_job(&self.program, &self.args, &self.cwd, &self.env)?;", "        windows_auto_probe(\"launch_enter\", 0);\n        let launched = create_windows_job(&self.program, &self.args, &self.cwd, &self.env)?;\n        windows_auto_probe(\"launch_return\", launched.process as usize);"),
         ("                BackgroundOutputStream::Stdout,\n                tx.clone(),", "                BackgroundOutputStream::Stdout,\n                tx.clone(),\n                process,"),
         ("                BackgroundOutputStream::Stderr,\n                tx.clone(),", "                BackgroundOutputStream::Stderr,\n                tx.clone(),\n                process,"),
-        ("                let result = windows_sys::Win32::System::Threading::WaitForSingleObject(", "                windows_auto_probe(\"process_wait_enter\", process as usize);\n                let result = windows_sys::Win32::System::Threading::WaitForSingleObject("),
+        ('''                let result = windows_sys::Win32::System::Threading::WaitForSingleObject(
+                    process,
+                    windows_sys::Win32::System::Threading::INFINITE,
+                );''', '''                windows_auto_probe("process_wait_enter", process as usize);
+                let result = loop {
+                    let observed = windows_sys::Win32::System::Threading::WaitForSingleObject(process, 1_000);
+                    windows_auto_probe("native_wait_observed", process as usize);
+                    let mut observed_code = 1u32;
+                    let exit_read_ok = windows_sys::Win32::System::Threading::GetExitCodeProcess(process, &mut observed_code);
+                    eprintln!("WINDOWS_AUTO_DIAG poll_result={} exit_read_ok={} exit_code={} identity={}", observed, exit_read_ok, observed_code, process as usize);
+                    let zero_time = || windows_sys::Win32::Foundation::FILETIME { dwLowDateTime: 0, dwHighDateTime: 0 };
+                    let (mut created, mut exited, mut kernel, mut user) = (zero_time(), zero_time(), zero_time(), zero_time());
+                    let times_read_ok = windows_sys::Win32::System::Threading::GetProcessTimes(process, &mut created, &mut exited, &mut kernel, &mut user);
+                    let ticks = |value: windows_sys::Win32::Foundation::FILETIME| ((value.dwHighDateTime as u64) << 32) | value.dwLowDateTime as u64;
+                    eprintln!("WINDOWS_AUTO_DIAG times_read_ok={} kernel_100ns={} user_100ns={} identity={}", times_read_ok, ticks(kernel), ticks(user), process as usize);
+                    if observed != windows_sys::Win32::Foundation::WAIT_TIMEOUT { break observed; }
+                };'''),
+        ("                windows_sys::Win32::Foundation::CloseHandle(process);", "                windows_auto_probe(\"process_handle_close_begin\", process as usize);\n                windows_sys::Win32::Foundation::CloseHandle(process);\n                windows_auto_probe(\"process_handle_close_return\", process as usize);"),
+        ("            unsafe { windows_sys::Win32::Foundation::CloseHandle(self.job) };", "            windows_auto_probe(\"job_close_begin\", self.job as usize);\n            unsafe { windows_sys::Win32::Foundation::CloseHandle(self.job) };\n            windows_auto_probe(\"job_close_return\", self.job as usize);"),
         ("                (result, code)\n            })", "                windows_auto_probe(\"process_wait_return\", process as usize);\n                eprintln!(\"WINDOWS_AUTO_DIAG wait_result={} exit_code={} identity={}\", result, code, process as usize);\n                (result, code)\n            })"),
         ("            let output = (stdout_task.await, stderr_task.await);", "            windows_auto_probe(\"process_wait_joined\", process);\n            let output = (stdout_task.await, stderr_task.await);\n            windows_auto_probe(\"both_pipes_joined\", process);"),
         ("        let count = reader\n            .read(&mut buffer)", "        windows_auto_probe(match stream { BackgroundOutputStream::Stdout => \"stdout_read_enter\", BackgroundOutputStream::Stderr => \"stderr_read_enter\" }, process);\n        let count = reader\n            .read(&mut buffer)"),
@@ -232,6 +250,9 @@ def main() -> int:
         assert "Duration::from_secs(10)" in patched[AUTO]
         assert patched[BOUNDARY].count("windows_auto_probe(") >= 10
         assert patched[HOST].count("stage=host_heartbeat") == 1
+        assert "WaitForSingleObject(process, 1_000)" in patched[BOUNDARY]
+        assert "observed != windows_sys::Win32::Foundation::WAIT_TIMEOUT" in patched[BOUNDARY]
+        assert "GetProcessTimes(process," in patched[BOUNDARY]
         try:
             replace_once("duplicate duplicate", "duplicate", "replacement")
         except ValueError:

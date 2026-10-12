@@ -182,3 +182,51 @@ Matrix fail-fast is disabled to retain both outcomes; artifact names include
 phase to avoid overwriting. Each runner retains its own unchanged 35/40/45-minute
 limits, original assertions, source restoration and owned-process cleanup.
 Only the optional experiment becomes two jobs; normal mandatory gates are untouched.
+
+## Actual Failure And Native Wait Status Follow-up
+
+CI3145/run `38195009504`, head `d9b7849cf8597dfea487d51608834395b9236cf0`:
+both diagnostic jobs FAIL, all120processes complete, 2188passed/32failed/0ignored
+test executions (2220 total). Baseline later parallel5/8 fail13/3 host tests;
+instrumented first suite fails the original Auto watchdog, later parallel8/9
+fail14/1 tests including broader host startup/shutdown paths. Neither phase's
+50 isolated calls fails. Later passes do not replace these failures.
+
+First instrumented failure: AutoDecision2.6739847s/request2.7748133s,
+allow_once/configured-model, no ToolResult by15s. Unique child8252, testPID3864,
+hostThread62/handle712; CreateProcess2.0962ms, assignment/resume proven. Native
+waiter147 enters, but completion is not observed before watchdog; matching host
+ticks continue through14s (postlaunch max gap1012.7936ms). This rules out a
+continuous whole-host stall for this sample, not waiter scheduling delays.
+Wait return0/exit0 and stderrEOF appear only after watchdog/cancellation; no
+stdout return or joined readers before then. Do not infer natural pre-cleanup
+exit or label all broader failures PowerShell. Specific underlying cause remains
+unproven; independent raw-evidence review agrees. Checkpoint `6116704602`.
+Artifacts (64 files each, expires2026-10-26): baseline11723446776 SHA256
+`b512cbe8c75fcb483193c763d242a5074a027e47c55616b6984165345911993d`;
+instrumented11723317188 SHA256
+`e3473a3fb26b52d7ef26c361ee5f1377369db727ff5c48230ad3268ca9b261c1`.
+
+The next temporary probe replaces the infinite native wait inside the existing
+unsafe waiter with one-second waits. WAIT_TIMEOUT continues waiting; any other
+result follows original terminal handling. Each observation records native time,
+wait result and GetExitCodeProcess success/code using the same owned handle.
+GetProcessTimes success and cumulative kernel/user CPU ticks (100 ns) are also
+recorded; failed queries must not be treated as zero CPU activity. No memory,
+command line, environment, process enumeration or stack contents are read.
+STILL_ACTIVE alone is not enough; pair it with the wait status. No poll causes
+termination or changes the existing command/fixture deadlines. This is an
+observer change, so the separate original baseline remains required.
+
+Also mark process-handle and owned-Job close entry/return. The legacy
+`process_wait_return` was emitted after final exit query and handle close;
+`native_wait_observed` now separates the actual API observation from that work.
+These probes can distinguish unsignaled child, waiter/log scheduling and handle
+release. Same handles/close sites and existing unsafe regions; no new process,
+privilege, ownership or unsafe block. Production Git Rust remains unchanged.
+Fresh two-runner order, bounded counts/budgets, source restoration and failure
+retention stay intact. Corrected probe compilation/execution remains pending CI.
+
+Primary Win32 semantics references: [WaitForSingleObject](https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-waitforsingleobject),
+[GetExitCodeProcess](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getexitcodeprocess),
+[GetProcessTimes](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getprocesstimes).
