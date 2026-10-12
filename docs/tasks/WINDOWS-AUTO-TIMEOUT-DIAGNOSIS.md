@@ -310,3 +310,55 @@ matching original Auto launcher thread and its fixture outcome. No new async
 task, deadline, permanent Rust or fourth source file; budgets, fixed two runners,
 original baseline, restoration and failed retention unchanged. Compilation and
 actual split intervals await new exact-head CI; no repair/merge/closure claim.
+
+## Actual Pre-Model Gap And Turn Preparation Follow-up
+
+CI3150/run `38218198772`, exact `27c59c086da328324dfb388027a64cf5132c136b`:
+all six ordinary mandatory gates eventually SUCCESS. Both diagnostic jobs FAIL,
+all120processes/2220tests complete: baseline1101passed9failed, instrumented
+1108passed2failed, combined2209passed11failed0ignored. Only baselineparallel1
+and instrumentedfirstsuite fail broader host fixtures. Original Auto PASSES at
+14.9891291s, a near-miss under the unchanged15s watchdog, not another reproduced
+Auto failure. Independent raw verification agrees; checkpoints6119969281 and
+6119976824 retain every failure and distinguish ordinary gates from diagnosis.
+
+First target testPID10180/hostThread78/child4540/handle608/waiter147:
+build10.686ms, submit69.9us; submit return-to-first conversational MockProvider
+stream entry9.5494836s. Conversation stream108.5us, return-to-review entry
+27.3626ms, review stream295.4us, review-return-to-report86.0368ms, report
+publication78.9us, report-return-to-launch64.6462ms. These stream returns create
+receivers, not completed consumption. Decision9.6971733s/request9.8116985s/
+result14.9891291s. Launch-return-to-child-signaled5.1745251s, five258/259 polls,
+CPU progresses to.453125s. Signal0/exit0 and reader joins occur BEFORE ownedJob
+close here, distinct from cancellation cleanup in the prior837failure. This
+sample's long prelaunch interval is before the first model invocation, not the
+measured mock Auto-review call. No claim that older failures share its cause.
+
+Artifacts64files each, same image/4CPU/original3SHA and restoration, expires
+2026-10-26: baseline11733647194 SHA256
+`a97c2d68c313ba6f872f806eae53f3efcfe49ffc13762579ca2127f04427b54f`;
+instrumented11732933280 SHA256
+`808f3e87f44845163c93af7c02854ac4f20a42eaa7baadfebdb0c51176548b68`.
+
+Next bounded overlay adds a fourth temporary source,
+`crates/talos-agent/src/request_plan.rs`, original canonical SHA256
+`ee966b222561b85a7bce44b6ebf842a54a9627d1a94bd277f68d7ee7f82d08bc`.
+It brackets session preparation/structured inputs, turn entry, tool definitions,
+protocol selection, prompt build, TurnStart hook and initial request seal. Only
+native time/PID/thread/stage; no prompt/tool definitions/input/content/IDs are
+printed. A prepare result temporary preserves the original single await and
+returned result. Original hooks/protocol/seal/error order stays intact; early
+errors may omit a success-return marker and must not become invented durations.
+The session entry boundary also distinguishes time waiting for turn preparation
+from time inside it; an unmarked later interval remains unresolved.
+
+Independent pre-edit scope review permits this fourth observation source under
+the same single-PR mechanically bounded CI-maintenance exception: no Search
+delivery, owner-state change, permanent Rust/API/permission/production behavior
+or deadline change. Actual scheduling/budget/context/protocol/performance repair
+requires an effective governed claim first. Four originals are now captured in
+the manifest/overlay and restored byte-for-byte in finally; baseline stays
+original. Self-test checks unique anchors and unchanged await count. Fixed two
+fresh runners,120cases/budgets/failed retention/mandatory gates unchanged. New
+compilation and actual preparation spans await new-head CI. PR remains open,
+unmerged; root cause and risk closure remain unclaimed, #590 stays complete.

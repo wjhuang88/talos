@@ -21,6 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 BOUNDARY = "crates/talos-tools/src/process_boundary.rs"
 AUTO = "crates/talos-desktop/src/runtime_host/auto_tests.rs"
 HOST = "crates/talos-desktop/src/runtime_host.rs"
+PLAN = "crates/talos-agent/src/request_plan.rs"
 END_BY = float("inf")
 CONTROLLED_TEST = "process_boundary::windows_tests::windows_auto_diagnostic_descendant_pipe_hold_is_observable_and_cleanup_bounded"
 CONTROLLED_FIXTURE = '''    #[tokio::test(flavor = "current_thread")]
@@ -185,7 +186,28 @@ fn windows_auto_probe(stage: &str, identity: usize) {
         ("                                        evaluator: report.evaluator,\n                                    });", '                                        evaluator: report.evaluator,\n                                    });\n                                    windows_auto_host_stage("auto_report_publish_return");'),
     ]:
         host = replace_once(host, old, new)
-    return {BOUNDARY: boundary, AUTO: auto, HOST: host}
+    plan_helper = '''fn windows_auto_turn_stage(stage: &str) {
+    eprintln!("WINDOWS_AUTO_DIAG time={:?} pid={} thread={:?} stage={}",
+        std::time::SystemTime::now(), std::process::id(), std::thread::current().id(), stage);
+}
+
+'''
+    plan = replace_once(originals[PLAN], "impl Agent {", plan_helper + "impl Agent {")
+    for old, new in [
+        ("        let (memory_query, input_messages) = Self::structured_session_inputs(items);", '        windows_auto_turn_stage("prepare_session_enter");\n        let (memory_query, input_messages) = Self::structured_session_inputs(items);\n        windows_auto_turn_stage("structured_inputs_return");'),
+        ("        self.prepare_turn_start(\n            memory_query,", "        let prepared_result = self.prepare_turn_start(\n            memory_query,"),
+        ("            Some(request_context_limit),\n        )\n        .await", '            Some(request_context_limit),\n        )\n        .await;\n        windows_auto_turn_stage("prepare_session_return");\n        prepared_result'),
+        ("        let turn_id = TurnId::new();", '        windows_auto_turn_stage("prepare_turn_enter");\n        let turn_id = TurnId::new();'),
+        ("        let active_tool_presentation_policy = self.tool_presentation_policy.clone();", '        windows_auto_turn_stage("tool_description_enter");\n        let active_tool_presentation_policy = self.tool_presentation_policy.clone();'),
+        ("        let selected_protocol = self\n", '        windows_auto_turn_stage("tool_description_return");\n        windows_auto_turn_stage("protocol_select_enter");\n        let selected_protocol = self\n'),
+        ("        let (mut messages, persist_start) = match self\n", '        windows_auto_turn_stage("protocol_select_return");\n        windows_auto_turn_stage("prompt_build_enter");\n        let (mut messages, persist_start) = match self\n'),
+        ("        messages.pop();", '        windows_auto_turn_stage("prompt_build_return");\n        messages.pop();'),
+        ("        if let Err(error) = self\n            .run_hook(&hook_ctx, HookEvent::TurnStart { turn_id })", '        windows_auto_turn_stage("turn_hook_enter");\n        if let Err(error) = self\n            .run_hook(&hook_ctx, HookEvent::TurnStart { turn_id })'),
+        ("        let mut continuation_parts = Vec::new();", '        windows_auto_turn_stage("turn_hook_return");\n        let mut continuation_parts = Vec::new();\n        windows_auto_turn_stage("initial_seal_enter");'),
+        ("        Ok(PreparedSessionTurn {", '        windows_auto_turn_stage("initial_seal_return");\n        Ok(PreparedSessionTurn {'),
+    ]:
+        plan = replace_once(plan, old, new)
+    return {BOUNDARY: boundary, AUTO: auto, HOST: host, PLAN: plan}
 
 
 def execute(command: list[str], log: Path, timeout: int) -> tuple[int, str]:
@@ -276,7 +298,7 @@ def main() -> int:
     mode.add_argument("--stress", action="store_true", help="bounded original-test sampling with host-runtime heartbeat; no synthetic fixture")
     mode.add_argument("--fresh-phase", choices=("baseline", "instrumented"), help="one phase per fresh runner; full parallel suite before isolated Talos calls")
     args = parser.parse_args()
-    original_bytes = {path: (ROOT / path).read_bytes() for path in (BOUNDARY, AUTO, HOST)}
+    original_bytes = {path: (ROOT / path).read_bytes() for path in (BOUNDARY, AUTO, HOST, PLAN)}
     originals = {path: data.decode("utf-8").replace("\r\n", "\n") for path, data in original_bytes.items()}
     patched = probes(originals)
     if args.self_test:
@@ -288,6 +310,9 @@ def main() -> int:
         assert "WaitForSingleObject(process, 1_000)" in patched[BOUNDARY]
         assert "observed != windows_sys::Win32::Foundation::WAIT_TIMEOUT" in patched[BOUNDARY]
         assert "GetProcessTimes(process," in patched[BOUNDARY]
+        assert patched[PLAN].count('windows_auto_turn_stage("prepare_session_enter")') == 1
+        assert patched[PLAN].count('windows_auto_turn_stage("initial_seal_return")') == 1
+        assert patched[PLAN].count(".await") == originals[PLAN].count(".await")
         try:
             replace_once("duplicate duplicate", "duplicate", "replacement")
         except ValueError:
