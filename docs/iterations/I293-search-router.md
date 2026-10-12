@@ -483,7 +483,8 @@ without completing any full C acceptance row.
 
 This stage starts from that merge under effective #664. Selection disposition: I293 continues
 its existing bounded slice; I294 remains independent; I300 owns Git repair, PERM-007-H is
-Refinement / Unclaimed; completed I288/I292 and I296-I299 remain closed; I277 deferred device
+Refinement / Unclaimed; I288/I292 retain Complete / Claimed records and are not reactivated;
+I296-I299 retain their recorded completion states; I277 deferred device
 acceptance and DEPENDENCY-003-A retain their own scopes. Open #705 is separate Windows timeout
 diagnosis and is not edited. Board-wide historical row drift is a separately owned governance
 residual, not changed in this implementation batch.
@@ -528,3 +529,10 @@ or natural-person review. Fresh unfiltered CI, exact-head review and CAS remain 
 Final governance rerun initially omitted the local Cargo PATH and failed its SQLite validator
 with cargo not found. Restoring the same verified toolchain environment produced zero-warning
 governance/claim passes; the invocation error is not reported as a source failure or a pass.
+
+Merge-time evidence review found the new selection sentence "remain closed" ambiguous: I288
+and I292 retain Complete / Claimed records, and GitHub #625 is still open. The sentence was
+corrected without closing that Issue or changing any claim. Independent review withdrew its
+initial APPROVE pending this correction. Candidate head 102338cd / CI3144 is superseded, not
+final merge evidence; corrected exact-head review and full CI must pass. Test/production code
+is unchanged from the locally verified tree; fresh docs governance/claims and diff checks apply.
