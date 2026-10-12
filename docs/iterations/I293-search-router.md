@@ -10,7 +10,7 @@
 | Source Issue | #643 |
 | Depends on | Accepted ADR-085; SEARCH-001-B / #642 complete in #656; NET-001 boundary coordination |
 | Claim State | Claimed |
-| Implementation PR | #681 / #685 / #696 (merged partial evidence); result-admission stage Review (PR number not yet assigned) |
+| Implementation PR | #681 / #685 / #696 / #706 (merged partial evidence); caller-boundary stage Review (PR not yet assigned) |
 | Completion | Pending |
 
 ## Collaboration Claim
@@ -26,7 +26,7 @@
 | Governance Claim PR | #664 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Governance-only claim+activation PR; exact-head CI, governance validators, remote Issue reconciliation and merge-time CAS required. |
-| Last Updated | 2026-10-11 |
+| Last Updated | 2026-10-12 |
 | Handoff / Release Condition | Claim effective after #664 merge `d801790454e252699684253166984662ea9dab6a`; implementation remains bounded by ADR-085 and this iteration. |
 
 ## Scope
@@ -400,3 +400,71 @@ Independent read-only Agent preview found no blockers, but is not final exact-he
 natural-person review. Before merge obtain fresh exact-head technical review, full unfiltered CI,
 authorized single-maintainer reason and final current-main/claim/overlap/review CAS. Source and
 validation limitations above remain effective even after this partial test stage merges.
+
+### Caller-boundary characterization stage (2026-10-12)
+
+#706 merged at `4b03149ca452bbaf4e96b580ab74135bc4ac670d`, reviewed head
+`02c8d9780cfd7fd82e786e5162b555d4b0077a2d`, after CI3136 / run38134968930 completed all
+six jobs successfully without reruns. Full macOS and Windows logs each execute eight admission
+experiments; macOS original socket, both SDK modes and preflight passed, as did Windows workspace,
+governance/claims (zero warnings), audit and CLI smoke. Independent exact-head review, current-main
+compatibility review, single-maintainer reason and final CAS are on #706 comments `6108458526`,
+`6108514280`, `6108453822`, `6108605266`. These supersede the preceding pending-stage instructions;
+they do not complete C. Unrelated #704 governance was preserved at merge.
+
+Workspace maintenance removed the prior local checkout and Cargo cache. This session re-cloned
+authoritative main at the #706 merge and reinstalled pinned Rust 1.99.0; actual rustc execution
+was verified. Old logs are historical evidence, not freshly recovered validation. No dependency,
+toolchain pin or repository build profile is changed.
+
+Runnable deliverable: `crates/talos-agent/tests/i293_caller_cancellation_characterization.rs`,
+three test-only cases through real Agent permission dispatch and AppServerSession interruption.
+An independently authored Network tool stand-in owns a counted waiting future and performs no
+network I/O. A bounded, buffered mock model emits native tool calls without spawning producer
+tasks; each test owns a unique temporary workspace. This stays under effective #664 and the
+current architecture/evidence/test-only execution boundary, with no production/API/permission
+policy, config, provider, transport or CI changes. Open #705 remains separately owned diagnosis.
+
+Focused assertions (three passed): Network Ask without a resolver denies before tool start;
+an admitted tool can outlive the permission approval deadline, and cancelling the separately
+created Agent token does not stop that active call; Session Interrupt drops the admitted tool's
+owned future before the matching Turn's Cancelled event, without a returned tool result. Paused
+Tokio time exercises the approval/execution distinction, not a new search execution budget.
+
+Initial local compilation rejected direct equality on TurnCompletionStatus (no PartialEq); variant
+matching corrected the test. The first execution passed one rejection assertion but failed both
+start waits. Diagnostic observations established that the stand-in lacked a safe typed resource:
+the rejection came from permission-state validation, not unavailable approval. That initial
+passing rejection is not Network-Ask evidence. The stand-in now explicitly declares a synthetic
+Domain resource, verifies approval-related denial rather than resource-state failure, and records
+the resolver invocation before cancellation. All three focused tests then passed. No production
+permission policy or existing timeout/assertion was changed. Actor shutdown/join followed by an
+event drain additionally rejects delayed tool results.
+
+This fixture's explicit Domain resource is not evidence that WebSearchTool has a suitable grant
+profile: its own implementation inherits the default Network facet with no typed resource, and
+its query schema supplies no URL for generic resource extraction. Actual registration/wrapper and
+approval behavior needs a separate audit/characterization before C-V10; do not infer a production
+failure or repair from the stand-in. Coordinate any policy repair with the permission owner.
+
+This supplies caller-carrier characterization toward C-V06/C-V07/C-V10 only. It does not invoke
+WebSearchTool or SearchBackend, propagate an enclosing search deadline/token, stop HTTP/DNS or
+dependency-spawned work, validate permission wrappers outside Agent, or prove binary/rollback
+acceptance. No returned SearchBackendError::Cancelled is inferred from future destruction.
+All full C-V01..C-V11 remain Pending; C/I293 Active / Claimed / incomplete, #643/#624 open,
+D independent and E/F gated. Documentation target: router integration plan and C Story.
+Infrastructure-only exception: no user-visible delivery. Local validation and fresh exact-head
+review/full unfiltered CI/final CAS are required before submission/merge respectively.
+
+Fresh Rust 1.99 local convergence: all three focused cases passed with no skips, target strict
+Clippy passed. Standard preflight passed site/installers, governance/claims (zero warnings),
+text/classifier, format, locked workspace check and strict Clippy; it stopped only at the
+unchanged OS-1 socket fixture (64 passed / 1 failed), not a full preflight pass. Existing exact
+local-only socket deferral: locked workspace 117 summaries, 3623 passed, zero failed/ignored,
+one filtered; all three new cases passed. Independent Runtime SDK default and coding builds
+both passed. No fixture archive, extra skip, dependency/lockfile, assertion/timeout or CI-policy
+change was needed. The early fixture failures above remain distinct from these successful runs.
+Updated independent Agent preview found no blockers; it acknowledged missing the original typed
+resource prerequisite and verified the corrected cause assertions and post-join drain. This is
+not final exact-head approval or natural-person review. Fresh exact-head CI/review and CAS remain
+merge gates; every full C acceptance row is still Pending.

@@ -1133,3 +1133,16 @@ repeating known mistakes.
 - Fix: Run controlling-terminal setup in a fresh child interpreter, use a nonblocking master and select-based selector, bound input/cursor responses and forced cleanup, continuously pump output while awaiting provider requests, hang up the PTY before cleanup waits, pace slash keys while pumping so the consumer-time IME guard can expire, and log every expected marker.
 - Prevention: Verify missing-marker and saturated-input deadlines plus consumer-time slash submission under output/cursor backpressure with disposable PTY children; keep fresh Darwin real-binary acceptance mandatory rather than infer cross-platform success from Linux or a bootstrap repair.
 - Promoted to rule/check: scripts/accept_auto_locale_tui.py; existing 25-second interaction and 15-minute CI limits retained.
+
+## 2026-10-12 - Verify rejection cause in permission characterization
+
+- Trigger: I293 offline caller-boundary fixtures through real Agent permission dispatch.
+- Symptom: A rejection case passed while allowed cases never reached the tool.
+- Root cause: The Network stand-in omitted a typed resource; rejection occurred during permission
+  state/grant validation, before the intended unavailable-approval boundary.
+- Fix: Declare an invented typed Domain resource, observe the denial reason and resolver count,
+  then verify actual tool readiness before testing deadline/cancellation effects.
+- Prevention: A zero-start assertion alone does not prove which gate rejected a call. Pair it with
+  cause-specific observations, and keep synthetic resource admission distinct from production
+  WebSearchTool/wrapper authorization evidence.
+- Promoted to rule/check: I293 caller characterization tests only; no permission policy change.
