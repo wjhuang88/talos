@@ -230,3 +230,47 @@ retention stay intact. Corrected probe compilation/execution remains pending CI.
 Primary Win32 semantics references: [WaitForSingleObject](https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-waitforsingleobject),
 [GetExitCodeProcess](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getexitcodeprocess),
 [GetProcessTimes](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getprocesstimes).
+
+## Actual Child-State Evidence And Host Preparation Follow-up
+
+CI3147/run `38196854374`, head `837fefa15f4892d693fb89e956630d26c9695733`:
+all six ordinary mandatory gates SUCCESS. Baseline60processes/1110tests PASS;
+instrumented60processes/1096passed14failed, failures only in first full suite.
+Combined2206passed14failed0ignored/2220 executions. Both50isolated-call samples
+and later nine suites pass; this does not replace the first-suite failure.
+
+Original Auto watchdog: AutoDecision10.6479664s/request10.7125676s, no result
+by15s. TestPID6636/hostThread69/child1200/handle596/waiterThread145;
+CreateProcess2.8189ms, assigned/resumed. Matching host's initial heartbeat gap
+is about10.6s before launch; postlaunch ticks continue about every second.
+Four native wait polls return258 with successful exit queries259 before
+cancellation. All CPU queries succeed; cumulative kernel+user CPU progresses
+.0625/.09375/.1875/.453125 seconds. The child is unsignaled/still-active at
+those sampled times and the waiter runs; this does not identify IO, Defender,
+PowerShell initialization or the preparation-delay cause. All65 CPU queries
+across this instrumented matrix succeed, validating the new API compilation
+and execution. Earlier probe-compilation-pending text is now superseded.
+
+After watchdog, Job close takes.2163ms; pipes reach EOF; wait reports0/exit0;
+process handle close takes.3089ms. Cleanup exit0 is not natural-exit proof.
+This sample does not show a continuous waiter/close stall or an observed
+leader-exited-before-EOF hold. Its late request differs from the historical
+early-request timeout, so do not assume all samples share one cause. Other13
+host startup/write/cancellation failures are not all PowerShell failures.
+Independent raw-artifact review confirms these limits. Checkpoint6117073163.
+Artifacts (64 files each, expires2026-10-26): baseline11724360591 SHA256
+`e48748189bc0792aafe467a7bd8bfbf3c7c5d61c5ca097c0fa0bcd967fa96a66`;
+instrumented11723941599 SHA256
+`9185fec26584e95bef20d2f246df50bc5e4cf5c11a0cde1380425c9d87f27449`.
+
+Next temporary metadata-only host probes mark task entry, provider entry/return,
+session setup, builder setup/build, initial work projection, command-loop ready,
+Submit receive and submit entry/return. Native time/PID/thread allow correlation
+to the existing launcher without logging requests, workspace/session identifiers,
+messages or provider data. Brackets preserve the original evaluation order and
+error paths. They measure coarse preparation spans, not every provider/runtime
+internal operation; a fast Submit return cannot prove subsequent planning fast.
+No new task, await, process, timeout or shutdown policy is added. The original
+baseline, fixed two fresh runners, counts/budgets, retained failures, byte-for-byte
+restoration and mandatory gates remain unchanged. New bracket compilation and
+actual spans require new-head CI; no root-cause repair/merge/closure is claimed.

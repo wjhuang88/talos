@@ -141,6 +141,7 @@ fn windows_auto_probe(stage: &str, identity: usize) {
     eprintln!("WINDOWS_AUTO_DIAG test_outcome enabled={} allow={} ok={} stages={:?}", enabled, allow, outcome.is_ok(), stages);
     if outcome.is_err() {''')
     host = replace_once(originals[HOST], "                        let terminal = executor.block_on(async move {\n                            let (provider, context_limit, auto_enabled) = match provider() {", '''                        let terminal = executor.block_on(async move {
+                            windows_auto_host_stage("host_task_enter");
                             // Temporary CI observation of this host executor, not the test executor.
                             tokio::spawn(async move {
                                 loop {
@@ -149,7 +150,25 @@ fn windows_auto_probe(stage: &str, identity: usize) {
                                     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
                                 }
                             });
+                            windows_auto_host_stage("provider_enter");
                             let (provider, context_limit, auto_enabled) = match provider() {''')
+    host_helper = '''fn windows_auto_host_stage(stage: &str) {
+    eprintln!("WINDOWS_AUTO_DIAG time={:?} pid={} thread={:?} stage={}",
+        std::time::SystemTime::now(), std::process::id(), std::thread::current().id(), stage);
+}
+
+'''
+    host = replace_once(host, "#[allow(clippy::too_many_arguments)]\nasync fn run_host(", host_helper + "#[allow(clippy::too_many_arguments)]\nasync fn run_host(")
+    for old, new in [
+        ("                            let approval_root = workspace_root.clone();", '                            windows_auto_host_stage("provider_return");\n                            windows_auto_host_stage("session_setup_enter");\n                            let approval_root = workspace_root.clone();'),
+        ("                            let mut builder = RuntimeBuilder::new()", '                            windows_auto_host_stage("session_setup_return");\n                            windows_auto_host_stage("builder_setup_enter");\n                            let mut builder = RuntimeBuilder::new()'),
+        ("                            match builder.build() {", '                            windows_auto_host_stage("builder_setup_return");\n                            windows_auto_host_stage("builder_build_enter");\n                            let build_result = builder.build();\n                            windows_auto_host_stage("builder_build_return");\n                            match build_result {'),
+        ("    let initial_work = load_work_projection(work_source.clone()).await;", '    windows_auto_host_stage("initial_projection_enter");\n    let initial_work = load_work_projection(work_source.clone()).await;\n    windows_auto_host_stage("initial_projection_return");'),
+        ("    loop {\n        tokio::select! {\n            result = async {", '    windows_auto_host_stage("command_loop_ready");\n    loop {\n        tokio::select! {\n            result = async {'),
+        ("                    Some(RuntimeCommand::Submit(message)) => {", '                    Some(RuntimeCommand::Submit(message)) => {\n                        windows_auto_host_stage("submit_received");'),
+        ("                        if let Err(error) = handle.submit(message).await\n", '                        windows_auto_host_stage("submit_enter");\n                        let submit_result = handle.submit(message).await;\n                        windows_auto_host_stage("submit_return");\n                        if let Err(error) = submit_result\n'),
+    ]:
+        host = replace_once(host, old, new)
     return {BOUNDARY: boundary, AUTO: auto, HOST: host}
 
 
