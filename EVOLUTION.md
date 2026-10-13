@@ -70,6 +70,7 @@ repeating known mistakes.
 | 58 | Testing / PTY | 交互 deadline 必须覆盖 PTY 读写与清理，逐阶段诊断不能证明超时根因 | I291 / #590 |
 | 59 | Async tests | Candidate poll 可使取消就绪；在启动和成功出口重新检查控制信号 | I293 |
 | 60 | Validation | 隔离 checkout target 并串行执行全库验证；工具链登记不等于可执行 | I293 |
+| 61 | Network authority | Endpoint canonicalization must be tested against the actual HTTP URL representation, including mapped IPv6 | I293 / #713 |
 
 ## Lessons
 
@@ -1174,3 +1175,15 @@ repeating known mistakes.
   relative paths and cross-instance snapshots before publishing storage read optimizations.
   Observe actual filesystem ErrorKind rather than infer permission-test coverage from UID alone.
 - Promoted to rule/check: bounded pending-submission recovery regressions only; no new policy.
+
+## 2026-10-13 - Endpoint authority must use actual HTTP host canonicalization
+
+- Trigger: I293 final source audit after a carrier candidate had passed stand-in IP tests.
+- Symptom: An actual parsed IPv4-mapped IPv6 URL was rejected before permission admission.
+- Root cause: HTTP URL serialization uses a hex mapped tail; std::net display uses dotted IPv4.
+  A self-chosen host fixture did not exercise the representation supplied by the real HTTP stack.
+- Fix: Validate the HTTP canonical mapped representation without adding a dependency or copying
+  a serializer; test parsed URL -> endpoint -> Domain proposal -> admission -> live check.
+- Prevention: Exercise producer/consumer representations at the real boundary, not only matching
+  hand-constructed values. Preserve private-address/connection enforcement as a separate gate.
+- Promoted to rule/check: parsed_http_url_ip_hosts_share_endpoint_and_policy_canonicalization.

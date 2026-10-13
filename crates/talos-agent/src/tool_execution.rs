@@ -509,7 +509,36 @@ impl Agent {
             ));
         }
 
-        let permission_profile = tool.permission_profile(&call.input);
+        let prepared_network = if tool.requires_network_invocation() {
+            if self.permission_pipeline.is_none() {
+                return Ok((
+                    ToolExecutionResult::error(
+                        "protected network tool requires the Agent permission pipeline",
+                    ),
+                    Vec::new(),
+                ));
+            }
+            match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                tool.prepare_network_invocation(&call.input)
+            })) {
+                Ok(Ok(Some(prepared))) => Some(prepared),
+                Ok(Err(error)) => {
+                    return Ok((ToolExecutionResult::error(error.to_string()), Vec::new()));
+                }
+                _ => {
+                    return Ok((
+                        ToolExecutionResult::error("network_preparation_unavailable"),
+                        Vec::new(),
+                    ));
+                }
+            }
+        } else {
+            None
+        };
+        let permission_profile = prepared_network.as_ref().map_or_else(
+            || tool.permission_profile(&call.input),
+            |prepared| prepared.permission_profile().to_vec(),
+        );
         let background_start_resource = permission_profile.iter().find_map(|facet| {
             facet
                 .resource
@@ -522,6 +551,14 @@ impl Agent {
         {
             Ok(ToolExecutionAdmission::Foreground) => None,
             Ok(ToolExecutionAdmission::Background(request)) => {
+                if prepared_network.is_some() {
+                    return Ok((
+                        ToolExecutionResult::error(
+                            "protected network invocation requires foreground execution",
+                        ),
+                        Vec::new(),
+                    ));
+                }
                 if self.permission_pipeline.is_none() {
                     return Ok((
                         ToolExecutionResult::error(
@@ -565,6 +602,7 @@ impl Agent {
         };
 
         let mut authorizations: Option<Vec<ToolExecutionAuthorization>> = None;
+        let mut network_authority = None;
         let permission_allowed = if let Some(pipeline) = self.permission_pipeline.as_deref() {
             let permission_deadline_at = tokio::time::Instant::now() + self.permission_deadline;
             let mut permission_call = ToolCall {
@@ -630,7 +668,15 @@ impl Agent {
                 deadline: permission_deadline_at
                     .saturating_duration_since(tokio::time::Instant::now()),
             };
-            let authorization = if matches!(call.name.as_str(), "bash" | "powershell")
+            let authorization = if let Some(prepared) = prepared_network.as_ref() {
+                pipeline
+                    .authorize_network(authorization_request, prepared.manifest(), user_intent)
+                    .await
+                    .map(|authority| {
+                        network_authority = Some(authority);
+                        Vec::new()
+                    })
+            } else if matches!(call.name.as_str(), "bash" | "powershell")
                 && working_directory.is_some()
             {
                 let working_directory = working_directory.as_deref().expect("checked above");
@@ -740,7 +786,16 @@ impl Agent {
 
         let normalized_input = call.input.clone();
 
-        let (mut result, parts) = if call.name == "bash" {
+        let (mut result, parts) = if let Some(prepared) = prepared_network {
+            let Some(authority) = network_authority else {
+                return Ok((
+                    ToolExecutionResult::error("network_authority_unavailable"),
+                    Vec::new(),
+                ));
+            };
+            let output = prepared.execute(authority).await;
+            (output.result, output.next_provider_parts)
+        } else if call.name == "bash" {
             if let Some(sb) = self.sandbox.as_deref() {
                 if sb.is_available() {
                     (

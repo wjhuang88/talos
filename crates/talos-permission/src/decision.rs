@@ -5,7 +5,9 @@ use std::fmt;
 use schemars::JsonSchema;
 use serde::Serialize;
 use serde_json::Value;
-use talos_core::tool::{ToolNature, ToolPermissionFacet, ToolProvenance, ToolResourceKind};
+use talos_core::tool::{
+    ToolNature, ToolNetworkManifest, ToolPermissionFacet, ToolProvenance, ToolResourceKind,
+};
 
 use crate::PermissionDecision;
 use crate::grant::{GrantId, GrantSource};
@@ -90,6 +92,7 @@ pub struct PermissionRequest<'a> {
     provenance: ToolProvenance,
     facets: &'a [ToolPermissionFacet],
     input: &'a Value,
+    network_manifest: Option<&'a ToolNetworkManifest>,
 }
 
 impl<'a> PermissionRequest<'a> {
@@ -106,6 +109,7 @@ impl<'a> PermissionRequest<'a> {
             provenance,
             facets,
             input,
+            network_manifest: None,
         }
     }
 
@@ -113,6 +117,19 @@ impl<'a> PermissionRequest<'a> {
     #[must_use]
     pub fn native(tool_name: &'a str, facets: &'a [ToolPermissionFacet], input: &'a Value) -> Self {
         Self::new(tool_name, ToolProvenance::Native, facets, input)
+    }
+
+    /// Binds a trusted native prepared plan. Completeness is checked by the grant compiler.
+    #[must_use]
+    pub fn with_network_manifest(mut self, manifest: &'a ToolNetworkManifest) -> Self {
+        self.network_manifest = Some(manifest);
+        self
+    }
+
+    /// Returns the invocation binding, if supplied by the trusted preparation path.
+    #[must_use]
+    pub const fn network_manifest(&self) -> Option<&ToolNetworkManifest> {
+        self.network_manifest
     }
 
     /// Returns the rule-matching tool name.

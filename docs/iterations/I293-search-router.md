@@ -10,7 +10,7 @@
 | Source Issue | #643 |
 | Depends on | Accepted ADR-085; SEARCH-001-B / #642 complete in #656; NET-001 boundary coordination |
 | Claim State | Claimed |
-| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance/ADR scope amendment (no implementation) |
+| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 carrier stage Review (default activation Pending) |
 | Completion | Pending |
 
 ## Collaboration Claim
@@ -646,3 +646,63 @@ Production acceptance remains real Agent/CLI/SDK/transport evidence for EP-01..1
 locked full checks, source-compatible external implementer/wrapper fixtures, independent protected
 review, compatibility rollback and final CAS. No default switch before controlled compatibility
 and connection/redirect parity gates pass. C/#643/#624 stay incomplete/open, D incomplete/E-F gated.
+
+### Endpoint Carrier Implementation Stage — 2026-10-13
+
+#712 merged 989fec2e00124e86667a3519f82527e2e75074ad after independent exact-head
+Agent protected security/API APPROVE6136536739, CI3165/run38335038737 and CAS6136603322.
+Four documentation jobs passed; two Rust/platform jobs were policy-selected skips.
+Synchronization6136612802/6136613235/6136613625 records effective ADR-090/amended scope.
+Earlier draft restrictions above are historical; implementation starts from this merge.
+
+This carrier-stage candidate adds opt-in core prepared types, complete manifest binding through
+proposal/preview/Session match/admission, live permission-state authority, owned Agent dispatch
+and complete CLI/TUI preview. SDK legacy defaults deny new network scope; real SDK actor fixtures
+exercise scoped approval and legacy rejection. Public request literals/Path APIs remain compatible.
+No WebSearchTool, transport, selection, dependency or lockfile changes. This is partial
+infrastructure, not binary WebSearch activation, full C/EP acceptance or HTTP cancellation proof.
+
+Independent local preview identified and corrected host-only TUI preview and an overbroad test
+name: shared full formatter/channel fixture and real final-hook Skip/revocation, ledger replay
+and caller-drop fixtures now exist. Preview is not exact-head PR approval. Source audit corrected
+ADR-090's first-match description to existing matching Deny precedence/non-Deny first-match;
+the evaluator is unchanged.
+
+See [carrier migration/API inventory](../reference/SEARCH-001-C-NETWORK-CARRIER-MIGRATION.md)
+for storage bounds, callback/wrapper/root dispositions and activation gates. Eight permission
+lifecycle fixtures, seven Agent dispatch fixtures, core bounds, TUI channel and SDK callback/actor
+fixtures are available. Final locked validation, protected review and CI remain publication/merge
+gates. Carrier stage is Review; Implementation PR not assigned before first stable push. I293/C remain Active /
+Claimed / incomplete; #643/#624 open, D incomplete/E/F gated. No Completion Commit.
+
+Local stable checkpoint (Rust1.99.0 / cargo1.99.0, locked): workspace check and Clippy passed;
+affected core/permission/Agent/CLI/runtime all-target Clippy passed with -D warnings. Workspace
+tests passed3657 across119 summaries,0 failures; only the already maintainer-authorized exact
+tests::runtime_evidence_rejects_directory_symlinks_and_socket_entries was filtered locally.
+Code CI must run the unfiltered workspace/platform gate; no new skip or ignore was introduced.
+The independently locked single-direct-Talos consumer passed both minimal and coding runs,
+including the new prepared network implementation/scoped approval and existing API surfaces.
+Formatting (workspace/external fixture), whitespace, text boundary23, classifier14, governance
+(SQL17/delivery12), Collaboration Claim, public site and installers passed. Initial Clippy's
+needless borrow and private preview enum-size findings were corrected locally; the preview stores
+boxed scope rather than changing an unrelated event enum. Existing models.toml compression
+build-script information remains; no new Rust lint allowance or dependency changes.
+
+No whole release_preflight.sh success is claimed: equivalent required local steps use the
+pre-authorized exact socket deferral above. Remote exact-head CI/security/API review and final
+CAS remain mandatory before merge. Transport/default activation and full C/EP rows remain Pending.
+
+Late actual-URL canonicalization audit: #713's first head8b5e4146/treea1fa475e was independently
+approved in comment6138564512, but the new mapped-IPv6 regression failed (actual parsed
+::ffff:7f00:1 versus std dotted display). The first head is not the corrected merge candidate;
+comment6138722441 records the hold. Core now validates mapped hosts using HTTP URL hexadecimal
+serialization, with a real parsed-URL -> Domain proposal -> admission/check regression.
+No Deny/facet relaxation, dependency or transport change. Fresh stable validation and exact-head
+security/API review/CI are required; the earlier3657 checkpoint remains historical.
+
+The correction refreshed locked workspace check/Clippy, affected all-target Clippy,3658 tests
+across119 summaries (0fail/only the same authorized socket filter), both independently locked
+SDK runs and formatting/whitespace. Eight permission fixtures now pass, including the formerly
+failing actual-URL case. Initial CI3167/run38348784946 completed successfully on8b5e4146, but is
+historical evidence only and cannot approve the corrected head. Fresh governance/claims, review
+and CI bind the corrected candidate. Recorded lesson61 promotes the real boundary regression.
