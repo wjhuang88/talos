@@ -72,3 +72,14 @@ permission/Agent/tool wiring, controlled existing compatibility transport and re
 all-built-in Auto policy, Git, generic NET retry/breaker, new native admission and release stay out.
 Preserve model-facing contract, no startup/GeoIP probing and explicit paid consent. Full C/EP
 acceptance remains Pending; #643/#624 stay open. See I293 for authorization, inventory and gates.
+
+
+## Effective Carrier And Direct Transport Stage — 2026-10-13
+
+#712 merged989fec2e establishes the accepted ADR-090 contract and amended I293 scope.
+#713 carrier merged69e1e116 after exact-head protected Agent review6138838842, full
+CI3168/run38350762077 and CAS6139059609. This is partial infrastructure evidence.
+The next private library-only [controlled direct transport](../../reference/SEARCH-001-C-CONTROLLED-TRANSPORT.md)
+stage is Review under I293, with actual local HTTP/DNS/permission/redirect/budget fixtures;
+no default WebSearch, new API/dependency or provider admission is activated. Full C/EP,
+TLS/proxy/compatibility parity and bounded D migration gates remain Pending; #643/#624 open.

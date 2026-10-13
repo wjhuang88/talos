@@ -10,7 +10,7 @@
 | Source Issue | #643 |
 | Depends on | Accepted ADR-085; SEARCH-001-B / #642 complete in #656; NET-001 boundary coordination |
 | Claim State | Claimed |
-| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 carrier stage Review (default activation Pending) |
+| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; controlled direct transport stage Review / PR not assigned (default activation Pending) |
 | Completion | Pending |
 
 ## Collaboration Claim
@@ -706,3 +706,67 @@ SDK runs and formatting/whitespace. Eight permission fixtures now pass, includin
 failing actual-URL case. Initial CI3167/run38348784946 completed successfully on8b5e4146, but is
 historical evidence only and cannot approve the corrected head. Fresh governance/claims, review
 and CI bind the corrected candidate. Recorded lesson61 promotes the real boundary regression.
+
+### Merged Carrier And Controlled Direct Transport Stage — 2026-10-13
+
+#713 merged at `69e1e1166943e7e9b39acab04ade9e362cccb5d3`, exact head
+`fc9286b430bebfef77891d95d9b1c992d6249faa`, tree `39d1809d664ce7685821ee692b6f0dccae5a10f6`.
+Protected independent Agent APPROVE6138838842, full CI3168/run38350762077 (six jobs) and
+CAS6139059609 passed. The original Unix socket fixture ran unfiltered in macOS CI. Issue
+synchronization6139067980/6139068201 retains C/Epic open; receipt6139068432 records the merge.
+This source update records existing carrier evidence, not a completion commit for C/EP.
+
+The next library-only infrastructure stage starts from that merge, within effective #712 scope.
+It adds a private `search_backend::transport` under the existing staged seam, without adding a
+lint allowance, dependency, lockfile, exported API or WebSearch/default wiring. There is no new
+provider, copied upstream protocol/parser, paid request, external search or regional observation.
+Runnable deliverable: actual reqwest -> owned loopback server fixtures and real Once permission
+admission -> transport. See [controlled transport contract/evidence](../reference/SEARCH-001-C-CONTROLLED-TRANSPORT.md).
+
+The direct client derives exact endpoints from the actual URL/method; checks authority before
+DNS and after DNS before logical send; rejects mixed/over-limit/nonpublic answer sets unless
+each nonpublic IP has an exact approved exception; pins all accepted addresses; disables ambient
+proxies, redirects, retries, Referer and decoding; creates a new HTTP/1 client per hop. Fixed
+request headers cannot be overridden. Explicit proxies return UnsupportedProxy with no direct
+fallback. Scoped GET/HEAD redirects are bounded; POST supports only same-origin307/308 and
+does not change method or forward its body to another origin. HTTPS downgrade is rejected.
+One shared execution deadline/request/body budget covers candidates and hops; explicit deadline
+fences supplement timeout_at. Storage, header acceptance and query/body limits are documented.
+
+Independent local source preview identified a deadline blocker: Tokio Timeout polls a Ready
+inner future before its timer. No failing pre-fix test run is claimed; corrected explicit fences
+and paused-clock expired/late-ready DNS fixtures cover the finding before publication. Negative
+socket counts now use terminal worker join/drained accept queues, not an instantaneous counter.
+This is a design/implementation preview, not remote exact-head approval.
+
+Focused corrected checkpoint:26 transport fixtures pass (plus the separate ambient-proxy child
+fixture invocation). Actual HTTP receipts cover Host identity, System DNS, exact IP exceptions,
+denied destination/redirect zero connections, real Once admission/revocation, concurrent shared
+budgets, body/header/encoding bounds, deadline/caller abort peer EOF and no hidden HTTP retry.
+Local TCP sockets are available; the unchanged Unix socket fixture remains environment-blocked. No new fixture is skipped. Full standard preflight and fresh
+exact-head independent security review/CI/CAS remain candidate gates; results follow below.
+
+Infrastructure stage is Review; I293 remains Active/Claimed/incomplete, no C Completion Commit.
+HTTPS certificate/SNI connection fixtures, explicit proxy and ambient-config migration, upstream
+form/request/parser/probe/retry/source parity, bounded D terms/privacy/MIT review and actual
+WebSearch/Agent/CLI/SDK/MCP integration remain default activation gates. Do not interpret direct
+local HTTP sockets as TLS, arbitrary-network SSRF, OS sandbox, resolver-task cancellation or
+regional reachability proof. D remains independently incomplete and E/F gated; #643/#624 open.
+
+Final local checkpoint (pinned Rust/cargo1.99.0, locked): workspace check/Clippy and network
+all-target Clippy pass; formatting, whitespace, governance(SQL17/delivery12), claims0warnings,
+text boundary23, classifier14, site/installers and both independent SDK modes pass. Workspace
+tests exit0 with3684 passes across119 primary suite summaries, no failures/ignores, and exactly
+one primary filter: the already authorized unchanged Unix socket fixture. The isolated ambient
+proxy child adds one pass/one summary; its --exact filters436 sibling tests only in that child,
+while the parent tool suite runs all437. Raw output therefore has120 summaries/3685 passes,
+which is not3685 distinct workspace tests or437 waived tests. All26 new fixtures run locally.
+
+The initial standard unfiltered release_preflight.sh did run and failed at the original Runtime
+socket fixture (66pass/1fail, PermissionDenied/Operation not permitted). TCP availability does
+not imply Unix socket availability. Preserve that failure; no whole local preflight pass is
+claimed. The equivalent required steps above use only the maintainer's prior exact local filter;
+full remote CI must run unfiltered. No production/test waiver or CI change was introduced.
+Source-based deadline finding, late-ready DNS completion observation and bounded failed-DNS
+hop reservations are reconciled locally before first submission. Independent protected exact-
+head review, CI and final CAS remain the remote gates for this stable stage.
