@@ -1,9 +1,10 @@
-# SEARCH-001-C: Controlled Direct Transport
+# SEARCH-001-C: Controlled Search Transport
 
 Library-only stage under effective I293/#712 and ADR-090; baseline #713 merge69e1e116.
 Private implementation: crates/talos-tools/src/search_backend/transport.rs. Default WebSearch,
 public API, model contract, dependencies/locks and provider selection remain unchanged.
-This stage supplies a runnable direct-HTTP prerequisite, not full C/EP completion or activation.
+Direct HTTP merged in #714 (d78dc75c). The current TLS/CONNECT subset extends that dormant
+prerequisite, not full C/EP completion or activation.
 
 ## Connection Contract
 
@@ -25,7 +26,8 @@ pinned dial set, under the same budget. POST retains body/method only on same-or
 other POST redirects fail. HTTPS downgrade, userinfo and fragments fail. A denied next host
 receives neither DNS nor a connection. Already-sent input at an approved source cannot be undone.
 
-Explicit proxy scopes return a closed UnsupportedProxy error; never silently dial direct.
+Explicit proxy scopes support only the limited CONNECT contract below; all other shapes return
+a closed UnsupportedProxy error and never silently dial direct.
 Ambient proxy variables are ignored only in this dormant direct implementation. Preserve current
 working proxy behavior until a separately validated snapshot/migration path permits activation.
 
@@ -34,7 +36,7 @@ working proxy behavior until a separately validated snapshot/migration path perm
 | Resource | Bound | Evidence/meaning |
 |---|---|---|
 | One shared execution duration | >0, <=60s | Covers DNS, send, redirect and reads; explicit fences reject expired/late-ready outcomes |
-| Hop attempt reservations | 1..8 shared atomically | Includes failed DNS and post-lookup revocation, all future candidates/hops; actual sends cannot exceed reservations; no automatic HTTP retry |
+| Hop attempt reservations | 1..8 shared atomically | Direct hop reserves1; proxy compound hop reserves2 before DNS; includes failed DNS and post-lookup revocation, all future candidates/hops; actual sends cannot exceed reservations; no automatic HTTP retry |
 | DNS addresses per hop | 1..16 | Retain seventeenth answer to detect overflow; reject whole set |
 | Actual URL / encoded query | <=8192 / <=4096 bytes | Path uses the core2048-byte bound; no userinfo/fragment |
 | POST body | <=16384 bytes per send | Total sends bounded; no GET/HEAD body |
@@ -79,7 +81,7 @@ No internal resolver/HTTP worker cancellation guarantee follows from observed lo
 
 ## Remaining Activation Gates
 
-Real HTTPS certificate/SNI/address fixtures; explicit proxy and ambient configuration migration;
+Broader explicit proxy support and ambient configuration snapshot/migration;
 controlled existing compatibility request/form/parser/probe/retry/source parity; bounded D
 terms/privacy/parser review and full MIT provenance before copying; real WebSearch and official
 CLI/SDK/MCP/standalone dispatch, router/deadline/rollback acceptance. Preserve paid opt-in and
@@ -89,3 +91,52 @@ The module inherits the private SearchBackend seam's already existing staged dea
 no new suppression is added. It is intentionally dormant and not a user-visible feature or new
 public transport API. Future integration must consume this code and re-evaluate staged allowances.
 Full C/EP rows remain Pending, D independently incomplete, E/F gated and #643/#624 open.
+
+## TLS And Explicit CONNECT Subset — 2026-10-13
+
+Direct HTTPS retains original hostname SNI/Host, pinned dial addresses and Rustls verification.
+The proxy subset accepts unauthenticated HTTP CONNECT only, with HTTPS IPv4-literal targets
+and declared GET/HEAD/POST methods. Hostname/HTTP/IPv6 targets, HTTPS proxies and malformed
+proxy method/path are UnsupportedProxy; authentication and SOCKS are not supported.
+
+The declared proxy endpoint path `/` is its configuration locator, not the CONNECT request-target.
+The latter is the approved literal target IP plus effective port. Target address policy runs
+before proxy DNS. The entire proxy answer set must pass the same port/global-or-exact-exception
+policy and is pinned. Both target and proxy live authority are checked before DNS and immediately
+before the compound logical start. Two shared reservations cover CONNECT plus target request;
+failed DNS/CONNECT consumes them conservatively. Ambient proxies remain disabled; there is no
+implicit direct fallback, retry, cookie or Authorization forwarding.
+
+Reqwest0.13.4 owns CONNECT→TLS→application internals. The authority fence covers the compound
+start, not each subsequent physical substep. Revocation after that start can permit already
+started application work; new redirects/hops must recheck and fail. A trusted proxy can choose
+its own remote routing: literal authority and verified IP SAN do not prove its remote TCP peer
+or end-to-end address pinning. Hostname CONNECT is rejected because reqwest delegates its
+resolution to the proxy; local target resolution would not enforce that destination.
+
+Pinned hyper-util0.1.21 CONNECT parsing has an8192-byte buffer/100-header bound, separate from
+our target response post-parser acceptance limits. Oversized CONNECT response tests are not
+proof of a16KiB pre-allocation limit. No whole-process memory/cancellation guarantee follows.
+
+Thirteen added fixtures cover direct SNI/Host/pinning; trusted wrong SAN, untrusted CA, expiry
+and CONNECT IP SAN; HTTPS downgrade; literal CONNECT/POST isolation; real Once proxy+target
+admission/revocation; denial before DNS; mixed answers and DNS-time revocation; unsupported
+shapes;407/oversized CONNECT; two-unit budget/deadline; compound-start revocation across a
+redirect; and caller-abort peer closure. Together with the original26, focused transport runs39.
+No live provider or regional availability claim is made.
+
+The test-only Python stdlib loopback server is an explicit host-utility tradeoff: existing runner
+availability avoids a new production/native dependency; missing Python fails rather than skips.
+Replace when a Rust-native TLS test-server dependency is approved. See the public synthetic
+certificate [fixture provenance](../../tests/fixtures/search-tls/README.md). The CA is merged
+only under cfg(test); production trust and validation are unchanged. Fixtures relay only to their
+own fixed loopback TLS socket. Terminal receipts require drained accepts and joined workers.
+Startup/operation and child polling are timed; kill/wait/reader join have an OS cleanup tail
+that is not independently interruptible. Do not call every cleanup step hard-deadline-bounded.
+
+Initial focused validation had33pass/3fail: repeated SNI callbacks on one TCP connection were
+mistaken for extra requests, and the fixture treated legitimate absent IP SNI as a counter,
+raising TypeError in its TLS callback. Corrected receipt handling and physical connection counts
+produced39pass/0fail. No packet-trace diagnosis of repeated callbacks is claimed. All-target
+Clippy's manual range-pattern finding was corrected without a lint suppression. Fresh locked
+workspace validation and protected exact-head review/CI/CAS are recorded in I293.

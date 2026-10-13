@@ -1,4 +1,5 @@
 use super::*;
+mod tls;
 use std::{
     collections::VecDeque,
     io::{Read, Write},
@@ -203,9 +204,7 @@ impl ToolNetworkAuthority for Authority {
         if self.revoked.load(Ordering::Relaxed) {
             return Err(ToolNetworkAuthorizationError::Invalidated);
         }
-        if id != self.manifest.invocation_id()
-            || !self.manifest.scope().endpoints().contains(endpoint)
-        {
+        if id != self.manifest.invocation_id() || !self.manifest.scope().contains(endpoint) {
             return Err(ToolNetworkAuthorizationError::Mismatch);
         }
         Ok(())

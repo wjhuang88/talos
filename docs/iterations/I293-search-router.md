@@ -10,7 +10,7 @@
 | Source Issue | #643 |
 | Depends on | Accepted ADR-085; SEARCH-001-B / #642 complete in #656; NET-001 boundary coordination |
 | Claim State | Claimed |
-| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; controlled direct transport stage Review / PR not assigned (default activation Pending) |
+| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; TLS/CONNECT subset Review / PR not assigned (default activation Pending) |
 | Completion | Pending |
 
 ## Collaboration Claim
@@ -770,3 +770,40 @@ full remote CI must run unfiltered. No production/test waiver or CI change was i
 Source-based deadline finding, late-ready DNS completion observation and bounded failed-DNS
 hop reservations are reconciled locally before first submission. Independent protected exact-
 head review, CI and final CAS remain the remote gates for this stable stage.
+
+
+## Direct Transport Merge And TLS/CONNECT Subset — 2026-10-13
+
+#714 merged `d78dc75c4b52fe7a2f708b752090c17e1f5f7bca` after protected independent Agent
+review6140200974, full CI3170/run38360092833 (six successful jobs) and CAS6140498436.
+Issue receipts6140512149 (#643),6140512432 (#624) and6140512783 (#714) retain partial status.
+
+The next library-only stage is Review under the same effective claim, based on that merge.
+[Transport contract](../reference/SEARCH-001-C-CONTROLLED-TRANSPORT.md) records verified direct
+TLS/SNI and limited explicit CONNECT: unauthenticated HTTP proxy, HTTPS IPv4-literal targets,
+proxy+target authority, pinned proxy DNS, two reservations per compound hop, no direct fallback.
+Hostname/HTTP/IPv6 targets and HTTPS proxies fail closed. Proxy `/` is a configuration locator;
+CONNECT uses literal IP:port. Compound-start revocation cannot undo already-started work, and
+trusted-proxy remote routing is not proven. No default WebSearch/API/dependency/lock change.
+
+Thirteen new fixtures plus26 prior fixtures pass in the focused network run. Test-only synthetic
+CA verification remains enabled. Python stdlib is an explicit temporary fixture host utility;
+missing utility fails, no new skip. Initial fixture33pass/3fail and corrected callback/None-SNI
+receipt handling are preserved in the contract and EVOLUTION. Independent implementation
+preview found no new blocker, but is not exact-head remote approval. Full C/EP remain Pending,
+I293 Active/Claimed, D independently incomplete, E/F gated, #643/#624 open. Broader proxy and
+ambient migration, compatibility form/parser/probe/retry/source parity, bounded D review and
+actual official root/router acceptance remain activation gates.
+
+
+Fresh final local checkpoint: pinned1.99.0 locked workspace check/Clippy, network all-target
+Clippy, fmt/diff, Python AST, governance(SQL17/delivery12), claims0warnings, text boundary23,
+classifier14, site/installers and both independent SDK modes pass. Fresh rebuilt workspace
+suite exits0:3697 primary passes/119 summaries, zero failures/ignores and exactly the prior
+Unix-socket filter. Its isolated ambient-proxy child adds1pass/1summary and449 sibling filters;
+parent tools run450 including all13 new TLS cases. Raw3698/120/450 filters must not be mistaken
+for3698 distinct tests or450 waived tests. No new skip or unfiltered local preflight claim.
+Independent final local protected preview found no blocker; remote exact-head review/CI/CAS
+remain required. Resume from feature/I293-search-tls-proxy; publish this stable stage, verify its
+remote tree equals the local tree, obtain independent protected review and full unfiltered CI,
+then repeat claim/base/head/tree/non-overlap/Issue CAS. Keep #643/#624 open and record actual PR.

@@ -6,7 +6,8 @@
 production endpoint-authority/search wiring on 2026-10-13; [ADR-090](../decisions/090-invocation-bound-search-endpoint-authority.md)
 and the existing C claim's scope amendment became effective in #712 (989fec2e), after protected
 review, CI and CAS. #713 carrier merged69e1e116 after exact-head review/CI/CAS. The private
-controlled direct-transport stage is Review under that claim, with actual local socket fixtures.
+controlled direct transport merged in #714 (d78dc75c); TLS/CONNECT subset is Review under that
+claim, with39 focused local fixtures and documented limitations.
 WebSearch default activation and full C/EP acceptance remain Pending, #643/#624 open. I300 and
 PERM-007-H retain their separate scopes.
 

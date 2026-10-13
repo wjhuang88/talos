@@ -72,6 +72,7 @@ repeating known mistakes.
 | 60 | Validation | 隔离 checkout target 并串行执行全库验证；工具链登记不等于可执行 | I293 |
 | 61 | Network authority | Endpoint canonicalization must be tested against the actual HTTP URL representation, including mapped IPv6 | I293 / #713 |
 | 62 | Async / Transport | timeout_at alone is not a deadline fence for immediately Ready inner futures | I293 |
+| 63 | TLS fixtures | Callback observations are not physical connections; absent IP SNI is valid | I293 |
 
 ## Lessons
 
@@ -1204,3 +1205,16 @@ repeating known mistakes.
   owned-socket deadline/drop receipts. Separate logical-start races from already-sent exposure.
 - Promoted to rule/check: expired_shared_budget_never_resolves_or_starts_a_connection;
   dns_ready_after_advancing_past_deadline_cannot_start_a_request.
+
+
+## 2026-10-13 - TLS Callback Receipts Need Physical Connection Identity
+
+- Trigger: Direct TLS/CONNECT focused run produced33pass/3fail.
+- Symptom: A correct direct handshake repeated its SNI callback; CONNECT TLS aborted in the
+  fixture when an IP target legitimately supplied no SNI.
+- Root cause: Tests assumed one callback per connection and conflated None with counter update.
+- Fix: Use a distinct counter sentinel; compare callback values and count accepted TCP sockets.
+- Prevention: Keep wrong SAN/untrusted/expired/IP-SAN negatives; do not infer a packet-level
+  handshake cause without a trace or describe a fixture exception as a production TLS defect.
+- Promoted to rule/check: direct_tls_preserves_original_sni_host_and_pinned_dial_address;
+  connect_target_ip_san_is_checked_even_with_a_trusted_fixture_ca.
