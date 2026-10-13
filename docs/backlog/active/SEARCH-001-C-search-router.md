@@ -60,3 +60,15 @@ distinguishes proposal compilation from execution enforcement and defines planne
 compatibility/fallback, redirect/connection and real-dispatch acceptance gates. It changes no
 production behavior or permission API, activates no PERM-007-H work and admits no provider.
 C/I293 and all full acceptance remain incomplete/Pending; #643/#624 remain open.
+
+## Authorized Scope Addition — 2026-10-13
+
+The maintainer accepted the described production endpoint-authority/search wiring scope. The
+architecture/test-only boundary above is preserved as prior-stage history; the expanded phase
+requires an effective I293 scope-amendment claim and accepted, independently reviewed
+[ADR-090](../../decisions/090-invocation-bound-search-endpoint-authority.md) before implementation.
+The draft remains governance-only and cannot activate code. Scope is search-only carrier,
+permission/Agent/tool wiring, controlled existing compatibility transport and real-dispatch tests;
+all-built-in Auto policy, Git, generic NET retry/breaker, new native admission and release stay out.
+Preserve model-facing contract, no startup/GeoIP probing and explicit paid consent. Full C/EP
+acceptance remains Pending; #643/#624 stay open. See I293 for authorization, inventory and gates.

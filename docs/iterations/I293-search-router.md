@@ -10,7 +10,7 @@
 | Source Issue | #643 |
 | Depends on | Accepted ADR-085; SEARCH-001-B / #642 complete in #656; NET-001 boundary coordination |
 | Claim State | Claimed |
-| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 (merged partial evidence); endpoint-authority architecture packet Review (PR not yet assigned) |
+| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); production scope/ADR amendment Draft (PR not yet assigned) |
 | Completion | Pending |
 
 ## Collaboration Claim
@@ -583,3 +583,64 @@ workspace test/preflight, Clippy or SDK build is claimed for this Markdown-only 
 read-only Agent preview found no blockers and confirmed source evidence/proposed API boundaries;
 it is not exact-head merge approval or natural-person review. Repository trusted-base routing,
 exact-head applicable review/CI and final CAS remain required before merge.
+
+### Authorized Production Scope Addition — 2026-10-13
+
+#709 merged as `bac4cce938da10d051fbafc562e2cba19e9557bd`, reviewed head
+`ec4a6112e992fb4196c7e43976c5caa8bd074387`, after independent architecture/permission-evidence
+APPROVE6127945569, CI3154/run38274655324 and final CAS6128010518. Four documentation-route jobs
+passed; Windows Rust/Linux Desktop were policy-selected skips, not Rust test passes. Complete logs
+show governance/claims0 warnings, SQL17, delivery12 and classifier14 checks. Merge synchronization
+is in comments6128036145/6128036514/6128036835. These supersede pending-stage merge instructions.
+All full C/EP acceptance remains Pending; no production API/behavior was delivered by that packet.
+
+The maintainer explicitly accepted the expanded bounded scope on 2026-10-13, after reviewing its
+description: invocation-bound endpoint authority and actual search wiring under ADR/claim,
+independent safety/API review and CI gates. This supersedes the session's architecture/test-only
+execution restriction for the authorized production phase once its scope amendment is effective;
+it does not pre-approve an unknown API or waive any gate. No further generic confirmation of the
+same scope is required. Concrete contract acceptance is through the reviewed ADR, not this note.
+
+Change-control classification: explicitly accepted scope addition required for I293's published
+SearchRouter/permission integration objective, not a separately selected general network or Auto
+feature. Preserve published scope/acceptance and historical restriction paragraphs above. Amend
+the existing single C claim, rather than creating duplicate C ownership or a new Issue for a local
+prerequisite. Proposed scope covers search-only core/permission/Agent prepared invocation and live
+authority, controlled compatibility/optional-adapter transport, associated CLI/SDK/MCP disposition,
+tests and migration docs. PERM-007-H's all-built-in Auto policy, I300 Git, D/E/F provider admission,
+NET-001 generic retry/breaker, new crate/dependency, unsafe/native exceptions and release stay out.
+
+Draft scope amendment PR: Pending. The target #664 claim and its previous Work Slice remain
+effective until a finalized amendment merges. This branch contains governance/decision docs only;
+no production implementation, implementation test or implementation branch exists. ADR-090 is
+Proposed, requiring independent permission/API/security review before acceptance. Implementation
+starts from the amended-claim/accepted-contract merge or later main, never this draft.
+
+Selection source: main `9cad344b8f7adef855ca6b858e6ccc7723103767` (I301 #711 repair merged).
+Fresh inventory retains I293/I294 Active search, I300 Active Git, I301 Review/Claimed (no closure
+inferred from merge), I277 Review/deferred device acceptance, I249 Planned and I164 Paused.
+PERM-007-H remains Refinement/Unclaimed; open #705 owns separate Windows latency diagnostics.
+Other completed owners retain their exact recorded completion/claim states. No other owner is
+reactivated, taken over or closed. Target claim/overlap and ADR identifier must be rechecked at CAS.
+
+The concrete draft is [ADR-090](../decisions/090-invocation-bound-search-endpoint-authority.md).
+An independent read-only design preview identified complete Session grant binding, Deny projection,
+public-struct-literal compatibility, live state authority and transport ownership as hard gates;
+it is not exact-head approval. The pinned rust-websearch archive was freshly downloaded, SHA256
+verified (`06b90d9a9ad9e7e347c4cd85c3fb37189256703db4fab1d6c6fb963ae1eed0ee`) and inspected:
+no injected client, private HTML parsers, internal limited(5) redirects. The candidate rehosts only
+the existing compound protocol under guarded clients inside talos-tools, keeps the same dependency
+and reusable network-free helpers/types with MIT provenance, and counts no native E/F admission.
+Protocol internalization is explicitly within this proposed scope and requires bounded D
+coordination for terms/privacy/parser and migration differences before activation. The pinned
+upstream root MIT license/notice was retrieved; preserve the complete notice and per-file source
+and modification records before copying. Protected invocation failures cannot automatically
+fall back to opaque/legacy execution; rollback is a controlled version/deployment revert or a
+separately accepted migration. Preparation errors use a closed, content-free error contract.
+No live search, key usage or transport proof is claimed by this source audit.
+
+Infrastructure-only governance deliverable: reviewed scope/ADR and owner/index synchronization.
+Production acceptance remains real Agent/CLI/SDK/transport evidence for EP-01..10 and C-V01..11,
+locked full checks, source-compatible external implementer/wrapper fixtures, independent protected
+review, compatibility rollback and final CAS. No default switch before controlled compatibility
+and connection/redirect parity gates pass. C/#643/#624 stay incomplete/open, D incomplete/E-F gated.
