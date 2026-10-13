@@ -583,6 +583,11 @@ Success、Error 或 Cancelled 终态原子落盘；若已完成的安全工具�
 发生在任何可持久化事实之前，则只记录隐藏终态，不伪造可见 turn。未完成的 assistant
 片段、原始 provider 响应、private tool data 与认证材料不会进入 transcript。
 
+源码嵌入方实现 opt-in prepared 网络工具时，需要使用完整 scoped approval 回调；
+旧参数式 SDK 默认回调会拒绝这种新 scope。[网络 carrier 迁移说明](docs/reference/SEARCH-001-C-NETWORK-CARRIER-MIGRATION.md)
+记录新增 API、精确 endpoint 绑定和 wrapper 要求。本 SEARCH-001-C 基础设施阶段
+尚未切换默认搜索传输，也未发布新版本。
+
 这还不是稳定的 1.0 SDK 承诺。当前公开嵌入表面是 `talos-runtime` 以及它从
 `talos-core` 重新导出的协议和 trait 类型；低层 `talos-agent` 构造器仍视为实现表面，
 除非文档另行声明。

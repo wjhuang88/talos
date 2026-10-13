@@ -126,6 +126,9 @@ impl ApprovalPrompt {
                 );
             }
         }
+        if let Some(scope) = preview.network_scope() {
+            eprintln!("{}", format_network_scope(scope));
+        }
         eprintln!();
         eprintln!("[1] Approve once  [2] Always approve  [3] Deny");
         eprint!("> ");
@@ -228,7 +231,7 @@ impl ApprovalPrompt {
 }
 
 pub(crate) fn format_grant_preview(preview: &GrantPreview) -> String {
-    preview
+    let mut formatted = preview
         .facets()
         .iter()
         .map(|facet| {
@@ -238,7 +241,49 @@ pub(crate) fn format_grant_preview(preview: &GrantPreview) -> String {
             )
         })
         .collect::<Vec<_>>()
-        .join("\n")
+        .join("\n");
+    if let Some(scope) = preview.network_scope() {
+        formatted.push('\n');
+        formatted.push_str(&format_network_scope(scope));
+    }
+    formatted
+}
+
+fn format_network_scope(scope: &talos_core::tool::ToolNetworkScope) -> String {
+    let mut lines = vec![
+        "Exact network scope (includes probes, fallbacks and allowed redirect destinations):"
+            .to_string(),
+    ];
+    for endpoint in scope.endpoints() {
+        lines.push(format!(
+            "  - {} {}://{}:{}{}",
+            endpoint.method(),
+            endpoint.scheme(),
+            endpoint.host(),
+            endpoint.port(),
+            endpoint.path()
+        ));
+    }
+    if let Some(proxy) = scope.proxy() {
+        lines.push(format!(
+            "  - explicit proxy: {} {}://{}:{}{}",
+            proxy.method(),
+            proxy.scheme(),
+            proxy.host(),
+            proxy.port(),
+            proxy.path()
+        ));
+    }
+    lines.push(format!(
+        "  - manual redirect limit: {}; private address exceptions: {:?}",
+        scope.redirect_limit(),
+        scope.private_addresses()
+    ));
+    lines.push(
+        "  - session reuse requires the same complete destination and tool configuration scope"
+            .to_string(),
+    );
+    lines.join("\n")
 }
 
 pub(crate) fn format_explained_grant_preview(
@@ -260,6 +305,88 @@ mod tests {
         InteractionCapability, PermissionContext, PermissionInvocation, PermissionMode,
         PermissionRequest,
     };
+
+    fn network_approval_request() -> PermissionApprovalRequest {
+        use talos_core::tool::{ToolNetworkEndpoint, ToolNetworkManifest, ToolNetworkScope};
+        let scope = ToolNetworkScope::new(
+            uuid::Uuid::new_v4(),
+            0,
+            vec![
+                ToolNetworkEndpoint::new("https", "search.example", 8443, "POST", "/search")
+                    .expect("search"),
+                ToolNetworkEndpoint::new("https", "fallback.example", 443, "GET", "/fallback")
+                    .expect("fallback"),
+            ],
+            Some(
+                ToolNetworkEndpoint::new("https", "proxy.example", 443, "CONNECT", "/")
+                    .expect("proxy"),
+            ),
+            vec!["127.0.0.1".parse().expect("address")],
+            2,
+        )
+        .expect("scope");
+        let manifest = ToolNetworkManifest::new(scope);
+        let facets: Vec<_> = ["search.example", "fallback.example", "proxy.example"]
+            .into_iter()
+            .map(|host| {
+                ToolPermissionFacet::with_resource(
+                    ToolNature::Network,
+                    host,
+                    ToolResourceKind::Domain,
+                )
+            })
+            .collect();
+        let input = serde_json::json!({"query":"private-query"});
+        let permission = PermissionRequest::native("web_search", &facets, &input)
+            .with_network_manifest(&manifest);
+        let state = PermissionSessionState::new(PermissionEngine::new());
+        let context = PermissionContext::new(
+            PermissionMode::Interactive,
+            InteractionCapability::Available,
+        );
+        let mut approval = approval_request();
+        approval.tool_name = "web_search".into();
+        approval.arguments = serde_json::json!({"query":"<redacted>"});
+        approval.preview = state
+            .propose(&permission, &context, talos_permission::GrantScope::Session)
+            .expect("proposal")
+            .preview()
+            .clone();
+        approval
+    }
+
+    #[tokio::test]
+    async fn tui_network_preview_shows_complete_scope_without_query_or_credentials() {
+        let request = network_approval_request();
+        let expected = format_grant_preview(&request.preview);
+        for field in [
+            "POST https://search.example:8443/search",
+            "GET https://fallback.example:443/fallback",
+            "CONNECT https://proxy.example:443/",
+            "redirect limit: 2",
+            "127.0.0.1",
+            "same complete destination",
+        ] {
+            assert!(expected.contains(field), "missing {field}");
+        }
+        assert!(!expected.contains("private-query"));
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        let handler = crate::registry::TuiApprovalHandler::new(tx, std::path::PathBuf::from("."));
+        let task =
+            tokio::spawn(async move { handler.resolve(request, Duration::from_secs(5)).await });
+        let talos_conversation::UiOutput::ToolApprovalRequest {
+            preview, response, ..
+        } = rx.recv().await.expect("panel")
+        else {
+            panic!("expected approval");
+        };
+        assert_eq!(preview.expect("scope"), expected);
+        response.send(ApprovalChoice::Deny).expect("respond");
+        assert_eq!(
+            task.await.expect("join").expect("choice"),
+            ApprovalChoice::Deny
+        );
+    }
 
     fn approval_request() -> PermissionApprovalRequest {
         let root = tempfile::tempdir().expect("tempdir");

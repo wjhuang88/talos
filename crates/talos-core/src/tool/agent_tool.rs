@@ -30,6 +30,23 @@ pub trait AgentTool: Send + Sync {
     /// custom schema.
     fn parameters(&self) -> Value;
 
+    /// Opts into invocation-bound network execution. Unmigrated tools retain their old path.
+    fn requires_network_invocation(&self) -> bool {
+        false
+    }
+
+    /// Prepares validated input/configuration locally, with no HTTP, DNS or probes.
+    /// Required tools and their wrappers must provide this path; missing preparation fails closed.
+    fn prepare_network_invocation(
+        &self,
+        _input: &Value,
+    ) -> Result<
+        Option<Box<dyn super::PreparedNetworkToolInvocation>>,
+        super::ToolNetworkPreparationError,
+    > {
+        Ok(None)
+    }
+
     /// Requires original provider argument evidence and a separate prepared invocation path.
     /// Ordinary tools retain the existing parsed-JSON dispatch by default.
     fn requires_original_invocation(&self) -> bool {

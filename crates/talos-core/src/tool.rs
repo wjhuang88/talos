@@ -7,6 +7,7 @@
 mod agent_tool;
 mod authorization;
 mod browser_arguments;
+mod network;
 mod prepared;
 mod protocol;
 mod registry;
@@ -15,6 +16,7 @@ mod todo_presentation;
 
 pub use self::{agent_tool::*, authorization::*, protocol::*, registry::*, result_presentation::*};
 pub use browser_arguments::{BrowserRawArguments, BrowserRawArgumentsError};
+pub use network::*;
 pub use prepared::{
     AuthorizedToolInvocation, PreparedExecutionOutput, PreparedFailureCode,
     PreparedInvocationError, PreparedToolInvocation,

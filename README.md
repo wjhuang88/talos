@@ -932,6 +932,12 @@ decisions are denied unless the embedder supplies policy or an approval handler.
 from an SDK handler installs only an in-memory grant owned by that `RuntimeHandle`; each new runtime
 starts with an empty grant store, and current policy denies are rechecked before every admission.
 
+Source consumers implementing an opt-in prepared network tool must use the complete scoped
+approval callback; the legacy argument-only SDK default denies this new scope. The
+[network carrier migration](docs/reference/SEARCH-001-C-NETWORK-CARRIER-MIGRATION.md) documents
+the additive API, exact endpoint binding and wrapper obligations. This SEARCH-001-C infrastructure
+stage does not activate a new default search transport or publish a release.
+
 This is not a stable 1.0 SDK guarantee yet. The public embedding surface is `talos-runtime`
 plus the protocol and trait types it re-exports from `talos-core`; lower-level `talos-agent`
 constructors remain implementation surface unless documented otherwise.

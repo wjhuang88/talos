@@ -68,8 +68,11 @@ literals. A bounded ToolNetworkManifest contains:
 
 Transport derives identity from the actual parsed request URL/method, not a claimed label.
 Canonicalization and policy projection must use the same validated representation, preserving
-existing resource/glob Deny semantics, including current per-facet first-match behavior rather
-than a new global rule scan. Domain facets cover every actual probe, request, fallback, CDN and
+existing resource/glob Deny semantics: matching Deny dominates, and first-match behavior is
+retained within non-Deny rules. The initial #712 wording incorrectly summarized this as only
+per-facet first-match; implementation source audit confirms the existing evaluator already scans
+for terminal matching Deny. This is a factual correction, not a new policy scan or behavior change.
+Domain facets cover every actual probe, request, fallback, CDN and
 redirect host before approval; manifest binding is
 separate from those rule-matching facets, not a fabricated Remote facet or model JSON field.
 No wildcard authority or global relaxation of MissingResource is permitted. Generic untyped

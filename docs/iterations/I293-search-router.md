@@ -646,3 +646,48 @@ Production acceptance remains real Agent/CLI/SDK/transport evidence for EP-01..1
 locked full checks, source-compatible external implementer/wrapper fixtures, independent protected
 review, compatibility rollback and final CAS. No default switch before controlled compatibility
 and connection/redirect parity gates pass. C/#643/#624 stay incomplete/open, D incomplete/E-F gated.
+
+### Endpoint Carrier Implementation Stage — 2026-10-13
+
+#712 merged 989fec2e00124e86667a3519f82527e2e75074ad after independent exact-head
+Agent protected security/API APPROVE6136536739, CI3165/run38335038737 and CAS6136603322.
+Four documentation jobs passed; two Rust/platform jobs were policy-selected skips.
+Synchronization6136612802/6136613235/6136613625 records effective ADR-090/amended scope.
+Earlier draft restrictions above are historical; implementation starts from this merge.
+
+This carrier-stage candidate adds opt-in core prepared types, complete manifest binding through
+proposal/preview/Session match/admission, live permission-state authority, owned Agent dispatch
+and complete CLI/TUI preview. SDK legacy defaults deny new network scope; real SDK actor fixtures
+exercise scoped approval and legacy rejection. Public request literals/Path APIs remain compatible.
+No WebSearchTool, transport, selection, dependency or lockfile changes. This is partial
+infrastructure, not binary WebSearch activation, full C/EP acceptance or HTTP cancellation proof.
+
+Independent local preview identified and corrected host-only TUI preview and an overbroad test
+name: shared full formatter/channel fixture and real final-hook Skip/revocation, ledger replay
+and caller-drop fixtures now exist. Preview is not exact-head PR approval. Source audit corrected
+ADR-090's first-match description to existing matching Deny precedence/non-Deny first-match;
+the evaluator is unchanged.
+
+See [carrier migration/API inventory](../reference/SEARCH-001-C-NETWORK-CARRIER-MIGRATION.md)
+for storage bounds, callback/wrapper/root dispositions and activation gates. Seven permission
+lifecycle fixtures, seven Agent dispatch fixtures, core bounds, TUI channel and SDK callback/actor
+fixtures are available. Final locked validation, protected review and CI remain publication/merge
+gates. Carrier stage is Review; Implementation PR not assigned before first stable push. I293/C remain Active /
+Claimed / incomplete; #643/#624 open, D incomplete/E/F gated. No Completion Commit.
+
+Local stable checkpoint (Rust1.99.0 / cargo1.99.0, locked): workspace check and Clippy passed;
+affected core/permission/Agent/CLI/runtime all-target Clippy passed with -D warnings. Workspace
+tests passed3657 across119 summaries,0 failures; only the already maintainer-authorized exact
+tests::runtime_evidence_rejects_directory_symlinks_and_socket_entries was filtered locally.
+Code CI must run the unfiltered workspace/platform gate; no new skip or ignore was introduced.
+The independently locked single-direct-Talos consumer passed both minimal and coding runs,
+including the new prepared network implementation/scoped approval and existing API surfaces.
+Formatting (workspace/external fixture), whitespace, text boundary23, classifier14, governance
+(SQL17/delivery12), Collaboration Claim, public site and installers passed. Initial Clippy's
+needless borrow and private preview enum-size findings were corrected locally; the preview stores
+boxed scope rather than changing an unrelated event enum. Existing models.toml compression
+build-script information remains; no new Rust lint allowance or dependency changes.
+
+No whole release_preflight.sh success is claimed: equivalent required local steps use the
+pre-authorized exact socket deferral above. Remote exact-head CI/security/API review and final
+CAS remain mandatory before merge. Transport/default activation and full C/EP rows remain Pending.

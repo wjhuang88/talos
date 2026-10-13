@@ -827,10 +827,12 @@ pub use talos_core::submission::{
 pub use talos_core::tool::{
     AgentTool, AtomicCreateCapability, AuthorizedToolInvocation, BrowserRawArguments,
     CapabilityProbe, PreparedExecutionOutput, PreparedFailureCode, PreparedInvocationError,
-    PreparedToolInvocation, ProtocolCapabilities, SharedAtomicCreateCapability,
-    ToolAuthorizationScope, ToolBackend, ToolContinuation, ToolExecutionAuthorization,
-    ToolExecutionOutput, ToolFamily, ToolNature, ToolPermissionFacet, ToolProtocol, ToolProvenance,
-    ToolResourceKind, ToolResult, ToolResultProjection,
+    PreparedNetworkToolInvocation, PreparedToolInvocation, ProtocolCapabilities,
+    SharedAtomicCreateCapability, ToolAuthorizationScope, ToolBackend, ToolContinuation,
+    ToolExecutionAuthorization, ToolExecutionOutput, ToolFamily, ToolNature, ToolNetworkAuthority,
+    ToolNetworkAuthorizationError, ToolNetworkEndpoint, ToolNetworkManifest,
+    ToolNetworkPreparationError, ToolNetworkScope, ToolPermissionFacet, ToolProtocol,
+    ToolProvenance, ToolResourceKind, ToolResult, ToolResultProjection,
 };
 /// Permission evaluation mode selected by the embedding application.
 pub use talos_permission::PermissionMode;
@@ -930,14 +932,19 @@ pub trait ApprovalHandler: Send + Sync {
 
     /// Requests approval using the exact bounded scope compiled by the
     /// permission layer. Existing handlers remain source-compatible through
-    /// the projection-only default implementation.
+    /// the projection-only default implementation for legacy scopes. An invocation-bound
+    /// network scope requires overriding this method and inspecting its complete preview;
+    /// the old argument-only callback cannot silently approve the new authority.
     async fn request_scoped_approval(
         &self,
         tool_name: &str,
         arguments: &Value,
         summary_fields: &[String],
-        _preview: &GrantPreview,
+        preview: &GrantPreview,
     ) -> ApprovalChoice {
+        if preview.network_scope().is_some() {
+            return ApprovalChoice::Deny;
+        }
         self.request_approval(tool_name, arguments, summary_fields)
             .await
     }
@@ -1829,6 +1836,7 @@ pub async fn collect_until_turn_completed(
 
 #[cfg(test)]
 mod tests {
+    mod network_invocation;
     use std::sync::Mutex as StdMutex;
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
     use std::time::Duration;
@@ -3382,6 +3390,88 @@ mod tests {
             .await;
         assert_eq!(choice, ApprovalChoice::Deny);
         assert_eq!(records.lock().expect("records")[0].arguments, input);
+    }
+
+    #[tokio::test]
+    async fn legacy_sdk_callback_cannot_silently_approve_network_manifest() {
+        use talos_core::tool::{ToolNetworkEndpoint, ToolNetworkManifest, ToolNetworkScope};
+        let records = Arc::new(StdMutex::new(Vec::new()));
+        let resolver = RuntimeApprovalResolver {
+            inner: Arc::new(RecordingApprovalHandler::new(
+                ApprovalChoice::AlwaysApprove,
+                records.clone(),
+            )),
+        };
+        let scope = ToolNetworkScope::new(
+            uuid::Uuid::new_v4(),
+            0,
+            vec![
+                ToolNetworkEndpoint::new("https", "search.example", 443, "GET", "/search")
+                    .expect("endpoint"),
+            ],
+            None,
+            vec![],
+            0,
+        )
+        .expect("scope");
+        let manifest = ToolNetworkManifest::new(scope);
+        let profile = [ToolPermissionFacet::with_resource(
+            ToolNature::Network,
+            "search.example",
+            ToolResourceKind::Domain,
+        )];
+        let input = serde_json::json!({"query":"private"});
+        let permission = PermissionRequest::native("web_search", &profile, &input)
+            .with_network_manifest(&manifest);
+        let state = PermissionSessionState::new(PermissionEngine::new());
+        let context = PermissionContext::new(
+            PermissionMode::Interactive,
+            InteractionCapability::Available,
+        );
+        let preview = state
+            .propose(&permission, &context, talos_permission::GrantScope::Session)
+            .expect("proposal")
+            .preview()
+            .clone();
+        let request = PermissionApprovalRequest {
+            tool_name: "web_search".into(),
+            provenance: talos_core::tool::ToolProvenance::Native,
+            arguments: serde_json::json!({"query":"<redacted>"}),
+            summary_fields: vec!["query".into()],
+            preview,
+            binding: talos_agent::permission_pipeline::PermissionBinding {
+                session_id: state.session_id().expect("id").stable_id(),
+                revisions: state
+                    .state_snapshot()
+                    .expect("snapshot")
+                    .revisions
+                    .as_array(),
+                mode: context.mode(),
+                interaction: context.interaction(),
+            },
+        };
+        assert_eq!(
+            resolver
+                .resolve(request.clone(), std::time::Duration::from_secs(1))
+                .await
+                .expect("resolve"),
+            ApprovalChoice::Deny
+        );
+        assert_eq!(
+            resolver
+                .resolve_with_explanation(
+                    request,
+                    std::time::Duration::from_secs(1),
+                    "Search scope"
+                )
+                .await
+                .expect("resolve"),
+            ApprovalChoice::Deny
+        );
+        assert!(
+            records.lock().expect("records").is_empty(),
+            "legacy callback must not be invoked"
+        );
     }
 
     #[async_trait]
