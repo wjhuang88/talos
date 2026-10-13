@@ -17,6 +17,52 @@ fn context() -> PermissionContext {
         InteractionCapability::Available,
     )
 }
+
+#[test]
+fn parsed_http_url_ip_hosts_share_endpoint_and_policy_canonicalization() {
+    for raw in [
+        "https://[::1]:8443/search",
+        "https://[2001:0db8::1]/search",
+        "https://[::ffff:127.0.0.1]/search",
+        "https://[::ffff:192.0.2.1]/search",
+        "https://127.0.0.1/search",
+    ] {
+        let url = url::Url::parse(raw).expect("parsed URL");
+        let destination = ToolNetworkEndpoint::new(
+            url.scheme(),
+            url.host_str().expect("host"),
+            url.port_or_known_default().expect("port"),
+            "GET",
+            url.path(),
+        )
+        .expect("actual parsed destination");
+        let facet = ToolPermissionFacet::with_resource(
+            ToolNature::Network,
+            destination.host(),
+            ToolResourceKind::Domain,
+        );
+        let manifest = ToolNetworkManifest::new(
+            ToolNetworkScope::new_configuration(vec![destination], None, vec![], 0).expect("scope"),
+        );
+        let input = json!({"query":"offline IP fixture"});
+        let facets = [facet];
+        let request = PermissionRequest::native("web_search", &facets, &input)
+            .with_network_manifest(&manifest);
+        let state = Arc::new(PermissionSessionState::new(PermissionEngine::new()));
+        let proposal = state
+            .propose(&request, &context(), GrantScope::Once)
+            .expect("proposal");
+        let pending = state
+            .approve_once(proposal, &request, &context())
+            .expect("approval");
+        let authority = state
+            .admit_network(pending, &request, &context())
+            .expect("admit");
+        authority
+            .check(manifest.invocation_id(), &manifest.scope().endpoints()[0])
+            .expect("exact IP scope");
+    }
+}
 fn endpoint(port: u16, method: &str, path: &str) -> ToolNetworkEndpoint {
     ToolNetworkEndpoint::new("https", "search.example", port, method, path).expect("endpoint")
 }

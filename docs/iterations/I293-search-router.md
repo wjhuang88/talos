@@ -10,7 +10,7 @@
 | Source Issue | #643 |
 | Depends on | Accepted ADR-085; SEARCH-001-B / #642 complete in #656; NET-001 boundary coordination |
 | Claim State | Claimed |
-| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance/ADR scope amendment (no implementation) |
+| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 carrier stage Review (default activation Pending) |
 | Completion | Pending |
 
 ## Collaboration Claim
@@ -669,7 +669,7 @@ ADR-090's first-match description to existing matching Deny precedence/non-Deny 
 the evaluator is unchanged.
 
 See [carrier migration/API inventory](../reference/SEARCH-001-C-NETWORK-CARRIER-MIGRATION.md)
-for storage bounds, callback/wrapper/root dispositions and activation gates. Seven permission
+for storage bounds, callback/wrapper/root dispositions and activation gates. Eight permission
 lifecycle fixtures, seven Agent dispatch fixtures, core bounds, TUI channel and SDK callback/actor
 fixtures are available. Final locked validation, protected review and CI remain publication/merge
 gates. Carrier stage is Review; Implementation PR not assigned before first stable push. I293/C remain Active /
@@ -691,3 +691,18 @@ build-script information remains; no new Rust lint allowance or dependency chang
 No whole release_preflight.sh success is claimed: equivalent required local steps use the
 pre-authorized exact socket deferral above. Remote exact-head CI/security/API review and final
 CAS remain mandatory before merge. Transport/default activation and full C/EP rows remain Pending.
+
+Late actual-URL canonicalization audit: #713's first head8b5e4146/treea1fa475e was independently
+approved in comment6138564512, but the new mapped-IPv6 regression failed (actual parsed
+::ffff:7f00:1 versus std dotted display). The first head is not the corrected merge candidate;
+comment6138722441 records the hold. Core now validates mapped hosts using HTTP URL hexadecimal
+serialization, with a real parsed-URL -> Domain proposal -> admission/check regression.
+No Deny/facet relaxation, dependency or transport change. Fresh stable validation and exact-head
+security/API review/CI are required; the earlier3657 checkpoint remains historical.
+
+The correction refreshed locked workspace check/Clippy, affected all-target Clippy,3658 tests
+across119 summaries (0fail/only the same authorized socket filter), both independently locked
+SDK runs and formatting/whitespace. Eight permission fixtures now pass, including the formerly
+failing actual-URL case. Initial CI3167/run38348784946 completed successfully on8b5e4146, but is
+historical evidence only and cannot approve the corrected head. Fresh governance/claims, review
+and CI bind the corrected candidate. Recorded lesson61 promotes the real boundary regression.

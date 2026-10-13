@@ -50,6 +50,12 @@ Positive/negative constructor bounds are tested. Query/body/response bounds, act
 hedging/deadline and DNS/proxy/connection enforcement remain controlled-transport gates. These
 storage limits alone establish neither those runtime limits nor SSRF protection.
 
+The IP regression derives destination identity from actual parsed HTTP URLs, including mapped
+IPv6, then compiles Domain policy and admits/checks the plan. HTTP URL serialization's mapped
+IPv4 tail is hexadecimal; std::net display uses dotted IPv4. Core validation deliberately uses
+the HTTP representation, with no new dependency or copied URL serializer. This is host identity
+evidence only; mapped-address/private-network connection classification remains a transport gate.
+
 ## Root And Wrapper Dispositions
 
 | Path | Carrier stage |

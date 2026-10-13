@@ -54,7 +54,17 @@ impl ToolNetworkEndpoint {
         let host_valid = if host.starts_with('[') && host.ends_with(']') {
             host[1..host.len() - 1]
                 .parse::<std::net::Ipv6Addr>()
-                .is_ok_and(|ip| format!("[{ip}]") == host)
+                .is_ok_and(|ip| {
+                    // HTTP URL serialization uses hex for mapped IPv4, whereas std Display
+                    // prints its dotted tail. Compare the actual HTTP host representation.
+                    let canonical = if ip.to_ipv4_mapped().is_some() {
+                        let segments = ip.segments();
+                        format!("[::ffff:{:x}:{:x}]", segments[6], segments[7])
+                    } else {
+                        format!("[{ip}]")
+                    };
+                    canonical == host
+                })
         } else if let Ok(ip) = host.parse::<std::net::Ipv4Addr>() {
             ip.to_string() == host
         } else {
