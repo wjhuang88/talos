@@ -5,9 +5,10 @@
 [I293](I293-search-router.md) retains SEARCH-001-C ownership. The maintainer accepted bounded
 production endpoint-authority/search wiring on 2026-10-13; [ADR-090](../decisions/090-invocation-bound-search-endpoint-authority.md)
 and the existing C claim's scope amendment became effective in #712 (989fec2e), after protected
-review, CI and CAS. The carrier-stage implementation is converging under that claim; WebSearch
-default activation and full C/EP acceptance remain Pending, #643/#624 open. I300 and PERM-007-H
-retain their separate scopes.
+review, CI and CAS. #713 carrier merged69e1e116 after exact-head review/CI/CAS. The private
+controlled direct-transport stage is Review under that claim, with actual local socket fixtures.
+WebSearch default activation and full C/EP acceptance remain Pending, #643/#624 open. I300 and
+PERM-007-H retain their separate scopes.
 
 [I301](I301-missing-pending-sidecar-startup.md) / RUNTIME-010 is Review / Claimed after #710
 merge `42b86112`. PR #711 preserves ParentDir/error/custody behavior; full remote CI

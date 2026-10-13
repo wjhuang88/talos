@@ -71,6 +71,7 @@ repeating known mistakes.
 | 59 | Async tests | Candidate poll 可使取消就绪；在启动和成功出口重新检查控制信号 | I293 |
 | 60 | Validation | 隔离 checkout target 并串行执行全库验证；工具链登记不等于可执行 | I293 |
 | 61 | Network authority | Endpoint canonicalization must be tested against the actual HTTP URL representation, including mapped IPv6 | I293 / #713 |
+| 62 | Async / Transport | timeout_at alone is not a deadline fence for immediately Ready inner futures | I293 |
 
 ## Lessons
 
@@ -1187,3 +1188,19 @@ repeating known mistakes.
 - Prevention: Exercise producer/consumer representations at the real boundary, not only matching
   hand-constructed values. Preserve private-address/connection enforcement as a separate gate.
 - Promoted to rule/check: parsed_http_url_ip_hosts_share_endpoint_and_policy_canonicalization.
+
+
+## 2026-10-13 - Explicit deadline fences supplement async timeout wrappers
+
+- Trigger: Independent I293 controlled-transport source preview before publication.
+- Symptom: Source inspection found an expired/late-ready inner future could precede the timer
+  check; no pre-fix failing execution is claimed.
+- Root cause: Tokio Timeout polls the inner future before its delay and returns immediately
+  on Ready. A wrapper alone does not fence later DNS/send or success boundaries.
+- Fix: Check the shared monotonic deadline before/after DNS, before send, at redirect/read
+  boundaries and before success; retain timeout_at to wake pending work. Join/drain socket
+  fixtures before making negative connection claims, rather than read a transient counter.
+- Prevention: Use paused-clock expired-budget and adversarial ready-DNS fixtures, plus actual
+  owned-socket deadline/drop receipts. Separate logical-start races from already-sent exposure.
+- Promoted to rule/check: expired_shared_budget_never_resolves_or_starts_a_connection;
+  dns_ready_after_advancing_past_deadline_cannot_start_a_request.

@@ -12,6 +12,10 @@
 use async_trait::async_trait;
 use thiserror::Error;
 
+// Staged, private transport infrastructure. Not wired into WebSearchTool before
+// ADR-090's protocol/parity/D activation gates. Uses the existing staged seam.
+mod transport;
+
 /// Backend identity retained across normalization and routing decisions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum SearchBackendId {
