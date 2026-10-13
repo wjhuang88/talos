@@ -23,6 +23,7 @@ silently rewrite the reason or boundary that governed an earlier implementation.
 
 | ADR | State | Current Boundary / Gate |
 |---|---|---|
+| [090: Invocation-Bound Search Endpoint Authority](090-invocation-bound-search-endpoint-authority.md) | Accepted contract / #712 activation proposed | Opt-in owned prepared network call; complete manifest/config Session grant binding, live Agent-minted authority, controlled compatibility rehosting and real-dispatch gates. Acceptance/effective scope only after exact-head protected review, CI and #712 merge. |
 | [089: Structured Git Effect Authorization](089-structured-git-effect-authorization.md) | Accepted / I300 activation proposed (#704) | Maintainer accepted 2026-10-11; literal paths, actual repository/index effects, configured execution authorization and diff fidelity. Claim and activation effective only upon #704 merge. |
 | [088: Trusted Todo Result Presentation](088-trusted-todo-result-presentation.md) | Accepted / I299 Complete | Producer-owned bounded transient spans; exact-text/invocation binding, literal fallback and raw-history preservation delivered by #701 (`69092675`). Public Rust API migration remains required for the next pre-1.0 minor release; no release authorized. |
 | [087: Authoritative Context Budget And Recovery](087-authoritative-context-budget-recovery.md) | Accepted / I298 | Shared admission telemetry, bounded request-only recovery, raw-history preservation and presentation API migration. |
