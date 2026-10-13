@@ -10,7 +10,7 @@
 | Source Issue | #643 |
 | Depends on | Accepted ADR-085; SEARCH-001-B / #642 complete in #656; NET-001 boundary coordination |
 | Claim State | Claimed |
-| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); production scope/ADR amendment Draft (PR not yet assigned) |
+| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance/ADR scope amendment (no implementation) |
 | Completion | Pending |
 
 ## Collaboration Claim
@@ -20,14 +20,14 @@
 | Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | GPT-6 Sol / talos开发 session |
-| Work Slice | SEARCH-001-C Talos-owned SearchRouter behavior and deterministic characterization only |
+| Work Slice | SEARCH-001-C SearchRouter; search-specific core/permission/Agent prepared invocation and endpoint authority; controlled existing-protocol compatibility internalization and optional-adapter transport; CLI/SDK/MCP dispositions, migration and validation under ADR-085/090 |
 | Claimed At | 2026-10-06 |
 | Source Issue | #643 |
-| Governance Claim PR | #664 |
+| Governance Claim PR | #712 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Governance-only claim+activation PR; exact-head CI, governance validators, remote Issue reconciliation and merge-time CAS required. |
-| Last Updated | 2026-10-12 |
-| Handoff / Release Condition | Claim effective after #664 merge `d801790454e252699684253166984662ea9dab6a`; implementation remains bounded by ADR-085 and this iteration. |
+| Authorization Evidence | Maintainer accepted bounded production scope 2026-10-13; independent protected security/API contract review, exact-head CI, governance validators, Issue reconciliation and final CAS required for #712 merge. No release or native admission authorized. |
+| Last Updated | 2026-10-13 |
+| Handoff / Release Condition | Original #664 claim effective at `d801790454e252699684253166984662ea9dab6a`; expanded scope effective only after #712 accepted-contract merge. Start implementation from that merge or later main; activation requires ADR-090 transport/parity/D gates. |
 
 ## Scope
 
@@ -610,10 +610,12 @@ authority, controlled compatibility/optional-adapter transport, associated CLI/S
 tests and migration docs. PERM-007-H's all-built-in Auto policy, I300 Git, D/E/F provider admission,
 NET-001 generic retry/breaker, new crate/dependency, unsafe/native exceptions and release stay out.
 
-Draft scope amendment PR: Pending. The target #664 claim and its previous Work Slice remain
-effective until a finalized amendment merges. This branch contains governance/decision docs only;
-no production implementation, implementation test or implementation branch exists. ADR-090 is
-Proposed, requiring independent permission/API/security review before acceptance. Implementation
+Scope amendment PR: #712. The target #664 claim and its previous Work Slice remain
+effective until this finalized amendment merges. This branch contains governance/decision docs only;
+no production implementation, implementation test or implementation branch exists. ADR-090's
+Accepted contract status is an ineffective draft until #712 passes independent exact-head
+permission/API/security review, CI and merges.
+Implementation
 starts from the amended-claim/accepted-contract merge or later main, never this draft.
 
 Selection source: main `9cad344b8f7adef855ca6b858e6ccc7723103767` (I301 #711 repair merged).

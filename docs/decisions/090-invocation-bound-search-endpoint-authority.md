@@ -1,6 +1,6 @@
 # ADR-090: Invocation-Bound Search Endpoint Authority
 
-*Status: Proposed / I293 scope amendment; not implementation authority until accepted review and target-branch merge.*
+*Status: Accepted contract / #712 activation proposed. This draft status becomes effective only on target-branch merge after independent exact-head security/API review and CI; no implementation authority before that merge.*
 
 ## Context And Authorization
 
@@ -16,7 +16,7 @@ Ask proposals; the current execution carrier is Path-only. Fresh audit on main `
 that Session grants match tool/provenance/facets only, not request fingerprint. Merely adding
 manifest data to that fingerprint would still allow same-host cross-port/path grant reuse.
 
-## Decision Candidate
+## Decision
 
 ### 1. Add An Opt-In Owned Prepared Network Path
 
@@ -212,3 +212,12 @@ new talos-search crate or dependency fork. None resolves the complete boundary w
 
 Related: ADR-066/067/085; [I293](../iterations/I293-search-router.md);
 [endpoint authority plan](../reference/SEARCH-001-C-ENDPOINT-AUTHORITY-PLAN.md).
+
+## Acceptance Record
+
+The maintainer's 2026-10-13 acceptance authorizes the bounded scope described above. Independent
+security/API design preview found no remaining design blocker after the safe-error, D migration
+and rollback corrections. That preview is not exact-head PR approval or transport proof. #712
+must record exact-head independent protected approval, CI and final CAS before merge; only then
+is this contract Accepted and the amended I293 scope effective. Runtime acceptance remains gated
+by the Migration And Acceptance section; no production implementation is delivered by #712.
