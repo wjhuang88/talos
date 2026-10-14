@@ -60,3 +60,39 @@ distinguishes proposal compilation from execution enforcement and defines planne
 compatibility/fallback, redirect/connection and real-dispatch acceptance gates. It changes no
 production behavior or permission API, activates no PERM-007-H work and admits no provider.
 C/I293 and all full acceptance remain incomplete/Pending; #643/#624 remain open.
+
+## Authorized Scope Addition — 2026-10-13
+
+The maintainer accepted the described production endpoint-authority/search wiring scope. The
+architecture/test-only boundary above is preserved as prior-stage history; the expanded phase
+requires an effective I293 scope-amendment claim and accepted, independently reviewed
+[ADR-090](../../decisions/090-invocation-bound-search-endpoint-authority.md) before implementation.
+The draft remains governance-only and cannot activate code. Scope is search-only carrier,
+permission/Agent/tool wiring, controlled existing compatibility transport and real-dispatch tests;
+all-built-in Auto policy, Git, generic NET retry/breaker, new native admission and release stay out.
+Preserve model-facing contract, no startup/GeoIP probing and explicit paid consent. Full C/EP
+acceptance remains Pending; #643/#624 stay open. See I293 for authorization, inventory and gates.
+
+
+## Effective Carrier And Direct Transport Stage — 2026-10-13
+
+#712 merged989fec2e establishes the accepted ADR-090 contract and amended I293 scope.
+#713 carrier merged69e1e116 after exact-head protected Agent review6138838842, full
+CI3168/run38350762077 and CAS6139059609. This is partial infrastructure evidence.
+The next private library-only [controlled direct transport](../../reference/SEARCH-001-C-CONTROLLED-TRANSPORT.md)
+stage is Review under I293, with actual local HTTP/DNS/permission/redirect/budget fixtures;
+no default WebSearch, new API/dependency or provider admission is activated. Full C/EP,
+TLS/proxy/compatibility parity and bounded D migration gates remain Pending; #643/#624 open.
+
+
+#714 direct transport merged `d78dc75c` after protected review6140200974, full CI3170 and CAS.
+The next dormant TLS/CONNECT subset stage is Review under I293:39 focused fixtures; direct
+SNI/certificate verification and unauthenticated HTTP CONNECT to HTTPS IPv4 literals only.
+No default activation, full C/EP completion, provider admission or release. Exact-head review/CI,
+broader proxy/ambient migration, compatibility parity, D and official-root acceptance remain.
+See the transport contract and I293 for authority timing, trusted-proxy limits and validation.
+
+#715 original CI3172 is failed (macOS445pass/5fail; all13 TLS cases pass on Windows).
+The25-year synthetic positive leaf violates Apple's825-day lifetime requirement; a coherent
+365-day leaf bundle correction retains production trust/verification and all negative cases.
+Fresh exact-head review/full CI required, no merge/skip/sole-cause inference. I293 records gates.

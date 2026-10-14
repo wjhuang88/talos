@@ -7,7 +7,9 @@ use schemars::JsonSchema;
 use serde::Serialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use talos_core::tool::{ToolNature, ToolProvenance, ToolResourceKind, normalize_authorized_path};
+use talos_core::tool::{
+    ToolNature, ToolNetworkScope, ToolProvenance, ToolResourceKind, normalize_authorized_path,
+};
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -82,6 +84,7 @@ impl fmt::Debug for CompiledFacetScope {
 pub struct GrantPreview {
     scope: GrantScope,
     facets: Vec<GrantPreviewFacet>,
+    network_scope: Option<Box<ToolNetworkScope>>,
 }
 
 impl fmt::Debug for GrantPreview {
@@ -105,6 +108,12 @@ impl GrantPreview {
     #[must_use]
     pub fn facets(&self) -> &[GrantPreviewFacet] {
         &self.facets
+    }
+
+    /// Returns exact destination/configuration scope for the local approval renderer.
+    /// It contains no query values, credentials or invocation fingerprints.
+    pub fn network_scope(&self) -> Option<&ToolNetworkScope> {
+        self.network_scope.as_deref()
     }
 }
 
@@ -200,6 +209,7 @@ pub(crate) struct ApprovedOnce {
     pub(crate) provenance: ToolProvenance,
     pub(crate) facets: Vec<CompiledFacetScope>,
     pub(crate) fingerprint: RequestFingerprint,
+    pub(crate) network_scope: Option<ToolNetworkScope>,
 }
 
 impl fmt::Debug for ApprovedOnce {
@@ -220,6 +230,7 @@ pub(crate) struct PermissionGrant {
     pub(crate) tool_name: String,
     pub(crate) provenance: ToolProvenance,
     pub(crate) facets: Vec<CompiledFacetScope>,
+    pub(crate) network_scope: Option<ToolNetworkScope>,
 }
 
 impl fmt::Debug for PermissionGrant {
@@ -271,6 +282,9 @@ pub(crate) fn compile_proposal(
     let fingerprint = fingerprint_request(request, &facets);
     let preview = GrantPreview {
         scope,
+        network_scope: request
+            .network_manifest()
+            .map(|m| Box::new(m.scope().clone())),
         facets: facets
             .iter()
             .map(|facet| GrantPreviewFacet {
@@ -310,6 +324,7 @@ fn compile_facets(
     workspace_root: Option<&Path>,
     require_grant_scope: bool,
 ) -> Result<Vec<CompiledFacetScope>, GrantError> {
+    validate_network_profile(request)?;
     let mut compiled = Vec::with_capacity(request.facets().len());
     for (index, facet) in request.facets().iter().enumerate() {
         let consequential = matches!(
@@ -403,7 +418,67 @@ fn fingerprint_request(
         hash_optional_resource(&mut hasher, facet.normalized_resource.as_ref());
     }
     hash_json(&mut hasher, request.input());
+    if let Some(manifest) = request.network_manifest() {
+        hasher.update([1]);
+        hasher.update(manifest.invocation_id().as_bytes());
+        let scope = manifest.scope();
+        hasher.update(scope.configuration_id().as_bytes());
+        hasher.update(scope.configuration_revision().to_le_bytes());
+        hash_len(&mut hasher, scope.endpoints().len());
+        for endpoint in scope.endpoints().iter().chain(scope.proxy()) {
+            hash_text(&mut hasher, endpoint.scheme());
+            hash_text(&mut hasher, endpoint.host());
+            hasher.update(endpoint.port().to_le_bytes());
+            hash_text(&mut hasher, endpoint.method());
+            hash_text(&mut hasher, endpoint.path());
+        }
+        hasher.update([u8::from(scope.proxy().is_some()), scope.redirect_limit()]);
+        hash_len(&mut hasher, scope.private_addresses().len());
+        for address in scope.private_addresses() {
+            hash_text(&mut hasher, &address.to_string());
+        }
+    }
     RequestFingerprint(hasher.finalize().into())
+}
+
+fn validate_network_profile(request: &PermissionRequest<'_>) -> Result<(), GrantError> {
+    let Some(manifest) = request.network_manifest() else {
+        return Ok(());
+    };
+    if *request.provenance() != ToolProvenance::Native {
+        return Err(GrantError::AdmissionInvalidated);
+    }
+    let mut hosts: Vec<_> = manifest
+        .scope()
+        .endpoints()
+        .iter()
+        .chain(manifest.scope().proxy())
+        .map(|e| e.host())
+        .collect();
+    hosts.sort_unstable();
+    hosts.dedup();
+    let mut declared = Vec::new();
+    for facet in request.facets() {
+        if facet.nature != ToolNature::Network
+            || facet.resource_kind != Some(ToolResourceKind::Domain)
+        {
+            return Err(GrantError::AdmissionInvalidated);
+        }
+        let host = facet
+            .resource
+            .as_deref()
+            .ok_or(GrantError::AdmissionInvalidated)?;
+        if !hosts.contains(&host) {
+            return Err(GrantError::AdmissionInvalidated);
+        }
+        declared.push(host);
+    }
+    declared.sort_unstable();
+    declared.dedup();
+    if declared != hosts {
+        return Err(GrantError::AdmissionInvalidated);
+    }
+    Ok(())
 }
 
 fn hash_provenance(hasher: &mut Sha256, provenance: &ToolProvenance) {

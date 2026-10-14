@@ -10,7 +10,7 @@
 | Source Issue | #643 |
 | Depends on | Accepted ADR-085; SEARCH-001-B / #642 complete in #656; NET-001 boundary coordination |
 | Claim State | Claimed |
-| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 (merged partial evidence); endpoint-authority architecture packet Review (PR not yet assigned) |
+| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 TLS/CONNECT subset Review (macOS fixture correction pending, default activation Pending) |
 | Completion | Pending |
 
 ## Collaboration Claim
@@ -20,14 +20,14 @@
 | Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | GPT-6 Sol / talos开发 session |
-| Work Slice | SEARCH-001-C Talos-owned SearchRouter behavior and deterministic characterization only |
+| Work Slice | SEARCH-001-C SearchRouter; search-specific core/permission/Agent prepared invocation and endpoint authority; controlled existing-protocol compatibility internalization and optional-adapter transport; CLI/SDK/MCP dispositions, migration and validation under ADR-085/090 |
 | Claimed At | 2026-10-06 |
 | Source Issue | #643 |
-| Governance Claim PR | #664 |
+| Governance Claim PR | #712 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Governance-only claim+activation PR; exact-head CI, governance validators, remote Issue reconciliation and merge-time CAS required. |
-| Last Updated | 2026-10-12 |
-| Handoff / Release Condition | Claim effective after #664 merge `d801790454e252699684253166984662ea9dab6a`; implementation remains bounded by ADR-085 and this iteration. |
+| Authorization Evidence | Maintainer accepted bounded production scope 2026-10-13; independent protected security/API contract review, exact-head CI, governance validators, Issue reconciliation and final CAS required for #712 merge. No release or native admission authorized. |
+| Last Updated | 2026-10-14 |
+| Handoff / Release Condition | Original #664 claim effective at `d801790454e252699684253166984662ea9dab6a`; expanded scope effective only after #712 accepted-contract merge. Start implementation from that merge or later main; activation requires ADR-090 transport/parity/D gates. |
 
 ## Scope
 
@@ -583,3 +583,269 @@ workspace test/preflight, Clippy or SDK build is claimed for this Markdown-only 
 read-only Agent preview found no blockers and confirmed source evidence/proposed API boundaries;
 it is not exact-head merge approval or natural-person review. Repository trusted-base routing,
 exact-head applicable review/CI and final CAS remain required before merge.
+
+### Authorized Production Scope Addition — 2026-10-13
+
+#709 merged as `bac4cce938da10d051fbafc562e2cba19e9557bd`, reviewed head
+`ec4a6112e992fb4196c7e43976c5caa8bd074387`, after independent architecture/permission-evidence
+APPROVE6127945569, CI3154/run38274655324 and final CAS6128010518. Four documentation-route jobs
+passed; Windows Rust/Linux Desktop were policy-selected skips, not Rust test passes. Complete logs
+show governance/claims0 warnings, SQL17, delivery12 and classifier14 checks. Merge synchronization
+is in comments6128036145/6128036514/6128036835. These supersede pending-stage merge instructions.
+All full C/EP acceptance remains Pending; no production API/behavior was delivered by that packet.
+
+The maintainer explicitly accepted the expanded bounded scope on 2026-10-13, after reviewing its
+description: invocation-bound endpoint authority and actual search wiring under ADR/claim,
+independent safety/API review and CI gates. This supersedes the session's architecture/test-only
+execution restriction for the authorized production phase once its scope amendment is effective;
+it does not pre-approve an unknown API or waive any gate. No further generic confirmation of the
+same scope is required. Concrete contract acceptance is through the reviewed ADR, not this note.
+
+Change-control classification: explicitly accepted scope addition required for I293's published
+SearchRouter/permission integration objective, not a separately selected general network or Auto
+feature. Preserve published scope/acceptance and historical restriction paragraphs above. Amend
+the existing single C claim, rather than creating duplicate C ownership or a new Issue for a local
+prerequisite. Proposed scope covers search-only core/permission/Agent prepared invocation and live
+authority, controlled compatibility/optional-adapter transport, associated CLI/SDK/MCP disposition,
+tests and migration docs. PERM-007-H's all-built-in Auto policy, I300 Git, D/E/F provider admission,
+NET-001 generic retry/breaker, new crate/dependency, unsafe/native exceptions and release stay out.
+
+Scope amendment PR: #712. The target #664 claim and its previous Work Slice remain
+effective until this finalized amendment merges. This branch contains governance/decision docs only;
+no production implementation, implementation test or implementation branch exists. ADR-090's
+Accepted contract status is an ineffective draft until #712 passes independent exact-head
+permission/API/security review, CI and merges.
+Implementation
+starts from the amended-claim/accepted-contract merge or later main, never this draft.
+
+Selection source: main `9cad344b8f7adef855ca6b858e6ccc7723103767` (I301 #711 repair merged).
+Fresh inventory retains I293/I294 Active search, I300 Active Git, I301 Review/Claimed (no closure
+inferred from merge), I277 Review/deferred device acceptance, I249 Planned and I164 Paused.
+PERM-007-H remains Refinement/Unclaimed; open #705 owns separate Windows latency diagnostics.
+Other completed owners retain their exact recorded completion/claim states. No other owner is
+reactivated, taken over or closed. Target claim/overlap and ADR identifier must be rechecked at CAS.
+
+The concrete draft is [ADR-090](../decisions/090-invocation-bound-search-endpoint-authority.md).
+An independent read-only design preview identified complete Session grant binding, Deny projection,
+public-struct-literal compatibility, live state authority and transport ownership as hard gates;
+it is not exact-head approval. The pinned rust-websearch archive was freshly downloaded, SHA256
+verified (`06b90d9a9ad9e7e347c4cd85c3fb37189256703db4fab1d6c6fb963ae1eed0ee`) and inspected:
+no injected client, private HTML parsers, internal limited(5) redirects. The candidate rehosts only
+the existing compound protocol under guarded clients inside talos-tools, keeps the same dependency
+and reusable network-free helpers/types with MIT provenance, and counts no native E/F admission.
+Protocol internalization is explicitly within this proposed scope and requires bounded D
+coordination for terms/privacy/parser and migration differences before activation. The pinned
+upstream root MIT license/notice was retrieved; preserve the complete notice and per-file source
+and modification records before copying. Protected invocation failures cannot automatically
+fall back to opaque/legacy execution; rollback is a controlled version/deployment revert or a
+separately accepted migration. Preparation errors use a closed, content-free error contract.
+No live search, key usage or transport proof is claimed by this source audit.
+
+Infrastructure-only governance deliverable: reviewed scope/ADR and owner/index synchronization.
+Production acceptance remains real Agent/CLI/SDK/transport evidence for EP-01..10 and C-V01..11,
+locked full checks, source-compatible external implementer/wrapper fixtures, independent protected
+review, compatibility rollback and final CAS. No default switch before controlled compatibility
+and connection/redirect parity gates pass. C/#643/#624 stay incomplete/open, D incomplete/E-F gated.
+
+### Endpoint Carrier Implementation Stage — 2026-10-13
+
+#712 merged 989fec2e00124e86667a3519f82527e2e75074ad after independent exact-head
+Agent protected security/API APPROVE6136536739, CI3165/run38335038737 and CAS6136603322.
+Four documentation jobs passed; two Rust/platform jobs were policy-selected skips.
+Synchronization6136612802/6136613235/6136613625 records effective ADR-090/amended scope.
+Earlier draft restrictions above are historical; implementation starts from this merge.
+
+This carrier-stage candidate adds opt-in core prepared types, complete manifest binding through
+proposal/preview/Session match/admission, live permission-state authority, owned Agent dispatch
+and complete CLI/TUI preview. SDK legacy defaults deny new network scope; real SDK actor fixtures
+exercise scoped approval and legacy rejection. Public request literals/Path APIs remain compatible.
+No WebSearchTool, transport, selection, dependency or lockfile changes. This is partial
+infrastructure, not binary WebSearch activation, full C/EP acceptance or HTTP cancellation proof.
+
+Independent local preview identified and corrected host-only TUI preview and an overbroad test
+name: shared full formatter/channel fixture and real final-hook Skip/revocation, ledger replay
+and caller-drop fixtures now exist. Preview is not exact-head PR approval. Source audit corrected
+ADR-090's first-match description to existing matching Deny precedence/non-Deny first-match;
+the evaluator is unchanged.
+
+See [carrier migration/API inventory](../reference/SEARCH-001-C-NETWORK-CARRIER-MIGRATION.md)
+for storage bounds, callback/wrapper/root dispositions and activation gates. Eight permission
+lifecycle fixtures, seven Agent dispatch fixtures, core bounds, TUI channel and SDK callback/actor
+fixtures are available. Final locked validation, protected review and CI remain publication/merge
+gates. Carrier stage is Review; Implementation PR not assigned before first stable push. I293/C remain Active /
+Claimed / incomplete; #643/#624 open, D incomplete/E/F gated. No Completion Commit.
+
+Local stable checkpoint (Rust1.99.0 / cargo1.99.0, locked): workspace check and Clippy passed;
+affected core/permission/Agent/CLI/runtime all-target Clippy passed with -D warnings. Workspace
+tests passed3657 across119 summaries,0 failures; only the already maintainer-authorized exact
+tests::runtime_evidence_rejects_directory_symlinks_and_socket_entries was filtered locally.
+Code CI must run the unfiltered workspace/platform gate; no new skip or ignore was introduced.
+The independently locked single-direct-Talos consumer passed both minimal and coding runs,
+including the new prepared network implementation/scoped approval and existing API surfaces.
+Formatting (workspace/external fixture), whitespace, text boundary23, classifier14, governance
+(SQL17/delivery12), Collaboration Claim, public site and installers passed. Initial Clippy's
+needless borrow and private preview enum-size findings were corrected locally; the preview stores
+boxed scope rather than changing an unrelated event enum. Existing models.toml compression
+build-script information remains; no new Rust lint allowance or dependency changes.
+
+No whole release_preflight.sh success is claimed: equivalent required local steps use the
+pre-authorized exact socket deferral above. Remote exact-head CI/security/API review and final
+CAS remain mandatory before merge. Transport/default activation and full C/EP rows remain Pending.
+
+Late actual-URL canonicalization audit: #713's first head8b5e4146/treea1fa475e was independently
+approved in comment6138564512, but the new mapped-IPv6 regression failed (actual parsed
+::ffff:7f00:1 versus std dotted display). The first head is not the corrected merge candidate;
+comment6138722441 records the hold. Core now validates mapped hosts using HTTP URL hexadecimal
+serialization, with a real parsed-URL -> Domain proposal -> admission/check regression.
+No Deny/facet relaxation, dependency or transport change. Fresh stable validation and exact-head
+security/API review/CI are required; the earlier3657 checkpoint remains historical.
+
+The correction refreshed locked workspace check/Clippy, affected all-target Clippy,3658 tests
+across119 summaries (0fail/only the same authorized socket filter), both independently locked
+SDK runs and formatting/whitespace. Eight permission fixtures now pass, including the formerly
+failing actual-URL case. Initial CI3167/run38348784946 completed successfully on8b5e4146, but is
+historical evidence only and cannot approve the corrected head. Fresh governance/claims, review
+and CI bind the corrected candidate. Recorded lesson61 promotes the real boundary regression.
+
+### Merged Carrier And Controlled Direct Transport Stage — 2026-10-13
+
+#713 merged at `69e1e1166943e7e9b39acab04ade9e362cccb5d3`, exact head
+`fc9286b430bebfef77891d95d9b1c992d6249faa`, tree `39d1809d664ce7685821ee692b6f0dccae5a10f6`.
+Protected independent Agent APPROVE6138838842, full CI3168/run38350762077 (six jobs) and
+CAS6139059609 passed. The original Unix socket fixture ran unfiltered in macOS CI. Issue
+synchronization6139067980/6139068201 retains C/Epic open; receipt6139068432 records the merge.
+This source update records existing carrier evidence, not a completion commit for C/EP.
+
+The next library-only infrastructure stage starts from that merge, within effective #712 scope.
+It adds a private `search_backend::transport` under the existing staged seam, without adding a
+lint allowance, dependency, lockfile, exported API or WebSearch/default wiring. There is no new
+provider, copied upstream protocol/parser, paid request, external search or regional observation.
+Runnable deliverable: actual reqwest -> owned loopback server fixtures and real Once permission
+admission -> transport. See [controlled transport contract/evidence](../reference/SEARCH-001-C-CONTROLLED-TRANSPORT.md).
+
+The direct client derives exact endpoints from the actual URL/method; checks authority before
+DNS and after DNS before logical send; rejects mixed/over-limit/nonpublic answer sets unless
+each nonpublic IP has an exact approved exception; pins all accepted addresses; disables ambient
+proxies, redirects, retries, Referer and decoding; creates a new HTTP/1 client per hop. Fixed
+request headers cannot be overridden. Explicit proxies return UnsupportedProxy with no direct
+fallback. Scoped GET/HEAD redirects are bounded; POST supports only same-origin307/308 and
+does not change method or forward its body to another origin. HTTPS downgrade is rejected.
+One shared execution deadline/request/body budget covers candidates and hops; explicit deadline
+fences supplement timeout_at. Storage, header acceptance and query/body limits are documented.
+
+Independent local source preview identified a deadline blocker: Tokio Timeout polls a Ready
+inner future before its timer. No failing pre-fix test run is claimed; corrected explicit fences
+and paused-clock expired/late-ready DNS fixtures cover the finding before publication. Negative
+socket counts now use terminal worker join/drained accept queues, not an instantaneous counter.
+This is a design/implementation preview, not remote exact-head approval.
+
+Focused corrected checkpoint:26 transport fixtures pass (plus the separate ambient-proxy child
+fixture invocation). Actual HTTP receipts cover Host identity, System DNS, exact IP exceptions,
+denied destination/redirect zero connections, real Once admission/revocation, concurrent shared
+budgets, body/header/encoding bounds, deadline/caller abort peer EOF and no hidden HTTP retry.
+Local TCP sockets are available; the unchanged Unix socket fixture remains environment-blocked. No new fixture is skipped. Full standard preflight and fresh
+exact-head independent security review/CI/CAS remain candidate gates; results follow below.
+
+Infrastructure stage is Review; I293 remains Active/Claimed/incomplete, no C Completion Commit.
+HTTPS certificate/SNI connection fixtures, explicit proxy and ambient-config migration, upstream
+form/request/parser/probe/retry/source parity, bounded D terms/privacy/MIT review and actual
+WebSearch/Agent/CLI/SDK/MCP integration remain default activation gates. Do not interpret direct
+local HTTP sockets as TLS, arbitrary-network SSRF, OS sandbox, resolver-task cancellation or
+regional reachability proof. D remains independently incomplete and E/F gated; #643/#624 open.
+
+Final local checkpoint (pinned Rust/cargo1.99.0, locked): workspace check/Clippy and network
+all-target Clippy pass; formatting, whitespace, governance(SQL17/delivery12), claims0warnings,
+text boundary23, classifier14, site/installers and both independent SDK modes pass. Workspace
+tests exit0 with3684 passes across119 primary suite summaries, no failures/ignores, and exactly
+one primary filter: the already authorized unchanged Unix socket fixture. The isolated ambient
+proxy child adds one pass/one summary; its --exact filters436 sibling tests only in that child,
+while the parent tool suite runs all437. Raw output therefore has120 summaries/3685 passes,
+which is not3685 distinct workspace tests or437 waived tests. All26 new fixtures run locally.
+
+The initial standard unfiltered release_preflight.sh did run and failed at the original Runtime
+socket fixture (66pass/1fail, PermissionDenied/Operation not permitted). TCP availability does
+not imply Unix socket availability. Preserve that failure; no whole local preflight pass is
+claimed. The equivalent required steps above use only the maintainer's prior exact local filter;
+full remote CI must run unfiltered. No production/test waiver or CI change was introduced.
+Source-based deadline finding, late-ready DNS completion observation and bounded failed-DNS
+hop reservations are reconciled locally before first submission. Independent protected exact-
+head review, CI and final CAS remain the remote gates for this stable stage.
+
+
+## Direct Transport Merge And TLS/CONNECT Subset — 2026-10-13
+
+#714 merged `d78dc75c4b52fe7a2f708b752090c17e1f5f7bca` after protected independent Agent
+review6140200974, full CI3170/run38360092833 (six successful jobs) and CAS6140498436.
+Issue receipts6140512149 (#643),6140512432 (#624) and6140512783 (#714) retain partial status.
+
+The next library-only stage is Review under the same effective claim, based on that merge.
+[Transport contract](../reference/SEARCH-001-C-CONTROLLED-TRANSPORT.md) records verified direct
+TLS/SNI and limited explicit CONNECT: unauthenticated HTTP proxy, HTTPS IPv4-literal targets,
+proxy+target authority, pinned proxy DNS, two reservations per compound hop, no direct fallback.
+Hostname/HTTP/IPv6 targets and HTTPS proxies fail closed. Proxy `/` is a configuration locator;
+CONNECT uses literal IP:port. Compound-start revocation cannot undo already-started work, and
+trusted-proxy remote routing is not proven. No default WebSearch/API/dependency/lock change.
+
+Thirteen new fixtures plus26 prior fixtures pass in the focused network run. Test-only synthetic
+CA verification remains enabled. Python stdlib is an explicit temporary fixture host utility;
+missing utility fails, no new skip. Initial fixture33pass/3fail and corrected callback/None-SNI
+receipt handling are preserved in the contract and EVOLUTION. Independent implementation
+preview found no new blocker, but is not exact-head remote approval. Full C/EP remain Pending,
+I293 Active/Claimed, D independently incomplete, E/F gated, #643/#624 open. Broader proxy and
+ambient migration, compatibility form/parser/probe/retry/source parity, bounded D review and
+actual official root/router acceptance remain activation gates.
+
+
+Fresh final local checkpoint: pinned1.99.0 locked workspace check/Clippy, network all-target
+Clippy, fmt/diff, Python AST, governance(SQL17/delivery12), claims0warnings, text boundary23,
+classifier14, site/installers and both independent SDK modes pass. Fresh rebuilt workspace
+suite exits0:3697 primary passes/119 summaries, zero failures/ignores and exactly the prior
+Unix-socket filter. Its isolated ambient-proxy child adds1pass/1summary and449 sibling filters;
+parent tools run450 including all13 new TLS cases. Raw3698/120/450 filters must not be mistaken
+for3698 distinct tests or450 waived tests. No new skip or unfiltered local preflight claim.
+Independent final local protected preview found no blocker; remote exact-head review/CI/CAS
+remain required. Resume from feature/I293-search-tls-proxy; publish this stable stage, verify its
+remote tree equals the local tree, obtain independent protected review and full unfiltered CI,
+then repeat claim/base/head/tree/non-overlap/Issue CAS. Keep #643/#624 open and record actual PR.
+
+## Cross-Platform TLS Fixture Correction — 2026-10-14
+
+#715 original head `6c3bdb0f5bd6dc859c11c3055fdead753dd52140`, treebd8eb29e, received
+independent protected Agent review6141466921. Full CI3172/run38368995942 was NOT successful:
+five jobs passed, but macOS release preflight failed445pass/5fail in tools; all13 added TLS
+cases passed on Windows. The five positive TLS failures were closed Request errors, not
+deadline evidence or proof of a single underlying cause. Original CI remains failed; no rerun,
+test skip, verification bypass, natural-person approval or merge is claimed.
+
+Read-only certificate inspection found positive leaf2020..2045, contrary to Apple's documented
+825-day maximum for TLS leaves issued after2019-07-01 (https://support.apple.com/en-sg/103769).
+The public bundle is regenerated together: root2020..2045; positive/host-only leaves365days
+(2026-10-01..2027-10-01); expired2020..2021. SAN/EKU/verification negatives remain. CA key exists
+only in offline generator memory and is discarded; public leaf key remains unchanged. SKI/AKI
+make issuer linkage explicit. The offline cryptography generator/checker verifies signatures,
+CA constraints, P-256/SHA-256, key correspondence, SAN/EKU/date/lifetime; it is not a CI/runtime
+prerequisite. Renew/review before2027-10-01. No production Rust/API/dependency/trust change.
+
+This eliminates a confirmed fixture incompatibility, not yet proof of complete macOS recovery.
+Independent correction design preview found no new blocker. Fresh corrected-head review and
+full unfiltered macOS/Windows CI remain mandatory. Checkout/toolchain/cache were removed by
+workspace maintenance; checkout restored from submitted head and pinned1.99.0 reinstalled.
+Do not reuse old local outputs as new-head evidence. Validation/resume receipt follows.
+
+Corrected local checkpoint (pinned1.99.0, locked): fresh focused39pass and rebuilt workspace
+3697 primary passes/119 summaries +isolated ambient child1 (raw3698/120), zero failures/ignores.
+All13 TLS cases execute; only the previously authorized unchanged Unix-socket primary filter.
+The child filters449 siblings, while parent tools run450. No unfiltered local preflight claim.
+Workspace check/Clippy, network all-target Clippy, fmt/diff, both independent SDK modes, AST,
+governance(SQL17/delivery12), claims0warnings, text boundary23, classifier14 and site/installers
+pass. An incomplete redirected tail was not used as SDK/governance evidence: direct independent
+rerun receipts verify both SDK modes and the remaining validators. No host-log root cause inferred.
+Offline metadata/signature/key/SAN/EKU/CA checks and OpenSSL positive hostname/IP verification
+pass; host-only IP and expired verification fail as intended. Checker rejects Python -O rather
+than silently suppress assertions. Independent local correction preview found no blocker.
+
+Resume on #715 / feature/I293-search-tls-proxy: push the coherent corrected checkpoint, verify
+remote/local tree equality, obtain fresh independent protected exact-head review and all six
+unfiltered CI jobs, then repeat main/head/tree/claim/non-overlap/Issue CAS. Preserve failedCI3172
+and do not use old-head approval as new-head evidence. C/EP Pending, D independently incomplete,
+E/F gated, #643/#624 open; broader proxy/ambient/protocol/D/official-root gates remain.

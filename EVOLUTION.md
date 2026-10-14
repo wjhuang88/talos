@@ -70,6 +70,10 @@ repeating known mistakes.
 | 58 | Testing / PTY | 交互 deadline 必须覆盖 PTY 读写与清理，逐阶段诊断不能证明超时根因 | I291 / #590 |
 | 59 | Async tests | Candidate poll 可使取消就绪；在启动和成功出口重新检查控制信号 | I293 |
 | 60 | Validation | 隔离 checkout target 并串行执行全库验证；工具链登记不等于可执行 | I293 |
+| 61 | Network authority | Endpoint canonicalization must be tested against the actual HTTP URL representation, including mapped IPv6 | I293 / #713 |
+| 62 | Async / Transport | timeout_at alone is not a deadline fence for immediately Ready inner futures | I293 |
+| 63 | TLS fixtures | Callback observations are not physical connections; absent IP SNI is valid | I293 |
+| 64 | TLS fixtures | Native platform verification includes certificate policy, not just roots | I293 / #715 |
 
 ## Lessons
 
@@ -1174,3 +1178,57 @@ repeating known mistakes.
   relative paths and cross-instance snapshots before publishing storage read optimizations.
   Observe actual filesystem ErrorKind rather than infer permission-test coverage from UID alone.
 - Promoted to rule/check: bounded pending-submission recovery regressions only; no new policy.
+
+## 2026-10-13 - Endpoint authority must use actual HTTP host canonicalization
+
+- Trigger: I293 final source audit after a carrier candidate had passed stand-in IP tests.
+- Symptom: An actual parsed IPv4-mapped IPv6 URL was rejected before permission admission.
+- Root cause: HTTP URL serialization uses a hex mapped tail; std::net display uses dotted IPv4.
+  A self-chosen host fixture did not exercise the representation supplied by the real HTTP stack.
+- Fix: Validate the HTTP canonical mapped representation without adding a dependency or copying
+  a serializer; test parsed URL -> endpoint -> Domain proposal -> admission -> live check.
+- Prevention: Exercise producer/consumer representations at the real boundary, not only matching
+  hand-constructed values. Preserve private-address/connection enforcement as a separate gate.
+- Promoted to rule/check: parsed_http_url_ip_hosts_share_endpoint_and_policy_canonicalization.
+
+
+## 2026-10-13 - Explicit deadline fences supplement async timeout wrappers
+
+- Trigger: Independent I293 controlled-transport source preview before publication.
+- Symptom: Source inspection found an expired/late-ready inner future could precede the timer
+  check; no pre-fix failing execution is claimed.
+- Root cause: Tokio Timeout polls the inner future before its delay and returns immediately
+  on Ready. A wrapper alone does not fence later DNS/send or success boundaries.
+- Fix: Check the shared monotonic deadline before/after DNS, before send, at redirect/read
+  boundaries and before success; retain timeout_at to wake pending work. Join/drain socket
+  fixtures before making negative connection claims, rather than read a transient counter.
+- Prevention: Use paused-clock expired-budget and adversarial ready-DNS fixtures, plus actual
+  owned-socket deadline/drop receipts. Separate logical-start races from already-sent exposure.
+- Promoted to rule/check: expired_shared_budget_never_resolves_or_starts_a_connection;
+  dns_ready_after_advancing_past_deadline_cannot_start_a_request.
+
+
+## 2026-10-13 - TLS Callback Receipts Need Physical Connection Identity
+
+- Trigger: Direct TLS/CONNECT focused run produced33pass/3fail.
+- Symptom: A correct direct handshake repeated its SNI callback; CONNECT TLS aborted in the
+  fixture when an IP target legitimately supplied no SNI.
+- Root cause: Tests assumed one callback per connection and conflated None with counter update.
+- Fix: Use a distinct counter sentinel; compare callback values and count accepted TCP sockets.
+- Prevention: Keep wrong SAN/untrusted/expired/IP-SAN negatives; do not infer a packet-level
+  handshake cause without a trace or describe a fixture exception as a production TLS defect.
+- Promoted to rule/check: direct_tls_preserves_original_sni_host_and_pinned_dial_address;
+  connect_target_ip_san_is_checked_even_with_a_trusted_fixture_ca.
+
+## 2026-10-14 - Synthetic TLS Leaves Must Satisfy Native Platform Policy
+
+- Trigger: #715 CI3172 Windows13 TLS cases passed; macOS five positive TLS cases failed.
+- Symptom: Closed Request errors with25-year synthetic positive leaf validity.
+- Root cause: A confirmed fixture incompatibility with Apple's825-day maximum; closed errors
+  do not establish that it was the sole cause of every failure. Reqwest's platform verifier
+  can apply OS policies beyond whether an injected root is present.
+- Fix: Regenerate a coherent public bundle with365-day positive/host-only leaves, unchanged
+  verification and expired/wrong-SAN/untrusted/IP-SAN negatives. Discard CA signing key.
+- Prevention: Check fixed-date certificate metadata/signatures/key linkage offline; record
+  renewal deadline and require actual native macOS/Windows CI before claiming portability.
+- Promoted to rule/check: tests/fixtures/search-tls/generate.py --check; direct_tls_preserves_original_sni_host_and_pinned_dial_address.

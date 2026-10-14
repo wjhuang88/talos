@@ -255,6 +255,22 @@ fn windows_auto_probe(stage: &str, identity: usize) {
         ("        let prepared_turn = if !runtime_managed {", '        windows_auto_actor_stage("actor_pre_prepare");\n        let prepared_turn = if !runtime_managed {'),
     ]:
         session = replace_once(session, old, new)
+    pause_sites = ("custody_failure", "missing_completion", "sq_disconnect", "interrupt", "shutdown")
+    pause_parts = session.split("self.pending_store.pause_unstarted()")
+    if len(pause_parts) != len(pause_sites) + 1:
+        raise ValueError("expected exactly five original Actor pause call sites")
+    session = pause_parts[0]
+    for site, suffix in zip(pause_sites, pause_parts[1:]):
+        session += ('{ windows_auto_actor_stage("pause_' + site + '_begin"); '
+                    'let pause_result = self.pending_store.pause_unstarted(); '
+                    'windows_auto_actor_stage("pause_' + site + '_return"); pause_result }' + suffix)
+    session = replace_once(session, "                        SessionOp::Shutdown => {", '                        SessionOp::Shutdown => {\n                            windows_auto_actor_stage("actor_shutdown_received");')
+    session = replace_once(session, "        if self.runtime_admission.is_none()\n            && let Err(error) = self.background_jobs.finalize().await", '        windows_auto_actor_stage("actor_loop_exit");\n        if self.runtime_admission.is_none()\n            && let Err(error) = self.background_jobs.finalize().await')
+    session = replace_once(session, '                message: format!("background cleanup incomplete: {error}"),\n            });\n        }\n    }', '                message: format!("background cleanup incomplete: {error}"),\n            });\n        }\n        windows_auto_actor_stage("actor_finalize_return");\n    }')
+    host = replace_once(host, "                    Some(RuntimeCommand::Shutdown) | None => {", '                    Some(RuntimeCommand::Shutdown) | None => {\n                        windows_auto_host_stage("host_shutdown_received");')
+    host = replace_once(host, "    match handle.shutdown().await {", '    windows_auto_host_stage("runtime_shutdown_begin");\n    let shutdown_result = handle.shutdown().await;\n    windows_auto_host_stage("runtime_shutdown_return");\n    match shutdown_result {')
+    host = replace_once(host, "                        finish_host_executor(executor, terminal, &capture_slots)", '                        windows_auto_host_stage("host_executor_finalize_begin");\n                        let final_terminal = finish_host_executor(executor, terminal, &capture_slots);\n                        windows_auto_host_stage("host_executor_finalize_return");\n                        final_terminal')
+    host = replace_once(host, "                let _ = terminal_tx.send(terminal.clone());", '                windows_auto_host_stage("terminal_publish_begin");\n                let _ = terminal_tx.send(terminal.clone());\n                windows_auto_host_stage("terminal_publish_return");')
     store_helper = '''fn windows_auto_store_timing(stage: &str, elapsed: std::time::Duration) {
     eprintln!("WINDOWS_AUTO_DIAG time={:?} pid={} thread={:?} stage={} elapsed_ns={}",
         std::time::SystemTime::now(), std::process::id(), std::thread::current().id(), stage, elapsed.as_nanos());
@@ -292,6 +308,35 @@ fn windows_auto_probe(stage: &str, identity: usize) {
 
 '''
     store = replace_once(store, recover, wrapped)
+    begin = store.index("    pub fn pause_unstarted(")
+    end = store.index("    /// Explicitly terminalizes", begin)
+    pause = store[begin:end]
+    body_begin = pause.index("        let _guard = self.guard()?;")
+    body_end = pause.rindex("\n    }")
+    body = pause[body_begin:body_end]
+    for stage, operation in [
+        ("pause_guard", "        let _guard = self.guard()?;"),
+        ("pause_connection", "        let mut connection = self.connection()?;"),
+        ("pause_immediate", "        let transaction = immediate(&mut connection)?;"),
+        ("pause_schema", "        ensure_schema(&transaction)?;"),
+        ("pause_update", '''        let changed = transaction.execute(
+            "UPDATE pending_submissions SET state = 'paused_pending'
+             WHERE state = 'accepted_pending'",
+            [],
+        )?;'''),
+        ("pause_commit", "        transaction.commit()?;"),
+    ]:
+        body = replace_once(body, operation, '        let operation_started = std::time::Instant::now();\n' + operation + f'\n        windows_auto_store_timing("{stage}", operation_started.elapsed());')
+    wrapped_pause = pause[:body_begin] + '''        let pause_started = std::time::Instant::now();
+        let pause_result: Result<usize, PendingSubmissionError> = (|| {
+''' + body + '''
+        })();
+        windows_auto_store_timing("pending_pause_total", pause_started.elapsed());
+        pause_result
+    }
+
+'''
+    store = replace_once(store, pause, wrapped_pause)
     connection = '''    fn connection(&self) -> Result<Connection, PendingSubmissionError> {
         if let Some(parent) = self.path.parent() {
             std::fs::create_dir_all(parent)?;
@@ -429,6 +474,12 @@ def main() -> int:
         assert patched[SESSION].count(".await") == originals[SESSION].count(".await")
         assert patched[STORE].count(".await") == originals[STORE].count(".await")
         assert patched[STORE].count('windows_auto_store_timing("pending_recover_total"') == 1
+        assert patched[STORE].count('windows_auto_store_timing("pending_pause_total"') == 1
+        assert patched[SESSION].count("self.pending_store.pause_unstarted()") == 5
+        assert all(patched[SESSION].count('windows_auto_actor_stage("pause_' + site + '_begin")') == 1 for site in ("custody_failure", "missing_completion", "sq_disconnect", "interrupt", "shutdown"))
+        # The pre-existing host heartbeat adds one sleep; shutdown adds no await.
+        assert patched[HOST].count(".await") == originals[HOST].count(".await") + 1
+        assert all(patched[path].count("unsafe") == originals[path].count("unsafe") for path in originals)
         try:
             replace_once("duplicate duplicate", "duplicate", "replacement")
         except ValueError:

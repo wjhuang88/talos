@@ -1,9 +1,13 @@
 //! Explicit in-memory permission Session state and approval fencing.
 
 use std::fmt;
-use std::sync::{Mutex, MutexGuard};
+use std::sync::{Arc, Mutex, MutexGuard};
 
-use talos_core::tool::{ToolAuthorizationScope, ToolExecutionAuthorization};
+use talos_core::tool::{
+    ToolAuthorizationScope, ToolExecutionAuthorization, ToolNetworkAuthority,
+    ToolNetworkAuthorizationError, ToolNetworkEndpoint, ToolNetworkManifest, ToolNetworkScope,
+    ToolPermissionFacet,
+};
 use uuid::Uuid;
 
 use crate::grant::{
@@ -132,6 +136,7 @@ struct State {
     revisions: PermissionStateRevisions,
     engine: PermissionEngine,
     grants: Vec<PermissionGrant>,
+    authority_reset: u64,
 }
 
 /// Composition-root-owned policy, proposal, grant, and admission state.
@@ -155,6 +160,7 @@ impl PermissionSessionState {
                 revisions: PermissionStateRevisions::ZERO,
                 engine,
                 grants: Vec::new(),
+                authority_reset: 0,
             }),
         }
     }
@@ -259,7 +265,10 @@ impl PermissionSessionState {
         context: &PermissionContext,
     ) -> Result<Vec<ToolExecutionAuthorization>, GrantError> {
         let state = self.try_lock_state()?;
-        admit_locked(&state, pending, request, context)
+        if request.network_manifest().is_some() {
+            return Err(GrantError::AdmissionInvalidated);
+        }
+        admit_locked(&state, &pending, request, context)
     }
 
     #[cfg(test)]
@@ -300,6 +309,7 @@ fn begin_invocation_from_evaluation(
                 facets,
                 fingerprint,
                 authority,
+                network_scope: request.network_manifest().map(|m| m.scope().clone()),
             })))
         }
         PermissionDecision::Ask => {
@@ -413,6 +423,7 @@ impl PermissionSessionState {
             facets,
             fingerprint,
             authority,
+            network_scope: request.network_manifest().map(|m| m.scope().clone()),
         }))
     }
 
@@ -423,8 +434,10 @@ impl PermissionSessionState {
             .lock()
             .map_err(|_| GrantError::StateUnavailable)?;
         let next_store = next_generation(state.revisions.store)?;
+        let next_reset = next_generation(state.authority_reset)?;
         state.grants.clear();
         state.revisions.store = next_store;
+        state.authority_reset = next_reset;
         Ok(())
     }
 
@@ -577,7 +590,61 @@ impl PermissionSessionState {
         context: &PermissionContext,
     ) -> Result<Vec<ToolExecutionAuthorization>, GrantError> {
         let state = self.lock_state()?;
-        admit_locked(&state, pending, request, context)
+        if request.network_manifest().is_some() {
+            return Err(GrantError::AdmissionInvalidated);
+        }
+        admit_locked(&state, &pending, request, context)
+    }
+
+    /// Consumes an exact prepared invocation and returns a live non-serializable checker.
+    /// The lock fences admission only; no lock is held while executing or awaiting HTTP.
+    pub fn admit_network(
+        self: &Arc<Self>,
+        pending: PendingInvocation,
+        request: &PermissionRequest<'_>,
+        context: &PermissionContext,
+    ) -> Result<Arc<dyn ToolNetworkAuthority>, GrantError> {
+        let state = self.lock_state()?;
+        self.network_authority_locked(&state, pending, request, context)
+    }
+
+    /// Nonblocking admission for deadline-bound orchestration; contention fails closed.
+    pub fn try_admit_network(
+        self: &Arc<Self>,
+        pending: PendingInvocation,
+        request: &PermissionRequest<'_>,
+        context: &PermissionContext,
+    ) -> Result<Arc<dyn ToolNetworkAuthority>, GrantError> {
+        let state = self.try_lock_state()?;
+        self.network_authority_locked(&state, pending, request, context)
+    }
+
+    fn network_authority_locked(
+        self: &Arc<Self>,
+        state: &State,
+        pending: PendingInvocation,
+        request: &PermissionRequest<'_>,
+        context: &PermissionContext,
+    ) -> Result<Arc<dyn ToolNetworkAuthority>, GrantError> {
+        let manifest = request
+            .network_manifest()
+            .ok_or(GrantError::AdmissionInvalidated)?;
+        admit_locked(state, &pending, request, context)?;
+        // Re-evaluate policy: even a matching scoped grant cannot remove a denied facet.
+        if matches!(
+            state.engine.evaluate_request(request, context).decision(),
+            PermissionDecision::Deny(_)
+        ) {
+            return Err(GrantError::AdmissionInvalidated);
+        }
+        Ok(Arc::new(NetworkAuthority {
+            state: self.clone(),
+            pending,
+            manifest: manifest.clone(),
+            profile: request.facets().to_vec(),
+            input: request.input().clone(),
+            authority_reset: state.authority_reset,
+        }))
     }
 }
 
@@ -593,6 +660,7 @@ fn approve_once_locked(
         provenance: proposal.provenance,
         facets: proposal.facets,
         fingerprint: proposal.fingerprint,
+        network_scope: request.network_manifest().map(|m| m.scope().clone()),
     };
     Ok(PendingInvocation::once(
         state.session_id,
@@ -625,6 +693,7 @@ fn approve_session_locked(
         facets: proposal.facets.clone(),
         fingerprint: proposal.fingerprint,
         authority: PendingAuthority::Session { id, source },
+        network_scope: request.network_manifest().map(|m| m.scope().clone()),
     };
     state.grants.push(PermissionGrant {
         id,
@@ -632,6 +701,7 @@ fn approve_session_locked(
         tool_name: proposal.tool_name,
         provenance: proposal.provenance,
         facets: proposal.facets,
+        network_scope: request.network_manifest().map(|m| m.scope().clone()),
     });
     state.revisions = next_revisions;
     Ok(pending)
@@ -639,7 +709,7 @@ fn approve_session_locked(
 
 fn admit_locked(
     state: &State,
-    pending: PendingInvocation,
+    pending: &PendingInvocation,
     request: &PermissionRequest<'_>,
     context: &PermissionContext,
 ) -> Result<Vec<ToolExecutionAuthorization>, GrantError> {
@@ -654,6 +724,7 @@ fn admit_locked(
         || pending.provenance != *request.provenance()
         || pending.facets != facets
         || pending.fingerprint != fingerprint
+        || pending.network_scope.as_ref() != request.network_manifest().map(|m| m.scope())
     {
         return Err(GrantError::AdmissionInvalidated);
     }
@@ -664,7 +735,13 @@ fn admit_locked(
             if state.grants.iter().any(|grant| {
                 grant.id == id
                     && grant.source == source
-                    && grant_matches(grant, request.tool_name(), request.provenance(), &facets)
+                    && grant_matches(
+                        grant,
+                        request.tool_name(),
+                        request.provenance(),
+                        &facets,
+                        request.network_manifest().map(|m| m.scope()),
+                    )
             }) =>
         {
             ToolAuthorizationScope::Session
@@ -692,8 +769,10 @@ pub struct PendingInvocation {
     facets: Vec<CompiledFacetScope>,
     fingerprint: crate::grant::RequestFingerprint,
     authority: PendingAuthority,
+    network_scope: Option<ToolNetworkScope>,
 }
 
+#[derive(Clone, Copy)]
 enum PendingAuthority {
     Policy,
     Once,
@@ -712,6 +791,7 @@ impl PendingInvocation {
             provenance,
             facets,
             fingerprint,
+            network_scope,
         } = approved;
         Self {
             session_id,
@@ -722,6 +802,7 @@ impl PendingInvocation {
             facets,
             fingerprint,
             authority: PendingAuthority::Once,
+            network_scope,
         }
     }
 }
@@ -745,11 +826,15 @@ fn evaluate_locked(
         });
     }
     let (facets, _) = compiled_identity(request, state.engine.workspace_root())?;
-    if let Some(grant) = state
-        .grants
-        .iter()
-        .find(|grant| grant_matches(grant, request.tool_name(), request.provenance(), &facets))
-    {
+    if let Some(grant) = state.grants.iter().find(|grant| {
+        grant_matches(
+            grant,
+            request.tool_name(),
+            request.provenance(),
+            &facets,
+            request.network_manifest().map(|m| m.scope()),
+        )
+    }) {
         let id = grant.id;
         let source = grant.source;
         return Ok(PermissionEvaluation {
@@ -768,8 +853,12 @@ fn grant_matches(
     tool_name: &str,
     provenance: &talos_core::tool::ToolProvenance,
     facets: &[CompiledFacetScope],
+    network_scope: Option<&ToolNetworkScope>,
 ) -> bool {
-    grant.tool_name == tool_name && grant.provenance == *provenance && grant.facets == facets
+    grant.tool_name == tool_name
+        && grant.provenance == *provenance
+        && grant.facets == facets
+        && grant.network_scope.as_ref() == network_scope
 }
 
 fn validate_proposal(
@@ -801,6 +890,75 @@ fn validate_proposal(
 
 fn next_generation(value: u64) -> Result<u64, GrantError> {
     value.checked_add(1).ok_or(GrantError::StateUnavailable)
+}
+
+// Not serializable; Debug deliberately contains no request or manifest fields.
+struct NetworkAuthority {
+    state: Arc<PermissionSessionState>,
+    pending: PendingInvocation,
+    manifest: ToolNetworkManifest,
+    profile: Vec<ToolPermissionFacet>,
+    input: serde_json::Value,
+    authority_reset: u64,
+}
+
+impl ToolNetworkAuthority for NetworkAuthority {
+    fn check(
+        &self,
+        invocation_id: Uuid,
+        destination: &ToolNetworkEndpoint,
+    ) -> Result<(), ToolNetworkAuthorizationError> {
+        if invocation_id != self.manifest.invocation_id()
+            || !self.manifest.scope().contains(destination)
+        {
+            return Err(ToolNetworkAuthorizationError::Mismatch);
+        }
+        let state = self
+            .state
+            .try_lock_state()
+            .map_err(|_| ToolNetworkAuthorizationError::Invalidated)?;
+        if state.session_id != self.pending.session_id
+            || state.authority_reset != self.authority_reset
+            || state.revisions.as_array()[..5] != self.pending.revisions.as_array()[..5]
+        {
+            return Err(ToolNetworkAuthorizationError::Invalidated);
+        }
+        let request = PermissionRequest::new(
+            &self.pending.tool_name,
+            self.pending.provenance.clone(),
+            &self.profile,
+            &self.input,
+        )
+        .with_network_manifest(&self.manifest);
+        let decision = state
+            .engine
+            .evaluate_request(&request, &self.pending.context)
+            .decision();
+        if matches!(decision, PermissionDecision::Deny(_)) {
+            return Err(ToolNetworkAuthorizationError::Invalidated);
+        }
+        match self.pending.authority {
+            PendingAuthority::Policy if decision != PermissionDecision::Allow => {
+                Err(ToolNetworkAuthorizationError::Invalidated)
+            }
+            PendingAuthority::Session { id, source }
+                if !state.grants.iter().any(|grant| {
+                    grant.id == id
+                        && grant.source == source
+                        && grant_matches(
+                            grant,
+                            &self.pending.tool_name,
+                            &self.pending.provenance,
+                            &self.pending.facets,
+                            Some(self.manifest.scope()),
+                        )
+                }) =>
+            {
+                Err(ToolNetworkAuthorizationError::Invalidated)
+            }
+            _ => Ok(()),
+        }
+    }
 }
 
 #[cfg(test)]

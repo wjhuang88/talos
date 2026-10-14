@@ -5,6 +5,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use serde_json::Value;
 mod api_surface;
+mod network;
 mod provider;
 mod safety;
 use provider::FixtureProvider as MockProvider;
@@ -195,6 +196,7 @@ async fn run() -> Result<()> {
     verify_ephemeral_default_refusal().await?;
     verify_browser_is_opt_in().await?;
     run_minimal_runtime().await?;
+    network::verify().await?;
     run_durable_session().await?;
     #[cfg(feature = "coding")]
     run_coding_preset().await?;

@@ -2,6 +2,22 @@
 
 ## Purpose
 
+[I302](I302-windows-owned-handle-evidence.md) / [TEST-003](../backlog/active/TEST-003-windows-owned-handle-evidence.md)
+is an Active/Claimed atomic proposal in #718 after maintainer scope acceptance on2026-10-14.
+ADR-091/claim are ineffective until #718 main merge; no PSS implementation yet.
+I293/I294/I300 remain Active; I301/I277 retain Review, I249 Planned and I164 Paused.
+I302 records the full inventory/non-overlap; #716 may later carry separate diagnostic commits.
+
+[I293](I293-search-router.md) retains SEARCH-001-C ownership. The maintainer accepted bounded
+production endpoint-authority/search wiring on 2026-10-13; [ADR-090](../decisions/090-invocation-bound-search-endpoint-authority.md)
+and the existing C claim's scope amendment became effective in #712 (989fec2e), after protected
+review, CI and CAS. #713 carrier merged69e1e116 after exact-head review/CI/CAS. The private
+controlled direct transport merged in #714 (d78dc75c); TLS/CONNECT subset is Review under that
+claim in #715, with39 focused fixtures and documented limitations. Original CI3172 macOS
+positive TLS failures require365-day synthetic leaf correction and fresh exact-head validation.
+WebSearch default activation and full C/EP acceptance remain Pending, #643/#624 open. I300 and
+PERM-007-H retain their separate scopes.
+
 [I301](I301-missing-pending-sidecar-startup.md) / RUNTIME-010 is Review / Claimed after #710
 merge `42b86112`. PR #711 preserves ParentDir/error/custody behavior; full remote CI
 and independent implementation review remain pending. #705 retains independent diagnostic residuals.

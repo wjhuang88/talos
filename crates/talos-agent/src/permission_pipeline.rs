@@ -6,7 +6,10 @@ use std::time::Duration;
 use async_trait::async_trait;
 use futures_util::FutureExt;
 use talos_core::ApprovalChoice;
-use talos_core::tool::{ToolExecutionAuthorization, ToolPermissionFacet, ToolProvenance};
+use talos_core::tool::{
+    ToolExecutionAuthorization, ToolNetworkAuthority, ToolNetworkManifest, ToolPermissionFacet,
+    ToolProvenance,
+};
 use talos_permission::{
     GrantPreview, GrantSource, InteractionCapability, PermissionContext, PermissionDecision,
     PermissionDecisionSource, PermissionInvocation, PermissionMode, PermissionOutcome,
@@ -304,7 +307,9 @@ impl PermissionPipeline {
         &self,
         authorization: PermissionAuthorizationRequest<'_>,
     ) -> Result<Vec<ToolExecutionAuthorization>, PermissionPipelineError> {
-        self.authorize_inner(authorization, None, None).await
+        self.authorize_inner(authorization, None, None, None)
+            .await?
+            .paths()
     }
 
     /// Evaluates, resolves and admits one request with bounded current-turn intent available to
@@ -314,7 +319,9 @@ impl PermissionPipeline {
         authorization: PermissionAuthorizationRequest<'_>,
         user_intent: Option<&str>,
     ) -> Result<Vec<ToolExecutionAuthorization>, PermissionPipelineError> {
-        self.authorize_inner(authorization, user_intent, None).await
+        self.authorize_inner(authorization, user_intent, None, None)
+            .await?
+            .paths()
     }
 
     /// Evaluates a request with trusted execution context supplied by its registered tool.
@@ -324,8 +331,27 @@ impl PermissionPipeline {
         user_intent: Option<&str>,
         working_directory: Option<&std::path::Path>,
     ) -> Result<Vec<ToolExecutionAuthorization>, PermissionPipelineError> {
-        self.authorize_inner(authorization, user_intent, working_directory)
-            .await
+        self.authorize_inner(authorization, user_intent, working_directory, None)
+            .await?
+            .paths()
+    }
+
+    /// Approves and admits the exact trusted prepared plan without changing legacy request literals.
+    pub async fn authorize_network(
+        &self,
+        authorization: PermissionAuthorizationRequest<'_>,
+        manifest: &ToolNetworkManifest,
+        user_intent: Option<&str>,
+    ) -> Result<Arc<dyn ToolNetworkAuthority>, PermissionPipelineError> {
+        match self
+            .authorize_inner(authorization, user_intent, None, Some(manifest))
+            .await?
+        {
+            InvocationAuthorization::Network(authority) => Ok(authority),
+            InvocationAuthorization::Paths(_) => Err(PermissionPipelineError::State(
+                "network admission unavailable".into(),
+            )),
+        }
     }
 
     async fn authorize_inner(
@@ -333,7 +359,8 @@ impl PermissionPipeline {
         authorization: PermissionAuthorizationRequest<'_>,
         user_intent: Option<&str>,
         working_directory: Option<&std::path::Path>,
-    ) -> Result<Vec<ToolExecutionAuthorization>, PermissionPipelineError> {
+        network_manifest: Option<&ToolNetworkManifest>,
+    ) -> Result<InvocationAuthorization, PermissionPipelineError> {
         let PermissionAuthorizationRequest {
             tool_name,
             provenance,
@@ -349,7 +376,10 @@ impl PermissionPipeline {
             .state
             .state_snapshot()
             .map_err(|error| PermissionPipelineError::State(error.to_string()))?;
-        let request = PermissionRequest::new(tool_name, provenance.clone(), profile, input);
+        let mut request = PermissionRequest::new(tool_name, provenance.clone(), profile, input);
+        if let Some(manifest) = network_manifest {
+            request = request.with_network_manifest(manifest);
+        }
         let (invocation, evaluation_report) = self
             .state
             .try_begin_invocation_with_report(&request, &self.context)
@@ -443,13 +473,37 @@ impl PermissionPipeline {
 
         ensure_before(deadline_at)?;
 
-        self.state
-            .try_admit(pending, &request, &self.context)
+        let authorization = if network_manifest.is_some() {
+            self.state
+                .try_admit_network(pending, &request, &self.context)
+                .map(InvocationAuthorization::Network)
+        } else {
+            self.state
+                .try_admit(pending, &request, &self.context)
+                .map(InvocationAuthorization::Paths)
+        };
+        authorization
             .map_err(|error| PermissionPipelineError::State(error.to_string()))
             .and_then(|authorization| {
                 ensure_before(deadline_at)?;
                 Ok(authorization)
             })
+    }
+}
+
+enum InvocationAuthorization {
+    Paths(Vec<ToolExecutionAuthorization>),
+    Network(Arc<dyn ToolNetworkAuthority>),
+}
+
+impl InvocationAuthorization {
+    fn paths(self) -> Result<Vec<ToolExecutionAuthorization>, PermissionPipelineError> {
+        match self {
+            Self::Paths(paths) => Ok(paths),
+            Self::Network(_) => Err(PermissionPipelineError::State(
+                "path admission unavailable".into(),
+            )),
+        }
     }
 }
 

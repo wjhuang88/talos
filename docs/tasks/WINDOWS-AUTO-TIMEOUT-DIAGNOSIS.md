@@ -534,3 +534,63 @@ diff checks and both governance validators with zero warnings. Initial project v
 failed because this shallow clone lacked the already-existing #701 completion object
 `690926759229818fcec92b1487d0cffef1bf5fcb`; GitHub verified it, fetching that real object
 resolved the failure. No unrelated owner or validation rule was changed.
+
+## Retained CI3163 Failure And Shutdown Follow-up — 2026-10-14
+
+Exact48ed767e CI3163/run38286315560 completed FAILURE. Six ordinary full platform/governance
+jobs passed; the two diagnostic phases failed. Both60-attempt matrices completed: baseline1108
+passed/2failed and instrumented1097passed/13failed, total120processes/2220executions with2205
+passed/15failed/0ignored. Baseline fresh-first failed original Auto after decision151.6643ms /
+request159.5418ms with no result before15s; its other failure was paused evaluation. Instrumented
+parallel9 failed3Auto shutdown10s checks and10other host tests. Its original Auto inner flow
+completed with ToolResult898.8776ms, child natural exit0 and both pipes joined before that result.
+Overlay line165 maps to original line151 shutdown expect, not the flow watchdog.
+
+Matched PID5048/thread62 initial recovery69.1622ms / Actor reconcile69.2491ms; subsequent reads
+211.8us/204.3us. Across60 matched original Auto targets, first recovery median0.2307ms and
+max69.1622ms; reconcile median0.2905ms/max69.2491ms. All63 child I/O reads succeeded. The first
+successful instrumented child read57635->60399->172322->2117645bytes before natural exit;
+initial flat CPU did not imply absent I/O. These successful counters do not explain the failed
+uninstrumented first call, and cross-VM/observer timings are not a controlled causal benchmark.
+
+Post-result target-thread PRAGMA5.8695867s supports a shutdown storage hypothesis, not exact
+caller/full-cause proof. pause_unstarted always opens/initializes a journal, including absence;
+Actor Shutdown/SQ disconnect/interrupt and custody-error paths call it. The new temporary
+observation adds five constant caller begin/return pairs, Shutdown receipt, normal Actor loop /
+finalization boundary, RuntimeHandle.shutdown, executor teardown and terminal publication spans.
+Terminal publication markers apply to Error as well as Stopped; finalization boundary markers
+also surround paths where managed Runtime owns cleanup, and do not assert a finalizer ran.
+The pause Result<usize> closure preserves original conditions, SQL, transaction, success/error
+and local drop order. It records total including original drops and successful guard/connection/
+immediate/schema/update/commit spans; a failing operation may omit its completion marker.
+No new await/unsafe/native API/handle/rights/permission/production change or deadline is introduced.
+
+The executor is available again. Old artifacts have now been independently downloaded and SHA256
+verified: instrumented11763952124 b7621405aee6ca38212a6c367551b41462ddd1bd6cc8d9240e8e5b8051bb4911;
+baseline11763671960 7d13b9767120e2121ff5ffa3ae662740ea2a10cc2399bdcd38143a1c72a7f804. Both
+manifests have head48ed767e, matching six normalized sources,4CPUs/image20260925.250.1 and60
+attempts with one failed attempt each. Both job logs retain the finally restoration marker;
+there is still no independent post-restore source readback hash. Checkpoints6129849703/6129921698.
+
+This stage integrates main f4313237, retaining Search #712-715 and effective #718 / I302 / TEST-003
+self-handle claim. That owner's self-only PSS observation excludes #705 takeover; this stage adds
+no PSS or launcher-ownership change and leaves #716/#717 and other owners intact. Only the same
+three diagnostic files differ from production main. The original fixed fresh-first120/2220
+matrix, budgets, no ignored tests and failed-attempt retention remain unchanged. A local SQL-anchor
+escape and heartbeat-await-count assertion were corrected before publication; final self-test and
+all six generated overlays parse under checksum-verified official Rust1.99. No new Windows result
+is claimed. Required independent storage/ABI/scope review and fresh exact-head CI remain.
+
+I301/RUNTIME-010 remain Review/Claimed. A production absent-journal pause no-op changes shutdown
+state reconciliation and requires a new effective Work Slice or formal governance scope expansion,
+with admission/race/custody/error/WAL review; it cannot enter this bounded diagnostic PR. Original
+PowerShell/host failures remain open, with no release, deadline increase, retry-to-green or #590
+reopening. Next: correlate actual caller/pause/terminal spans before choosing a production fix.
+
+Stable-stage local verification: both governance validators passed0warnings, classifier14,
+YAML/Python syntax and six Rust overlays passed. Locked Linux check of the generated Session/Agent
+overlays passed; an isolated worktree then restored both originals and compared actual readback
+bytes. This local restoration check is not a retroactive readback proof for old Windows CI.
+Independent storage/native/security/scope review found no blocker; new exact remote review and
+Windows execution remain required. No product test, full preflight or Windows execution is inferred
+from the focused Linux typecheck.
