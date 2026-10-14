@@ -73,6 +73,7 @@ repeating known mistakes.
 | 61 | Network authority | Endpoint canonicalization must be tested against the actual HTTP URL representation, including mapped IPv6 | I293 / #713 |
 | 62 | Async / Transport | timeout_at alone is not a deadline fence for immediately Ready inner futures | I293 |
 | 63 | TLS fixtures | Callback observations are not physical connections; absent IP SNI is valid | I293 |
+| 64 | TLS fixtures | Native platform verification includes certificate policy, not just roots | I293 / #715 |
 
 ## Lessons
 
@@ -1218,3 +1219,16 @@ repeating known mistakes.
   handshake cause without a trace or describe a fixture exception as a production TLS defect.
 - Promoted to rule/check: direct_tls_preserves_original_sni_host_and_pinned_dial_address;
   connect_target_ip_san_is_checked_even_with_a_trusted_fixture_ca.
+
+## 2026-10-14 - Synthetic TLS Leaves Must Satisfy Native Platform Policy
+
+- Trigger: #715 CI3172 Windows13 TLS cases passed; macOS five positive TLS cases failed.
+- Symptom: Closed Request errors with25-year synthetic positive leaf validity.
+- Root cause: A confirmed fixture incompatibility with Apple's825-day maximum; closed errors
+  do not establish that it was the sole cause of every failure. Reqwest's platform verifier
+  can apply OS policies beyond whether an injected root is present.
+- Fix: Regenerate a coherent public bundle with365-day positive/host-only leaves, unchanged
+  verification and expired/wrong-SAN/untrusted/IP-SAN negatives. Discard CA signing key.
+- Prevention: Check fixed-date certificate metadata/signatures/key linkage offline; record
+  renewal deadline and require actual native macOS/Windows CI before claiming portability.
+- Promoted to rule/check: tests/fixtures/search-tls/generate.py --check; direct_tls_preserves_original_sni_host_and_pinned_dial_address.

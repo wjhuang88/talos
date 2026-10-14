@@ -140,3 +140,9 @@ raising TypeError in its TLS callback. Corrected receipt handling and physical c
 produced39pass/0fail. No packet-trace diagnosis of repeated callbacks is claimed. All-target
 Clippy's manual range-pattern finding was corrected without a lint suppression. Fresh locked
 workspace validation and protected exact-head review/CI/CAS are recorded in I293.
+
+Cross-platform correction2026-10-14: initial CI3172 macOS positive TLS cases failed while
+Windows passed. The25-year synthetic leaf violated Apple's825-day TLS leaf limit; regenerated
+365-day positive/host-only leaves remove that known incompatibility while retaining platform
+verification, all negatives and production trust. Closed Request errors did not prove the sole
+cause. Fresh corrected-head macOS acceptance remains required; see I293 and fixture provenance.
