@@ -102,3 +102,8 @@ CAS6158600236; all13 TLS cases pass on macOS/Windows, old failedCI retained. Nex
 form transport prerequisite is Review:47 focused fixtures, no default activation/dependency/API
 or upstream parser copy. Full local/remote gates and broader proxy/ambient/protocol/D/official-
 root acceptance remain Pending; #643/#624 open. I293 records the authoritative stage evidence.
+
+#716 original protected review6158827975 is retained; CI3175 failed Windows process-wide
+handle counting (+11) while five jobs passed. A bounded test-only isolated-worker correction
+preserves all40 faults and +2 threshold, using existing outer Job ownership. Fresh protected
+review/native CI/CAS remain; no production process change, skip or retry-to-green claim.

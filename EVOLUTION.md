@@ -74,6 +74,7 @@ repeating known mistakes.
 | 62 | Async / Transport | timeout_at alone is not a deadline fence for immediately Ready inner futures | I293 |
 | 63 | TLS fixtures | Callback observations are not physical connections; absent IP SNI is valid | I293 |
 | 64 | TLS fixtures | Native platform verification includes certificate policy, not just roots | I293 / #715 |
+| 65 | Resource tests | Process-wide counters need isolated workers and owned descendant cleanup | I293 / #716 |
 
 ## Lessons
 
@@ -1232,3 +1233,15 @@ repeating known mistakes.
 - Prevention: Check fixed-date certificate metadata/signatures/key linkage offline; record
   renewal deadline and require actual native macOS/Windows CI before claiming portability.
 - Promoted to rule/check: tests/fixtures/search-tls/generate.py --check; direct_tls_preserves_original_sni_host_and_pinned_dial_address.
+
+## 2026-10-14 - Process-wide Resource Counters Need Isolated Workers
+
+- Trigger: #716 CI3175 Windows handle-count fixture failed with before151/after162.
+- Symptom: The sampled process also ran concurrent socket/TLS/process tests.
+- Root cause: Confirmed measurement scope includes sibling activity; the observed +11 alone
+  establishes neither a real leak nor interference as its sole cause.
+- Fix: Run the exact fixture in an owned single-test worker, preserving40 faults and +2
+  threshold. Existing outer Job ownership also covers descendants before inner assignment.
+- Prevention: Require the intended fault at each attempt and a completed count receipt;
+  continuously drain bounded diagnostics and prove native CI rather than retrying old heads.
+- Promoted to rule/check: windows_partial_setup_failures_release_every_parent_handle.

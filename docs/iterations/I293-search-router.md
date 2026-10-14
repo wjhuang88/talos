@@ -10,7 +10,7 @@
 | Source Issue | #643 |
 | Depends on | Accepted ADR-085; SEARCH-001-B / #642 complete in #656; NET-001 boundary coordination |
 | Claim State | Claimed |
-| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 merged TLS/CONNECT subset; bounded form transport Review / PR not assigned (default activation Pending) |
+| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 merged TLS/CONNECT subset; #716 bounded form transport Review / CI3175 failed, test-only correction pending fresh native CI (default activation Pending) |
 | Completion | Pending |
 
 ## Collaboration Claim
@@ -899,3 +899,52 @@ text boundary23, classifier14 and site/installers pass. No full unfiltered local
 Fresh exact-head protected review/full CI/CAS remain the remote gates. Resume on
 feature/I293-search-form-protocol from #715 merge; verify local/remote tree equality before
 publication and keep full C/EP, #643/#624 and D/E-F activation dispositions unchanged.
+
+## Form Candidate CI And Isolated Handle Fixture — 2026-10-14
+
+#716 original head925e46a89a8dce7e8177b9e1f681657974f2f9e2/tree2085eb5e9069c9cf574fd59f89abb8ac6b74e777
+received protected independent Agent review6158827975. CI3175/run38495718642 passed five
+jobs but failed Windows workspace: tools448pass/1fail, pre-existing
+windows_partial_setup_failures_release_every_parent_handle before151/after162 (+11).
+Its GetProcessHandleCount observes the entire concurrent harness. That measurement scope
+permits interference from other tests; this is not proof that interference solely caused +11
+or that no actual leak exists. Failed CI remains evidence, not a retry-to-green candidate.
+
+Bounded maintenance under the existing collaboration SOP exception repairs only that Windows
+test in the same PR. Production process source is byte-identical; no unsafe/native binding,
+process rights/policy, dependency/lock, production deadline, skip or waiver changes. The outer
+test uses existing WindowsBackgroundLauncher assignment-before-resume/kill-on-close Job
+ownership to launch the same binary with exact test selection and one test thread. Descendants
+created before inner assignment remain under the outer Job; no breakaway is introduced.
+The sole control Arc stays owned through terminal handling and receipt validation; last drop
+provides panic cleanup. The worker initializes its Tokio runtime before the baseline, then
+executes the original synchronous five faults times eight attempts and original +2 threshold.
+Exact injected-error checks prevent an earlier launch failure from masquerading as a later fault.
+
+Success requires a real successful Exited event and a <=1024-byte JSON receipt in an owned
+canonical temporary directory, reporting all40 attempts, u32 before/after and a nonzero worker
+PID distinct from the parent. Exact invocation/receipt checks reject zero-test success or EOF.
+Captured diagnostics retain <=16KiB while continuing to drain. Event waiting is bounded60s;
+failure requests force termination and drains terminal events for up to10s before assertion.
+These bounds do not claim a hard limit on every OS/native cleanup tail. Actual nested-Job
+compatibility and resource assertions must pass native Windows CI; unsupported-host failure
+is not skipped. #705 retains its separate workflow/diagnosis/script scope.
+
+Restored pinned1.99.0 local locked check/Clippy and workspace tests pass:3705 primary/119
+summaries +ambient child1 (raw3706/120), zero failures/ignores; only the previously authorized
+unchanged Unix-socket primary filter. Child457 exact-only sibling filters are not waivers;
+parent tools458 execute them. External SDK fixture passed. Windows-only correction is not
+compiled/executed by this Linux checkpoint; fresh final validation, independent protected
+implementation/exact-head review and all six unfiltered native CI jobs remain before CAS.
+I293/C remain Active/Claimed/incomplete; #643/#624 open, D separate and E/F gated.
+
+Final correction checkpoint: independent protected implementation preview found no blocker;
+not stable-head approval or native execution. Fresh fmt/diff/workspace Clippy, both SDK modes,
+governance(SQL17/delivery12), claims0warnings, text boundary23/classifier14 and site/installers
+pass. Initial shell scoping omitted cargo from later chained commands; validation was rerun
+under a shared explicit toolchain environment. A mistaken extra SDK --offline invocation was
+rejected by argparse after the standard validator had passed both actual SDK modes; no offline
+SDK claim is made. Remote main is stilld66e380a, #643/#624 open and only #705/#716 open PRs;
+#705 changes workflow/diagnostic docs/script, not this committed Rust test fixture.
+Publish the coherent checkpoint to the existing #716 branch, verify tree equality, obtain fresh
+exact-head protected independent Agent review and complete unfiltered CI, then repeat CAS.
