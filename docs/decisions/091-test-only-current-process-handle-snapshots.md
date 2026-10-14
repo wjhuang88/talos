@@ -2,8 +2,9 @@
 
 ## Status
 
-Proposed. Maintainer accepted the scope packet on2026-10-14 at14:50 Asia/Shanghai. This draft
-becomes Accepted only with finalized TEST-003/I302 atomic claim merge, independent protected
+Accepted contract proposal in #718; ineffective until target-main merge. Maintainer accepted
+the scope packet on2026-10-14 at14:50 Asia/Shanghai. This contract becomes effective only with
+finalized TEST-003/I302 atomic claim merge, independent protected
 native/security review, exact-head CI and CAS. It does not authorize implementation beforehand.
 
 ## Context
@@ -13,6 +14,9 @@ Pipe(+1) and first Assignment(+2), then stays stable through40 exact injected fa
 cleanup-return checks can prove known calls succeeded, not which remaining handles grew or why.
 Do not warm up/raise thresholds/retry-to-green on an unproved initialization hypothesis.
 ADR-068 owns production Job launch; this decision adds only a test diagnostic ABI boundary.
+
+CI3178 additionally reached that final sample after all known cleanup BOOL checks passed; the
+same growth remains. Successful known closes do not identify or qualify remaining resources.
 
 ## Decision
 
@@ -41,6 +45,10 @@ TypeNameLength is bytes; enforce even <=128, pointer null/alignment checks, leng
 UTF-16 validity and immediate bounded owned copy while marker lives. It need not be NUL-terminated.
 No native pointer/reference escapes its owner.
 
+Synthetic invalid-pointer fixtures test rejection predicates only; they must not dereference
+fabricated addresses. Alignment/null/length checks are not arbitrary-address safety proof:
+actual copying accepts only buffers returned by the currently owned live native walk marker.
+
 Caps: <=1024 entries/snapshot, <=4 snapshots/worker, <=32 emitted changed entries and <=16KiB
 diagnostic output. Over-limit/API/data errors produce bounded failure, not partial-complete/zero
 evidence. Caps bound copied data/work, not all PSS internal allocations. Handle value/type changes
@@ -52,6 +60,8 @@ One owner each for snapshot/marker, no concurrent descriptor use. Create initial
 capture/walk/marker/free statuses are checked. Marker frees before snapshot; explicit checked
 cleanup also has error/panic fallback, with no double free. Local snapshot frees use the same
 current-process pseudohandle. A cleanup failure remains evidence/failure; do not silently succeed.
+Consume ownership before a release attempt. If it returns an error, do not retry that descriptor;
+its state may be uncertain. Fallback cleans only still-owned resources not previously released.
 Only documented successful end-of-walk terminates enumeration; other errors fail collection.
 
 Run a separate owned snapshot worker under existing assigned-before-resume/kill-on-close outer

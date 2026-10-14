@@ -3,8 +3,8 @@
 ## Purpose
 
 [I302](I302-windows-owned-handle-evidence.md) / [TEST-003](../backlog/active/TEST-003-windows-owned-handle-evidence.md)
-is a Ready/Unclaimed draft selection after maintainer scope acceptance on2026-10-14.
-ADR-091/claim are ineffective until atomic governance merge; no PSS implementation yet.
+is an Active/Claimed atomic proposal in #718 after maintainer scope acceptance on2026-10-14.
+ADR-091/claim are ineffective until #718 main merge; no PSS implementation yet.
 I293/I294/I300 remain Active; I301/I277 retain Review, I249 Planned and I164 Paused.
 I302 records the full inventory/non-overlap; #716 may later carry separate diagnostic commits.
 

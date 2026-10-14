@@ -1,6 +1,6 @@
 # TEST-003: Test-Only Current-Process Handle Evidence
 
-**Status**: Ready / Unclaimed; draft atomic selection for I302
+**Status**: In Progress / Claimed; proposed atomic selection, ineffective until #718 merges
 **Type**: Spike / Technical Story
 **Parent Epic**: None; related SEARCH-001-C/#643 and #716 CI blocker
 **Source Issue**: #717
@@ -10,15 +10,15 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-6 |
+| Work Slice | TEST-003 self-only Windows PSS handle metadata, bounded copies/cleanup/observer controls and evidence; no I293 search or production launcher ownership. |
+| Claimed At | 2026-10-14 |
 | Source Issue | #717 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Maintainer accepted the bounded self-snapshot packet on 2026-10-14 at14:50 Asia/Shanghai; finalized ADR/claim/security review/CI/CAS still required. |
+| Governance Claim PR | #718 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Maintainer accepted bounded self-snapshot scope 2026-10-14 at14:50 Asia/Shanghai and authorized continued GitHub delivery; no distinct maintainer reviewer available. Independent protected Agent native/security review, exact-head CI, validators and CAS are mandatory; no natural-person approval claim. |
 | Implementation PR | Not started; later #716 follow-up after effective claim refresh |
 | Last Updated | 2026-10-14 |
 | Handoff / Release Condition | No implementation before finalized atomic claim and ADR merge into main; no automatic original-defect closure or #716 merge. |
@@ -97,3 +97,6 @@ PSS capture/flags/entry/walk/free contracts linked in ADR-091.
 Governance preparation only. No implementation or Completion Commit. Claim/activation/ADR become
 effective only on merge. #716 can later carry separate I293 and I302 commits after effective-main
 refresh; sharing a PR transfers no ownership between the two slices.
+
+Finalized #718 proposes Active/Claimed I302 and accepted ADR-091 atomically; all remain ineffective
+until merge. Independent complete contract preview found no blocker. No PSS code is in this PR.
