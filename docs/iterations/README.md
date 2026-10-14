@@ -6,9 +6,9 @@
 production endpoint-authority/search wiring on 2026-10-13; [ADR-090](../decisions/090-invocation-bound-search-endpoint-authority.md)
 and the existing C claim's scope amendment became effective in #712 (989fec2e), after protected
 review, CI and CAS. #713 carrier merged69e1e116 after exact-head review/CI/CAS. The private
-controlled direct transport merged in #714 (d78dc75c); TLS/CONNECT subset is Review under that
-claim in #715, with39 focused fixtures and documented limitations. Original CI3172 macOS
-positive TLS failures require365-day synthetic leaf correction and fresh exact-head validation.
+controlled direct transport merged in #714 (d78dc75c); TLS/CONNECT subset merged under the same
+claim in #715 (d66e380a) after protected review/full CI3173/CAS and native TLS recovery.
+Bounded form transport is the next Review stage (47 focused fixtures); complete parity remains.
 WebSearch default activation and full C/EP acceptance remain Pending, #643/#624 open. I300 and
 PERM-007-H retain their separate scopes.
 

@@ -5,6 +5,45 @@ use std::{
     sync::mpsc,
 };
 
+#[tokio::test]
+async fn connect_form_post_preserves_encoded_body_inside_verified_tls() {
+    let fixture = Fixture::new("leaf.pem", "tunnel");
+    let url = fixture.url("127.0.0.1", "/search");
+    let t = trusted(transport(
+        scoped(
+            &[(&url, Method::POST)],
+            Some(fixture.proxy()),
+            loopback(),
+            0,
+        ),
+        dns(fixture.port("proxy_port")),
+        Duration::from_secs(4),
+        2,
+        1024,
+    ));
+    let fields = form_fields(&[("q", "中 +&=~\r\n"), ("q", "*._-"), ("", "")]);
+    assert_eq!(
+        t.execute_form(url, fields)
+            .await
+            .expect("verified form POST")
+            .body,
+        b"tls"
+    );
+    let receipt = fixture.finish();
+    assert_eq!(requests(&receipt).len(), 1);
+    let request = requests(&receipt)[0].as_str().expect("application receipt");
+    assert!(
+        request
+            .to_ascii_lowercase()
+            .contains("content-type: application/x-www-form-urlencoded\r\n")
+    );
+    assert!(request.ends_with("q=%E4%B8%AD+%2B%26%3D%7E%0D%0A&q=*._-&="));
+    let connect = receipt["connect"][0].as_str().expect("CONNECT receipt");
+    assert!(!connect.contains("%E4") && !connect.contains("q="));
+    assert_eq!(count(&receipt, "proxy_connections"), 1);
+    assert_eq!(count(&receipt, "tls_connections"), 1);
+}
+
 struct Fixture {
     ports: serde_json::Value,
     child: Option<Child>,

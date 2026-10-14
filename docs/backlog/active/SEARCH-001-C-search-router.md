@@ -96,3 +96,9 @@ See the transport contract and I293 for authority timing, trusted-proxy limits a
 The25-year synthetic positive leaf violates Apple's825-day lifetime requirement; a coherent
 365-day leaf bundle correction retains production trust/verification and all negative cases.
 Fresh exact-head review/full CI required, no merge/skip/sole-cause inference. I293 records gates.
+
+#715 corrected head merged `d66e380a` with protected review6158318325, all six CI3173 jobs and
+CAS6158600236; all13 TLS cases pass on macOS/Windows, old failedCI retained. Next I293 bounded
+form transport prerequisite is Review:47 focused fixtures, no default activation/dependency/API
+or upstream parser copy. Full local/remote gates and broader proxy/ambient/protocol/D/official-
+root acceptance remain Pending; #643/#624 open. I293 records the authoritative stage evidence.
