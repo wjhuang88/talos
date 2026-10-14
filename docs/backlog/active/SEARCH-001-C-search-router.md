@@ -111,3 +111,7 @@ review/native CI/CAS remain; no production process change, skip or retry-to-gree
 CI3176 failed the isolated worker as well:73→76, original +2 assertion intact; five other jobs
 passed. Root cause remains unknown. #716 prepares a bounded test-only41-sample trace, preserving
 all40 attempts/threshold/cleanup. This is diagnostic evidence, not a fixed or merge-ready stage.
+
+CI3177 trace failed cold73→76: first Pipe+1/first Assignment+2, later samples stable. Known cleanup
+BOOL checks are prepared without new native calls; richer self-only metadata requires separately
+accepted diagnostic scope/ADR/claim. No warmup or original-threshold change; #716 stays unmerged.

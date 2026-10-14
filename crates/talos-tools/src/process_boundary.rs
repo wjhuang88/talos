@@ -681,26 +681,60 @@ fn create_windows_job_with_hooks(
         })
     })();
     if result.is_err() {
+        #[cfg(test)]
+        let mut cleanup_failures = 0u16;
         unsafe {
             if !thread.is_null() {
-                CloseHandle(thread);
+                let _closed = CloseHandle(thread);
+                #[cfg(test)]
+                if _closed == 0 {
+                    cleanup_failures |= 1;
+                }
             }
             if !process.is_null() {
-                windows_sys::Win32::System::Threading::TerminateProcess(process, 1);
-                CloseHandle(process);
+                let _terminated =
+                    windows_sys::Win32::System::Threading::TerminateProcess(process, 1);
+                let _closed = CloseHandle(process);
+                #[cfg(test)]
+                {
+                    if _terminated == 0 {
+                        cleanup_failures |= 1 << 1;
+                    }
+                    if _closed == 0 {
+                        cleanup_failures |= 1 << 2;
+                    }
+                }
             }
             if !attrs.is_null() {
                 DeleteProcThreadAttributeList(attrs);
             }
             if !job.is_null() {
-                CloseHandle(job);
+                let _closed = CloseHandle(job);
+                #[cfg(test)]
+                if _closed == 0 {
+                    cleanup_failures |= 1 << 3;
+                }
             }
+            #[cfg(test)]
+            let mut pipe_bit = 1u16 << 4;
             for handle in [out_read, out_write, err_read, err_write] {
                 if !handle.is_null() {
-                    CloseHandle(handle);
+                    let _closed = CloseHandle(handle);
+                    #[cfg(test)]
+                    if _closed == 0 {
+                        cleanup_failures |= pipe_bit;
+                    }
+                }
+                #[cfg(test)]
+                {
+                    pipe_bit <<= 1;
                 }
             }
         }
+        // Report only after every cleanup operation has been attempted. Test failures
+        // must not short-circuit release of a later handle or termination of the child.
+        #[cfg(test)]
+        assert_eq!(cleanup_failures, 0, "Windows launch cleanup failure mask");
     }
     result
 }

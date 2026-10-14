@@ -1251,3 +1251,7 @@ that worker but does not establish the cause of remaining resource growth. Recor
 per-attempt samples after all original assertions, then emit diagnostics outside the interval;
 preserve the independent final sample/threshold and both failures. Warmup or threshold widening
 without a proven cause would conceal evidence rather than repair the fixture.
+
+CI3177 localizes growth to first Pipe(+1) and first Assignment(+2), followed by stable samples.
+This is boundary evidence, not handle identity/lifetime proof. Check existing cleanup return values
+after all release attempts; adding new native observation needs its own reviewed contract/claim.

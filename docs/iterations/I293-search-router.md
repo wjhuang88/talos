@@ -10,7 +10,7 @@
 | Source Issue | #643 |
 | Depends on | Accepted ADR-085; SEARCH-001-B / #642 complete in #656; NET-001 boundary coordination |
 | Claim State | Claimed |
-| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 merged TLS/CONNECT subset; #716 bounded form transport Review / CI3175 and CI3176 failed; isolated-worker handle trace diagnostic pending (default activation Pending) |
+| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 merged TLS/CONNECT subset; #716 bounded form transport Review / CI3175..3177 failed; checked existing cleanup diagnostic pending, richer self-snapshot proposal Unclaimed (default activation Pending) |
 | Completion | Pending |
 
 ## Collaboration Claim
@@ -990,3 +990,38 @@ non-Windows code; fresh full native CI is mandatory. Main remainsd66e380a, open 
 are separate; I293 claim/lifecycle and all activation gates remain unchanged. Publish the stable
 diagnostic tree, verify remote identity, obtain fresh independent protected exact-head review,
 then interpret the trace before proposing any correction or merge.
+
+## First-Use Boundaries And Checked Existing Cleanup — 2026-10-14
+
+CI3177/run38520756375 failed Windows while all five other jobs passed. The diagnostic worker
+recorded73 baseline,74 after first Pipe,74 through all eight Pipe/Job/AttributeList attempts,
+76 after first Assignment,76 through remaining Assignment/Resume, independent after76. All40
+exact injected-error checks reached the unchanged +2 assertion; parent448pass/1fail, worker
+0pass/1fail/448 exact-only sibling filters, no ignored tests. This run exhibits two first-use
+growth boundaries and no repeated accumulation; it establishes neither a legitimate lifetime
+nor a one-time leak's absence. Preserve3175/3176/3177 as actual failed evidence.
+
+Within the same bounded fixture maintenance, capture BOOL results from the existing close and
+TerminateProcess calls and aggregate a test-only failure mask. Bits0 thread close,1 termination,
+2 process close,3 Job close,4..7 stdout-read/write and stderr-read/write close. Only assert after
+all cleanup operations have been attempted, so a failed check cannot skip a later release.
+The original calls/conditions/order and production failure result remain; no new native call,
+binding/unsafe block/handle/rights/manifest/lock is introduced. Source bytes in this production
+function do change to capture existing return values; previous byte-identity claims apply only
+to earlier heads. No production return checking or behavioral fix is claimed. The new checks
+can establish known calls' success, not process-wide resource closure or the +3 cause.
+
+Independent local protected preview found no blocker for these stronger checks. A proposed
+[current-process type snapshot packet](../proposals/WINDOWS-HANDLE-COUNT-SELF-SNAPSHOT.md) records
+the next concrete observation contract. It is Proposed/Unclaimed and requires maintainer scope
+acceptance followed by separate effective ADR/claim before adding a native feature or unsafe
+helper. Current I293 scope/claim and security decisions remain unchanged; no PSS code is added.
+No warmup, threshold increase, skip or merge authorization follows from either diagnostic.
+
+Final local checkpoint: independent seven-file protected preview found no publication blocker.
+Pinned1.99.0 fmt/diff, governance(SQL17/delivery12), claims0warnings, text boundary23 and
+classifier14 pass. Comparison of the touched function's native call-site inventory/order and
+unsafe block count is unchanged; this is source evidence, not compiled-binary equivalence or
+native cleanup execution. No new local workspace/native pass is claimed. Fresh stable-head
+protected diagnostic review and native full CI remain necessary. Proposal is not scope approval;
+Cargo feature unification must be verified before any test-only feature-isolation claim.

@@ -11,6 +11,8 @@ claim in #715 (d66e380a) after protected review/full CI3173/CAS and native TLS r
 Bounded form transport #716 is Review (47 focused fixtures); CI3175 failed the pre-existing
 Windows process-wide handle-count test. CI3176 also failed in the isolated worker73→76;
 test-only per-attempt trace diagnostics await fresh review/native CI; complete parity remains.
+CI3177 records first Pipe+1 and first Assignment+2 then stable. Checked existing cleanup is the
+next bounded diagnostic; a self-only type-snapshot proposal remains unclaimed, with no PSS code.
 WebSearch default activation and full C/EP acceptance remain Pending, #643/#624 open. I300 and
 PERM-007-H retain their separate scopes.
 
