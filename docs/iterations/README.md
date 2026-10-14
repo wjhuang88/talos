@@ -2,6 +2,12 @@
 
 ## Purpose
 
+[I302](I302-windows-owned-handle-evidence.md) / [TEST-003](../backlog/active/TEST-003-windows-owned-handle-evidence.md)
+is an Active/Claimed atomic proposal in #718 after maintainer scope acceptance on2026-10-14.
+ADR-091/claim are ineffective until #718 main merge; no PSS implementation yet.
+I293/I294/I300 remain Active; I301/I277 retain Review, I249 Planned and I164 Paused.
+I302 records the full inventory/non-overlap; #716 may later carry separate diagnostic commits.
+
 [I293](I293-search-router.md) retains SEARCH-001-C ownership. The maintainer accepted bounded
 production endpoint-authority/search wiring on 2026-10-13; [ADR-090](../decisions/090-invocation-bound-search-endpoint-authority.md)
 and the existing C claim's scope amendment became effective in #712 (989fec2e), after protected
