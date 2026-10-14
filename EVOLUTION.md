@@ -1245,3 +1245,9 @@ repeating known mistakes.
 - Prevention: Require the intended fault at each attempt and a completed count receipt;
   continuously drain bounded diagnostics and prove native CI rather than retrying old heads.
 - Promoted to rule/check: windows_partial_setup_failures_release_every_parent_handle.
+
+The isolated worker then failed CI3176 with73→76. Isolation removes sibling-test activity from
+that worker but does not establish the cause of remaining resource growth. Record fixed-size
+per-attempt samples after all original assertions, then emit diagnostics outside the interval;
+preserve the independent final sample/threshold and both failures. Warmup or threshold widening
+without a proven cause would conceal evidence rather than repair the fixture.

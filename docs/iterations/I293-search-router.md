@@ -10,7 +10,7 @@
 | Source Issue | #643 |
 | Depends on | Accepted ADR-085; SEARCH-001-B / #642 complete in #656; NET-001 boundary coordination |
 | Claim State | Claimed |
-| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 merged TLS/CONNECT subset; #716 bounded form transport Review / CI3175 failed, test-only correction pending fresh native CI (default activation Pending) |
+| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 merged TLS/CONNECT subset; #716 bounded form transport Review / CI3175 and CI3176 failed; isolated-worker handle trace diagnostic pending (default activation Pending) |
 | Completion | Pending |
 
 ## Collaboration Claim
@@ -948,3 +948,45 @@ SDK claim is made. Remote main is stilld66e380a, #643/#624 open and only #705/#7
 #705 changes workflow/diagnostic docs/script, not this committed Rust test fixture.
 Publish the coherent checkpoint to the existing #716 branch, verify tree equality, obtain fresh
 exact-head protected independent Agent review and complete unfiltered CI, then repeat CAS.
+
+## Isolated Worker Failure And Bounded Trace — 2026-10-14
+
+Fresh #716 protected review6159740360 approved heada30279c1c53f52c8b2448d85e5940539557ba552/
+tree6ae44a0b2ab5096d646585bd20e193c78892cf07, conditional on native CI/CAS. CI3176/
+run38502637067 FAILED Windows workspace, five other jobs passed. The isolated worker reached
+the original final resource assertion: before73/after76 (+3),0pass/1fail/448 exact-only sibling
+filters. Parent tools448pass/1fail,0ignored/0filtered. Outer cleanup=Ok(())/terminal=true;
+no timeout or output overflow. These observations prove the worker/Job launched and the exact
+fault checks reached the final sample, not that all supervision tasks joined or that no leak
+exists. Isolation alone did not resolve the failure. Mac full unfiltered release preflight,
+original Unix-socket case and both SDK modes passed; form/TLS fixtures passed on both hosts.
+Windows downstream governance/audit/smoke steps were skipped by failure, not passed evidence.
+
+Source review finds attempted cleanup of thread/process/job/pipes and attribute list, but its
+unchecked native cleanup results do not prove actual closure. Neither a true handle leak nor
+cold initialization is yet established. Do not warm up the launch path to hide a first-use delta,
+widen +2, ignore/skip the case, retry the failed head to green or activate/merge the candidate.
+
+The next stable candidate is explicitly diagnostic, not a completed correction: a fixed stack
+[u32;41] records the original baseline and the count after each of the original40 fault attempts.
+It reuses the existing read-only count helper and adds no unsafe/binding/handle/rights/dependency
+or production-code changes. No diagnostic I/O or dynamic trace allocation occurs in the sampled
+interval. A bounded trace prints after the independent original final sample and before its
+unchanged assertion, so failures reveal growth by fault/attempt. Index0 is baseline; indices1..8
+Pipe,9..16 Job,17..24 AttributeList,25..32 Assignment,33..40 Resume. Retain both counts[40] and
+the separate original after value. Original exact errors,40 attempts,+2,outer ownership,
+deadlines/drain and success-only receipt remain. Totals can locate growth boundaries but cannot
+identify handle types or establish a unique cause. Native CI is required; even a green diagnostic
+run alone is not root-cause closure or merge authorization. No new scope/claim/lifecycle change;
+bounded fixture maintenance stays within #716 and does not take over #705 diagnosis.
+
+Local diagnostic checkpoint: independent protected implementation preview found no blocker for
+diagnostic publication only. Restored pinned1.99.0 fmt/diff, governance(SQL17/delivery12),
+claims0warnings, text boundary23 and classifier14 pass. Source-prefix comparison proves production
+process bytes unchanged; only10 Rust lines in the Windows test module are added. No new local
+workspace compile/runtime pass is claimed for this Windows-only trace, and no new local test
+filter was used. Original Linux and CI3176 Mac results remain historical receipts for unchanged
+non-Windows code; fresh full native CI is mandatory. Main remainsd66e380a, open PRs #705/#716
+are separate; I293 claim/lifecycle and all activation gates remain unchanged. Publish the stable
+diagnostic tree, verify remote identity, obtain fresh independent protected exact-head review,
+then interpret the trace before proposing any correction or merge.

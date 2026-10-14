@@ -9,8 +9,8 @@ review, CI and CAS. #713 carrier merged69e1e116 after exact-head review/CI/CAS. 
 controlled direct transport merged in #714 (d78dc75c); TLS/CONNECT subset merged under the same
 claim in #715 (d66e380a) after protected review/full CI3173/CAS and native TLS recovery.
 Bounded form transport #716 is Review (47 focused fixtures); CI3175 failed the pre-existing
-Windows process-wide handle-count test. Test-only isolated-worker correction awaits fresh
-protected review/native CI; complete parity remains.
+Windows process-wide handle-count test. CI3176 also failed in the isolated worker73→76;
+test-only per-attempt trace diagnostics await fresh review/native CI; complete parity remains.
 WebSearch default activation and full C/EP acceptance remain Pending, #643/#624 open. I300 and
 PERM-007-H retain their separate scopes.
 

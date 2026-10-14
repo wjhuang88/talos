@@ -107,3 +107,7 @@ root acceptance remain Pending; #643/#624 open. I293 records the authoritative s
 handle counting (+11) while five jobs passed. A bounded test-only isolated-worker correction
 preserves all40 faults and +2 threshold, using existing outer Job ownership. Fresh protected
 review/native CI/CAS remain; no production process change, skip or retry-to-green claim.
+
+CI3176 failed the isolated worker as well:73→76, original +2 assertion intact; five other jobs
+passed. Root cause remains unknown. #716 prepares a bounded test-only41-sample trace, preserving
+all40 attempts/threshold/cleanup. This is diagnostic evidence, not a fixed or merge-ready stage.

@@ -1301,6 +1301,10 @@ mod windows_tests {
         );
         let launcher = powershell("Start-Sleep -Seconds 30");
         let before = current_process_handle_count();
+        // Fixed storage and read-only counts keep diagnostics out of the sampled work.
+        // Index 0 is the baseline; each group of eight follows the fault order below.
+        let mut counts = [0u32; 41];
+        counts[0] = before;
         let mut attempts = 0;
         for fault in [
             WindowsLaunchFault::Pipe,
@@ -1332,9 +1336,15 @@ mod windows_tests {
                     "must reach the requested fault, not fail earlier"
                 );
                 attempts += 1;
+                counts[attempts] = current_process_handle_count();
             }
         }
         let after = current_process_handle_count();
+        // Preserve the independent final sample and emit evidence before a failure.
+        // This is a diagnostic trace, not a warmup, threshold change or success receipt.
+        eprintln!(
+            "WINDOWS_HANDLE_COUNT_TRACE fault_order=Pipe,Job,AttributeList,Assignment,Resume attempts_per_fault=8 counts={counts:?} before={before} after={after}"
+        );
         assert!(
             after <= before.saturating_add(2),
             "partial launch failures leaked handles: before={before}, after={after}"
