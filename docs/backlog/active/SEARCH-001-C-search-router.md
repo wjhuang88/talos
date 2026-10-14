@@ -83,3 +83,16 @@ The next private library-only [controlled direct transport](../../reference/SEAR
 stage is Review under I293, with actual local HTTP/DNS/permission/redirect/budget fixtures;
 no default WebSearch, new API/dependency or provider admission is activated. Full C/EP,
 TLS/proxy/compatibility parity and bounded D migration gates remain Pending; #643/#624 open.
+
+
+#714 direct transport merged `d78dc75c` after protected review6140200974, full CI3170 and CAS.
+The next dormant TLS/CONNECT subset stage is Review under I293:39 focused fixtures; direct
+SNI/certificate verification and unauthenticated HTTP CONNECT to HTTPS IPv4 literals only.
+No default activation, full C/EP completion, provider admission or release. Exact-head review/CI,
+broader proxy/ambient migration, compatibility parity, D and official-root acceptance remain.
+See the transport contract and I293 for authority timing, trusted-proxy limits and validation.
+
+#715 original CI3172 is failed (macOS445pass/5fail; all13 TLS cases pass on Windows).
+The25-year synthetic positive leaf violates Apple's825-day lifetime requirement; a coherent
+365-day leaf bundle correction retains production trust/verification and all negative cases.
+Fresh exact-head review/full CI required, no merge/skip/sole-cause inference. I293 records gates.

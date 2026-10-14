@@ -10,7 +10,7 @@
 | Source Issue | #643 |
 | Depends on | Accepted ADR-085; SEARCH-001-B / #642 complete in #656; NET-001 boundary coordination |
 | Claim State | Claimed |
-| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; controlled direct transport stage Review / PR not assigned (default activation Pending) |
+| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 TLS/CONNECT subset Review (macOS fixture correction pending, default activation Pending) |
 | Completion | Pending |
 
 ## Collaboration Claim
@@ -26,7 +26,7 @@
 | Governance Claim PR | #712 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer accepted bounded production scope 2026-10-13; independent protected security/API contract review, exact-head CI, governance validators, Issue reconciliation and final CAS required for #712 merge. No release or native admission authorized. |
-| Last Updated | 2026-10-13 |
+| Last Updated | 2026-10-14 |
 | Handoff / Release Condition | Original #664 claim effective at `d801790454e252699684253166984662ea9dab6a`; expanded scope effective only after #712 accepted-contract merge. Start implementation from that merge or later main; activation requires ADR-090 transport/parity/D gates. |
 
 ## Scope
@@ -770,3 +770,82 @@ full remote CI must run unfiltered. No production/test waiver or CI change was i
 Source-based deadline finding, late-ready DNS completion observation and bounded failed-DNS
 hop reservations are reconciled locally before first submission. Independent protected exact-
 head review, CI and final CAS remain the remote gates for this stable stage.
+
+
+## Direct Transport Merge And TLS/CONNECT Subset — 2026-10-13
+
+#714 merged `d78dc75c4b52fe7a2f708b752090c17e1f5f7bca` after protected independent Agent
+review6140200974, full CI3170/run38360092833 (six successful jobs) and CAS6140498436.
+Issue receipts6140512149 (#643),6140512432 (#624) and6140512783 (#714) retain partial status.
+
+The next library-only stage is Review under the same effective claim, based on that merge.
+[Transport contract](../reference/SEARCH-001-C-CONTROLLED-TRANSPORT.md) records verified direct
+TLS/SNI and limited explicit CONNECT: unauthenticated HTTP proxy, HTTPS IPv4-literal targets,
+proxy+target authority, pinned proxy DNS, two reservations per compound hop, no direct fallback.
+Hostname/HTTP/IPv6 targets and HTTPS proxies fail closed. Proxy `/` is a configuration locator;
+CONNECT uses literal IP:port. Compound-start revocation cannot undo already-started work, and
+trusted-proxy remote routing is not proven. No default WebSearch/API/dependency/lock change.
+
+Thirteen new fixtures plus26 prior fixtures pass in the focused network run. Test-only synthetic
+CA verification remains enabled. Python stdlib is an explicit temporary fixture host utility;
+missing utility fails, no new skip. Initial fixture33pass/3fail and corrected callback/None-SNI
+receipt handling are preserved in the contract and EVOLUTION. Independent implementation
+preview found no new blocker, but is not exact-head remote approval. Full C/EP remain Pending,
+I293 Active/Claimed, D independently incomplete, E/F gated, #643/#624 open. Broader proxy and
+ambient migration, compatibility form/parser/probe/retry/source parity, bounded D review and
+actual official root/router acceptance remain activation gates.
+
+
+Fresh final local checkpoint: pinned1.99.0 locked workspace check/Clippy, network all-target
+Clippy, fmt/diff, Python AST, governance(SQL17/delivery12), claims0warnings, text boundary23,
+classifier14, site/installers and both independent SDK modes pass. Fresh rebuilt workspace
+suite exits0:3697 primary passes/119 summaries, zero failures/ignores and exactly the prior
+Unix-socket filter. Its isolated ambient-proxy child adds1pass/1summary and449 sibling filters;
+parent tools run450 including all13 new TLS cases. Raw3698/120/450 filters must not be mistaken
+for3698 distinct tests or450 waived tests. No new skip or unfiltered local preflight claim.
+Independent final local protected preview found no blocker; remote exact-head review/CI/CAS
+remain required. Resume from feature/I293-search-tls-proxy; publish this stable stage, verify its
+remote tree equals the local tree, obtain independent protected review and full unfiltered CI,
+then repeat claim/base/head/tree/non-overlap/Issue CAS. Keep #643/#624 open and record actual PR.
+
+## Cross-Platform TLS Fixture Correction — 2026-10-14
+
+#715 original head `6c3bdb0f5bd6dc859c11c3055fdead753dd52140`, treebd8eb29e, received
+independent protected Agent review6141466921. Full CI3172/run38368995942 was NOT successful:
+five jobs passed, but macOS release preflight failed445pass/5fail in tools; all13 added TLS
+cases passed on Windows. The five positive TLS failures were closed Request errors, not
+deadline evidence or proof of a single underlying cause. Original CI remains failed; no rerun,
+test skip, verification bypass, natural-person approval or merge is claimed.
+
+Read-only certificate inspection found positive leaf2020..2045, contrary to Apple's documented
+825-day maximum for TLS leaves issued after2019-07-01 (https://support.apple.com/en-sg/103769).
+The public bundle is regenerated together: root2020..2045; positive/host-only leaves365days
+(2026-10-01..2027-10-01); expired2020..2021. SAN/EKU/verification negatives remain. CA key exists
+only in offline generator memory and is discarded; public leaf key remains unchanged. SKI/AKI
+make issuer linkage explicit. The offline cryptography generator/checker verifies signatures,
+CA constraints, P-256/SHA-256, key correspondence, SAN/EKU/date/lifetime; it is not a CI/runtime
+prerequisite. Renew/review before2027-10-01. No production Rust/API/dependency/trust change.
+
+This eliminates a confirmed fixture incompatibility, not yet proof of complete macOS recovery.
+Independent correction design preview found no new blocker. Fresh corrected-head review and
+full unfiltered macOS/Windows CI remain mandatory. Checkout/toolchain/cache were removed by
+workspace maintenance; checkout restored from submitted head and pinned1.99.0 reinstalled.
+Do not reuse old local outputs as new-head evidence. Validation/resume receipt follows.
+
+Corrected local checkpoint (pinned1.99.0, locked): fresh focused39pass and rebuilt workspace
+3697 primary passes/119 summaries +isolated ambient child1 (raw3698/120), zero failures/ignores.
+All13 TLS cases execute; only the previously authorized unchanged Unix-socket primary filter.
+The child filters449 siblings, while parent tools run450. No unfiltered local preflight claim.
+Workspace check/Clippy, network all-target Clippy, fmt/diff, both independent SDK modes, AST,
+governance(SQL17/delivery12), claims0warnings, text boundary23, classifier14 and site/installers
+pass. An incomplete redirected tail was not used as SDK/governance evidence: direct independent
+rerun receipts verify both SDK modes and the remaining validators. No host-log root cause inferred.
+Offline metadata/signature/key/SAN/EKU/CA checks and OpenSSL positive hostname/IP verification
+pass; host-only IP and expired verification fail as intended. Checker rejects Python -O rather
+than silently suppress assertions. Independent local correction preview found no blocker.
+
+Resume on #715 / feature/I293-search-tls-proxy: push the coherent corrected checkpoint, verify
+remote/local tree equality, obtain fresh independent protected exact-head review and all six
+unfiltered CI jobs, then repeat main/head/tree/claim/non-overlap/Issue CAS. Preserve failedCI3172
+and do not use old-head approval as new-head evidence. C/EP Pending, D independently incomplete,
+E/F gated, #643/#624 open; broader proxy/ambient/protocol/D/official-root gates remain.

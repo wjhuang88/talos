@@ -1,5 +1,5 @@
-//! Controlled direct HTTP transport for the staged search compatibility migration.
-//! No default tool wiring, proxy support, protocol parser or provider admission.
+//! Controlled HTTP transport for the staged search compatibility migration.
+//! No default wiring; proxy support is limited to HTTP CONNECT / HTTPS IPv4 literals.
 
 use std::{
     net::{IpAddr, SocketAddr},
@@ -136,6 +136,8 @@ pub(super) struct SearchTransport {
     authority: Arc<dyn ToolNetworkAuthority>,
     budget: Arc<TransportBudget>,
     dns: Arc<dyn SearchDns>,
+    #[cfg(test)]
+    fixture_roots: Vec<reqwest::Certificate>,
 }
 
 impl SearchTransport {
@@ -145,8 +147,21 @@ impl SearchTransport {
         budget: Arc<TransportBudget>,
         dns: Arc<dyn SearchDns>,
     ) -> Result<Self, TransportError> {
-        if manifest.scope().proxy().is_some() {
-            // No silent direct fallback for a plan that explicitly requires a proxy.
+        if let Some(proxy) = manifest.scope().proxy()
+            && (proxy.scheme() != "http"
+                || proxy.method() != "CONNECT"
+                || proxy.path() != "/"
+                || manifest.scope().endpoints().iter().any(|endpoint| {
+                    endpoint.scheme() != "https"
+                        || endpoint
+                            .host()
+                            .trim_matches(['[', ']'])
+                            .parse::<std::net::Ipv4Addr>()
+                            .is_err()
+                        || !matches!(endpoint.method(), "GET" | "HEAD" | "POST")
+                }))
+        {
+            // Hostname CONNECT delegates target DNS to the proxy; it cannot be locally pinned.
             return Err(TransportError::UnsupportedProxy);
         }
         Ok(Self {
@@ -154,6 +169,8 @@ impl SearchTransport {
             authority,
             budget,
             dns,
+            #[cfg(test)]
+            fixture_roots: Vec::new(),
         })
     }
 
@@ -182,6 +199,12 @@ impl SearchTransport {
         self.authority
             .check(self.manifest.invocation_id(), &endpoint)
             .map_err(|_| TransportError::Unauthorized)?;
+        if let Some(proxy) = self.manifest.scope().proxy() {
+            self.authority
+                .check(self.manifest.invocation_id(), proxy)
+                .map_err(|_| TransportError::Unauthorized)?;
+        }
+        self.budget.check_live()?;
         Ok(endpoint)
     }
 
@@ -217,33 +240,37 @@ impl SearchTransport {
             // Bound every hop attempt, including failed DNS or a later denied send.
             TransportBudget::reserve(
                 &self.budget.attempts,
-                1,
+                if self.manifest.scope().proxy().is_some() {
+                    2
+                } else {
+                    1
+                },
                 self.budget.max_requests,
                 TransportError::RequestLimit,
             )?;
-            let host = endpoint
+            let mut host = endpoint
                 .host()
                 .trim_start_matches('[')
                 .trim_end_matches(']');
+            let mut port = endpoint.port();
+            if let Some(proxy) = self.manifest.scope().proxy() {
+                let target = host
+                    .parse::<IpAddr>()
+                    .map_err(|_| TransportError::UnsupportedProxy)?;
+                self.check_addresses(&[SocketAddr::new(target, port)], port)?;
+                host = proxy.host().trim_matches(['[', ']']);
+                port = proxy.port();
+            }
             let addresses = match host.parse::<IpAddr>() {
-                Ok(ip) => vec![SocketAddr::new(ip, endpoint.port())],
-                Err(_) => self.dns.resolve(host, endpoint.port()).await?,
+                Ok(ip) => vec![SocketAddr::new(ip, port)],
+                Err(_) => self.dns.resolve(host, port).await?,
             };
             self.budget.check_live()?;
-            if addresses.is_empty()
-                || addresses.len() > 16
-                || addresses.iter().any(|a| {
-                    a.port() != endpoint.port()
-                        || (!is_global_address(a.ip())
-                            && !self.manifest.scope().private_addresses().contains(&a.ip()))
-                })
-            {
-                return Err(TransportError::Address);
-            }
-            // A fresh direct HTTP/1 client for each hop cannot reuse another authority's
-            // connection, coalesce origins, follow redirects or consult ambient proxies.
-            // Override the actual dial set while preserving hostname/Host/SNI/TLS validation.
-            let client = Client::builder()
+            self.check_addresses(&addresses, port)?;
+            // A fresh HTTP/1 client cannot reuse another authority's connection, coalesce
+            // origins, follow redirects or consult ambient proxies. Pin the direct target
+            // or explicit proxy peer; TLS still verifies the original target URL identity.
+            let builder = Client::builder()
                 .no_proxy()
                 .redirect(reqwest::redirect::Policy::none())
                 .retry(reqwest::retry::never())
@@ -254,9 +281,19 @@ impl SearchTransport {
                 .no_brotli()
                 .no_deflate()
                 .no_zstd()
-                .resolve_to_addrs(host, &addresses)
-                .build()
-                .map_err(|_| TransportError::Request)?;
+                .resolve_to_addrs(host, &addresses);
+            let builder = if let Some(proxy) = self.manifest.scope().proxy() {
+                let proxy_url = format!("http://{}:{}/", proxy.host(), proxy.port());
+                builder.proxy(
+                    reqwest::Proxy::https(proxy_url)
+                        .map_err(|_| TransportError::UnsupportedProxy)?,
+                )
+            } else {
+                builder
+            };
+            #[cfg(test)]
+            let builder = builder.tls_certs_merge(self.fixture_roots.clone());
+            let client = builder.build().map_err(|_| TransportError::Request)?;
             let mut request = client
                 .request(method.clone(), url.clone())
                 .header(reqwest::header::ACCEPT_ENCODING, "identity");
@@ -268,7 +305,9 @@ impl SearchTransport {
             let request = request
                 .build()
                 .map_err(|_| TransportError::InvalidRequest)?;
-            // Last synchronous fence, after DNS and client construction, before logical send.
+            // Compound CONNECT + TLS + HTTPS starts at this one synchronous fence. Reqwest
+            // exposes no check between its internal physical steps; later revocation stops
+            // later hops, and cannot undo the already-started compound hop.
             self.check(request.url(), request.method())?;
             let mut response = client
                 .execute(request)
@@ -344,6 +383,25 @@ impl SearchTransport {
                 status,
                 body: result,
             });
+        }
+    }
+
+    fn check_addresses(&self, addresses: &[SocketAddr], port: u16) -> Result<(), TransportError> {
+        if addresses.is_empty()
+            || addresses.len() > 16
+            || addresses.iter().any(|address| {
+                address.port() != port
+                    || (!is_global_address(address.ip())
+                        && !self
+                            .manifest
+                            .scope()
+                            .private_addresses()
+                            .contains(&address.ip()))
+            })
+        {
+            Err(TransportError::Address)
+        } else {
+            Ok(())
         }
     }
 }
