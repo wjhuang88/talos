@@ -1264,3 +1264,15 @@ before attribution; use existing-operation stage controls and retain cold failur
 When observing a launcher with live raw resources, contain the entire checkpoint (counts,
 capture, numeric copy and storage), then report observer failure only after original cleanup.
 Returned handle values retained after cleanup are historical numbers, not proof of live owners.
+
+## 2026-10-15 — Separate API Return Evidence From Cleanup And Module Identity
+
+- CI3198 direct checkpoints put unexplained growth before failure cleanup; known returned
+  handles disappeared from bounded snapshots. Do not translate disappearance into object lifetime
+  or all-resource release proof, or diagnostic success into the original failed regression's fix.
+- Version-qualified official DLL disassembly can establish an initialization mechanism without
+  proving the CI runner uses those bytes. Hash fixed installed files before matching offline
+  samples; on-disk identity still does not attest a later process's loaded module.
+- Preserve PDB GUID/age mismatch instead of treating symbol-server retrieval as strict matching.
+  Keep unknown handle types unknown and original cold/+2 failures visible. Diagnostic metadata
+  collection must be bounded and cannot suppress the original full test command.

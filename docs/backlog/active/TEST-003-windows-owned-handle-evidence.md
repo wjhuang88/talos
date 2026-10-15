@@ -194,3 +194,25 @@ On the materially new combined diagnostic source, fresh pinned locked full prefl
 local filter; fixed-source Windows coding cross-check/Clippy and graphs/gates pass. This does
 NOT erase the old Linux failure or prove repair/scheduling cause. Exact receipts/independent
 continuations and limits are in I302. Fresh stable-head protected review/native CI are pending.
+
+## CI3198 Interpretation And Installed-File Follow-up — 2026-10-15
+
+Exact d90676f7/tree9d14 protected remote review6188161308 approved diagnostics only. CI3198
+run38707880538 FAILED (Windows455pass/1fail, other five jobs succeed), original cold73->76;
+modes1–6 succeeded. Direct Pipe counts73/76/76/74 show returned308/312 disappear after cleanup,
+extra File304 present at successful return. Process counts79/83/83/76 show all seven returned
+values disappear after cleanup, while unknown328/Key332 were already present at API return.
+This locates instrumented growth, not object identity/lifetime or cold cache/leak causation.
+Independent raw-log/source interpretation verified; full receipts6194344099 remain on #717.
+
+Read-only Microsoft DLL disassembly identifies a cached pipe-root handle mechanism in a
+version-qualified public sample; I302 records exact URL/hash/RVAs and PDB age mismatch. It is a
+candidate for +1 only, not exact CI module/handle attribution or the unexplained process+2.
+A separately reviewed evidence-only workflow prelude hashes three fixed installed System32
+DLLs using capped read-only streams (actual32MiB limit,16KiB chunks). Emit only three bounded
+basename/status/length/hash records; no content/path/exception/environment output or persistence.
+No new native ABI/PSS/unsafe/dependency/download/PE execution/process enumeration, test changes,
+threshold/warmup/skip/waiver. Identity failure cannot skip original full tests and remains a failed
+evidence result. On-disk identity at collection time is not loaded-module identity. Owner remains
+Review/Claimed/incomplete; fresh workflow review/native CI required, no original defect repair,
+Completion Commit or716 merge. #643/#624 remain open; #705 workflow ownership is preserved.

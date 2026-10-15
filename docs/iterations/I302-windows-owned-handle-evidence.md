@@ -335,3 +335,76 @@ are unchanged; native call-site inventory/order is unchanged apart from cfg(test
 Independent protected design/code/combined previews found no blocker. Stable local and remote
 fingerprint review plus new unfiltered native CI still precede interpretation/acceptance. No
 rootcause closure, local-failure erasure, Complete state, production repair or merge authority.
+
+## CI3198 Call Boundaries And Installed-File Identity Stage — 2026-10-15
+
+Published d90676f7a8f423f48c6fc0809d69616a5f27dad5/tree9d14f9d8 received exact-remote
+protected publication review6188161308 after all20 changed blobs matched. Full CI3198/run38707880538
+FAILED: Windows tools455pass/1fail/0ignored/0filtered, five other jobs succeeded. Cold40 remains
+73->76; modes1–6 succeeded. Native job116331772442 receipts are retained in #717 comment6194344099.
+
+Mode5 counts73/76/76/74 at before_pipe/pipe_created/before_cleanup/after_cleanup. Successful
+CreatePipe returned308/312; these disappeared after cleanup. Extra File304 was already present
+at pipe_created. Mode6 counts79/83/83/76 at before_process/process_created/before_cleanup/
+after_cleanup. Successful CreateProcessW added returned Thread312/Process316 plus unknown328/
+Key332. All seven API-return values (four pipes, Job, process, thread) disappeared after cleanup;
+unknown328/Key332 remained in the copied table. Counts before/after each PSS observation matched.
+Independent protected read-only interpretation verified these raw receipts and exact source.
+For these instrumented executions, extra growth exists in the successful API call intervals,
+not first in later cleanup. This is not object/lifetime identity, cold causation, all-resources-
+released proof or elimination of PSS/concurrent OS effects. Actual Assignment API remains
+short-circuited. Original failure is retained; no cache qualification, repair or merge acceptance.
+
+Offline read-only analysis downloaded the public Microsoft symbol-server kernelbase.dll sample:
+https://msdl.microsoft.com/download/symbols/kernelbase.dll/4370855D401000/kernelbase.dll
+SHA256 bffbb14b005b7b2764dbde1a95512aeb95662215fc33c780618435cde6661d6a,4254808bytes,
+FileVersion10.0.26100.9549. Official download/hash is not a completed Authenticode trust validation.
+Third-party Winbindex was only a locator, not primary authority. PE exports/imports and disassembly
+show CreatePipe RVA1007f0 testing global RVA3ac9d0, opening the static Device/NamedPipe root via
+NtOpenFile, publishing with compare-exchange, closing a losing candidate, then using the cached
+root in NtCreateNamedPipeFile. Independent reviewer verified this path/hash. This establishes a
+cache mechanism in this sample and a concrete candidate for the +1, NOT that CI's File304 is that
+cached handle. Installed runner module bytes/version have not been matched. This cannot explain
+CreateProcess unknown+Key. Matching-GUID public PDB has InfoAge2 versus PE/DBIAge1; do not claim
+strict symbol identity. Export/import/static-string evidence above does not require PDB names.
+No downloaded Windows PE executed, process memory read, additional PID or observer API used.
+
+Next bounded evidence stage reads only the three fixed installed System32 files kernelbase.dll,
+kernel32.dll and ntdll.dll before the unchanged Windows workspace command. PowerShell uses a
+read-only stream (sharing read only), rejects reparse points and empty/>=32MiB files, hashes in
+16KiB chunks with an actual32MiB read cap, validates observed length, and disposes each stream/hash.
+Output is three fixed-shape basename/phase/status/byte-count/SHA256 records, under1KiB total;
+no contents, full paths, exception bodies or environment values emitted/saved. Hashing necessarily
+reads bytes. No file download, PE execution/parser, version API, process/module enumeration,
+PInvoke, Talos ABI/unsafe/dependency, PSS or production behavior change. Identity collection failure
+is explicit and all original workspace tests are still attempted; a test failure retains its exit,
+otherwise incomplete identity fails the step. Existing20min step budget now also covers this small
+prelude. #705's other workflow steps are unchanged. The identity is an on-disk sample at collection
+time, not proof of the module mapped into the later test process; no atomic loaded-file claim.
+Independent protected scope assessment accepted this as existing I302 evidence, not an ADR/claim
+expansion. Fresh workflow review/checks/exact-head native CI remain required. No Completion Commit.
+
+Local convergence for this workflow/document-only delta: official PowerShell7.6.7 Linux asset
+SHA2566896f9e3a6b0a354bf470835a96da76d2f801cd50dcf047ad7c4563bf93bf431 verified. Parser
+accepts the extracted exact step. Disposable real-file fixtures independently match all three
+SHA256/length records, reject reparse points and >=32MiB, preserve cargo execution and exit1/7
+priority when identity is incomplete. A protected draft review found unguarded Dispose could
+skip tests; both releases now have independent catches, mark the receipt incomplete and attempt
+all remaining releases. Fault fixtures verify both throwing releases/all six attempts and no
+exception-body output. Initial exit fixtures used incorrect -Command/-File wrapper propagation;
+corrected explicit wrapper propagation passes, without treating those harness failures as native
+Windows outcomes. No fixture/mock code is added to CI or the repository. Linux PowerShell cannot
+prove Windows System32 behavior. Text23/classifier14/claims0warnings/diff checks pass.
+Workspace maintenance removed the previous checkout/toolchain; fresh checkout is exact d906.
+Governance first failed missing cargo, then cargo-only recovery failed missing rustc; neither is
+reported as a pass. Restore pinned1.99 tool executables and rerun. Rust/native sources are unchanged
+from failedCI3198 and its recorded local preflight; no new Rust/full-preflight pass is claimed for
+this workflow-only delta. Fresh exact-head unfiltered CI remains the native check.
+
+Recovery completed: official pinned Cargo/Rustc archives verified; two truncated extracted native
+libraries were detected by archive sizes and restored with checked chunked extraction. Rustc1.99
+and actual locked dependency metadata now run. Final governance passes SQLite17/delivery12,
+0warnings; claims0warnings/text23/classifier14/diff and exact-step PowerShell parser/fixtures pass.
+This is workflow/document validation, not a new Rust build or native Windows pass. The revised
+independent protected draft review found the Dispose blocker fixed and no remaining publication
+blocker; final fingerprint review and new full CI remain outstanding.
