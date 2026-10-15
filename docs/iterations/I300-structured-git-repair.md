@@ -1,3 +1,15 @@
+Pull current-branch fetch checkpoint (2026-10-16): implementation commit
+`cd94435e` adds native Pull's `--update-head-ok` to the fixed fetch command;
+regression commit `d819eb8c` verifies with real Git that an explicit current-branch
+refspec updates HEAD while leaving worktree reconciliation for the next stage.
+Both focused locked, all-feature library tests passed, as did formatting and
+diff checks. These tests cover command construction/native behavior only.
+Production fetch/integration remains disabled; the incomplete continuation draft
+was withdrawn. Fresh post-fetch admission, integration execution, stage-budget
+closure, runtime evidence and current-head preflight/review remain required.
+I300/T7 remains Active. The branch is rebased on fetched `origin/main` at
+`0ef5a532`; these two stage commits are local and not yet published.
+
 Pull helper-admission checkpoint (2026-10-15, commit `093edd1a`): Pull
 configuration now refuses selected-remote upload-pack and VCS helpers before
 fetch planning. Active automatic maintenance refuses a configured
