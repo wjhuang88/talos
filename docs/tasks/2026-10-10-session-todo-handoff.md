@@ -1,3 +1,20 @@
+Pull continuation capacity checkpoint (2026-10-16, `14ddb555`): removed
+remaining per-path approval continuations for internal absent tracking evidence
+and redundant graph namespace facets. The admitted closed metadata scope covers
+those paths; worktree/attribute admission remains separate. The shared runner
+regression now requires reaching fetch within three discovery stages, with both
+a ten-level ref namespace and an absent tracking reflog; creating that reflog
+after planning invalidates retained evidence. Locked all-feature Pull tests pass
+45/45 and all-target all-feature tools Clippy passes (before the final test-only
+assertion). Fetch/integration remains disabled and all delivery gates remain
+open. Fetched origin/main remains `0ef5a532`; rebase reports up to date. Existing
+cache-cleanup authorization was used for target/debug/incremental after available
+space fell to about 2 GiB. Standard preflight then failed with ENOSPC during
+workspace compilation; both governance validators had passed with zero warnings.
+Under the existing broader authorization, target/debug rebuildable artifacts
+were cleared for a retry with incremental compilation and debug symbols disabled.
+No workspace-preflight pass is claimed; no source or Git data was removed.
+
 Pull scoped graph discovery checkpoint (2026-10-16, `2c867bb3`): production
 prefetch discovery now requires the closed metadata Read facet and exact Read
 tokens for both identity-bound repository roots, then completes the bounded
