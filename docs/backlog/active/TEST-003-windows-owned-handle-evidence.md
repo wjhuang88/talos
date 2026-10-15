@@ -114,3 +114,38 @@ candidate is reimplemented/reviewed/validated anew; see I302 execution journal. 
 workers retain cold40/+2, four observer snapshots and four native cleanup-fixture captures.
 Diagnostic publication is not original-defect repair, Complete state or716 merge authority.
 No Completion Commit or native observation is claimed. #643/#624 remain open.
+
+## Native Evidence And Stage Controls — 2026-10-15
+
+CI3190/run38679585476 on exact published head a39ee9590428630a28ea8deb1781608e76ac9abb
+failed the unchanged cold worker73->76: Windows453passed/1failed/0ignored/0filtered; five other
+jobs passed. The observer and native cleanup fixtures both succeeded. Four observer phases had
+counts73/73/74/76, with unchanged before/after observation counts. Added/retyped metadata:
+first_pipe File\u0000 value168; final_40 unknown value328 and Key\u0000 value332. These raw
+type strings include a trailing NUL. Values are process-local, may be reused, and do not identify
+objects or prove a leak/legitimate cache. Successful controls do not eliminate every observer effect.
+The known cleanup BOOLs passed; parent cleanup/terminal success does not establish all lifetimes.
+Exact protected remote review6184162949 approved diagnostic publication only, not repair/merge.
+
+Source confirms the injected Assignment branch short-circuits before AssignProcessToJobObject.
+That API therefore cannot explain the +2 through its execution on this fault path. Two further
+independent owned workers use existing launcher operations/rejections without a new hook/native
+call/unsafe/rights: mode3 observes baseline, first Pipe cleanup, attribute preparation followed by
+the exact existing quote rejection, then suspended-process failure cleanup; mode4 observes
+baseline, existing program resolution, existing environment construction, then suspended-process
+failure cleanup. The environment builder itself reads/copies the worker environment; immediately
+discard its result, with no extra observational copy/inspection/log/persistence of its contents.
+Each worker retains four snapshots and all existing caps/Jobs/deadlines. All five outcomes are
+collected before asserting; original cold40/+2 remains uninstrumented and unchanged.
+
+Main23e659e2403739b74bc018ec46305346e8e2c7ad (including bdea322f) is included in separate
+baseline refreshes. I304/RUNTIME-011 retains its independent effective #722 claim.
+I303/SKILL-006 remains Complete/Closed with its own evidence, while I302 stays Review/Claimed.
+New controls require fresh local validation, exact-head protected review and unfiltered native
+CI. They narrow a phase interval, not root cause or resource identity. No Completion Commit.
+
+Fresh pinned locked local preflight passed3717primary+1existing-child tests/0failed/ignored,
+workspace check/Clippy and both SDK modes, with only the previously authorized local socket
+filter. Final-source Windows test-target cross-check/Clippy, feature graphs, governance/claims,
+text/classifier/fmt/diff/scale pass; no new native execution claimed. Full receipts are in I302.
+Stable exact-head protected review and unfiltered native CI precede evidence acceptance.

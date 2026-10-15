@@ -121,3 +121,9 @@ self-only diagnostic scope. Recovered #716 candidate incorporates current main9b
 keeps I293 search commits separate from I302 observer work. Native execution/review/acceptance
 pending; original40/+2 and all failed history retained. Diagnostic collection does not fix the
 original defect or authorize716 merge, default Search activation or full C/Epic closure.
+
+CI3190 on published a39ee959 failed unchanged cold73->76; Windows453passed/1failed, five other
+jobs passed. Successful I302 observer/native fixtures are diagnostic evidence only. New bounded
+stage controls and typed-evidence interpretation remain in TEST-003/I302, with fresh protected
+review/native CI required. Main23e659e2 is included without taking over I303/I304 work. I293/C
+stays Active/Claimed/incomplete, #643/#624 open; production/default activation gates unchanged.

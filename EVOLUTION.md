@@ -1255,3 +1255,8 @@ without a proven cause would conceal evidence rather than repair the fixture.
 CI3177 localizes growth to first Pipe(+1) and first Assignment(+2), followed by stable samples.
 This is boundary evidence, not handle identity/lifetime proof. Check existing cleanup return values
 after all release attempts; adding new native observation needs its own reviewed contract/claim.
+
+CI3190 self-only type metadata still does not identify resource lifetimes. Source inspection
+also shows injected Assignment short-circuits before AssignProcessToJobObject: a fault label
+names an error boundary, not proof that its namesake API executed. Read actual control flow
+before attribution; use existing-operation stage controls and retain cold failure/uncertainty.

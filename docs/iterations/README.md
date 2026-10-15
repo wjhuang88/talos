@@ -12,8 +12,9 @@ is Complete / Closed for #719 under ADR-092; implementation #721 merged as `6d72
 after exact-head CI, independent security/API review and CAS.
 
 [I302](I302-windows-owned-handle-evidence.md) / [TEST-003](../backlog/active/TEST-003-windows-owned-handle-evidence.md)
-is Review/Claimed for recovered bounded diagnostic candidate #716 from current main.
-#718 merged f4313237 / ADR-091 effective; fresh review/native CI pending, original failure retained.
+is Review/Claimed for bounded diagnostic candidate #716. #718 merged f4313237 / ADR-091
+effective. CI3190 failed cold73→76 while observer/native fixtures succeeded; new independent
+stage controls need fresh protected review/native CI. Original cold40/+2 failure is retained.
 I293/I294/I300 remain Active; I301/I277 retain Review, I249 Planned and I164 Paused.
 I302 records the full inventory/non-overlap and workspace-recovery receipts; separate I302 commits
 in #716 do not close original defects or authorize Search activation/merge.

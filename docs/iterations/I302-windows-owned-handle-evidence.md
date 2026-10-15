@@ -169,3 +169,55 @@ does not inherit an unbounded backtrace; no process-global mutation. Fallback di
 ignore broken-pipe errors to avoid a second panic after resource cleanup. Fresh exact-head
 protected publication review and new full CI/native observations are still required. This is a
 stable diagnostic stage, not an existing defect repair or merge-ready candidate.
+
+## CI3190 Result And Bounded Stage Follow-up — 2026-10-15
+
+Published a39ee9590428630a28ea8deb1781608e76ac9abb/tree797191a0 has exact protected remote
+publication review6184162949 (all20 changed blobs matched). CI3190/run38679585476 FAILED:
+Windows tools453passed/1failed/0ignored/0filtered; all five other jobs passed. Cold mode0 still
+fails73->76, first Pipe+1 and first Assignment+2 then stable through40 exact faults. Mode1
+observer and mode2 native fixtures succeeded despite the preserved original failure. Four
+snapshots baseline/observer_control/first_pipe/final_40 had sizes73/73/74/76, with matching
+counts before/after each observation. First_pipe adds/retypes File\u0000 value168; final_40
+adds/retypes unknown value328 and Key\u0000 value332. Raw type names retain trailing NUL;
+unknown remains unknown. Values/reuse/observer effects cannot establish object identity, leak
+or legitimate initialization. Parent cleanup Ok and terminal true are not complete lifetime proof.
+
+Source short-circuiting proves the injected Assignment path does not execute actual
+AssignProcessToJobObject. Its preceding preparation/CreateProcess/failure-cleanup interval is
+still unresolved. New independent modes3/4 narrow that interval using existing operations:
+
+- Mode3: control_baseline, first_pipe_cleanup, attributes_prepared_then_rejected using the exact
+  existing quote error after UpdateProcThreadAttribute, suspended_process_cleanup using exact
+  existing Assignment error.
+- Mode4: control_baseline, program_resolved, environment_built, suspended_process_cleanup.
+  The existing builder reads/copies worker environment; immediately drop its result, with no
+  extra observational copy/inspection/log/persistence. No new PSS/environment capture or output.
+
+Both have four existing bounded captures, known phase labels/count caps checked in the parent,
+unchanged Jobs/60s wait/10s terminal drain/output caps. A pure fixture rejects reordered or
+another mode's phase labels. All five outcomes are attempted/retained before final assertion;
+original mode0/cold40/+2, modes1/2, native helper/unsafe/features/lock remain unchanged. Independent
+protected local preview found no implementation blocker; exact candidate validation/review and
+new native evidence remain pending. No retry of old failed heads or root-cause/fix claim.
+
+Baseline refresh bc5d4ea68342377b2ebba7edfe5f6c14cf4852da includes mainbdea322f and retains
+independent #721/#723 I303/SKILL-006 Complete/Closed (implementation6d72975e), I302Review/Claimed
+and all I293/#643/#624 product gates. Earlier old-main/recovery receipts above are historical.
+
+A further baseline refresh includes main23e659e2403739b74bc018ec46305346e8e2c7ad (#722),
+retaining I304/RUNTIME-011 independent claim and all unrelated owner state.
+
+### Fresh Stage-Control Local Validation
+
+Pinned1.99.0 locked release_preflight passed on the refreshed source: workspace check/Clippy,
+3717 primary test passes plus1 existing exact-selection child pass,0failed/ignored; both Runtime
+SDK fixture modes passed. Only the previously authorized exact local Unix-socket filter is added
+by an external wrapper; source scripts/CI are unchanged and native CI remains unfiltered. The
+457 sibling filters belong to that existing child invocation. Root Cargo.lock is unchanged.
+Windows GNU coding test-target check and Clippy(-D warnings) passed on final source; this is
+cross-compilation, not native execution. Actual Windows coding and full workspace/all-feature
+normal+build graphs exclude ProcessSnapshotting; coding test/dev graph includes it. Governance,
+claims(0warnings), text boundary23, classifier14, fmt/diff and scale checks pass. Independent
+protected local previews found no blocker; final exact local/remote fingerprint review and new
+native CI remain required. CI3190 remains failed evidence; stage controls are not a repair.

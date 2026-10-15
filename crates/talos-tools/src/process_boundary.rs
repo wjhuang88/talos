@@ -1215,9 +1215,9 @@ mod windows_tests {
             // tests must not change this fixture's baseline or final sample.
             let mut outcomes = Vec::new();
             let mut controls = Vec::new();
-            // Cold, observer, native cleanup fixtures: separate owned processes. Retain
+            // Cold, observer, native cleanup fixtures and stage controls: owned processes. Retain
             // original failure, but attempt all workers before asserting any outcome.
-            for mode in [0u8, 1, 2] {
+            for mode in [0u8, 1, 2, 3, 4] {
                 let directory = tempfile::Builder::new()
                     .prefix("talos-handle-count-")
                     .tempdir()
@@ -1301,7 +1301,7 @@ mod windows_tests {
                 controls.push(control); // retain Jobs through every worker/receipt check
             }
             eprintln!("handle worker outcomes={outcomes:?}");
-            assert_eq!(outcomes.len(), 3);
+            assert_eq!(outcomes.len(), 5);
             for (mode, result) in outcomes {
                 assert!(result.is_ok(), "handle worker mode={mode}: {result:?}");
             }
@@ -1344,6 +1344,8 @@ mod windows_tests {
             Some(value) if value == "0" => 0,
             Some(value) if value == "1" => 1,
             Some(value) if value == "2" => 2,
+            Some(value) if value == "3" => 3,
+            Some(value) if value == "4" => 4,
             Some(_) => panic!("invalid owned handle worker mode"),
         };
         if mode == 2 {
@@ -1359,6 +1361,59 @@ mod windows_tests {
             return;
         }
         let launcher = powershell("Start-Sleep -Seconds 30");
+        if matches!(mode, 3 | 4) {
+            let mut phases = Vec::new();
+            let mut observations = Vec::new();
+            record_handle_stage("control_baseline", &mut phases, &mut observations);
+            if mode == 3 {
+                assert_handle_stage_failure(
+                    &launcher,
+                    &launcher.program,
+                    Some(WindowsLaunchFault::Pipe),
+                    "injected pipe setup failure",
+                );
+                record_handle_stage("first_pipe_cleanup", &mut phases, &mut observations);
+                // Existing input rejection is AFTER UpdateProcThreadAttribute and BEFORE
+                // resolve/environment/CreateProcessW. No new hook/native/unsafe is needed.
+                assert_handle_stage_failure(
+                    &launcher,
+                    "invalid\"program",
+                    None,
+                    "Windows program path contains an unsupported quote or NUL",
+                );
+                record_handle_stage(
+                    "attributes_prepared_then_rejected",
+                    &mut phases,
+                    &mut observations,
+                );
+            } else {
+                let resolved =
+                    resolve_windows_program(&launcher.program).expect("known fixture program");
+                drop(resolved);
+                record_handle_stage("program_resolved", &mut phases, &mut observations);
+                // Exercise the existing launcher environment builder (which reads/copies
+                // the worker's environment), then immediately discard its output. No extra
+                // observational copy, inspection, log or persistence of those contents.
+                drop(windows_environment(&launcher.env));
+                record_handle_stage("environment_built", &mut phases, &mut observations);
+            }
+            assert_handle_stage_failure(
+                &launcher,
+                &launcher.program,
+                Some(WindowsLaunchFault::Assignment),
+                "injected AssignProcessToJobObject failure",
+            );
+            record_handle_stage("suspended_process_cleanup", &mut phases, &mut observations);
+            let output =
+                handle_snapshot::differences(&phases).expect("bounded complete stage differences");
+            eprintln!("PSS_STAGE_COUNTS mode={mode} observations={observations:?}");
+            eprintln!(
+                "PSS_STAGE_TYPES mode={mode} {}",
+                String::from_utf8_lossy(&output)
+            );
+            std::fs::write(receipt, output).expect("stage-control receipt");
+            return;
+        }
         let mut phases = Vec::new();
         let mut observer_counts = Vec::new();
         if mode == 1 {
@@ -1503,18 +1558,101 @@ mod windows_tests {
             if data["snapshots"].as_u64() != Some(4) {
                 return Err("wrong snapshot count".to_owned());
             }
-            if mode == 1
+            if mode != 2
                 && data["changes"]
                     .as_array()
                     .is_none_or(|changes| changes.len() > 32)
             {
                 return Err("missing/oversized type differences".to_owned());
             }
+            if mode != 2 {
+                let expected = match mode {
+                    1 => ["baseline", "observer_control", "first_pipe", "final_40"],
+                    3 => [
+                        "control_baseline",
+                        "first_pipe_cleanup",
+                        "attributes_prepared_then_rejected",
+                        "suspended_process_cleanup",
+                    ],
+                    4 => [
+                        "control_baseline",
+                        "program_resolved",
+                        "environment_built",
+                        "suspended_process_cleanup",
+                    ],
+                    _ => return Err("invalid observer mode".to_owned()),
+                };
+                let phases = data["phase_sizes"]
+                    .as_array()
+                    .ok_or("missing observer phases")?;
+                if phases.len() != expected.len()
+                    || phases.iter().zip(expected).any(|(entry, phase)| {
+                        entry[0].as_str() != Some(phase)
+                            || entry[1].as_u64().is_none_or(|size| size > 1024)
+                    })
+                {
+                    return Err("observer phase order/entry cap invalid".to_owned());
+                }
+            }
             if mode == 2 && data["native_checks"] != true {
                 return Err("native fixtures missing".to_owned());
             }
         }
         Ok(())
+    }
+
+    fn record_handle_stage(
+        phase: &'static str,
+        phases: &mut Vec<(&'static str, handle_snapshot::Handles)>,
+        observations: &mut Vec<(&'static str, u32, u32)>,
+    ) {
+        let before = current_process_handle_count();
+        phases.push((
+            phase,
+            handle_snapshot::capture().expect("checked self stage snapshot"),
+        ));
+        observations.push((phase, before, current_process_handle_count()));
+    }
+
+    fn assert_handle_stage_failure(
+        launcher: &WindowsBackgroundLauncher,
+        program: &str,
+        fault: Option<WindowsLaunchFault>,
+        expected: &str,
+    ) {
+        let result = create_windows_job_with_hooks(
+            program,
+            &launcher.args,
+            &launcher.cwd,
+            &launcher.env,
+            WindowsLaunchTestHooks { fault },
+        );
+        assert_eq!(
+            result.err().as_deref(),
+            Some(expected),
+            "must reach the intended stage"
+        );
+    }
+
+    #[test]
+    fn handle_stage_receipt_requires_exact_phase_order() {
+        let directory = tempfile::tempdir().expect("fixture directory");
+        let path = directory.path().join("receipt.json");
+        let pid = std::process::id().wrapping_add(1).max(1);
+        let mut data = serde_json::json!({"child_pid":pid,"snapshots":4,"changes":[],
+            "phase_sizes":[["control_baseline",73],["first_pipe_cleanup",74],
+                ["attributes_prepared_then_rejected",74],["suspended_process_cleanup",76]]});
+        std::fs::write(&path, serde_json::to_vec(&data).expect("fixture JSON"))
+            .expect("fixture write");
+        assert!(validate_handle_receipt(&path, 3).is_ok());
+        assert!(
+            validate_handle_receipt(&path, 4).is_err(),
+            "another worker's phases are not valid evidence"
+        );
+        data["phase_sizes"][2][0] = serde_json::json!("control_baseline");
+        std::fs::write(&path, serde_json::to_vec(&data).expect("fixture JSON"))
+            .expect("fixture write");
+        assert!(validate_handle_receipt(&path, 3).is_err());
     }
 
     #[test]
