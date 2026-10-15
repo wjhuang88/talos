@@ -1,6 +1,6 @@
 # Iteration I303: Embedded Skill Progressive Disclosure
 
-> Document status: Active
+> Document status: Review
 > Published plan date: 2026-10-15
 > Planned objective: let `talos-runtime` embedders deliver Skill Level 1/2 content to the model.
 > MVP deliverable: runtime-only embedder sets a skill context and the next provider request contains
@@ -63,11 +63,35 @@ size and UTF-8 handling. Revert only this slice if regression appears; CLI budge
 ## Actual Activation And Execution
 
 2026-10-15: governance-only draft prepared; no production/test/dependency edit or implementation
-branch.
+branch. Claim #720 passed exact-head CI run 38673086493 and merge-time CAS, and merged as
+`9b7ba281`; implementation branch `feature/I303-embedded-skill-disclosure` starts from it.
+
+Implementation (stable candidate):
+
+- `talos-skill::disclosure`: `resolve_skill_file`/`read_skill_file` (rejects empty, absolute,
+  root/prefix and `..`; canonical containment so symlink escape fails; regular file; 2 MiB cap
+  checked before and after read; UTF-8), `list_skill_files` (no symlink following, sorted, 256
+  entries/depth 8, truncation flag), `chunk_text` (UTF-8 boundaries, offset continuation),
+  `bounded_text` and `SkillActivation` (CLI-identical format, 24/16 KiB budgets).
+- `SkillManager::load_reference` delegates to the confined read; missing files keep
+  `SkillError::FileNotFound`, rejections use `SkillError::IoError` (no enum change).
+- `talos-cli::skill_runtime` reuses `SkillActivation`; private confinement copy removed.
+- `RuntimeHandle::set_skill_context` / `clear_skill_context` share the `submit` admission path.
+- `RuntimeBuilder::skill_read_tool(Vec<RuntimeSkill>)` registers read-only `skill_read`
+  (parameters `skill`/`reference`/`offset`; blocking IO in `spawn_blocking` with join-failure
+  fallback); skipped when empty or a caller tool of that name exists.
+- Root re-exports `RuntimeSkill`, `RuntimeSkillLoader`, `RuntimeSkillActivation`,
+  `RuntimeSkillReadLimits`; rustdoc, README/README.zh-CN, SDK contract and ARCHITECTURE updated.
 
 ## Verification Evidence / Completion Evidence
 
-Pending. No Completion Commit exists; not Complete.
+Local, pinned Rust 1.99.0, `--locked`: `./scripts/release_preflight.sh` passed (120 test
+binaries ok, clippy `-D warnings`, external runtime fixture). New tests: talos-skill confinement,
+symlink escape (Unix), size/UTF-8, listing, chunking and activation format; runtime unit
+`skill_read` chunk/escape/unknown-skill; runtime public-API tests proving the provider request
+contains/omits the `SKILL.md` body after set/clear, active-turn rejection event, opt-in
+registration with two bound skills, and caller-tool precedence. Exact-head CI and independent
+Agent security/API review pending. No Completion Commit exists; not Complete.
 
 ## Variance And Residuals
 

@@ -1,6 +1,6 @@
 # SKILL-006: Embedded Skill Progressive Disclosure
 
-**Status**: Active / Claimed; proposed atomic selection, ineffective until #720 merges
+**Status**: Review / Claimed; claim #720 effective at `9b7ba281`
 **Type**: Product / Runtime API Story
 **Parent Epic**: None; related SKILL-002 (CLI explicit activation, Complete)
 **Source Issue**: #719
