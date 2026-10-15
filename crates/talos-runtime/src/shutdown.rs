@@ -241,6 +241,7 @@ pub(crate) type RuntimeFinalizerFuture =
     Pin<Box<dyn Future<Output = Result<(), RuntimeFinalizerError>> + Send + 'static>>;
 
 pub(crate) trait RuntimeFinalizer: Send + Sync {
+    fn seal_admission(&self) {}
     fn identifier(&self) -> ShutdownFinalizerId;
     fn order(&self) -> u16;
     fn cap(&self) -> Duration;
@@ -458,6 +459,9 @@ impl ShutdownCoordinator {
                 *self.state() = CoordinatorState::Closing(plan);
                 self.changed.notify_waiters();
                 if matches!(options.active_turn_policy, ActiveTurnPolicy::Interrupt) {
+                    for entry in &self.finalizers.entries {
+                        entry.seal_admission();
+                    }
                     self.admission.interrupt_active();
                 }
                 let coordinator = self.clone();
@@ -542,15 +546,22 @@ impl ShutdownCoordinator {
                 .await
                 .is_err()
             {
+                for entry in &self.finalizers.entries {
+                    entry.seal_admission();
+                }
                 self.admission.interrupt_active();
             }
+        }
+
+        for entry in &self.finalizers.entries {
+            entry.seal_admission();
         }
 
         let mut actor_join_error = None;
         let actor = self.actor_task().take();
         let shutdown_barrier =
             tokio::time::timeout_at(deadline, self.admission.wait_until_shutdown_barrier()).await;
-        let barrier_finished = shutdown_barrier.is_ok();
+        let barrier_finished = matches!(shutdown_barrier, Ok(true));
 
         let snapshot = self.admission.snapshot();
         let durable_reconciliation = match shutdown_barrier {

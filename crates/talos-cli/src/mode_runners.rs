@@ -875,16 +875,26 @@ pub(crate) async fn run_mcp_server() -> Result<()> {
     let permission_engine = Arc::new(talos_permission::PermissionEngine::new());
     let hook_registry = build_hook_registry(false);
     let permission_gate = Arc::new(McpPermissionGate::new(permission_engine, hook_registry));
-    let handler = TalosMcpHandler::new(tool_registry, permission_gate);
+    let handler = Arc::new(TalosMcpHandler::new_with_owner_lifecycle(
+        tool_registry,
+        permission_gate,
+        true,
+    ));
 
     let running = handler
+        .clone()
         .serve(rmcp::transport::stdio())
         .await
         .map_err(|e| anyhow!("failed to start mcp server: {e}"))?;
-    let _ = running
-        .waiting()
-        .await
-        .map_err(|e| anyhow!("mcp server join error: {e}"))?;
+    let transport_result = running.waiting().await;
+    let cleanup_result = handler.shutdown(std::time::Duration::from_secs(5)).await;
+    if transport_result.is_err() && cleanup_result.is_err() {
+        return Err(anyhow!(
+            "mcp server transport failed and tool cleanup was not confirmed"
+        ));
+    }
+    cleanup_result.map_err(|e| anyhow!("mcp server cleanup error: {e}"))?;
+    transport_result.map_err(|e| anyhow!("mcp server join error: {e}"))?;
     Ok(())
 }
 // I009-S4 end
