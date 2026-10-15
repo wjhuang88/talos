@@ -5318,6 +5318,7 @@ fn pull_fetch_command(
             "gc.autoDetach=false",
             "--no-pager",
             "fetch",
+            "--update-head-ok",
             "--",
             remote,
         ])
@@ -6101,6 +6102,7 @@ pub(super) mod tests {
                 "gc.autoDetach=false",
                 "--no-pager",
                 "fetch",
+                "--update-head-ok",
                 "--",
                 "upstream name"
             ]
