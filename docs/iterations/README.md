@@ -2,6 +2,11 @@
 
 ## Purpose
 
+[I304](I304-absent-journal-pause.md) / [RUNTIME-011](../backlog/active/RUNTIME-011-absent-journal-pause.md)
+is a governance-only draft for an absent-journal pause no-op, distinct from I301 recovery reads.
+No claim/activation or implementation is effective; exact-head review/CI/CAS and main merge required.
+The full selection inventory/non-overlap and preserved #705 failures are in I304.
+
 [I303](I303-embedded-skill-progressive-disclosure.md) / [SKILL-006](../backlog/active/SKILL-006-embedded-skill-progressive-disclosure.md)
 is an Active/Claimed atomic proposal for #719 under ADR-092 in #720; ineffective until #720 merges.
 No implementation yet; non-overlapping with I293/I294/I300/I301/I302.
