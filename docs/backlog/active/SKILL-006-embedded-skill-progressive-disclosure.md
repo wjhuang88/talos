@@ -1,6 +1,6 @@
 # SKILL-006: Embedded Skill Progressive Disclosure
 
-**Status**: Review / Claimed; claim #720 effective at `9b7ba281`
+**Status**: Complete / Closed; Completion Commit `6d72975e`
 **Type**: Product / Runtime API Story
 **Parent Epic**: None; related SKILL-002 (CLI explicit activation, Complete)
 **Source Issue**: #719
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | OpenCode / Claude Opus 5.5 |
 | Work Slice | #719 A-D: shared confined Skill Level 1/2 disclosure in talos-skill, load_reference hardening, CLI reuse, RuntimeHandle skill-context methods, opt-in runtime skill_read tool, tests and docs only. |
@@ -19,7 +19,7 @@
 | Governance Claim PR | #720 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer selected full A+B+C+D scope and Single-maintainer merge on 2026-10-15; no distinct maintainer reviewer available. Independent Agent security/API review, exact-head CI, both validators and merge-time CAS are mandatory. |
-| Implementation PR | Not started |
+| Implementation PR | #721 (merged `6d72975e`) |
 | Last Updated | 2026-10-15 |
 | Handoff / Release Condition | No implementation before this claim and ADR-092 reach main; release only after evidence-bearing closeout or explicit handoff. |
 
@@ -77,3 +77,9 @@ Update `RuntimeBuilder::skill_index` rustdoc, `docs/reference/RUNTIME-SDK-CONTRA
 
 Symlink check/use race and prompt-guidance policy remain documented residuals in ADR-092/I303.
 No Complete state without an already-existing implementation SHA.
+
+## Completion — 2026-10-15
+
+Completion Commit: `6d72975e` (merge of #721).
+Exact-head CI, independent Agent security/API review APPROVE and merge-time CAS passed. Evidence is owned by
+[I303](../../iterations/I303-embedded-skill-progressive-disclosure.md). Residuals stay in ADR-092.

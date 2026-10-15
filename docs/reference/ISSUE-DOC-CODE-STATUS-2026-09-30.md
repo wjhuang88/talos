@@ -75,7 +75,7 @@
 | [#644](https://github.com/wjhuang88/talos/issues/644) | Native zero-key provider and regional evidence gate | [SEARCH-001-D](../backlog/active/SEARCH-001-D-provider-evidence.md) | Planned / Unclaimed | Research child may proceed only under its own iteration and claim; no production provider behavior is authorized. |
 | [#670](https://github.com/wjhuang88/talos/issues/670) | Converge storage and retrieval capability contracts without behavior change | [STORE-002](../backlog/active/STORE-002-storage-capability-contracts.md) | Intake / Unclaimed | Architecture issue newly opened; owner/iteration/claim still required before implementation. |
 | [#717](https://github.com/wjhuang88/talos/issues/717) | Test-only current-process handle evidence | [TEST-003](../backlog/active/TEST-003-windows-owned-handle-evidence.md) | In Progress / Claimed (proposed) | #718 atomic I302/ADR-091 claim is ineffective until main merge; no PSS implementation. |
-| [#719](https://github.com/wjhuang88/talos/issues/719) | Embedded Skill Level 1/2 progressive disclosure | [SKILL-006](../backlog/active/SKILL-006-embedded-skill-progressive-disclosure.md) | Review / Claimed | Claim #720 effective at 9b7ba281; implementation candidate under exact-head CI and review. |
+| [#719](https://github.com/wjhuang88/talos/issues/719) | Embedded Skill Level 1/2 progressive disclosure | [SKILL-006](../backlog/active/SKILL-006-embedded-skill-progressive-disclosure.md) | Complete / Closed | #721 merged as 6d72975e; closeout records Completion Commit. |
 
 ## Synchronization Notes
 
