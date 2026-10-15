@@ -87,8 +87,8 @@ pub use grant::{
     GrantError, GrantId, GrantPreview, GrantPreviewFacet, GrantScope, GrantSource, ProposedGrant,
 };
 pub use session::{
-    PendingInvocation, PermissionEvaluation, PermissionInvocation, PermissionSessionId,
-    PermissionSessionState, PermissionStateRevisions, PermissionStateSnapshot,
+    AdmittedInvocation, PendingInvocation, PermissionEvaluation, PermissionInvocation,
+    PermissionSessionId, PermissionSessionState, PermissionStateRevisions, PermissionStateSnapshot,
 };
 pub use workspace_trust::{WorkspaceTrustStore, is_git_workspace, is_within_repo};
 

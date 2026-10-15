@@ -342,7 +342,68 @@ fn compile_facets(
             });
             continue;
         };
-        if !supported_resource_pair(facet.nature, resource_kind) {
+        // These closed capabilities are consumed only by the prepared Git
+        // stages. They do not admit generic Remote or Path subtree grants.
+        let bound_git_command = request.facets().iter().any(|facet| {
+            facet.nature == ToolNature::Execute
+                && facet.resource_kind == Some(ToolResourceKind::Command)
+                && facet
+                    .resource
+                    .as_deref()
+                    .is_some_and(|path| Path::new(path).is_absolute())
+        });
+        let git_config_discovery = facet.nature == ToolNature::Read
+            && resource_kind == ToolResourceKind::Remote
+            && facet.resource.as_deref() == Some("git:configuration-chain")
+            && matches!(
+                request.tool_name(),
+                "git_add" | "git_commit" | "git_checkout" | "git_push" | "git_pull"
+            )
+            && bound_git_command;
+        let receiver_reference_tree = facet.nature == ToolNature::Read
+            && resource_kind == ToolResourceKind::Remote
+            && facet.resource.as_deref() == Some("git:receiver-reference-tree")
+            && request.tool_name() == "git_push"
+            && request.facets().iter().any(|facet| {
+                facet.nature == ToolNature::Read
+                    && facet.resource_kind == Some(ToolResourceKind::Path)
+                    && facet.resource.as_deref().is_some_and(|path| {
+                        Path::new(path).is_absolute()
+                            && Path::new(path).file_name() == Some(std::ffi::OsStr::new("refs"))
+                    })
+            });
+        let receiver_metadata = matches!(facet.nature, ToolNature::Read | ToolNature::Write)
+            && resource_kind == ToolResourceKind::Remote
+            && facet.resource.as_deref() == Some("git:receiver-metadata")
+            && request.tool_name() == "git_push"
+            && bound_git_command
+            && request.facets().iter().any(|root| {
+                root.nature == facet.nature
+                    && root.resource_kind == Some(ToolResourceKind::Path)
+                    && root
+                        .resource
+                        .as_deref()
+                        .is_some_and(|path| Path::new(path).is_absolute())
+            });
+        let pull_metadata = matches!(facet.nature, ToolNature::Read | ToolNature::Write)
+            && resource_kind == ToolResourceKind::Remote
+            && facet.resource.as_deref() == Some("git:pull-repository-metadata")
+            && request.tool_name() == "git_pull"
+            && bound_git_command
+            && request.facets().iter().any(|root| {
+                root.nature == facet.nature
+                    && root.resource_kind == Some(ToolResourceKind::Path)
+                    && root
+                        .resource
+                        .as_deref()
+                        .is_some_and(|path| Path::new(path).is_absolute())
+            });
+        if !supported_resource_pair(facet.nature, resource_kind)
+            && !git_config_discovery
+            && !receiver_reference_tree
+            && !receiver_metadata
+            && !pull_metadata
+        {
             return Err(GrantError::MissingResource(index));
         }
         let raw_resource = facet.resource.clone();
@@ -592,5 +653,203 @@ const fn kind_tag(value: ToolResourceKind) -> u8 {
         ToolResourceKind::Domain => 1,
         ToolResourceKind::Command => 2,
         ToolResourceKind::Remote => 3,
+    }
+}
+
+#[cfg(test)]
+mod discovery_tests {
+    use super::*;
+    use talos_core::tool::ToolPermissionFacet;
+
+    #[test]
+    fn closed_git_discovery_scope_cannot_become_generic_remote_read() {
+        let input = serde_json::json!({"paths": ["file"]});
+        let root = std::env::current_dir().expect("workspace");
+        let command = root.join("git").to_string_lossy().into_owned();
+        let mut facets = vec![
+            ToolPermissionFacet::with_resource(
+                ToolNature::Read,
+                "git:configuration-chain",
+                ToolResourceKind::Remote,
+            ),
+            ToolPermissionFacet::with_resource(
+                ToolNature::Execute,
+                command,
+                ToolResourceKind::Command,
+            ),
+        ];
+        for tool in [
+            "git_add",
+            "git_commit",
+            "git_checkout",
+            "git_push",
+            "git_pull",
+        ] {
+            assert!(
+                compile_facets(
+                    &PermissionRequest::native(tool, &facets, &input),
+                    Some(&root),
+                    true
+                )
+                .is_ok()
+            );
+        }
+        assert!(
+            compile_facets(
+                &PermissionRequest::native("read_file", &facets, &input),
+                Some(&root),
+                true
+            )
+            .is_err()
+        );
+        assert!(
+            compile_facets(
+                &PermissionRequest::native(
+                    "git_commit",
+                    &facets,
+                    &serde_json::json!({"message":"commit"})
+                ),
+                Some(&root),
+                true
+            )
+            .is_ok()
+        );
+        assert!(
+            compile_facets(
+                &PermissionRequest::native("git_push", &facets, &input),
+                Some(&root),
+                true
+            )
+            .is_ok()
+        );
+        assert!(
+            compile_facets(
+                &PermissionRequest::native("git_fetch", &facets, &input),
+                Some(&root),
+                true
+            )
+            .is_err()
+        );
+        assert!(
+            compile_facets(
+                &PermissionRequest::native("git_add", &facets[..1], &input),
+                Some(&root),
+                true
+            )
+            .is_err()
+        );
+        facets[0].resource = Some("arbitrary:file".into());
+        assert!(
+            compile_facets(
+                &PermissionRequest::native("git_add", &facets, &input),
+                Some(&root),
+                true
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn receiver_reference_tree_requires_push_and_explicit_root() {
+        let root = std::env::current_dir().expect("workspace");
+        let input = serde_json::json!({"remote": "receiver"});
+        let mut facets = vec![ToolPermissionFacet::with_resource(
+            ToolNature::Read,
+            "git:receiver-reference-tree",
+            ToolResourceKind::Remote,
+        )];
+        let allowed = |facets: &[ToolPermissionFacet], tool| {
+            compile_facets(
+                &PermissionRequest::native(tool, facets, &input),
+                Some(&root),
+                true,
+            )
+            .is_ok()
+        };
+        assert!(!allowed(&facets, "git_push"));
+        facets.push(ToolPermissionFacet::with_resource(
+            ToolNature::Read,
+            root.join("receiver/refs").to_string_lossy().into_owned(),
+            ToolResourceKind::Path,
+        ));
+        assert!(allowed(&facets, "git_push"));
+        assert!(!allowed(&facets, "git_add"));
+        assert!(!allowed(&facets, "read_file"));
+        facets[1].resource = Some(root.join("receiver/other").to_string_lossy().into_owned());
+        assert!(!allowed(&facets, "git_push"));
+    }
+
+    #[test]
+    fn receiver_metadata_requires_push_command_and_matching_path_nature() {
+        let root = std::env::current_dir().expect("workspace");
+        let input = serde_json::json!({"remote":"receiver"});
+        for nature in [ToolNature::Read, ToolNature::Write] {
+            let mut facets = vec![ToolPermissionFacet::with_resource(
+                nature,
+                "git:receiver-metadata",
+                ToolResourceKind::Remote,
+            )];
+            let allowed = |facets: &[ToolPermissionFacet], tool| {
+                compile_facets(
+                    &PermissionRequest::native(tool, facets, &input),
+                    Some(&root),
+                    true,
+                )
+                .is_ok()
+            };
+            assert!(!allowed(&facets, "git_push"));
+            facets.push(ToolPermissionFacet::with_resource(
+                ToolNature::Execute,
+                root.join("git").to_string_lossy().into_owned(),
+                ToolResourceKind::Command,
+            ));
+            assert!(!allowed(&facets, "git_push"));
+            facets.push(ToolPermissionFacet::with_resource(
+                nature,
+                root.join("receiver").to_string_lossy().into_owned(),
+                ToolResourceKind::Path,
+            ));
+            assert!(allowed(&facets, "git_push"));
+            for tool in ["git_add", "git_commit", "git_pull", "write_file"] {
+                assert!(!allowed(&facets, tool));
+            }
+            facets[2].nature = if nature == ToolNature::Read {
+                ToolNature::Write
+            } else {
+                ToolNature::Read
+            };
+            assert!(!allowed(&facets, "git_push"));
+        }
+    }
+
+    #[test]
+    fn accepted_pull_metadata_capability_requires_bound_pull_roots() {
+        let root = std::env::current_dir().expect("workspace");
+        let input = serde_json::json!({"remote":"pull"});
+        let facets = vec![
+            ToolPermissionFacet::with_resource(
+                ToolNature::Read,
+                "git:pull-repository-metadata",
+                ToolResourceKind::Remote,
+            ),
+            ToolPermissionFacet::with_resource(
+                ToolNature::Execute,
+                root.join("git").to_string_lossy().into_owned(),
+                ToolResourceKind::Command,
+            ),
+            ToolPermissionFacet::with_resource(
+                ToolNature::Read,
+                root.join("repo/.git").to_string_lossy().into_owned(),
+                ToolResourceKind::Path,
+            ),
+        ];
+        assert!(
+            compile_facets(
+                &PermissionRequest::native("git_pull", &facets, &input),
+                Some(&root),
+                true,
+            )
+            .is_ok()
+        );
     }
 }
