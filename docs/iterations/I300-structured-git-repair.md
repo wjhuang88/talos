@@ -1,3 +1,15 @@
+Pull helper-admission checkpoint (2026-10-15, commit `093edd1a`): Pull
+configuration now refuses selected-remote upload-pack and VCS helpers before
+fetch planning. Active automatic maintenance refuses a configured
+`gc.recentObjectsHook` or nonempty `gc.repackFilterTo`; disabling
+`maintenance.auto` keeps those settings inactive. The locked all-feature
+`talos-tools` Pull library selection passes 43/43, including the new regression,
+and formatting/diff checks pass. `origin/main` was fetched at `0ef5a532`;
+`git rebase origin/main` reported up to date. This is a bounded pre-fetch
+correction, not production fetch or integration. The prior full preflight
+predates this commit, so current-head preflight, independent review, platform
+evidence and publication remain open. I300/T7 stays Active.
+
 Final-source gate checkpoint (2026-10-15; unpublished): approved standard
 `release_preflight.sh` completed outside the sandbox with exit 0 (session 8083).
 It covered governance/claims, the workspace tests including the 699-test

@@ -1,3 +1,11 @@
+Current Pull helper-admission checkpoint (2026-10-15, `093edd1a`): selected
+remote upload-pack/VCS helpers and active automatic-maintenance external
+effects now refuse before fetch planning. The locked all-feature
+`talos-tools` Pull library selection passes 43/43. `origin/main` is
+`0ef5a532`; the requested rebase reported up to date. Production fetch and
+integration still refuse, and current-head full preflight/review/publication
+remain open. T7 stays Active; later serial tasks remain unactivated.
+
 Current initialized-child validation (2026-10-15; unpublished): the approved
 standard `release_preflight.sh` completed outside the sandbox with exit 0
 (session 8083). It passed governance and claims validation, the full workspace
