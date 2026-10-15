@@ -408,3 +408,22 @@ and actual locked dependency metadata now run. Final governance passes SQLite17/
 This is workflow/document validation, not a new Rust build or native Windows pass. The revised
 independent protected draft review found the Dispose blocker fixed and no remaining publication
 blocker; final fingerprint review and new full CI remain outstanding.
+
+## Concurrent Main Compatibility Refresh — 2026-10-15
+
+Published installed-file stage e50dd56555bbf759e66f4a969692f9376b4c5e02/tree4c28222a received
+exact-remote protected review6194730196 (all21 blobs matched). No full CI run was created before
+compatibility refresh: concurrent #725 merged main0ef5a532930642d730bcc6d974f2a79605efaaee and
+GitHub reported mergeable=false. GitHub documents that pull_request workflows do not run with
+merge conflicts; this is a compatibility gate, not another native test result or retry-to-green.
+Main's five changed files are PROVIDER-008/ADR-093 governance only. Retain its new owner, proposed
+ADR/index and #724 matrix row byte-for-byte; no provider activation or ownership transfer. Resolve
+the adjacent backlog conflict by retaining the complete TEST-003 row from the implementation
+candidate and PROVIDER-008 intake row from main, dropping the malformed old partial TEST-003 row
+whose ineffective-claim text was already superseded by effective #718. No Rust/workflow change in
+this refresh; installed-file diagnostics remain identical. Repeat governance/claims/diff checks,
+combined exact-head protected review and native CI on the refreshed baseline before acceptance.
+Compatibility checks passed: actual pinned locked-metadata governance SQLite17/delivery12 with
+0warnings, claims0warnings/text23/diff; incoming owner/ADR/index and new provider rows match
+main exactly. Independent protected resolution preview found no blocker; source/workflow bytes
+are unchanged from the reviewed installed-file stage. No native result exists for that stage yet.
