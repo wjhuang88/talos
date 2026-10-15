@@ -1,6 +1,6 @@
 # SKILL-006: Embedded Skill Progressive Disclosure
 
-**Status**: Active / Claimed; proposed atomic selection, ineffective until the claim PR merges
+**Status**: Active / Claimed; proposed atomic selection, ineffective until #720 merges
 **Type**: Product / Runtime API Story
 **Parent Epic**: None; related SKILL-002 (CLI explicit activation, Complete)
 **Source Issue**: #719
@@ -16,7 +16,7 @@
 | Work Slice | #719 A-D: shared confined Skill Level 1/2 disclosure in talos-skill, load_reference hardening, CLI reuse, RuntimeHandle skill-context methods, opt-in runtime skill_read tool, tests and docs only. |
 | Claimed At | 2026-10-15 |
 | Source Issue | #719 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #720 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer selected full A+B+C+D scope and Single-maintainer merge on 2026-10-15; no distinct maintainer reviewer available. Independent Agent security/API review, exact-head CI, both validators and merge-time CAS are mandatory. |
 | Implementation PR | Not started |

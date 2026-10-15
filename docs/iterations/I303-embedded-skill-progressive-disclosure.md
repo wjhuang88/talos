@@ -16,7 +16,7 @@
 | Work Slice | #719 A-D: shared confined Skill Level 1/2 disclosure in talos-skill, load_reference hardening, CLI reuse, RuntimeHandle skill-context methods, opt-in runtime skill_read tool, tests and docs only. |
 | Claimed At | 2026-10-15 |
 | Source Issue | #719 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #720 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer selected full A+B+C+D scope and Single-maintainer merge on 2026-10-15; no distinct maintainer reviewer available. Independent Agent security/API review, exact-head CI, both validators and merge-time CAS are mandatory. |
 | Implementation PR | Not started |
@@ -28,7 +28,7 @@
 Selected Story: [SKILL-006](../backlog/active/SKILL-006-embedded-skill-progressive-disclosure.md);
 preserve its scope, exclusions, acceptance, validation and documentation targets. Contract:
 [ADR-092](../decisions/092-embedded-skill-progressive-disclosure.md). The Active/Claimed values
-become effective only when the finalized claim PR merges into main.
+become effective only when the finalized #720 merges into main.
 
 ### Selection Inventory And Dispositions
 

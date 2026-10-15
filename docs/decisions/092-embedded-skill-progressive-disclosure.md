@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted contract proposal in the SKILL-006 / I303 governance claim PR; ineffective until that
+Accepted contract proposal in #720 (SKILL-006 / I303 governance claim); ineffective until that
 finalized claim merges into main. The maintainer selected the full #719 scope (A+B+C+D) and the
 Single-maintainer merge path on 2026-10-15. It authorizes no implementation before that merge.
 
