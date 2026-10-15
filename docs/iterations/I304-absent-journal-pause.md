@@ -86,3 +86,30 @@ No implementation or Completion Commit; not Complete. Future execution appends, 
 
 #705 retains evaluator5s composite failure phase, native child latency, old10s attribution and
 existing-journal costs. I301 retains its own owner-first closeout; no release or #590 reopening.
+
+## Target Integration Checkpoint — 2026-10-15
+
+CI3191/run38679683657 completed SUCCESS on original head374bafe4: four required documentation
+jobs passed, Windows Rust/Linux feature were skipped by trusted documentation routing. This is
+governance evidence only. Before merge, actual main advanced to `bdea322fc30a724c2407daa27972f92ba1b34d4b`
+through #721 implementation and #723 owner-first SKILL-006/I303 Complete/Closed. Preserve those
+records and production bytes. Resolve the single Board conflict as a union of the I304 proposal
+and current I303 completed row; retain auto-merged backlog/index updates. Original selection
+inventory above is history; I303 is now terminal, #721 closed, #716 and #705 remain open and
+separately owned. No overlapping pause owner appeared. I301 remains Review. Claim #722 is still
+ineffective, no production/test implementation exists. Fresh exact-head governance CI/review and
+both validators/CAS are required for this integrated candidate, without retrying CI3182.
+
+Local integrated-candidate environment limit: workspace maintenance removed the previous checkout
+and compiler. Public Git sources were recovered and the official Rust1.99.0 GNU archive's SHA256
+verified before installation. Installed compiler/driver/LLVM bytes match the extracted originals,
+with28GB disk available; nevertheless even `rustc -vV` terminates with SIGBUS. The last loader
+diagnostic names LLVM initialization; the actual cause remains unresolved. Immediate binding
+and an independent physical copy did not recover execution;
+ptrace diagnosis is unavailable in this sandbox. Cargo reports1.99.0 normally. Project governance
+therefore actually FAILED at locked Cargo metadata's compiler probe; its delivery fixtures passed.
+Claim validation passed0warnings and diff/union review passed. No local full-project success is
+claimed, no pin/dependency/lock/assertion/CI policy is changed. The unchanged reduced-documentation
+CI must run both complete validators successfully on the exact integrated head in its capable
+environment before merge; independent review and CAS remain mandatory. This is a retained local
+environment failure, never replacement success or a waiver of the remote validation gate.

@@ -31,6 +31,7 @@
 //! Detailed markdown instructions go here...
 //! ```
 
+pub mod disclosure;
 mod error;
 mod loader;
 mod manager;
@@ -38,6 +39,10 @@ mod parser;
 mod token;
 mod types;
 
+pub use disclosure::{
+    SkillActivation, SkillFileListing, SkillReadLimits, SkillTextChunk, chunk_text,
+    list_skill_files, read_skill_file,
+};
 pub use error::{Result, SkillError};
 pub use loader::{
     ExternalTargetPolicy, SkillDiscoveryPolicy, SkillDiscoveryWarning, SkillDiscoveryWarningKind,

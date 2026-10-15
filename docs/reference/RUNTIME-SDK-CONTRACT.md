@@ -28,6 +28,8 @@ support boundaries. See [I280 migration](I280-RUNTIME-FACADE-MIGRATION.md).
 | `collect_until_turn_completed` | Helper to drain events until a turn finishes | Pre-1.0 |
 | `RuntimeError` / `RuntimeResult<T>` | Error types for runtime operations | Pre-1.0 |
 | `ApprovalHandler` | Trait embedders implement to bridge `Ask` decisions; defined in `talos-runtime` | Pre-1.0 |
+| `RuntimeHandle::set_skill_context` / `clear_skill_context` | Queue an activated-skill context change for subsequent provider requests; rejected with `SessionEvent::Error` while a turn is active; not persisted (ADR-092) | I303 pre-1.0 additive API |
+| `RuntimeBuilder::skill_read_tool` | Opt-in read-only `skill_read` tool over bound skills with confinement, 2 MiB file cap and 48 KiB chunks; caller tool of the same name wins (ADR-092) | I303 pre-1.0 additive API; not registered by default |
 | `RuntimeBuilder::shared_tools` | Explicitly opt into the shared Talos built-in tool contribution inventory when the `shared-composition` feature is enabled | I160 pre-1.0 additive API; not selected by `RuntimeBuilder::new()` |
 
 ### Re-exported Protocol Types (actual `pub use` in `talos-runtime`)
@@ -48,7 +50,9 @@ verify against `crates/talos-runtime/src/lib.rs` if the surface may have changed
 | `ToolNature` | `talos_core::tool` | Risk classification: Read / Write / Execute / Network |
 | `ToolProvenance` | `talos_core::tool` | Tool origin: `Native`, `McpRemote { server }`, or `Plugin { name, version, carrier }` (ADR-028) |
 | `RuntimeHookRegistry` | `talos_plugin::HookRegistry` (re-exported under this alias) | Hook registry used by `RuntimeBuilder::hook_registry` |
-| `RuntimeSkillIndex` | `talos_skill::SkillIndex` (re-exported under this alias) | Skill index used by `RuntimeBuilder::skill_index` |
+| `RuntimeSkillIndex` | `talos_skill::SkillIndex` (re-exported under this alias) | Level 0 skill index used by `RuntimeBuilder::skill_index` (name/description only) |
+| `RuntimeSkill`, `RuntimeSkillLoader` | `talos_skill::Skill`, `talos_skill::SkillLoader` | Parsed skills for `RuntimeBuilder::skill_read_tool` and activation |
+| `RuntimeSkillActivation`, `RuntimeSkillReadLimits` | `talos_skill::SkillActivation`, `talos_skill::SkillReadLimits` | Bounded, confined Level 1/2 content for `RuntimeHandle::set_skill_context` (ADR-092) |
 
 ### I280 facade signature closure (source development)
 
