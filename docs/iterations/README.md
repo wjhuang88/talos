@@ -3,8 +3,8 @@
 ## Purpose
 
 [I304](I304-absent-journal-pause.md) / [RUNTIME-011](../backlog/active/RUNTIME-011-absent-journal-pause.md)
-is a governance-only draft for an absent-journal pause no-op, distinct from I301 recovery reads.
-No claim/activation or implementation is effective; exact-head review/CI/CAS and main merge required.
+is an Active/Claimed governance-only proposal #722 for an absent-journal pause no-op, distinct from I301 recovery reads.
+No claim/activation or implementation is effective before exact-head review/CI/CAS and main merge.
 The full selection inventory/non-overlap and preserved #705 failures are in I304.
 
 [I303](I303-embedded-skill-progressive-disclosure.md) / [SKILL-006](../backlog/active/SKILL-006-embedded-skill-progressive-disclosure.md)

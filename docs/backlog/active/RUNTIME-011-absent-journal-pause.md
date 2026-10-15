@@ -1,6 +1,6 @@
 # RUNTIME-011: Absent-Journal Pause Without Initialization
 
-> Document status: Ready
+> Document status: Active
 
 **Type**: Technical / Runtime State Story
 **Parent Epic**: None
@@ -10,13 +10,13 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex |
 | Work Slice | Absent-journal pause no-op under the existing pending-store guard; storage and real Actor/Runtime shutdown regressions and documentation only. Existing-journal durability, admission authority and shutdown policy remain unchanged. |
 | Claimed At | 2026-10-15 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #722 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer authorized continuing the intermittent-timeout investigation and grounded repair using GitHub CI. No distinct maintainer reviewer is available; independent Agent storage/custody/API review, exact-head CI, both validators and merge-time CAS are mandatory. |
 | Implementation PR | Not started |
@@ -24,6 +24,9 @@
 | Handoff / Release Condition | No implementation branch or committed implementation before finalized claim reaches main; stop if the optimization requires new custody semantics or an ADR change. |
 
 ## Identity / Goal / Value
+
+Active/Claimed is a finalized atomic proposal in #722, ineffective until merged into main.
+No implementation branch/source/test change precedes that gate.
 
 Runtime callers shutting down or interrupting a legacy/new session with no pending journal should
 not initialize SQLite solely to pause zero durable submissions. CI3182's successful original-Auto
@@ -64,7 +67,8 @@ already acknowledged record or turn failed reconciliation into successful shutdo
   runs, then only accepted_pending transitions, exact changed count and transaction durability hold,
   and restart preserves identities, receipts, payloads, state and order.
 - Given concurrent stores, when absence/pause and durable admission interleave, then no acknowledged
-  submission disappears: prior admission is paused, later admission remains recoverable. Exercise
+  submission disappears: prior admission still in accepted_pending is paused, later admission
+  remains recoverable; Running is never relabeled by pause. Exercise
   the Runtime closing/admission barrier as well as the store snapshot; no global fence is claimed.
 - Given inaccessible/invalid parents, malformed journals or unsupported schema, when pause runs,
   then original observable errors remain. Final symlinks, dangling ancestors and `..` ambiguity

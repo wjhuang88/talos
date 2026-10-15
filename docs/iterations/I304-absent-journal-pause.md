@@ -1,6 +1,6 @@
 # Iteration I304: Absent-Journal Pause Without Initialization
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-10-15
 > Planned objective: avoid initializing SQLite only to pause an absent pending journal.
 > MVP deliverable: real Actor/Runtime shutdown preserves receipts without creating an empty journal.
@@ -9,13 +9,13 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex |
 | Work Slice | Absent-journal pause no-op under the existing pending-store guard; storage and real Actor/Runtime shutdown regressions and documentation only. Existing-journal durability, admission authority and shutdown policy remain unchanged. |
 | Claimed At | 2026-10-15 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #722 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer authorized continuing the intermittent-timeout investigation and grounded repair using GitHub CI. No distinct maintainer reviewer is available; independent Agent storage/custody/API review, exact-head CI, both validators and merge-time CAS are mandatory. |
 | Implementation PR | Not started |
@@ -78,7 +78,8 @@ review confirms the distinction; shared identity is not a distinct human formal 
 
 ## Verification / Completion Evidence
 
-Pending finalized claim PR number, both validators, exact-head CI, independent review and CAS.
+Finalized atomic proposal #722 is ineffective until main merge. Both validators, exact-head CI,
+independent review and merge-time CAS are required.
 No implementation or Completion Commit; not Complete. Future execution appends, not replaces, this plan.
 
 ## Variance And Residuals
