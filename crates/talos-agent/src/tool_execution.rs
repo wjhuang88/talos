@@ -509,11 +509,40 @@ impl Agent {
             ));
         }
 
-        let mut prepared =
+        let prepared_network = if tool.requires_network_invocation() {
+            if self.permission_pipeline.is_none() {
+                return Ok((
+                    ToolExecutionResult::error(
+                        "protected network tool requires the Agent permission pipeline",
+                    ),
+                    Vec::new(),
+                ));
+            }
+            match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                tool.prepare_network_invocation(&call.input)
+            })) {
+                Ok(Ok(Some(prepared))) => Some(prepared),
+                Ok(Err(error)) => {
+                    return Ok((ToolExecutionResult::error(error.to_string()), Vec::new()));
+                }
+                _ => {
+                    return Ok((
+                        ToolExecutionResult::error("network_preparation_unavailable"),
+                        Vec::new(),
+                    ));
+                }
+            }
+        } else {
+            None
+        };
+        let mut prepared = if prepared_network.is_some() {
+            None
+        } else {
             match tool.prepare_normalized_with_provenance(&call.input, tool.provenance()) {
                 Ok(prepared) => prepared,
                 Err(error) => return Ok((ToolExecutionResult::error(error), Vec::new())),
-            };
+            }
+        };
         if prepared.is_some() && call.name == "bash" {
             return Ok((
                 ToolExecutionResult::error(
@@ -532,7 +561,9 @@ impl Agent {
         }
         // Prepared profiles are reserved by the stage budget before any cloning below.
         // Prepared operations cannot use background dispatch.
-        let permission_profile = if prepared.is_none() {
+        let permission_profile = if let Some(network) = prepared_network.as_ref() {
+            network.permission_profile().to_vec()
+        } else if prepared.is_none() {
             tool.permission_profile(&call.input)
         } else {
             Vec::new()
@@ -633,6 +664,7 @@ impl Agent {
             .as_ref()
             .map(|_| tokio::time::Instant::now() + talos_core::tool::PREPARED_INVOCATION_TIMEOUT);
         let mut authorizations: Option<Vec<ToolExecutionAuthorization>> = None;
+        let mut network_authority = None;
         let permission_allowed = loop {
             if let Some(operation) = prepared.as_ref() {
                 let Some(identity) = operation.plan_identity().cloned() else {
@@ -728,7 +760,15 @@ impl Agent {
                     deadline: permission_deadline_at
                         .saturating_duration_since(tokio::time::Instant::now()),
                 };
-                let authorization = if let Some(operation) = prepared.as_ref() {
+                let authorization = if let Some(network) = prepared_network.as_ref() {
+                    pipeline
+                        .authorize_network(authorization_request, network.manifest(), user_intent)
+                        .await
+                        .map(|authority| {
+                            network_authority = Some(authority);
+                            Vec::new()
+                        })
+                } else if let Some(operation) = prepared.as_ref() {
                     let Some(plan) = operation.plan_identity() else {
                         return Ok((
                             ToolExecutionResult::error("prepared plan identity required"),
@@ -900,7 +940,16 @@ impl Agent {
 
         let normalized_input = call.input.clone();
 
-        let (mut result, parts) = if let Some(output) = prepared_output {
+        let (mut result, parts) = if let Some(network) = prepared_network {
+            let Some(authority) = network_authority else {
+                return Ok((
+                    ToolExecutionResult::error("network_authority_unavailable"),
+                    Vec::new(),
+                ));
+            };
+            let output = network.execute(authority).await;
+            (output.result, output.next_provider_parts)
+        } else if let Some(output) = prepared_output {
             (output.result, output.next_provider_parts)
         } else if call.name == "bash" {
             if let Some(sb) = self.sandbox.as_deref() {
