@@ -1170,11 +1170,25 @@ impl ConfigState {
         repository: &RepositoryState,
         environment: &BTreeMap<OsString, OsString>,
     ) -> Result<Vec<PathBuf>, GitToolError> {
+        let maintenance_enabled = self
+            .values
+            .get(b"maintenance.auto".as_slice())
+            .and_then(|values| values.last())
+            .map(|value| git_boolean(value.as_deref()))
+            .transpose()?
+            .unwrap_or(true);
         if self.values.contains_key(b"core.gitproxy".as_slice())
-            || self.values.contains_key(b"gc.recentobjectshook".as_slice())
+            || maintenance_enabled
+                && (self.values.contains_key(b"gc.recentobjectshook".as_slice())
+                    || self
+                        .values
+                        .get(b"gc.repackfilterto".as_slice())
+                        .and_then(|values| values.last())
+                        .and_then(|value| value.as_deref())
+                        .is_some_and(|value| !value.is_empty()))
         {
             return Err(unsupported(
-                "Configured Git fetch helper effects require separate authorization",
+                "Configured Git fetch helper or external maintenance effects require separate authorization",
             ));
         }
         let directory = configured_path(&self.values, b"core.hookspath", environment)?
@@ -1191,6 +1205,21 @@ impl ConfigState {
         self.auxiliary.extend(paths.iter().cloned());
         self.hooks.extend(paths.iter().cloned());
         Ok(paths)
+    }
+
+    /// Validate the selected fetch remote after policy discovery, before any fetch mutation.
+    pub(super) fn prepare_pull_transport(&self, remote: &str) -> Result<(), GitToolError> {
+        for key in [
+            format!("remote.{remote}.uploadpack"),
+            format!("remote.{remote}.vcs"),
+        ] {
+            if self.values.contains_key(key.as_bytes()) {
+                return Err(unsupported(
+                    "Configured Pull transport helper requires separate execution authorization",
+                ));
+            }
+        }
+        Ok(())
     }
 
     /// Capture fetch-triggered hooks only after their exact paths were admitted.
@@ -2289,6 +2318,59 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn pull_helper_checks_follow_maintenance_and_selected_remote() {
+        let root = tempfile::tempdir().expect("fixture");
+        assert!(
+            std::process::Command::new("git")
+                .args(["init"])
+                .current_dir(root.path())
+                .output()
+                .expect("git")
+                .status
+                .success()
+        );
+        let repository = RepositoryState::capture(root.path()).expect("repository");
+        let capture = |records: &str| {
+            let source = repository.common_dir.join("config");
+            let output = records
+                .split_terminator('\0')
+                .map(|record| format!("file:{}\0{record}\0", source.display()))
+                .collect::<String>();
+            ConfigState::capture_host(output.as_bytes(), &repository, &BTreeMap::new())
+                .expect("config")
+        };
+
+        for records in [
+            "maintenance.auto\nfalse\0gc.recentObjectsHook\nhook\0gc.repackFilterTo\n/out\0",
+            "maintenance.auto\n0\0gc.recentObjectsHook\nhook\0gc.repackFilterTo\n\0",
+        ] {
+            let mut config = capture(records);
+            config
+                .prepare_pull(&repository, &BTreeMap::new())
+                .expect("disabled maintenance keeps external settings inactive");
+        }
+        for records in [
+            "maintenance.auto\ntrue\0gc.recentObjectsHook\nhook\0",
+            "maintenance.auto\nyes\0gc.repackFilterTo\n/out\0",
+            "gc.recentObjectsHook\nhook\0",
+            "gc.repackFilterTo\n/out\0",
+        ] {
+            let mut config = capture(records);
+            assert!(
+                config.prepare_pull(&repository, &BTreeMap::new()).is_err(),
+                "{records}"
+            );
+        }
+
+        let config = capture("remote.origin.uploadpack\ncustom-upload\0");
+        assert!(config.prepare_pull_transport("origin").is_err());
+        assert!(config.prepare_pull_transport("other").is_ok());
+        let config = capture("remote.origin.vcs\ncustom-vcs\0");
+        assert!(config.prepare_pull_transport("origin").is_err());
+        assert!(config.prepare_pull_transport("other").is_ok());
     }
 
     #[test]

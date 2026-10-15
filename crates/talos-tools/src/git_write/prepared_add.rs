@@ -959,6 +959,7 @@ impl AddPlan {
         .await?;
         let remote =
             super::pull_state::fetch_remote(&records, initial.branch(), pull.remote.as_deref())?;
+        config.prepare_pull_transport(&remote)?;
         let destinations = super::remote_state::destinations(
             &self
                 .config
