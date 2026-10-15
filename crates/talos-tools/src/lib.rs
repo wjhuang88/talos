@@ -69,7 +69,7 @@ pub mod git;
 pub mod http_request;
 #[cfg(feature = "image")]
 pub mod image_validation;
-#[cfg(feature = "shell")]
+#[cfg(any(feature = "shell", all(feature = "git", unix)))]
 mod process_boundary;
 #[cfg(feature = "image")]
 pub mod read_image_tool;
