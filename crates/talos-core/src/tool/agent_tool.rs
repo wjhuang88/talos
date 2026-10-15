@@ -17,6 +17,14 @@ use super::{
 /// `dyn AgentTool` behind an `Arc`.
 #[async_trait]
 pub trait AgentTool: Send + Sync {
+    /// Returns the stable owner handle for bounded cancellation/shutdown cleanup.
+    /// Composition roots retain it before dispatch and across registry replacement.
+    /// Wrappers must forward the inner handle. None preserves legacy behavior and
+    /// makes no claim that this tool provides managed cleanup evidence.
+    fn cleanup_receipt(&self) -> Option<std::sync::Arc<dyn super::ToolCleanupOwner>> {
+        None
+    }
+
     /// Returns the unique name of this tool.
     fn name(&self) -> &str;
 
@@ -70,6 +78,30 @@ pub trait AgentTool: Send + Sync {
     /// shapes or platforms. The default preserves existing behavior.
     fn execution_admission(&self, _input: &Value) -> Result<ToolExecutionAdmission, String> {
         Ok(ToolExecutionAdmission::Foreground)
+    }
+
+    /// Prepares a normal parsed-input operation before permission evaluation.
+    ///
+    /// The default preserves the existing route. Tools whose effects depend on
+    /// repository or other mutable state can return one owned operation that
+    /// supplies the reviewed facets and is consumed at execution. Prepared
+    /// operations require a permission-aware composition root.
+    fn prepare_normalized_invocation(
+        &self,
+        _input: &Value,
+    ) -> Result<Option<Box<dyn super::PreparedNormalToolInvocation>>, String> {
+        Ok(None)
+    }
+
+    /// Prepares with provenance supplied by the trusted dispatch entrypoint.
+    /// The default preserves legacy preparation; migrated tools retain this
+    /// source in their exact execution proof rather than reading caller JSON.
+    fn prepare_normalized_with_provenance(
+        &self,
+        input: &Value,
+        _provenance: ToolProvenance,
+    ) -> Result<Option<Box<dyn super::PreparedNormalToolInvocation>>, String> {
+        self.prepare_normalized_invocation(input)
     }
 
     /// Commits a semantically admitted background execution after permission succeeds.

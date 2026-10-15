@@ -112,9 +112,28 @@ const LEGACY_TOOL_REGISTRATION_SOURCE: &str = "legacy:unchecked";
 pub struct ToolRegistry {
     tools: HashMap<String, Arc<dyn AgentTool>>,
     contribution_sources: HashMap<String, ToolContributionSource>,
+    cleanup_owners: Vec<Arc<dyn super::ToolCleanupOwner>>,
 }
 
 impl ToolRegistry {
+    /// Retained cleanup owners, including tools replaced through registration.
+    /// Composition roots snapshot these after registration and before dispatch.
+    /// Holding these handles does not seal, cancel or authorize any operation.
+    pub fn cleanup_receipts(&self) -> Vec<Arc<dyn super::ToolCleanupOwner>> {
+        self.cleanup_owners.clone()
+    }
+
+    fn retain_cleanup_owner(&mut self, tool: &dyn AgentTool) {
+        if let Some(owner) = tool.cleanup_receipt()
+            && !self
+                .cleanup_owners
+                .iter()
+                .any(|existing| Arc::ptr_eq(existing, &owner))
+        {
+            self.cleanup_owners.push(owner);
+        }
+    }
+
     /// Creates a new empty tool registry.
     pub fn new() -> Self {
         Self::default()
@@ -127,6 +146,7 @@ impl ToolRegistry {
     /// during I158 migration. New product composition should use
     /// [`register_contribution`](Self::register_contribution).
     pub fn register(&mut self, tool: Arc<dyn AgentTool>) {
+        self.retain_cleanup_owner(tool.as_ref());
         let name = tool.name().to_owned();
         self.contribution_sources.remove(&name);
         self.tools.insert(name, tool);
@@ -152,6 +172,7 @@ impl ToolRegistry {
             });
         }
 
+        self.retain_cleanup_owner(tool.as_ref());
         self.contribution_sources.insert(tool_name.clone(), source);
         self.tools.insert(tool_name, tool);
         Ok(())
@@ -189,6 +210,7 @@ impl ToolRegistry {
         }
 
         for ToolContribution { source, tool } in contributions {
+            self.retain_cleanup_owner(tool.as_ref());
             let tool_name = tool.name().to_owned();
             self.contribution_sources.insert(tool_name.clone(), source);
             self.tools.insert(tool_name, tool);
@@ -266,5 +288,66 @@ fn input_type_name(value: &Value) -> &'static str {
         Value::String(_) => "string",
         Value::Array(_) => "array",
         Value::Object(_) => "object",
+    }
+}
+
+#[cfg(test)]
+mod cleanup_tests {
+    use super::*;
+    use crate::tool::{ToolCleanupError, ToolCleanupOwner, ToolCleanupReceipt, ToolResult};
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    #[derive(Default)]
+    struct Owner(AtomicBool);
+
+    #[async_trait::async_trait]
+    impl ToolCleanupReceipt for Owner {
+        async fn wait(&self, _: std::time::Duration) -> Result<(), ToolCleanupError> {
+            Ok(())
+        }
+    }
+    impl ToolCleanupOwner for Owner {
+        fn seal(&self) {
+            self.0.store(true, Ordering::SeqCst);
+        }
+    }
+    struct Tool(Arc<Owner>);
+    #[async_trait::async_trait]
+    impl AgentTool for Tool {
+        fn name(&self) -> &str {
+            "replacement"
+        }
+        fn description(&self) -> &str {
+            "fixture"
+        }
+        fn parameters(&self) -> Value {
+            serde_json::json!({"type":"object"})
+        }
+        fn cleanup_receipt(&self) -> Option<Arc<dyn ToolCleanupOwner>> {
+            Some(self.0.clone())
+        }
+        async fn execute(&self, _: Value) -> ToolResult {
+            ToolResult::success("fixture")
+        }
+    }
+
+    #[test]
+    fn replacement_retains_prior_owner_and_deduplicates_shared_owner() {
+        let first = Arc::new(Owner::default());
+        let second = Arc::new(Owner::default());
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(Tool(first.clone())));
+        registry.register(Arc::new(Tool(second.clone())));
+        registry.register(Arc::new(Tool(second.clone())));
+        let retained = registry.cleanup_receipts();
+        assert_eq!(retained.len(), 2);
+        drop(registry);
+        assert!(!first.0.load(Ordering::SeqCst));
+        assert!(!second.0.load(Ordering::SeqCst));
+        for owner in retained {
+            owner.seal();
+        }
+        assert!(first.0.load(Ordering::SeqCst));
+        assert!(second.0.load(Ordering::SeqCst));
     }
 }
