@@ -1,6 +1,6 @@
 # RUNTIME-011: Absent-Journal Pause Without Initialization
 
-> Document status: Active
+> Document status: Review
 
 **Type**: Technical / Runtime State Story
 **Parent Epic**: None
@@ -105,3 +105,13 @@ CI3182's sole baseline failure is a 5s composite evaluator fixture without exact
 successful pause spans do not prove that failure or historical10s failures have the same cause.
 Those failures, native active-child latency and existing-journal costs remain #705 residuals.
 No Completion Commit exists; this is not Complete.
+
+## Implementation Checkpoint — 2026-10-15
+
+Claim #722 became effective at main merge `23e659e2403739b74bc018ec46305346e8e2c7ad`.
+The implementation candidate starts from later main `0ef5a532930642d730bcc6d974f2a79605efaaee`,
+which adds only #725's separately owned Provider intake. The original proposal wording above is
+historical. Delivery is Review / Claimed; the execution and validation record is in I304.
+Guard-before-absence, storage regressions and actual Actor/Runtime shutdown tests implement this
+slice. Independent exact-head custody/API review, full native CI and post-repair Windows comparison
+with preserved CI3182 remain gates. No Completion Commit or timeout-closure claim exists.

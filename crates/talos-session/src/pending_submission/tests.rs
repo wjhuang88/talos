@@ -19,6 +19,257 @@ fn submission() -> StructuredSubmission {
 }
 
 #[test]
+fn absent_pause_creates_no_storage_and_later_admission_remains_durable() {
+    let dir = tempfile::tempdir().expect("temporary directory");
+    let session_file = dir.path().join("missing/deeper/session.tlog");
+    let store = PendingSubmissionStore::for_session_file(&session_file, "session-1");
+    assert_eq!(store.pause_unstarted().expect("empty pause"), 0);
+    assert!(!dir.path().join("missing").exists());
+    let payload = submission();
+    let (receipt, disposition) = store.accept(&payload).expect("later admission");
+    assert_eq!(disposition, SubmissionReceiptDisposition::AcceptedPending);
+    drop(store);
+    let reopened = PendingSubmissionStore::for_session_file(&session_file, "session-1");
+    let records = reopened.recover_unstarted().expect("durable recovery");
+    assert_eq!(records.len(), 1);
+    assert_eq!(records[0].receipt_id, receipt);
+    assert_eq!(records[0].submission, payload);
+    assert_eq!(records[0].state, PendingSubmissionState::AcceptedPending);
+    assert_eq!(reopened.pause_unstarted().expect("pause admitted work"), 1);
+}
+
+#[test]
+fn pause_changes_only_existing_accepted_pending_and_preserves_receipts() {
+    let dir = tempfile::tempdir().expect("temporary directory");
+    let session_file = dir.path().join("session.tlog");
+    let store = PendingSubmissionStore::for_session_file(&session_file, "session-1");
+    let accepted = submission();
+    let mut running = submission();
+    running.id = "running".into();
+    running.items[0].id = "running-item".into();
+    let mut paused = submission();
+    paused.id = "paused".into();
+    paused.items[0].id = "paused-item".into();
+    for payload in [&accepted, &running, &paused] {
+        store.accept(payload).expect("accept");
+    }
+    store
+        .mark_running(&running.id, "turn-running")
+        .expect("start");
+    store.mark_paused(&paused.id).expect("prior pause");
+    let mut expected = store.get(&accepted.id).expect("read").expect("accepted");
+    let running_before = store.get(&running.id).expect("read");
+    let paused_before = store.get(&paused.id).expect("read");
+    expected.state = PendingSubmissionState::PausedPending;
+    assert_eq!(store.pause_unstarted().expect("pause"), 1);
+    assert_eq!(store.pause_unstarted().expect("repeat pause"), 0);
+    drop(store);
+    let reopened = PendingSubmissionStore::for_session_file(&session_file, "session-1");
+    assert_eq!(
+        reopened.get(&accepted.id).expect("read"),
+        Some(expected.clone())
+    );
+    assert_eq!(reopened.get(&running.id).expect("read"), running_before);
+    assert_eq!(reopened.get(&paused.id).expect("read"), paused_before);
+    assert_eq!(
+        reopened.recover_unstarted().expect("FIFO"),
+        vec![expected, paused_before.expect("paused")]
+    );
+    assert_eq!(
+        reopened.recover_running().expect("running"),
+        vec![running_before.expect("running")]
+    );
+}
+
+#[test]
+fn pause_and_cross_instance_admission_keep_acknowledged_work() {
+    let dir = tempfile::tempdir().expect("temporary directory");
+    let session_file = dir.path().join("missing/session.tlog");
+    let reader = PendingSubmissionStore::for_session_file(&session_file, "session-1");
+    assert_eq!(reader.pause_unstarted().expect("absent snapshot"), 0);
+    assert!(!dir.path().join("missing").exists());
+    let writer = PendingSubmissionStore::for_session_file(&session_file, "session-1");
+    let barrier = Arc::new(std::sync::Barrier::new(2));
+    let ready = Arc::clone(&barrier);
+    let admission = std::thread::spawn(move || {
+        ready.wait();
+        writer.accept(&submission()).expect("concurrent admission")
+    });
+    barrier.wait();
+    let changed = reader.pause_unstarted().expect("concurrent pause");
+    let (receipt, disposition) = admission.join().expect("writer joins");
+    assert_eq!(disposition, SubmissionReceiptDisposition::AcceptedPending);
+    let reopened = PendingSubmissionStore::for_session_file(&session_file, "session-1");
+    let records = reopened.recover_unstarted().expect("acknowledged custody");
+    assert_eq!(records.len(), 1);
+    assert_eq!(records[0].receipt_id, receipt);
+    assert_eq!(records[0].submission, submission());
+    assert_eq!(
+        records[0].state,
+        match changed {
+            0 => PendingSubmissionState::AcceptedPending,
+            1 => PendingSubmissionState::PausedPending,
+            other => panic!("unexpected changed count: {other}"),
+        }
+    );
+    assert_eq!(
+        reopened.pause_unstarted().expect("post-ack pause"),
+        1 - changed
+    );
+    assert_eq!(
+        reopened
+            .get(&submission().id)
+            .expect("read")
+            .expect("record")
+            .state,
+        PendingSubmissionState::PausedPending
+    );
+}
+
+#[test]
+fn pause_preserves_invalid_parent_malformed_journal_and_schema_errors() {
+    let dir = tempfile::tempdir().expect("temporary directory");
+    let parent = dir.path().join("file");
+    std::fs::write(&parent, "sentinel").expect("file fixture");
+    let invalid =
+        PendingSubmissionStore::for_session_file(&parent.join("session.tlog"), "session-1");
+    assert!(matches!(
+        invalid.pause_unstarted(),
+        Err(PendingSubmissionError::Io(_))
+    ));
+    assert_eq!(
+        std::fs::read_to_string(&parent).expect("unchanged"),
+        "sentinel"
+    );
+    let malformed =
+        PendingSubmissionStore::for_session_file(&dir.path().join("session.tlog"), "malformed");
+    std::fs::write(malformed.path(), "not SQLite").expect("malformed fixture");
+    assert!(matches!(
+        malformed.pause_unstarted(),
+        Err(PendingSubmissionError::Storage(_))
+    ));
+    let unsupported =
+        PendingSubmissionStore::for_session_file(&dir.path().join("session.tlog"), "unsupported");
+    let connection = unsupported.connection().expect("connection");
+    ensure_schema(&connection).expect("schema");
+    connection
+        .execute(
+            "UPDATE pending_journal_meta SET value = 999 WHERE key = 'schema_version'",
+            [],
+        )
+        .expect("unsupported fixture");
+    drop(connection);
+    assert!(matches!(
+        unsupported.pause_unstarted(),
+        Err(PendingSubmissionError::UnsupportedSchema(999))
+    ));
+}
+
+#[test]
+fn pause_parentdir_path_cannot_hide_previously_acknowledged_custody() {
+    let dir = tempfile::tempdir().expect("temporary directory");
+    let store =
+        PendingSubmissionStore::for_session_file(&dir.path().join("session.tlog"), "session-1");
+    let (receipt, _) = store.accept(&submission()).expect("canonical admission");
+    let missing = dir.path().join("missing");
+    let alternate =
+        PendingSubmissionStore::for_session_file(&missing.join("../session.tlog"), "session-1");
+    assert_eq!(alternate.pause_unstarted().expect("conservative pause"), 1);
+    let records = store.recover_unstarted().expect("recovery");
+    assert_eq!(records.len(), 1);
+    assert_eq!(records[0].receipt_id, receipt);
+    assert_eq!(records[0].submission, submission());
+    assert_eq!(records[0].state, PendingSubmissionState::PausedPending);
+}
+
+#[test]
+fn pause_parentdir_empty_path_retains_sqlite_initialization() {
+    let dir = tempfile::tempdir().expect("temporary directory");
+    let missing = dir.path().join("missing");
+    let store =
+        PendingSubmissionStore::for_session_file(&missing.join("../session.tlog"), "session-1");
+    assert_eq!(
+        store.pause_unstarted().expect("conservative empty pause"),
+        0
+    );
+    assert!(dir.path().join("session-1.pending.sqlite").is_file());
+    #[cfg(unix)]
+    assert!(missing.is_dir());
+}
+
+#[test]
+fn absent_pause_preserves_poisoned_guard_error() {
+    let dir = tempfile::tempdir().expect("temporary directory");
+    let store = PendingSubmissionStore::for_session_file(
+        &dir.path().join("missing/session.tlog"),
+        "session-1",
+    );
+    let lock = Arc::clone(&store.lock);
+    assert!(
+        std::thread::spawn(move || {
+            let _guard = lock.lock().expect("guard");
+            panic!("poison fixture");
+        })
+        .join()
+        .is_err()
+    );
+    assert!(matches!(
+        store.pause_unstarted(),
+        Err(PendingSubmissionError::LockPoisoned)
+    ));
+    assert!(!dir.path().join("missing").exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn pause_preserves_symlink_routes_and_dangling_ancestor_errors() {
+    use std::os::unix::fs::symlink;
+    let dir = tempfile::tempdir().expect("temporary directory");
+    let store =
+        PendingSubmissionStore::for_session_file(&dir.path().join("session.tlog"), "linked");
+    let target = dir.path().join("target.sqlite");
+    symlink(&target, store.path()).expect("final dangling link");
+    assert_eq!(
+        store.pause_unstarted().expect("SQLite follows final link"),
+        0
+    );
+    assert!(target.is_file());
+    let invalid =
+        PendingSubmissionStore::for_session_file(&dir.path().join("session.tlog"), "invalid-link");
+    symlink(dir.path().join("absent/target.sqlite"), invalid.path()).expect("invalid final link");
+    assert!(matches!(
+        invalid.pause_unstarted(),
+        Err(PendingSubmissionError::Storage(_))
+    ));
+    let dangling = dir.path().join("dangling");
+    symlink(dir.path().join("absent"), &dangling).expect("dangling ancestor");
+    let store = PendingSubmissionStore::for_session_file(
+        &dangling.join("deeper/session.tlog"),
+        "session-1",
+    );
+    assert!(matches!(
+        store.pause_unstarted(),
+        Err(PendingSubmissionError::Io(_))
+    ));
+    let directory = dir.path().join("directory");
+    std::fs::create_dir(&directory).expect("directory");
+    let link = dir.path().join("directory-link");
+    symlink(&directory, &link).expect("directory link");
+    let store =
+        PendingSubmissionStore::for_session_file(&link.join("missing/session.tlog"), "session-1");
+    assert_eq!(store.pause_unstarted().expect("absent linked child"), 0);
+    assert!(!directory.join("missing").exists());
+    let looping = dir.path().join("looping");
+    symlink(&looping, &looping).expect("symlink loop");
+    let store =
+        PendingSubmissionStore::for_session_file(&looping.join("session.tlog"), "session-1");
+    assert!(matches!(
+        store.pause_unstarted(),
+        Err(PendingSubmissionError::Io(_))
+    ));
+}
+
+#[test]
 fn prestart_error_is_idempotent_but_cannot_erase_a_started_turn() {
     let dir = tempfile::tempdir().expect("temporary directory");
     let store =
@@ -755,12 +1006,16 @@ fn recovery_preserves_filesystem_permission_errors() {
     let observation = std::fs::symlink_metadata(store.path());
     let running = store.recover_running();
     let pending = store.recover_unstarted();
+    let paused = store.pause_unstarted();
     std::fs::set_permissions(&parent, std::fs::Permissions::from_mode(0o700))
         .expect("restore directory");
     let kind = observation.expect_err("sidecar remains absent").kind();
     eprintln!("pending-journal permission fixture filesystem_error={kind:?}");
     match kind {
         std::io::ErrorKind::PermissionDenied => {
+            assert!(
+                matches!(paused, Err(PendingSubmissionError::Io(e)) if e.kind() == std::io::ErrorKind::PermissionDenied)
+            );
             assert!(
                 matches!(running, Err(PendingSubmissionError::Io(e)) if e.kind() == std::io::ErrorKind::PermissionDenied)
             );
@@ -770,6 +1025,7 @@ fn recovery_preserves_filesystem_permission_errors() {
         }
         std::io::ErrorKind::NotFound => {
             // A privileged process can inspect this directory despite its mode.
+            assert_eq!(paused.expect("privileged empty pause"), 0);
             assert!(running.expect("privileged empty running").is_empty());
             assert!(pending.expect("privileged empty pending").is_empty());
         }

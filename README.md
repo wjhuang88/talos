@@ -941,6 +941,10 @@ shutdown fence closes, new SDK submissions return typed `RuntimeClosing` without
 existing consuming `RuntimeHandle::shutdown()` remains available and returns
 `ShutdownIncomplete` instead of reporting incomplete cleanup as success.
 
+When the pending journal is genuinely absent, pausing unstarted work during shutdown returns zero
+without initializing SQLite or creating its parent directories. This is an operation snapshot; later
+admission by another store instance remains durable, and Running records keep their existing state.
+
 After actor-owned durable reconciliation, shutdown runs a build-time frozen set of Talos-owned
 resource finalizers once in fixed order under the same total deadline. `ShutdownReport::finalizers()`
 contains only fixed identifiers and typed outcomes; arbitrary embedder callbacks and caller-provided

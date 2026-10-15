@@ -498,8 +498,14 @@ impl PendingSubmissionStore {
     }
 
     /// Pauses all accepted submissions that have not started.
+    ///
+    /// A genuinely absent journal is an empty snapshot and is not created.
+    /// This does not fence later admission by another store instance.
     pub fn pause_unstarted(&self) -> Result<usize, PendingSubmissionError> {
         let _guard = self.guard()?;
+        if !self.sidecar_exists()? {
+            return Ok(0);
+        }
         let mut connection = self.connection()?;
         let transaction = immediate(&mut connection)?;
         ensure_schema(&transaction)?;
@@ -767,7 +773,7 @@ impl PendingSubmissionStore {
         }
     }
 
-    // Called under the store guard. Absence is a read snapshot, not a custody fence:
+    // Called under the store guard. Absence is an operation snapshot, not a custody fence:
     // another store instance may subsequently create and durably admit work.
     fn sidecar_exists(&self) -> Result<bool, PendingSubmissionError> {
         match std::fs::symlink_metadata(self.path.as_ref()) {
