@@ -1873,6 +1873,7 @@ dependencies = [
  "faster-hex",
  "gix-features",
  "sha1-checked",
+ "sha2 0.11.0",
  "thiserror",
 ]
 
@@ -4661,6 +4662,7 @@ dependencies = [
  "sha2 0.11.0",
  "similar",
  "talos-core",
+ "talos-permission",
  "talos-sandbox",
  "talos-text",
  "thiserror",

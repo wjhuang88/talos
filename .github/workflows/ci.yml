@@ -248,6 +248,23 @@ jobs:
           cargo test -p talos-desktop --features desktop-ui --locked
           exit $LASTEXITCODE
 
+      - name: Structured Git executable guard tests
+        shell: pwsh
+        run: |
+          $tests = @(
+            'git::git_write::prepared_add::tests::windows_program_guard_allows_real_git_startup',
+            'git::git_write::prepared_add::tests::program_evidence_retains_windows_replacement_guard'
+          )
+          $listed = @(cargo test -p talos-tools --features git --locked --lib -- --list)
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          foreach ($test in $tests) {
+            if ($listed -notcontains "${test}: test") {
+              throw "Required Windows Git regression is missing: $test"
+            }
+            cargo test -p talos-tools --features git --locked --lib $test -- --exact --nocapture
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
       - name: Focused PowerShell process, permission, and timeout tests
         run: |
           cargo test -p talos-tools --locked windows_spawned_powershell_child_cannot_observe_dangerous_parent_environment -- --nocapture

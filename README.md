@@ -672,6 +672,23 @@ install does not need a manual catalog initialization step: Talos does not creat
 `catalog.db` for model metadata. Model/provider metadata updates are build-time only through
 `BUILD_MODELS=1`; the legacy `--import-models` flag is kept as a no-op compatibility notice.
 
+The current I300 development candidate treats `git_add` paths literally, relative to
+the workspace. It first requests dedicated Git configuration-chain discovery
+permission, then separately authorizes the resulting staging plan. Configuration
+values remain internal. Discovery requires host Git support for `git var
+GIT_ATTR_SYSTEM` and `GIT_ATTR_GLOBAL`. Unsupported filters, hooks, fsmonitor,
+object alternates, and split indexes are refused; any fallback requires separate
+authorization. This migration currently covers `git_add`; lifecycle and other Git
+write-tool gates remain open. See the [I300 migration inventory](docs/reference/I300-GIT-AUTHORIZATION-MIGRATION.md).
+The candidate's nonrecursive checkout can replace a nonempty submodule directory
+only after discovering its entries and obtaining explicit deletion permission for
+each one, including untracked files. Effective configuration sources and symbolic
+or special entries remain protected; failures can leave partial Git effects.
+The in-progress `git_commit` migration currently refuses mutation, including
+direct calls. Its planned admitted execution keeps automatic maintenance in the
+foreground (`maintenance.autoDetach=false`, `gc.autoDetach=false`) so maintenance
+shares the invocation lifetime; maintenance work is not disabled.
+
 ## Built-In Capabilities
 
 Talos ships with built-in tools for common coding-agent work:
