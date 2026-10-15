@@ -1,0 +1,13770 @@
+//! One-use staging plan. Configuration and process ownership validation remain
+//! I300 publication gates; this module does not claim OS containment.
+
+use std::collections::BTreeMap;
+use std::ffi::OsString;
+use std::path::{Path, PathBuf};
+
+use async_trait::async_trait;
+use serde_json::Value;
+use talos_core::tool::{
+    PreparedNormalStage, PreparedNormalToolInvocation, PreparedPlanIdentity, ToolExecutionOutput,
+    ToolNature, ToolPermissionFacet, ToolProvenance, ToolResourceKind,
+};
+use talos_permission::{AdmittedInvocation, PermissionRequest};
+
+use super::{
+    GitAddInput, GitCheckoutInput, GitCommitInput, GitPullInput, GitPushInput, GitToolError,
+    capture_add_sources, literal_add_paths, repository_state::RepositoryState, snapshot,
+};
+
+struct ChildInspectionEvidence {
+    attributes: Vec<(PathBuf, snapshot::Entry)>,
+    sources: Vec<(PathBuf, PathBuf, Vec<String>, Vec<snapshot::Entry>)>,
+    status: Vec<(PathBuf, super::status_state::StatusState)>,
+}
+
+#[derive(PartialEq, Eq)]
+struct ReceiverChildExecutable {
+    spelling: PathBuf,
+    canonical: PathBuf,
+    identity: snapshot::PathIdentity,
+    program: ProgramEvidence,
+}
+
+impl ReceiverChildExecutable {
+    fn capture(spelling: &Path, admitted: &Path) -> Result<Self, GitToolError> {
+        let canonical = spelling.canonicalize().map_err(|_| {
+            GitToolError::InvalidInput("Receiver child executable is unavailable".into())
+        })?;
+        if canonical != admitted {
+            return Err(GitToolError::InvalidInput(
+                "Receiver child executable changed after Read admission".into(),
+            ));
+        }
+        let identity = snapshot::PathIdentity::capture(spelling).map_err(|_| {
+            GitToolError::InvalidInput("Receiver child executable path is unavailable".into())
+        })?;
+        let program = capture_program(&canonical)?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            if !std::fs::metadata(&canonical)
+                .is_ok_and(|metadata| metadata.permissions().mode() & 0o111 != 0)
+            {
+                return Err(GitToolError::InvalidInput(
+                    "Receiver child executable is not executable".into(),
+                ));
+            }
+        }
+        if spelling.canonicalize().ok().as_deref() != Some(&canonical)
+            || snapshot::PathIdentity::capture(spelling).ok().as_ref() != Some(&identity)
+            || capture_program(&canonical)? != program
+        {
+            return Err(GitToolError::InvalidInput(
+                "Receiver child executable changed during inspection".into(),
+            ));
+        }
+        Ok(Self {
+            spelling: spelling.to_owned(),
+            canonical,
+            identity,
+            program,
+        })
+    }
+
+    fn revalidate(&self, admitted: &Path) -> Result<(), GitToolError> {
+        if &Self::capture(&self.spelling, admitted)? != self {
+            return Err(GitToolError::InvalidInput(
+                "Receiver child executable changed after discovery".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl ChildInspectionEvidence {
+    fn revalidate(&self) -> Result<(), GitToolError> {
+        for (workdir, expected) in &self.status {
+            if &super::status_state::StatusState::capture(workdir, &[])? != expected {
+                return Err(GitToolError::InvalidInput(
+                    "Submodule status inputs changed during inspection".into(),
+                ));
+            }
+        }
+        let mut budget = snapshot::Budget {
+            entries: 4096,
+            bytes: 4 * 1024 * 1024,
+        };
+        for (path, expected) in &self.attributes {
+            let actual = snapshot::Entry::capture(path, &mut budget).map_err(|_| {
+                GitToolError::InvalidInput("Submodule attribute evidence unavailable".into())
+            })?;
+            if &actual != expected {
+                return Err(GitToolError::InvalidInput(
+                    "Submodule attributes changed after inspection".into(),
+                ));
+            }
+        }
+        for (discovery, workdir, paths, expected) in &self.sources {
+            let (current, nested) = tracked_commit_sources_at(discovery, workdir)?;
+            if &current != paths
+                || !nested.is_empty()
+                || &capture_tracked_sources(workdir, paths)? != expected
+            {
+                return Err(GitToolError::InvalidInput(
+                    "Submodule tracked sources changed after inspection".into(),
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone)]
+enum Operation {
+    Add,
+    Commit(GitCommitInput),
+    Checkout(GitCheckoutInput),
+    Push(GitPushInput),
+    Pull(GitPullInput),
+}
+
+impl Operation {
+    fn name(&self) -> &'static str {
+        match self {
+            Self::Add => "git_add",
+            Self::Commit(_) => "git_commit",
+            Self::Checkout(_) => "git_checkout",
+            Self::Push(_) => "git_push",
+            Self::Pull(_) => "git_pull",
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Phase {
+    SenderConfiguration,
+    ReceiverRoots,
+    ReceiverMetadata,
+    ReceiverCommon,
+    ReceiverConfiguration,
+    ReceiverAuxiliary,
+    ReceiverMutation,
+    Mutation,
+    CheckoutDeletion,
+    CheckoutNewGitlinks,
+    CheckoutChildMarkers,
+    CheckoutChildMetadata,
+    CheckoutChildConfiguration,
+    CheckoutChildWorktree,
+    TargetConfiguration,
+    PullPreparation,
+    PullFetch,
+}
+
+pub(super) struct AddPlan {
+    phase: Phase,
+    command_budget: std::sync::Mutex<CommandBudget>,
+    #[cfg(unix)]
+    execution: talos_sandbox::OwnedCommandOperation,
+    operation: Operation,
+    commit_state: Option<super::repository_state::CommitState>,
+    push_destinations: Vec<String>,
+    receiver_roots: Vec<PathBuf>,
+    receiver_child_paths: Vec<PathBuf>,
+    receiver_child_executables: Vec<ReceiverChildExecutable>,
+    receiver_layouts: Vec<super::receiver_state::Root>,
+    receiver_metadata: Vec<super::receiver_state::Metadata>,
+    receiver_common: Vec<super::receiver_state::Common>,
+    receiver_worktree_inventories: Vec<super::receiver_state::WorktreeInventory>,
+    receiver_siblings: Vec<super::receiver_state::Metadata>,
+    receiver_configs: Vec<(PathBuf, super::config_state::ChildConfig)>,
+    receiver_effects: Vec<super::config_state::ReceiverEffects>,
+    receiver_auxiliary: Vec<Vec<(PathBuf, snapshot::RegularEvidence)>>,
+    receiver_rebase: Vec<(PathBuf, bool, super::receiver_state::RebaseState)>,
+    receiver_sibling_refs: Vec<(PathBuf, super::receiver_state::ReferenceTree)>,
+    receiver_sibling_targets: Vec<super::receiver_state::SiblingTargets>,
+    receiver_storage: Vec<super::receiver_storage::Storage>,
+    sender_mutation_facets: Vec<ToolPermissionFacet>,
+    checkout_target: Option<super::checkout_state::TargetTree>,
+    checkout_guessed: bool,
+    checkout_tracking_source: Option<(String, String)>,
+    checkout_tracking_writes: Vec<super::target_config::Record>,
+    checkout_new_branch: Option<String>,
+    checkout_parents: Option<super::checkout_state::TargetParents>,
+    checkout_empty_gitlinks: Vec<(PathBuf, snapshot::PathIdentity)>,
+    checkout_new_gitlinks: Vec<(PathBuf, NewGitlinkDirectory)>,
+    checkout_child_layouts: Vec<super::receiver_state::Root>,
+    checkout_child_metadata: Vec<super::receiver_state::Metadata>,
+    checkout_child_bootstrap: Vec<(PathBuf, super::config_state::ChildConfig)>,
+    checkout_child_worktrees: Vec<(PathBuf, PathBuf, snapshot::PathIdentity)>,
+    checkout_child_startup: Vec<super::config_state::ChildStartupLayout>,
+    checkout_pending_new_gitlinks: Vec<(PathBuf, snapshot::PathIdentity)>,
+    checkout_deletion: Option<super::checkout_deletion::Inventory>,
+    target_config_sources: Option<super::target_config::Sources>,
+    target_config_roots: Vec<PathBuf>,
+    target_hook_paths: Option<Vec<PathBuf>>,
+    target_hook_evidence: Vec<(PathBuf, snapshot::RegularEvidence)>,
+    pull_before: Option<super::pull_state::BeforeFetch>,
+    pull_evidence: Option<super::pull_state::PullEvidence>,
+    pull_sources: Option<PullSources>,
+    pull_attribute_paths: Vec<PathBuf>,
+    pull_attributes: Vec<PullAttribute>,
+    pull_remote: Option<String>,
+    pull_destinations: Vec<String>,
+    pull_transport_supported: bool,
+    pull_hook_paths: Vec<PathBuf>,
+    pull_hook_evidence: Vec<(PathBuf, snapshot::RegularEvidence)>,
+    pull_graph_paths: Option<Vec<PathBuf>>,
+    pull_inventory: Option<super::pull_inventory::Inventory>,
+    identity: PreparedPlanIdentity,
+    workspace: PathBuf,
+    input: Value,
+    provenance: ToolProvenance,
+    repository: RepositoryState,
+    paths: Vec<String>,
+    sources: Vec<snapshot::Entry>,
+    gitlinks: Vec<GitlinkEvidence>,
+    facets: Vec<ToolPermissionFacet>,
+    environment: BTreeMap<OsString, OsString>,
+    program: PathBuf,
+    program_entry: ProgramEvidence,
+    maintenance_program: Option<PathBuf>,
+    config: Option<super::config_state::ConfigState>,
+    child_configs: Vec<(PathBuf, super::config_state::ChildConfig)>,
+    child_locations: Vec<(PathBuf, super::repository_state::ChildLocation)>,
+    child_attributes: std::collections::BTreeSet<PathBuf>,
+}
+
+// Retained by the consumed plan across discovery/continuation. Reserve worst-case
+// stdout + stderr capacity before spawning; failures and cancellation do not
+// refund it. This counts Talos-spawned commands, not Git's internal descendants.
+struct CommandBudget {
+    commands: usize,
+    output_bytes: u64,
+}
+
+impl Default for CommandBudget {
+    fn default() -> Self {
+        Self {
+            commands: 128,
+            output_bytes: 64 * 1024 * 1024,
+        }
+    }
+}
+
+impl CommandBudget {
+    fn reserve(&mut self, per_pipe_limit: u64) -> Result<(), GitToolError> {
+        let exhausted = || {
+            GitToolError::InvalidInput(
+                "Git cumulative command/output budget exhausted; no further child started".into(),
+            )
+        };
+        let commands = self.commands.checked_sub(1).ok_or_else(exhausted)?;
+        let reserved_bytes = per_pipe_limit.checked_mul(2).ok_or_else(exhausted)?;
+        let output_bytes = self
+            .output_bytes
+            .checked_sub(reserved_bytes)
+            .ok_or_else(exhausted)?;
+        self.commands = commands;
+        self.output_bytes = output_bytes;
+        Ok(())
+    }
+}
+
+impl AddPlan {
+    #[cfg(unix)]
+    pub(super) fn bind_operation(
+        mut self,
+        execution: talos_sandbox::OwnedCommandOperation,
+    ) -> Self {
+        self.execution = execution;
+        self
+    }
+
+    async fn run_command(
+        &self,
+        command: tokio::process::Command,
+        deadline: std::time::Duration,
+        limit: u64,
+    ) -> Result<Vec<u8>, GitToolError> {
+        let output = self.run_command_output(command, deadline, limit).await?;
+        if !output.status.success() {
+            let bytes = if output.stderr.is_empty() {
+                &output.stdout
+            } else {
+                &output.stderr
+            };
+            return Err(GitToolError::Git(
+                String::from_utf8_lossy(bytes).trim().to_owned(),
+            ));
+        }
+        Ok(output.stdout)
+    }
+
+    // A probe's documented nonzero exit is data, but spawning, timeout,
+    // cancellation and collection failures remain errors from the owned runner.
+    async fn run_command_output(
+        &self,
+        command: tokio::process::Command,
+        deadline: std::time::Duration,
+        limit: u64,
+    ) -> Result<std::process::Output, GitToolError> {
+        self.command_budget
+            .lock()
+            .map_err(|_| GitToolError::Git("Git command budget unavailable".into()))?
+            .reserve(limit)?;
+        #[cfg(unix)]
+        {
+            let mut command = command;
+            crate::process_boundary::apply_process_hardening(&mut command);
+            self.execution.execute(command.into_std(), deadline,
+                usize::try_from(limit).unwrap_or(usize::MAX)).await
+                .map_err(|error| GitToolError::Git(format!("host Git execution failed: {error}; effects may be partial; inspect repository before retrying")))
+        }
+        #[cfg(not(unix))]
+        {
+            super::run_host_command_output(command, deadline, limit).await
+        }
+    }
+
+    pub(super) fn prepare(
+        workspace: &Path,
+        input: &Value,
+        provenance: ToolProvenance,
+    ) -> Result<Self, GitToolError> {
+        let parsed: GitAddInput = serde_json::from_value(input.clone())
+            .map_err(|error| GitToolError::InvalidInput(error.to_string()))?;
+        Self::prepare_operation(
+            workspace,
+            input,
+            provenance,
+            Operation::Add,
+            Some(parsed.paths),
+        )
+    }
+
+    pub(super) fn prepare_commit(
+        workspace: &Path,
+        input: &Value,
+        provenance: ToolProvenance,
+    ) -> Result<Self, GitToolError> {
+        let parsed: GitCommitInput = serde_json::from_value(input.clone())
+            .map_err(|error| GitToolError::InvalidInput(error.to_string()))?;
+        if parsed.message.contains('\0') {
+            return Err(GitToolError::InvalidInput(
+                "Git commit message contains NUL".into(),
+            ));
+        }
+        Self::prepare_operation(
+            workspace,
+            input,
+            provenance,
+            Operation::Commit(parsed),
+            None,
+        )
+    }
+
+    pub(super) fn prepare_push(
+        workspace: &Path,
+        input: &Value,
+        provenance: ToolProvenance,
+    ) -> Result<Self, GitToolError> {
+        let parsed: GitPushInput = serde_json::from_value(input.clone())
+            .map_err(|error| GitToolError::InvalidInput(error.to_string()))?;
+        super::validate_git_positional(parsed.remote.as_deref().unwrap_or("origin"))?;
+        if let Some(branch) = &parsed.branch {
+            super::validate_git_positional(branch)?;
+        }
+        Self::prepare_operation(workspace, input, provenance, Operation::Push(parsed), None)
+    }
+
+    pub(super) fn prepare_pull(
+        workspace: &Path,
+        input: &Value,
+        provenance: ToolProvenance,
+    ) -> Result<Self, GitToolError> {
+        let parsed: GitPullInput = serde_json::from_value(input.clone())
+            .map_err(|error| GitToolError::InvalidInput(error.to_string()))?;
+        if let Some(remote) = &parsed.remote {
+            super::validate_git_positional(remote)?;
+        }
+        Self::prepare_operation(workspace, input, provenance, Operation::Pull(parsed), None)
+    }
+
+    pub(super) fn prepare_checkout(
+        workspace: &Path,
+        input: &Value,
+        provenance: ToolProvenance,
+    ) -> Result<Self, GitToolError> {
+        let parsed: GitCheckoutInput = serde_json::from_value(input.clone())
+            .map_err(|e| GitToolError::InvalidInput(e.to_string()))?;
+        super::validate_git_positional(if parsed.branch == "-" && !parsed.create {
+            "@{-1}"
+        } else {
+            &parsed.branch
+        })?;
+        Self::prepare_operation(
+            workspace,
+            input,
+            provenance,
+            Operation::Checkout(parsed),
+            None,
+        )
+    }
+
+    fn prepare_operation(
+        workspace: &Path,
+        input: &Value,
+        provenance: ToolProvenance,
+        operation: Operation,
+        selected: Option<Vec<String>>,
+    ) -> Result<Self, GitToolError> {
+        let environment = execution_environment();
+        validate_environment(&environment)?;
+        let environment = trace_suppressed_environment(environment);
+        let program = resolve_git(&environment)?;
+        let program_entry = capture_program(&program)?;
+        let repository = RepositoryState::capture(workspace)?;
+        let commit_state = if matches!(operation, Operation::Commit(_) | Operation::Checkout(_)) {
+            Some(super::repository_state::CommitState::capture(&repository)?)
+        } else {
+            None
+        };
+        let config = None;
+        let mut gitlinks = Vec::new();
+        let paths = match &operation {
+            Operation::Push(_) | Operation::Pull(_) => Vec::new(),
+            Operation::Add => literal_add_paths(
+                workspace,
+                &repository.workdir,
+                &selected.unwrap_or_default(),
+            )?,
+            Operation::Commit(_) | Operation::Checkout(_) => {
+                let tracked = tracked_commit_sources(&repository.workdir)?;
+                gitlinks = tracked.1;
+                tracked.0
+            }
+        };
+        let sources = match &operation {
+            Operation::Push(_) | Operation::Pull(_) => Vec::new(),
+            Operation::Add => capture_add_sources(&repository.workdir, &paths)?,
+            Operation::Commit(_) | Operation::Checkout(_) => {
+                capture_tracked_sources(&repository.workdir, &paths)?
+            }
+        };
+        let mut facets = Vec::new();
+        if matches!(
+            operation,
+            Operation::Checkout(_) | Operation::Push(_) | Operation::Pull(_)
+        ) {
+            for path in [
+                &repository.workdir,
+                &repository.git_dir,
+                &repository.common_dir,
+            ] {
+                facets.push(path_facet(
+                    ToolNature::Read,
+                    path,
+                    if matches!(operation, Operation::Pull(_)) {
+                        "Pull sender repository roots; configuration discovery only, with no fetch or integration authority"
+                    } else if matches!(operation, Operation::Push(_)) {
+                        "push sender references and objects; worktree directory enumeration and attribute rules for pack delta selection"
+                    } else {
+                        "checkout target discovery and worktree evidence"
+                    },
+                )?);
+            }
+            if matches!(operation, Operation::Pull(_)) {
+                facets.push(ToolPermissionFacet::with_resource(
+                    ToolNature::Read,
+                    "git:pull-repository-metadata",
+                    ToolResourceKind::Remote,
+                ));
+            }
+        }
+        for (path, entry) in paths.iter().zip(&sources) {
+            let source = repository.workdir.join(path);
+            // Git records the final link entry, not its target. The permission
+            // engine canonicalizes Path resources, so admit its containing
+            // directory rather than pretending to read the target.
+            let resource = if matches!(entry, snapshot::Entry::Link(_)) {
+                source.parent().ok_or_else(|| {
+                    GitToolError::InvalidInput("staging entry has no parent".into())
+                })?
+            } else {
+                &source
+            };
+            facets.push(path_facet(
+                ToolNature::Read,
+                resource,
+                "selected staging source entries",
+            )?);
+        }
+        for link in &gitlinks {
+            let source = repository.workdir.join(&link.path);
+            let resource = if matches!(link.entry, snapshot::Entry::Link(_)) {
+                source.parent().ok_or_else(|| {
+                    GitToolError::InvalidInput("gitlink entry has no parent".into())
+                })?
+            } else {
+                &source
+            };
+            facets.push(path_facet(
+                ToolNature::Read,
+                resource,
+                "tracked submodule entry and checkout metadata",
+            )?);
+            if let Some(child) = &link.metadata_path {
+                facets.push(path_facet(
+                    ToolNature::Read,
+                    child,
+                    "submodule HEAD and index metadata",
+                )?);
+            }
+        }
+        facets.push(path_facet(
+            ToolNature::Write,
+            &repository.git_dir,
+            "index and worktree Git metadata",
+        )?);
+        if repository.common_dir != repository.git_dir {
+            facets.push(path_facet(
+                ToolNature::Write,
+                &repository.common_dir,
+                "shared Git object metadata",
+            )?);
+        }
+        facets.push(
+            ToolPermissionFacet::with_resource(
+                ToolNature::Execute,
+                program.to_str().ok_or_else(|| {
+                    GitToolError::InvalidInput("Git program path is not UTF-8".into())
+                })?,
+                ToolResourceKind::Command,
+            )
+            .with_description(format!("{}; diagnostic trace2 file/socket output disabled in structured children", match &operation {
+                Operation::Push(_) => "host Git push with resolved remote destinations",
+                Operation::Pull(_) => "host Git Pull configuration discovery; fetch and integration require subsequent admissions",
+                Operation::Add => "host Git literal-path staging",
+                Operation::Checkout(_) => "host Git branch checkout with repository-wide worktree effects",
+                Operation::Commit(_) => "host Git commit; maintenance.autoDetach=false and gc.autoDetach=false keep maintenance in the foreground",
+            })),
+        );
+        // Closed named capability: only the fixed discovery stage consumes it.
+        // It is not Path authority and cannot be used by generic file tools.
+        facets.retain(|facet| facet.nature != ToolNature::Write);
+        facets.push(ToolPermissionFacet::with_resource(
+            ToolNature::Read, "git:configuration-chain", ToolResourceKind::Remote,
+        ).with_description("discover Git system/global/include configuration internally; no general file access"));
+        Ok(Self {
+            phase: Phase::SenderConfiguration,
+            command_budget: std::sync::Mutex::new(CommandBudget::default()),
+            #[cfg(unix)]
+            execution: talos_sandbox::OwnedCommandExecutor::default().operation(),
+            operation,
+            commit_state,
+            push_destinations: Vec::new(),
+            receiver_roots: Vec::new(),
+            receiver_child_paths: Vec::new(),
+            receiver_child_executables: Vec::new(),
+            receiver_layouts: Vec::new(),
+            receiver_metadata: Vec::new(),
+            receiver_common: Vec::new(),
+            receiver_worktree_inventories: Vec::new(),
+            receiver_siblings: Vec::new(),
+            receiver_configs: Vec::new(),
+            receiver_effects: Vec::new(),
+            receiver_auxiliary: Vec::new(),
+            receiver_rebase: Vec::new(),
+            receiver_sibling_refs: Vec::new(),
+            receiver_sibling_targets: Vec::new(),
+            receiver_storage: Vec::new(),
+            sender_mutation_facets: Vec::new(),
+            checkout_target: None,
+            checkout_guessed: false,
+            checkout_tracking_source: None,
+            checkout_tracking_writes: Vec::new(),
+            checkout_new_branch: None,
+            checkout_parents: None,
+            checkout_empty_gitlinks: Vec::new(),
+            checkout_new_gitlinks: Vec::new(),
+            checkout_child_layouts: Vec::new(),
+            checkout_child_metadata: Vec::new(),
+            checkout_child_bootstrap: Vec::new(),
+            checkout_child_worktrees: Vec::new(),
+            checkout_child_startup: Vec::new(),
+            checkout_pending_new_gitlinks: Vec::new(),
+            checkout_deletion: None,
+            target_config_sources: None,
+            target_config_roots: Vec::new(),
+            target_hook_paths: None,
+            target_hook_evidence: Vec::new(),
+            pull_before: None,
+            pull_evidence: None,
+            pull_sources: None,
+            pull_attribute_paths: Vec::new(),
+            pull_attributes: Vec::new(),
+            pull_remote: None,
+            pull_destinations: Vec::new(),
+            pull_transport_supported: false,
+            pull_hook_paths: Vec::new(),
+            pull_hook_evidence: Vec::new(),
+            pull_graph_paths: None,
+            pull_inventory: None,
+            identity: PreparedPlanIdentity::new(),
+            workspace: workspace.to_owned(),
+            input: input.clone(),
+            provenance,
+            repository,
+            paths,
+            sources,
+            gitlinks,
+            facets,
+            environment,
+            program,
+            program_entry,
+            maintenance_program: None,
+            config,
+            child_configs: Vec::new(),
+            child_locations: Vec::new(),
+            child_attributes: std::collections::BTreeSet::new(),
+        })
+    }
+
+    fn request(&self) -> PermissionRequest<'_> {
+        PermissionRequest::new(
+            self.operation.name(),
+            self.provenance.clone(),
+            &self.facets,
+            &self.input,
+        )
+    }
+
+    async fn pull_probe(&self, args: Vec<String>) -> Result<std::process::Output, GitToolError> {
+        // Tree listings carry one record per path, unlike small scalar probes.
+        // Keep repeated listings within the unchanged cumulative output budget.
+        let output_limit = if args.first().is_some_and(|arg| arg == "ls-tree") {
+            1024 * 1024
+        } else {
+            16 * 1024
+        };
+        self.revalidate()?;
+        let mut command = tokio::process::Command::new(&self.program);
+        command
+            .current_dir(&self.repository.workdir)
+            .arg("--no-pager")
+            .args(args)
+            .env_clear()
+            .envs(&self.environment);
+        self.run_command_output(command, std::time::Duration::from_secs(10), output_limit)
+            .await
+    }
+
+    async fn discover_pull_prefetch(
+        mut self: Box<Self>,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<Box<Self>, GitToolError> {
+        self.revalidate()?;
+        if self.pull_graph_paths.is_none() {
+            let index_path = self.repository.git_dir.join("index");
+            if !authorizations.iter().any(|token| {
+                token.authorizes_path(
+                    "git_pull",
+                    ToolNature::Read,
+                    &self.workspace,
+                    index_path.to_str().unwrap_or_default(),
+                )
+            }) {
+                return Err(GitToolError::InvalidInput(
+                    "Pull index discovery lacks exact Read admission".into(),
+                ));
+            }
+            let format = self
+                .pull_probe(vec!["rev-parse".into(), "--show-object-format".into()])
+                .await?;
+            let length = match (
+                format.status.success(),
+                format.stderr.is_empty(),
+                format.stdout.as_slice(),
+            ) {
+                (true, true, b"sha1\n") => 40,
+                (true, true, b"sha256\n") => 64,
+                _ => {
+                    return Err(GitToolError::Git(
+                        "Pull index object format unavailable".into(),
+                    ));
+                }
+            };
+            let (index, _) = super::pull_state::decode_index(&index_path, length)?;
+            let head = self.repository.git_dir.join("HEAD");
+            if !authorizations.iter().any(|token| {
+                token.authorizes_path(
+                    "git_pull",
+                    ToolNature::Read,
+                    &self.workspace,
+                    head.to_str().unwrap_or_default(),
+                )
+            }) {
+                return Err(GitToolError::InvalidInput(
+                    "Pull policy discovery lacks HEAD Read admission".into(),
+                ));
+            }
+            let branch_output = self
+                .pull_probe(vec![
+                    "symbolic-ref".into(),
+                    "--quiet".into(),
+                    "--no-recurse".into(),
+                    "HEAD".into(),
+                ])
+                .await?;
+            let branch = match branch_output.status.code() {
+                Some(0) if branch_output.stderr.is_empty() => Some(
+                    std::str::from_utf8(&branch_output.stdout)
+                        .ok()
+                        .and_then(|text| text.strip_prefix("refs/heads/"))
+                        .and_then(|text| text.strip_suffix('\n'))
+                        .ok_or_else(|| {
+                            GitToolError::InvalidInput("Invalid Pull branch discovery".into())
+                        })?,
+                ),
+                Some(1) if branch_output.stdout.is_empty() && branch_output.stderr.is_empty() => {
+                    None
+                }
+                _ => {
+                    return Err(GitToolError::Git(
+                        "Pull policy branch discovery failed".into(),
+                    ));
+                }
+            };
+            let config = self
+                .config
+                .as_ref()
+                .ok_or_else(|| GitToolError::Git("Missing Pull configuration".into()))?;
+            let needs_sources = super::pull_state::BeforeFetch::policy_requires_clean_worktree(
+                &config.pull_records()?,
+                branch,
+            )?;
+            let mut inventory = self
+                .pull_inventory
+                .take()
+                .ok_or_else(|| GitToolError::Git("Missing Pull graph inventory".into()))?;
+            inventory.advance(|path| {
+                authorizations.iter().any(|token| {
+                    token.authorizes_path(
+                        "git_pull",
+                        ToolNature::Read,
+                        &self.workspace,
+                        path.to_str().unwrap_or_default(),
+                    )
+                })
+            })?;
+            let objects_ready = {
+                [&self.repository.git_dir, &self.repository.common_dir]
+                    .iter()
+                    .all(|root| {
+                        let objects = root.join("objects");
+                        // Replacement refs may be symbolic and resolve into any
+                        // refs subtree, so admitting refs/replace alone is insufficient.
+                        let references = root.join("refs");
+                        let packed = root.join("packed-refs");
+                        inventory.subtree_complete(&objects)
+                            && inventory.subtree_complete(&references)
+                            && inventory.subtree_complete(&packed)
+                            && inventory
+                                .paths()
+                                .iter()
+                                .filter(|path| {
+                                    path.starts_with(&objects)
+                                        || path.starts_with(&references)
+                                        || **path == packed
+                                })
+                                .all(|path| {
+                                    authorizations.iter().any(|token| {
+                                        token.authorizes_path(
+                                            "git_pull",
+                                            ToolNature::Read,
+                                            &self.workspace,
+                                            path.to_str().unwrap_or_default(),
+                                        )
+                                    })
+                                })
+                    })
+            };
+            let mut encoded = Vec::new();
+            for entry in index.entries() {
+                if !needs_sources {
+                    break;
+                }
+                if entry.mode.bits() == 0o040000 && objects_ready {
+                    inventory.revalidate()?;
+                    self.config
+                        .as_ref()
+                        .ok_or_else(|| GitToolError::Git("Missing Pull configuration".into()))?
+                        .prepare_pull_inspection()?;
+                    let output = self
+                        .pull_probe(vec![
+                            "ls-tree".into(),
+                            "-r".into(),
+                            "-z".into(),
+                            entry.id.to_string(),
+                        ])
+                        .await?;
+                    inventory.revalidate()?;
+                    if !output.status.success() || !output.stderr.is_empty() {
+                        return Err(GitToolError::Git(
+                            "Pull sparse tree discovery failed".into(),
+                        ));
+                    }
+                    encoded.extend(pull_sparse_names(entry.path(&index), &output.stdout)?);
+                    continue;
+                }
+                if matches!(entry.mode.bits(), 0o040000 | 0o160000) {
+                    continue;
+                }
+                encoded.extend_from_slice(entry.path(&index));
+                encoded.push(0);
+            }
+            let mut source_paths = pull_tracked_read_paths(&self.repository.workdir, &encoded)?;
+            let mut attributes = std::collections::BTreeSet::new();
+            for source in &source_paths {
+                let mut parent = source.parent();
+                while let Some(directory) = parent {
+                    if !directory.starts_with(&self.repository.workdir) {
+                        break;
+                    }
+                    attributes.insert(directory.join(".gitattributes"));
+                    parent = directory.parent();
+                }
+            }
+            if needs_sources {
+                attributes.insert(self.repository.common_dir.join("info/attributes"));
+                if let Some(path) =
+                    config.pull_diff_order_file(&self.repository.workdir, &self.environment)?
+                {
+                    attributes.insert(path);
+                }
+            }
+            for variable in ["GIT_ATTR_SYSTEM", "GIT_ATTR_GLOBAL"]
+                .into_iter()
+                .filter(|_| needs_sources)
+            {
+                attributes.insert(
+                    self.inspect_attribute_path_at(&self.repository.workdir, variable)
+                        .await?,
+                );
+            }
+            self.pull_attribute_paths = attributes.into_iter().collect();
+            source_paths.extend(self.pull_attribute_paths.iter().cloned());
+            let mut paths = inventory.paths();
+            paths.extend(source_paths);
+            if inventory.complete() {
+                // Fixed evidence names are known at configuration discovery
+                // and already have exact facets, even when absent on disk.
+                paths.extend(super::pull_state::PullEvidence::required_paths(
+                    &self.repository,
+                    None,
+                    false,
+                )?);
+                paths.sort();
+                paths.dedup();
+            }
+            let mut added_facets = false;
+            for path in &paths {
+                if !self.facets.iter().any(|facet| {
+                    facet.nature == ToolNature::Read
+                        && facet.resource_kind == Some(ToolResourceKind::Path)
+                        && facet.resource.as_deref() == path.to_str()
+                }) {
+                    self.facets.push(path_facet(
+                        ToolNature::Read,
+                        path,
+                        "Pull graph exact-path discovery and read evidence",
+                    )?);
+                    added_facets = true;
+                }
+            }
+            let complete = inventory.complete();
+            if complete {
+                self.pull_graph_paths = Some(paths);
+            }
+            self.pull_inventory = Some(inventory);
+            if !complete || added_facets {
+                self.identity = PreparedPlanIdentity::new();
+                return Ok(self);
+            }
+            // Only an unchanged completed frontier can use the current proof.
+            // Newly discovered source paths wait for fresh admission above.
+            // Inspect under that same
+            // admission instead of spending an identical-profile continuation.
+        }
+        // Exact root Read permits directory discovery, not descendant bytes.
+        // The graph inventory must be discovered and admitted separately before
+        // any reflog/object inspection. Configuration discovery cannot grant it.
+        let paths = self.pull_graph_paths.as_ref().filter(|paths| !paths.is_empty())
+            .ok_or_else(|| GitToolError::InvalidInput(
+                "Pull reference/reflog/object graph read inventory requires separate discovery and admission; no prefetch probe performed".into(),
+            ))?;
+        for path in paths {
+            if !authorizations.iter().any(|token| {
+                token.authorizes_path(
+                    "git_pull",
+                    ToolNature::Read,
+                    &self.workspace,
+                    path.to_str().unwrap_or_default(),
+                )
+            }) {
+                return Err(GitToolError::InvalidInput(
+                    "Pull graph resource lacks exact Read admission".into(),
+                ));
+            }
+        }
+        self.inspect_pull_prefetch().await
+    }
+
+    async fn inspect_pull_prefetch(mut self: Box<Self>) -> Result<Box<Self>, GitToolError> {
+        self.revalidate()?;
+        let Operation::Pull(pull) = &self.operation else {
+            return Err(GitToolError::Git("Invalid Pull discovery operation".into()));
+        };
+        let config = self
+            .config
+            .as_ref()
+            .ok_or_else(|| GitToolError::Git("missing Pull configuration evidence".into()))?;
+        config.prepare_pull_inspection()?;
+        let records = config.pull_records()?;
+        let format = self
+            .pull_probe(vec!["rev-parse".into(), "--show-object-format".into()])
+            .await?;
+        let oid_length = match (
+            format.status.success(),
+            format.stderr.is_empty(),
+            format.stdout.as_slice(),
+        ) {
+            (true, true, b"sha1\n") => 40,
+            (true, true, b"sha256\n") => 64,
+            _ => return Err(GitToolError::Git("Pull object format probe failed".into())),
+        };
+        let (index, index_evidence) =
+            super::pull_state::decode_index(&self.repository.git_dir.join("index"), oid_length)?;
+        if index.entries().iter().any(|entry| entry.stage_raw() != 0) {
+            return Err(GitToolError::InvalidInput(
+                "Pull requires resolving index conflicts before fetch".into(),
+            ));
+        }
+        let initial = super::pull_state::BeforeFetch::probe(&records, None, oid_length, |args| {
+            self.pull_probe(args)
+        })
+        .await?;
+        let remote =
+            super::pull_state::fetch_remote(&records, initial.branch(), pull.remote.as_deref())?;
+        let destinations = super::remote_state::destinations(
+            &self
+                .config
+                .as_ref()
+                .ok_or_else(|| GitToolError::Git("missing Pull config".into()))?
+                .pull_remote_records()?,
+            &remote,
+            false,
+        )?;
+        let tracking = initial
+            .branch()
+            .map(|branch| super::pull_state::tracking_reference(&records, branch, &remote))
+            .transpose()?
+            .flatten();
+        let mut supplemental_paths_added = false;
+        let mut source_names = Vec::new();
+        if initial.requires_clean_worktree() && self.pull_graph_paths.is_some() {
+            // A symbolic branch chain can resolve to a different policy than
+            // direct HEAD discovery. Discover all fixed attribute paths here
+            // too; newly needed paths still wait for fresh exact admission.
+            let mut fixed_attributes = vec![self.repository.common_dir.join("info/attributes")];
+            if let Some(path) =
+                config.pull_diff_order_file(&self.repository.workdir, &self.environment)?
+            {
+                fixed_attributes.push(path);
+            }
+            for variable in ["GIT_ATTR_SYSTEM", "GIT_ATTR_GLOBAL"] {
+                fixed_attributes.push(
+                    self.inspect_attribute_path_at(&self.repository.workdir, variable)
+                        .await?,
+                );
+            }
+            for path in fixed_attributes {
+                if !self.pull_attribute_paths.contains(&path) {
+                    self.pull_attribute_paths.push(path);
+                }
+            }
+            let mut encoded = Vec::new();
+            for entry in index.entries() {
+                if entry.mode.bits() == 0o040000 {
+                    let output = self
+                        .pull_probe(vec![
+                            "ls-tree".into(),
+                            "-r".into(),
+                            "-z".into(),
+                            entry.id.to_string(),
+                        ])
+                        .await?;
+                    if !output.status.success() || !output.stderr.is_empty() {
+                        return Err(GitToolError::Git(
+                            "Pull sparse tree discovery failed".into(),
+                        ));
+                    }
+                    encoded.extend(pull_sparse_names(entry.path(&index), &output.stdout)?);
+                    continue;
+                }
+                if entry.mode.bits() != 0o160000 {
+                    encoded.extend_from_slice(entry.path(&index));
+                    encoded.push(0);
+                }
+            }
+            let mut names = pull_tracked_read_paths(&self.repository.workdir, &encoded)?;
+            for path in &names {
+                source_names.push(
+                    path.strip_prefix(&self.repository.workdir)
+                        .ok()
+                        .and_then(Path::to_str)
+                        .ok_or_else(|| {
+                            GitToolError::InvalidInput("Invalid Pull source path".into())
+                        })?
+                        .to_owned(),
+                );
+                let mut parent = path.parent();
+                while let Some(directory) =
+                    parent.filter(|directory| directory.starts_with(&self.repository.workdir))
+                {
+                    let attribute = directory.join(".gitattributes");
+                    if !self.pull_attribute_paths.contains(&attribute) {
+                        self.pull_attribute_paths.push(attribute);
+                    }
+                    parent = directory.parent();
+                }
+            }
+            names.extend(self.pull_attribute_paths.iter().cloned());
+            if let Some(paths) = &mut self.pull_graph_paths {
+                for path in names {
+                    if !paths.contains(&path) {
+                        self.facets.push(path_facet(
+                            ToolNature::Read,
+                            &path,
+                            "Pull rebase tracked source inspection",
+                        )?);
+                        paths.push(path);
+                        supplemental_paths_added = true;
+                    }
+                }
+            }
+        }
+        // Directory enumeration cannot discover absent reflogs or grafts.
+        // Request their exact paths without probing them, then require fresh
+        // admission through discover_pull_prefetch before evidence capture.
+        if let Some(paths) = &mut self.pull_graph_paths {
+            let required = super::pull_state::PullEvidence::required_paths(
+                &self.repository,
+                tracking.as_deref(),
+                false,
+            )?;
+            let missing: Vec<_> = required
+                .into_iter()
+                .filter(|path| !paths.contains(path))
+                .collect();
+            if !missing.is_empty() {
+                for path in missing {
+                    self.facets.push(path_facet(
+                        ToolNature::Read,
+                        &path,
+                        "Pull exact reference/reflog evidence, including absent paths",
+                    )?);
+                    paths.push(path);
+                }
+                supplemental_paths_added = true;
+            }
+        }
+        if supplemental_paths_added {
+            self.identity = PreparedPlanIdentity::new();
+            return Ok(self);
+        }
+        if initial.requires_clean_worktree() && self.pull_graph_paths.is_some() {
+            self.pull_sources = Some(PullSources::capture(
+                &self.repository.workdir,
+                source_names,
+            )?);
+            let mut budget = snapshot::Budget {
+                entries: 4096,
+                bytes: 4 * 1024 * 1024,
+            };
+            self.pull_attributes = self
+                .pull_attribute_paths
+                .iter()
+                .map(|path| PullAttribute::capture(path, &mut budget))
+                .collect::<Result<_, _>>()?;
+            if let Some(sources) = &self.pull_sources {
+                for batch in sources.paths.chunks(16) {
+                    let mut args = vec![
+                        "check-attr".into(),
+                        "-z".into(),
+                        "filter".into(),
+                        "--".into(),
+                    ];
+                    args.extend(batch.iter().cloned());
+                    let output = self.pull_probe(args).await?;
+                    if !output.status.success() || !output.stderr.is_empty() {
+                        return Err(GitToolError::Git("Pull filter inspection failed".into()));
+                    }
+                    let fields = output.stdout.split(|byte| *byte == 0).collect::<Vec<_>>();
+                    if fields.last() != Some(&b"".as_slice()) || fields.len() - 1 != batch.len() * 3
+                    {
+                        return Err(GitToolError::InvalidInput(
+                            "Invalid Pull filter inspection output".into(),
+                        ));
+                    }
+                    for (fields, path) in fields[..fields.len() - 1]
+                        .as_chunks::<3>()
+                        .0
+                        .iter()
+                        .zip(batch)
+                    {
+                        if fields[0] != path.as_bytes()
+                            || fields[1] != b"filter"
+                            || !matches!(fields[2], b"unspecified" | b"unset")
+                        {
+                            return Err(GitToolError::InvalidInput("Pull tracked source uses a configured filter; requires separate authorization".into()));
+                        }
+                    }
+                    self.revalidate()?;
+                }
+            }
+        }
+        let evidence =
+            super::pull_state::PullEvidence::capture(&self.repository, tracking.as_deref(), false)?;
+        evidence.require_no_pending_merge()?;
+        evidence.require_index(&index_evidence)?;
+        if initial.requires_empty_initial_index()
+            && (!index.entries().is_empty() || evidence.index_timestamp_nonzero())
+        {
+            return Err(GitToolError::InvalidInput(
+                "Pull with rebase cannot update an unborn branch with staged changes".into(),
+            ));
+        }
+        if self.pull_sources.is_some() && !initial.requires_empty_initial_index() {
+            for cached in [true, false] {
+                self.revalidate()?;
+                evidence.revalidate()?;
+                let mut command = tokio::process::Command::new(&self.program);
+                // Quiet/exit-code can report stale stat data as dirty when
+                // refresh is disabled. Numstat performs content comparison;
+                // any output (including a mode-only 0/0 record) is a change.
+                command
+                    .current_dir(&self.repository.workdir)
+                    .args([
+                        "-c",
+                        "diff.autoRefreshIndex=false",
+                        "--no-pager",
+                        "diff",
+                        "--numstat",
+                        "-z",
+                        "--no-renames",
+                        "--no-ext-diff",
+                        "--no-textconv",
+                    ])
+                    .env_clear()
+                    .envs(&self.environment)
+                    .env("GIT_OPTIONAL_LOCKS", "0");
+                if cached {
+                    command.args(["--cached", "--ignore-submodules=all", "HEAD", "--"]);
+                } else {
+                    command.args(["--ignore-submodules=all", "--"]);
+                }
+                let output = self
+                    .run_command_output(command, std::time::Duration::from_secs(10), 16 * 1024)
+                    .await?;
+                evidence.revalidate()?;
+                self.revalidate()?;
+                match output.status.code() {
+                    Some(0) if output.stderr.is_empty() && output.stdout.is_empty() => {}
+                    Some(0) if output.stderr.is_empty() && !output.stdout.is_empty() => {
+                        return Err(GitToolError::InvalidInput(
+                            if cached {
+                                "Pull with rebase requires a clean index before fetch"
+                            } else {
+                                "Pull with rebase requires a clean worktree before fetch"
+                            }
+                            .into(),
+                        ));
+                    }
+                    _ => {
+                        return Err(GitToolError::Git(
+                            "Pull clean-worktree inspection failed".into(),
+                        ));
+                    }
+                }
+            }
+        }
+
+        let before = super::pull_state::BeforeFetch::probe(
+            &records,
+            tracking.as_deref(),
+            oid_length,
+            |args| self.pull_probe(args),
+        )
+        .await?;
+        if !before.same_checkout(&initial) {
+            return Err(GitToolError::InvalidInput(
+                "Pull branch or HEAD changed during upstream discovery".into(),
+            ));
+        }
+        evidence.revalidate()?;
+        self.revalidate()?;
+        self.pull_before = Some(before);
+        self.pull_evidence = Some(evidence);
+        self.pull_remote = Some(remote);
+        self.pull_destinations = destinations.clone();
+        self.pull_transport_supported = destinations.iter().all(|destination| {
+            std::panic::catch_unwind(|| gix::url::parse(destination)).is_ok_and(|parsed| {
+                parsed.is_ok_and(|url| {
+                    url.scheme == gix::url::Scheme::Git
+                        && url.host.is_some()
+                        && url.user.is_none()
+                        && url.password.is_none()
+                })
+            })
+        });
+        for destination in destinations {
+            self.facets.push(
+                ToolPermissionFacet::with_resource(
+                    ToolNature::Network,
+                    destination,
+                    ToolResourceKind::Remote,
+                )
+                .with_description("Pull fetch network destination"),
+            );
+        }
+        // Fetch writes only identity-bound repository metadata. Integration has
+        // a separate later plan; this facet is not worktree authority.
+        self.facets.push(path_facet(
+            ToolNature::Write,
+            &self.repository.git_dir,
+            "Pull fetch metadata writes under the identity-bound gitdir",
+        )?);
+        if self.repository.common_dir != self.repository.git_dir {
+            self.facets.push(path_facet(
+                ToolNature::Write,
+                &self.repository.common_dir,
+                "Pull fetch metadata writes under the identity-bound common dir",
+            )?);
+        }
+        self.facets.push(ToolPermissionFacet::with_resource(
+            ToolNature::Write,
+            "git:pull-repository-metadata",
+            ToolResourceKind::Remote,
+        ));
+        self.identity = PreparedPlanIdentity::new();
+        self.phase = Phase::PullFetch;
+        Ok(self)
+    }
+
+    async fn discover(mut self: Box<Self>) -> Result<Box<Self>, GitToolError> {
+        self.revalidate()?;
+        if matches!(
+            &self.operation,
+            Operation::Commit(_) | Operation::Checkout(_)
+        ) {
+            for link in &self.gitlinks {
+                let Some(metadata_path) = &link.metadata_path else {
+                    continue;
+                };
+                let location = super::repository_state::ChildLocation::capture(metadata_path)?;
+                self.child_attributes
+                    .insert(location.common_dir.join("config"));
+                self.child_attributes
+                    .insert(location.git_dir.join("config.worktree"));
+                let workdir = self.repository.workdir.join(&link.path);
+                let output = self.inspect_config_at(&workdir).await?;
+                self.child_attributes
+                    .extend(super::config_state::declared_include_paths(
+                        &output,
+                        &workdir,
+                        &self.environment,
+                    )?);
+                let config = super::config_state::ChildConfig::capture(&output, &workdir)?;
+                config.verify_host(&self.inspect_config_at(&workdir).await?)?;
+                self.child_attributes.extend(config.attribute_paths(
+                    &workdir,
+                    &location.common_dir,
+                    &self.environment,
+                )?);
+                for variable in ["GIT_ATTR_SYSTEM", "GIT_ATTR_GLOBAL"] {
+                    self.child_attributes
+                        .insert(self.inspect_attribute_path_at(&workdir, variable).await?);
+                }
+                if super::repository_state::ChildLocation::capture(metadata_path)? != location {
+                    return Err(GitToolError::InvalidInput(
+                        "Submodule location changed during configuration discovery".into(),
+                    ));
+                }
+                self.child_configs.push((workdir, config));
+                self.child_locations.push((metadata_path.clone(), location));
+            }
+        }
+        let output = self.inspect_config().await?;
+        let mut config = super::config_state::ConfigState::capture_host(
+            &output,
+            &self.repository,
+            &self.environment,
+        )?;
+        if let Operation::Pull(pull) = &self.operation {
+            // Retain configuration before selecting a transport or probing its
+            // upstream. No fetch, worktree update or helper execution belongs
+            // to this independently admitted configuration discovery stage.
+            if let Some(remote) = &pull.remote {
+                super::validate_git_positional(remote)?;
+            }
+            config.verify_host(&self.inspect_config().await?)?;
+            self.pull_hook_paths = config.prepare_pull(&self.repository, &self.environment)?;
+            self.config = Some(config);
+            self.revalidate()?;
+            self.facets
+                .retain(|facet| facet.resource.as_deref() != Some("git:configuration-chain"));
+            for (path, _) in &self
+                .config
+                .as_ref()
+                .ok_or_else(|| GitToolError::Git("missing Pull configuration evidence".into()))?
+                .files
+            {
+                self.facets.push(path_facet(
+                    ToolNature::Read,
+                    path,
+                    "Pull configuration evidence",
+                )?);
+            }
+            for path in &self.pull_hook_paths {
+                self.facets.push(path_facet(
+                    ToolNature::Read,
+                    path,
+                    "Pull fetch-triggered Git hook inspection",
+                )?);
+            }
+            self.identity = PreparedPlanIdentity::new();
+            let inventory = super::pull_inventory::Inventory::new(
+                &self.repository.git_dir,
+                &self.repository.common_dir,
+            );
+            for path in inventory.paths() {
+                self.facets.push(path_facet(
+                    ToolNature::Read,
+                    &path,
+                    "Pull graph namespace discovery; descendant bytes require subsequent admission",
+                )?);
+            }
+            for path in
+                super::pull_state::PullEvidence::required_paths(&self.repository, None, false)?
+            {
+                if !self.facets.iter().any(|facet| {
+                    facet.nature == ToolNature::Read && facet.resource.as_deref() == path.to_str()
+                }) {
+                    self.facets.push(path_facet(
+                        ToolNature::Read,
+                        &path,
+                        "Pull fixed evidence path, including absent metadata",
+                    )?);
+                }
+            }
+            self.pull_inventory = Some(inventory);
+            self.phase = Phase::PullPreparation;
+            return Ok(self);
+        }
+        if let Operation::Push(push) = &self.operation {
+            super::remote_state::reject_legacy_remotes(&self.repository.common_dir)?;
+            config.prepare_push(
+                &self.repository,
+                &self.environment,
+                push.remote.as_deref().unwrap_or("origin"),
+            )?;
+            self.push_destinations = super::remote_state::destinations(
+                &super::remote_state::records(&output)?,
+                push.remote.as_deref().unwrap_or("origin"),
+                true,
+            )?;
+        }
+        if matches!(self.operation, Operation::Commit(_)) {
+            config.prepare_commit(
+                &self.repository,
+                &self.environment,
+                self.commit_state
+                    .as_ref()
+                    .ok_or_else(|| GitToolError::Git("missing commit state evidence".into()))?,
+            )?;
+        }
+        if matches!(
+            self.operation,
+            Operation::Commit(_) | Operation::Checkout(_) | Operation::Push(_)
+        ) {
+            // Path-only query against the already-admitted executable. Defer
+            // reading the reported child executable to continuation admission.
+            let mut command = tokio::process::Command::new(&self.program);
+            command
+                .current_dir(&self.repository.workdir)
+                .arg("--exec-path")
+                .env_clear()
+                .envs(&self.environment);
+            let output = self
+                .run_command(command, std::time::Duration::from_secs(10), 16 * 1024)
+                .await?;
+            let path = output
+                .strip_suffix(b"\n")
+                .and_then(|path| std::str::from_utf8(path).ok())
+                .map(PathBuf::from)
+                .filter(|path| {
+                    path.is_absolute() && !path.as_os_str().as_encoded_bytes().contains(&0)
+                })
+                .ok_or_else(|| {
+                    GitToolError::InvalidInput(
+                        "Git child executable directory is unavailable".into(),
+                    )
+                })?;
+            self.maintenance_program =
+                Some(path.join(if cfg!(windows) { "git.exe" } else { "git" }));
+        }
+        if let Operation::Checkout(checkout) = &self.operation {
+            let (resolved, tracking_source) =
+                self.resolve_checkout_target(checkout, &config).await?;
+            let guessed = tracking_source.is_some();
+            self.checkout_guessed = guessed;
+            self.checkout_tracking_source = tracking_source;
+            if checkout.create || guessed {
+                self.checkout_new_branch =
+                    Some(self.inspect_checkout_branch(&checkout.branch).await?);
+                let start = self.inspect_checkout_start(checkout.create).await?;
+                self.checkout_tracking_writes = config.checkout_tracking_writes(
+                    self.checkout_new_branch
+                        .as_deref()
+                        .ok_or_else(|| GitToolError::Git("Missing checkout branch name".into()))?,
+                    start.as_deref(),
+                )?;
+            }
+            let oid = resolved.as_str();
+            let symbolic_context = checkout.branch == "HEAD"
+                || checkout.branch == "@"
+                || checkout.branch == "-"
+                || checkout
+                    .branch
+                    .strip_prefix("@{-")
+                    .and_then(|value| value.strip_suffix('}'))
+                    .is_some_and(|number| {
+                        !number.is_empty() && number.bytes().all(|byte| byte.is_ascii_digit())
+                    });
+            let previous_branch = if !checkout.create && symbolic_context {
+                let mut command = tokio::process::Command::new(&self.program);
+                command
+                    .current_dir(&self.repository.workdir)
+                    .args([
+                        "rev-parse",
+                        "--symbolic-full-name",
+                        "--verify",
+                        "--end-of-options",
+                        if checkout.branch == "-" {
+                            "@{-1}"
+                        } else {
+                            &checkout.branch
+                        },
+                    ])
+                    .env_clear()
+                    .envs(&self.environment);
+                let output = self
+                    .run_command(command, std::time::Duration::from_secs(10), 4096)
+                    .await?;
+                let reference = std::str::from_utf8(&output)
+                    .map_err(|_| {
+                        GitToolError::InvalidInput("Invalid previous checkout reference".into())
+                    })?
+                    .trim();
+                reference.strip_prefix("refs/heads/").map(str::to_owned)
+            } else {
+                None
+            };
+            let local_name = previous_branch.as_deref().unwrap_or(&checkout.branch);
+            let local = if !checkout.create && local_name != "-" {
+                super::checkout_state::LocalTarget::capture(&self.repository.workdir, local_name)?
+            } else {
+                None
+            };
+            if local.as_ref().is_some_and(|local| local.commit != oid) {
+                return Err(GitToolError::InvalidInput(
+                    "Checkout local target changed during discovery".into(),
+                ));
+            }
+            let target_discovery = local.is_none() && config.has_branch_conditionals();
+            if target_discovery {
+                let mut roots = config
+                    .files
+                    .iter()
+                    .map(|(path, _)| path.clone())
+                    .collect::<Vec<_>>();
+                // git-var reports system/global roots in native read order.
+                // Included sources remain capture dependencies, never roots.
+                let mut ordered_roots = Vec::new();
+                for variable in ["GIT_CONFIG_SYSTEM", "GIT_CONFIG_GLOBAL"] {
+                    ordered_roots.extend(self.inspect_config_paths(variable).await?);
+                }
+                ordered_roots.push(self.repository.common_dir.join("config"));
+                roots.extend(ordered_roots.iter().cloned());
+                self.target_config_roots = ordered_roots;
+                let branch = if checkout.create || guessed {
+                    self.checkout_new_branch.as_deref().map(str::as_bytes)
+                } else {
+                    local
+                        .as_ref()
+                        .and_then(|local| local.reference.strip_prefix("refs/heads/"))
+                        .map(str::as_bytes)
+                };
+                let mut sources = super::target_config::Sources::new(branch, roots)?;
+                sources.add_directory_context(&self.repository.git_dir)?;
+                self.target_config_sources = Some(sources);
+            }
+            // Source hooks are still selected from the invocation config. A
+            // pending target chain cannot proceed to mutation until its effects
+            // gate has independently completed.
+            config.prepare_checkout(
+                &self.repository,
+                &self.environment,
+                local.is_some() || target_discovery,
+            )?;
+            let target = super::checkout_state::TargetTree::capture(&self.repository.workdir, oid)?;
+            let target_links: std::collections::BTreeSet<_> = target
+                .entries
+                .iter()
+                .filter(|(_, (mode, _))| *mode == 0o160000)
+                .map(|(path, _)| path.as_str())
+                .collect();
+            let current_links: std::collections::BTreeSet<_> = self
+                .gitlinks
+                .iter()
+                .map(|link| link.path.as_str())
+                .collect();
+            for added in target_links.difference(&current_links) {
+                // A missing new gitlink becomes an uninitialized directory:
+                // there is no child repository whose configuration or status
+                // could be inspected by checkout. Its absence is retained in
+                // the target source evidence and checked again before spawn.
+                match std::fs::symlink_metadata(self.repository.workdir.join(added)) {
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                    Err(error) => return Err(GitToolError::InvalidInput(error.to_string())),
+                    Ok(metadata) if metadata.is_dir() => {
+                        let path = self.repository.workdir.join(added);
+                        let identity = snapshot::PathIdentity::capture(&path)
+                            .map_err(|error| GitToolError::InvalidInput(error.to_string()))?;
+                        self.checkout_pending_new_gitlinks.push((path, identity));
+                    }
+                    Ok(metadata) if metadata.is_file() && self.paths.iter().any(|path| path == added) => {}
+                    #[cfg(unix)]
+                    Ok(metadata) if metadata.file_type().is_symlink()
+                        && self.paths.iter().any(|path| path == added)
+                        && tracked_symlink(&self.repository.workdir, added)? => {}
+                    Ok(_) => return Err(GitToolError::InvalidInput("Checkout introduces a submodule at an existing path; child discovery requires a separately authorized invocation".into())),
+                }
+            }
+            let mut deletion_roots = Vec::new();
+            for removed in current_links.difference(&target_links) {
+                // A missing, uninitialized gitlink has no child state to
+                // preserve. Its absence is bound by retained gitlink evidence.
+                if self.gitlinks.iter().any(|link| {
+                    link.path == *removed
+                        && link.metadata_path.is_none()
+                        && matches!(link.entry, snapshot::Entry::Missing)
+                }) {
+                    continue;
+                }
+                if target.entries.keys().any(|path| {
+                    path == removed
+                        || path
+                            .strip_prefix(*removed)
+                            .is_some_and(|suffix| suffix.starts_with('/'))
+                }) {
+                    let path = self.repository.workdir.join(removed);
+                    if self.gitlinks.iter().any(|link| {
+                        link.path == *removed
+                            && link.metadata_path.is_none()
+                            && matches!(link.entry, snapshot::Entry::Directory(_))
+                    }) {
+                        if let Ok(identity) = capture_empty_gitlink(&path) {
+                            self.checkout_empty_gitlinks.push((path, identity));
+                        } else {
+                            deletion_roots.push((*removed).to_owned());
+                        }
+                        continue;
+                    }
+                    if self.gitlinks.iter().any(|link| {
+                        link.path == *removed && matches!(link.entry, snapshot::Entry::Directory(_))
+                    }) {
+                        deletion_roots.push((*removed).to_owned());
+                        continue;
+                    }
+                    return Err(GitToolError::InvalidInput("Checkout changes a submodule path kind; use a separately authorized invocation".into()));
+                }
+            }
+            if !deletion_roots.is_empty() {
+                self.checkout_deletion = Some(super::checkout_deletion::Inventory::new(
+                    &self.repository.workdir,
+                    deletion_roots,
+                )?);
+            }
+            let mut paths: std::collections::BTreeSet<_> = self.paths.iter().cloned().collect();
+            paths.extend(target.entries.keys().cloned());
+            self.paths = paths.into_iter().collect();
+            self.checkout_parents = Some(super::checkout_state::TargetParents::capture(
+                &self.repository.workdir,
+                &self.paths,
+            )?);
+            self.sources = capture_tracked_sources(&self.repository.workdir, &self.paths)?;
+            self.checkout_target = Some(target);
+        }
+        // Git reports its compiled installation prefix and global attribute
+        // fallback without reading attribute contents. Do not guess either path
+        // from the executable location; their reads require the next admission.
+        for variable in ["GIT_ATTR_SYSTEM", "GIT_ATTR_GLOBAL"] {
+            let path = self
+                .inspect_attribute_path_at(&self.repository.workdir, variable)
+                .await?;
+            config.stable_auxiliary.insert(path.clone());
+            config.auxiliary.insert(path);
+        }
+        config
+            .stable_auxiliary
+            .extend(self.child_attributes.iter().cloned());
+        for (_, child) in &self.child_configs {
+            config
+                .stable_auxiliary
+                .extend(child.files.iter().map(|(path, _)| path.clone()));
+        }
+        for variable in ["GIT_CONFIG_SYSTEM", "GIT_CONFIG_GLOBAL"] {
+            let paths = self.inspect_config_paths(variable).await?;
+            config.stable_auxiliary.extend(paths.iter().cloned());
+            config.auxiliary.extend(paths);
+        }
+        let mut leaves = Vec::new();
+        for (path, source) in self.paths.iter().zip(&self.sources) {
+            selected_leaves(Path::new(path), source, &mut leaves)?;
+            selected_directory_rules(
+                &self.repository.workdir.join(path),
+                source,
+                &mut config.auxiliary,
+            );
+        }
+        // Attribute/ignore rules in every source ancestor affect selected files.
+        // This only records paths; contents wait for the continuation's admission.
+        for path in self.paths.iter().chain(leaves.iter()) {
+            let selected = self.repository.workdir.join(path);
+            let mut ancestor = selected.parent();
+            while let Some(directory) = ancestor {
+                if !directory.starts_with(&self.repository.workdir) {
+                    break;
+                }
+                config.auxiliary.insert(directory.join(".gitattributes"));
+                config.auxiliary.insert(directory.join(".gitignore"));
+                ancestor = directory.parent();
+            }
+        }
+        // Capture and then inspect again: do not accept a mixed configuration snapshot.
+        config.verify_host(&self.inspect_config().await?)?;
+        self.config = Some(config);
+        self.revalidate()?;
+        self.facets
+            .retain(|facet| facet.resource.as_deref() != Some("git:configuration-chain"));
+        for (path, _) in &self
+            .config
+            .as_ref()
+            .ok_or_else(|| GitToolError::Git("missing configuration evidence".into()))?
+            .files
+        {
+            self.facets.push(path_facet(
+                ToolNature::Read,
+                path,
+                "Git configuration evidence",
+            )?);
+        }
+        for path in &self
+            .config
+            .as_ref()
+            .ok_or_else(|| GitToolError::Git("missing configuration evidence".into()))?
+            .auxiliary
+        {
+            self.facets.push(path_facet(
+                ToolNature::Read,
+                path,
+                "Git attributes, ignore and hook inspection",
+            )?);
+        }
+        self.facets.push(path_facet(
+            ToolNature::Write,
+            &self.repository.git_dir,
+            "index and worktree Git metadata",
+        )?);
+        if self.repository.common_dir != self.repository.git_dir {
+            self.facets.push(path_facet(
+                ToolNature::Write,
+                &self.repository.common_dir,
+                "shared Git object metadata",
+            )?);
+        }
+        if matches!(self.operation, Operation::Checkout(_)) {
+            self.facets.push(path_facet(
+                ToolNature::Write,
+                &self.repository.workdir,
+                "checkout repository-wide worktree mutation",
+            )?);
+        }
+        self.identity = PreparedPlanIdentity::new();
+        if matches!(self.operation, Operation::Commit(_)) {
+            self.facets.push(path_facet(ToolNature::Read, &self.repository.workdir,
+                "repository-wide status directory enumeration and ignore rules, including untracked directories")?);
+        }
+        for path in &self.child_attributes {
+            self.facets.push(path_facet(
+                ToolNature::Read,
+                path,
+                "submodule effective attribute and exclude sources",
+            )?);
+        }
+        for (_, location) in &self.child_locations {
+            if matches!(self.operation, Operation::Checkout(_)) {
+                self.facets.push(path_facet(
+                    ToolNature::Write,
+                    &location.git_dir,
+                    "checkout child status may refresh its index",
+                )?);
+            }
+            self.facets.push(path_facet(
+                ToolNature::Read,
+                &location.common_dir,
+                "discovered shared submodule metadata",
+            )?);
+        }
+        for (_, config) in &self.child_configs {
+            for (path, _) in &config.files {
+                self.facets.push(path_facet(
+                    ToolNature::Read,
+                    path,
+                    "submodule configuration evidence",
+                )?);
+            }
+        }
+        if let Some(program) = &self.maintenance_program {
+            self.facets.push(path_facet(
+                ToolNature::Read,
+                program,
+                "Git child executable identity for maintenance, submodule status or object transfer",
+            )?);
+            self.facets.push(ToolPermissionFacet::with_resource(
+                ToolNature::Execute, program.to_str().ok_or_else(|| GitToolError::InvalidInput("Git child executable path is not UTF-8".into()))?, ToolResourceKind::Command,
+            ).with_description("Git maintenance, submodule status or object transfer; executable must match the bound Git binary"));
+        }
+        for destination in &self.push_destinations {
+            if let Some(path) =
+                super::remote_state::local_destination(destination, &self.repository.workdir)?
+            {
+                self.facets.push(path_facet(
+                    ToolNature::Read,
+                    &path,
+                    "local Git receiver layout discovery; no receiver mutation",
+                )?);
+                self.receiver_roots.push(path);
+                if self.receiver_roots.len() > 64 {
+                    return Err(GitToolError::InvalidInput(
+                        "Git receiver layout discovery exceeds 64 destinations".into(),
+                    ));
+                }
+                continue;
+            }
+            self.facets.push(
+                ToolPermissionFacet::with_resource(
+                    ToolNature::Network,
+                    destination.clone(),
+                    ToolResourceKind::Remote,
+                )
+                .with_description(
+                    "Git push object transfer and remote reference updates; non-direct transports require additional effect validation",
+                ),
+            );
+        }
+        if !self.receiver_roots.is_empty() {
+            let exec_path = self
+                .maintenance_program
+                .as_ref()
+                .and_then(|program| program.parent())
+                .ok_or_else(|| {
+                    GitToolError::InvalidInput(
+                        "Git receive-pack executable directory is unavailable".into(),
+                    )
+                })?;
+            let receiver = exec_path.join(if cfg!(windows) {
+                "git-receive-pack.exe"
+            } else {
+                "git-receive-pack"
+            });
+            let shell = self.inspect_git_shell_path().await?;
+            for (path, description) in [
+                (
+                    &receiver,
+                    "local Git receive-pack child executable identity",
+                ),
+                (&shell, "local Git transport shell executable identity"),
+            ] {
+                self.facets
+                    .push(path_facet(ToolNature::Read, path, description)?);
+                self.receiver_child_paths.push(path.clone());
+            }
+            let maintenance = self.maintenance_program.as_ref().ok_or_else(|| {
+                GitToolError::InvalidInput("Receiver Git child executable missing".into())
+            })?;
+            if !self.receiver_child_paths.contains(maintenance) {
+                self.receiver_child_paths.push(maintenance.clone());
+            }
+        }
+        self.phase = if !self.checkout_pending_new_gitlinks.is_empty() {
+            self.sender_mutation_facets = self.facets.clone();
+            self.facets.retain(|facet| facet.nature == ToolNature::Read);
+            for (path, _) in &self.checkout_pending_new_gitlinks {
+                self.facets.push(path_facet(
+                    ToolNature::Read,
+                    path,
+                    "new gitlink top-level name discovery; no mutation authority",
+                )?);
+            }
+            Phase::CheckoutNewGitlinks
+        } else if self.target_config_sources.is_some() {
+            self.sender_mutation_facets = self.facets.clone();
+            self.facets.retain(|facet| facet.nature == ToolNature::Read);
+            self.add_target_configuration_reads()?;
+            Phase::TargetConfiguration
+        } else if self.checkout_deletion.is_some() {
+            self.sender_mutation_facets = self.facets.clone();
+            self.facets.retain(|facet| facet.nature == ToolNature::Read);
+            self.add_checkout_deletion_reads()?;
+            Phase::CheckoutDeletion
+        } else if self.receiver_roots.is_empty() {
+            Phase::Mutation
+        } else {
+            self.sender_mutation_facets = self.facets.clone();
+            self.facets.retain(|facet| facet.nature == ToolNature::Read);
+            Phase::ReceiverRoots
+        };
+        Ok(self)
+    }
+
+    fn discover_new_gitlinks(
+        mut self: Box<Self>,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<Box<Self>, GitToolError> {
+        self.revalidate()?;
+        for (path, _) in &self.checkout_pending_new_gitlinks {
+            if !authorizations.iter().any(|token| {
+                token.normalized_path() == path
+                    && token.authorizes_path(
+                        "git_checkout",
+                        ToolNature::Read,
+                        &self.workspace,
+                        path.to_str().unwrap_or_default(),
+                    )
+            }) {
+                return Err(GitToolError::InvalidInput(
+                    "New gitlink directory requires exact Read admission".into(),
+                ));
+            }
+        }
+        for (path, expected) in &self.checkout_pending_new_gitlinks {
+            if &snapshot::PathIdentity::capture(path)
+                .map_err(|error| GitToolError::InvalidInput(error.to_string()))?
+                != expected
+            {
+                return Err(GitToolError::InvalidInput(
+                    "New gitlink directory changed during discovery".into(),
+                ));
+            }
+            let evidence = capture_new_gitlink_directory(path, true)?;
+            if &evidence.identity != expected {
+                return Err(GitToolError::InvalidInput(
+                    "New gitlink directory changed during discovery".into(),
+                ));
+            }
+            self.checkout_new_gitlinks.push((path.clone(), evidence));
+        }
+        self.checkout_pending_new_gitlinks.clear();
+        let markers: Vec<_> = self
+            .checkout_new_gitlinks
+            .iter()
+            .filter(|(_, evidence)| evidence.names.iter().any(|name| name == ".git"))
+            .map(|(path, _)| path.join(".git"))
+            .collect();
+        if !markers.is_empty() {
+            for marker in markers {
+                self.facets.push(path_facet(
+                    ToolNature::Read,
+                    &marker,
+                    "new child Git marker discovery; target metadata remains unapproved",
+                )?);
+            }
+            self.phase = Phase::CheckoutChildMarkers;
+            self.identity = PreparedPlanIdentity::new();
+            return Ok(self);
+        }
+        self.finish_new_gitlink_discovery()
+    }
+
+    fn finish_new_gitlink_discovery(mut self: Box<Self>) -> Result<Box<Self>, GitToolError> {
+        if self.target_config_sources.is_some() {
+            self.add_target_configuration_reads()?;
+            self.phase = Phase::TargetConfiguration;
+        } else if self.checkout_deletion.is_some() {
+            self.add_checkout_deletion_reads()?;
+            self.phase = Phase::CheckoutDeletion;
+        } else {
+            self.facets.append(&mut self.sender_mutation_facets);
+            self.phase = Phase::Mutation;
+        }
+        self.identity = PreparedPlanIdentity::new();
+        Ok(self)
+    }
+
+    fn checkout_child_read<'a>(
+        &self,
+        path: &Path,
+        authorizations: &'a [talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<&'a Path, GitToolError> {
+        authorizations
+            .iter()
+            .find(|token| {
+                token.authorizes_path(
+                    "git_checkout",
+                    ToolNature::Read,
+                    &self.workspace,
+                    path.to_str().unwrap_or_default(),
+                )
+            })
+            .map(|token| token.normalized_path())
+            .ok_or_else(|| {
+                GitToolError::InvalidInput("New child path requires separate Read admission".into())
+            })
+    }
+
+    fn discover_checkout_child_markers(
+        mut self: Box<Self>,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<Box<Self>, GitToolError> {
+        self.revalidate()?;
+        let roots: Vec<_> = self
+            .checkout_new_gitlinks
+            .iter()
+            .filter(|(_, evidence)| evidence.names.iter().any(|name| name == ".git"))
+            .map(|(path, _)| path.clone())
+            .collect();
+        // Check the complete frontier before any marker contents are inspected.
+        for root in &roots {
+            self.checkout_child_read(root, authorizations)?;
+            self.checkout_child_read(&root.join(".git"), authorizations)?;
+        }
+        for root in roots {
+            let layout = super::receiver_state::Root::capture(
+                &root,
+                self.checkout_child_read(&root, authorizations)?,
+            )?;
+            for path in std::iter::once(layout.metadata_path.clone())
+                .chain(["commondir", "gitdir", "HEAD"].map(|leaf| layout.metadata_path.join(leaf)))
+            {
+                self.facets.push(path_facet(ToolNature::Read, &path,
+                    "new child Git directory and fixed layout pointer discovery; no target contents")?);
+            }
+            self.checkout_child_layouts.push(layout);
+        }
+        self.identity = PreparedPlanIdentity::new();
+        self.phase = Phase::CheckoutChildMetadata;
+        Ok(self)
+    }
+
+    fn discover_checkout_child_metadata(
+        mut self: Box<Self>,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<Box<Self>, GitToolError> {
+        self.revalidate()?;
+        for layout in &self.checkout_child_layouts {
+            self.checkout_child_read(&layout.metadata_path, authorizations)?;
+            for leaf in ["commondir", "gitdir", "HEAD"] {
+                self.checkout_child_read(&layout.metadata_path.join(leaf), authorizations)?;
+            }
+        }
+        for layout in &self.checkout_child_layouts {
+            let metadata = super::receiver_state::Metadata::capture(
+                &layout.metadata_path,
+                self.checkout_child_read(&layout.metadata_path, authorizations)?,
+            )?;
+            // A linked child's backlink must name the already admitted marker.
+            // Do not inspect a newly declared unrelated worktree marker.
+            if metadata
+                .worktree_marker
+                .as_ref()
+                .is_some_and(|path| path != &layout.canonical.join(".git"))
+            {
+                return Err(GitToolError::InvalidInput(
+                    "New child backlink requires independent worktree discovery".into(),
+                ));
+            }
+            self.facets.push(path_facet(
+                ToolNature::Read,
+                &metadata.common_path,
+                "new child shared Git metadata; no mutation authority",
+            )?);
+            for path in [
+                metadata.common_path.join("config"),
+                metadata.canonical.join("config.worktree"),
+            ] {
+                self.facets.push(path_facet(
+                    ToolNature::Read,
+                    &path,
+                    "new child raw startup layout configuration; includes not expanded",
+                )?);
+            }
+            self.checkout_child_metadata.push(metadata);
+        }
+        self.facets.push(
+            ToolPermissionFacet::with_resource(
+                ToolNature::Execute,
+                self.program
+                    .to_str()
+                    .ok_or_else(|| GitToolError::InvalidInput("Git path is not UTF-8".into()))?,
+                ToolResourceKind::Command,
+            )
+            .with_description("fixed new-child configuration discovery; Trace2 outputs disabled"),
+        );
+        self.facets.push(ToolPermissionFacet::with_resource(
+            ToolNature::Read, "git:configuration-chain", ToolResourceKind::Remote,
+        ).with_description("discover new-child system/global/include configuration internally; no general file access"));
+        self.identity = PreparedPlanIdentity::new();
+        self.phase = Phase::CheckoutChildConfiguration;
+        Ok(self)
+    }
+
+    async fn discover_checkout_child_configuration(
+        mut self: Box<Self>,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<Box<Self>, GitToolError> {
+        self.revalidate()?;
+        if self.checkout_child_layouts.len() != self.checkout_child_metadata.len() {
+            return Err(GitToolError::Git(
+                "Incomplete new child location evidence".into(),
+            ));
+        }
+        // No command runs until every newly discovered shared root is admitted.
+        for metadata in &self.checkout_child_metadata {
+            self.checkout_child_read(&metadata.common_path, authorizations)?;
+            self.checkout_child_read(&metadata.common_path.join("config"), authorizations)?;
+            self.checkout_child_read(&metadata.canonical.join("config.worktree"), authorizations)?;
+        }
+        for (layout, metadata) in self
+            .checkout_child_layouts
+            .iter()
+            .zip(&self.checkout_child_metadata)
+        {
+            let startup = super::config_state::ChildStartupLayout::capture(
+                &metadata.canonical,
+                &metadata.common_path,
+                metadata.has_common(),
+            )?;
+            for target in &startup.targets {
+                self.facets.push(path_facet(
+                    ToolNature::Read,
+                    target,
+                    "new child raw startup core.worktree target; independent of include overrides",
+                )?);
+            }
+            let worktree = startup
+                .targets
+                .iter()
+                .next()
+                .cloned()
+                .unwrap_or_else(|| layout.canonical.clone());
+            self.checkout_child_startup.push(startup);
+            // Bind setup to the already admitted directory: --git-dir alone
+            // still resolves core.worktree. This is a discovery-only override;
+            // the configured value remains in the inventory for fresh admission.
+            let output = self
+                .inspect_checkout_child_config(&metadata.canonical, &layout.canonical)
+                .await?;
+            let config =
+                super::config_state::ChildConfig::capture_receiver(&output, &metadata.canonical)?;
+            config.verify_host(
+                &self
+                    .inspect_checkout_child_config(&metadata.canonical, &layout.canonical)
+                    .await?,
+            )?;
+            self.facets.push(path_facet(
+                ToolNature::Read,
+                &worktree,
+                "new child effective worktree layout and subsequent status sources",
+            )?);
+            for (path, _) in &config.files {
+                self.facets.push(path_facet(
+                    ToolNature::Read,
+                    path,
+                    "new child bootstrap configuration evidence retained for continuation",
+                )?);
+            }
+            self.checkout_child_bootstrap.push((worktree, config));
+        }
+        self.identity = PreparedPlanIdentity::new();
+        self.phase = Phase::CheckoutChildWorktree;
+        Ok(self)
+    }
+
+    async fn discover_checkout_child_worktree(
+        mut self: Box<Self>,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<Box<Self>, GitToolError> {
+        self.revalidate()?;
+        if self.checkout_child_bootstrap.len() != self.checkout_child_layouts.len() {
+            return Err(GitToolError::Git(
+                "Incomplete child bootstrap evidence".into(),
+            ));
+        }
+        // Admit the entire worktree frontier before any ordinary Git setup.
+        for startup in &self.checkout_child_startup {
+            for target in &startup.targets {
+                self.checkout_child_read(target, authorizations)?;
+            }
+        }
+        for (worktree, config) in &self.checkout_child_bootstrap {
+            let admitted = self.checkout_child_read(worktree, authorizations)?;
+            let identity = snapshot::PathIdentity::capture(worktree).map_err(|_| {
+                GitToolError::InvalidInput("Child worktree identity unavailable".into())
+            })?;
+            if worktree.canonicalize().ok().as_deref() != Some(admitted) {
+                return Err(GitToolError::InvalidInput(
+                    "Child worktree changed after admission".into(),
+                ));
+            }
+            config.revalidate()?;
+            self.checkout_child_worktrees
+                .push((worktree.clone(), admitted.to_owned(), identity));
+        }
+        for startup in &self.checkout_child_startup {
+            for target in &startup.targets {
+                let admitted = self.checkout_child_read(target, authorizations)?;
+                let identity = snapshot::PathIdentity::capture(target).map_err(|_| {
+                    GitToolError::InvalidInput("Child startup target unavailable".into())
+                })?;
+                if target.canonicalize().ok().as_deref() != Some(admitted) {
+                    return Err(GitToolError::InvalidInput(
+                        "Child startup target changed after admission".into(),
+                    ));
+                }
+                self.checkout_child_worktrees
+                    .push((target.clone(), admitted.to_owned(), identity));
+            }
+        }
+        for (layout, metadata) in self
+            .checkout_child_layouts
+            .iter()
+            .zip(&self.checkout_child_metadata)
+        {
+            let location = super::repository_state::ChildLocation::capture(&layout.metadata_path)?;
+            if location.git_dir != metadata.canonical
+                || location.common_dir
+                    != self.checkout_child_read(&metadata.common_path, authorizations)?
+            {
+                return Err(GitToolError::InvalidInput(
+                    "New child shared directory changed after admission".into(),
+                ));
+            }
+            let workdir = &layout.canonical;
+            let output = self.inspect_config_at(workdir).await?;
+            let config = super::config_state::ChildConfig::capture(&output, workdir)?;
+            config.verify_host(&self.inspect_config_at(workdir).await?)?;
+            self.child_attributes
+                .extend(super::config_state::declared_include_paths(
+                    &output,
+                    workdir,
+                    &self.environment,
+                )?);
+            self.child_attributes
+                .insert(location.common_dir.join("config"));
+            self.child_attributes
+                .insert(location.git_dir.join("config.worktree"));
+            self.child_attributes.extend(config.attribute_paths(
+                self.checkout_child_effective_worktree(workdir),
+                &location.common_dir,
+                &self.environment,
+            )?);
+            for variable in ["GIT_ATTR_SYSTEM", "GIT_ATTR_GLOBAL"] {
+                self.child_attributes
+                    .insert(self.inspect_attribute_path_at(workdir, variable).await?);
+            }
+            layout.revalidate(&layout.canonical)?;
+            metadata.revalidate(&metadata.canonical)?;
+            if super::repository_state::ChildLocation::capture(&layout.metadata_path)? != location {
+                return Err(GitToolError::InvalidInput(
+                    "New child location changed during configuration discovery".into(),
+                ));
+            }
+            // These are the existing child-status scopes, freshly exposed for
+            // new children. They are not inferred from parent-directory Read.
+            self.sender_mutation_facets.push(path_facet(
+                ToolNature::Read,
+                self.checkout_child_effective_worktree(workdir),
+                "new child status directory enumeration, ignore rules and tracked sources",
+            )?);
+            self.sender_mutation_facets.push(path_facet(
+                ToolNature::Read,
+                &location.git_dir,
+                "new child HEAD, index and object metadata",
+            )?);
+            self.sender_mutation_facets.push(path_facet(
+                ToolNature::Read,
+                &location.common_dir,
+                "new child shared object and reference metadata",
+            )?);
+            self.sender_mutation_facets.push(path_facet(
+                ToolNature::Write,
+                &location.git_dir,
+                "checkout child status may refresh its index",
+            )?);
+            self.child_configs.push((workdir.clone(), config));
+            self.child_locations
+                .push((layout.metadata_path.clone(), location));
+        }
+        let config = self
+            .config
+            .as_mut()
+            .ok_or_else(|| GitToolError::Git("Missing source configuration".into()))?;
+        config
+            .stable_auxiliary
+            .extend(self.child_attributes.iter().cloned());
+        for path in &self.child_attributes {
+            self.sender_mutation_facets.push(path_facet(
+                ToolNature::Read,
+                path,
+                "new child effective attribute, exclude and include sources",
+            )?);
+        }
+        for (_, child) in &self.child_configs {
+            for (path, _) in &child.files {
+                config.stable_auxiliary.insert(path.clone());
+                let read = path_facet(ToolNature::Read, path, "new child configuration evidence")?;
+                // Intermediate target-config/deletion stages also revalidate
+                // ChildConfig after the discovery capability has expired.
+                self.facets.push(read.clone());
+                self.sender_mutation_facets.push(read);
+            }
+        }
+        self.facets.retain(|facet| {
+            facet.nature == ToolNature::Read
+                && facet.resource.as_deref() != Some("git:configuration-chain")
+        });
+        self.revalidate()?;
+        self.finish_new_gitlink_discovery()
+    }
+
+    fn add_target_configuration_reads(&mut self) -> Result<(), GitToolError> {
+        for path in self
+            .target_config_sources
+            .as_ref()
+            .ok_or_else(|| GitToolError::Git("Missing target configuration sources".into()))?
+            .paths()
+        {
+            if !self.facets.iter().any(|facet| {
+                facet.nature == ToolNature::Read && facet.resource.as_deref() == path.to_str()
+            }) {
+                self.facets.push(path_facet(
+                    ToolNature::Read,
+                    &path,
+                    "target configuration source or ancestor identity; no mutation authority",
+                )?);
+            }
+        }
+        Ok(())
+    }
+
+    fn discover_target_configuration(
+        mut self: Box<Self>,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<Box<Self>, GitToolError> {
+        self.revalidate()?;
+        if let Some(paths) = &self.target_hook_paths {
+            let sources = self
+                .target_config_sources
+                .as_mut()
+                .ok_or_else(|| GitToolError::Git("Missing target hook ancestor evidence".into()))?;
+            sources.advance(
+                |path| {
+                    authorizations.iter().any(|token| {
+                        token.authorizes_path(
+                            "git_checkout",
+                            ToolNature::Read,
+                            &self.workspace,
+                            path.to_str().unwrap_or_default(),
+                        )
+                    })
+                },
+                &self.environment,
+            )?;
+            if !sources.complete() {
+                self.add_target_configuration_reads()?;
+                self.identity = PreparedPlanIdentity::new();
+                return Ok(self);
+            }
+            if paths.iter().any(|path| {
+                !authorizations.iter().any(|token| {
+                    token.authorizes_path(
+                        "git_checkout",
+                        ToolNature::Read,
+                        &self.workspace,
+                        path.to_str().unwrap_or_default(),
+                    )
+                })
+            }) {
+                return Err(GitToolError::InvalidInput(
+                    "Target checkout hooks require exact Read admission before capture".into(),
+                ));
+            }
+            self.target_hook_evidence =
+                super::config_state::ConfigState::capture_checkout_reload_hooks(paths)?;
+            self.revalidate()?;
+            // Preserve every discovered Read in the final profile. A deletion
+            // inventory still needs its own read-only frontier before any Write
+            // authority is restored. Neither continuation reuses this proof.
+            if self.checkout_deletion.is_some() {
+                self.add_checkout_deletion_reads()?;
+                self.phase = Phase::CheckoutDeletion;
+            } else {
+                self.facets
+                    .extend(self.sender_mutation_facets.iter().cloned());
+                self.phase = Phase::Mutation;
+            }
+            self.identity = PreparedPlanIdentity::new();
+            return Ok(self);
+        }
+        let sources = self
+            .target_config_sources
+            .as_mut()
+            .ok_or_else(|| GitToolError::Git("Missing target configuration sources".into()))?;
+        sources.advance(
+            |path| {
+                authorizations.iter().any(|token| {
+                    token.authorizes_path(
+                        "git_checkout",
+                        ToolNature::Read,
+                        &self.workspace,
+                        path.to_str().unwrap_or_default(),
+                    )
+                })
+            },
+            &self.environment,
+        )?;
+        if sources.complete()
+            && sources.worktree_config_enabled(&self.repository.common_dir.join("config"))?
+        {
+            let worktree = self.repository.git_dir.join("config.worktree");
+            // The extension is now bound to admitted main-config bytes. A new
+            // worktree root waits for its own exact Read frontier if necessary.
+            if self.target_config_roots.last() != Some(&worktree) {
+                self.target_config_roots.push(worktree.clone());
+                sources.add([worktree])?;
+            }
+        }
+        if sources.complete() {
+            sources.predict_tracking(
+                &self.repository.common_dir.join("config"),
+                &self.checkout_tracking_writes,
+            )?;
+            // Potential source discovery is not ordered conditional evaluation.
+            // Do not manufacture final effects from this intermediate evidence.
+            let records = sources.ordered_records(
+                &self.target_config_roots,
+                &self.environment,
+                Some(&self.repository.git_dir),
+            )?;
+            super::config_state::ConfigState::validate_checkout_reload(&records)?;
+            let paths = self
+                .config
+                .as_ref()
+                .ok_or_else(|| GitToolError::Git("Missing source configuration".into()))?
+                .checkout_reload_hook_paths(&records, &self.repository, &self.environment)?;
+            for path in &paths {
+                sources.add_optional_directory_context(path.parent().ok_or_else(|| {
+                    GitToolError::InvalidInput("Target hook parent is unavailable".into())
+                })?)?;
+            }
+            for path in &paths {
+                self.facets.push(path_facet(
+                    ToolNature::Read,
+                    path,
+                    "late checkout traditional hook candidate; contents require fresh Read admission",
+                )?);
+            }
+            self.target_hook_paths = Some(paths);
+            self.add_target_configuration_reads()?;
+            self.identity = PreparedPlanIdentity::new();
+            return Ok(self);
+        }
+        self.add_target_configuration_reads()?;
+        self.identity = PreparedPlanIdentity::new();
+        Ok(self)
+    }
+
+    fn add_checkout_deletion_reads(&mut self) -> Result<(), GitToolError> {
+        let inventory = self
+            .checkout_deletion
+            .as_ref()
+            .ok_or_else(|| GitToolError::Git("Missing checkout deletion inventory".into()))?;
+        for path in inventory.paths() {
+            if !self.facets.iter().any(|facet| {
+                facet.nature == ToolNature::Read && facet.resource.as_deref() == path.to_str()
+            }) {
+                self.facets.push(path_facet(ToolNature::Read, &path,
+                    "checkout deletion inventory: directory names or exact file evidence; no deletion authority")?);
+            }
+        }
+        Ok(())
+    }
+
+    fn discover_checkout_deletion(
+        mut self: Box<Self>,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<Box<Self>, GitToolError> {
+        self.revalidate()?;
+        let mut inventory = self
+            .checkout_deletion
+            .take()
+            .ok_or_else(|| GitToolError::Git("Missing checkout deletion inventory".into()))?;
+        inventory.advance(|path| {
+            authorizations.iter().any(|token| {
+                token.normalized_path() == path
+                    && token.authorizes_path(
+                        "git_checkout",
+                        ToolNature::Read,
+                        &self.workspace,
+                        path.to_str().unwrap_or_default(),
+                    )
+            })
+        })?;
+        let complete = inventory.complete();
+        self.checkout_deletion = Some(inventory);
+        self.add_checkout_deletion_reads()?;
+        if complete {
+            self.facets
+                .extend(self.sender_mutation_facets.iter().cloned());
+            for path in self
+                .checkout_deletion
+                .as_ref()
+                .ok_or_else(|| GitToolError::Git("Missing checkout deletion inventory".into()))?
+                .paths()
+            {
+                self.facets.push(path_facet(ToolNature::Write, &path,
+                    "checkout may recursively delete this child entry, including untracked files and child Git metadata")?);
+            }
+            self.phase = Phase::Mutation;
+        }
+        self.identity = PreparedPlanIdentity::new();
+        Ok(self)
+    }
+
+    async fn inspect_git_shell_path(&self) -> Result<PathBuf, GitToolError> {
+        let mut command = tokio::process::Command::new(&self.program);
+        command
+            .current_dir(&self.repository.workdir)
+            .args(["var", "GIT_SHELL_PATH"])
+            .env_clear()
+            .envs(&self.environment);
+        let output = self
+            .run_command(command, std::time::Duration::from_secs(10), 16 * 1024)
+            .await?;
+        let path = output
+            .strip_suffix(b"\n")
+            .and_then(|path| std::str::from_utf8(path).ok())
+            .map(PathBuf::from)
+            .filter(|path| {
+                path.is_absolute()
+                    && !path.as_os_str().as_encoded_bytes().contains(&0)
+                    && !path
+                        .components()
+                        .any(|component| component == std::path::Component::ParentDir)
+            })
+            .ok_or_else(|| {
+                GitToolError::InvalidInput("Git transport shell path is unavailable".into())
+            })?;
+        Ok(path)
+    }
+
+    fn discover_receiver_roots(
+        mut self: Box<Self>,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<Box<Self>, GitToolError> {
+        // No Git command or automatic repository discovery is allowed here:
+        // a gitfile may name a directory outside the admitted receiver root.
+        let mut metadata_paths = Vec::new();
+        for path in &self.receiver_child_paths {
+            let admitted = self.receiver_read_path(path, authorizations)?;
+            self.receiver_child_executables
+                .push(ReceiverChildExecutable::capture(path, admitted)?);
+        }
+        self.validate_receiver_git_programs()?;
+        for root in &self.receiver_roots {
+            let spelling = root
+                .to_str()
+                .ok_or_else(|| GitToolError::InvalidInput("Receiver path is not UTF-8".into()))?;
+            let authorization = authorizations
+                .iter()
+                .find(|authorization| {
+                    authorization.authorizes_path(
+                        self.operation.name(),
+                        ToolNature::Read,
+                        &self.workspace,
+                        spelling,
+                    )
+                })
+                .ok_or_else(|| {
+                    GitToolError::InvalidInput("Receiver Read authorization missing".into())
+                })?;
+            let layout =
+                super::receiver_state::Root::capture(root, authorization.normalized_path())?;
+            metadata_paths.push(layout.metadata_path.clone());
+            self.receiver_layouts.push(layout);
+        }
+        for path in metadata_paths {
+            self.facets.push(path_facet(
+                ToolNature::Read,
+                &path,
+                "receiver Git metadata layout; configuration and writes remain unapproved",
+            )?);
+        }
+        self.identity = PreparedPlanIdentity::new();
+        self.phase = Phase::ReceiverMetadata;
+        Ok(self)
+    }
+
+    fn receiver_read_path<'a>(
+        &self,
+        path: &Path,
+        authorizations: &'a [talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<&'a Path, GitToolError> {
+        let spelling = path
+            .to_str()
+            .ok_or_else(|| GitToolError::InvalidInput("Receiver path is not UTF-8".into()))?;
+        authorizations
+            .iter()
+            .find(|authorization| {
+                authorization.authorizes_path(
+                    self.operation.name(),
+                    ToolNature::Read,
+                    &self.workspace,
+                    spelling,
+                )
+            })
+            .map(|authorization| authorization.normalized_path())
+            .ok_or_else(|| GitToolError::InvalidInput("Receiver Read authorization missing".into()))
+    }
+
+    fn discover_receiver_metadata(
+        mut self: Box<Self>,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<Box<Self>, GitToolError> {
+        self.revalidate_receiver_roots(authorizations)?;
+        for layout in &self.receiver_layouts {
+            let admitted = self.receiver_read_path(&layout.metadata_path, authorizations)?;
+            let metadata =
+                super::receiver_state::Metadata::capture(&layout.metadata_path, admitted)?;
+            self.facets.push(path_facet(
+                ToolNature::Read,
+                &metadata.common_path,
+                "receiver shared metadata layout; configuration and writes remain unapproved",
+            )?);
+            for path in [
+                metadata.common_path.join("refs"),
+                metadata.canonical.join("refs"),
+            ] {
+                self.facets.push(path_facet(
+                    ToolNature::Read,
+                    &path,
+                    "receiver reference directory and bounded descendant tree; no mutation",
+                )?);
+            }
+            self.facets.push(path_facet(
+                ToolNature::Read,
+                &metadata.common_path.join("packed-refs"),
+                "receiver packed reference file evidence; no mutation",
+            )?);
+            self.facets.push(path_facet(
+                ToolNature::Read,
+                &metadata.common_path.join("worktrees"),
+                "receiver worktree registration names only; no child content reads",
+            )?);
+            // Path authorizations are exact. The separately reviewed closed
+            // capability covers bounded descendant reads under the admitted
+            // refs roots; the roots alone cannot authorize the tree walk.
+            self.facets.push(
+                ToolPermissionFacet::with_resource(
+                    ToolNature::Read,
+                    "git:receiver-reference-tree",
+                    ToolResourceKind::Remote,
+                )
+                .with_description(
+                    "bounded receiver refs subtree inspection at the separately admitted paths; push only, no general file access or mutation",
+                ),
+            );
+            if let Some(marker) = &metadata.worktree_marker {
+                self.facets.push(path_facet(
+                    ToolNature::Read,
+                    marker,
+                    "receiver linked-worktree backpointer target; no worktree mutation",
+                )?);
+            }
+            self.receiver_metadata.push(metadata);
+        }
+        self.revalidate_receiver_roots(authorizations)?;
+        self.identity = PreparedPlanIdentity::new();
+        self.phase = Phase::ReceiverCommon;
+        Ok(self)
+    }
+
+    fn discover_receiver_common(
+        mut self: Box<Self>,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<Box<Self>, GitToolError> {
+        self.require_receiver_reference_capability()?;
+        self.revalidate_receiver_metadata(authorizations)?;
+        let mut reference_budget = snapshot::Budget {
+            entries: 65_536,
+            bytes: 16 * 1024 * 1024,
+        };
+        for metadata in &self.receiver_metadata {
+            let common = self.receiver_read_path(&metadata.common_path, authorizations)?;
+            let marker = metadata
+                .worktree_marker
+                .as_ref()
+                .map(|path| self.receiver_read_path(path, authorizations))
+                .transpose()?;
+            for path in [
+                metadata.common_path.join("refs"),
+                metadata.canonical.join("refs"),
+                metadata.common_path.join("packed-refs"),
+            ] {
+                self.receiver_read_path(&path, authorizations)?;
+            }
+            let evidence = super::receiver_state::Common::capture_with_budget(
+                metadata,
+                common,
+                marker,
+                &mut reference_budget,
+            )?;
+            let registrations = metadata.common_path.join("worktrees");
+            let inventory = super::receiver_state::WorktreeInventory::capture(
+                &registrations,
+                self.receiver_read_path(&registrations, authorizations)?,
+            )?;
+            for name in &inventory.names {
+                let sibling = registrations.join(name);
+                self.facets.push(path_facet(
+                    ToolNature::Read,
+                    &sibling,
+                    "receiver sibling worktree metadata candidate; contents deferred",
+                )?);
+                for leaf in ["HEAD", "gitdir", "commondir"] {
+                    self.facets.push(path_facet(
+                        ToolNature::Read,
+                        &sibling.join(leaf),
+                        "receiver sibling HEAD and layout pointer evidence; targets deferred",
+                    )?);
+                }
+            }
+            self.receiver_worktree_inventories.push(inventory);
+            for (base, declared) in &evidence.includes {
+                let text = declared.to_str().ok_or_else(|| {
+                    GitToolError::InvalidInput("Receiver include path is not UTF-8".into())
+                })?;
+                let path = if let Some(relative) = text.strip_prefix("~/") {
+                    let home = self
+                        .environment
+                        .get(std::ffi::OsStr::new("HOME"))
+                        .ok_or_else(|| {
+                            GitToolError::InvalidInput(
+                                "Receiver include requires a captured home directory".into(),
+                            )
+                        })?;
+                    let home = Path::new(home);
+                    if !home.is_absolute() {
+                        return Err(GitToolError::InvalidInput(
+                            "Receiver include home must be absolute".into(),
+                        ));
+                    }
+                    super::remote_state::validate_local_path_syntax(home)?;
+                    if Path::new(relative).has_root() {
+                        return Err(GitToolError::InvalidInput(
+                            "Receiver home include suffix must be relative".into(),
+                        ));
+                    }
+                    super::remote_state::validate_local_path_syntax(Path::new(relative))?;
+                    if Path::new(relative)
+                        .components()
+                        .any(|part| part == std::path::Component::ParentDir)
+                    {
+                        return Err(GitToolError::InvalidInput(
+                            "Receiver home include has ambiguous parent traversal".into(),
+                        ));
+                    }
+                    home.join(relative)
+                } else {
+                    if text.starts_with('~') || text.starts_with("%(") {
+                        return Err(GitToolError::InvalidInput(
+                            "Receiver include interpolation requires additional discovery".into(),
+                        ));
+                    }
+                    super::remote_state::validate_local_path_syntax(declared)?;
+                    base.join(declared)
+                };
+                self.facets.push(path_facet(ToolNature::Read, &path,
+                    "receiver declared include candidate, including inactive conditions; contents not yet inspected")?);
+            }
+            for path in &evidence.local_worktrees {
+                self.facets.push(path_facet(ToolNature::Read, path,
+                    "receiver local core.worktree layout hint; effective configuration remains unapproved")?);
+            }
+            if let Some(target) = &evidence.backlink_target {
+                self.facets.push(path_facet(
+                    ToolNature::Read,
+                    target,
+                    "receiver worktree backlink verification; no mutation",
+                )?);
+            }
+            self.receiver_common.push(evidence);
+        }
+        self.revalidate_receiver_metadata(authorizations)?;
+        self.facets.push(
+            ToolPermissionFacet::with_resource(
+                ToolNature::Execute,
+                self.program.to_str().ok_or_else(|| {
+                    GitToolError::InvalidInput("Git program path is not UTF-8".into())
+                })?,
+                ToolResourceKind::Command,
+            )
+            .with_description(
+                "fixed receiver configuration inventory; Trace2 file/socket output disabled",
+            ),
+        );
+        self.facets.push(ToolPermissionFacet::with_resource(
+            ToolNature::Read, "git:configuration-chain", ToolResourceKind::Remote,
+        ).with_description("discover receiver system/global/include configuration internally; no mutation or general file access"));
+        self.identity = PreparedPlanIdentity::new();
+        self.phase = Phase::ReceiverConfiguration;
+        Ok(self)
+    }
+
+    async fn discover_receiver_configuration(
+        mut self: Box<Self>,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<Box<Self>, GitToolError> {
+        self.revalidate()?;
+        self.revalidate_receiver_common(authorizations)?;
+        // Ordinary `git config` setup can resolve these direct-file layout
+        // hints even though receive-pack's enter_repo does not. Their access
+        // must be admitted before the fixed configuration-chain command.
+        for (metadata, inventory) in self
+            .receiver_metadata
+            .iter()
+            .zip(&self.receiver_worktree_inventories)
+        {
+            for name in &inventory.names {
+                let path = metadata.common_path.join("worktrees").join(name);
+                let admitted = self.receiver_read_path(&path, authorizations)?;
+                for leaf in ["HEAD", "gitdir", "commondir"] {
+                    self.receiver_read_path(&path.join(leaf), authorizations)?;
+                }
+                let sibling = super::receiver_state::Metadata::capture(&path, admitted)?;
+                self.facets.push(path_facet(
+                    ToolNature::Read,
+                    &sibling.canonical.join("refs"),
+                    "sibling private references under dedicated receiver reference-tree admission",
+                )?);
+                self.facets.push(path_facet(
+                    ToolNature::Read,
+                    &sibling.common_path,
+                    "sibling shared directory target; verification deferred",
+                )?);
+                if let Some(marker) = &sibling.worktree_marker {
+                    self.facets.push(path_facet(
+                        ToolNature::Read,
+                        marker,
+                        "sibling worktree marker target; verification deferred",
+                    )?);
+                }
+                self.receiver_siblings.push(sibling);
+            }
+        }
+        for common in &self.receiver_common {
+            for path in &common.local_worktrees {
+                let admitted = self.receiver_read_path(path, authorizations)?;
+                if path.canonicalize().map_err(|_| {
+                    GitToolError::InvalidInput("Receiver setup worktree is unavailable".into())
+                })? != admitted
+                {
+                    return Err(GitToolError::InvalidInput(
+                        "Receiver setup worktree changed after admission".into(),
+                    ));
+                }
+            }
+        }
+        for (metadata, common) in self.receiver_metadata.iter().zip(&self.receiver_common) {
+            let output = self.inspect_receiver_config_at(&metadata.canonical).await?;
+            let config =
+                super::config_state::ChildConfig::capture_receiver(&output, &metadata.canonical)?;
+            if output != self.inspect_receiver_config_at(&metadata.canonical).await? {
+                return Err(GitToolError::InvalidInput(
+                    "Receiver configuration changed during discovery".into(),
+                ));
+            }
+            let mut effects = config.receiver_effects(
+                &metadata.canonical,
+                &common.canonical,
+                &self.environment,
+            )?;
+            // get_worktrees reads the main worktree HEAD and separately checks
+            // common/config.worktree for core.bare when invoked from a linked
+            // worktree. These are not necessarily in that receiver's config chain.
+            effects.paths.insert(common.canonical.join("HEAD"));
+            effects
+                .paths
+                .insert(common.canonical.join("config.worktree"));
+            // receive-pack checks detached worktrees for an active bisect.
+            // Inventory names only here; auxiliary admission precedes reads.
+            for gitdir in std::iter::once(&metadata.canonical)
+                .chain(std::iter::once(&common.canonical))
+                .chain(
+                    self.receiver_siblings
+                        .iter()
+                        .filter(|sibling| {
+                            sibling.spelling.parent()
+                                == Some(metadata.common_path.join("worktrees").as_path())
+                        })
+                        .map(|sibling| &sibling.canonical),
+                )
+            {
+                for leaf in ["BISECT_LOG", "BISECT_START"] {
+                    effects.paths.insert(gitdir.join(leaf));
+                }
+                for (directory, merge) in [("rebase-apply", false), ("rebase-merge", true)] {
+                    let path = gitdir.join(directory);
+                    self.facets.push(path_facet(
+                        ToolNature::Read,
+                        &path,
+                        "receiver rebase directory existence",
+                    )?);
+                    for leaf in super::receiver_state::RebaseState::leaves(merge) {
+                        self.facets.push(path_facet(
+                            ToolNature::Read,
+                            &path.join(leaf),
+                            "receiver rebase occupancy evidence",
+                        )?);
+                    }
+                }
+            }
+            for path in &effects.paths {
+                self.facets.push(path_facet(
+                    ToolNature::Read,
+                    path,
+                    "receiver hook, fsck, worktree state and object-layout evidence; no helper execution",
+                )?);
+            }
+            self.receiver_effects.push(effects);
+            for (path, _) in &config.files {
+                self.facets.push(path_facet(
+                    ToolNature::Read,
+                    path,
+                    "receiver configuration evidence",
+                )?);
+            }
+            for path in super::config_state::declared_include_paths(
+                &output,
+                &metadata.canonical,
+                &self.environment,
+            )? {
+                // Receiver include discovery has no staged traversal identities.
+                super::remote_state::validate_local_path_syntax(&path)?;
+                self.facets.push(path_facet(
+                    ToolNature::Read,
+                    &path,
+                    "receiver declared include dependency",
+                )?);
+            }
+            self.receiver_configs
+                .push((metadata.canonical.clone(), config));
+        }
+        self.revalidate_receiver_siblings(authorizations)?;
+        self.revalidate_receiver_common(authorizations)?;
+        self.revalidate()?;
+        self.facets.retain(|facet| {
+            facet.nature != ToolNature::Execute
+                && facet.resource.as_deref() != Some("git:configuration-chain")
+        });
+        self.identity = PreparedPlanIdentity::new();
+        self.phase = Phase::ReceiverAuxiliary;
+        Ok(self)
+    }
+
+    async fn inspect_receiver_config_at(&self, gitdir: &Path) -> Result<Vec<u8>, GitToolError> {
+        let mut command = tokio::process::Command::new(&self.program);
+        // An absolute gitdir keeps local --show-origin paths independent of
+        // any cwd change performed by ordinary Git repository setup.
+        command
+            .current_dir(gitdir)
+            .arg("--no-pager")
+            .arg("--git-dir")
+            .arg(gitdir)
+            .args(["config", "--show-origin", "--null", "--list", "--includes"])
+            .env_clear()
+            .envs(&self.environment);
+        self.run_command(command, std::time::Duration::from_secs(10), 256 * 1024)
+            .await
+            .map_err(|error| match error {
+                GitToolError::InvalidInput(_) => error,
+                _ => GitToolError::Git(
+                    "Receiver configuration inspection failed; configuration values withheld"
+                        .into(),
+                ),
+            })
+    }
+
+    async fn inspect_checkout_child_config(
+        &self,
+        gitdir: &Path,
+        worktree: &Path,
+    ) -> Result<Vec<u8>, GitToolError> {
+        let mut command = tokio::process::Command::new(&self.program);
+        command
+            .current_dir(worktree)
+            .arg("--no-pager")
+            .arg("--git-dir")
+            .arg(gitdir)
+            .arg("--work-tree")
+            .arg(worktree)
+            .args(["config", "--show-origin", "--null", "--list", "--includes"])
+            .env_clear()
+            .envs(&self.environment);
+        self.run_command(command, std::time::Duration::from_secs(10), 256 * 1024)
+            .await
+            .map_err(|_| {
+                GitToolError::Git(
+                    "Child bootstrap configuration inspection failed; values withheld".into(),
+                )
+            })
+    }
+
+    fn discover_receiver_auxiliary(
+        mut self: Box<Self>,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<Box<Self>, GitToolError> {
+        self.revalidate()?;
+        self.revalidate_receiver_common(authorizations)?;
+        self.revalidate_receiver_siblings(authorizations)?;
+        for (_, config) in &self.receiver_configs {
+            config.revalidate()?;
+        }
+        for (effects, common) in self.receiver_effects.iter().zip(&self.receiver_common) {
+            for path in &effects.paths {
+                self.receiver_read_path(path, authorizations)?;
+            }
+            let evidence = effects.capture()?;
+            for (path, entry) in &evidence {
+                if path == &common.canonical.join("HEAD")
+                    && let snapshot::Entry::File(_, bytes) = &entry.entry
+                {
+                    super::receiver_state::validate_symbolic_target(bytes)?;
+                }
+            }
+            self.receiver_auxiliary.push(evidence);
+        }
+        self.require_receiver_reference_capability()?;
+        let mut reference_budget = self.remaining_receiver_reference_budget()?;
+        for sibling in &self.receiver_siblings {
+            let targets = self.capture_receiver_sibling_targets(sibling, authorizations)?;
+            if let Some(target) = &targets.backlink_target {
+                self.facets.push(path_facet(
+                    ToolNature::Read,
+                    target,
+                    "sibling marker backlink target; verification after fresh admission",
+                )?);
+            }
+            self.receiver_sibling_targets.push(targets);
+            let path = sibling.canonical.join("refs");
+            let admitted = self.receiver_read_path(&path, authorizations)?;
+            let evidence = super::receiver_state::ReferenceTree::capture_admitted(
+                &path,
+                admitted,
+                &mut reference_budget,
+            )?;
+            self.receiver_sibling_refs.push((path, evidence));
+        }
+        for root in self
+            .receiver_metadata
+            .iter()
+            .map(|metadata| &metadata.canonical)
+            .chain(self.receiver_common.iter().map(|common| &common.canonical))
+            .chain(
+                self.receiver_siblings
+                    .iter()
+                    .map(|sibling| &sibling.canonical),
+            )
+        {
+            for (directory, merge) in [("rebase-apply", false), ("rebase-merge", true)] {
+                let path = root.join(directory);
+                if self
+                    .receiver_rebase
+                    .iter()
+                    .any(|(existing, _, _)| existing == &path)
+                {
+                    continue;
+                }
+                let admitted = self.receiver_read_path(&path, authorizations)?;
+                for leaf in super::receiver_state::RebaseState::leaves(merge) {
+                    self.receiver_read_path(&path.join(leaf), authorizations)?;
+                }
+                let state = super::receiver_state::RebaseState::capture(&path, admitted, merge)?;
+                self.receiver_rebase.push((path, merge, state));
+            }
+        }
+        self.revalidate_receiver_siblings(authorizations)?;
+        self.revalidate_receiver_common(authorizations)?;
+        self.identity = PreparedPlanIdentity::new();
+        self.phase = Phase::ReceiverMutation;
+        self.prepare_receiver_storage()?;
+        Ok(self)
+    }
+
+    fn revalidate_receiver_auxiliary(
+        &self,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<(), GitToolError> {
+        self.revalidate()?;
+        self.revalidate_receiver_common(authorizations)?;
+        self.revalidate_receiver_siblings(authorizations)?;
+        for (path, merge, expected) in &self.receiver_rebase {
+            let admitted = self.receiver_read_path(path, authorizations)?;
+            for leaf in super::receiver_state::RebaseState::leaves(*merge) {
+                self.receiver_read_path(&path.join(leaf), authorizations)?;
+            }
+            if &super::receiver_state::RebaseState::capture(path, admitted, *merge)? != expected {
+                return Err(GitToolError::InvalidInput(
+                    "Receiver rebase state changed after admission".into(),
+                ));
+            }
+        }
+        self.require_receiver_reference_capability()?;
+        if self.receiver_sibling_refs.len() != self.receiver_siblings.len() {
+            return Err(GitToolError::InvalidInput(
+                "Receiver sibling reference evidence missing".into(),
+            ));
+        }
+        if self.receiver_sibling_targets.len() != self.receiver_siblings.len() {
+            return Err(GitToolError::InvalidInput(
+                "Receiver sibling target evidence missing".into(),
+            ));
+        }
+        for (sibling, expected) in self
+            .receiver_siblings
+            .iter()
+            .zip(&self.receiver_sibling_targets)
+        {
+            if &self.capture_receiver_sibling_targets(sibling, authorizations)? != expected {
+                return Err(GitToolError::InvalidInput(
+                    "Receiver sibling targets changed after admission".into(),
+                ));
+            }
+            let admitted = expected
+                .backlink_target
+                .as_ref()
+                .map(|path| self.receiver_read_path(path, authorizations))
+                .transpose()?;
+            expected.verify_backlink(sibling, admitted)?;
+        }
+        let mut reference_budget = self.remaining_receiver_reference_budget()?;
+        for (path, expected) in &self.receiver_sibling_refs {
+            let admitted = self.receiver_read_path(path, authorizations)?;
+            if &super::receiver_state::ReferenceTree::capture_admitted(
+                path,
+                admitted,
+                &mut reference_budget,
+            )? != expected
+            {
+                return Err(GitToolError::InvalidInput(
+                    "Receiver sibling references changed after admission".into(),
+                ));
+            }
+        }
+        for (_, config) in &self.receiver_configs {
+            config.revalidate()?;
+        }
+        for (effects, expected) in self.receiver_effects.iter().zip(&self.receiver_auxiliary) {
+            for path in &effects.paths {
+                self.receiver_read_path(path, authorizations)?;
+            }
+            if &effects.capture()? != expected {
+                return Err(GitToolError::InvalidInput(
+                    "Receiver auxiliary evidence changed after admission".into(),
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn remaining_receiver_reference_budget(&self) -> Result<snapshot::Budget, GitToolError> {
+        let mut budget = snapshot::Budget {
+            entries: 65_536,
+            bytes: 16 * 1024 * 1024,
+        };
+        for common in &self.receiver_common {
+            budget.entries = budget
+                .entries
+                .checked_sub(common.reference_entries)
+                .ok_or_else(|| {
+                    GitToolError::InvalidInput("Receiver reference entry limit exceeded".into())
+                })?;
+            budget.bytes = budget
+                .bytes
+                .checked_sub(common.reference_bytes)
+                .ok_or_else(|| {
+                    GitToolError::InvalidInput("Receiver reference byte limit exceeded".into())
+                })?;
+        }
+        Ok(budget)
+    }
+
+    fn prepare_receiver_storage(&mut self) -> Result<(), GitToolError> {
+        for root in self
+            .receiver_metadata
+            .iter()
+            .map(|metadata| &metadata.canonical)
+            .chain(self.receiver_common.iter().map(|common| &common.canonical))
+        {
+            self.facets.push(path_facet(
+                ToolNature::Read,
+                root,
+                "receiver metadata structure and object-store inspection",
+            )?);
+        }
+        self.facets.push(ToolPermissionFacet::with_resource(ToolNature::Read, "git:receiver-metadata", ToolResourceKind::Remote)
+            .with_description("receiver metadata descendant inspection at separately admitted roots; no mutation in this stage"));
+        self.facets.push(
+            ToolPermissionFacet::with_resource(
+                ToolNature::Execute,
+                self.program
+                    .to_str()
+                    .ok_or_else(|| GitToolError::InvalidInput("Git path is not UTF-8".into()))?,
+                ToolResourceKind::Command,
+            )
+            .with_description(
+                "bound Git receiver executable; metadata inspection stage does not start it",
+            ),
+        );
+        Ok(())
+    }
+
+    fn inspect_receiver_storage(
+        &self,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<Vec<super::receiver_storage::Storage>, GitToolError> {
+        self.revalidate_receiver_auxiliary(authorizations)?;
+        if !self.facets.iter().any(|facet| {
+            facet.nature == ToolNature::Read
+                && facet.resource_kind == Some(ToolResourceKind::Remote)
+                && facet.resource.as_deref() == Some("git:receiver-metadata")
+        }) {
+            return Err(GitToolError::InvalidInput(
+                "Receiver metadata capability missing".into(),
+            ));
+        }
+        let mut remaining = 65_536;
+        let mut storage = Vec::new();
+        for root in self
+            .receiver_metadata
+            .iter()
+            .map(|metadata| &metadata.canonical)
+            .chain(self.receiver_common.iter().map(|common| &common.canonical))
+        {
+            storage.push(super::receiver_storage::Storage::capture(
+                root,
+                self.receiver_read_path(root, authorizations)?,
+                &mut remaining,
+            )?);
+        }
+        Ok(storage)
+    }
+
+    fn prepare_receiver_mutation(
+        mut self: Box<Self>,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<Box<Self>, GitToolError> {
+        self.validate_receiver_shell_baseline()?;
+        self.receiver_storage = self.inspect_receiver_storage(authorizations)?;
+        self.facets
+            .extend(self.sender_mutation_facets.iter().cloned());
+        for root in self
+            .receiver_metadata
+            .iter()
+            .map(|entry| &entry.canonical)
+            .chain(self.receiver_common.iter().map(|entry| &entry.canonical))
+        {
+            self.facets.push(path_facet(ToolNature::Write, root,
+                "receiver Git metadata for push and foreground maintenance; excludes worktrees and external stores")?);
+        }
+        self.facets.push(ToolPermissionFacet::with_resource(
+            ToolNature::Write, "git:receiver-metadata", ToolResourceKind::Remote,
+        ).with_description("push and foreground maintenance metadata within separately admitted receiver roots"));
+        for child in &self.receiver_child_executables {
+            self.facets.push(
+                ToolPermissionFacet::with_resource(
+                    ToolNature::Execute,
+                    child.spelling.to_str().ok_or_else(|| {
+                        GitToolError::InvalidInput("Receiver executable path is not UTF-8".into())
+                    })?,
+                    ToolResourceKind::Command,
+                )
+                .with_description("bound receiver transport or Git maintenance executable"),
+            );
+        }
+        self.identity = PreparedPlanIdentity::new();
+        self.phase = Phase::Mutation;
+        Ok(self)
+    }
+
+    fn capture_receiver_sibling_targets(
+        &self,
+        sibling: &super::receiver_state::Metadata,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<super::receiver_state::SiblingTargets, GitToolError> {
+        let owner = self
+            .receiver_metadata
+            .iter()
+            .zip(&self.receiver_common)
+            .find(|(metadata, _)| {
+                sibling.spelling.parent() == Some(metadata.common_path.join("worktrees").as_path())
+            })
+            .ok_or_else(|| GitToolError::InvalidInput("Receiver sibling owner missing".into()))?;
+        let common = self.receiver_read_path(&sibling.common_path, authorizations)?;
+        let marker = sibling
+            .worktree_marker
+            .as_ref()
+            .map(|path| self.receiver_read_path(path, authorizations))
+            .transpose()?;
+        super::receiver_state::SiblingTargets::capture(sibling, common, &owner.1.canonical, marker)
+    }
+
+    fn revalidate_receiver_siblings(
+        &self,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<(), GitToolError> {
+        let expected: usize = self
+            .receiver_worktree_inventories
+            .iter()
+            .map(|inventory| inventory.names.len())
+            .sum();
+        if self.receiver_siblings.len() != expected {
+            return Err(GitToolError::InvalidInput(
+                "Receiver sibling metadata evidence missing".into(),
+            ));
+        }
+        for sibling in &self.receiver_siblings {
+            for leaf in ["HEAD", "gitdir", "commondir"] {
+                self.receiver_read_path(&sibling.spelling.join(leaf), authorizations)?;
+            }
+            sibling.revalidate(self.receiver_read_path(&sibling.spelling, authorizations)?)?;
+        }
+        Ok(())
+    }
+
+    fn revalidate_receiver_common(
+        &self,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<(), GitToolError> {
+        self.require_receiver_reference_capability()?;
+        self.revalidate_receiver_metadata(authorizations)?;
+        if self.receiver_worktree_inventories.len() != self.receiver_common.len() {
+            return Err(GitToolError::InvalidInput(
+                "Receiver worktree inventory missing".into(),
+            ));
+        }
+        for (metadata, inventory) in self
+            .receiver_metadata
+            .iter()
+            .zip(&self.receiver_worktree_inventories)
+        {
+            inventory.revalidate(
+                self.receiver_read_path(&metadata.common_path.join("worktrees"), authorizations)?,
+            )?;
+        }
+        let mut reference_budget = snapshot::Budget {
+            entries: 65_536,
+            bytes: 16 * 1024 * 1024,
+        };
+        for (metadata, evidence) in self.receiver_metadata.iter().zip(&self.receiver_common) {
+            let common = self.receiver_read_path(&metadata.common_path, authorizations)?;
+            let marker = metadata
+                .worktree_marker
+                .as_ref()
+                .map(|path| self.receiver_read_path(path, authorizations))
+                .transpose()?;
+            for path in [
+                metadata.common_path.join("refs"),
+                metadata.canonical.join("refs"),
+                metadata.common_path.join("packed-refs"),
+            ] {
+                self.receiver_read_path(&path, authorizations)?;
+            }
+            evidence.revalidate_with_budget(metadata, common, marker, &mut reference_budget)?;
+            let target = evidence
+                .backlink_target
+                .as_ref()
+                .map(|path| self.receiver_read_path(path, authorizations))
+                .transpose()?;
+            evidence.verify_backlink(metadata, target)?;
+        }
+        Ok(())
+    }
+
+    // The dispatcher has consumed the full prepared proof before entering
+    // these methods. Exact Path tokens alone do not cover descendant reads.
+    fn require_receiver_reference_capability(&self) -> Result<(), GitToolError> {
+        if !self.facets.iter().any(|facet| {
+            facet.nature == ToolNature::Read
+                && facet.resource_kind == Some(ToolResourceKind::Remote)
+                && facet.resource.as_deref() == Some("git:receiver-reference-tree")
+        }) {
+            return Err(GitToolError::InvalidInput(
+                "Receiver reference tree discovery capability missing".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn revalidate_receiver_metadata(
+        &self,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<(), GitToolError> {
+        self.revalidate_receiver_roots(authorizations)?;
+        for metadata in &self.receiver_metadata {
+            metadata.revalidate(self.receiver_read_path(&metadata.spelling, authorizations)?)?;
+        }
+        Ok(())
+    }
+
+    fn revalidate_receiver_roots(
+        &self,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<(), GitToolError> {
+        if self.receiver_child_paths.len() != self.receiver_child_executables.len() {
+            return Err(GitToolError::InvalidInput(
+                "Receiver child executable evidence is incomplete".into(),
+            ));
+        }
+        for (path, evidence) in self
+            .receiver_child_paths
+            .iter()
+            .zip(&self.receiver_child_executables)
+        {
+            evidence.revalidate(self.receiver_read_path(path, authorizations)?)?;
+        }
+        self.validate_receiver_git_programs()?;
+        for layout in &self.receiver_layouts {
+            let spelling = layout
+                .spelling
+                .to_str()
+                .ok_or_else(|| GitToolError::InvalidInput("Receiver path is not UTF-8".into()))?;
+            let authorization = authorizations
+                .iter()
+                .find(|authorization| {
+                    authorization.authorizes_path(
+                        self.operation.name(),
+                        ToolNature::Read,
+                        &self.workspace,
+                        spelling,
+                    )
+                })
+                .ok_or_else(|| {
+                    GitToolError::InvalidInput("Receiver Read authorization missing".into())
+                })?;
+            layout.revalidate(authorization.normalized_path())?;
+        }
+        Ok(())
+    }
+
+    fn validate_receiver_shell_baseline(&self) -> Result<(), GitToolError> {
+        let path = self
+            .receiver_child_paths
+            .get(1)
+            .ok_or_else(|| GitToolError::InvalidInput("Receiver shell missing".into()))?;
+        let evidence = self
+            .receiver_child_executables
+            .iter()
+            .find(|child| &child.spelling == path)
+            .ok_or_else(|| GitToolError::InvalidInput("Receiver shell identity missing".into()))?;
+        validate_receiver_shell_path(path, &evidence.canonical)
+    }
+
+    fn validate_receiver_git_programs(&self) -> Result<(), GitToolError> {
+        // Validate representability now; dispatch will use this exact fixed
+        // command once the remaining mutation effects are bound.
+        receiver_command(&self.program)?;
+        validate_receiver_shell_environment(&self.environment)?;
+        let maintenance = self.maintenance_program.as_ref().ok_or_else(|| {
+            GitToolError::InvalidInput("Receiver Git child executable missing".into())
+        })?;
+        let receive_pack = self.receiver_child_paths.first().ok_or_else(|| {
+            GitToolError::InvalidInput("Receiver receive-pack executable missing".into())
+        })?;
+        for path in [receive_pack, maintenance] {
+            let evidence = self
+                .receiver_child_executables
+                .iter()
+                .find(|evidence| &evidence.spelling == path)
+                .ok_or_else(|| {
+                    GitToolError::InvalidInput("Receiver Git executable evidence missing".into())
+                })?;
+            if evidence.program != self.program_entry {
+                return Err(GitToolError::InvalidInput("Receiver Git children differ from the configuration-discovery executable; use a separately authorized invocation".into()));
+            }
+        }
+        Ok(())
+    }
+
+    async fn inspect_config(&self) -> Result<Vec<u8>, GitToolError> {
+        self.inspect_config_at(&self.repository.workdir).await
+    }
+
+    async fn resolve_checkout_target(
+        &self,
+        checkout: &GitCheckoutInput,
+        config: &super::config_state::ConfigState,
+    ) -> Result<(String, Option<(String, String)>), GitToolError> {
+        let target = if checkout.create {
+            "HEAD"
+        } else if checkout.branch == "-" {
+            "@{-1}"
+        } else {
+            &checkout.branch
+        };
+        let mut tracking_source = None;
+        let output = match self.inspect_commit_target(target).await? {
+            Some(output) => output,
+            None if !checkout.create && checkout.branch != "-" => {
+                let (candidates, default) = config.checkout_candidates(&checkout.branch)?;
+                let mut resolved = Vec::new();
+                for (remote, reference) in candidates {
+                    if let Some(oid) = self.inspect_commit_target(&reference).await? {
+                        resolved.push((remote, reference, oid));
+                    }
+                }
+                if resolved.len() == 1 {
+                    let (remote, reference, oid) = resolved.remove(0);
+                    tracking_source = Some((remote, reference));
+                    oid
+                } else if let Some(index) = default.as_ref().and_then(|default| {
+                    resolved.iter().position(|(remote, _, _)| remote == default)
+                }) {
+                    let (remote, reference, oid) = resolved.remove(index);
+                    tracking_source = Some((remote, reference));
+                    oid
+                } else {
+                    return Err(GitToolError::InvalidInput(
+                        "Checkout target is missing or ambiguous".into(),
+                    ));
+                }
+            }
+            None => {
+                return Err(GitToolError::InvalidInput(
+                    "Checkout target is missing".into(),
+                ));
+            }
+        };
+        let oid = std::str::from_utf8(&output)
+            .map_err(|_| GitToolError::InvalidInput("Invalid checkout target".into()))?
+            .trim()
+            .to_owned();
+        Ok((oid, tracking_source))
+    }
+
+    /// Branch creation without a start argument uses HEAD's resolved reference.
+    /// This fixed read-only query remains in admitted configuration discovery.
+    async fn inspect_checkout_start(&self, create: bool) -> Result<Option<String>, GitToolError> {
+        if !create {
+            return Ok(self
+                .checkout_tracking_source
+                .as_ref()
+                .map(|(_, reference)| reference.clone()));
+        }
+        let mut command = tokio::process::Command::new(&self.program);
+        command
+            .current_dir(&self.repository.workdir)
+            .args([
+                "rev-parse",
+                "--symbolic-full-name",
+                "--verify",
+                "--end-of-options",
+                "HEAD",
+            ])
+            .env_clear()
+            .envs(&self.environment);
+        let output = self
+            .run_command(command, std::time::Duration::from_secs(10), 4096)
+            .await?;
+        let reference = output
+            .strip_suffix(b"\n")
+            .and_then(|value| std::str::from_utf8(value).ok())
+            .filter(|value| !value.is_empty() && !value.contains(['\0', '\n', '\r']))
+            .ok_or_else(|| GitToolError::InvalidInput("Invalid checkout start reference".into()))?;
+        if reference == "HEAD" {
+            return Ok(None);
+        }
+        if !reference.starts_with("refs/heads/") {
+            return Err(GitToolError::InvalidInput(
+                "Unsupported checkout HEAD reference".into(),
+            ));
+        }
+        Ok(Some(reference.to_owned()))
+    }
+
+    /// Native branch interpretation can expand previous-checkout expressions.
+    /// This read-only call runs inside the admitted config-discovery boundary.
+    async fn inspect_checkout_branch(&self, branch: &str) -> Result<String, GitToolError> {
+        let mut command = tokio::process::Command::new(&self.program);
+        command
+            .current_dir(&self.repository.workdir)
+            .args(["check-ref-format", "--branch", branch])
+            .env_clear()
+            .envs(&self.environment);
+        let output = self
+            .run_command(command, std::time::Duration::from_secs(10), 4096)
+            .await?;
+        let name = output
+            .strip_suffix(b"\n")
+            .and_then(|value| std::str::from_utf8(value).ok())
+            .filter(|value| !value.is_empty() && !value.contains(['\0', '\n', '\r']))
+            .ok_or_else(|| {
+                GitToolError::InvalidInput("Invalid normalized checkout branch".into())
+            })?;
+        Ok(name.to_owned())
+    }
+
+    // Only Git's quiet missing-reference result permits candidate fallback.
+    // Infrastructure errors and diagnostic failures must stop discovery.
+    async fn inspect_commit_target(&self, target: &str) -> Result<Option<Vec<u8>>, GitToolError> {
+        let mut command = tokio::process::Command::new(&self.program);
+        command
+            .current_dir(&self.repository.workdir)
+            .args([
+                "rev-parse",
+                "--verify",
+                "--quiet",
+                "--end-of-options",
+                &format!("{target}^{{commit}}"),
+            ])
+            .env_clear()
+            .envs(&self.environment);
+        let output = self
+            .run_command_output(command, std::time::Duration::from_secs(10), 1024)
+            .await?;
+        if output.status.success() {
+            return Ok(Some(output.stdout));
+        }
+        if output.status.code() == Some(1) && output.stdout.is_empty() && output.stderr.is_empty() {
+            return Ok(None);
+        }
+        Err(GitToolError::Git(
+            "Git commit target inspection failed".into(),
+        ))
+    }
+
+    async fn inspect_config_at(&self, workdir: &Path) -> Result<Vec<u8>, GitToolError> {
+        let mut command = tokio::process::Command::new(&self.program);
+        command
+            .current_dir(workdir)
+            .args([
+                "--no-pager",
+                "config",
+                "--show-origin",
+                "--null",
+                "--list",
+                "--includes",
+            ])
+            .env_clear()
+            .envs(&self.environment);
+        self.run_command(command, std::time::Duration::from_secs(10), 256 * 1024)
+            .await
+            .map_err(|error| match error {
+                GitToolError::InvalidInput(_) => error,
+                _ => GitToolError::Git(
+                    "Git configuration inspection failed; configuration values withheld".into(),
+                ),
+            })
+    }
+
+    async fn inspect_config_paths(&self, variable: &str) -> Result<Vec<PathBuf>, GitToolError> {
+        let mut command = tokio::process::Command::new(&self.program);
+        command
+            .current_dir(&self.repository.workdir)
+            .args(["--no-pager", "var", variable])
+            .env_clear()
+            .envs(&self.environment);
+        let output = self.run_command(command, std::time::Duration::from_secs(10), 16 * 1024).await
+            .map_err(|error| match error {
+                GitToolError::InvalidInput(_) => error,
+                _ => GitToolError::InvalidInput("Git configuration path discovery unavailable; use a separately authorized invocation".into()),
+            })?;
+        if output.is_empty() {
+            return Ok(Vec::new());
+        }
+        let output = output.strip_suffix(b"\n").ok_or_else(|| {
+            GitToolError::InvalidInput("Invalid configuration path response".into())
+        })?;
+        let paths = output
+            .split(|byte| *byte == b'\n')
+            .map(|path| {
+                let path = std::str::from_utf8(path).map(PathBuf::from).map_err(|_| {
+                    GitToolError::InvalidInput("Configuration path is not UTF-8".into())
+                })?;
+                if !path.is_absolute() || path.as_os_str().as_encoded_bytes().contains(&0) {
+                    return Err(GitToolError::InvalidInput(
+                        "Invalid configuration path".into(),
+                    ));
+                }
+                Ok(path)
+            })
+            .collect::<Result<Vec<_>, GitToolError>>()?;
+        if paths.len()
+            > if variable == "GIT_CONFIG_SYSTEM" {
+                1
+            } else {
+                2
+            }
+        {
+            return Err(GitToolError::InvalidInput(
+                "Ambiguous configuration path response".into(),
+            ));
+        }
+        Ok(paths)
+    }
+
+    async fn inspect_attribute_path_at(
+        &self,
+        workdir: &Path,
+        variable: &str,
+    ) -> Result<PathBuf, GitToolError> {
+        let mut command = tokio::process::Command::new(&self.program);
+        command
+            .current_dir(workdir)
+            .args(["--no-pager", "var", variable])
+            .env_clear()
+            .envs(&self.environment);
+        let output = self.run_command(command, std::time::Duration::from_secs(10), 16 * 1024)
+            .await
+            .map_err(|error| match error {
+                GitToolError::InvalidInput(_) => error,
+                _ => GitToolError::InvalidInput(
+                    "Git attribute path discovery unavailable; use a Git installation supporting GIT_ATTR_SYSTEM/GLOBAL or a separately authorized invocation".into(),
+                ),
+            })?;
+        let path = output.strip_suffix(b"\n").ok_or_else(|| {
+            GitToolError::InvalidInput(
+                "Git attribute path discovery returned an invalid path".into(),
+            )
+        })?;
+        let path = std::str::from_utf8(path)
+            .map(PathBuf::from)
+            .map_err(|_| GitToolError::InvalidInput("Git attribute path is not UTF-8".into()))?;
+        if !path.is_absolute() || path.as_os_str().as_encoded_bytes().contains(&0) {
+            return Err(GitToolError::InvalidInput(
+                "Git attribute path is not absolute".into(),
+            ));
+        }
+        Ok(path)
+    }
+
+    async fn execute_admitted(
+        &self,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<String, GitToolError> {
+        if self.phase != Phase::Mutation {
+            return Err(GitToolError::InvalidInput(
+                "Git mutation requires a completed discovery phase".into(),
+            ));
+        }
+        if !self.receiver_roots.is_empty() {
+            for root in self
+                .receiver_metadata
+                .iter()
+                .map(|entry| &entry.canonical)
+                .chain(self.receiver_common.iter().map(|entry| &entry.canonical))
+            {
+                if !authorizations.iter().any(|token| {
+                    token.authorizes_path(
+                        "git_push",
+                        ToolNature::Write,
+                        &self.workspace,
+                        root.to_str().unwrap_or_default(),
+                    )
+                }) {
+                    return Err(GitToolError::InvalidInput(
+                        "Receiver metadata root lacks Write admission".into(),
+                    ));
+                }
+            }
+            if !self.facets.iter().any(|facet| {
+                facet.nature == ToolNature::Write
+                    && facet.resource_kind == Some(ToolResourceKind::Remote)
+                    && facet.resource.as_deref() == Some("git:receiver-metadata")
+            }) {
+                return Err(GitToolError::InvalidInput(
+                    "Receiver metadata Write capability missing".into(),
+                ));
+            }
+            if self.inspect_receiver_storage(authorizations)? != self.receiver_storage {
+                return Err(GitToolError::InvalidInput(
+                    "Receiver metadata changed after approval".into(),
+                ));
+            }
+        }
+        self.revalidate()?;
+        let push_attributes = if matches!(self.operation, Operation::Push(_)) {
+            Some(super::status_state::StatusState::capture_pack_attributes(
+                &self.repository.workdir,
+            )?)
+        } else {
+            None
+        };
+        if matches!(self.operation, Operation::Push(_)) {
+            if self.receiver_roots.is_empty() {
+                super::remote_state::validate_direct_transport(&self.push_destinations)?;
+            } else {
+                let local = self.push_destinations.iter().map(|destination| {
+                    super::remote_state::local_destination(destination, &self.repository.workdir)?
+                        .ok_or_else(|| GitToolError::InvalidInput(
+                            "Mixed local and network push destinations require separate transport command planning".into(),
+                        ))
+                }).collect::<Result<Vec<_>, _>>()?;
+                if local != self.receiver_roots
+                    || self.receiver_metadata.len() != local.len()
+                    || self.receiver_common.len() != local.len()
+                {
+                    return Err(GitToolError::InvalidInput(
+                        "Push receiver destination evidence is incomplete".into(),
+                    ));
+                }
+                self.validate_receiver_shell_baseline()?;
+            }
+        }
+        self.revalidate_maintenance_program()?;
+        let status = if matches!(self.operation, Operation::Commit(_)) {
+            Some(super::status_state::StatusState::capture(
+                &self.repository.workdir,
+                &self
+                    .gitlinks
+                    .iter()
+                    .map(|link| self.repository.workdir.join(&link.path))
+                    .collect::<Vec<_>>(),
+            )?)
+        } else {
+            None
+        };
+        let child_evidence = if matches!(
+            self.operation,
+            Operation::Commit(_) | Operation::Checkout(_)
+        ) {
+            let children = self.capture_admitted_children()?;
+            let child_inspection = self.inspect_child_filters().await?;
+            Some((children, child_inspection))
+        } else {
+            None
+        };
+        self.config
+            .as_ref()
+            .ok_or_else(|| {
+                GitToolError::InvalidInput(
+                    "Git configuration discovery requires separate admission".into(),
+                )
+            })?
+            .verify_host(&self.inspect_config().await?)?;
+        let config = self
+            .config
+            .as_ref()
+            .ok_or_else(|| GitToolError::Git("missing configuration evidence".into()))?;
+        if let Some(target) = &self.checkout_target {
+            let mut target_sources = self
+                .target_config_sources
+                .as_ref()
+                .map_or_else(Vec::new, |sources| {
+                    sources.captured_paths().cloned().collect()
+                });
+            target_sources.extend(
+                self.target_hook_evidence
+                    .iter()
+                    .map(|(path, _)| path.clone()),
+            );
+            config.validate_checkout_target(&self.repository, target, &target_sources)?;
+        }
+        if let Some(inventory) = &self.checkout_deletion {
+            if !inventory.complete()
+                || inventory.paths().iter().any(|path| {
+                    !authorizations.iter().any(|token| {
+                        token.normalized_path() == path
+                            && token.authorizes_path(
+                                "git_checkout",
+                                ToolNature::Write,
+                                &self.workspace,
+                                path.to_str().unwrap_or_default(),
+                            )
+                    })
+                })
+            {
+                return Err(GitToolError::InvalidInput(
+                    "Checkout deletion requires exact Write admission for every child entry".into(),
+                ));
+            }
+            let mut protected: Vec<_> = self
+                .child_configs
+                .iter()
+                .flat_map(|(_, config)| config.files.iter().map(|(path, _)| path.clone()))
+                .collect();
+            if let Some(sources) = &self.target_config_sources {
+                protected.extend(sources.captured_paths().cloned());
+            }
+            protected.extend(
+                self.target_hook_evidence
+                    .iter()
+                    .map(|(path, _)| path.clone()),
+            );
+            if let Some((_, inspection)) = &child_evidence {
+                protected.extend(inspection.attributes.iter().filter_map(|(path, entry)| {
+                    (!matches!(entry, snapshot::Entry::Missing)).then_some(path.clone())
+                }));
+            }
+            config.validate_checkout_deletions(&inventory.roots(), &protected)?;
+        }
+        let auxiliary = config.capture_auxiliary()?;
+        let mut entries = Vec::new();
+        for (path, source) in self.paths.iter().zip(&self.sources) {
+            selected_leaves(Path::new(path), source, &mut entries)?;
+        }
+        if !entries.is_empty() {
+            let mut command = tokio::process::Command::new(&self.program);
+            command
+                .current_dir(&self.repository.workdir)
+                .args(["--no-pager", "check-attr", "-z", "filter", "--"])
+                .args(&entries)
+                .env_clear()
+                .envs(&self.environment);
+            let output = self
+                .run_command(command, std::time::Duration::from_secs(10), 256 * 1024)
+                .await?;
+            let fields = output.split(|byte| *byte == 0).collect::<Vec<_>>();
+            if fields.last() != Some(&b"".as_slice()) || (fields.len() - 1) != entries.len() * 3 {
+                return Err(GitToolError::InvalidInput(
+                    "Git filter inspection returned an invalid result".into(),
+                ));
+            }
+            for (fields, expected) in fields[..fields.len() - 1]
+                .as_chunks::<3>()
+                .0
+                .iter()
+                .zip(&entries)
+            {
+                if fields[0] != expected.as_bytes()
+                    || fields[1] != b"filter"
+                    || !matches!(fields[2], b"unspecified" | b"unset")
+                {
+                    return Err(GitToolError::InvalidInput("Selected Git sources use a configured filter; use a separately authorized Git invocation".into()));
+                }
+            }
+        }
+        if let Some(target) = &self.checkout_target
+            && !self.paths.is_empty()
+        {
+            for source in [format!("--source={}", target.commit), "--cached".to_owned()] {
+                let mut command = tokio::process::Command::new(&self.program);
+                command
+                    .current_dir(&self.repository.workdir)
+                    .args(["check-attr", "-z", &source, "filter", "--"])
+                    .args(&self.paths)
+                    .env_clear()
+                    .envs(&self.environment);
+                let output = self
+                    .run_command(command, std::time::Duration::from_secs(10), 256 * 1024)
+                    .await?;
+                let fields: Vec<_> = output.split(|byte| *byte == 0).collect();
+                if fields.last() != Some(&b"".as_slice())
+                    || fields.len() != self.paths.len() * 3 + 1
+                {
+                    return Err(GitToolError::InvalidInput(
+                        "Invalid checkout target attribute evidence".into(),
+                    ));
+                }
+                for (fields, path) in fields[..fields.len() - 1]
+                    .as_chunks::<3>()
+                    .0
+                    .iter()
+                    .zip(&self.paths)
+                {
+                    if fields[0] != path.as_bytes()
+                        || fields[1] != b"filter"
+                        || !matches!(fields[2], b"unspecified" | b"unset")
+                    {
+                        return Err(GitToolError::InvalidInput("Checkout target uses a configured filter; use a separately authorized invocation".into()));
+                    }
+                }
+            }
+        }
+        self.revalidate()?;
+        if auxiliary != config.capture_auxiliary()? {
+            return Err(GitToolError::InvalidInput(
+                "Git auxiliary sources changed during inspection".into(),
+            ));
+        }
+        if let Some((children, child_inspection)) = &child_evidence {
+            if children != &self.capture_admitted_children()? {
+                return Err(GitToolError::InvalidInput(
+                    "Submodule HEAD or index changed during admitted inspection".into(),
+                ));
+            }
+            child_inspection.revalidate()?;
+        }
+        if let Some(expected) = status
+            && expected
+                != super::status_state::StatusState::capture(
+                    &self.repository.workdir,
+                    &self
+                        .gitlinks
+                        .iter()
+                        .map(|link| self.repository.workdir.join(&link.path))
+                        .collect::<Vec<_>>(),
+                )?
+        {
+            return Err(GitToolError::InvalidInput(
+                "Git status inputs changed during inspection".into(),
+            ));
+        }
+        self.revalidate_maintenance_program()?;
+        if let Operation::Checkout(checkout) = &self.operation {
+            let (current, tracking_source) = self.resolve_checkout_target(checkout, config).await?;
+            if self
+                .checkout_target
+                .as_ref()
+                .is_none_or(|target| target.commit != current)
+                || tracking_source != self.checkout_tracking_source
+            {
+                return Err(GitToolError::InvalidInput(
+                    "Checkout target changed after approval".into(),
+                ));
+            }
+            if let Some(expected) = &self.checkout_new_branch
+                && self.inspect_checkout_branch(&checkout.branch).await? != *expected
+            {
+                return Err(GitToolError::InvalidInput(
+                    "Checkout branch name changed after approval".into(),
+                ));
+            }
+            if let Some(name) = &self.checkout_new_branch {
+                let start = self.inspect_checkout_start(checkout.create).await?;
+                if config.checkout_tracking_writes(name, start.as_deref())?
+                    != self.checkout_tracking_writes
+                {
+                    return Err(GitToolError::InvalidInput(
+                        "Checkout tracking writes changed after approval".into(),
+                    ));
+                }
+            }
+            self.revalidate()?;
+        }
+        if let Some(expected) = push_attributes
+            && expected
+                != super::status_state::StatusState::capture_pack_attributes(
+                    &self.repository.workdir,
+                )?
+        {
+            return Err(GitToolError::InvalidInput(
+                "Push attribute sources changed during inspection".into(),
+            ));
+        }
+        let receiver = if self.receiver_roots.is_empty() {
+            None
+        } else {
+            Some(receiver_command(&self.program)?)
+        };
+        let mut args = vec!["--no-pager", "--literal-pathspecs"];
+        match &self.operation {
+            Operation::Pull(_) => {
+                return Err(GitToolError::InvalidInput(
+                    "Pull cannot use the generic Git mutation dispatcher".into(),
+                ));
+            }
+            Operation::Push(push) => {
+                args.extend([
+                    "-c",
+                    "maintenance.autoDetach=false",
+                    "-c",
+                    "gc.autoDetach=false",
+                    "push",
+                ]);
+                if let Some(receiver) = &receiver {
+                    args.extend(["--receive-pack", receiver]);
+                }
+                if push.force {
+                    args.push("--force");
+                }
+                args.push("--");
+                args.push(push.remote.as_deref().unwrap_or("origin"));
+                if let Some(branch) = &push.branch {
+                    args.push(branch);
+                }
+            }
+            Operation::Add => {
+                args.extend(["add", "--"]);
+                args.extend(self.paths.iter().map(String::as_str));
+            }
+            Operation::Checkout(checkout) => {
+                args.push("checkout");
+                if checkout.create {
+                    args.push("-b");
+                }
+                args.push(if checkout.branch == "-" && !checkout.create {
+                    "@{-1}"
+                } else {
+                    &checkout.branch
+                });
+                args.push("--");
+            }
+            Operation::Commit(commit) => {
+                args.extend([
+                    "-c",
+                    "maintenance.autoDetach=false",
+                    "-c",
+                    "gc.autoDetach=false",
+                    "commit",
+                    "-m",
+                    &commit.message,
+                ]);
+                if commit.all {
+                    args.push("--all");
+                }
+            }
+        }
+        let mut command = tokio::process::Command::new(&self.program);
+        command
+            .current_dir(&self.repository.workdir)
+            .args(&args)
+            .env_clear()
+            .envs(&self.environment);
+        if !self.receiver_roots.is_empty()
+            && self.inspect_receiver_storage(authorizations)? != self.receiver_storage
+        {
+            return Err(GitToolError::InvalidInput(
+                "Receiver metadata changed during final inspection".into(),
+            ));
+        }
+        self.run_command(command, std::time::Duration::from_secs(300), 256 * 1024)
+            .await.map_err(|error| {
+                if matches!(self.operation, Operation::Push(_)) {
+                    GitToolError::Git(format!("{error}; push may have partially updated remote references; inspect every destination before retrying"))
+                } else if self.checkout_deletion.is_some() {
+                    GitToolError::Git(format!("{error}; checkout may have partially removed child entries or updated repository state; inspect the worktree before retrying"))
+                } else { error }
+            })?;
+        match &self.operation {
+            Operation::Pull(_) => Err(GitToolError::InvalidInput(
+                "Pull cannot use the generic Git mutation result".into(),
+            )),
+            Operation::Push(push) => Ok(format!(
+                "pushed to {}",
+                push.remote.as_deref().unwrap_or("origin")
+            )),
+            Operation::Checkout(checkout) => Ok(format!("switched to branch {}", checkout.branch)),
+            Operation::Add => Ok(format!("staged {} file(s)", self.paths.len())),
+            Operation::Commit(commit) => Ok(format!(
+                "committed: {}",
+                commit.message.lines().next().unwrap_or_default()
+            )),
+        }
+    }
+
+    fn revalidate_maintenance_program(&self) -> Result<(), GitToolError> {
+        if let Some(program) = &self.maintenance_program
+            && (program.canonicalize().ok().as_ref() != Some(&self.program)
+                || capture_program(&self.program)? != self.program_entry)
+        {
+            return Err(GitToolError::InvalidInput("Git maintenance executable differs from the bound Git binary; use a separately authorized invocation".into()));
+        }
+        Ok(())
+    }
+
+    fn checkout_child_effective_worktree<'a>(&'a self, discovery: &'a Path) -> &'a Path {
+        self.checkout_child_layouts
+            .iter()
+            .zip(&self.checkout_child_bootstrap)
+            .find(|(layout, _)| layout.canonical == discovery)
+            .map(|(_, (worktree, _))| worktree.as_path())
+            .unwrap_or(discovery)
+    }
+
+    /// Called only after the continuation proof is consumed. Shared child
+    /// metadata discovered in stage one is not read before this admission.
+    fn capture_admitted_children(&self) -> Result<Vec<RepositoryState>, GitToolError> {
+        if self.config.is_none() {
+            return Err(GitToolError::InvalidInput(
+                "Submodule metadata requires continuation admission".into(),
+            ));
+        }
+        if self.child_configs.len() != self.child_locations.len() {
+            return Err(GitToolError::Git(
+                "Incomplete child discovery evidence".into(),
+            ));
+        }
+        self.child_configs
+            .iter()
+            .zip(&self.child_locations)
+            .map(|((workdir, config), (path, location))| {
+                config.revalidate()?;
+                if &super::repository_state::ChildLocation::capture(path)? != location {
+                    return Err(GitToolError::InvalidInput(
+                        "Submodule location changed before metadata capture".into(),
+                    ));
+                }
+                let state = RepositoryState::capture(workdir)?;
+                let canonical_workdir = self
+                    .checkout_child_effective_worktree(workdir)
+                    .canonicalize()
+                    .map_err(|_| {
+                        GitToolError::InvalidInput("Submodule checkout unavailable".into())
+                    })?;
+                if state.workdir != canonical_workdir
+                    || state.git_dir != location.git_dir
+                    || state.common_dir != location.common_dir
+                {
+                    return Err(GitToolError::InvalidInput(
+                        "Submodule metadata does not match admitted locations".into(),
+                    ));
+                }
+                if &super::repository_state::ChildLocation::capture(path)? != location {
+                    return Err(GitToolError::InvalidInput(
+                        "Submodule location changed during metadata capture".into(),
+                    ));
+                }
+                config.revalidate()?;
+                Ok(state)
+            })
+            .collect()
+    }
+
+    async fn inspect_child_filters(&self) -> Result<ChildInspectionEvidence, GitToolError> {
+        let mut attribute_paths = self.child_attributes.clone();
+        let mut child_paths = Vec::new();
+        let mut child_sources = Vec::new();
+        let mut status = Vec::new();
+        for (workdir, _) in &self.child_configs {
+            let effective = self.checkout_child_effective_worktree(workdir);
+            let (paths, nested) = tracked_commit_sources_at(workdir, effective)?;
+            if !nested.is_empty() {
+                return Err(GitToolError::InvalidInput("Nested submodule status requires additional configuration discovery; use a separately authorized invocation".into()));
+            }
+            status.push((
+                effective.to_owned(),
+                super::status_state::StatusState::capture(effective, &[])?,
+            ));
+            for path in &paths {
+                let absolute = effective.join(path);
+                let mut ancestor = absolute.parent();
+                while let Some(directory) = ancestor {
+                    if !directory.starts_with(effective) {
+                        break;
+                    }
+                    attribute_paths.insert(directory.join(".gitattributes"));
+                    ancestor = directory.parent();
+                }
+            }
+            child_sources.push(capture_tracked_sources(effective, &paths)?);
+            child_paths.push(paths);
+        }
+        // The continuation covers these external attribute paths. Snapshot all
+        // sources before check-attr; it must never execute a clean filter.
+        let capture = || {
+            let mut budget = snapshot::Budget {
+                entries: 4096,
+                bytes: 4 * 1024 * 1024,
+            };
+            attribute_paths
+                .iter()
+                .map(|path| {
+                    let entry = snapshot::Entry::capture(path, &mut budget).map_err(|_| {
+                        GitToolError::InvalidInput(
+                            "Submodule attribute evidence unavailable".into(),
+                        )
+                    })?;
+                    if !matches!(entry, snapshot::Entry::File(..) | snapshot::Entry::Missing) {
+                        return Err(GitToolError::InvalidInput(
+                            "Submodule attribute sources must be regular files".into(),
+                        ));
+                    }
+                    Ok(entry)
+                })
+                .collect::<Result<Vec<_>, GitToolError>>()
+        };
+        let attributes = capture()?;
+        for (((workdir, config), (_, location)), paths) in self
+            .child_configs
+            .iter()
+            .zip(&self.child_locations)
+            .zip(&child_paths)
+        {
+            config.verify_host(&self.inspect_config_at(workdir).await?)?;
+            if paths.is_empty() {
+                continue;
+            }
+            let command = self.child_filter_command(
+                &location.git_dir,
+                self.checkout_child_effective_worktree(workdir),
+                paths,
+            );
+            let output = self
+                .run_command(command, std::time::Duration::from_secs(10), 256 * 1024)
+                .await?;
+            let fields = output.split(|byte| *byte == 0).collect::<Vec<_>>();
+            if fields.last() != Some(&b"".as_slice()) || fields.len() - 1 != paths.len() * 3 {
+                return Err(GitToolError::InvalidInput(
+                    "Submodule filter inspection returned invalid output".into(),
+                ));
+            }
+            for (fields, path) in fields[..fields.len() - 1]
+                .as_chunks::<3>()
+                .0
+                .iter()
+                .zip(paths)
+            {
+                if fields[0] != path.as_bytes()
+                    || fields[1] != b"filter"
+                    || !matches!(fields[2], b"unspecified" | b"unset")
+                {
+                    return Err(GitToolError::InvalidInput("Submodule status uses a configured filter; use a separately authorized invocation".into()));
+                }
+            }
+        }
+        if capture()? != attributes {
+            return Err(GitToolError::InvalidInput(
+                "Submodule attributes changed during inspection".into(),
+            ));
+        }
+        let evidence = ChildInspectionEvidence {
+            status,
+            attributes: attribute_paths.into_iter().zip(attributes).collect(),
+            sources: self
+                .child_configs
+                .iter()
+                .map(|(workdir, _)| {
+                    (
+                        workdir.clone(),
+                        self.checkout_child_effective_worktree(workdir).to_owned(),
+                    )
+                })
+                .zip(child_paths)
+                .zip(child_sources)
+                .map(|(((discovery, workdir), paths), sources)| {
+                    (discovery, workdir, paths, sources)
+                })
+                .collect(),
+        };
+        evidence.revalidate()?;
+        Ok(evidence)
+    }
+
+    fn child_filter_command(
+        &self,
+        gitdir: &Path,
+        worktree: &Path,
+        paths: &[String],
+    ) -> tokio::process::Command {
+        let mut command = tokio::process::Command::new(&self.program);
+        command
+            // Index paths are root-relative, even when discovery was inside
+            // core.worktree. Explicit roots prevent cwd-prefix reinterpretation.
+            .current_dir(worktree)
+            .arg("--git-dir")
+            .arg(gitdir)
+            .arg("--work-tree")
+            .arg(worktree)
+            .args(["--no-pager", "check-attr", "-z", "filter", "--"])
+            .args(paths)
+            .env_clear()
+            .envs(&self.environment);
+        command
+    }
+
+    fn revalidate(&self) -> Result<(), GitToolError> {
+        // Refuse a moved layout pointer before rediscovery can read a new root
+        // using the retained plan's old-root admission.
+        self.repository.revalidate_location()?;
+        if let Some(sources) = &self.target_config_sources {
+            sources.revalidate().map_err(|_| {
+                GitToolError::InvalidInput(
+                    "Target Git configuration sources changed after discovery".into(),
+                )
+            })?;
+        }
+        if !self.target_hook_evidence.is_empty() {
+            if self
+                .target_config_sources
+                .as_ref()
+                .is_none_or(|sources| !sources.complete())
+            {
+                return Err(GitToolError::InvalidInput(
+                    "Target hook ancestor evidence is incomplete".into(),
+                ));
+            }
+            let paths = self
+                .target_hook_evidence
+                .iter()
+                .map(|(path, _)| path.clone())
+                .collect::<Vec<_>>();
+            if super::config_state::ConfigState::capture_checkout_reload_hooks(&paths)?
+                != self.target_hook_evidence
+            {
+                return Err(GitToolError::InvalidInput(
+                    "Target checkout hook evidence changed after discovery".into(),
+                ));
+            }
+        }
+        if let Some(inventory) = &self.checkout_deletion {
+            inventory.revalidate()?;
+        }
+        if let Some(expected) = &self.checkout_parents
+            && &super::checkout_state::TargetParents::capture(
+                &self.repository.workdir,
+                &self.paths,
+            )? != expected
+        {
+            return Err(GitToolError::InvalidInput(
+                "Checkout parent paths changed after discovery".into(),
+            ));
+        }
+        for (path, expected) in &self.checkout_empty_gitlinks {
+            // Refuse a replacement before enumerating its directory names.
+            if &snapshot::PathIdentity::capture(path)
+                .map_err(|error| GitToolError::InvalidInput(error.to_string()))?
+                != expected
+                || &capture_empty_gitlink(path)? != expected
+            {
+                return Err(GitToolError::InvalidInput(
+                    "Empty submodule directory changed after discovery".into(),
+                ));
+            }
+        }
+        for (path, expected) in &self.checkout_new_gitlinks {
+            if snapshot::PathIdentity::capture(path)
+                .map_err(|error| GitToolError::InvalidInput(error.to_string()))?
+                != expected.identity
+                || capture_new_gitlink_directory(path, true)? != *expected
+            {
+                return Err(GitToolError::InvalidInput(
+                    "New submodule directory changed after discovery".into(),
+                ));
+            }
+        }
+        if matches!(self.operation, Operation::Push(_)) {
+            super::remote_state::reject_legacy_remotes(&self.repository.common_dir)?;
+        }
+        for layout in &self.checkout_child_layouts {
+            layout.revalidate(&layout.canonical)?;
+        }
+        for metadata in &self.checkout_child_metadata {
+            metadata.revalidate(&metadata.canonical)?;
+        }
+        for (_, config) in &self.checkout_child_bootstrap {
+            config.revalidate()?;
+        }
+        for startup in &self.checkout_child_startup {
+            startup.revalidate()?;
+        }
+        for (spelling, canonical, identity) in &self.checkout_child_worktrees {
+            if spelling.canonicalize().ok().as_ref() != Some(canonical)
+                || snapshot::PathIdentity::capture(spelling).ok().as_ref() != Some(identity)
+            {
+                return Err(GitToolError::InvalidInput(
+                    "Child worktree changed after discovery".into(),
+                ));
+            }
+        }
+        for (path, expected) in &self.child_locations {
+            if &super::repository_state::ChildLocation::capture(path)? != expected {
+                return Err(GitToolError::InvalidInput(
+                    "Submodule location changed after discovery".into(),
+                ));
+            }
+        }
+        for (_, config) in &self.child_configs {
+            config.revalidate()?;
+        }
+        let current_environment = execution_environment();
+        validate_environment(&current_environment)?;
+        if trace_suppressed_environment(current_environment) != self.environment
+            || capture_program(&self.program)? != self.program_entry
+            || RepositoryState::capture(&self.workspace)? != self.repository
+            || match &self.operation {
+                Operation::Push(_) | Operation::Pull(_) => false,
+                Operation::Add => {
+                    literal_add_paths(
+                        &self.workspace,
+                        &self.repository.workdir,
+                        &serde_json::from_value::<GitAddInput>(self.input.clone())
+                            .map_err(|error| GitToolError::InvalidInput(error.to_string()))?
+                            .paths,
+                    )? != self.paths
+                }
+                Operation::Checkout(_) => {
+                    if tracked_commit_sources(&self.repository.workdir)?.1 != self.gitlinks {
+                        true
+                    } else if let Some(expected) = &self.checkout_parents {
+                        &super::checkout_state::TargetParents::capture(
+                            &self.repository.workdir,
+                            &self.paths,
+                        )? != expected
+                    } else {
+                        false
+                    }
+                }
+                Operation::Commit(_) => {
+                    let (paths, gitlinks) = tracked_commit_sources(&self.repository.workdir)?;
+                    paths != self.paths || gitlinks != self.gitlinks
+                }
+            }
+            || match &self.operation {
+                Operation::Push(_) | Operation::Pull(_) => Vec::new(),
+                Operation::Add => capture_add_sources(&self.repository.workdir, &self.paths)?,
+                Operation::Commit(_) | Operation::Checkout(_) => {
+                    capture_tracked_sources(&self.repository.workdir, &self.paths)?
+                }
+            } != self.sources
+        {
+            return Err(GitToolError::InvalidInput(
+                "Git repository or sources changed after preparation; request a fresh authorization".into(),
+            ));
+        }
+        if let Some(expected) = &self.commit_state
+            && &super::repository_state::CommitState::capture(&self.repository)? != expected
+        {
+            return Err(GitToolError::InvalidInput(
+                "Git commit state changed after preparation".into(),
+            ));
+        }
+        if let Some(config) = &self.config {
+            config.revalidate()?;
+        }
+        if let Some(evidence) = &self.pull_evidence {
+            evidence.revalidate()?;
+        }
+        if let Some(sources) = &self.pull_sources {
+            sources.revalidate(&self.repository.workdir)?;
+        }
+        let mut attribute_budget = snapshot::Budget {
+            entries: 4096,
+            bytes: 4 * 1024 * 1024,
+        };
+        for attribute in &self.pull_attributes {
+            attribute.revalidate(&mut attribute_budget)?;
+        }
+        if !self.pull_hook_evidence.is_empty()
+            && super::config_state::ConfigState::capture_pull_hooks(&self.pull_hook_paths)?
+                != self.pull_hook_evidence
+        {
+            return Err(GitToolError::InvalidInput(
+                "Pull fetch hook evidence changed after discovery".into(),
+            ));
+        }
+        if let Some(inventory) = &self.pull_inventory {
+            inventory.revalidate()?;
+        }
+        if self.phase == Phase::PullFetch
+            && (self.pull_before.is_none() || self.pull_remote.is_none())
+        {
+            return Err(GitToolError::Git(
+                "Missing retained Pull pre-fetch evidence".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+// Both commit modes may refresh tracked entries across the repository, including
+// paths outside a subworkspace. --all additionally stages them. Untracked files
+// are not sources for either mode.
+#[derive(Debug, PartialEq, Eq)]
+struct GitlinkEvidence {
+    path: String,
+    index_oid: String,
+    entry: snapshot::Entry,
+    metadata_path: Option<PathBuf>,
+    marker: snapshot::Entry,
+}
+
+// Parse only: discovering names must not inspect worktree metadata or follow links.
+struct PullSources {
+    paths: Vec<String>,
+    parents: super::checkout_state::TargetParents,
+    entries: Vec<snapshot::Entry>,
+}
+
+struct PullAttribute {
+    path: PathBuf,
+    root: PathBuf,
+    relative: Vec<String>,
+    parents: super::checkout_state::TargetParents,
+    evidence: snapshot::RegularEvidence,
+}
+
+impl PullAttribute {
+    fn capture(path: &Path, budget: &mut snapshot::Budget) -> Result<Self, GitToolError> {
+        let root = path
+            .ancestors()
+            .last()
+            .filter(|root| root.is_absolute())
+            .ok_or_else(|| {
+                GitToolError::InvalidInput("Pull attribute path must be absolute".into())
+            })?
+            .to_owned();
+        let relative = vec![
+            path.strip_prefix(&root)
+                .ok()
+                .and_then(Path::to_str)
+                .ok_or_else(|| GitToolError::InvalidInput("Invalid Pull attribute path".into()))?
+                .to_owned(),
+        ];
+        let parents = super::checkout_state::TargetParents::capture(&root, &relative)?;
+        let evidence = snapshot::RegularEvidence::capture(path, budget)
+            .map_err(|error| GitToolError::InvalidInput(error.to_string()))?;
+        if super::checkout_state::TargetParents::capture(&root, &relative)? != parents {
+            return Err(GitToolError::InvalidInput(
+                "Pull attribute parent changed during inspection".into(),
+            ));
+        }
+        Ok(Self {
+            path: path.to_owned(),
+            root,
+            relative,
+            parents,
+            evidence,
+        })
+    }
+
+    fn revalidate(&self, budget: &mut snapshot::Budget) -> Result<(), GitToolError> {
+        if super::checkout_state::TargetParents::capture(&self.root, &self.relative)?
+            != self.parents
+            || snapshot::RegularEvidence::capture(&self.path, budget)
+                .map_err(|error| GitToolError::InvalidInput(error.to_string()))?
+                != self.evidence
+            || super::checkout_state::TargetParents::capture(&self.root, &self.relative)?
+                != self.parents
+        {
+            return Err(GitToolError::InvalidInput(
+                "Pull attribute changed after inspection".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl PullSources {
+    // Caller must admit every exact source path before capturing contents.
+    fn capture(workdir: &Path, paths: Vec<String>) -> Result<Self, GitToolError> {
+        let parents = super::checkout_state::TargetParents::capture(workdir, &paths)?;
+        let entries = capture_tracked_sources(workdir, &paths)?;
+        let result = Self {
+            paths,
+            parents,
+            entries,
+        };
+        result.revalidate(workdir)?;
+        Ok(result)
+    }
+
+    fn revalidate(&self, workdir: &Path) -> Result<(), GitToolError> {
+        // Check ancestors before opening sources: old path admission must not
+        // become permission to follow a newly substituted directory link.
+        if super::checkout_state::TargetParents::capture(workdir, &self.paths)? != self.parents
+            || capture_tracked_sources(workdir, &self.paths)? != self.entries
+            || super::checkout_state::TargetParents::capture(workdir, &self.paths)? != self.parents
+        {
+            return Err(GitToolError::InvalidInput(
+                "Pull tracked sources changed after inspection".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+fn pull_sparse_names(prefix: &[u8], output: &[u8]) -> Result<Vec<u8>, GitToolError> {
+    let invalid = || GitToolError::InvalidInput("Invalid Pull sparse tree listing".into());
+    if !prefix.ends_with(b"/") || output.len() > 16 * 1024 * 1024 {
+        return Err(invalid());
+    }
+    let mut names = Vec::new();
+    if output.is_empty() {
+        return Ok(names);
+    }
+    for record in output
+        .strip_suffix(&[0])
+        .ok_or_else(invalid)?
+        .split(|byte| *byte == 0)
+    {
+        let tab = record
+            .iter()
+            .position(|byte| *byte == b'\t')
+            .ok_or_else(invalid)?;
+        let header: Vec<_> = record[..tab].split(|byte| *byte == b' ').collect();
+        if header.len() != 3
+            || !matches!(header[2].len(), 40 | 64)
+            || !header[2].iter().all(u8::is_ascii_hexdigit)
+            || header[2].iter().all(|byte| *byte == b'0')
+        {
+            return Err(invalid());
+        }
+        if header[0] == b"160000" && header[1] == b"commit" {
+            continue;
+        }
+        if !matches!(header[0], b"100644" | b"100755" | b"120000") || header[1] != b"blob" {
+            return Err(invalid());
+        }
+        names.extend_from_slice(prefix);
+        names.extend_from_slice(&record[tab + 1..]);
+        names.push(0);
+        if names.len() > 16 * 1024 * 1024 {
+            return Err(invalid());
+        }
+    }
+    // Validate joined names lexically here as well as at facet construction.
+    // This helper performs no filesystem access.
+    pull_tracked_read_paths(Path::new(""), &names)?;
+    Ok(names)
+}
+
+fn pull_tracked_read_paths(workdir: &Path, output: &[u8]) -> Result<Vec<PathBuf>, GitToolError> {
+    if output.is_empty() {
+        return Ok(Vec::new());
+    }
+    let invalid = || GitToolError::InvalidInput("Invalid Pull tracked-path inventory".into());
+    let bytes = output.strip_suffix(&[0]).ok_or_else(invalid)?;
+    let mut paths = std::collections::BTreeSet::new();
+    for name in bytes.split(|byte| *byte == 0) {
+        let name = std::str::from_utf8(name).map_err(|_| invalid())?;
+        if name.is_empty()
+            || name.split('/').any(|part| matches!(part, "" | "." | ".."))
+            || Path::new(name)
+                .components()
+                .any(|part| !matches!(part, std::path::Component::Normal(_)))
+            || name.contains('\\')
+        {
+            return Err(invalid());
+        }
+        paths.insert(workdir.join(name));
+    }
+    Ok(paths.into_iter().collect())
+}
+
+#[cfg(unix)]
+fn tracked_symlink(workdir: &Path, path: &str) -> Result<bool, GitToolError> {
+    std::panic::catch_unwind(|| {
+        let repo = super::discover_repo(workdir)?;
+        let index = repo
+            .index_or_empty()
+            .map_err(|error| GitToolError::Git(error.to_string()))?;
+        Ok(index.entries().iter().any(|entry| {
+            entry.stage_raw() == 0
+                && entry.mode.bits() == 0o120000
+                && entry.path(&index) == path.as_bytes()
+        }))
+    })
+    .unwrap_or_else(|_| Err(GitToolError::Git("Git symlink inspection failed".into())))
+}
+
+fn tracked_commit_sources(
+    workdir: &Path,
+) -> Result<(Vec<String>, Vec<GitlinkEvidence>), GitToolError> {
+    tracked_commit_sources_at(workdir, workdir)
+}
+
+fn tracked_commit_sources_at(
+    discovery: &Path,
+    workdir: &Path,
+) -> Result<(Vec<String>, Vec<GitlinkEvidence>), GitToolError> {
+    std::panic::catch_unwind(|| {
+        let repo = super::discover_repo(discovery)?;
+        let index = repo
+            .index_or_empty()
+            .map_err(|error| GitToolError::Git(error.to_string()))?;
+        let mut paths = std::collections::BTreeSet::new();
+        let mut gitlinks = Vec::new();
+        for entry in index.entries() {
+            if entry.stage_raw() != 0 {
+                return Err(GitToolError::InvalidInput(
+                    "Git commit has unmerged index entries; resolve conflicts before preparing a commit".into(),
+                ));
+            }
+            let path = std::str::from_utf8(entry.path(&index))
+                .map_err(|_| GitToolError::InvalidInput("Tracked Git path is not UTF-8".into()))?;
+            if entry.mode.bits() == 0o160000 {
+                let normalized = literal_add_paths(workdir, workdir, &[path.to_owned()])?;
+                let path = normalized.into_iter().next().ok_or_else(|| GitToolError::InvalidInput("missing gitlink path".into()))?;
+                gitlinks.push(capture_gitlink(workdir, path, entry.id.to_string())?);
+            } else {
+                paths.insert(path.to_owned());
+            }
+        }
+        let paths = if paths.is_empty() { Vec::new() } else {
+            literal_add_paths(workdir, workdir, &paths.into_iter().collect::<Vec<_>>())?
+        };
+        Ok((paths, gitlinks))
+    })
+    .unwrap_or_else(|_| {
+        Err(GitToolError::Git(
+            "Git tracked source inspection failed".into(),
+        ))
+    })
+}
+
+fn capture_tracked_sources(
+    workdir: &Path,
+    paths: &[String],
+) -> Result<Vec<snapshot::Entry>, GitToolError> {
+    let mut budget = snapshot::Budget {
+        entries: 4096,
+        bytes: 16 * 1024 * 1024,
+    };
+    paths
+        .iter()
+        .map(|path| {
+            let absolute = workdir.join(path);
+            if std::fs::symlink_metadata(&absolute).is_ok_and(|metadata| metadata.is_dir()) {
+                // Replacing a tracked file with a directory does not make its
+                // untracked descendants sources for status or commit --all.
+                budget.entries = budget.entries.checked_sub(1).ok_or_else(|| {
+                    GitToolError::InvalidInput("Submodule source snapshot limit exceeded".into())
+                })?;
+                return Ok(snapshot::Entry::Directory(Vec::new()));
+            }
+            snapshot::Entry::capture(&absolute, &mut budget)
+                .map_err(|error| GitToolError::InvalidInput(error.to_string()))
+        })
+        .collect()
+}
+
+// Separate from removed-gitlink evidence: deletion still requires an empty
+// directory, whereas nonrecursive checkout preserves these untracked names.
+#[derive(Debug, PartialEq, Eq)]
+struct NewGitlinkDirectory {
+    identity: snapshot::PathIdentity,
+    names: Vec<std::ffi::OsString>,
+}
+
+fn capture_new_gitlink_directory(
+    path: &Path,
+    allow_marker: bool,
+) -> Result<NewGitlinkDirectory, GitToolError> {
+    let invalid = || {
+        GitToolError::InvalidInput(
+            "New gitlink requires a stable uninitialized directory within discovery limits".into(),
+        )
+    };
+    let metadata = std::fs::symlink_metadata(path).map_err(|_| invalid())?;
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        if metadata.file_attributes()
+            & windows_sys::Win32::Storage::FileSystem::FILE_ATTRIBUTE_REPARSE_POINT
+            != 0
+        {
+            return Err(invalid());
+        }
+    }
+    if !metadata.is_dir() {
+        return Err(invalid());
+    }
+    let identity = snapshot::PathIdentity::capture(path).map_err(|_| invalid())?;
+    let mut names = Vec::new();
+    let mut bytes = 0usize;
+    for entry in std::fs::read_dir(path).map_err(|_| invalid())? {
+        let name = entry.map_err(|_| invalid())?.file_name();
+        bytes = bytes
+            .checked_add(name.as_encoded_bytes().len())
+            .ok_or_else(invalid)?;
+        if names.len() >= 4096 || bytes > 1024 * 1024 {
+            return Err(invalid());
+        }
+        // No child stat/open: reject metadata names and filesystem aliases
+        // from names alone. Windows nonempty support awaits runtime evidence.
+        if cfg!(windows) {
+            return Err(invalid());
+        }
+        let valid = (allow_marker && name == ".git")
+            || std::panic::catch_unwind(|| {
+                gix::validate::path::component(
+                    name.as_encoded_bytes().into(),
+                    None,
+                    gix::validate::path::component::Options {
+                        protect_windows: false,
+                        protect_hfs: true,
+                        protect_ntfs: true,
+                    },
+                )
+                .is_ok()
+            })
+            .map_err(|_| invalid())?;
+        if !valid {
+            return Err(invalid());
+        }
+        names.push(name);
+    }
+    names.sort();
+    if snapshot::PathIdentity::capture(path).map_err(|_| invalid())? != identity {
+        return Err(invalid());
+    }
+    Ok(NewGitlinkDirectory { identity, names })
+}
+
+fn capture_empty_gitlink(path: &Path) -> Result<snapshot::PathIdentity, GitToolError> {
+    let invalid = || {
+        GitToolError::InvalidInput(
+            "Checkout submodule path kind requires a stable empty directory".into(),
+        )
+    };
+    let metadata = std::fs::symlink_metadata(path).map_err(|_| invalid())?;
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        if metadata.file_attributes()
+            & windows_sys::Win32::Storage::FileSystem::FILE_ATTRIBUTE_REPARSE_POINT
+            != 0
+        {
+            return Err(invalid());
+        }
+    }
+    if !metadata.is_dir() {
+        return Err(invalid());
+    }
+    let before = snapshot::PathIdentity::capture(path).map_err(|_| invalid())?;
+    if std::fs::read_dir(path)
+        .map_err(|_| invalid())?
+        .next()
+        .is_some()
+    {
+        return Err(invalid());
+    }
+    if snapshot::PathIdentity::capture(path).map_err(|_| invalid())? != before {
+        return Err(invalid());
+    }
+    Ok(before)
+}
+
+fn capture_gitlink(
+    workdir: &Path,
+    path: String,
+    index_oid: String,
+) -> Result<GitlinkEvidence, GitToolError> {
+    let absolute = workdir.join(&path);
+    let metadata = match std::fs::symlink_metadata(&absolute) {
+        Ok(metadata) => Some(metadata),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+        Err(error) => return Err(GitToolError::InvalidInput(error.to_string())),
+    };
+    let mut marker_entry = snapshot::Entry::Missing;
+    let (entry, metadata_path) = if metadata.as_ref().is_some_and(|metadata| metadata.is_dir()) {
+        let marker = absolute.join(".git");
+        let marker_metadata = match std::fs::symlink_metadata(&marker) {
+            Ok(metadata) => Some(metadata),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+            Err(error) => return Err(GitToolError::InvalidInput(error.to_string())),
+        };
+        let metadata_path = match marker_metadata {
+            Some(metadata) if metadata.is_dir() => {
+                marker_entry = snapshot::Entry::Directory(Vec::new());
+                Some(marker)
+            }
+            Some(metadata) if metadata.is_file() => {
+                marker_entry = snapshot::Entry::capture(&marker, &mut snapshot::Budget { entries: 1, bytes: 16 * 1024 })
+                    .map_err(|error| GitToolError::InvalidInput(error.to_string()))?;
+                let snapshot::Entry::File(_, bytes) = &marker_entry else {
+                    return Err(GitToolError::InvalidInput("Submodule marker changed during inspection".into()));
+                };
+                let raw = bytes.strip_prefix(b"gitdir: ").ok_or_else(|| GitToolError::InvalidInput("Invalid submodule gitdir marker".into()))?;
+                let raw = raw.strip_suffix(b"\n").unwrap_or(raw);
+                let raw = raw.strip_suffix(b"\r").unwrap_or(raw);
+                let path = PathBuf::from(std::str::from_utf8(raw).map_err(|_| GitToolError::InvalidInput("Submodule gitdir path is not UTF-8".into()))?);
+                if path.as_os_str().is_empty() || raw.contains(&0) {
+                    return Err(GitToolError::InvalidInput("Invalid submodule gitdir path".into()));
+                }
+                // Resolve only the pathname. No config/index/HEAD/object reads
+                // from its destination occur before this Path facet is admitted.
+                Some(if path.is_absolute() { path } else { absolute.join(path) })
+            }
+            Some(_) => return Err(GitToolError::InvalidInput("Submodule metadata link or special entry requires a separately authorized invocation".into())),
+            None => None,
+        };
+        (snapshot::Entry::Directory(Vec::new()), metadata_path)
+    } else {
+        let entry = snapshot::Entry::capture(
+            &absolute,
+            &mut snapshot::Budget {
+                entries: 1,
+                bytes: 16 * 1024 * 1024,
+            },
+        )
+        .map_err(|error| GitToolError::InvalidInput(error.to_string()))?;
+        (entry, None)
+    };
+    Ok(GitlinkEvidence {
+        path,
+        index_oid,
+        entry,
+        metadata_path,
+        marker: marker_entry,
+    })
+}
+
+fn selected_leaves(
+    path: &Path,
+    entry: &snapshot::Entry,
+    output: &mut Vec<String>,
+) -> Result<(), GitToolError> {
+    match entry {
+        snapshot::Entry::Directory(children) => {
+            for (name, child) in children {
+                selected_leaves(&path.join(name), child, output)?;
+            }
+        }
+        snapshot::Entry::File(..) => output.push(
+            path.to_str()
+                .ok_or_else(|| GitToolError::InvalidInput("Git source name is not UTF-8".into()))?
+                .to_owned(),
+        ),
+        snapshot::Entry::Missing | snapshot::Entry::Link(_) => {}
+    }
+    Ok(())
+}
+
+fn selected_directory_rules(
+    path: &Path,
+    entry: &snapshot::Entry,
+    output: &mut std::collections::BTreeSet<PathBuf>,
+) {
+    if let snapshot::Entry::Directory(children) = entry {
+        output.insert(path.join(".gitattributes"));
+        output.insert(path.join(".gitignore"));
+        for (name, child) in children {
+            selected_directory_rules(&path.join(name), child, output);
+        }
+    }
+}
+
+fn execution_environment() -> BTreeMap<OsString, OsString> {
+    let mut environment = std::env::vars_os().collect::<BTreeMap<_, _>>();
+    // Reuse the existing process-hardening loader policy without mutating the
+    // parent process. This does not remove any Git configuration override.
+    let dangerous = talos_sandbox::hardening::ProcessHardening::dangerous_env_var_names();
+    environment.retain(|key, _| {
+        !dangerous.iter().any(|name| {
+            if cfg!(windows) {
+                key.to_str()
+                    .is_some_and(|key| key.eq_ignore_ascii_case(name))
+            } else {
+                key == std::ffi::OsStr::new(name)
+            }
+        })
+    });
+    environment
+}
+
+/// Trace2 targets are loaded before ordinary configuration inspection. Disable
+/// diagnostic output in structured children so read-only discovery cannot write
+/// an unapproved file or socket from system/global configuration.
+fn trace_suppressed_environment(
+    mut environment: BTreeMap<OsString, OsString>,
+) -> BTreeMap<OsString, OsString> {
+    for name in ["GIT_TRACE2", "GIT_TRACE2_EVENT", "GIT_TRACE2_PERF"] {
+        environment.insert(OsString::from(name), OsString::from("0"));
+    }
+    environment
+}
+
+fn validate_environment(environment: &BTreeMap<OsString, OsString>) -> Result<(), GitToolError> {
+    let mut bytes = 0usize;
+    for (name, value) in environment {
+        bytes = bytes.saturating_add(name.len()).saturating_add(value.len());
+        let upper = name.to_string_lossy().to_ascii_uppercase();
+        if matches!(upper.as_str(), "HOME" | "XDG_CONFIG_HOME")
+            && value.as_encoded_bytes().contains(&b'\n')
+        {
+            return Err(GitToolError::InvalidInput("Git configuration home paths containing newlines cannot be discovered unambiguously; use a separately authorized invocation".into()));
+        }
+        // The structured tool always captures output with --no-pager. Retain
+        // GIT_PAGER in the frozen environment, but it cannot start a pager.
+        if upper.starts_with("GIT_") && upper != "GIT_PAGER" {
+            // Git environment switches include repository/object redirection,
+            // config injection and trace files. Never silently strip them and
+            // then run a different command than the user configured.
+            return Err(GitToolError::InvalidInput(
+                "Git environment overrides require a separately authorized Git invocation".into(),
+            ));
+        }
+    }
+    if bytes > 1024 * 1024 {
+        return Err(GitToolError::InvalidInput(
+            "Git environment snapshot exceeds its limit".into(),
+        ));
+    }
+    Ok(())
+}
+
+/// Do not silently discard shell startup configuration. Local receive-pack
+/// transport uses a shell, so inherited startup scripts/functions and tracing
+/// expressions must use a separately authorized invocation.
+fn validate_receiver_shell_environment(
+    environment: &BTreeMap<OsString, OsString>,
+) -> Result<(), GitToolError> {
+    for name in environment.keys() {
+        let name = name.to_string_lossy();
+        let name = if cfg!(windows) {
+            name.to_ascii_uppercase()
+        } else {
+            name.into_owned()
+        };
+        if matches!(
+            name.as_str(),
+            "BASH_ENV"
+                | "ENV"
+                | "SHELLOPTS"
+                | "BASHOPTS"
+                | "ZDOTDIR"
+                | "PS4"
+                | "SSH_CLIENT"
+                | "SSH2_CLIENT"
+        ) || name.starts_with("BASH_FUNC_")
+        {
+            return Err(GitToolError::InvalidInput("Local Git transport inherits shell startup or function configuration whose effects are not bound; use a separately authorized invocation".into()));
+        }
+    }
+    Ok(())
+}
+
+// Git invokes this shell as noninteractive `sh -c`, never as a login shell.
+// Other compiled shells may load unconditional startup files (for example
+// zshenv); their path/effect inventory requires separate support.
+fn validate_receiver_shell_path(path: &Path, canonical: &Path) -> Result<(), GitToolError> {
+    let supported = (cfg!(target_os = "macos") && canonical == Path::new("/bin/sh"))
+        || (cfg!(target_os = "linux")
+            && ["/bin/dash", "/usr/bin/dash", "/bin/bash", "/usr/bin/bash"]
+                .iter()
+                .any(|candidate| canonical == Path::new(candidate)));
+    if supported && path == Path::new("/bin/sh") {
+        Ok(())
+    } else {
+        Err(GitToolError::InvalidInput(
+            "Receiver transport requires the bound Unix /bin/sh baseline; other shells require separately authorized execution".into(),
+        ))
+    }
+}
+
+fn resolve_git(environment: &BTreeMap<OsString, OsString>) -> Result<PathBuf, GitToolError> {
+    let path = environment
+        .iter()
+        .find_map(|(key, value)| {
+            key.to_str()
+                .is_some_and(|key| {
+                    if cfg!(windows) {
+                        key.eq_ignore_ascii_case("PATH")
+                    } else {
+                        key == "PATH"
+                    }
+                })
+                .then_some(value)
+        })
+        .ok_or_else(|| GitToolError::Git("PATH is unavailable; cannot resolve host Git".into()))?;
+    for directory in std::env::split_paths(path) {
+        let candidate = directory.join(if cfg!(windows) { "git.exe" } else { "git" });
+        if candidate.is_file() {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                if !candidate
+                    .metadata()
+                    .is_ok_and(|m| m.permissions().mode() & 0o111 != 0)
+                {
+                    continue;
+                }
+            }
+            return candidate
+                .canonicalize()
+                .map_err(|_| GitToolError::Git("host Git cannot be resolved".into()));
+        }
+    }
+    Err(GitToolError::Git(
+        "git not installed. Install git or use read-only tools.".into(),
+    ))
+}
+
+struct ProgramEvidence {
+    entry: snapshot::Entry,
+    #[cfg(unix)]
+    identity: (u64, u64, i64, i64),
+    #[cfg(windows)]
+    _guard: std::fs::File,
+    #[cfg(not(any(unix, windows)))]
+    modified: Option<std::time::SystemTime>,
+}
+
+impl PartialEq for ProgramEvidence {
+    fn eq(&self, other: &Self) -> bool {
+        if self.entry != other.entry {
+            return false;
+        }
+        #[cfg(unix)]
+        {
+            self.identity == other.identity
+        }
+        #[cfg(windows)]
+        {
+            // Each evidence object holds its own non-write/non-delete shared
+            // handle; equality compares the bytes captured through that handle.
+            true
+        }
+        #[cfg(not(any(unix, windows)))]
+        {
+            self.modified == other.modified
+        }
+    }
+}
+
+impl Eq for ProgramEvidence {}
+
+#[cfg(windows)]
+fn capture_program(path: &Path) -> Result<ProgramEvidence, GitToolError> {
+    use std::io::Read;
+    use std::os::windows::fs::{MetadataExt, OpenOptionsExt};
+    use windows_sys::Win32::Storage::FileSystem::{
+        FILE_ATTRIBUTE_REPARSE_POINT, FILE_FLAG_OPEN_REPARSE_POINT, FILE_SHARE_READ,
+    };
+
+    if path.canonicalize().ok().as_deref() != Some(path) {
+        return Err(GitToolError::Git(
+            "host Git program location changed after preparation".into(),
+        ));
+    }
+    let invalid = || GitToolError::Git("host Git program is unavailable or changed".into());
+    let before = std::fs::symlink_metadata(path).map_err(|_| invalid())?;
+    if !before.is_file() || before.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+        return Err(invalid());
+    }
+    let mut options = std::fs::OpenOptions::new();
+    options
+        .read(true)
+        .share_mode(FILE_SHARE_READ)
+        .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT);
+    let mut guard = options.open(path).map_err(|_| invalid())?;
+    let opened = guard.metadata().map_err(|_| invalid())?;
+    if !opened.is_file()
+        || opened.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
+        || opened.len() > 64 * 1024 * 1024
+    {
+        return Err(invalid());
+    }
+    let mut bytes = Vec::new();
+    (&mut guard)
+        .take(64 * 1024 * 1024 + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|_| invalid())?;
+    if bytes.len() > 64 * 1024 * 1024 {
+        return Err(invalid());
+    }
+    let after = std::fs::symlink_metadata(path).map_err(|_| invalid())?;
+    if !after.is_file()
+        || after.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
+        || before.len() != opened.len()
+        || after.len() != opened.len()
+        || before.creation_time() != opened.creation_time()
+        || after.creation_time() != opened.creation_time()
+        || before.last_write_time() != opened.last_write_time()
+        || after.last_write_time() != opened.last_write_time()
+    {
+        return Err(invalid());
+    }
+    Ok(ProgramEvidence {
+        entry: snapshot::Entry::File(opened.permissions(), bytes),
+        _guard: guard,
+    })
+}
+
+#[cfg(not(windows))]
+fn capture_program(path: &Path) -> Result<ProgramEvidence, GitToolError> {
+    if path.canonicalize().ok().as_deref() != Some(path) {
+        return Err(GitToolError::Git(
+            "host Git program location changed after preparation".into(),
+        ));
+    }
+    let before = std::fs::symlink_metadata(path)
+        .map_err(|_| GitToolError::Git("host Git program metadata is unavailable".into()))?;
+    let entry = snapshot::Entry::capture_regular(
+        path,
+        &mut snapshot::Budget {
+            entries: 1,
+            bytes: 64 * 1024 * 1024,
+        },
+    )
+    .map_err(|_| {
+        GitToolError::Git("host Git program snapshot is unavailable or exceeds its limit".into())
+    })?;
+    if !matches!(entry, snapshot::Entry::File(..)) {
+        return Err(GitToolError::Git(
+            "host Git program is no longer a regular file".into(),
+        ));
+    }
+    let after = std::fs::symlink_metadata(path)
+        .map_err(|_| GitToolError::Git("host Git program metadata is unavailable".into()))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        let identity = |metadata: &std::fs::Metadata| {
+            (
+                metadata.dev(),
+                metadata.ino(),
+                metadata.ctime(),
+                metadata.ctime_nsec(),
+            )
+        };
+        if identity(&before) != identity(&after) {
+            return Err(GitToolError::Git(
+                "host Git changed during inspection".into(),
+            ));
+        }
+        Ok(ProgramEvidence {
+            entry,
+            identity: identity(&after),
+        })
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        if before.modified().ok() != after.modified().ok() || before.len() != after.len() {
+            return Err(GitToolError::Git(
+                "host Git changed during inspection".into(),
+            ));
+        }
+        Ok(ProgramEvidence {
+            entry,
+            modified: after.modified().ok(),
+        })
+    }
+}
+
+fn path_facet(
+    nature: ToolNature,
+    path: &Path,
+    description: &str,
+) -> Result<ToolPermissionFacet, GitToolError> {
+    let resource = path.to_str().ok_or_else(|| {
+        GitToolError::InvalidInput("Git resource path cannot be represented losslessly".into())
+    })?;
+    Ok(
+        ToolPermissionFacet::with_resource(nature, resource, ToolResourceKind::Path)
+            .with_description(description),
+    )
+}
+
+/// Local transport strips GIT_CONFIG_PARAMETERS, so sender `-c` options do not
+/// reach receive-pack. Carry the accepted scheduling overrides in its fixed
+/// command explicitly, quoting the independently bound Git executable.
+fn receiver_command(program: &Path) -> Result<String, GitToolError> {
+    let text = program
+        .to_str()
+        .filter(|text| program.is_absolute() && !text.contains(['\0', '\n', '\r']))
+        .ok_or_else(|| {
+            GitToolError::InvalidInput(
+                "Receiver Git executable cannot be represented in a fixed command".into(),
+            )
+        })?;
+    let quoted = format!("'{}'", text.replace('\'', "'\\''"));
+    Ok(format!(
+        "{quoted} -c maintenance.autoDetach=false -c gc.autoDetach=false receive-pack"
+    ))
+}
+
+fn pull_fetch_command(
+    program: &Path,
+    workdir: &Path,
+    remote: &str,
+    environment: &BTreeMap<OsString, OsString>,
+) -> Result<tokio::process::Command, GitToolError> {
+    if !program.is_absolute()
+        || !workdir.is_absolute()
+        || remote.is_empty()
+        || remote.contains(['\0', '\n', '\r'])
+    {
+        return Err(GitToolError::InvalidInput(
+            "Pull fetch command inputs are not bound absolute values".into(),
+        ));
+    }
+    let mut command = tokio::process::Command::new(program);
+    command
+        .current_dir(workdir)
+        .args([
+            "-c",
+            "maintenance.autoDetach=false",
+            "-c",
+            "gc.autoDetach=false",
+            "--no-pager",
+            "fetch",
+            "--",
+            remote,
+        ])
+        .env_clear()
+        .envs(environment);
+    Ok(command)
+}
+
+#[async_trait]
+impl PreparedNormalToolInvocation for AddPlan {
+    #[cfg(unix)]
+    fn cleanup_receipt(&self) -> Option<std::sync::Arc<dyn talos_core::tool::ToolCleanupReceipt>> {
+        Some(std::sync::Arc::new(self.execution.cleanup_receipt()))
+    }
+
+    fn plan_identity(&self) -> Option<&PreparedPlanIdentity> {
+        Some(&self.identity)
+    }
+
+    fn permission_profile(&self) -> &[ToolPermissionFacet] {
+        &self.facets
+    }
+
+    async fn execute_stage(
+        self: Box<Self>,
+        admission: Box<dyn std::any::Any + Send>,
+    ) -> PreparedNormalStage {
+        if self.phase == Phase::Mutation {
+            return PreparedNormalStage::Complete(self.execute(admission).await);
+        }
+        let Ok(proof) = admission.downcast::<AdmittedInvocation>() else {
+            return PreparedNormalStage::Complete(ToolExecutionOutput::error(
+                "Git discovery requires its admitted proof",
+            ));
+        };
+        let Ok(authorizations) = proof.consume_for_prepared(&self.request(), &self.identity) else {
+            return PreparedNormalStage::Complete(ToolExecutionOutput::error(
+                "Git discovery proof does not authorize this plan",
+            ));
+        };
+        let result = match self.phase {
+            Phase::CheckoutNewGitlinks => self.discover_new_gitlinks(&authorizations),
+            Phase::CheckoutChildMarkers => self.discover_checkout_child_markers(&authorizations),
+            Phase::CheckoutChildMetadata => self.discover_checkout_child_metadata(&authorizations),
+            Phase::CheckoutChildConfiguration => {
+                self.discover_checkout_child_configuration(&authorizations)
+                    .await
+            }
+            Phase::CheckoutChildWorktree => {
+                self.discover_checkout_child_worktree(&authorizations).await
+            }
+            Phase::CheckoutDeletion => self.discover_checkout_deletion(&authorizations),
+            Phase::TargetConfiguration => self
+                .discover_target_configuration(&authorizations)
+                .map_err(|error| {
+                    GitToolError::InvalidInput(format!("target-branch discovery: {error}"))
+                }),
+            Phase::PullPreparation => self.discover_pull_prefetch(&authorizations).await,
+            Phase::PullFetch => {
+                if let Err(error) = self.revalidate() {
+                    return PreparedNormalStage::Complete(ToolExecutionOutput::error(
+                        error.to_string(),
+                    ));
+                }
+                for root in [&self.repository.git_dir, &self.repository.common_dir] {
+                    if !authorizations.iter().any(|token| {
+                        token.authorizes_path(
+                            "git_pull",
+                            ToolNature::Write,
+                            &self.workspace,
+                            root.to_str().unwrap_or_default(),
+                        )
+                    }) {
+                        return PreparedNormalStage::Complete(ToolExecutionOutput::error(
+                            "Pull fetch metadata root lacks Write admission",
+                        ));
+                    }
+                }
+                if !self.facets.iter().any(|facet| {
+                    facet.nature == ToolNature::Write
+                        && facet.resource_kind == Some(ToolResourceKind::Remote)
+                        && facet.resource.as_deref() == Some("git:pull-repository-metadata")
+                }) {
+                    return PreparedNormalStage::Complete(ToolExecutionOutput::error(
+                        "Pull fetch metadata Write capability missing",
+                    ));
+                }
+                if !self.pull_transport_supported {
+                    return PreparedNormalStage::Complete(ToolExecutionOutput::error(
+                        "Pull transport requires separately validated path, helper, credential, or network effects",
+                    ));
+                }
+                for path in &self.pull_hook_paths {
+                    if !authorizations.iter().any(|token| {
+                        token.authorizes_path(
+                            "git_pull",
+                            ToolNature::Read,
+                            &self.workspace,
+                            path.to_str().unwrap_or_default(),
+                        )
+                    }) {
+                        return PreparedNormalStage::Complete(ToolExecutionOutput::error(
+                            "Pull fetch hook lacks exact Read admission",
+                        ));
+                    }
+                }
+                let hook_evidence = match super::config_state::ConfigState::capture_pull_hooks(
+                    &self.pull_hook_paths,
+                ) {
+                    Ok(evidence) => evidence,
+                    Err(error) => {
+                        return PreparedNormalStage::Complete(ToolExecutionOutput::error(
+                            error.to_string(),
+                        ));
+                    }
+                };
+                if !self.pull_hook_evidence.is_empty() && hook_evidence != self.pull_hook_evidence {
+                    return PreparedNormalStage::Complete(ToolExecutionOutput::error(
+                        "Pull fetch hook evidence changed after discovery",
+                    ));
+                }
+                if let Some(remote) = &self.pull_remote
+                    && let Err(error) = pull_fetch_command(
+                        &self.program,
+                        &self.repository.workdir,
+                        remote,
+                        &self.environment,
+                    )
+                {
+                    return PreparedNormalStage::Complete(ToolExecutionOutput::error(
+                        error.to_string(),
+                    ));
+                }
+                return PreparedNormalStage::Complete(ToolExecutionOutput::error(
+                    "git_pull fetch and integration execution is not yet implemented",
+                ));
+            }
+            Phase::SenderConfiguration => self.discover().await,
+            Phase::ReceiverRoots => self.discover_receiver_roots(&authorizations),
+            Phase::ReceiverMetadata => self.discover_receiver_metadata(&authorizations),
+            Phase::ReceiverCommon => self.discover_receiver_common(&authorizations),
+            Phase::ReceiverConfiguration => {
+                self.discover_receiver_configuration(&authorizations).await
+            }
+            Phase::ReceiverAuxiliary => self.discover_receiver_auxiliary(&authorizations),
+            Phase::ReceiverMutation => self.prepare_receiver_mutation(&authorizations),
+            Phase::Mutation => Err(GitToolError::InvalidInput(
+                "Invalid discovery dispatch".into(),
+            )),
+        };
+        match result {
+            Ok(plan) => PreparedNormalStage::Continue(plan),
+            Err(error) => {
+                PreparedNormalStage::Complete(ToolExecutionOutput::error(error.to_string()))
+            }
+        }
+    }
+
+    async fn execute(
+        self: Box<Self>,
+        admission: Box<dyn std::any::Any + Send>,
+    ) -> ToolExecutionOutput {
+        let Ok(proof) = admission.downcast::<AdmittedInvocation>() else {
+            return ToolExecutionOutput::error(
+                "Git mutation requires an admitted invocation proof",
+            );
+        };
+        let Ok(authorizations) = proof.consume_for_prepared(&self.request(), &self.identity) else {
+            return ToolExecutionOutput::error("Git invocation proof does not authorize this plan");
+        };
+        match self.execute_admitted(&authorizations).await {
+            Ok(content) => ToolExecutionOutput::success(content),
+            Err(error) => ToolExecutionOutput::error(error.to_string()),
+        }
+    }
+}
+
+#[cfg(test)]
+pub(super) mod tests {
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn prepared_local_push_runs_all_eight_admitted_stages() {
+        for layout in [
+            "bare",
+            "normal",
+            "linked",
+            "file",
+            "multiple",
+            "partial",
+            "cancel",
+            "maintenance",
+            "maintenance-cancel",
+        ] {
+            let sender = fixture();
+            let receiver = tempfile::tempdir().expect("receiver");
+            let destination = receiver.path().join("receiver ' quoted.git");
+            let git = |cwd: &Path, args: &[&str]| {
+                let output = std::process::Command::new("git")
+                    .current_dir(cwd)
+                    .args(args)
+                    .output()
+                    .expect("fixture Git");
+                assert!(output.status.success(), "{output:?}");
+                output.stdout
+            };
+            git(
+                sender.path(),
+                &[
+                    "-c",
+                    "user.name=Fixture",
+                    "-c",
+                    "user.email=fixture@example.invalid",
+                    "-c",
+                    "commit.gpgSign=false",
+                    "commit",
+                    "--allow-empty",
+                    "-m",
+                    "source",
+                ],
+            );
+            let common = receiver.path().join("main");
+            if layout == "linked" {
+                git(
+                    receiver.path(),
+                    &[
+                        "clone",
+                        "--no-hardlinks",
+                        sender.path().to_str().expect("sender"),
+                        common.to_str().expect("main"),
+                    ],
+                );
+                git(
+                    &common,
+                    &[
+                        "worktree",
+                        "add",
+                        "-b",
+                        "linked",
+                        destination.to_str().expect("destination"),
+                    ],
+                );
+            } else {
+                let mut args = vec!["init"];
+                if layout != "normal" {
+                    args.push("--bare");
+                }
+                args.push(destination.to_str().expect("destination"));
+                git(receiver.path(), &args);
+            }
+            let second = receiver.path().join("second.git");
+            let mut second_original = None;
+            let remote = if matches!(layout, "multiple" | "partial") {
+                git(
+                    receiver.path(),
+                    &["init", "--bare", second.to_str().expect("second")],
+                );
+                if layout == "partial" {
+                    git(
+                        &second,
+                        &["fetch", sender.path().to_str().expect("sender"), "HEAD"],
+                    );
+                    let tree = String::from_utf8(git(&second, &["rev-parse", "FETCH_HEAD^{tree}"]))
+                        .expect("tree");
+                    let commit = String::from_utf8(git(
+                        &second,
+                        &[
+                            "-c",
+                            "user.name=Fixture",
+                            "-c",
+                            "user.email=fixture@example.invalid",
+                            "-c",
+                            "commit.gpgSign=false",
+                            "commit-tree",
+                            tree.trim(),
+                            "-m",
+                            "divergent receiver",
+                        ],
+                    ))
+                    .expect("commit");
+                    git(
+                        &second,
+                        &["update-ref", "refs/heads/approved", commit.trim()],
+                    );
+                    second_original = Some(git(&second, &["rev-parse", "refs/heads/approved"]));
+                }
+                git(
+                    sender.path(),
+                    &[
+                        "config",
+                        "remote.multiple.url",
+                        destination.to_str().expect("destination"),
+                    ],
+                );
+                for target in [&destination, &second] {
+                    git(
+                        sender.path(),
+                        &[
+                            "config",
+                            "--add",
+                            "remote.multiple.pushurl",
+                            target.to_str().expect("target"),
+                        ],
+                    );
+                }
+                "multiple".to_owned()
+            } else if layout == "file" {
+                format!("file://{}", destination.display())
+            } else {
+                destination.to_str().expect("remote").to_owned()
+            };
+            let metadata = if layout == "normal" {
+                destination.join(".git")
+            } else if layout == "linked" {
+                common.join(".git")
+            } else {
+                destination.clone()
+            };
+            let receiver_lock = metadata.join("refs/heads/approved.lock");
+            let packed_lock = metadata.join("packed-refs.lock");
+            if layout == "maintenance-cancel" {
+                git(
+                    &destination,
+                    &["fetch", sender.path().to_str().expect("sender"), "HEAD"],
+                );
+                let oid =
+                    String::from_utf8(git(sender.path(), &["rev-parse", "HEAD"])).expect("oid");
+                for index in 0..17 {
+                    git(
+                        &destination,
+                        &[
+                            "update-ref",
+                            &format!("refs/heads/fixture-{index}"),
+                            oid.trim(),
+                        ],
+                    );
+                }
+                for (key, value) in [
+                    ("maintenance.auto", "true"),
+                    ("maintenance.gc.enabled", "false"),
+                    ("maintenance.pack-refs.enabled", "true"),
+                    ("core.packedRefsTimeout", "30000"),
+                ] {
+                    git(&destination, &["config", key, value]);
+                }
+                std::fs::write(&packed_lock, b"fixture-owned packed lock\n").expect("packed lock");
+            }
+            if layout == "maintenance" {
+                for (key, value) in [
+                    ("maintenance.auto", "true"),
+                    ("maintenance.gc.enabled", "false"),
+                    ("maintenance.loose-objects.enabled", "true"),
+                    ("maintenance.loose-objects.auto", "1"),
+                ] {
+                    git(&destination, &["config", key, value]);
+                }
+            }
+            if layout == "cancel" {
+                git(
+                    &destination,
+                    &["config", "core.filesRefLockTimeout", "30000"],
+                );
+                std::fs::write(&receiver_lock, b"fixture-owned lock\n").expect("receiver lock");
+            }
+            let input = serde_json::json!({"remote": remote, "branch":"HEAD:refs/heads/approved"});
+            let mut plan: Box<dyn PreparedNormalToolInvocation> = Box::new(
+                AddPlan::prepare_push(sender.path(), &input, ToolProvenance::Native).expect("plan"),
+            );
+            let state = PermissionSessionState::new(PermissionEngine::with_workspace_root(
+                sender.path().into(),
+            ));
+            let context = PermissionContext::new(
+                PermissionMode::Interactive,
+                InteractionCapability::Available,
+            );
+            let mut stages = 0;
+            loop {
+                stages += 1;
+                assert!(stages <= 8);
+                let request =
+                    PermissionRequest::native("git_push", plan.permission_profile(), &input);
+                let proposal = state
+                    .propose(&request, &context, GrantScope::Once)
+                    .expect("proposal");
+                let pending = state
+                    .approve_once(proposal, &request, &context)
+                    .expect("approve stage");
+                let admission = state
+                    .try_admit_prepared_invocation(
+                        pending,
+                        &request,
+                        &context,
+                        plan.plan_identity().expect("identity"),
+                    )
+                    .expect("admit stage");
+                if layout == "maintenance-cancel" && stages == 8 {
+                    let receipt = plan.cleanup_receipt().expect("maintenance receipt");
+                    let task =
+                        tokio::spawn(async move { plan.execute_stage(Box::new(admission)).await });
+                    let pack_pid =
+                        tokio::time::timeout(std::time::Duration::from_secs(10), async {
+                            loop {
+                                assert!(
+                                    !task.is_finished(),
+                                    "maintenance must wait on packed lock"
+                                );
+                                let output = std::process::Command::new("ps")
+                                    .args(["-axo", "pid=,ppid=,command="])
+                                    .output()
+                                    .expect("process observation");
+                                assert!(output.status.success());
+                                let rows: Vec<(u32, u32, String)> =
+                                    String::from_utf8(output.stdout)
+                                        .expect("process list")
+                                        .lines()
+                                        .filter_map(|line| {
+                                            let mut fields = line.split_whitespace();
+                                            Some((
+                                                fields.next()?.parse().ok()?,
+                                                fields.next()?.parse().ok()?,
+                                                fields.collect::<Vec<_>>().join(" "),
+                                            ))
+                                        })
+                                        .collect();
+                                for (pid, parent, command) in &rows {
+                                    if !command.contains("pack-refs --all --prune --auto") {
+                                        continue;
+                                    }
+                                    let mut ancestor = *parent;
+                                    let mut maintenance = false;
+                                    for _ in 0..8 {
+                                        let Some((_, ppid, command)) =
+                                            rows.iter().find(|(id, _, _)| *id == ancestor)
+                                        else {
+                                            break;
+                                        };
+                                        maintenance |= command.contains("maintenance run");
+                                        if maintenance
+                                            && command.contains("receive-pack")
+                                            && command.contains(
+                                                destination.to_str().expect("destination"),
+                                            )
+                                        {
+                                            return *pid;
+                                        }
+                                        ancestor = *ppid;
+                                    }
+                                }
+                                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                            }
+                        })
+                        .await
+                        .expect("actual receiver maintenance pack-refs descendant");
+                    assert!(
+                        metadata.join("refs/heads/approved").exists(),
+                        "ref update precedes maintenance"
+                    );
+                    task.abort();
+                    assert!(matches!(task.await, Err(error) if error.is_cancelled()));
+                    receipt
+                        .wait(std::time::Duration::from_secs(3))
+                        .await
+                        .expect("maintenance cleanup confirmed");
+                    let observed = std::process::Command::new("ps")
+                        .args(["-p", &pack_pid.to_string(), "-o", "stat="])
+                        .output()
+                        .expect("descendant status");
+                    assert!(
+                        (observed.status.code() == Some(1)
+                            && observed.stdout.is_empty()
+                            && observed.stderr.is_empty())
+                            || (observed.status.success()
+                                && observed.stderr.is_empty()
+                                && String::from_utf8_lossy(&observed.stdout)
+                                    .trim()
+                                    .starts_with('Z')),
+                        "maintenance descendant remains live or observation failed: {observed:?}"
+                    );
+                    assert_eq!(
+                        std::fs::read(&packed_lock).expect("original packed lock"),
+                        b"fixture-owned packed lock\n"
+                    );
+                    std::fs::remove_file(&packed_lock).expect("release packed lock");
+                    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+                    assert!(
+                        !metadata.join("packed-refs").exists(),
+                        "no late maintenance write"
+                    );
+                    break;
+                }
+                if layout == "cancel" && stages == 8 {
+                    let receipt = plan.cleanup_receipt().expect("local push receipt");
+                    let task =
+                        tokio::spawn(async move { plan.execute_stage(Box::new(admission)).await });
+                    let oid =
+                        String::from_utf8(git(sender.path(), &["rev-parse", "HEAD"])).expect("oid");
+                    let oid = oid.trim();
+                    let received_object = metadata.join("objects").join(&oid[..2]).join(&oid[2..]);
+                    tokio::time::timeout(std::time::Duration::from_secs(10), async {
+                        while !received_object.exists() {
+                            assert!(!task.is_finished(), "push ended before receiver lock wait");
+                            tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+                        }
+                    })
+                    .await
+                    .expect("receiver accepted objects");
+                    assert!(
+                        !task.is_finished(),
+                        "reference lock must hold execution open"
+                    );
+                    task.abort();
+                    assert!(matches!(task.await, Err(error) if error.is_cancelled()));
+                    receipt
+                        .wait(std::time::Duration::from_secs(3))
+                        .await
+                        .expect("local receiver cleanup confirmed");
+                    assert!(!metadata.join("refs/heads/approved").exists());
+                    assert_eq!(
+                        std::fs::read(&receiver_lock).expect("original lock"),
+                        b"fixture-owned lock\n"
+                    );
+                    break;
+                }
+                match plan.execute_stage(Box::new(admission)).await {
+                    PreparedNormalStage::Continue(next) => {
+                        assert!(
+                            !metadata.join("refs/heads/approved").exists(),
+                            "no early mutation"
+                        );
+                        if let Some(original) = &second_original {
+                            assert_eq!(
+                                &git(&second, &["rev-parse", "refs/heads/approved"]),
+                                original
+                            );
+                        } else {
+                            assert!(!second.join("refs/heads/approved").exists());
+                        }
+                        plan = next;
+                    }
+                    PreparedNormalStage::Complete(output) => {
+                        assert_eq!(
+                            output.result.is_error,
+                            layout == "partial",
+                            "{}",
+                            output.result.content
+                        );
+                        if layout == "partial" {
+                            assert!(
+                                output
+                                    .result
+                                    .content
+                                    .contains("partially updated remote references"),
+                                "{}",
+                                output.result.content
+                            );
+                        }
+                        break;
+                    }
+                }
+            }
+            assert_eq!(stages, 8);
+            if layout == "cancel" {
+                // Releasing the competing lock after confirmed cleanup must not
+                // let a surviving receive-pack finish the reference update.
+                std::fs::remove_file(&receiver_lock).expect("release fixture lock");
+                tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+                assert!(!metadata.join("refs/heads/approved").exists());
+                continue;
+            }
+            assert_eq!(
+                git(sender.path(), &["rev-parse", "HEAD"]),
+                git(&destination, &["rev-parse", "refs/heads/approved"])
+            );
+            if layout == "multiple" {
+                assert_eq!(
+                    git(sender.path(), &["rev-parse", "HEAD"]),
+                    git(&second, &["rev-parse", "refs/heads/approved"])
+                );
+            }
+            if let Some(original) = second_original {
+                assert_eq!(
+                    git(&second, &["rev-parse", "refs/heads/approved"]),
+                    original
+                );
+            }
+            if layout == "maintenance" {
+                assert!(
+                    std::fs::read_dir(metadata.join("objects/pack"))
+                        .expect("receiver packs")
+                        .any(|entry| entry
+                            .expect("pack entry")
+                            .path()
+                            .extension()
+                            .is_some_and(|extension| extension == "pack")),
+                    "receiver automatic maintenance must finish before push completes"
+                );
+            }
+        }
+    }
+
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    #[test]
+    fn receiver_system_shell_noninteractive_command_does_not_source_home_startup() {
+        let home = tempfile::tempdir().expect("fixture home");
+        for file in [
+            ".profile",
+            ".bash_profile",
+            ".bash_login",
+            ".bashrc",
+            ".zshenv",
+            ".zshrc",
+        ] {
+            std::fs::write(home.path().join(file), "printf unexpected > startup-ran\n")
+                .expect("startup sentinel");
+        }
+        let canonical = Path::new("/bin/sh").canonicalize().expect("system shell");
+        validate_receiver_shell_path(Path::new("/bin/sh"), &canonical).expect("system baseline");
+        for shell in ["/bin/zsh", "/usr/local/bin/sh", "sh"] {
+            assert!(validate_receiver_shell_path(Path::new(shell), &canonical).is_err());
+        }
+        assert!(validate_receiver_shell_path(Path::new("/bin/sh"), Path::new("/bin/ksh")).is_err());
+        let output = std::process::Command::new("/bin/sh")
+            .args(["-c", "printf '%s' \"$1\"", "fixed-command", "approved"])
+            .current_dir(home.path())
+            .env_clear()
+            .env("HOME", home.path())
+            .env("PATH", "/usr/bin:/bin")
+            .output()
+            .expect("system shell");
+        assert!(output.status.success());
+        assert_eq!(output.stdout, b"approved");
+        assert!(!home.path().join("startup-ran").exists());
+    }
+
+    #[test]
+    fn receiver_shell_startup_environment_refuses_without_mutating_parent_snapshot() {
+        for name in [
+            "BASH_ENV",
+            "ENV",
+            "SHELLOPTS",
+            "BASHOPTS",
+            "ZDOTDIR",
+            "PS4",
+            "SSH_CLIENT",
+            "SSH2_CLIENT",
+            "BASH_FUNC_git%%",
+        ] {
+            let environment = std::collections::BTreeMap::from([(
+                std::ffi::OsString::from(name),
+                std::ffi::OsString::from("unbound"),
+            )]);
+            let before = environment.clone();
+            assert!(
+                validate_receiver_shell_environment(&environment).is_err(),
+                "{name}"
+            );
+            assert_eq!(before, environment);
+        }
+        validate_receiver_shell_environment(&std::collections::BTreeMap::from([(
+            std::ffi::OsString::from("PATH"),
+            std::ffi::OsString::from("/usr/bin:/bin"),
+        )]))
+        .expect("ordinary environment");
+        #[cfg(unix)]
+        validate_receiver_shell_environment(&std::collections::BTreeMap::from([(
+            std::ffi::OsString::from("bash_env"),
+            std::ffi::OsString::from("case-sensitive environment"),
+        )]))
+        .expect("Unix variable names are case sensitive");
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn fixed_receiver_command_performs_real_local_push() {
+        let sender = fixture();
+        let target = tempfile::tempdir().expect("receiver");
+        let receiver = target.path().join("receiver ' with spaces.git");
+        let program = resolve_git(&execution_environment()).expect("Git");
+        let commit = std::process::Command::new(&program)
+            .current_dir(sender.path())
+            .args([
+                "-c",
+                "user.name=Fixture",
+                "-c",
+                "user.email=fixture@example.invalid",
+                "-c",
+                "commit.gpgSign=false",
+                "commit",
+                "--allow-empty",
+                "-m",
+                "fixture",
+            ])
+            .output()
+            .expect("initial commit");
+        assert!(commit.status.success());
+        let init = std::process::Command::new(&program)
+            .args(["init", "--bare"])
+            .arg(&receiver)
+            .output()
+            .expect("bare init");
+        assert!(init.status.success());
+        let mut command = tokio::process::Command::new(&program);
+        command
+            .current_dir(sender.path())
+            .arg("push")
+            .arg(format!(
+                "--receive-pack={}",
+                receiver_command(&program).expect("receiver command")
+            ))
+            .arg("--")
+            .arg(&receiver)
+            .arg("HEAD:refs/heads/approved");
+        super::super::run_host_command(command, std::time::Duration::from_secs(30), 16 * 1024)
+            .await
+            .expect("real local push");
+        let head = std::process::Command::new(&program)
+            .current_dir(sender.path())
+            .args(["rev-parse", "HEAD"])
+            .output()
+            .expect("sender head");
+        let received = std::process::Command::new(&program)
+            .arg("--git-dir")
+            .arg(&receiver)
+            .args(["rev-parse", "refs/heads/approved"])
+            .output()
+            .expect("receiver ref");
+        assert!(head.status.success() && received.status.success());
+        assert_eq!(head.stdout, received.stdout);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn receiver_command_quotes_executable_and_carries_foreground_settings() {
+        use std::os::unix::fs::PermissionsExt;
+        let directory = tempfile::tempdir().expect("fixture");
+        let root = directory.path().canonicalize().expect("canonical");
+        let program = root.join("git ' $(touch injected) ; executable");
+        std::fs::write(&program, "#!/bin/sh\nprintf '%s\\n' \"$@\"\n").expect("fixture program");
+        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).expect("mode");
+        let mut command = tokio::process::Command::new("/bin/sh");
+        command
+            .current_dir(&root)
+            .arg("-c")
+            .arg(receiver_command(&program).expect("fixed command"));
+        let output =
+            super::super::run_host_command(command, std::time::Duration::from_secs(10), 4096)
+                .await
+                .expect("execute");
+        assert_eq!(
+            output,
+            b"-c\nmaintenance.autoDetach=false\n-c\ngc.autoDetach=false\nreceive-pack\n"
+        );
+        assert!(!root.join("injected").exists());
+        assert!(receiver_command(Path::new("relative-git")).is_err());
+    }
+
+    #[test]
+    fn pull_fetch_command_binds_remote_foreground_maintenance_and_trace_policy() {
+        use std::ffi::OsStr;
+        let root = tempfile::tempdir().expect("root");
+        let program = root.path().join("git executable");
+        let workdir = root.path().join("worktree");
+        std::fs::create_dir(&workdir).expect("worktree");
+        let environment = trace_suppressed_environment(BTreeMap::from([
+            (OsString::from("PATH"), OsString::from("/usr/bin")),
+            (OsString::from("GIT_TRACE2"), OsString::from("/tmp/trace")),
+        ]));
+        let command = pull_fetch_command(&program, &workdir, "upstream name", &environment)
+            .expect("fetch command");
+        assert_eq!(command.as_std().get_program(), program.as_os_str());
+        assert_eq!(command.as_std().get_current_dir(), Some(workdir.as_path()));
+        assert_eq!(
+            command
+                .as_std()
+                .get_args()
+                .map(|argument| argument.to_string_lossy().into_owned())
+                .collect::<Vec<_>>(),
+            [
+                "-c",
+                "maintenance.autoDetach=false",
+                "-c",
+                "gc.autoDetach=false",
+                "--no-pager",
+                "fetch",
+                "--",
+                "upstream name"
+            ]
+        );
+        let actual_environment = command.as_std().get_envs().collect::<BTreeMap<_, _>>();
+        assert_eq!(
+            actual_environment.get(OsStr::new("GIT_TRACE2")),
+            Some(&Some(OsStr::new("0")))
+        );
+        assert!(pull_fetch_command(&program, &workdir, "bad\nremote", &environment).is_err());
+        assert!(pull_fetch_command(Path::new("git"), &workdir, "origin", &environment).is_err());
+    }
+
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn windows_program_guard_allows_real_git_startup() {
+        let program = resolve_git(&execution_environment()).expect("Git on test PATH");
+        let evidence = capture_program(&program).expect("retain Git guard");
+        let mut command = tokio::process::Command::new(&program);
+        command.arg("--version");
+        let output =
+            super::super::run_host_command(command, std::time::Duration::from_secs(10), 16 * 1024)
+                .await
+                .expect("Git must start while its evidence handle survives");
+        assert!(output.starts_with(b"git version "));
+        assert!(evidence == capture_program(&program).expect("revalidate Git"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn program_evidence_retains_windows_replacement_guard() {
+        let root = tempfile::tempdir().expect("fixture");
+        let path = root.path().join("program");
+        std::fs::write(&path, "executable evidence").expect("program");
+        let path = path.canonicalize().expect("canonical");
+        let evidence = capture_program(&path).expect("capture");
+        let second = capture_program(&path).expect("shared read capture");
+        assert!(evidence == second);
+        assert!(std::fs::OpenOptions::new().write(true).open(&path).is_err());
+        assert!(std::fs::rename(&path, path.with_extension("old")).is_err());
+        assert!(std::fs::remove_file(&path).is_err());
+        drop(second);
+        assert!(std::fs::remove_file(&path).is_err());
+        drop(evidence);
+        std::fs::rename(&path, path.with_extension("old")).expect("released guard");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn receiver_child_executable_binds_link_target_and_identical_replacement() {
+        use std::os::unix::fs::{PermissionsExt, symlink};
+        let root = tempfile::tempdir().expect("fixture");
+        let base = root.path().canonicalize().expect("canonical");
+        let program = base.join("program");
+        let alternate = base.join("alternate");
+        for path in [&program, &alternate] {
+            std::fs::write(path, "executable evidence").expect("program");
+            std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755)).expect("mode");
+        }
+        let link = base.join("git-receive-pack");
+        symlink(&program, &link).expect("link");
+        let evidence = ReceiverChildExecutable::capture(&link, &program).expect("capture");
+        evidence.revalidate(&program).expect("unchanged");
+        std::fs::remove_file(&link).expect("unlink");
+        symlink(&alternate, &link).expect("retarget");
+        assert!(evidence.revalidate(&program).is_err());
+        std::fs::remove_file(&link).expect("unlink");
+        symlink(&program, &link).expect("restore");
+        std::fs::rename(&program, base.join("old-inode")).expect("retain inode");
+        std::fs::write(&program, "executable evidence").expect("replacement");
+        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).expect("mode");
+        assert!(evidence.revalidate(&program).is_err());
+        assert!(ReceiverChildExecutable::capture(&link, &alternate).is_err());
+    }
+
+    #[tokio::test]
+    async fn receiver_child_requires_read_admission_before_capture() {
+        let sender = fixture();
+        let receiver = fixture();
+        let plan = AddPlan::prepare_push(
+            sender.path(),
+            &serde_json::json!({"remote": receiver.path()}),
+            ToolProvenance::Native,
+        )
+        .expect("plan");
+        let mut plan = Box::new(plan).discover().await.expect("discovery");
+        // This absent child has no Read facet. Admission must fail before capture
+        // could report that its executable is unavailable.
+        plan.receiver_child_paths = vec![sender.path().join("unadmitted-child")];
+        let admission = proof(&plan);
+        let PreparedNormalStage::Complete(output) = plan.execute_stage(Box::new(admission)).await
+        else {
+            panic!("unadmitted child cannot advance discovery");
+        };
+        assert!(output.result.is_error);
+        assert!(
+            output
+                .result
+                .content
+                .contains("Receiver Read authorization missing")
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn receiver_child_replacement_refuses_next_discovery_stage() {
+        use std::os::unix::fs::PermissionsExt;
+        let sender = fixture();
+        let receiver = fixture();
+        let child = sender
+            .path()
+            .canonicalize()
+            .expect("canonical")
+            .join("child");
+        std::fs::write(&child, "fixture executable").expect("child");
+        std::fs::set_permissions(&child, std::fs::Permissions::from_mode(0o755)).expect("mode");
+        let plan = AddPlan::prepare_push(
+            sender.path(),
+            &serde_json::json!({"remote": receiver.path()}),
+            ToolProvenance::Native,
+        )
+        .expect("plan");
+        let mut plan = Box::new(plan).discover().await.expect("discovery");
+        // Substitute only the shell fixture. Git children must retain their
+        // identity relationship with the configuration-discovery executable.
+        plan.receiver_child_paths[1] = child.clone();
+        plan.facets
+            .push(path_facet(ToolNature::Read, &child, "fixture child").expect("facet"));
+        let admission = proof(&plan);
+        let PreparedNormalStage::Continue(next) = plan.execute_stage(Box::new(admission)).await
+        else {
+            panic!("admitted child must allow root discovery");
+        };
+        std::fs::rename(&child, child.with_extension("old")).expect("retain old inode");
+        std::fs::write(&child, "fixture executable").expect("replacement");
+        std::fs::set_permissions(&child, std::fs::Permissions::from_mode(0o755)).expect("mode");
+        // Re-admit the continuation through the production permission API.
+        let state = PermissionSessionState::new(PermissionEngine::with_workspace_root(
+            sender.path().into(),
+        ));
+        let context = PermissionContext::new(
+            PermissionMode::Interactive,
+            InteractionCapability::Available,
+        );
+        let input = serde_json::json!({"remote": receiver.path()});
+        let request = PermissionRequest::native("git_push", next.permission_profile(), &input);
+        let proposal = state
+            .propose(&request, &context, GrantScope::Once)
+            .expect("proposal");
+        let pending = state
+            .approve_once(proposal, &request, &context)
+            .expect("approval");
+        let admission = state
+            .try_admit_prepared_invocation(
+                pending,
+                &request,
+                &context,
+                next.plan_identity().expect("identity"),
+            )
+            .expect("admission");
+        let PreparedNormalStage::Complete(output) = next.execute_stage(Box::new(admission)).await
+        else {
+            panic!("replaced child cannot advance metadata discovery");
+        };
+        assert!(output.result.is_error);
+        assert!(
+            output
+                .result
+                .content
+                .contains("Receiver child executable changed after discovery")
+        );
+    }
+
+    #[tokio::test]
+    async fn discovery_proof_cannot_enter_mutation_dispatch() {
+        let root = fixture();
+        let plan = prepare(root.path());
+        let admission = proof(&plan);
+        let result = Box::new(plan).execute(Box::new(admission)).await;
+        assert!(result.result.is_error);
+        assert!(result.result.content.contains("completed discovery phase"));
+        assert!(!root.path().join(".git/index").exists());
+    }
+
+    #[test]
+    fn command_budget_reserves_both_pipes_and_never_partially_charges() {
+        let mut budget = CommandBudget {
+            commands: 2,
+            output_bytes: 8,
+        };
+        budget.reserve(2).expect("first child");
+        assert_eq!((budget.commands, budget.output_bytes), (1, 4));
+        assert!(budget.reserve(u64::MAX).is_err());
+        assert_eq!((budget.commands, budget.output_bytes), (1, 4));
+        assert!(budget.reserve(3).is_err());
+        assert_eq!((budget.commands, budget.output_bytes), (1, 4));
+        budget.reserve(2).expect("second child");
+        assert!(budget.reserve(0).is_err());
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn pull_prefetch_probe_uses_owned_runner_and_propagates_budget_failure() {
+        let root = fixture();
+        let plan = prepare(root.path());
+        let run = |args: Vec<String>| {
+            let mut command = tokio::process::Command::new(&plan.program);
+            command
+                .current_dir(root.path())
+                .args(args)
+                .env_clear()
+                .envs(&plan.environment);
+            plan.run_command_output(command, std::time::Duration::from_secs(5), 1024)
+        };
+        super::super::pull_state::BeforeFetch::probe(b"", None, 40, run)
+            .await
+            .expect("real unborn repository probes");
+        let mut calls = 0;
+        let changing = |args: Vec<String>| {
+            calls += 1;
+            if calls == 3 {
+                let output = std::process::Command::new("git")
+                    .current_dir(root.path())
+                    .args(["symbolic-ref", "HEAD", "refs/heads/changed-during-probe"])
+                    .output()
+                    .expect("fixture branch change");
+                assert!(output.status.success());
+            }
+            let mut command = tokio::process::Command::new(&plan.program);
+            command
+                .current_dir(root.path())
+                .args(args)
+                .env_clear()
+                .envs(&plan.environment);
+            plan.run_command_output(command, std::time::Duration::from_secs(5), 1024)
+        };
+        let changed = super::super::pull_state::BeforeFetch::probe(b"", None, 40, changing)
+            .await
+            .expect_err("changing HEAD cannot be retained");
+        assert!(changed.to_string().contains("HEAD changed"));
+        plan.command_budget.lock().expect("budget").commands = 0;
+        let run = |args: Vec<String>| {
+            let mut command = tokio::process::Command::new(&plan.program);
+            command
+                .current_dir(root.path())
+                .args(args)
+                .env_clear()
+                .envs(&plan.environment);
+            plan.run_command_output(command, std::time::Duration::from_secs(5), 1024)
+        };
+        let error = super::super::pull_state::BeforeFetch::probe(b"", None, 40, run)
+            .await
+            .expect_err("budget failure is not unborn HEAD");
+        assert!(
+            error
+                .to_string()
+                .contains("cumulative command/output budget")
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn commit_target_probe_only_treats_quiet_missing_reference_as_absent() {
+        let root = fixture();
+        let plan = prepare(root.path());
+        assert!(
+            plan.inspect_commit_target("refs/heads/missing")
+                .await
+                .expect("missing reference")
+                .is_none()
+        );
+        plan.command_budget.lock().expect("budget").commands = 0;
+        let error = plan
+            .inspect_commit_target("refs/heads/missing")
+            .await
+            .expect_err("exhaustion is not missing");
+        assert!(
+            error
+                .to_string()
+                .contains("cumulative command/output budget")
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn probe_exit_status_is_not_a_process_failure() {
+        let root = fixture();
+        let plan = prepare(root.path());
+        let mut command = tokio::process::Command::new("git");
+        command
+            .current_dir(root.path())
+            .args(["config", "--local", "--get", "fixture.absent"]);
+        let output = plan
+            .run_command_output(command, std::time::Duration::from_secs(5), 1024)
+            .await
+            .expect("completed missing-value probe");
+        assert_eq!(output.status.code(), Some(1));
+        assert!(output.stdout.is_empty() && output.stderr.is_empty());
+        let missing = tokio::process::Command::new(root.path().join("nonexistent-git"));
+        assert!(
+            plan.run_command_output(missing, std::time::Duration::from_secs(1), 1024)
+                .await
+                .is_err()
+        );
+        let mut slow = tokio::process::Command::new("/bin/sh");
+        slow.args(["-c", "sleep 10"]);
+        assert!(
+            plan.run_command_output(slow, std::time::Duration::from_millis(100), 1024)
+                .await
+                .is_err()
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn exhausted_command_budget_refuses_before_spawn() {
+        let root = fixture();
+        let plan = prepare(root.path());
+        plan.command_budget.lock().expect("budget").commands = 0;
+        let marker = root.path().join("unexpected-child");
+        let mut command = tokio::process::Command::new("/bin/sh");
+        command
+            .args(["-c", "printf spawned > \"$1\"", "fixture"])
+            .arg(&marker);
+        let error = plan
+            .run_command(command, std::time::Duration::from_secs(1), 128)
+            .await
+            .expect_err("must refuse before spawn");
+        assert!(
+            error
+                .to_string()
+                .contains("cumulative command/output budget")
+        );
+        assert!(!marker.exists());
+    }
+
+    #[tokio::test]
+    async fn discovery_reports_budget_exhaustion_without_misdiagnosing_installation() {
+        let root = fixture();
+        let plan = prepare(root.path());
+        plan.command_budget.lock().expect("budget").commands = 0;
+        for error in [
+            plan.inspect_config().await.expect_err("config inspection"),
+            plan.inspect_config_paths("GIT_CONFIG_GLOBAL")
+                .await
+                .expect_err("config path inspection"),
+            plan.inspect_attribute_path_at(root.path(), "GIT_ATTR_GLOBAL")
+                .await
+                .expect_err("attribute path inspection"),
+        ] {
+            assert!(
+                error
+                    .to_string()
+                    .contains("cumulative command/output budget"),
+                "{error}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn discovery_and_mutation_share_command_budget() {
+        let root = fixture();
+        let plan = prepare(root.path());
+        let before = plan.command_budget.lock().expect("budget").commands;
+        let next = Box::new(plan).discover().await.expect("discovery");
+        assert!(next.command_budget.lock().expect("budget").commands < before);
+        // A continuation keeps the same allowance; no mutation child may
+        // start once prior discovery has exhausted it.
+        next.command_budget.lock().expect("budget").commands = 0;
+        let marker = root.path().join("unexpected-continuation-child");
+        let mut command = tokio::process::Command::new("/bin/sh");
+        command
+            .args(["-c", "printf spawned > \"$1\"", "fixture"])
+            .arg(&marker);
+        let error = next
+            .run_command(command, std::time::Duration::from_secs(1), 128)
+            .await
+            .expect_err("must refuse before spawn");
+        assert!(
+            error
+                .to_string()
+                .contains("cumulative command/output budget"),
+            "{}",
+            error
+        );
+        assert!(!marker.exists());
+        assert!(!root.path().join(".git/index").exists());
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn discovery_runner_does_not_connect_to_trace_socket() {
+        let root = fixture();
+        let home = tempfile::tempdir().expect("isolated home");
+        let socket = home.path().join("trace.sock");
+        let listener = std::os::unix::net::UnixListener::bind(&socket).expect("socket");
+        listener.set_nonblocking(true).expect("nonblocking");
+        std::fs::write(
+            home.path().join(".gitconfig"),
+            format!(
+                "[trace2]\n eventTarget = af_unix:stream:{}\n",
+                socket.display()
+            ),
+        )
+        .expect("config");
+        let plan = prepare(root.path());
+        let mut environment = plan.environment.clone();
+        environment.insert("HOME".into(), home.path().as_os_str().into());
+        environment.insert("XDG_CONFIG_HOME".into(), home.path().as_os_str().into());
+        let mut command = tokio::process::Command::new(&plan.program);
+        command
+            .current_dir(root.path())
+            .args(["config", "--null", "--show-origin", "--list"])
+            .env_clear()
+            .envs(environment);
+        plan.run_command(command, std::time::Duration::from_secs(10), 256 * 1024)
+            .await
+            .expect("discovery");
+        assert_eq!(
+            listener.accept().expect_err("no trace connection").kind(),
+            std::io::ErrorKind::WouldBlock
+        );
+    }
+
+    #[tokio::test]
+    async fn discovery_runner_suppresses_configured_trace_files() {
+        let root = fixture();
+        let home = tempfile::tempdir().expect("isolated home");
+        let mut config = String::from("[trace2]\n");
+        for (key, name) in [
+            ("normalTarget", "normal"),
+            ("eventTarget", "event"),
+            ("perfTarget", "perf"),
+        ] {
+            config.push_str(&format!(" {key} = {}\n", home.path().join(name).display()));
+        }
+        std::fs::write(home.path().join(".gitconfig"), config).expect("config");
+        let plan = prepare(root.path());
+        let mut environment = plan.environment.clone();
+        environment.insert("HOME".into(), home.path().as_os_str().into());
+        environment.insert("XDG_CONFIG_HOME".into(), home.path().as_os_str().into());
+        let mut command = tokio::process::Command::new(&plan.program);
+        command
+            .current_dir(root.path())
+            .args(["config", "--null", "--show-origin", "--list"])
+            .env_clear()
+            .envs(environment);
+        let output = plan
+            .run_command(command, std::time::Duration::from_secs(10), 256 * 1024)
+            .await
+            .expect("discovery");
+        assert!(
+            output
+                .windows(b"trace2.eventtarget".len())
+                .any(|w| w == b"trace2.eventtarget")
+        );
+        for name in ["normal", "event", "perf"] {
+            assert!(!home.path().join(name).exists());
+        }
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn cancelled_push_closes_transport_and_confirms_cleanup() {
+        use std::io::{Read, Write};
+        for during_pack in [false, true] {
+            let root = fixture();
+            if during_pack {
+                let mut state = 0x12345678u32;
+                let data: Vec<u8> = (0..8 * 1024 * 1024)
+                    .map(|_| {
+                        state ^= state << 13;
+                        state ^= state >> 17;
+                        state ^= state << 5;
+                        state as u8
+                    })
+                    .collect();
+                std::fs::write(root.path().join("payload"), data).expect("payload");
+                assert!(
+                    std::process::Command::new("git")
+                        .current_dir(root.path())
+                        .args(["add", "payload"])
+                        .output()
+                        .expect("add")
+                        .status
+                        .success()
+                );
+            }
+            assert!(
+                std::process::Command::new("git")
+                    .current_dir(root.path())
+                    .args([
+                        "-c",
+                        "user.name=Fixture",
+                        "-c",
+                        "user.email=fixture@example.invalid",
+                        "-c",
+                        "commit.gpgSign=false",
+                        "commit",
+                        "--allow-empty",
+                        "-m",
+                        "fixture"
+                    ])
+                    .output()
+                    .expect("commit")
+                    .status
+                    .success()
+            );
+            let index_before = std::fs::read(root.path().join(".git/index")).ok();
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("listener");
+            listener.set_nonblocking(true).expect("nonblocking");
+            let destination = format!("git://{}/repo", listener.local_addr().expect("address"));
+            let plan = AddPlan::prepare_push(
+                root.path(),
+                &serde_json::json!({"remote":destination,"branch":"HEAD:refs/heads/test"}),
+                ToolProvenance::Native,
+            )
+            .expect("plan");
+            let next = Box::new(plan).discover().await.expect("discovery");
+            let receipt = next.cleanup_receipt().expect("receipt");
+            let admission = proof(&next);
+            let task = tokio::spawn(async move { next.execute(Box::new(admission)).await });
+            let mut stream = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+                loop {
+                    match listener.accept() {
+                        Ok((stream, _)) => break stream,
+                        Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                            tokio::time::sleep(std::time::Duration::from_millis(5)).await
+                        }
+                        Err(error) => panic!("accept: {error}"),
+                    }
+                }
+            })
+            .await
+            .expect("push connected");
+            stream.set_nonblocking(true).expect("nonblocking");
+            if during_pack {
+                let advertisement = "0000000000000000000000000000000000000000 capabilities^{}\0report-status delete-refs ofs-delta\n";
+                let packet = format!("{:04x}{advertisement}0000", advertisement.len() + 4);
+                stream.write_all(packet.as_bytes()).expect("advertisement");
+                tokio::time::timeout(std::time::Duration::from_secs(10), async {
+                    let mut observed = Vec::new();
+                    let mut bytes = [0; 256];
+                    loop {
+                        match stream.read(&mut bytes) {
+                            Ok(0) => panic!("closed before pack"),
+                            Ok(count) => {
+                                observed.extend_from_slice(&bytes[..count]);
+                                if observed.windows(4).any(|window| window == b"PACK") {
+                                    break;
+                                }
+                                assert!(observed.len() < 64 * 1024, "pack header missing");
+                            }
+                            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                                tokio::time::sleep(std::time::Duration::from_millis(5)).await
+                            }
+                            Err(error) => panic!("pack read: {error}"),
+                        }
+                    }
+                })
+                .await
+                .expect("pack started");
+                assert!(!task.is_finished(), "push must still be active");
+            }
+            task.abort();
+            assert!(task.await.expect_err("cancelled").is_cancelled());
+            receipt
+                .wait(std::time::Duration::from_secs(3))
+                .await
+                .expect("cleanup confirmed");
+            tokio::time::timeout(std::time::Duration::from_secs(3), async {
+                let mut bytes = [0; 4096];
+                loop {
+                    match stream.read(&mut bytes) {
+                        Ok(0) => break,
+                        Ok(_) => {}
+                        Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                            tokio::time::sleep(std::time::Duration::from_millis(5)).await
+                        }
+                        Err(error) if error.kind() == std::io::ErrorKind::ConnectionReset => break,
+                        Err(error) => panic!("read: {error}"),
+                    }
+                }
+            })
+            .await
+            .expect("transport closed");
+            assert_eq!(
+                std::fs::read(root.path().join(".git/index")).ok(),
+                index_before
+            );
+        }
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn cancelled_plan_receipt_prevents_descendant_delayed_write() {
+        let root = fixture();
+        let plan = prepare(root.path());
+        let receipt = plan.cleanup_receipt().expect("local receipt");
+        let mut command = tokio::process::Command::new("sh");
+        command.current_dir(root.path()).args([
+            "-c",
+            "(sleep 1; printf forbidden > delayed) & printf ready > ready; wait",
+        ]);
+        let task = tokio::spawn(async move {
+            plan.run_command(command, std::time::Duration::from_secs(10), 1024)
+                .await
+        });
+        tokio::time::timeout(std::time::Duration::from_secs(3), async {
+            while !root.path().join("ready").exists() {
+                tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+            }
+        })
+        .await
+        .expect("started");
+        task.abort();
+        assert!(task.await.expect_err("cancelled task").is_cancelled());
+        receipt
+            .wait(std::time::Duration::from_secs(3))
+            .await
+            .expect("confirmed cleanup");
+        tokio::time::sleep(std::time::Duration::from_millis(1100)).await;
+        assert!(!root.path().join("delayed").exists());
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn sealed_owner_refuses_discovery_and_prepared_continuation() {
+        use talos_core::tool::AgentTool;
+        let root = fixture();
+        let tool = super::super::GitAddTool::new(root.path().to_owned());
+        let owner = tool.cleanup_receipt().expect("owner");
+        let plan = prepare(root.path()).bind_operation(tool.executor.operation());
+        let receipt = plan.cleanup_receipt().expect("operation");
+        let continuation = Box::new(plan).discover().await.expect("discovery");
+        receipt
+            .wait(std::time::Duration::from_secs(1))
+            .await
+            .expect("discovery cleanup");
+        owner.seal();
+        let output = execute_approved(*continuation).await;
+        assert!(output.result.is_error);
+        assert!(
+            output
+                .result
+                .content
+                .contains("configuration inspection failed"),
+            "{}",
+            output.result.content
+        );
+        let fresh = prepare(root.path()).bind_operation(tool.executor.operation());
+        let error = match Box::new(fresh).discover().await {
+            Ok(_) => panic!("sealed discovery accepted"),
+            Err(error) => error,
+        };
+        assert!(
+            error
+                .to_string()
+                .contains("configuration inspection failed")
+        );
+        assert!(!root.path().join(".git/index").exists());
+        receipt
+            .wait(std::time::Duration::from_secs(1))
+            .await
+            .expect("local cleanup");
+        owner
+            .wait(std::time::Duration::from_secs(1))
+            .await
+            .expect("owner cleanup");
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn parent_configuration_identity_changes_invalidate_discovered_plan() {
+        for retarget in [false, true] {
+            let root = fixture();
+            for directory in ["first", "second"] {
+                std::fs::create_dir(root.path().join(directory)).expect("directory");
+                std::fs::write(
+                    root.path().join(directory).join("config"),
+                    "[user]\n name = Fixture\n",
+                )
+                .expect("config");
+            }
+            let link = root.path().join("current");
+            std::os::unix::fs::symlink(root.path().join("first"), &link).expect("link");
+            assert!(
+                std::process::Command::new("git")
+                    .args(["config", "include.path"])
+                    .arg(link.join("config"))
+                    .current_dir(root.path())
+                    .status()
+                    .expect("include")
+                    .success()
+            );
+            let plan = Box::new(prepare(root.path()))
+                .discover()
+                .await
+                .expect("discovery");
+            plan.revalidate().expect("unchanged");
+            if retarget {
+                std::fs::remove_file(&link).expect("unlink");
+                std::os::unix::fs::symlink(root.path().join("second"), &link).expect("retarget");
+            } else {
+                std::fs::rename(
+                    root.path().join("second/config"),
+                    root.path().join("first/config"),
+                )
+                .expect("replace with identical bytes");
+            }
+            assert!(
+                plan.revalidate()
+                    .expect_err("changed identity")
+                    .to_string()
+                    .contains("path identity")
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn promisor_remote_maintenance_refuses_before_mutation() {
+        for (key, value) in [
+            ("remote.origin.promisor", "true"),
+            ("remote.origin.partialCloneFilter", "blob:none"),
+            ("extensions.partialClone", "origin"),
+        ] {
+            let root = fixture();
+            assert!(
+                std::process::Command::new("git")
+                    .args(["config", "maintenance.auto", "false"])
+                    .current_dir(root.path())
+                    .status()
+                    .expect("maintenance")
+                    .success()
+            );
+            let status = std::process::Command::new("git")
+                .args(["config", key, value])
+                .current_dir(root.path())
+                .status()
+                .expect("config");
+            assert!(status.success());
+            let plan = AddPlan::prepare_commit(
+                root.path(),
+                &serde_json::json!({"message":"promisor"}),
+                ToolProvenance::Native,
+            )
+            .expect("plan");
+            let output = execute_approved(plan).await;
+            assert!(output.result.is_error && output.result.content.contains("promisor remote"));
+            assert!(!root.path().join(".git/COMMIT_EDITMSG").exists());
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn maintenance_entry_retarget_is_refused_after_initial_validation() {
+        let root = fixture();
+        let mut plan = prepare(root.path());
+        let entry = root.path().join("maintenance-git");
+        std::os::unix::fs::symlink(&plan.program, &entry).expect("entry");
+        plan.maintenance_program = Some(entry.clone());
+        plan.revalidate_maintenance_program()
+            .expect("initial binding");
+        let other = root.path().join("other-program");
+        std::fs::write(&other, "not Git").expect("other program");
+        std::fs::remove_file(&entry).expect("remove fixture link");
+        std::os::unix::fs::symlink(other, &entry).expect("retarget");
+        assert!(
+            plan.revalidate_maintenance_program()
+                .expect_err("late replacement")
+                .to_string()
+                .contains("maintenance executable differs")
+        );
+    }
+
+    #[tokio::test]
+    async fn commit_maintenance_recent_objects_hook_requires_execution_authorization() {
+        for maintenance in [None, Some("true"), Some("false")] {
+            let root = fixture();
+            let git = |args: &[&str]| {
+                let output = std::process::Command::new("git")
+                    .args(args)
+                    .current_dir(root.path())
+                    .output()
+                    .expect("fixture Git");
+                assert!(
+                    output.status.success(),
+                    "{}",
+                    String::from_utf8_lossy(&output.stderr)
+                );
+                output.stdout
+            };
+            git(&["add", "file"]);
+            git(&["commit", "-m", "initial"]);
+            std::fs::write(root.path().join("file"), "changed").expect("change");
+            git(&["add", "file"]);
+            git(&[
+                "config",
+                "gc.recentObjectsHook",
+                "touch recent-objects-hook-ran",
+            ]);
+            if let Some(value) = maintenance {
+                git(&["config", "maintenance.auto", value]);
+            }
+            let head = git(&["rev-parse", "HEAD"]);
+            let index = std::fs::read(root.path().join(".git/index")).expect("index");
+            let plan = AddPlan::prepare_commit(
+                root.path(),
+                &serde_json::json!({"message":"prepared"}),
+                ToolProvenance::Native,
+            )
+            .expect("plan");
+            let output = execute_approved(plan).await;
+            if maintenance == Some("false") {
+                assert!(!output.result.is_error, "{}", output.result.content);
+                assert_ne!(git(&["rev-parse", "HEAD"]), head);
+            } else {
+                assert!(
+                    output.result.is_error
+                        && output.result.content.contains("gc.recentObjectsHook")
+                );
+                assert_eq!(git(&["rev-parse", "HEAD"]), head);
+                assert_eq!(
+                    std::fs::read(root.path().join(".git/index")).expect("index"),
+                    index
+                );
+            }
+            assert!(!root.path().join("recent-objects-hook-ran").exists());
+        }
+    }
+
+    #[tokio::test]
+    async fn maintenance_pack_redirection_requires_separate_effect_authorization() {
+        let root = fixture();
+        let outside = tempfile::tempdir().expect("outside object destination");
+        let git = |args: &[&str]| {
+            assert!(
+                std::process::Command::new("git")
+                    .args(args)
+                    .current_dir(root.path())
+                    .status()
+                    .expect("config")
+                    .success()
+            );
+        };
+        git(&[
+            "config",
+            "gc.repackFilterTo",
+            outside.path().to_str().expect("path"),
+        ]);
+        let input = serde_json::json!({"message":"parent"});
+        let plan =
+            AddPlan::prepare_commit(root.path(), &input, ToolProvenance::Native).expect("plan");
+        let admission = proof(&plan);
+        let PreparedNormalStage::Complete(output) =
+            Box::new(plan).execute_stage(Box::new(admission)).await
+        else {
+            panic!("redirect was allowed")
+        };
+        assert!(output.result.is_error && output.result.content.contains("gc.repackFilterTo"));
+        assert!(
+            std::fs::read_dir(outside.path())
+                .expect("outside unchanged")
+                .next()
+                .is_none()
+        );
+        git(&["config", "maintenance.auto", "false"]);
+        let plan = AddPlan::prepare_commit(root.path(), &input, ToolProvenance::Native)
+            .expect("disabled maintenance");
+        let admission = proof(&plan);
+        assert!(matches!(
+            Box::new(plan).execute_stage(Box::new(admission)).await,
+            PreparedNormalStage::Continue(_)
+        ));
+        assert!(!root.path().join(".git/COMMIT_EDITMSG").exists());
+    }
+
+    #[test]
+    fn retained_child_evidence_rejects_changes_after_inspection_returns() {
+        let root = fixture();
+        let output = std::process::Command::new("git")
+            .args(["add", "file"])
+            .current_dir(root.path())
+            .output()
+            .expect("stage");
+        assert!(output.status.success());
+        let paths = vec!["file".to_owned()];
+        let evidence = ChildInspectionEvidence {
+            attributes: vec![(root.path().join(".gitattributes"), snapshot::Entry::Missing)],
+            status: Vec::new(),
+            sources: vec![(
+                root.path().to_owned(),
+                root.path().to_owned(),
+                paths.clone(),
+                capture_tracked_sources(root.path(), &paths).expect("sources"),
+            )],
+        };
+        evidence.revalidate().expect("unchanged");
+        std::fs::write(root.path().join("file"), "after!").expect("late edit");
+        assert!(
+            evidence
+                .revalidate()
+                .expect_err("late source change")
+                .to_string()
+                .contains("tracked sources")
+        );
+        std::fs::write(root.path().join("file"), "before").expect("restore");
+        std::fs::write(root.path().join(".gitattributes"), "file filter=late\n")
+            .expect("late attribute");
+        assert!(
+            evidence
+                .revalidate()
+                .expect_err("late attributes")
+                .to_string()
+                .contains("attributes changed")
+        );
+    }
+
+    #[test]
+    fn tracked_child_sources_detect_edits_without_reading_untracked_replacement_tree() {
+        let root = tempfile::tempdir().expect("fixture");
+        let paths = vec!["tracked".to_owned()];
+        std::fs::write(root.path().join("tracked"), "first").expect("tracked");
+        let before = capture_tracked_sources(root.path(), &paths).expect("before");
+        std::fs::write(root.path().join("tracked"), "other").expect("same length edit");
+        assert_ne!(
+            before,
+            capture_tracked_sources(root.path(), &paths).expect("after")
+        );
+        std::fs::remove_file(root.path().join("tracked")).expect("remove file");
+        std::fs::create_dir_all(root.path().join("tracked/untracked/.git"))
+            .expect("untracked nested repository");
+        assert_eq!(
+            capture_tracked_sources(root.path(), &paths).expect("directory kind only"),
+            vec![snapshot::Entry::Directory(Vec::new())]
+        );
+    }
+
+    #[tokio::test]
+    async fn child_status_filter_is_refused_without_executing_helper() {
+        let root = fixture();
+        let child = root.path().join("module");
+        std::fs::create_dir(&child).expect("child");
+        let git = |cwd: &Path, args: &[&str]| {
+            let output = std::process::Command::new("git")
+                .args(args)
+                .current_dir(cwd)
+                .output()
+                .expect("fixture Git");
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        };
+        git(&child, &["init"]);
+        std::fs::write(child.join("tracked"), "first\n").expect("tracked");
+        git(&child, &["add", "tracked"]);
+        git(
+            root.path(),
+            &[
+                "update-index",
+                "--add",
+                "--cacheinfo",
+                "160000",
+                "1111111111111111111111111111111111111111",
+                "module",
+            ],
+        );
+        let parent_attributes = root.path().join("parent-attributes");
+        std::fs::write(&parent_attributes, "").expect("parent attributes");
+        git(
+            root.path(),
+            &[
+                "config",
+                "core.attributesFile",
+                parent_attributes.to_str().expect("path"),
+            ],
+        );
+        let plan = Box::new(
+            AddPlan::prepare_commit(
+                root.path(),
+                &serde_json::json!({"message":"parent"}),
+                ToolProvenance::Native,
+            )
+            .expect("plan"),
+        )
+        .discover()
+        .await
+        .expect("child attribute discovery");
+        let child_global = plan
+            .inspect_attribute_path_at(&child, "GIT_ATTR_GLOBAL")
+            .await
+            .expect("child global");
+        assert_ne!(child_global, parent_attributes);
+        assert!(plan.child_attributes.contains(&child_global));
+        assert!(
+            plan.facets
+                .iter()
+                .any(|facet| facet.nature == ToolNature::Read
+                    && facet.resource.as_deref() == child_global.to_str())
+        );
+        std::fs::write(child.join(".gitattributes"), "tracked filter=probe\n").expect("attributes");
+        git(
+            &child,
+            &["config", "filter.probe.clean", "touch helper-ran; cat"],
+        );
+        std::fs::write(child.join("tracked"), "other\n").expect("same length edit");
+        for all in [false, true] {
+            let input = serde_json::json!({"message":"parent", "all":all});
+            let result = execute_approved(
+                AddPlan::prepare_commit(root.path(), &input, ToolProvenance::Native).expect("plan"),
+            )
+            .await;
+            assert!(
+                result.result.is_error
+                    && result
+                        .result
+                        .content
+                        .contains("Submodule status uses a configured filter"),
+                "{}",
+                result.result.content
+            );
+            assert!(!child.join("helper-ran").exists());
+            assert!(!root.path().join(".git/COMMIT_EDITMSG").exists());
+        }
+    }
+
+    #[tokio::test]
+    async fn child_invalid_index_is_read_only_after_continuation_admission() {
+        let root = fixture();
+        let child = root.path().join("module");
+        let external = tempfile::tempdir().expect("external metadata");
+        std::fs::create_dir(&child).expect("child");
+        let git = |cwd: &Path, args: &[&str]| {
+            let output = std::process::Command::new("git")
+                .args(args)
+                .current_dir(cwd)
+                .output()
+                .expect("Git fixture");
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        };
+        git(
+            &child,
+            &[
+                "init",
+                "--separate-git-dir",
+                external
+                    .path()
+                    .join("metadata")
+                    .to_str()
+                    .expect("metadata path"),
+            ],
+        );
+        git(
+            root.path(),
+            &[
+                "update-index",
+                "--add",
+                "--cacheinfo",
+                "160000",
+                "1111111111111111111111111111111111111111",
+                "module",
+            ],
+        );
+        std::fs::write(
+            external.path().join("metadata/index"),
+            "invalid child index",
+        )
+        .expect("invalid index");
+        let input = serde_json::json!({"message":"parent", "all":true});
+        let plan = AddPlan::prepare_commit(root.path(), &input, ToolProvenance::Native)
+            .expect("prepare without reading child index");
+        let admission = proof(&plan);
+        let PreparedNormalStage::Continue(next) =
+            Box::new(plan).execute_stage(Box::new(admission)).await
+        else {
+            panic!("discovery must not read child index")
+        };
+        assert!(next.permission_profile().iter().any(|facet| {
+            facet.nature == ToolNature::Read
+                && facet.resource.as_deref()
+                    == external
+                        .path()
+                        .join("metadata")
+                        .canonicalize()
+                        .expect("canonical metadata")
+                        .to_str()
+        }));
+        drop(next);
+        assert!(!root.path().join(".git/COMMIT_EDITMSG").exists());
+        let result = execute_approved(
+            AddPlan::prepare_commit(root.path(), &input, ToolProvenance::Native)
+                .expect("second plan"),
+        )
+        .await;
+        assert!(result.result.is_error);
+        assert!(!root.path().join(".git/COMMIT_EDITMSG").exists());
+        assert_eq!(
+            std::fs::read(external.path().join("metadata/index")).expect("preserved index"),
+            b"invalid child index"
+        );
+    }
+
+    #[tokio::test]
+    async fn child_config_discovery_detects_included_fsmonitor_before_status() {
+        let root = fixture();
+        let child = root.path().join("module");
+        std::fs::create_dir(&child).expect("child");
+        let git = |cwd: &Path, args: &[&str]| {
+            let output = std::process::Command::new("git")
+                .args(args)
+                .current_dir(cwd)
+                .output()
+                .expect("fixture Git");
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        };
+        git(&child, &["init"]);
+        git(
+            root.path(),
+            &[
+                "update-index",
+                "--add",
+                "--cacheinfo",
+                "160000",
+                "1111111111111111111111111111111111111111",
+                "module",
+            ],
+        );
+        let outside = tempfile::tempdir().expect("external config");
+        let included = outside.path().join("config");
+        std::fs::write(&included, "[core]\n fsmonitor = touch helper-ran\n")
+            .expect("helper config");
+        git(
+            &child,
+            &["config", "include.path", included.to_str().expect("path")],
+        );
+        let input = serde_json::json!({"message":"parent", "all":true});
+        let plan = AddPlan::prepare_commit(root.path(), &input, ToolProvenance::Native)
+            .expect("no child config before admission");
+        let admission = proof(&plan);
+        let PreparedNormalStage::Complete(output) =
+            Box::new(plan).execute_stage(Box::new(admission)).await
+        else {
+            panic!("child fsmonitor allowed")
+        };
+        assert!(output.result.is_error && output.result.content.contains("submodule fsmonitor"));
+        assert!(!child.join("helper-ran").exists());
+        assert!(!root.path().join(".git/COMMIT_EDITMSG").exists());
+        std::fs::write(&included, "[core]\n fsmonitor = false\n").expect("disabled helper");
+        let plan =
+            AddPlan::prepare_commit(root.path(), &input, ToolProvenance::Native).expect("plan");
+        let admission = proof(&plan);
+        let PreparedNormalStage::Continue(next) =
+            Box::new(plan).execute_stage(Box::new(admission)).await
+        else {
+            panic!("disabled fsmonitor should discover")
+        };
+        assert!(
+            next.permission_profile()
+                .iter()
+                .any(|facet| facet.nature == ToolNature::Read
+                    && facet.resource.as_deref() == included.to_str())
+        );
+        drop(next); // Declining continuation has no mutation effects.
+        assert!(!child.join("helper-ran").exists());
+    }
+
+    #[test]
+    fn external_gitlink_marker_is_planned_without_reading_destination() {
+        let root = fixture();
+        let outside = tempfile::tempdir().expect("external metadata");
+        let child = root.path().join("module");
+        std::fs::create_dir(&child).expect("checkout");
+        let marker = child.join(".git");
+        std::fs::write(&marker, format!("gitdir: {}\n", outside.path().display())).expect("marker");
+        // Not a valid repository: preparation must still succeed, because the
+        // destination's contents have no authorization yet.
+        std::fs::write(outside.path().join("config"), "invalid config").expect("external config");
+        let output = std::process::Command::new("git")
+            .args([
+                "update-index",
+                "--add",
+                "--cacheinfo",
+                "160000",
+                "1111111111111111111111111111111111111111",
+                "module",
+            ])
+            .current_dir(root.path())
+            .output()
+            .expect("index");
+        assert!(output.status.success());
+        let plan = AddPlan::prepare_commit(
+            root.path(),
+            &serde_json::json!({"message":"parent"}),
+            ToolProvenance::Native,
+        )
+        .expect("deferred external metadata");
+        assert!(
+            plan.facets
+                .iter()
+                .any(|facet| facet.nature == ToolNature::Read
+                    && facet.resource.as_deref() == outside.path().to_str())
+        );
+        std::fs::write(outside.path().join("config"), "different invalid config")
+            .expect("external change");
+        plan.revalidate()
+            .expect("external content not read before admission");
+        std::fs::write(&marker, "gitdir: other\n").expect("retarget marker");
+        assert!(
+            plan.revalidate().is_err(),
+            "marker retarget must invalidate preparation"
+        );
+    }
+
+    #[test]
+    fn commit_gitlink_preparation_defers_child_head_and_worktree_reads() {
+        let root = fixture();
+        let child = root.path().join("module");
+        std::fs::create_dir(&child).expect("module");
+        let git = |cwd: &Path, args: &[&str]| {
+            let output = std::process::Command::new("git")
+                .args(args)
+                .current_dir(cwd)
+                .output()
+                .expect("fixture Git");
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        };
+        git(&child, &["init"]);
+        git(
+            &child,
+            &[
+                "-c",
+                "user.name=Test",
+                "-c",
+                "user.email=test@example.invalid",
+                "-c",
+                "commit.gpgSign=false",
+                "commit",
+                "--allow-empty",
+                "-m",
+                "first",
+            ],
+        );
+        git(root.path(), &["add", "module", "file"]);
+        let (paths, before) = tracked_commit_sources(root.path()).expect("sources");
+        assert_eq!(paths, ["file"]);
+        assert_eq!(before.len(), 1);
+        assert!(before[0].metadata_path.is_some());
+        std::fs::create_dir(child.join("untracked")).expect("untracked");
+        std::fs::create_dir(child.join("untracked/.git")).expect("nested untracked marker");
+        assert_eq!(
+            before,
+            tracked_commit_sources(root.path())
+                .expect("unchanged metadata")
+                .1
+        );
+        git(
+            &child,
+            &[
+                "-c",
+                "user.name=Test",
+                "-c",
+                "user.email=test@example.invalid",
+                "-c",
+                "commit.gpgSign=false",
+                "commit",
+                "--allow-empty",
+                "-m",
+                "second",
+            ],
+        );
+        let after = tracked_commit_sources(root.path()).expect("new HEAD").1;
+        assert_eq!(before[0].index_oid, after[0].index_oid);
+        assert_eq!(
+            before, after,
+            "preparation must defer child HEAD reads until admission"
+        );
+        let plan = AddPlan::prepare_commit(
+            root.path(),
+            &serde_json::json!({"message":"parent", "all":true}),
+            ToolProvenance::Native,
+        )
+        .expect("plan with gitlink");
+        assert_eq!(plan.gitlinks.len(), 1);
+        assert!(plan.facets.iter().any(|facet| {
+            facet.nature == ToolNature::Read
+                && facet.resource.as_deref()
+                    == child
+                        .join(".git")
+                        .canonicalize()
+                        .expect("canonical child metadata")
+                        .to_str()
+        }));
+    }
+
+    #[test]
+    fn commit_gitlink_preserves_missing_and_uninitialized_checkout_states() {
+        let root = fixture();
+        let output = std::process::Command::new("git")
+            .args([
+                "update-index",
+                "--add",
+                "--cacheinfo",
+                "160000",
+                "1111111111111111111111111111111111111111",
+                "module",
+            ])
+            .current_dir(root.path())
+            .output()
+            .expect("gitlink");
+        assert!(output.status.success());
+        let missing = tracked_commit_sources(root.path()).expect("missing").1;
+        assert_eq!(missing[0].entry, snapshot::Entry::Missing);
+        std::fs::create_dir(root.path().join("module")).expect("uninitialized");
+        let empty = tracked_commit_sources(root.path()).expect("empty").1;
+        assert!(matches!(empty[0].entry, snapshot::Entry::Directory(_)));
+        assert!(empty[0].metadata_path.is_none());
+        assert_ne!(missing, empty);
+    }
+
+    #[tokio::test]
+    async fn commit_all_deletes_replaced_tracked_file_and_refuses_nested_repository() {
+        for nested in [false, true] {
+            let root = fixture();
+            let git = |args: &[&str]| {
+                let output = std::process::Command::new("git")
+                    .args(args)
+                    .current_dir(root.path())
+                    .output()
+                    .expect("git");
+                assert!(
+                    output.status.success(),
+                    "{}",
+                    String::from_utf8_lossy(&output.stderr)
+                );
+                String::from_utf8(output.stdout).expect("utf8")
+            };
+            git(&["config", "user.name", "Fixture"]);
+            git(&["config", "user.email", "fixture@example.invalid"]);
+            git(&["config", "commit.gpgSign", "false"]);
+            git(&["add", "file"]);
+            git(&["commit", "-m", "initial"]);
+            std::fs::remove_file(root.path().join("file")).expect("remove tracked file");
+            std::fs::create_dir(root.path().join("file")).expect("replacement directory");
+            if nested {
+                git(&["init", "file"]);
+            }
+            std::fs::write(root.path().join("file/untracked"), "not a commit source")
+                .expect("nested untracked");
+            let plan = AddPlan::prepare_commit(
+                root.path(),
+                &serde_json::json!({"message":"delete replaced file", "all":true}),
+                ToolProvenance::Native,
+            )
+            .expect("tracked-only plan");
+            let head = git(&["rev-parse", "HEAD"]);
+            let output = execute_approved(plan).await;
+            if nested {
+                assert!(
+                    output.result.is_error && output.result.content.contains("nested repository"),
+                    "{}",
+                    output.result.content
+                );
+                assert_eq!(git(&["rev-parse", "HEAD"]), head);
+            } else {
+                assert!(!output.result.is_error, "{}", output.result.content);
+                assert!(git(&["ls-tree", "--name-only", "HEAD"]).is_empty());
+            }
+            assert_eq!(
+                std::fs::read_to_string(root.path().join("file/untracked")).expect("preserved"),
+                "not a commit source"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn checkout_linked_worktree_admits_actual_metadata_and_preserves_main_head() {
+        let root = fixture();
+        let linked = tempfile::tempdir().expect("linked worktree");
+        let git = |path: &Path, args: &[&str]| {
+            let output = std::process::Command::new("git")
+                .args(args)
+                .current_dir(path)
+                .output()
+                .expect("git");
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            String::from_utf8(output.stdout)
+                .expect("utf8")
+                .trim()
+                .to_owned()
+        };
+        git(root.path(), &["config", "user.name", "Fixture"]);
+        git(
+            root.path(),
+            &["config", "user.email", "fixture@example.invalid"],
+        );
+        git(root.path(), &["config", "commit.gpgSign", "false"]);
+        git(root.path(), &["add", "file"]);
+        git(root.path(), &["commit", "-m", "initial"]);
+        let main_head = git(root.path(), &["symbolic-ref", "HEAD"]);
+        git(root.path(), &["branch", "target"]);
+        git(
+            root.path(),
+            &[
+                "worktree",
+                "add",
+                "-b",
+                "linked",
+                linked.path().to_str().expect("path"),
+            ],
+        );
+        let plan = AddPlan::prepare_checkout(
+            linked.path(),
+            &serde_json::json!({"branch":"target"}),
+            ToolProvenance::Native,
+        )
+        .expect("plan");
+        let discovered = Box::new(plan).discover().await.expect("discover");
+        for path in [
+            &discovered.repository.git_dir,
+            &discovered.repository.common_dir,
+        ] {
+            assert!(
+                discovered
+                    .facets
+                    .iter()
+                    .any(|facet| facet.nature == ToolNature::Write
+                        && facet.resource.as_deref() == path.to_str())
+            );
+        }
+        let plan = AddPlan::prepare_checkout(
+            linked.path(),
+            &serde_json::json!({"branch":"target"}),
+            ToolProvenance::Native,
+        )
+        .expect("plan");
+        let output = execute_approved(plan).await;
+        assert!(!output.result.is_error, "{}", output.result.content);
+        assert_eq!(git(linked.path(), &["branch", "--show-current"]), "target");
+        assert_eq!(git(root.path(), &["symbolic-ref", "HEAD"]), main_head);
+    }
+
+    #[tokio::test]
+    #[cfg(unix)]
+    async fn checkout_existing_local_branch_preserves_onbranch_configuration() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = fixture();
+        let git = |args: &[&str]| {
+            let output = std::process::Command::new("git")
+                .args(args)
+                .current_dir(root.path())
+                .output()
+                .expect("git");
+            assert!(output.status.success(), "{output:?}");
+            String::from_utf8(output.stdout)
+                .expect("utf8")
+                .trim()
+                .to_owned()
+        };
+        git(&["config", "user.name", "Fixture"]);
+        git(&["config", "user.email", "fixture@example.invalid"]);
+        git(&["config", "commit.gpgSign", "false"]);
+        git(&["add", "file"]);
+        git(&["commit", "-m", "initial"]);
+        git(&["branch", "-m", "source"]);
+        git(&["branch", "target"]);
+        for branch in ["source", "target"] {
+            let path = root.path().join(format!("{branch}.config"));
+            std::fs::write(&path, format!("[fixture]\n marker = {branch}\n"))
+                .expect("conditional config");
+            git(&[
+                "config",
+                &format!("includeIf.onbranch:{branch}.path"),
+                path.to_str().expect("path"),
+            ]);
+        }
+        let index = std::fs::read(root.path().join(".git/index")).expect("index");
+        for branch in ["target", "source"] {
+            let plan = AddPlan::prepare_checkout(
+                root.path(),
+                &serde_json::json!({"branch":branch}),
+                ToolProvenance::Native,
+            )
+            .expect("plan");
+            let output = execute_approved(plan).await;
+            assert!(!output.result.is_error, "{}", output.result.content);
+            assert_eq!(git(&["branch", "--show-current"]), branch);
+            assert_eq!(git(&["config", "fixture.marker"]), branch);
+        }
+        for (input, branch) in [
+            ("-", "target"),
+            ("@{-1}", "source"),
+            ("@{-1}", "target"),
+            ("-", "source"),
+        ] {
+            let plan = AddPlan::prepare_checkout(
+                root.path(),
+                &serde_json::json!({"branch":input}),
+                ToolProvenance::Native,
+            )
+            .expect("previous branch plan");
+            let output = execute_approved(plan).await;
+            assert!(!output.result.is_error, "{}", output.result.content);
+            assert_eq!(git(&["branch", "--show-current"]), branch);
+            assert_eq!(git(&["config", "fixture.marker"]), branch);
+        }
+        for input in ["HEAD", "@"] {
+            let head_plan = AddPlan::prepare_checkout(
+                root.path(),
+                &serde_json::json!({"branch":input}),
+                ToolProvenance::Native,
+            )
+            .expect("attached HEAD plan");
+            let head_output = execute_approved(head_plan).await;
+            assert!(
+                !head_output.result.is_error,
+                "{}",
+                head_output.result.content
+            );
+            assert_eq!(git(&["branch", "--show-current"]), "source");
+            assert_eq!(git(&["config", "fixture.marker"]), "source");
+        }
+        let plan = AddPlan::prepare_checkout(
+            root.path(),
+            &serde_json::json!({"branch":"target"}),
+            ToolProvenance::Native,
+        )
+        .expect("stale config plan");
+        let discovered = Box::new(plan).discover().await.expect("discovery");
+        let admission = proof(&discovered);
+        std::fs::write(
+            root.path().join("source.config"),
+            "[fixture]\n marker = changed\n",
+        )
+        .expect("change active conditional config");
+        let PreparedNormalStage::Complete(refused) =
+            discovered.execute_stage(Box::new(admission)).await
+        else {
+            panic!("stale conditional config must refuse before continuation");
+        };
+        assert!(
+            refused.result.is_error && refused.result.content.contains("changed"),
+            "{}",
+            refused.result.content
+        );
+        assert_eq!(git(&["branch", "--show-current"]), "source");
+        assert_eq!(
+            std::fs::read(root.path().join(".git/index")).expect("index"),
+            index
+        );
+        std::fs::write(
+            root.path().join("source.config"),
+            "[fixture]\n marker = source\n",
+        )
+        .expect("restore active conditional config");
+        for event in ["post-checkout", "reference-transaction"] {
+            std::fs::write(
+                root.path().join("source.config"),
+                format!(
+                    "[hook \"conditional\"]\n event = {event}\n command = touch command-hook-ran\n"
+                ),
+            )
+            .expect("active command hook");
+            let plan = AddPlan::prepare_checkout(
+                root.path(),
+                &serde_json::json!({"branch":"target"}),
+                ToolProvenance::Native,
+            )
+            .expect("command hook plan");
+            let refused = execute_approved(plan).await;
+            assert!(
+                refused.result.is_error && refused.result.content.contains("hook commands"),
+                "{}",
+                refused.result.content
+            );
+            assert_eq!(git(&["branch", "--show-current"]), "source");
+            assert!(!root.path().join("command-hook-ran").exists());
+            assert_eq!(
+                std::fs::read(root.path().join(".git/index")).expect("index"),
+                index
+            );
+        }
+        std::fs::write(
+            root.path().join("source.config"),
+            "[fixture]\n marker = source\n",
+        )
+        .expect("restore conditional config after command hooks");
+        let hooks = root.path().join("target-hooks");
+        std::fs::create_dir(&hooks).expect("hooks");
+        let hook = hooks.join("post-checkout");
+        std::fs::write(&hook, "#!/bin/sh\ntouch hook-ran\n").expect("hook");
+        std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o755)).expect("mode");
+        std::fs::write(
+            root.path().join("target.config"),
+            format!(
+                "[core]\n hooksPath = {}\n[fixture]\n marker = target\n",
+                hooks.display()
+            ),
+        )
+        .expect("target config");
+        let create = AddPlan::prepare_checkout(
+            root.path(),
+            &serde_json::json!({"branch":"created", "create":true}),
+            ToolProvenance::Native,
+        )
+        .expect("create plan");
+        let refused = execute_approved(create).await;
+        assert!(
+            refused.result.is_error && refused.result.content.contains("target-branch discovery"),
+            "{}",
+            refused.result.content
+        );
+        assert_eq!(git(&["branch", "--show-current"]), "source");
+        let plan = AddPlan::prepare_checkout(
+            root.path(),
+            &serde_json::json!({"branch":"target"}),
+            ToolProvenance::Native,
+        )
+        .expect("plan");
+        let output = execute_approved(plan).await;
+        assert!(!output.result.is_error, "{}", output.result.content);
+        assert!(!root.path().join("hook-ran").exists());
+        assert_eq!(git(&["branch", "--show-current"]), "target");
+        let plan = AddPlan::prepare_checkout(
+            root.path(),
+            &serde_json::json!({"branch":"source"}),
+            ToolProvenance::Native,
+        )
+        .expect("plan");
+        let refused = execute_approved(plan).await;
+        assert!(
+            refused.result.is_error && refused.result.content.contains("post-checkout"),
+            "{}",
+            refused.result.content
+        );
+        assert_eq!(git(&["branch", "--show-current"]), "target");
+        assert!(!root.path().join("hook-ran").exists());
+        assert_eq!(
+            std::fs::read(root.path().join(".git/index")).expect("index"),
+            index
+        );
+    }
+
+    #[tokio::test]
+    async fn checkout_ref_movement_after_discovery_invalidates_plan() {
+        let root = fixture();
+        let git = |args: &[&str]| {
+            let output = std::process::Command::new("git")
+                .args(args)
+                .current_dir(root.path())
+                .output()
+                .expect("git");
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            String::from_utf8(output.stdout)
+                .expect("utf8")
+                .trim()
+                .to_owned()
+        };
+        git(&["config", "user.name", "Fixture"]);
+        git(&["config", "user.email", "fixture@example.invalid"]);
+        git(&["config", "commit.gpgSign", "false"]);
+        git(&["add", "file"]);
+        git(&["commit", "-m", "initial"]);
+        let initial = git(&["rev-parse", "HEAD"]);
+        git(&["branch", "target"]);
+        std::fs::write(root.path().join("file"), "second").expect("file");
+        git(&["commit", "-am", "second"]);
+        let current = git(&["rev-parse", "HEAD"]);
+        assert_ne!(initial, current);
+        let plan = AddPlan::prepare_checkout(
+            root.path(),
+            &serde_json::json!({"branch":"target"}),
+            ToolProvenance::Native,
+        )
+        .expect("plan");
+        let admission = proof(&plan);
+        let PreparedNormalStage::Continue(next) =
+            Box::new(plan).execute_stage(Box::new(admission)).await
+        else {
+            panic!("discovery");
+        };
+        let engine =
+            PermissionSessionState::new(PermissionEngine::with_workspace_root(root.path().into()));
+        let context = PermissionContext::new(
+            PermissionMode::Interactive,
+            InteractionCapability::Available,
+        );
+        let input = serde_json::json!({"branch":"target"});
+        let request = PermissionRequest::native("git_checkout", next.permission_profile(), &input);
+        let proposal = engine
+            .propose(&request, &context, GrantScope::Once)
+            .expect("proposal");
+        let pending = engine
+            .approve_once(proposal, &request, &context)
+            .expect("approve");
+        let proof = engine
+            .try_admit_prepared_invocation(
+                pending,
+                &request,
+                &context,
+                next.plan_identity().expect("identity"),
+            )
+            .expect("admit");
+        git(&["update-ref", "refs/heads/target", &current]);
+        let output = next.execute(Box::new(proof)).await;
+        assert!(
+            output.result.is_error && output.result.content.contains("changed"),
+            "{}",
+            output.result.content
+        );
+        assert_eq!(git(&["rev-parse", "HEAD"]), current);
+        assert_ne!(git(&["branch", "--show-current"]), "target");
+        assert_eq!(
+            std::fs::read_to_string(root.path().join("file")).expect("file"),
+            "second"
+        );
+    }
+
+    #[tokio::test]
+    async fn checkout_protects_captured_target_only_config_from_tree_replacement() {
+        let root = fixture();
+        let git = |args: &[&str]| {
+            let output = std::process::Command::new("git")
+                .current_dir(root.path())
+                .args(args)
+                .output()
+                .expect("Git");
+            assert!(output.status.success(), "{args:?}: {output:?}");
+            String::from_utf8(output.stdout)
+                .expect("UTF8")
+                .trim()
+                .to_owned()
+        };
+        git(&["config", "user.name", "Fixture"]);
+        git(&["config", "user.email", "fixture@example.invalid"]);
+        git(&["config", "commit.gpgSign", "false"]);
+        git(&["add", "file"]);
+        git(&["commit", "-qm", "base"]);
+        let base = git(&["rev-parse", "HEAD"]);
+        std::fs::write(root.path().join("target.conf"), b"[fixture]\nmarker=new\n")
+            .expect("config");
+        git(&["add", "target.conf"]);
+        git(&["commit", "-qm", "target"]);
+        let target = git(&["rev-parse", "HEAD"]);
+        git(&["checkout", "--detach", &base]);
+        // The inactive include is absent now; the target tree would create it
+        // before Git reloads the target configuration chain.
+        let source = root.path().join("target.conf").canonicalize().err();
+        assert!(source.is_some());
+        let source = root
+            .path()
+            .canonicalize()
+            .expect("root")
+            .join("target.conf");
+        let plan = AddPlan::prepare_checkout(
+            root.path(),
+            &serde_json::json!({"branch":target}),
+            ToolProvenance::Native,
+        )
+        .expect("plan");
+        let plan = Box::new(plan).discover().await.expect("discovery");
+        let mut sources =
+            super::super::target_config::Sources::new(Some(b"topic"), [source.clone()])
+                .expect("sources");
+        while !sources.complete() {
+            sources
+                .advance(|_| true, &plan.environment)
+                .expect("capture absence");
+        }
+        let config = plan.config.as_ref().expect("config");
+        let tree = plan.checkout_target.as_ref().expect("tree");
+        config
+            .validate_checkout_target(&plan.repository, tree, &[])
+            .expect("ordinary added file");
+        let protected = sources.captured_paths().cloned().collect::<Vec<_>>();
+        assert!(
+            config
+                .validate_checkout_target(&plan.repository, tree, &protected)
+                .is_err()
+        );
+        assert!(
+            config
+                .validate_checkout_deletions(&[source], &protected)
+                .is_err()
+        );
+        assert_eq!(git(&["rev-parse", "HEAD"]), base);
+        assert!(!root.path().join("target.conf").exists());
+        // Exercise the same protection through actual target discovery and
+        // fresh final admission, without injecting Sources into the plan.
+        git(&["config", "remote.origin.url", "."]);
+        git(&[
+            "config",
+            "remote.origin.fetch",
+            "+refs/heads/*:refs/remotes/origin/*",
+        ]);
+        git(&["update-ref", "refs/remotes/origin/topic", &target]);
+        git(&[
+            "config",
+            "includeIf.onbranch:topic.path",
+            root.path()
+                .canonicalize()
+                .expect("canonical fixture")
+                .join("target.conf")
+                .to_str()
+                .expect("source path"),
+        ]);
+        let before = std::fs::read(root.path().join(".git/index")).expect("index");
+        let plan = AddPlan::prepare_checkout(
+            root.path(),
+            &serde_json::json!({"branch":"topic"}),
+            ToolProvenance::Native,
+        )
+        .expect("guessed target plan");
+        let output = execute_approved(plan).await;
+        assert!(
+            output.result.is_error,
+            "target must not create its config source"
+        );
+        assert!(
+            output
+                .result
+                .content
+                .contains("Checkout rewrites an effective configuration or auxiliary source"),
+            "{}",
+            output.result.content
+        );
+        assert_eq!(git(&["rev-parse", "HEAD"]), base);
+        assert!(!root.path().join("target.conf").exists());
+        assert!(!root.path().join(".git/refs/heads/topic").exists());
+        assert_eq!(
+            std::fs::read(root.path().join(".git/index")).expect("index"),
+            before
+        );
+    }
+
+    #[tokio::test]
+    async fn checkout_target_tree_cannot_create_or_replace_late_hook() {
+        for existing in [false, true] {
+            let root = fixture();
+            let git = |args: &[&str]| {
+                let output = std::process::Command::new("git")
+                    .current_dir(root.path())
+                    .args(args)
+                    .output()
+                    .expect("Git");
+                assert!(output.status.success(), "{args:?}: {output:?}");
+                String::from_utf8(output.stdout)
+                    .expect("UTF8")
+                    .trim()
+                    .to_owned()
+            };
+            git(&["config", "user.name", "Fixture"]);
+            git(&["config", "user.email", "fixture@example.invalid"]);
+            git(&["config", "commit.gpgSign", "false"]);
+            let hook = root.path().join("late-hooks/post-checkout");
+            if existing {
+                std::fs::create_dir(root.path().join("late-hooks")).expect("parent");
+                std::fs::write(&hook, b"retained non-executable hook\n").expect("source hook");
+            }
+            git(&["add", "."]);
+            git(&["commit", "-qm", "base"]);
+            let base = git(&["rev-parse", "HEAD"]);
+            std::fs::create_dir_all(root.path().join("late-hooks")).expect("target parent");
+            std::fs::write(&hook, b"#!/bin/sh\necho escaped > hook-marker\n").expect("target hook");
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o755))
+                    .expect("target executable mode");
+            }
+            git(&["add", "late-hooks/post-checkout"]);
+            git(&["update-index", "--chmod=+x", "late-hooks/post-checkout"]);
+            git(&["commit", "-qm", "target hook"]);
+            let target = git(&["rev-parse", "HEAD"]);
+            git(&["checkout", "--detach", &base]);
+            let retained = std::fs::read(&hook).ok();
+            git(&["config", "remote.origin.url", "."]);
+            git(&[
+                "config",
+                "remote.origin.fetch",
+                "+refs/heads/*:refs/remotes/origin/*",
+            ]);
+            git(&["update-ref", "refs/remotes/origin/topic", &target]);
+            git(&["config", "includeIf.onbranch:topic.path", "target.conf"]);
+            std::fs::write(
+                root.path().join(".git/target.conf"),
+                b"[core]\nhooksPath=late-hooks\n",
+            )
+            .expect("config");
+            let index = std::fs::read(root.path().join(".git/index")).expect("index");
+            let plan = AddPlan::prepare_checkout(
+                root.path(),
+                &serde_json::json!({"branch":"topic"}),
+                ToolProvenance::Native,
+            )
+            .expect("plan");
+            let output = execute_approved(plan).await;
+            assert!(output.result.is_error, "target hook must be protected");
+            assert!(
+                output
+                    .result
+                    .content
+                    .contains("Checkout rewrites an effective configuration or auxiliary source"),
+                "{}",
+                output.result.content
+            );
+            assert_eq!(git(&["rev-parse", "HEAD"]), base);
+            assert_eq!(
+                std::fs::read(root.path().join(".git/index")).expect("index"),
+                index
+            );
+            assert_eq!(std::fs::read(&hook).ok(), retained);
+            assert!(!root.path().join(".git/refs/heads/topic").exists());
+            assert!(!root.path().join("hook-marker").exists());
+        }
+    }
+
+    #[tokio::test]
+    async fn checkout_target_configuration_limits_refuse_before_mutation() {
+        for kind in ["bytes", "cumulative-bytes", "records", "paths", "expansion"] {
+            let root = fixture();
+            let git = |args: &[&str]| {
+                let output = std::process::Command::new("git")
+                    .current_dir(root.path())
+                    .args(args)
+                    .output()
+                    .expect("Git");
+                assert!(output.status.success(), "{args:?}: {output:?}");
+                output.stdout
+            };
+            git(&["config", "user.name", "Fixture"]);
+            git(&["config", "user.email", "fixture@example.invalid"]);
+            git(&["config", "commit.gpgSign", "false"]);
+            git(&["add", "file"]);
+            git(&["commit", "-qm", "initial"]);
+            git(&["config", "includeIf.onbranch:topic.path", "target.conf"]);
+            let payload = match kind {
+                "bytes" => format!("#{}\n", "x".repeat(4 * 1024 * 1024)),
+                "cumulative-bytes" => {
+                    std::fs::write(
+                        root.path().join(".git/child.conf"),
+                        format!("#{}\n", "x".repeat(2200 * 1024)),
+                    )
+                    .expect("second source below individual limit");
+                    format!("[include]\npath=child.conf\n#{}\n", "x".repeat(2200 * 1024))
+                }
+                "expansion" => {
+                    std::fs::write(
+                        root.path().join(".git/child.conf"),
+                        format!("[fixture]\nmarker={}\n", "x".repeat(200_000)),
+                    )
+                    .expect("shared child");
+                    format!("[include]\n{}", "path=child.conf\n".repeat(22))
+                }
+                "records" => format!("[fixture]\n{}", "marker=value\n".repeat(4097)),
+                "paths" => format!(
+                    "[include]\n{}",
+                    (0..4096)
+                        .map(|index| format!("path=missing-{index}\n"))
+                        .collect::<String>()
+                ),
+                _ => unreachable!("fixture kind"),
+            };
+            let source = root.path().join(".git/target.conf");
+            std::fs::write(&source, payload.as_bytes()).expect("target config");
+            let head = std::fs::read(root.path().join(".git/HEAD")).expect("HEAD");
+            let index = std::fs::read(root.path().join(".git/index")).expect("index");
+            let worktree = std::fs::read(root.path().join("file")).expect("file");
+            let plan = AddPlan::prepare_checkout(
+                root.path(),
+                &serde_json::json!({"branch":"topic", "create":true}),
+                ToolProvenance::Native,
+            )
+            .expect("plan");
+            let output = execute_approved(plan).await;
+            assert!(output.result.is_error, "{kind}: {}", output.result.content);
+            assert!(
+                output.result.content.contains("target-branch discovery")
+                    && output
+                        .result
+                        .content
+                        .contains("Target Git configuration cannot be parsed safely"),
+                "{kind}: {}",
+                output.result.content
+            );
+            assert_eq!(
+                std::fs::read(&source).expect("config retained"),
+                payload.as_bytes()
+            );
+            assert_eq!(
+                std::fs::read(root.path().join(".git/HEAD")).expect("HEAD"),
+                head
+            );
+            assert_eq!(
+                std::fs::read(root.path().join(".git/index")).expect("index"),
+                index
+            );
+            assert_eq!(
+                std::fs::read(root.path().join("file")).expect("file"),
+                worktree
+            );
+            assert!(!root.path().join(".git/refs/heads/topic").exists());
+        }
+    }
+
+    #[tokio::test]
+    async fn checkout_target_only_configuration_drift_invalidates_retained_plan() {
+        let root = fixture();
+        let git = |args: &[&str]| {
+            let output = std::process::Command::new("git")
+                .current_dir(root.path())
+                .args(args)
+                .output()
+                .expect("Git");
+            assert!(output.status.success(), "{args:?}: {output:?}");
+            output.stdout
+        };
+        git(&["config", "user.name", "Fixture"]);
+        git(&["config", "user.email", "fixture@example.invalid"]);
+        git(&["config", "commit.gpgSign", "false"]);
+        git(&["add", "file"]);
+        git(&["commit", "-qm", "initial"]);
+        git(&["config", "includeIf.onbranch:topic.path", "target.conf"]);
+        let source = root.path().join(".git/target.conf");
+        std::fs::write(&source, b"[fixture]\nmarker=before\n").expect("target source");
+        let head = git(&["rev-parse", "HEAD"]);
+        let index = std::fs::read(root.path().join(".git/index")).expect("index");
+        let plan = AddPlan::prepare_checkout(
+            root.path(),
+            &serde_json::json!({"branch":"topic", "create":true}),
+            ToolProvenance::Native,
+        )
+        .expect("plan");
+        let mut plan = Box::new(plan).discover().await.expect("discovery");
+        let sources = plan.target_config_sources.as_mut().expect("target chain");
+        // Isolate the retained evidence guard from the unfinished final-effects
+        // stage. This helper admits each exact frontier only inside the test.
+        while !sources.complete() {
+            sources
+                .advance(|_| true, &plan.environment)
+                .expect("capture");
+        }
+        plan.revalidate().expect("unchanged evidence");
+        std::fs::write(&source, b"[fixture]\nmarker=after\n").expect("drift");
+        let error = plan.revalidate().expect_err("target-only drift");
+        assert!(
+            error
+                .to_string()
+                .contains("Target Git configuration sources changed")
+        );
+        assert_eq!(git(&["rev-parse", "HEAD"]), head);
+        assert_eq!(
+            std::fs::read(root.path().join(".git/index")).expect("index"),
+            index
+        );
+        assert!(!root.path().join(".git/refs/heads/topic").exists());
+    }
+
+    #[tokio::test]
+    async fn checkout_target_hooks_wait_for_all_exact_read_tokens() {
+        for (missing_read, fresh_mutation, drift) in [
+            (true, false, None),
+            (false, false, None),
+            (false, true, None),
+            (false, true, Some("config")),
+            (false, true, Some("hook")),
+            (false, true, Some("ancestor")),
+        ] {
+            let root = fixture();
+            let git = |args: &[&str]| {
+                let output = std::process::Command::new("git")
+                    .current_dir(root.path())
+                    .args(args)
+                    .output()
+                    .expect("Git");
+                assert!(output.status.success(), "{args:?}: {output:?}");
+                output.stdout
+            };
+            git(&["config", "user.name", "Fixture"]);
+            git(&["config", "user.email", "fixture@example.invalid"]);
+            git(&["config", "commit.gpgSign", "false"]);
+            git(&["add", "file"]);
+            git(&["commit", "-qm", "initial"]);
+            std::fs::create_dir(root.path().join(".git/traversal"))
+                .expect("cancelled traversal directory");
+            git(&[
+                "config",
+                "includeIf.onbranch:topic.path",
+                "traversal/../target.conf",
+            ]);
+            std::fs::write(
+                root.path().join(".git/target.conf"),
+                b"[core]\nhooksPath=late-hooks\n",
+            )
+            .expect("target config");
+            // Keep the parent present so the hook case exercises leaf evidence,
+            // independently of the already-covered absent-parent guard.
+            std::fs::create_dir(root.path().join("late-hooks")).expect("hook parent");
+            let head = git(&["rev-parse", "HEAD"]);
+            let symbolic_head = std::fs::read(root.path().join(".git/HEAD")).expect("HEAD");
+            let worktree = std::fs::read(root.path().join("file")).expect("file");
+            let index = std::fs::read(root.path().join(".git/index")).expect("index");
+            let plan = AddPlan::prepare_checkout(
+                root.path(),
+                &serde_json::json!({"branch":"topic", "create":true}),
+                ToolProvenance::Native,
+            )
+            .expect("plan");
+            let mut history = talos_core::tool::PreparedStageHistory::default();
+            assert!(history.record_profile(&plan.identity, &plan.facets));
+            let mut plan = Box::new(plan).discover().await.expect("discovery");
+            while plan.target_hook_paths.is_none() {
+                assert!(history.record_profile(&plan.identity, &plan.facets));
+                assert!(plan.phase == Phase::TargetConfiguration);
+                let tokens = proof(&plan)
+                    .consume_for_prepared(&plan.request(), &plan.identity)
+                    .expect("source admission");
+                plan = plan
+                    .discover_target_configuration(&tokens)
+                    .expect("frontier");
+            }
+            assert!(history.record_profile(&plan.identity, &plan.facets));
+            let paths = plan.target_hook_paths.as_ref().expect("hook frontier");
+            let omitted = paths[1].clone();
+            // A directory would fail regular-file capture if inspected. Missing any
+            // exact token must fail admission first, before inspecting either leaf.
+            if missing_read {
+                std::fs::create_dir_all(paths[0].parent().expect("parent"))
+                    .expect("hooks directory");
+                std::fs::create_dir(&paths[0]).expect("invalid hook leaf");
+            }
+            let mut tokens = proof(&plan)
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .expect("hook admission");
+            if missing_read {
+                tokens.retain(|token| token.normalized_path() != omitted);
+            }
+            let stale = proof(&plan);
+            let result = plan.discover_target_configuration(&tokens);
+            if missing_read {
+                assert!(
+                    result
+                        .err()
+                        .expect("missing read")
+                        .to_string()
+                        .contains("exact Read admission before capture")
+                );
+            } else {
+                let final_plan = result.expect("final mutation plan");
+                assert!(history.record_profile(&final_plan.identity, &final_plan.facets));
+                assert!(final_plan.phase == Phase::Mutation);
+                assert!(!final_plan.target_hook_evidence.is_empty());
+                assert!(
+                    final_plan
+                        .facets
+                        .iter()
+                        .any(|facet| facet.nature == ToolNature::Write)
+                );
+                if fresh_mutation {
+                    let admission = proof(&final_plan);
+                    match drift {
+                        Some("config") => std::fs::write(
+                            root.path().join(".git/target.conf"),
+                            b"[core]\nhooksPath=other-hooks\n",
+                        )
+                        .expect("config drift"),
+                        Some("hook") => std::fs::write(
+                            root.path().join("late-hooks/post-checkout"),
+                            b"new hook bytes\n",
+                        )
+                        .expect("hook drift"),
+                        Some("ancestor") => {
+                            std::fs::rename(
+                                root.path().join(".git/traversal"),
+                                root.path().join(".git/traversal-old"),
+                            )
+                            .expect("retain original ancestor");
+                            std::fs::create_dir(root.path().join(".git/traversal"))
+                                .expect("replacement ancestor");
+                        }
+                        None => {}
+                        _ => unreachable!("fixture case"),
+                    }
+                    let output = final_plan.execute(Box::new(admission)).await;
+                    assert_eq!(
+                        output.result.is_error,
+                        drift.is_some(),
+                        "{}",
+                        output.result.content
+                    );
+                    if let Some(kind) = drift {
+                        assert!(
+                            output.result.content.contains(if kind != "hook" {
+                                "Target Git configuration sources changed"
+                            } else {
+                                "Target checkout hook evidence changed"
+                            }),
+                            "{}",
+                            output.result.content
+                        );
+                    } else {
+                        assert_eq!(git(&["branch", "--show-current"]), b"topic\n");
+                    }
+                } else {
+                    let denied = final_plan.execute(Box::new(stale)).await;
+                    assert!(
+                        denied.result.is_error,
+                        "old discovery proof must not authorize mutation"
+                    );
+                }
+            }
+            assert_eq!(git(&["rev-parse", "HEAD"]), head);
+            assert_eq!(
+                std::fs::read(root.path().join("file")).expect("file"),
+                worktree
+            );
+            if !fresh_mutation || drift.is_some() {
+                assert_eq!(
+                    std::fs::read(root.path().join(".git/HEAD")).expect("HEAD"),
+                    symbolic_head
+                );
+            }
+            assert_eq!(
+                std::fs::read(root.path().join(".git/index")).expect("index"),
+                index
+            );
+            assert_eq!(
+                root.path().join(".git/refs/heads/topic").exists(),
+                fresh_mutation && drift.is_none()
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn checkout_target_hook_missing_evidence_refuses_later_creation() {
+        let root = fixture();
+        for args in [
+            vec!["add", "file"],
+            vec![
+                "-c",
+                "user.name=Fixture",
+                "-c",
+                "user.email=fixture@example.invalid",
+                "-c",
+                "commit.gpgSign=false",
+                "commit",
+                "-qm",
+                "initial",
+            ],
+        ] {
+            assert!(
+                std::process::Command::new("git")
+                    .current_dir(root.path())
+                    .args(args)
+                    .output()
+                    .expect("Git")
+                    .status
+                    .success()
+            );
+        }
+        let plan = AddPlan::prepare_checkout(
+            root.path(),
+            &serde_json::json!({"branch":"topic", "create":true}),
+            ToolProvenance::Native,
+        )
+        .expect("plan");
+        let mut plan = Box::new(plan).discover().await.expect("discovery");
+        let parent = plan.repository.workdir.join("late-hooks");
+        std::fs::create_dir(&parent).expect("hook directory");
+        let path = parent.join("post-checkout");
+        let mut sources = super::super::target_config::Sources::new(None, []).expect("sources");
+        sources
+            .add_directory_context(path.parent().expect("hook parent"))
+            .expect("ancestor frontier");
+        while !sources.complete() {
+            sources
+                .advance(|_| true, &plan.environment)
+                .expect("test-only ancestor admission");
+        }
+        plan.target_config_sources = Some(sources);
+        // Isolate the evidence guard while final mutation remains disabled.
+        plan.target_hook_evidence =
+            super::super::config_state::ConfigState::capture_checkout_reload_hooks(
+                std::slice::from_ref(&path),
+            )
+            .expect("admitted missing evidence");
+        plan.revalidate().expect("unchanged absence");
+        std::fs::write(&path, b"created after discovery").expect("late file");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).expect("mode");
+        }
+        assert!(plan.revalidate().is_err());
+        #[cfg(unix)]
+        {
+            std::fs::remove_file(&path).expect("fixture hook cleanup");
+            std::fs::remove_dir(&parent).expect("fixture parent cleanup");
+            let outside = tempfile::tempdir().expect("outside");
+            std::fs::create_dir(outside.path().join("post-checkout"))
+                .expect("invalid external leaf");
+            std::os::unix::fs::symlink(outside.path(), &parent).expect("redirect parent");
+            let error = plan.revalidate().expect_err("ancestor substitution");
+            assert!(
+                error
+                    .to_string()
+                    .contains("Target Git configuration sources changed")
+            );
+        }
+        assert!(!root.path().join(".git/refs/heads/topic").exists());
+    }
+
+    #[tokio::test]
+    async fn checkout_tracking_prediction_from_detached_head_matches_native() {
+        for mode in ["true", "always", "inherit"] {
+            let root = fixture();
+            let git = |args: &[&str]| {
+                let output = std::process::Command::new("git")
+                    .current_dir(root.path())
+                    .args(args)
+                    .output()
+                    .expect("git");
+                assert!(output.status.success(), "{args:?}: {output:?}");
+                output.stdout
+            };
+            git(&["config", "user.name", "Fixture"]);
+            git(&["config", "user.email", "fixture@example.invalid"]);
+            git(&["config", "commit.gpgSign", "false"]);
+            git(&["add", "file"]);
+            git(&["commit", "-m", "initial"]);
+            git(&["checkout", "--detach", "HEAD"]);
+            git(&["config", "branch.autoSetupMerge", mode]);
+            let plan = AddPlan::prepare_checkout(
+                root.path(),
+                &serde_json::json!({"branch":"topic", "create":true}),
+                ToolProvenance::Native,
+            )
+            .expect("plan");
+            let plan = Box::new(plan).discover().await.expect("discovery");
+            let predicted = plan.checkout_tracking_writes.clone();
+            let output = execute_approved(*plan).await;
+            assert!(
+                !output.result.is_error,
+                "mode={mode}: {}",
+                output.result.content
+            );
+            let config = git(&["config", "--local", "--null", "--list"]);
+            let actual = super::super::config_state::parse_host(&config)
+                .expect("config")
+                .into_iter()
+                .filter(|(key, _)| key.starts_with(b"branch.topic."))
+                .collect::<std::collections::BTreeMap<_, _>>();
+            let mut expected = std::collections::BTreeMap::<_, Vec<_>>::new();
+            for record in predicted {
+                expected.entry(record.key).or_default().push(record.value);
+            }
+            assert_eq!(actual, expected, "mode={mode}");
+        }
+    }
+
+    #[tokio::test]
+    async fn checkout_tracking_prediction_matches_native_mode_matrix() {
+        for guessed in [false, true] {
+            for mode in ["false", "true", "always", "inherit", "simple"] {
+                for rebase in ["never", "local", "remote", "always"] {
+                    let root = fixture();
+                    let git = |args: &[&str]| {
+                        let output = std::process::Command::new("git")
+                            .current_dir(root.path())
+                            .args(args)
+                            .output()
+                            .expect("git");
+                        assert!(output.status.success(), "{args:?}: {output:?}");
+                        output.stdout
+                    };
+                    git(&["config", "user.name", "Fixture"]);
+                    git(&["config", "user.email", "fixture@example.invalid"]);
+                    git(&["config", "commit.gpgSign", "false"]);
+                    git(&["add", "file"]);
+                    git(&["commit", "-m", "initial"]);
+                    git(&["branch", "-m", "parent"]);
+                    git(&["config", "branch.autoSetupMerge", mode]);
+                    git(&["config", "branch.autoSetupRebase", rebase]);
+                    git(&["config", "branch.parent.remote", "."]);
+                    git(&["config", "branch.parent.merge", "refs/heads/base"]);
+                    if guessed {
+                        git(&["config", "remote.origin.url", "/unused"]);
+                        git(&[
+                            "config",
+                            "remote.origin.fetch",
+                            "+refs/heads/*:refs/remotes/origin/*",
+                        ]);
+                        git(&["update-ref", "refs/remotes/origin/topic", "HEAD"]);
+                    }
+                    let plan = AddPlan::prepare_checkout(
+                        root.path(),
+                        &serde_json::json!({"branch":"topic", "create":!guessed}),
+                        ToolProvenance::Native,
+                    )
+                    .expect("plan");
+                    let plan = Box::new(plan).discover().await.expect("discovery");
+                    let predicted = plan.checkout_tracking_writes.clone();
+                    let output = execute_approved(*plan).await;
+                    assert!(
+                        !output.result.is_error,
+                        "guessed={guessed}, mode={mode}, rebase={rebase}: {}",
+                        output.result.content
+                    );
+                    let config = git(&["config", "--local", "--null", "--list"]);
+                    let actual = super::super::config_state::parse_host(&config)
+                        .expect("config")
+                        .into_iter()
+                        .filter(|(key, _)| key.starts_with(b"branch.topic."))
+                        .collect::<std::collections::BTreeMap<_, _>>();
+                    let mut expected = std::collections::BTreeMap::<_, Vec<_>>::new();
+                    for record in predicted {
+                        expected.entry(record.key).or_default().push(record.value);
+                    }
+                    assert_eq!(
+                        actual, expected,
+                        "guessed={guessed}, mode={mode}, rebase={rebase}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn checkout_guess_binds_remote_and_reference_even_for_equal_commits() {
+        let root = fixture();
+        let git = |args: &[&str]| {
+            let output = std::process::Command::new("git")
+                .current_dir(root.path())
+                .args(args)
+                .output()
+                .expect("git");
+            assert!(output.status.success(), "{output:?}");
+            String::from_utf8(output.stdout)
+                .expect("text")
+                .trim()
+                .to_owned()
+        };
+        git(&["config", "user.name", "Fixture"]);
+        git(&["config", "user.email", "fixture@example.invalid"]);
+        git(&["config", "commit.gpgSign", "false"]);
+        git(&["add", "file"]);
+        git(&["commit", "-m", "initial"]);
+        let oid = git(&["rev-parse", "HEAD"]);
+        for remote in ["first", "second"] {
+            git(&["config", &format!("remote.{remote}.url"), "/unused"]);
+            git(&[
+                "config",
+                &format!("remote.{remote}.fetch"),
+                &format!("+refs/heads/*:refs/remotes/{remote}/*"),
+            ]);
+            git(&["update-ref", &format!("refs/remotes/{remote}/topic"), &oid]);
+        }
+        let mut retained = Vec::new();
+        for remote in ["first", "second"] {
+            git(&["config", "checkout.defaultRemote", remote]);
+            let plan = AddPlan::prepare_checkout(
+                root.path(),
+                &serde_json::json!({"branch":"topic"}),
+                ToolProvenance::Native,
+            )
+            .expect("plan");
+            let plan = Box::new(plan).discover().await.expect("discovery");
+            assert!(plan.checkout_guessed);
+            assert_eq!(plan.checkout_new_branch.as_deref(), Some("topic"));
+            assert_eq!(
+                plan.checkout_tracking_source,
+                Some((remote.to_owned(), format!("refs/remotes/{remote}/topic")))
+            );
+            assert_eq!(plan.checkout_target.as_ref().expect("target").commit, oid);
+            retained.push(plan.checkout_tracking_source.clone());
+        }
+        assert_ne!(retained[0], retained[1]);
+        assert!(git(&["branch", "--list", "topic"]).is_empty());
+
+        git(&["config", "checkout.defaultRemote", "first"]);
+        let plan = AddPlan::prepare_checkout(
+            root.path(),
+            &serde_json::json!({"branch":"topic"}),
+            ToolProvenance::Native,
+        )
+        .expect("stale-source plan");
+        let plan = Box::new(plan).discover().await.expect("discovery");
+        let admission = proof(&plan);
+        let branch = git(&["branch", "--show-current"]);
+        let index = std::fs::read(root.path().join(".git/index")).expect("index");
+        let head = std::fs::read(root.path().join(".git/HEAD")).expect("HEAD");
+        git(&["config", "checkout.defaultRemote", "second"]);
+        assert_eq!(git(&["rev-parse", "refs/remotes/first/topic"]), oid);
+        assert_eq!(git(&["rev-parse", "refs/remotes/second/topic"]), oid);
+        let PreparedNormalStage::Complete(output) = plan.execute_stage(Box::new(admission)).await
+        else {
+            panic!("changed remote selection must refuse before continuation");
+        };
+        assert!(
+            output.result.is_error && output.result.content.contains("changed"),
+            "{}",
+            output.result.content
+        );
+        assert_eq!(git(&["branch", "--show-current"]), branch);
+        assert!(git(&["branch", "--list", "topic"]).is_empty());
+        assert_eq!(
+            std::fs::read(root.path().join(".git/index")).expect("index"),
+            index
+        );
+        assert_eq!(
+            std::fs::read(root.path().join(".git/HEAD")).expect("HEAD"),
+            head
+        );
+    }
+
+    #[tokio::test]
+    async fn checkout_created_branch_binds_native_previous_name_expansion() {
+        let root = fixture();
+        let git = |args: &[&str]| {
+            let output = std::process::Command::new("git")
+                .current_dir(root.path())
+                .args(args)
+                .output()
+                .expect("git");
+            assert!(output.status.success(), "{output:?}");
+            String::from_utf8(output.stdout)
+                .expect("text")
+                .trim()
+                .to_owned()
+        };
+        git(&["config", "user.name", "Fixture"]);
+        git(&["config", "user.email", "fixture@example.invalid"]);
+        git(&["config", "commit.gpgSign", "false"]);
+        git(&["add", "file"]);
+        git(&["commit", "-m", "initial"]);
+        git(&["branch", "-m", "previous"]);
+        git(&["checkout", "-b", "current"]);
+        git(&["branch", "-D", "previous"]);
+        let plan = AddPlan::prepare_checkout(
+            root.path(),
+            &serde_json::json!({"branch":"@{-1}", "create":true}),
+            ToolProvenance::Native,
+        )
+        .expect("plan");
+        let plan = Box::new(plan).discover().await.expect("discovery");
+        assert_eq!(plan.checkout_new_branch.as_deref(), Some("previous"));
+        assert!(!plan.checkout_guessed);
+        let output = execute_approved(*plan).await;
+        assert!(!output.result.is_error, "{}", output.result.content);
+        assert_eq!(git(&["branch", "--show-current"]), "previous");
+        let plan = AddPlan::prepare_checkout(
+            root.path(),
+            &serde_json::json!({"branch":"bad..name", "create":true}),
+            ToolProvenance::Native,
+        )
+        .expect("lexical plan");
+        assert!(Box::new(plan).discover().await.is_err());
+        assert_eq!(git(&["branch", "--show-current"]), "previous");
+    }
+
+    #[tokio::test]
+    async fn checkout_same_oid_previous_branch_reflog_change_invalidates_plan() {
+        let root = fixture();
+        let git = |args: &[&str]| {
+            let output = std::process::Command::new("git")
+                .args(args)
+                .current_dir(root.path())
+                .output()
+                .expect("git");
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            String::from_utf8(output.stdout)
+                .expect("utf8")
+                .trim()
+                .to_owned()
+        };
+        git(&["config", "user.name", "Fixture"]);
+        git(&["config", "user.email", "fixture@example.invalid"]);
+        git(&["config", "commit.gpgSign", "false"]);
+        git(&["add", "file"]);
+        git(&["commit", "-m", "initial"]);
+        git(&["checkout", "-b", "first"]);
+        git(&["branch", "other"]);
+        git(&["checkout", "-b", "current"]);
+        let conditional = root.path().join("current.config");
+        std::fs::write(&conditional, "[fixture]\n marker = current\n").expect("config");
+        git(&[
+            "config",
+            "includeIf.onbranch:current.path",
+            conditional.to_str().expect("path"),
+        ]);
+        let input = serde_json::json!({"branch":"@{-1}"});
+        let plan =
+            AddPlan::prepare_checkout(root.path(), &input, ToolProvenance::Native).expect("plan");
+        let plan = Box::new(plan).discover().await.expect("discovery");
+        let oid = git(&["rev-parse", "@{-1}"]);
+        let log_path = root.path().join(".git/logs/HEAD");
+        let log = std::fs::read_to_string(&log_path).expect("reflog");
+        assert!(log.contains("moving from first to current"));
+        std::fs::write(
+            &log_path,
+            log.replace(
+                "moving from first to current",
+                "moving from other to current",
+            ),
+        )
+        .expect("change previous branch");
+        assert_eq!(
+            git(&["rev-parse", "@{-1}"]),
+            oid,
+            "OID alone cannot detect this change"
+        );
+        let output = execute_approved(*plan).await;
+        assert!(
+            output.result.is_error && output.result.content.contains("changed"),
+            "{}",
+            output.result.content
+        );
+        assert_eq!(git(&["branch", "--show-current"]), "current");
+    }
+
+    #[tokio::test]
+    async fn git_configuration_path_discovery_includes_absent_global_candidates() {
+        let root = fixture();
+        let mut plan = prepare(root.path());
+        let home = root.path().join("home");
+        let xdg = root.path().join("xdg");
+        // Override only the child command environment, never the test process.
+        plan.environment
+            .insert("HOME".into(), home.clone().into_os_string());
+        plan.environment
+            .insert("XDG_CONFIG_HOME".into(), xdg.clone().into_os_string());
+        let paths = plan
+            .inspect_config_paths("GIT_CONFIG_GLOBAL")
+            .await
+            .expect("path query");
+        assert!(paths.contains(&home.join(".gitconfig")));
+        assert!(paths.contains(&xdg.join("git/config")));
+        assert!(paths.iter().all(|path| !path.exists()));
+        assert!(!home.exists());
+        assert!(!xdg.exists());
+    }
+
+    #[tokio::test]
+    async fn checkout_target_executable_hook_refuses_before_mutation() {
+        for hook_name in [".hooks/post-checkout", ".hooks/POST-CHECKOUT"] {
+            let root = fixture();
+            let git = |args: &[&str]| {
+                let output = std::process::Command::new("git")
+                    .args(args)
+                    .current_dir(root.path())
+                    .output()
+                    .expect("git");
+                assert!(
+                    output.status.success(),
+                    "{}",
+                    String::from_utf8_lossy(&output.stderr)
+                );
+                String::from_utf8(output.stdout)
+                    .expect("utf8")
+                    .trim()
+                    .to_owned()
+            };
+            git(&["config", "user.name", "Fixture"]);
+            git(&["config", "user.email", "fixture@example.invalid"]);
+            git(&["config", "commit.gpgSign", "false"]);
+            git(&["config", "core.hooksPath", ".hooks"]);
+            git(&["add", "file"]);
+            git(&["commit", "-m", "base"]);
+            git(&["branch", "target"]);
+            git(&["checkout", "-b", "hook-target"]);
+            std::fs::create_dir(root.path().join(".hooks")).expect("hooks");
+            std::fs::write(root.path().join(hook_name), "#!/bin/sh\ntouch marker\n").expect("hook");
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                std::fs::set_permissions(
+                    root.path().join(hook_name),
+                    std::fs::Permissions::from_mode(0o755),
+                )
+                .expect("mode");
+            }
+            git(&["add", hook_name]);
+            git(&["commit", "-m", "hook"]);
+            git(&["checkout", "target"]);
+            let index_before = std::fs::read(root.path().join(".git/index")).expect("index");
+            let plan = AddPlan::prepare_checkout(
+                root.path(),
+                &serde_json::json!({"branch":"hook-target"}),
+                ToolProvenance::Native,
+            )
+            .expect("plan");
+            let output = execute_approved(plan).await;
+            assert!(
+                output.result.is_error && output.result.content.contains("executable hook"),
+                "{}",
+                output.result.content
+            );
+            assert_eq!(git(&["branch", "--show-current"]), "target");
+            assert!(!root.path().join("marker").exists());
+            assert!(!root.path().join(hook_name).exists());
+            assert_eq!(
+                std::fs::read(root.path().join(".git/index")).expect("index"),
+                index_before
+            );
+        }
+    }
+
+    #[tokio::test]
+    #[cfg(unix)]
+    async fn checkout_cannot_replace_effective_configuration_symlink_ancestor() {
+        for source_path in ["../alias/config", "../alias/../config"] {
+            let root = fixture();
+            let external = tempfile::tempdir().expect("external configuration");
+            let link_target = external.path().join("directory");
+            std::fs::create_dir(&link_target).expect("target directory");
+            std::fs::write(link_target.join("config"), "[core]\n filemode = true\n")
+                .expect("nested config");
+            std::fs::write(external.path().join("config"), "[core]\n filemode = true\n")
+                .expect("config");
+            let git = |args: &[&str]| {
+                let output = std::process::Command::new("git")
+                    .args(args)
+                    .current_dir(root.path())
+                    .output()
+                    .expect("git");
+                assert!(output.status.success(), "{output:?}");
+                String::from_utf8(output.stdout)
+                    .expect("utf8")
+                    .trim()
+                    .to_owned()
+            };
+            git(&["config", "user.name", "Fixture"]);
+            git(&["config", "user.email", "fixture@example.invalid"]);
+            git(&["config", "commit.gpgSign", "false"]);
+            std::os::unix::fs::symlink(&link_target, root.path().join("alias")).expect("alias");
+            git(&["add", "."]);
+            git(&["commit", "-m", "alias"]);
+            git(&["branch", "base"]);
+            git(&["checkout", "-b", "replacement"]);
+            std::fs::remove_file(root.path().join("alias")).expect("unlink fixture alias");
+            std::fs::write(root.path().join("alias"), "replacement").expect("replacement");
+            git(&["add", "alias"]);
+            git(&["commit", "-m", "replace alias"]);
+            git(&["checkout", "base"]);
+            git(&["config", "include.path", source_path]);
+            let index = std::fs::read(root.path().join(".git/index")).expect("index");
+            let plan = AddPlan::prepare_checkout(
+                root.path(),
+                &serde_json::json!({"branch":"replacement"}),
+                ToolProvenance::Native,
+            )
+            .expect("plan");
+            let output = execute_approved(plan).await;
+            assert!(
+                output.result.is_error && output.result.content.contains("rewrites an effective"),
+                "{}",
+                output.result.content
+            );
+            assert_eq!(git(&["branch", "--show-current"]), "base");
+            assert_eq!(
+                std::fs::read_link(root.path().join("alias")).expect("alias retained"),
+                link_target
+            );
+            assert_eq!(
+                std::fs::read(root.path().join(".git/index")).expect("index"),
+                index
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn checkout_refuses_to_rewrite_effective_configuration_and_attributes() {
+        for (kind, empty_include) in [
+            ("include.path", false),
+            ("include.path", true),
+            ("includeIf.onbranch:changed.path", false),
+            ("includeIf.onbranch:changed.path", true),
+            ("core.attributesFile", false),
+        ] {
+            let root = fixture();
+            let git = |args: &[&str]| {
+                let output = std::process::Command::new("git")
+                    .args(args)
+                    .current_dir(root.path())
+                    .output()
+                    .expect("git");
+                assert!(
+                    output.status.success(),
+                    "{}",
+                    String::from_utf8_lossy(&output.stderr)
+                );
+                String::from_utf8(output.stdout)
+                    .expect("utf8")
+                    .trim()
+                    .to_owned()
+            };
+            git(&["config", "user.name", "Fixture"]);
+            git(&["config", "user.email", "fixture@example.invalid"]);
+            git(&["config", "commit.gpgSign", "false"]);
+            let (initial, changed) = if empty_include {
+                ("", "[core]\n fsmonitor = touch marker\n")
+            } else if kind != "core.attributesFile" {
+                (
+                    "[core]\n filemode = true\n",
+                    "[core]\n fsmonitor = touch marker\n",
+                )
+            } else {
+                ("* -filter\n", "* filter=evil\n")
+            };
+            std::fs::create_dir(root.path().join("settings")).expect("settings");
+            let source = root.path().join("settings/rules");
+            std::fs::write(&source, initial).expect("initial");
+            git(&["add", "."]);
+            git(&["commit", "-m", "base"]);
+            git(&["branch", "base"]);
+            git(&["checkout", "-b", "changed"]);
+            std::fs::write(&source, changed).expect("changed");
+            git(&["commit", "-am", "changed"]);
+            git(&["checkout", "base"]);
+            if kind.starts_with("includeIf.") {
+                git(&["branch", "unchanged"]);
+            }
+            git(&["config", kind, source.to_str().expect("source path")]);
+            git(&["config", "filter.evil.clean", "touch marker"]);
+            let index = std::fs::read(root.path().join(".git/index")).expect("index");
+            let plan = AddPlan::prepare_checkout(
+                root.path(),
+                &serde_json::json!({"branch":"changed"}),
+                ToolProvenance::Native,
+            )
+            .expect("plan");
+            let output = execute_approved(plan).await;
+            assert!(
+                output.result.is_error && output.result.content.contains("rewrites an effective"),
+                "{kind}: {}",
+                output.result.content
+            );
+            assert_eq!(git(&["branch", "--show-current"]), "base");
+            assert_eq!(std::fs::read_to_string(&source).expect("source"), initial);
+            assert_eq!(
+                std::fs::read(root.path().join(".git/index")).expect("index"),
+                index
+            );
+            assert!(!root.path().join("marker").exists());
+            // An unchanged effective source in a tracked directory is safe;
+            // tree directory entries alone must not be mistaken for rewrites.
+            let plan = AddPlan::prepare_checkout(
+                root.path(),
+                &serde_json::json!({"branch":"unchanged", "create":!kind.starts_with("includeIf.")}),
+                ToolProvenance::Native,
+            )
+            .expect("unchanged plan");
+            let output = execute_approved(plan).await;
+            assert!(!output.result.is_error, "{kind}: {}", output.result.content);
+        }
+    }
+
+    #[tokio::test]
+    async fn checkout_file_directory_transitions_and_conflicting_edits() {
+        let root = fixture();
+        let git = |args: &[&str]| {
+            let output = std::process::Command::new("git")
+                .args(args)
+                .current_dir(root.path())
+                .output()
+                .expect("git");
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            String::from_utf8(output.stdout)
+                .expect("utf8")
+                .trim()
+                .to_owned()
+        };
+        git(&["config", "user.name", "Fixture"]);
+        git(&["config", "user.email", "fixture@example.invalid"]);
+        git(&["config", "commit.gpgSign", "false"]);
+        git(&["add", "file"]);
+        git(&["commit", "-m", "file"]);
+        git(&["branch", "plain"]);
+        git(&["checkout", "-b", "directory"]);
+        std::fs::remove_file(root.path().join("file")).expect("remove fixture file");
+        std::fs::create_dir(root.path().join("file")).expect("directory");
+        std::fs::write(root.path().join("file/nested"), "nested").expect("nested");
+        git(&["add", "-A"]);
+        git(&["commit", "-m", "directory"]);
+        git(&["checkout", "plain"]);
+        for branch in ["directory", "plain"] {
+            let plan = AddPlan::prepare_checkout(
+                root.path(),
+                &serde_json::json!({"branch":branch}),
+                ToolProvenance::Native,
+            )
+            .expect("plan");
+            let output = execute_approved(plan).await;
+            assert!(
+                !output.result.is_error,
+                "{branch}: {}",
+                output.result.content
+            );
+            assert_eq!(git(&["branch", "--show-current"]), branch);
+        }
+        std::fs::write(root.path().join("file"), "uncommitted").expect("dirty file");
+        let before = std::fs::read(root.path().join(".git/index")).expect("index");
+        let plan = AddPlan::prepare_checkout(
+            root.path(),
+            &serde_json::json!({"branch":"directory"}),
+            ToolProvenance::Native,
+        )
+        .expect("conflict plan");
+        let output = execute_approved(plan).await;
+        assert!(
+            output.result.is_error,
+            "conflicting edit must not be overwritten"
+        );
+        assert_eq!(git(&["branch", "--show-current"]), "plain");
+        assert_eq!(
+            std::fs::read_to_string(root.path().join("file")).expect("dirty file"),
+            "uncommitted"
+        );
+        assert_eq!(
+            std::fs::read(root.path().join(".git/index")).expect("index"),
+            before
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn checkout_tracked_symlink_to_gitlink_preserves_referent_and_dirty_link() {
+        for dangling in [false, true] {
+            let root = fixture();
+            let external = tempfile::tempdir().expect("external fixture");
+            let referent = external.path().join("sentinel");
+            if !dangling {
+                std::fs::write(&referent, b"external sentinel").expect("sentinel");
+            }
+            let git = |args: &[&str]| {
+                let output = std::process::Command::new("git")
+                    .current_dir(root.path())
+                    .args(args)
+                    .output()
+                    .expect("git");
+                assert!(
+                    output.status.success(),
+                    "{}",
+                    String::from_utf8_lossy(&output.stderr)
+                );
+                String::from_utf8(output.stdout)
+                    .expect("utf8")
+                    .trim()
+                    .to_owned()
+            };
+            git(&["config", "user.name", "Fixture"]);
+            git(&["config", "user.email", "fixture@example.invalid"]);
+            git(&["config", "submodule.recurse", "false"]);
+            let link = root.path().join("link");
+            std::os::unix::fs::symlink(&referent, &link).expect("tracked link");
+            git(&["add", "link"]);
+            git(&["commit", "-m", "base link"]);
+            git(&["branch", "base"]);
+            let oid = git(&["rev-parse", "HEAD"]);
+            git(&["checkout", "-b", "linked"]);
+            git(&["update-index", "--cacheinfo", "160000", &oid, "link"]);
+            git(&["commit", "-m", "gitlink"]);
+            git(&["checkout", "base"]);
+            let index = std::fs::read(root.path().join(".git/index")).expect("index");
+            let dirty = external.path().join("dirty-target");
+
+            git(&["config", "core.excludesFile", "link"]);
+            let plan = AddPlan::prepare_checkout(
+                root.path(),
+                &serde_json::json!({"branch":"linked"}),
+                ToolProvenance::Native,
+            )
+            .expect("protected symlink plan");
+            let result = execute_approved(plan).await;
+            assert!(result.result.is_error, "protected auxiliary source");
+            assert_eq!(std::fs::read_link(&link).expect("protected link"), referent);
+            assert_eq!(git(&["branch", "--show-current"]), "base");
+            assert_eq!(
+                std::fs::read(root.path().join(".git/index")).expect("protected index"),
+                index
+            );
+            git(&["config", "--unset", "core.excludesFile"]);
+
+            // Both already-dirty and approval-time link changes must preserve
+            // the link entry rather than follow or remove its external target.
+            for late in [false, true] {
+                if !late {
+                    std::fs::remove_file(&link).expect("remove fixture link");
+                    std::os::unix::fs::symlink(&dirty, &link).expect("dirty link");
+                }
+                let plan = AddPlan::prepare_checkout(
+                    root.path(),
+                    &serde_json::json!({"branch":"linked"}),
+                    ToolProvenance::Native,
+                )
+                .expect("symlink checkout plan");
+                assert!(
+                    !plan.facets.iter().any(|facet| {
+                        facet.resource_kind == Some(ToolResourceKind::Path)
+                            && facet.resource.as_deref() == referent.to_str()
+                    }),
+                    "link target must not become a source permission"
+                );
+                let plan = Box::new(plan).discover().await.expect("symlink discovery");
+                if late {
+                    std::fs::remove_file(&link).expect("remove fixture link");
+                    std::os::unix::fs::symlink(&dirty, &link).expect("late link change");
+                }
+                let admission = proof(&plan);
+                let result = plan.execute(Box::new(admission)).await;
+                assert!(result.result.is_error, "{}", result.result.content);
+                assert_eq!(std::fs::read_link(&link).expect("retained link"), dirty);
+                assert_eq!(git(&["branch", "--show-current"]), "base");
+                assert_eq!(
+                    std::fs::read(root.path().join(".git/index")).expect("retained index"),
+                    index
+                );
+                std::fs::remove_file(&link).expect("remove fixture dirty link");
+                std::os::unix::fs::symlink(&referent, &link).expect("restore fixture link");
+            }
+
+            let plan = AddPlan::prepare_checkout(
+                root.path(),
+                &serde_json::json!({"branch":"linked"}),
+                ToolProvenance::Native,
+            )
+            .expect("clean link plan");
+            let result = execute_approved(plan).await;
+            assert!(!result.result.is_error, "{}", result.result.content);
+            assert_eq!(git(&["branch", "--show-current"]), "linked");
+            assert!(
+                std::fs::symlink_metadata(&link)
+                    .expect("gitlink directory")
+                    .is_dir()
+            );
+            assert!(
+                std::fs::read_dir(&link)
+                    .expect("uninitialized gitlink")
+                    .next()
+                    .is_none()
+            );
+            assert!(git(&["ls-files", "--stage", "link"]).starts_with("160000 "));
+            if dangling {
+                assert!(!referent.exists());
+            } else {
+                assert_eq!(
+                    std::fs::read(&referent).expect("external preserved"),
+                    b"external sentinel"
+                );
+            }
+            assert!(!dirty.exists());
+        }
+    }
+
+    #[test]
+    fn new_gitlink_directory_binds_names_without_reading_descendants() {
+        let root = tempfile::tempdir().expect("fixture");
+        let child = root.path().join("child");
+        std::fs::create_dir(&child).expect("directory");
+        std::fs::write(child.join("sentinel"), b"preserve").expect("sentinel");
+        std::fs::create_dir_all(child.join("deep/nested")).expect("descendants");
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(root.path().join("absent"), child.join("external"))
+                .expect("broken external link");
+            let _socket =
+                std::os::unix::net::UnixListener::bind(child.join("socket")).expect("socket");
+        }
+        if cfg!(windows) {
+            assert!(capture_new_gitlink_directory(&child, false).is_err());
+            return;
+        }
+        let before = capture_new_gitlink_directory(&child, false).expect("ordinary descendants");
+        std::fs::write(child.join("deep/nested/late"), b"not inspected").expect("deep change");
+        assert_eq!(
+            capture_new_gitlink_directory(&child, false).expect("names only"),
+            before
+        );
+        for marker in [".git", ".GIT", "git~1"] {
+            std::fs::write(child.join(marker), b"must not be opened").expect("marker");
+            assert!(
+                capture_new_gitlink_directory(&child, false).is_err(),
+                "{marker}"
+            );
+            std::fs::remove_file(child.join(marker)).expect("remove marker");
+        }
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(root.path().join("absent"), child.join(".git"))
+                .expect("broken marker");
+            assert!(capture_new_gitlink_directory(&child, false).is_err());
+            std::fs::remove_file(child.join(".git")).expect("remove marker");
+        }
+        std::fs::create_dir(child.join(".git")).expect("metadata directory");
+        assert!(capture_new_gitlink_directory(&child, false).is_err());
+        std::fs::remove_dir(child.join(".git")).expect("remove metadata");
+        for index in 0..4096 {
+            std::fs::write(child.join(format!("entry-{index}")), []).expect("budget entry");
+        }
+        assert!(capture_new_gitlink_directory(&child, false).is_err());
+    }
+
+    #[tokio::test]
+    async fn child_filter_command_uses_effective_root_without_discovery_prefix() {
+        let root = fixture();
+        let discovery = root.path().join("nested");
+        std::fs::create_dir(&discovery).expect("discovery");
+        assert!(
+            std::process::Command::new("git")
+                .current_dir(&discovery)
+                .arg("init")
+                .output()
+                .expect("child init")
+                .status
+                .success()
+        );
+        std::fs::write(
+            root.path().join(".gitattributes"),
+            "tracked filter=root-filter\n",
+        )
+        .expect("root attributes");
+        std::fs::write(discovery.join(".gitattributes"), "tracked -filter\n")
+            .expect("discovery attributes");
+        let plan = prepare(root.path());
+        let command =
+            plan.child_filter_command(&discovery.join(".git"), root.path(), &["tracked".into()]);
+        let output = plan
+            .run_command(command, std::time::Duration::from_secs(10), 4096)
+            .await
+            .expect("real child filter probe");
+        assert_eq!(output, b"tracked\0filter\0root-filter\0");
+    }
+
+    #[tokio::test]
+    async fn child_bound_config_discovery_does_not_resolve_configured_worktree() {
+        let root = fixture();
+        let child = root.path().join("child");
+        assert!(
+            std::process::Command::new("git")
+                .current_dir(root.path())
+                .args(["init", "child"])
+                .output()
+                .expect("init")
+                .status
+                .success()
+        );
+        let missing = root.path().join("unapproved-missing-worktree");
+        assert!(
+            std::process::Command::new("git")
+                .current_dir(&child)
+                .args(["config", "core.worktree"])
+                .arg(&missing)
+                .output()
+                .expect("config")
+                .status
+                .success()
+        );
+        let plan = AddPlan::prepare_checkout(
+            root.path(),
+            &serde_json::json!({"branch":"HEAD"}),
+            ToolProvenance::Native,
+        )
+        .expect("plan");
+        let output = plan
+            .inspect_checkout_child_config(&child.join(".git"), &child)
+            .await
+            .expect("bound probe");
+        assert!(
+            output
+                .windows(missing.as_os_str().len())
+                .any(|value| { value == missing.to_string_lossy().as_bytes() })
+        );
+        assert!(!missing.exists());
+    }
+
+    #[tokio::test]
+    async fn checkout_new_gitlink_preserves_initialized_child() {
+        if cfg!(windows) {
+            return;
+        }
+        for mode in [
+            "native",
+            "prepared",
+            "native-external",
+            "prepared-external",
+            "filter-external",
+            "native-linked",
+            "prepared-linked",
+            "ancestor-refused",
+            "raw-denied",
+        ] {
+            let root = fixture();
+            let git = |cwd: &Path, args: &[&str]| {
+                let output = std::process::Command::new("git")
+                    .current_dir(cwd)
+                    .args(args)
+                    .output()
+                    .expect("Git fixture");
+                assert!(
+                    output.status.success(),
+                    "{}",
+                    String::from_utf8_lossy(&output.stderr)
+                );
+                String::from_utf8(output.stdout)
+                    .expect("UTF8")
+                    .trim()
+                    .to_owned()
+            };
+            git(root.path(), &["config", "user.name", "Fixture"]);
+            git(
+                root.path(),
+                &["config", "user.email", "fixture@example.invalid"],
+            );
+            git(root.path(), &["config", "submodule.recurse", "false"]);
+            git(root.path(), &["commit", "--allow-empty", "-m", "base"]);
+            git(root.path(), &["branch", "base"]);
+            let oid = git(root.path(), &["rev-parse", "HEAD"]);
+            git(root.path(), &["checkout", "-b", "linked"]);
+            git(
+                root.path(),
+                &[
+                    "update-index",
+                    "--add",
+                    "--cacheinfo",
+                    "160000",
+                    &oid,
+                    "child",
+                ],
+            );
+            git(root.path(), &["commit", "-m", "gitlink"]);
+            git(root.path(), &["checkout", "base"]);
+            let linked_common = tempfile::tempdir().expect("linked common repository");
+            if mode.ends_with("-linked") {
+                git(linked_common.path(), &["init"]);
+                git(linked_common.path(), &["config", "user.name", "Child"]);
+                git(
+                    linked_common.path(),
+                    &["config", "user.email", "child@example.invalid"],
+                );
+                git(
+                    linked_common.path(),
+                    &["commit", "--allow-empty", "-m", "common"],
+                );
+                git(
+                    linked_common.path(),
+                    &[
+                        "worktree",
+                        "add",
+                        "-b",
+                        "child",
+                        root.path().join("child").to_str().expect("child path"),
+                    ],
+                );
+            } else {
+                git(root.path(), &["init", "child"]);
+            }
+            let child = root.path().join("child");
+            git(&child, &["config", "user.name", "Child"]);
+            git(&child, &["config", "user.email", "child@example.invalid"]);
+            std::fs::write(child.join("tracked"), b"tracked-preserve").expect("tracked source");
+            git(&child, &["add", "tracked"]);
+            git(&child, &["commit", "--allow-empty", "-m", "child"]);
+            std::fs::write(child.join("sentinel"), b"preserve").expect("sentinel");
+            let child_gitdir = PathBuf::from(git(&child, &["rev-parse", "--absolute-git-dir"]));
+            let head = std::fs::read(child_gitdir.join("HEAD")).expect("child HEAD");
+            let external = tempfile::tempdir().expect("external worktree");
+            if mode == "ancestor-refused" {
+                git(
+                    &child,
+                    &[
+                        "config",
+                        "core.worktree",
+                        root.path().to_str().expect("ancestor"),
+                    ],
+                );
+            }
+            if mode.ends_with("-external") {
+                std::fs::rename(child.join("tracked"), external.path().join("tracked"))
+                    .expect("relocate tracked worktree source");
+                git(
+                    &child,
+                    &[
+                        "config",
+                        "core.worktree",
+                        external.path().to_str().expect("path"),
+                    ],
+                );
+                std::fs::write(
+                    external.path().join("external-sentinel"),
+                    b"external-preserve",
+                )
+                .expect("external sentinel");
+                if mode == "filter-external" {
+                    std::fs::write(
+                        external.path().join(".gitattributes"),
+                        "tracked filter=sentinel\n",
+                    )
+                    .expect("external attributes");
+                    git(
+                        &child,
+                        &[
+                            "config",
+                            "filter.sentinel.clean",
+                            "touch filter-must-not-run",
+                        ],
+                    );
+                }
+            }
+            if mode == "raw-denied" {
+                let outside = tempfile::tempdir().expect("raw external worktree");
+                let external = outside.path().canonicalize().expect("canonical");
+                git(
+                    &child,
+                    &["config", "core.worktree", external.to_str().expect("path")],
+                );
+                // An include hides the raw startup target in merged output.
+                std::fs::write(
+                    child.join(".git/override.conf"),
+                    format!("[core]\nworktree={}\n", child.display()),
+                )
+                .expect("override");
+                git(&child, &["config", "include.path", "override.conf"]);
+                let plan = AddPlan::prepare_checkout(
+                    root.path(),
+                    &serde_json::json!({"branch":"linked"}),
+                    ToolProvenance::Native,
+                )
+                .expect("plan");
+                let mut plan = Box::new(plan).discover().await.expect("parent discovery");
+                let tokens = proof(&plan)
+                    .consume_for_prepared(&plan.request(), &plan.identity)
+                    .expect("names proof");
+                plan = plan.discover_new_gitlinks(&tokens).expect("names");
+                let tokens = proof(&plan)
+                    .consume_for_prepared(&plan.request(), &plan.identity)
+                    .expect("marker proof");
+                plan = plan
+                    .discover_checkout_child_markers(&tokens)
+                    .expect("marker");
+                let tokens = proof(&plan)
+                    .consume_for_prepared(&plan.request(), &plan.identity)
+                    .expect("metadata proof");
+                plan = plan
+                    .discover_checkout_child_metadata(&tokens)
+                    .expect("metadata");
+                let tokens = proof(&plan)
+                    .consume_for_prepared(&plan.request(), &plan.identity)
+                    .expect("config proof");
+                plan = plan
+                    .discover_checkout_child_configuration(&tokens)
+                    .await
+                    .expect("bound bootstrap");
+                assert!(
+                    plan.facets
+                        .iter()
+                        .any(|facet| facet.nature == ToolNature::Read
+                            && facet.resource.as_deref() == external.to_str())
+                );
+                let mut tokens = proof(&plan)
+                    .consume_for_prepared(&plan.request(), &plan.identity)
+                    .expect("worktree proof");
+                tokens.retain(|token| token.normalized_path() != external);
+                let error = plan
+                    .discover_checkout_child_worktree(&tokens)
+                    .await
+                    .err()
+                    .expect("raw target denied");
+                assert!(error.to_string().contains("Read"), "{error}");
+                assert_eq!(git(root.path(), &["branch", "--show-current"]), "base");
+                assert_eq!(
+                    std::fs::read(child.join("sentinel")).expect("sentinel"),
+                    b"preserve"
+                );
+                continue;
+            } else if mode.starts_with("native") {
+                git(root.path(), &["checkout", "linked"]);
+            } else {
+                let plan = AddPlan::prepare_checkout(
+                    root.path(),
+                    &serde_json::json!({"branch":"linked"}),
+                    ToolProvenance::Native,
+                )
+                .expect("plan");
+                let output = execute_approved(plan).await;
+                if mode == "ancestor-refused" {
+                    assert!(
+                        output.result.is_error
+                            && output
+                                .result
+                                .content
+                                .contains("source snapshot limit exceeded"),
+                        "{:?}",
+                        output.result
+                    );
+                    assert_eq!(git(root.path(), &["branch", "--show-current"]), "base");
+                    assert_eq!(
+                        std::fs::read(child.join("tracked")).expect("child source"),
+                        b"tracked-preserve"
+                    );
+                    assert_eq!(
+                        std::fs::read(child_gitdir.join("HEAD")).expect("HEAD"),
+                        head
+                    );
+                    continue;
+                }
+                if mode == "filter-external" {
+                    assert!(
+                        output.result.is_error
+                            && output.result.content.contains("configured filter"),
+                        "{:?}",
+                        output.result
+                    );
+                    assert_eq!(git(root.path(), &["branch", "--show-current"]), "base");
+                    assert!(!external.path().join("filter-must-not-run").exists());
+                    assert!(!child.join("filter-must-not-run").exists());
+                    assert_eq!(
+                        std::fs::read(external.path().join("tracked")).expect("tracked source"),
+                        b"tracked-preserve"
+                    );
+                    continue;
+                }
+                assert!(!output.result.is_error, "{:?}", output.result);
+            }
+            assert_eq!(git(root.path(), &["branch", "--show-current"]), "linked");
+            assert_eq!(
+                std::fs::read(child.join("sentinel")).expect("sentinel"),
+                b"preserve"
+            );
+            assert_eq!(
+                std::fs::read(child_gitdir.join("HEAD")).expect("HEAD"),
+                head
+            );
+            if mode.ends_with("-external") {
+                assert_eq!(
+                    std::fs::read(external.path().join("tracked")).expect("tracked source"),
+                    b"tracked-preserve"
+                );
+                assert_eq!(
+                    std::fs::read(external.path().join("external-sentinel"))
+                        .expect("external sentinel"),
+                    b"external-preserve"
+                );
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn checkout_new_gitlink_accepts_empty_directory_and_rejects_late_changes() {
+        for change in [
+            "native",
+            "native-nonempty",
+            "none",
+            "late-marker",
+            "child",
+            "identity",
+            "nonempty",
+            "initialized",
+            "missing-read",
+            "old-proof",
+            "symlink",
+        ] {
+            if change == "symlink" && !cfg!(unix) {
+                continue;
+            }
+            let root = fixture();
+            let git = |args: &[&str]| {
+                let output = std::process::Command::new("git")
+                    .current_dir(root.path())
+                    .args(args)
+                    .output()
+                    .expect("git");
+                assert!(
+                    output.status.success(),
+                    "{}",
+                    String::from_utf8_lossy(&output.stderr)
+                );
+                String::from_utf8(output.stdout)
+                    .expect("utf8")
+                    .trim()
+                    .to_owned()
+            };
+            git(&["config", "user.name", "Fixture"]);
+            git(&["config", "user.email", "fixture@example.invalid"]);
+            git(&["config", "submodule.recurse", "false"]);
+            git(&["commit", "--allow-empty", "-m", "base"]);
+            git(&["branch", "base"]);
+            let oid = git(&["rev-parse", "HEAD"]);
+            git(&["checkout", "-b", "linked"]);
+            git(&[
+                "update-index",
+                "--add",
+                "--cacheinfo",
+                "160000",
+                &oid,
+                "child",
+            ]);
+            git(&["commit", "-m", "gitlink"]);
+            git(&["checkout", "base"]);
+            let child = root.path().join("child");
+            std::fs::create_dir_all(&child).expect("empty directory");
+            let index = std::fs::read(root.path().join(".git/index")).expect("index");
+            #[cfg(unix)]
+            let mut preserved_socket = None;
+            if matches!(change, "nonempty" | "native-nonempty") {
+                for directory in ["objects", "refs", "deep/nested"] {
+                    std::fs::create_dir_all(child.join(directory)).expect("bare-shaped directory");
+                }
+                std::fs::write(child.join("HEAD"), b"ref: refs/heads/main\n").expect("bare HEAD");
+                std::fs::write(
+                    child.join("config"),
+                    b"[core]\n bare = true\n fsmonitor = touch EXECUTED\n",
+                )
+                .expect("inert child config");
+                #[cfg(unix)]
+                {
+                    std::os::unix::fs::symlink("/unread-external-target", child.join("external"))
+                        .expect("preserved link");
+                    preserved_socket = Some(
+                        std::os::unix::net::UnixListener::bind(child.join("socket"))
+                            .expect("preserved socket"),
+                    );
+                    assert!(
+                        std::process::Command::new("mkfifo")
+                            .arg(child.join("pipe"))
+                            .status()
+                            .expect("FIFO fixture")
+                            .success()
+                    );
+                }
+            }
+            if matches!(change, "native" | "native-nonempty") {
+                if change == "native-nonempty" {
+                    std::fs::write(child.join("sentinel"), b"preserve").expect("native sentinel");
+                }
+                git(&["checkout", "linked"]);
+            } else {
+                if change == "nonempty" {
+                    std::fs::write(child.join("sentinel"), b"preserve").expect("child");
+                } else if change == "initialized" {
+                    std::fs::create_dir(child.join(".git")).expect("child metadata");
+                }
+                let plan = AddPlan::prepare_checkout(
+                    root.path(),
+                    &serde_json::json!({"branch":"linked"}),
+                    ToolProvenance::Native,
+                )
+                .expect("plan");
+                if change == "nonempty" {
+                    assert_eq!(execute_approved(plan).await.result.is_error, cfg!(windows));
+                } else if change == "initialized" {
+                    assert!(execute_approved(plan).await.result.is_error);
+                } else {
+                    let plan = Box::new(plan).discover().await.expect("discovery");
+                    assert!(plan.phase == Phase::CheckoutNewGitlinks);
+                    let old_proof = proof(&plan);
+                    let mut tokens = proof(&plan)
+                        .consume_for_prepared(&plan.request(), &plan.identity)
+                        .expect("admission");
+                    if change == "missing-read" {
+                        tokens.retain(|token| {
+                            !token.authorizes_path(
+                                "git_checkout",
+                                ToolNature::Read,
+                                &plan.workspace,
+                                child.to_str().expect("child path"),
+                            )
+                        });
+                        std::fs::write(child.join("sentinel"), b"preserve").expect("unread child");
+                        let error = match plan.discover_new_gitlinks(&tokens) {
+                            Ok(_) => panic!("missing Read must refuse"),
+                            Err(error) => error,
+                        };
+                        assert!(
+                            error.to_string().contains("exact Read admission"),
+                            "{error}"
+                        );
+                    } else {
+                        let plan = plan
+                            .discover_new_gitlinks(&tokens)
+                            .expect("empty directory");
+                        assert!(plan.phase == Phase::Mutation);
+                        assert!(plan.facets.iter().any(|facet| {
+                            facet.nature == ToolNature::Read
+                                && facet.resource.as_deref()
+                                    == plan.repository.workdir.join("child").to_str()
+                        }));
+                        if change == "old-proof" {
+                            let PreparedNormalStage::Complete(output) =
+                                plan.execute_stage(Box::new(old_proof)).await
+                            else {
+                                panic!("old discovery proof must not continue")
+                            };
+                            assert!(output.result.is_error);
+                        } else {
+                            let tokens = proof(&plan)
+                                .consume_for_prepared(&plan.request(), &plan.identity)
+                                .expect("mutation admission");
+                            if change == "late-marker" {
+                                std::fs::write(child.join(".git"), b"must not be read")
+                                    .expect("late marker");
+                            } else if change == "child" {
+                                std::fs::write(child.join("sentinel"), b"preserve")
+                                    .expect("late child");
+                            } else if change == "identity" {
+                                std::fs::rename(&child, root.path().join("retained-child"))
+                                    .expect("retain inode");
+                                std::fs::create_dir(&child).expect("replacement");
+                            } else if change == "symlink" {
+                                #[cfg(unix)]
+                                {
+                                    let retained = root.path().join("retained-child");
+                                    std::fs::rename(&child, &retained).expect("retain directory");
+                                    std::fs::write(retained.join("sentinel"), b"preserve")
+                                        .expect("link referent");
+                                    std::os::unix::fs::symlink(&retained, &child)
+                                        .expect("replacement link");
+                                }
+                            }
+                            let result = plan.execute_admitted(&tokens).await;
+                            assert_eq!(result.is_ok(), change == "none", "{change}: {result:?}");
+                        }
+                    }
+                }
+            }
+            if matches!(change, "native" | "native-nonempty" | "none")
+                || (change == "nonempty" && !cfg!(windows))
+            {
+                assert_eq!(git(&["branch", "--show-current"]), "linked");
+                assert!(git(&["ls-files", "--stage", "child"]).starts_with("160000 "));
+                if matches!(change, "nonempty" | "native-nonempty") {
+                    assert_eq!(
+                        std::fs::read(child.join("sentinel")).expect("preserved"),
+                        b"preserve"
+                    );
+                } else {
+                    assert_eq!(std::fs::read_dir(&child).expect("child").count(), 0);
+                }
+            } else {
+                assert_eq!(git(&["branch", "--show-current"]), "base");
+                assert_eq!(
+                    std::fs::read(root.path().join(".git/index")).expect("index retained"),
+                    index
+                );
+                if matches!(change, "child" | "nonempty" | "symlink") {
+                    assert_eq!(
+                        std::fs::read(child.join("sentinel")).expect("retained child"),
+                        b"preserve"
+                    );
+                }
+            }
+            if matches!(change, "nonempty" | "native-nonempty") {
+                assert_eq!(
+                    std::fs::read(child.join("HEAD")).expect("preserved HEAD"),
+                    b"ref: refs/heads/main\n"
+                );
+                assert_eq!(
+                    std::fs::read(child.join("config")).expect("preserved config"),
+                    b"[core]\n bare = true\n fsmonitor = touch EXECUTED\n"
+                );
+                assert!(child.join("deep/nested").is_dir());
+                assert!(!child.join("EXECUTED").exists());
+                assert!(!root.path().join("EXECUTED").exists());
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::FileTypeExt;
+                    assert_eq!(
+                        std::fs::read_link(child.join("external")).expect("preserved link"),
+                        PathBuf::from("/unread-external-target")
+                    );
+                    assert!(
+                        std::fs::symlink_metadata(child.join("pipe"))
+                            .expect("preserved FIFO")
+                            .file_type()
+                            .is_fifo()
+                    );
+                    let socket = preserved_socket.as_ref().expect("socket listener");
+                    socket.set_nonblocking(true).expect("nonblocking socket");
+                    assert_eq!(
+                        socket.accept().expect_err("no socket connection").kind(),
+                        std::io::ErrorKind::WouldBlock
+                    );
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn checkout_tracked_file_to_gitlink_preserves_dirty_source() {
+        let root = fixture();
+        let git = |args: &[&str]| {
+            let output = std::process::Command::new("git")
+                .current_dir(root.path())
+                .args(args)
+                .output()
+                .expect("git");
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            String::from_utf8(output.stdout)
+                .expect("utf8")
+                .trim()
+                .to_owned()
+        };
+        git(&["config", "user.name", "Fixture"]);
+        git(&["config", "user.email", "fixture@example.invalid"]);
+        git(&["config", "submodule.recurse", "false"]);
+        std::fs::write(root.path().join("file"), b"[fixture]\n value = retained\n")
+            .expect("config-compatible source");
+        git(&["add", "file"]);
+        git(&["commit", "-m", "base"]);
+        git(&["branch", "base"]);
+        let oid = git(&["rev-parse", "HEAD"]);
+        let original = std::fs::read(root.path().join("file")).expect("original");
+        git(&["checkout", "-b", "linked"]);
+        git(&["update-index", "--cacheinfo", "160000", &oid, "file"]);
+        git(&["commit", "-m", "link"]);
+        git(&["checkout", "base"]);
+        git(&["config", "include.path", "../file"]);
+        let index_before = std::fs::read(root.path().join(".git/index")).expect("index");
+        let plan = AddPlan::prepare_checkout(
+            root.path(),
+            &serde_json::json!({"branch":"linked"}),
+            ToolProvenance::Native,
+        )
+        .expect("configuration-source plan");
+        let output = execute_approved(plan).await;
+        assert!(
+            output.result.is_error,
+            "configuration source must not be replaced"
+        );
+        assert!(
+            output.result.content.contains("configuration")
+                || output.result.content.contains("auxiliary"),
+            "{}",
+            output.result.content
+        );
+        assert_eq!(git(&["branch", "--show-current"]), "base");
+        assert_eq!(
+            std::fs::read(root.path().join("file")).expect("config preserved"),
+            original
+        );
+        assert_eq!(
+            std::fs::read(root.path().join(".git/index")).expect("index preserved"),
+            index_before
+        );
+        git(&["config", "--unset", "include.path"]);
+        for dirty in [true, false] {
+            std::fs::write(
+                root.path().join("file"),
+                if dirty {
+                    b"dirty".as_slice()
+                } else {
+                    &original
+                },
+            )
+            .expect("source");
+            let index = std::fs::read(root.path().join(".git/index")).expect("index");
+            let plan = AddPlan::prepare_checkout(
+                root.path(),
+                &serde_json::json!({"branch":"linked"}),
+                ToolProvenance::Native,
+            )
+            .expect("plan");
+            let output = execute_approved(plan).await;
+            assert_eq!(output.result.is_error, dirty, "{}", output.result.content);
+            if dirty {
+                assert_eq!(git(&["branch", "--show-current"]), "base");
+                assert_eq!(
+                    std::fs::read(root.path().join("file")).expect("dirty preserved"),
+                    b"dirty"
+                );
+                assert_eq!(
+                    std::fs::read(root.path().join(".git/index")).expect("index preserved"),
+                    index
+                );
+            } else {
+                assert_eq!(git(&["branch", "--show-current"]), "linked");
+                assert!(root.path().join("file").is_dir());
+                assert!(!root.path().join("file/.git").exists());
+                assert!(git(&["ls-files", "--stage", "file"]).starts_with("160000 "));
+            }
+        }
+        git(&["-C", "file", "init"]);
+        git(&["-C", "file", "config", "user.name", "Fixture"]);
+        git(&[
+            "-C",
+            "file",
+            "config",
+            "user.email",
+            "fixture@example.invalid",
+        ]);
+        std::fs::write(root.path().join("file/local"), b"child content").expect("child file");
+        git(&["-C", "file", "add", "local"]);
+        git(&["-C", "file", "commit", "-m", "child"]);
+        std::fs::write(root.path().join("file/local"), b"dirty child").expect("dirty child");
+        let child_head = git(&["-C", "file", "rev-parse", "HEAD"]);
+        let index_before = std::fs::read(root.path().join(".git/index")).expect("parent index");
+        let plan = AddPlan::prepare_checkout(
+            root.path(),
+            &serde_json::json!({"branch":"base"}),
+            ToolProvenance::Native,
+        )
+        .expect("initialized reverse plan");
+        let output = execute_approved(plan).await;
+        assert!(
+            output.result.is_error,
+            "initialized child deletion is not authorized"
+        );
+        assert!(
+            output.result.content.contains("effective configuration"),
+            "{}",
+            output.result.content
+        );
+        assert_eq!(git(&["branch", "--show-current"]), "linked");
+        assert_eq!(git(&["-C", "file", "rev-parse", "HEAD"]), child_head);
+        assert_eq!(
+            std::fs::read(root.path().join("file/local")).expect("preserved dirty child"),
+            b"dirty child"
+        );
+        assert_eq!(
+            std::fs::read(root.path().join(".git/index")).expect("preserved index"),
+            index_before
+        );
+        std::fs::remove_dir_all(root.path().join("file")).expect("remove isolated fixture child");
+        std::fs::create_dir(root.path().join("file")).expect("empty uninitialized directory");
+        std::fs::write(root.path().join("file/untracked"), b"explicit deletion")
+            .expect("uninitialized child content");
+        // A guessed branch combines target-conditional discovery with the
+        // deletion frontier. No Write may appear until both are complete.
+        git(&["config", "remote.origin.url", "."]);
+        git(&[
+            "config",
+            "remote.origin.fetch",
+            "+refs/heads/*:refs/remotes/origin/*",
+        ]);
+        let base_oid = git(&["rev-parse", "base"]);
+        git(&["update-ref", "refs/remotes/origin/topic", &base_oid]);
+        git(&["config", "includeIf.onbranch:topic.path", "target.conf"]);
+        std::fs::write(
+            root.path().join(".git/target.conf"),
+            b"[fixture]\nmarker=target\n",
+        )
+        .expect("target config");
+        let plan = AddPlan::prepare_checkout(
+            root.path(),
+            &serde_json::json!({"branch":"topic"}),
+            ToolProvenance::Native,
+        )
+        .expect("guessed deletion plan");
+        let mut plan = Box::new(plan).discover().await.expect("guessed discovery");
+        assert!(plan.phase == Phase::TargetConfiguration);
+        while plan.phase == Phase::TargetConfiguration {
+            assert!(
+                !plan
+                    .facets
+                    .iter()
+                    .any(|facet| facet.nature == ToolNature::Write)
+            );
+            let tokens = proof(&plan)
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .expect("target proof");
+            plan = plan
+                .discover_target_configuration(&tokens)
+                .expect("target frontier");
+        }
+        assert!(plan.phase == Phase::CheckoutDeletion);
+        while plan.phase == Phase::CheckoutDeletion {
+            assert!(
+                !plan
+                    .facets
+                    .iter()
+                    .any(|facet| facet.nature == ToolNature::Write)
+            );
+            let tokens = proof(&plan)
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .expect("deletion proof");
+            plan = plan
+                .discover_checkout_deletion(&tokens)
+                .expect("deletion frontier");
+        }
+        assert!(plan.phase == Phase::Mutation);
+        let mut tokens = proof(&plan)
+            .consume_for_prepared(&plan.request(), &plan.identity)
+            .expect("mutation proof");
+        let child = plan.repository.workdir.join("file/untracked");
+        tokens.retain(|token| {
+            !token.authorizes_path(
+                "git_checkout",
+                ToolNature::Write,
+                &plan.workspace,
+                child.to_str().expect("child"),
+            )
+        });
+        assert!(
+            plan.execute_admitted(&tokens)
+                .await
+                .expect_err("missing child Write")
+                .to_string()
+                .contains("exact Write admission")
+        );
+        assert_eq!(git(&["branch", "--show-current"]), "linked");
+        assert!(!root.path().join(".git/refs/heads/topic").exists());
+        assert_eq!(
+            std::fs::read(root.path().join("file/untracked")).expect("preserved"),
+            b"explicit deletion"
+        );
+        #[cfg(unix)]
+        let _socket = std::os::unix::net::UnixListener::bind(root.path().join("file/socket"))
+            .expect("socket fixture");
+        for denied_entry in [None, Some("untracked"), Some("pipe"), Some("socket")] {
+            if !cfg!(unix) && matches!(denied_entry, Some("pipe" | "socket")) {
+                continue;
+            }
+            let missing_write = denied_entry.is_some();
+            #[cfg(unix)]
+            if !root.path().join("file/pipe").exists() {
+                assert!(
+                    std::process::Command::new("mkfifo")
+                        .arg(root.path().join("file/pipe"))
+                        .status()
+                        .expect("FIFO fixture")
+                        .success()
+                );
+            }
+            let plan = AddPlan::prepare_checkout(
+                root.path(),
+                &serde_json::json!({"branch":"base"}),
+                ToolProvenance::Native,
+            )
+            .expect("deletion refusal plan");
+            let mut plan = Box::new(plan).discover().await.expect("deletion discovery");
+            while plan.phase == Phase::CheckoutDeletion {
+                let tokens = proof(&plan)
+                    .consume_for_prepared(&plan.request(), &plan.identity)
+                    .expect("frontier admission");
+                plan = plan.discover_checkout_deletion(&tokens).expect("frontier");
+            }
+            let mut tokens = proof(&plan)
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .expect("final admission");
+            if missing_write {
+                let child = plan
+                    .repository
+                    .workdir
+                    .join("file")
+                    .join(denied_entry.expect("denied child"));
+                tokens.retain(|token| {
+                    !token.authorizes_path(
+                        "git_checkout",
+                        ToolNature::Write,
+                        &plan.workspace,
+                        child.to_str().expect("child path"),
+                    )
+                });
+            } else {
+                std::fs::write(root.path().join("file/late"), b"preserve late child")
+                    .expect("late child");
+            }
+            let error = plan
+                .execute_admitted(&tokens)
+                .await
+                .expect_err("denied deletion");
+            if missing_write {
+                assert!(
+                    error.to_string().contains("exact Write admission"),
+                    "{error}"
+                );
+            }
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::FileTypeExt;
+                assert!(
+                    std::fs::symlink_metadata(root.path().join("file/pipe"))
+                        .expect("FIFO retained")
+                        .file_type()
+                        .is_fifo()
+                );
+                assert!(
+                    std::fs::symlink_metadata(root.path().join("file/socket"))
+                        .expect("socket retained")
+                        .file_type()
+                        .is_socket()
+                );
+            }
+            assert_eq!(git(&["branch", "--show-current"]), "linked");
+            assert_eq!(
+                std::fs::read(root.path().join("file/untracked")).expect("preserved child"),
+                b"explicit deletion"
+            );
+            assert_eq!(
+                std::fs::read(root.path().join(".git/index")).expect("preserved index"),
+                index_before
+            );
+            if !missing_write {
+                assert_eq!(
+                    std::fs::read(root.path().join("file/late")).expect("preserved late child"),
+                    b"preserve late child"
+                );
+                std::fs::remove_file(root.path().join("file/late"))
+                    .expect("remove fixture late child");
+            }
+        }
+        let plan = AddPlan::prepare_checkout(
+            root.path(),
+            &serde_json::json!({"branch":"base"}),
+            ToolProvenance::Native,
+        )
+        .expect("nonempty reverse plan");
+        let mut plan = Box::new(plan).discover().await.expect("config discovery");
+        while plan.phase == Phase::CheckoutDeletion {
+            assert!(
+                !plan
+                    .facets
+                    .iter()
+                    .any(|facet| facet.nature == ToolNature::Write)
+            );
+            let tokens = proof(&plan)
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .expect("inventory proof");
+            plan = plan
+                .discover_checkout_deletion(&tokens)
+                .expect("admitted frontier");
+        }
+        assert!(
+            plan.facets
+                .iter()
+                .any(|facet| facet.nature == ToolNature::Write
+                    && facet.resource.as_deref()
+                        == plan.repository.workdir.join("file/untracked").to_str())
+        );
+        let admission = proof(&plan);
+        let result = plan.execute(Box::new(admission)).await;
+        assert!(!result.result.is_error, "{}", result.result.content);
+        assert_eq!(
+            std::fs::read(root.path().join("file")).expect("restored file"),
+            original
+        );
+        git(&["checkout", "linked"]);
+        let plan = AddPlan::prepare_checkout(
+            root.path(),
+            &serde_json::json!({"branch":"base"}),
+            ToolProvenance::Native,
+        )
+        .expect("empty reverse plan");
+        let plan = Box::new(plan).discover().await.expect("empty discovery");
+        std::fs::write(root.path().join("file/late"), b"preserve").expect("late child");
+        let admission = proof(&plan);
+        let output = plan.execute(Box::new(admission)).await;
+        assert!(output.result.is_error);
+        assert_eq!(
+            std::fs::read(root.path().join("file/late")).expect("late preserved"),
+            b"preserve"
+        );
+        assert_eq!(git(&["branch", "--show-current"]), "linked");
+        std::fs::remove_file(root.path().join("file/late")).expect("remove fixture late child");
+
+        #[cfg(unix)]
+        {
+            let plan = AddPlan::prepare_checkout(
+                root.path(),
+                &serde_json::json!({"branch":"base"}),
+                ToolProvenance::Native,
+            )
+            .expect("replacement plan");
+            let plan = Box::new(plan)
+                .discover()
+                .await
+                .expect("replacement discovery");
+            std::fs::rename(root.path().join("file"), root.path().join("saved-empty"))
+                .expect("retain original directory inode");
+            std::fs::create_dir(root.path().join("file")).expect("replacement empty directory");
+            let admission = proof(&plan);
+            let output = plan.execute(Box::new(admission)).await;
+            assert!(output.result.is_error);
+            assert!(
+                output
+                    .result
+                    .content
+                    .contains("Empty submodule directory changed"),
+                "{}",
+                output.result.content
+            );
+            assert_eq!(git(&["branch", "--show-current"]), "linked");
+            std::fs::remove_dir(root.path().join("file")).expect("remove fixture replacement");
+            std::fs::rename(root.path().join("saved-empty"), root.path().join("file"))
+                .expect("restore fixture directory");
+        }
+
+        let plan = AddPlan::prepare_checkout(
+            root.path(),
+            &serde_json::json!({"branch":"base"}),
+            ToolProvenance::Native,
+        )
+        .expect("reverse plan");
+        let output = execute_approved(plan).await;
+        assert!(!output.result.is_error, "{}", output.result.content);
+        assert_eq!(git(&["branch", "--show-current"]), "base");
+        assert_eq!(
+            std::fs::read(root.path().join("file")).expect("restored source"),
+            original
+        );
+        git(&["checkout", "-b", "directory-target"]);
+        git(&["rm", "file"]);
+        std::fs::create_dir(root.path().join("file")).expect("target directory");
+        std::fs::write(root.path().join("file/child"), b"directory child").expect("target child");
+        git(&["add", "file/child"]);
+        git(&["commit", "-m", "directory target"]);
+        git(&["checkout", "linked"]);
+        std::fs::remove_dir(root.path().join("file")).expect("empty gitlink directory");
+        let plan = AddPlan::prepare_checkout(
+            root.path(),
+            &serde_json::json!({"branch":"directory-target"}),
+            ToolProvenance::Native,
+        )
+        .expect("directory reverse plan");
+        let output = execute_approved(plan).await;
+        assert!(!output.result.is_error, "{}", output.result.content);
+        assert_eq!(git(&["branch", "--show-current"]), "directory-target");
+        assert_eq!(
+            std::fs::read(root.path().join("file/child")).expect("restored child"),
+            b"directory child"
+        );
+        assert!(!root.path().join("file/.git").exists());
+    }
+
+    #[tokio::test]
+    async fn checkout_adds_uninitialized_gitlink_and_removes_dirty_initialized_gitlink() {
+        let root = fixture();
+        let source = tempfile::tempdir().expect("child source");
+        let git = |path: &Path, args: &[&str]| {
+            let output = std::process::Command::new("git")
+                .args(args)
+                .current_dir(path)
+                .output()
+                .expect("git");
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            String::from_utf8(output.stdout)
+                .expect("utf8")
+                .trim()
+                .to_owned()
+        };
+        git(source.path(), &["init"]);
+        for path in [root.path(), source.path()] {
+            git(path, &["config", "user.name", "Fixture"]);
+            git(path, &["config", "user.email", "fixture@example.invalid"]);
+            git(path, &["config", "commit.gpgSign", "false"]);
+        }
+        std::fs::write(source.path().join("child-file"), "original").expect("child file");
+        git(source.path(), &["add", "."]);
+        git(source.path(), &["commit", "-m", "child"]);
+        let child_head = git(source.path(), &["rev-parse", "HEAD"]);
+        git(root.path(), &["add", "file"]);
+        git(root.path(), &["commit", "-m", "base"]);
+        git(root.path(), &["branch", "base"]);
+        git(root.path(), &["checkout", "-b", "with-child"]);
+        git(
+            root.path(),
+            &[
+                "update-index",
+                "--add",
+                "--cacheinfo",
+                "160000",
+                &child_head,
+                "child",
+            ],
+        );
+        git(root.path(), &["commit", "-m", "gitlink"]);
+        git(root.path(), &["checkout", "base"]);
+        assert!(!root.path().join("child").exists());
+        let plan = AddPlan::prepare_checkout(
+            root.path(),
+            &serde_json::json!({"branch":"with-child"}),
+            ToolProvenance::Native,
+        )
+        .expect("addition plan");
+        let output = execute_approved(plan).await;
+        assert!(!output.result.is_error, "{}", output.result.content);
+        assert_eq!(
+            git(root.path(), &["branch", "--show-current"]),
+            "with-child"
+        );
+        assert!(!root.path().join("child/.git").exists());
+        git(
+            root.path(),
+            &[
+                "clone",
+                source.path().to_str().expect("source path"),
+                "child",
+            ],
+        );
+        let child = root.path().join("child");
+        std::fs::write(child.join("child-file"), "dirty").expect("dirty child");
+        let plan = AddPlan::prepare_checkout(
+            root.path(),
+            &serde_json::json!({"branch":"base"}),
+            ToolProvenance::Native,
+        )
+        .expect("removal plan");
+        let output = execute_approved(plan).await;
+        assert!(!output.result.is_error, "{}", output.result.content);
+        assert_eq!(git(root.path(), &["branch", "--show-current"]), "base");
+        assert!(git(root.path(), &["ls-files", "--", "child"]).is_empty());
+        assert_eq!(git(&child, &["rev-parse", "HEAD"]), child_head);
+        assert_eq!(
+            std::fs::read_to_string(child.join("child-file")).expect("child preserved"),
+            "dirty"
+        );
+    }
+
+    #[tokio::test]
+    async fn checkout_nonrecursive_gitlink_preserves_dirty_child_worktree() {
+        let root = fixture();
+        let child = root.path().join("child");
+        std::fs::create_dir(&child).expect("child");
+        let git = |path: &Path, args: &[&str]| {
+            let output = std::process::Command::new("git")
+                .args(args)
+                .current_dir(path)
+                .output()
+                .expect("git");
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            String::from_utf8(output.stdout)
+                .expect("utf8")
+                .trim()
+                .to_owned()
+        };
+        git(&child, &["init"]);
+        for path in [root.path(), child.as_path()] {
+            git(path, &["config", "user.name", "Fixture"]);
+            git(path, &["config", "user.email", "fixture@example.invalid"]);
+            git(path, &["config", "commit.gpgSign", "false"]);
+        }
+        std::fs::write(child.join("child-file"), "first").expect("child file");
+        git(&child, &["add", "."]);
+        git(&child, &["commit", "-m", "first"]);
+        let first = git(&child, &["rev-parse", "HEAD"]);
+        git(root.path(), &["add", "file"]);
+        git(
+            root.path(),
+            &[
+                "update-index",
+                "--add",
+                "--cacheinfo",
+                "160000",
+                &first,
+                "child",
+            ],
+        );
+        git(root.path(), &["commit", "-m", "base"]);
+        git(root.path(), &["branch", "base"]);
+        git(root.path(), &["checkout", "-b", "target"]);
+        std::fs::write(child.join("child-file"), "second").expect("child file");
+        git(&child, &["commit", "-am", "second"]);
+        let second = git(&child, &["rev-parse", "HEAD"]);
+        git(
+            root.path(),
+            &["update-index", "--cacheinfo", "160000", &second, "child"],
+        );
+        git(root.path(), &["commit", "-m", "new gitlink"]);
+        git(root.path(), &["checkout", "base"]);
+        std::fs::write(child.join("child-file"), "dirty child").expect("dirty");
+        let plan = AddPlan::prepare_checkout(
+            root.path(),
+            &serde_json::json!({"branch":"target"}),
+            ToolProvenance::Native,
+        )
+        .expect("plan");
+        let discovered = Box::new(
+            AddPlan::prepare_checkout(
+                root.path(),
+                &serde_json::json!({"branch":"target"}),
+                ToolProvenance::Native,
+            )
+            .expect("permission plan"),
+        )
+        .discover()
+        .await
+        .expect("discovery");
+        assert!(discovered.facets.iter().any(|facet| {
+            facet.nature == ToolNature::Write
+                && facet.resource.as_deref()
+                    == child
+                        .join(".git")
+                        .canonicalize()
+                        .expect("canonical child metadata")
+                        .to_str()
+        }));
+        let output = execute_approved(plan).await;
+        assert!(!output.result.is_error, "{}", output.result.content);
+        assert_eq!(git(root.path(), &["branch", "--show-current"]), "target");
+        assert_eq!(git(&child, &["rev-parse", "HEAD"]), second);
+        assert_eq!(
+            std::fs::read_to_string(child.join("child-file")).expect("dirty preserved"),
+            "dirty child"
+        );
+        git(&child, &["config", "core.fsmonitor", "touch helper-ran"]);
+        let index_before = std::fs::read(root.path().join(".git/index")).expect("index");
+        let plan = AddPlan::prepare_checkout(
+            root.path(),
+            &serde_json::json!({"branch":"base"}),
+            ToolProvenance::Native,
+        )
+        .expect("helper plan");
+        let output = execute_approved(plan).await;
+        assert!(
+            output.result.is_error && output.result.content.contains("submodule fsmonitor"),
+            "{}",
+            output.result.content
+        );
+        assert_eq!(git(root.path(), &["branch", "--show-current"]), "target");
+        assert_eq!(
+            std::fs::read(root.path().join(".git/index")).expect("index"),
+            index_before
+        );
+        assert!(!child.join("helper-ran").exists());
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn checkout_post_hook_refuses_before_branch_change() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = fixture();
+        let git = |args: &[&str]| {
+            let output = std::process::Command::new("git")
+                .args(args)
+                .current_dir(root.path())
+                .output()
+                .expect("git");
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            output.stdout
+        };
+        git(&["config", "user.name", "Fixture"]);
+        git(&["config", "user.email", "fixture@example.invalid"]);
+        git(&["config", "commit.gpgSign", "false"]);
+        git(&["add", "file"]);
+        git(&["commit", "-m", "base"]);
+        git(&["branch", "target"]);
+        let hook = root.path().join(".git/hooks/post-checkout");
+        std::fs::write(&hook, "#!/bin/sh\nprintf forbidden > marker\n").expect("hook");
+        std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o755))
+            .expect("executable");
+        let branch = git(&["branch", "--show-current"]);
+        let index = std::fs::read(root.path().join(".git/index")).expect("index");
+        let plan = AddPlan::prepare_checkout(
+            root.path(),
+            &serde_json::json!({"branch":"target"}),
+            ToolProvenance::Native,
+        )
+        .expect("plan");
+        let output = execute_approved(plan).await;
+        assert!(
+            output.result.is_error && output.result.content.contains("post-checkout"),
+            "{}",
+            output.result.content
+        );
+        assert_eq!(git(&["branch", "--show-current"]), branch);
+        assert_eq!(
+            std::fs::read(root.path().join(".git/index")).expect("index"),
+            index
+        );
+        assert!(!root.path().join("marker").exists());
+    }
+
+    #[tokio::test]
+    async fn checkout_index_only_filter_refuses_before_mutation() {
+        let root = fixture();
+        let git = |args: &[&str]| {
+            let output = std::process::Command::new("git")
+                .args(args)
+                .current_dir(root.path())
+                .output()
+                .expect("git");
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            output.stdout
+        };
+        git(&["config", "user.name", "Fixture"]);
+        git(&["config", "user.email", "fixture@example.invalid"]);
+        git(&["config", "commit.gpgSign", "false"]);
+        std::fs::write(root.path().join(".gitattributes"), "file -filter\n").expect("base rules");
+        git(&["add", "."]);
+        git(&["commit", "-m", "base"]);
+        git(&["branch", "base"]);
+        git(&["checkout", "-b", "target"]);
+        std::fs::write(root.path().join("file"), "target").expect("file");
+        git(&["commit", "-am", "target"]);
+        git(&["checkout", "base"]);
+        std::fs::write(root.path().join(".gitattributes"), "file filter=custom\n")
+            .expect("index rules");
+        git(&["add", ".gitattributes"]);
+        std::fs::write(root.path().join(".gitattributes"), "file -filter\n")
+            .expect("worktree rules");
+        git(&[
+            "config",
+            "filter.custom.smudge",
+            "sh -c 'printf forbidden > marker; cat'",
+        ]);
+        assert!(
+            String::from_utf8(git(&["check-attr", "--cached", "filter", "--", "file"]))
+                .expect("cached")
+                .contains("custom")
+        );
+        assert!(
+            String::from_utf8(git(&["check-attr", "filter", "--", "file"]))
+                .expect("current")
+                .contains("unset")
+        );
+        let head = git(&["rev-parse", "HEAD"]);
+        let index = std::fs::read(root.path().join(".git/index")).expect("index");
+        let plan = AddPlan::prepare_checkout(
+            root.path(),
+            &serde_json::json!({"branch":"target"}),
+            ToolProvenance::Native,
+        )
+        .expect("plan");
+        let output = execute_approved(plan).await;
+        assert!(
+            output.result.is_error && output.result.content.contains("filter"),
+            "{}",
+            output.result.content
+        );
+        assert_eq!(git(&["rev-parse", "HEAD"]), head);
+        assert_eq!(
+            std::fs::read(root.path().join(".git/index")).expect("index"),
+            index
+        );
+        assert_eq!(
+            std::fs::read(root.path().join("file")).expect("file"),
+            b"before"
+        );
+        assert!(!root.path().join("marker").exists());
+    }
+
+    #[tokio::test]
+    async fn checkout_target_filter_refuses_before_worktree_mutation() {
+        let root = fixture();
+        let git = |args: &[&str]| {
+            let output = std::process::Command::new("git")
+                .args(args)
+                .current_dir(root.path())
+                .output()
+                .expect("git");
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            output.stdout
+        };
+        git(&["config", "user.name", "Fixture"]);
+        git(&["config", "user.email", "fixture@example.invalid"]);
+        git(&["config", "commit.gpgSign", "false"]);
+        git(&["add", "file"]);
+        git(&["commit", "-m", "base"]);
+        git(&["branch", "base"]);
+        git(&["checkout", "-b", "filtered"]);
+        std::fs::write(root.path().join(".gitattributes"), "file filter=custom\n")
+            .expect("attributes");
+        std::fs::write(root.path().join("file"), "target").expect("target");
+        git(&["add", "."]);
+        git(&["commit", "-m", "filtered target"]);
+        git(&["checkout", "base"]);
+        git(&[
+            "config",
+            "filter.custom.smudge",
+            "sh -c 'printf forbidden > marker; cat'",
+        ]);
+        let head = git(&["rev-parse", "HEAD"]);
+        let index = std::fs::read(root.path().join(".git/index")).expect("index");
+        let plan = AddPlan::prepare_checkout(
+            root.path(),
+            &serde_json::json!({"branch":"filtered"}),
+            ToolProvenance::Native,
+        )
+        .expect("plan");
+        let output = execute_approved(plan).await;
+        assert!(
+            output.result.is_error && output.result.content.contains("filter"),
+            "{}",
+            output.result.content
+        );
+        assert_eq!(git(&["rev-parse", "HEAD"]), head);
+        assert_eq!(
+            std::fs::read(root.path().join(".git/index")).expect("index"),
+            index
+        );
+        assert_eq!(
+            std::fs::read(root.path().join("file")).expect("file"),
+            b"before"
+        );
+        assert!(!root.path().join("marker").exists());
+    }
+
+    #[tokio::test]
+    async fn real_commit_runs_configured_automatic_maintenance() {
+        let root = fixture();
+        let git = |args: &[&str]| {
+            let output = std::process::Command::new("git")
+                .args(args)
+                .current_dir(root.path())
+                .output()
+                .expect("git");
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        };
+        git(&["config", "user.name", "Fixture"]);
+        git(&["config", "user.email", "fixture@example.invalid"]);
+        git(&["config", "commit.gpgSign", "false"]);
+        git(&["config", "maintenance.auto", "true"]);
+        git(&["config", "maintenance.gc.enabled", "false"]);
+        git(&["config", "maintenance.loose-objects.enabled", "true"]);
+        git(&["config", "maintenance.loose-objects.auto", "1"]);
+        git(&["add", "file"]);
+        let pack_dir = root.path().join(".git/objects/pack");
+        assert_eq!(
+            std::fs::read_dir(&pack_dir)
+                .expect("pack directory")
+                .count(),
+            0
+        );
+        let plan = AddPlan::prepare_commit(
+            root.path(),
+            &serde_json::json!({"message":"maintenance"}),
+            ToolProvenance::Native,
+        )
+        .expect("plan");
+        let output = execute_approved(plan).await;
+        assert!(!output.result.is_error, "{}", output.result.content);
+        assert!(
+            std::fs::read_dir(&pack_dir)
+                .expect("packs")
+                .any(|entry| entry
+                    .expect("entry")
+                    .path()
+                    .extension()
+                    .is_some_and(|extension| extension == "pack")),
+            "automatic loose-object maintenance must produce a pack before completion"
+        );
+    }
+
+    #[tokio::test]
+    async fn real_commit_preserves_index_semantics_and_all_excludes_untracked() {
+        let root = fixture();
+        let git = |args: &[&str]| {
+            let result = std::process::Command::new("git")
+                .args(args)
+                .current_dir(root.path())
+                .output()
+                .expect("git");
+            assert!(
+                result.status.success(),
+                "{}",
+                String::from_utf8_lossy(&result.stderr)
+            );
+            String::from_utf8(result.stdout).expect("utf8")
+        };
+        git(&["config", "user.name", "Fixture"]);
+        git(&["config", "user.email", "fixture@example.invalid"]);
+        git(&["config", "commit.gpgSign", "false"]);
+        git(&["add", "file"]);
+        std::fs::write(root.path().join("file"), "unstaged").expect("edit");
+        std::fs::write(root.path().join("untracked"), "private").expect("untracked");
+        let plan = AddPlan::prepare_commit(
+            root.path(),
+            &serde_json::json!({"message":"index only"}),
+            ToolProvenance::Native,
+        )
+        .expect("plan");
+        let output = execute_approved(plan).await;
+        assert!(!output.result.is_error, "{}", output.result.content);
+        assert_eq!(git(&["show", "HEAD:file"]), "before");
+        assert_eq!(
+            std::fs::read_to_string(root.path().join("file")).expect("worktree"),
+            "unstaged"
+        );
+        let plan = AddPlan::prepare_commit(
+            root.path(),
+            &serde_json::json!({"message":"tracked", "all":true}),
+            ToolProvenance::Native,
+        )
+        .expect("all plan");
+        let output = execute_approved(plan).await;
+        assert!(!output.result.is_error, "{}", output.result.content);
+        assert_eq!(git(&["show", "HEAD:file"]), "unstaged");
+        assert_eq!(git(&["ls-tree", "--name-only", "HEAD"]), "file\n");
+        let head = git(&["rev-parse", "HEAD"]);
+        let plan = AddPlan::prepare_commit(
+            root.path(),
+            &serde_json::json!({"message":"no changes"}),
+            ToolProvenance::Native,
+        )
+        .expect("no-op plan");
+        assert!(execute_approved(plan).await.result.is_error);
+        assert_eq!(git(&["rev-parse", "HEAD"]), head);
+    }
+
+    #[tokio::test]
+    async fn commit_plan_binds_tracked_sources_and_rejects_add_proof() {
+        let root = fixture();
+        let output = std::process::Command::new("git")
+            .args(["add", "file"])
+            .current_dir(root.path())
+            .output()
+            .expect("stage");
+        assert!(output.status.success());
+        std::fs::write(root.path().join("untracked"), "not selected").expect("untracked");
+        let commit = AddPlan::prepare_commit(
+            root.path(),
+            &serde_json::json!({"message":"first"}),
+            ToolProvenance::Native,
+        )
+        .expect("commit plan");
+        assert_eq!(commit.paths, ["file"]);
+        assert_eq!(commit.request().tool_name(), "git_commit");
+        assert!(commit.facets.iter().any(|facet| {
+            facet
+                .description
+                .as_deref()
+                .is_some_and(|description| description.contains("maintenance.autoDetach=false"))
+        }));
+        let add = prepare(root.path());
+        let result = Box::new(commit).execute_stage(Box::new(proof(&add))).await;
+        let PreparedNormalStage::Complete(result) = result else {
+            panic!("exchanged proof accepted")
+        };
+        assert!(result.result.is_error);
+        let tool = super::super::GitCommitTool::new(root.path().to_owned());
+        assert!(
+            tool.execute(serde_json::json!({"message":"first"}))
+                .await
+                .is_error
+        );
+    }
+
+    #[tokio::test]
+    async fn commit_inspects_parent_filters_before_mutation_in_both_modes() {
+        for all in [false, true] {
+            let root = fixture();
+            assert!(
+                std::process::Command::new("git")
+                    .args(["add", "file"])
+                    .current_dir(root.path())
+                    .status()
+                    .expect("stage")
+                    .success()
+            );
+            std::fs::write(root.path().join(".gitattributes"), "file filter=probe\n")
+                .expect("attributes");
+            assert!(
+                std::process::Command::new("git")
+                    .args(["config", "filter.probe.clean", "touch helper-ran; cat"])
+                    .current_dir(root.path())
+                    .status()
+                    .expect("filter")
+                    .success()
+            );
+            let index = std::fs::read(root.path().join(".git/index")).expect("index");
+            let output = execute_approved(
+                AddPlan::prepare_commit(
+                    root.path(),
+                    &serde_json::json!({"message":"filtered", "all":all}),
+                    ToolProvenance::Native,
+                )
+                .expect("plan"),
+            )
+            .await;
+            assert!(
+                output.result.is_error && output.result.content.contains("configured filter"),
+                "{}",
+                output.result.content
+            );
+            assert!(!root.path().join("helper-ran").exists());
+            assert!(!root.path().join(".git/COMMIT_EDITMSG").exists());
+            assert_eq!(
+                index,
+                std::fs::read(root.path().join(".git/index")).expect("preserved index")
+            );
+        }
+    }
+
+    #[test]
+    fn directory_rules_include_empty_and_symlink_only_subdirectories() {
+        let entry = super::snapshot::Entry::Directory(vec![
+            ("empty".into(), super::snapshot::Entry::Directory(vec![])),
+            (
+                "links".into(),
+                super::snapshot::Entry::Directory(vec![(
+                    "link".into(),
+                    super::snapshot::Entry::Link("missing".into()),
+                )]),
+            ),
+        ]);
+        let root = std::path::Path::new("selected");
+        let mut paths = std::collections::BTreeSet::new();
+        super::selected_directory_rules(root, &entry, &mut paths);
+        for directory in [root.to_path_buf(), root.join("empty"), root.join("links")] {
+            assert!(paths.contains(&directory.join(".gitattributes")));
+            assert!(paths.contains(&directory.join(".gitignore")));
+        }
+        assert_eq!(paths.len(), 6);
+    }
+    use super::*;
+    use talos_core::tool::AgentTool;
+    use talos_permission::{
+        GrantScope, InteractionCapability, PermissionContext, PermissionEngine, PermissionMode,
+        PermissionSessionState,
+    };
+
+    fn proof(plan: &AddPlan) -> AdmittedInvocation {
+        let state = PermissionSessionState::new(PermissionEngine::with_workspace_root(
+            plan.workspace.clone(),
+        ));
+        let context = PermissionContext::new(
+            PermissionMode::Interactive,
+            InteractionCapability::Available,
+        );
+        let request = plan.request();
+        let proposal = state
+            .propose(&request, &context, GrantScope::Once)
+            .expect("proposal");
+        let pending = state
+            .approve_once(proposal, &request, &context)
+            .expect("approval");
+        state
+            .try_admit_prepared_invocation(pending, &request, &context, &plan.identity)
+            .expect("admission")
+    }
+
+    #[tokio::test]
+    async fn pull_configuration_stage_requires_fresh_admission_without_mutation() {
+        let root = fixture();
+        let input = serde_json::json!({});
+        let prepare = || {
+            AddPlan::prepare_pull(root.path(), &input, ToolProvenance::Native)
+                .expect("Pull preparation")
+        };
+        let plan = prepare();
+        assert_eq!(plan.operation.name(), "git_pull");
+        assert!(
+            plan.facets
+                .iter()
+                .all(|facet| facet.nature != ToolNature::Write)
+        );
+        assert!(
+            plan.facets
+                .iter()
+                .any(|facet| { facet.resource.as_deref() == Some("git:configuration-chain") })
+        );
+        assert!(plan.facets.iter().any(|facet| {
+            facet.nature == ToolNature::Read
+                && facet.resource.as_deref() == Some("git:pull-repository-metadata")
+        }));
+        assert!(plan.facets.iter().all(|facet| {
+            facet.resource.as_deref() != Some("git:pull-repository-metadata")
+                || facet.nature == ToolNature::Read
+        }));
+        let before = RepositoryState::capture(root.path()).expect("before");
+        let PreparedNormalStage::Complete(denied) =
+            Box::new(plan).execute_stage(Box::new(())).await
+        else {
+            panic!("missing proof continued")
+        };
+        assert!(denied.result.is_error);
+        let plan = prepare();
+        let admitted = proof(&plan);
+        let old_stage_proof = proof(&plan);
+        let PreparedNormalStage::Continue(next) =
+            Box::new(plan).execute_stage(Box::new(admitted)).await
+        else {
+            panic!("discovery failed")
+        };
+        assert!(
+            next.permission_profile()
+                .iter()
+                .all(|facet| facet.nature != ToolNature::Write)
+        );
+        assert!(
+            !next
+                .permission_profile()
+                .iter()
+                .any(|facet| { facet.resource.as_deref() == Some("git:configuration-chain") })
+        );
+        let PreparedNormalStage::Complete(replayed) =
+            next.execute_stage(Box::new(old_stage_proof)).await
+        else {
+            panic!("old proof continued")
+        };
+        assert!(replayed.result.is_error);
+        assert_eq!(
+            RepositoryState::capture(root.path()).expect("after"),
+            before
+        );
+        assert!(!root.path().join(".git/FETCH_HEAD").exists());
+
+        let next = Box::new(prepare()).discover().await.expect("configuration");
+        let admitted = proof(&next);
+        std::fs::OpenOptions::new()
+            .append(true)
+            .open(root.path().join(".git/config"))
+            .and_then(|mut file| {
+                use std::io::Write;
+                file.write_all(b"\n[pull]\n\trebase = true\n")
+            })
+            .expect("change config");
+        let PreparedNormalStage::Complete(changed) = next.execute_stage(Box::new(admitted)).await
+        else {
+            panic!("changed configuration continued")
+        };
+        assert!(changed.result.is_error);
+        assert!(changed.result.content.contains("changed"));
+        assert!(!root.path().join(".git/FETCH_HEAD").exists());
+    }
+
+    #[test]
+    fn pull_attribute_evidence_detects_creation_and_replacement() {
+        let root = tempfile::tempdir().expect("fixture");
+        let path = root.path().canonicalize().expect("root").join("attributes");
+        let budget = || snapshot::Budget {
+            entries: 32,
+            bytes: 4096,
+        };
+        let missing = PullAttribute::capture(&path, &mut budget()).expect("missing");
+        missing.revalidate(&mut budget()).expect("unchanged");
+        std::fs::write(&path, "* -filter\n").expect("create");
+        assert!(missing.revalidate(&mut budget()).is_err());
+        let present = PullAttribute::capture(&path, &mut budget()).expect("present");
+        std::fs::write(&path, "* filter=external\n").expect("change");
+        assert!(present.revalidate(&mut budget()).is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn pull_attribute_evidence_refuses_parent_and_leaf_links() {
+        let root = tempfile::tempdir().expect("fixture");
+        let root = root.path().canonicalize().expect("root");
+        std::fs::create_dir(root.join("rules")).expect("directory");
+        let path = root.join("rules/attributes");
+        std::fs::write(&path, "* -filter\n").expect("rules");
+        let budget = || snapshot::Budget {
+            entries: 32,
+            bytes: 4096,
+        };
+        let evidence = PullAttribute::capture(&path, &mut budget()).expect("capture");
+        std::fs::rename(root.join("rules"), root.join("moved")).expect("move");
+        std::os::unix::fs::symlink(root.join("moved"), root.join("rules")).expect("parent link");
+        assert!(evidence.revalidate(&mut budget()).is_err());
+        assert!(PullAttribute::capture(&path, &mut budget()).is_err());
+        let leaf = root.join("leaf");
+        std::os::unix::fs::symlink(root.join("moved/attributes"), &leaf).expect("leaf link");
+        assert!(PullAttribute::capture(&leaf, &mut budget()).is_err());
+    }
+
+    #[test]
+    fn pull_source_evidence_detects_content_and_missing_path_changes() {
+        let root = tempfile::tempdir().expect("fixture");
+        std::fs::write(root.path().join("file"), "before").expect("source");
+        let evidence = PullSources::capture(root.path(), vec!["file".into(), "missing".into()])
+            .expect("capture");
+        evidence.revalidate(root.path()).expect("unchanged");
+        std::fs::write(root.path().join("file"), "after").expect("change");
+        assert!(evidence.revalidate(root.path()).is_err());
+        std::fs::write(root.path().join("file"), "before").expect("restore");
+        std::fs::write(root.path().join("missing"), "created").expect("create");
+        assert!(evidence.revalidate(root.path()).is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn pull_source_evidence_refuses_redirected_parent() {
+        let root = tempfile::tempdir().expect("fixture");
+        let outside = tempfile::tempdir().expect("outside");
+        std::fs::create_dir(root.path().join("dir")).expect("directory");
+        std::fs::write(root.path().join("dir/file"), "same").expect("source");
+        std::fs::write(outside.path().join("file"), "same").expect("outside source");
+        let evidence = PullSources::capture(root.path(), vec!["dir/file".into()]).expect("capture");
+        std::fs::rename(root.path().join("dir"), root.path().join("old")).expect("move");
+        std::os::unix::fs::symlink(outside.path(), root.path().join("dir")).expect("redirect");
+        assert!(evidence.revalidate(root.path()).is_err());
+        assert!(PullSources::capture(root.path(), vec!["dir/file".into()]).is_err());
+    }
+
+    #[test]
+    fn pull_sparse_tree_listing_rejects_malformed_and_oversize_records() {
+        let prefix = b"dir/";
+        let good = b"100644 blob aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\tfile\0";
+        assert_eq!(
+            pull_sparse_names(prefix, good).expect("good"),
+            b"dir/file\0"
+        );
+        for bad in [
+            b"100644 blob zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz\tfile\0".as_slice(),
+            b"100644 blob 0000000000000000000000000000000000000000\tfile\0",
+            b"100644 tree aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\tdir\0",
+            b"100644 blob aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\t../file\0",
+            b"100644 blob aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\tfile",
+        ] {
+            assert!(pull_sparse_names(prefix, bad).is_err());
+        }
+        let large = vec![b'x'; 16 * 1024 * 1024 + 1];
+        assert!(pull_sparse_names(prefix, &large).is_err());
+    }
+
+    #[test]
+    fn pull_tracked_inventory_only_constructs_literal_paths() {
+        let root = tempfile::tempdir().expect("fixture");
+        let names =
+            pull_tracked_read_paths(root.path(), b"missing/leaf\0-leading\0").expect("names");
+        assert!(names.contains(&root.path().join("missing/leaf")));
+        assert!(!root.path().join("missing").exists());
+        for bad in [
+            b"../outside\0".as_slice(),
+            b"/absolute\0",
+            b"a//b\0",
+            b"a/./b\0",
+            b"unterminated",
+        ] {
+            assert!(pull_tracked_read_paths(root.path(), bad).is_err());
+        }
+    }
+
+    #[tokio::test]
+    async fn pull_prefetch_rebase_distinguishes_missing_empty_and_staged_index() {
+        for state in ["missing", "empty", "staged"] {
+            let root = fixture();
+            let mut commands = vec![vec!["config", "pull.rebase", "true"]];
+            if state != "missing" {
+                commands.push(vec!["add", "file"]);
+            }
+            for args in commands {
+                let output = std::process::Command::new("git")
+                    .current_dir(root.path())
+                    .args(args)
+                    .output()
+                    .expect("fixture Git");
+                assert!(output.status.success());
+            }
+            if state == "empty" {
+                let output = std::process::Command::new("git")
+                    .current_dir(root.path())
+                    .args(["read-tree", "--empty"])
+                    .output()
+                    .expect("empty index");
+                assert!(output.status.success());
+            }
+            let plan =
+                AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+                    .expect("Pull");
+            let plan = Box::new(plan).discover().await.expect("config");
+            if state == "missing" {
+                let plan = plan
+                    .inspect_pull_prefetch()
+                    .await
+                    .expect("unborn index accepted");
+                assert!(plan.phase == Phase::PullFetch);
+                assert!(!root.path().join(".git/index").exists());
+                assert!(!root.path().join(".git/FETCH_HEAD").exists());
+                continue;
+            }
+            let error = match plan.inspect_pull_prefetch().await {
+                Ok(_) => panic!("staged unborn rebase accepted"),
+                Err(error) => error,
+            };
+            assert!(
+                error
+                    .to_string()
+                    .contains("unborn branch with staged changes")
+            );
+            assert!(!root.path().join(".git/FETCH_HEAD").exists());
+        }
+    }
+
+    #[tokio::test]
+    async fn pull_prefetch_rejects_unmerged_index_without_fetch() {
+        use std::io::Write;
+        let root = fixture();
+        let blob = std::process::Command::new("git")
+            .current_dir(root.path())
+            .args(["hash-object", "-w", "file"])
+            .output()
+            .expect("fixture blob");
+        assert!(blob.status.success());
+        let oid = String::from_utf8(blob.stdout).expect("oid");
+        let mut index = std::process::Command::new("git")
+            .current_dir(root.path())
+            .args(["update-index", "--index-info"])
+            .stdin(std::process::Stdio::piped())
+            .spawn()
+            .expect("fixture index");
+        index
+            .stdin
+            .take()
+            .expect("index input")
+            .write_all(format!("100644 {} 1\tfile\n", oid.trim()).as_bytes())
+            .expect("conflict entry");
+        assert!(index.wait().expect("index result").success());
+        let plan =
+            AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+                .expect("Pull");
+        let plan = Box::new(plan).discover().await.expect("config");
+        // Exercise production inspection with a real conflict-stage index;
+        // exact frontier admission is separately covered by runner tests.
+        let error = match plan.inspect_pull_prefetch().await {
+            Ok(_) => panic!("unmerged index accepted"),
+            Err(error) => error,
+        };
+        assert!(error.to_string().contains("index conflicts"));
+        assert!(!root.path().join(".git/FETCH_HEAD").exists());
+    }
+
+    #[tokio::test]
+    async fn pull_prefetch_retains_configured_remote_and_rejects_changed_reflog() {
+        let root = fixture();
+        let git = |args: &[&str]| {
+            let output = std::process::Command::new("git")
+                .current_dir(root.path())
+                .args(args)
+                .output()
+                .expect("fixture Git");
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        };
+        git(&["symbolic-ref", "HEAD", "refs/heads/Topic"]);
+        git(&["config", "user.name", "Pull Fixture"]);
+        git(&["config", "user.email", "fixture@example.invalid"]);
+        git(&["config", "commit.gpgSign", "false"]);
+        git(&["add", "file"]);
+        git(&["commit", "-m", "original"]);
+        for (key, value) in [
+            (
+                "remote.Up.stream.url",
+                "git://example.invalid/prefetch-must-not-contact",
+            ),
+            ("remote.Up.stream.fetch", "+refs/heads/*:refs/custom/*"),
+            ("branch.Topic.remote", "Up.stream"),
+            ("branch.Topic.merge", "refs/heads/main"),
+            ("branch.Topic.rebase", "true"),
+        ] {
+            git(&["config", key, value]);
+        }
+        let plan =
+            AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+                .expect("Pull");
+        let plan = Box::new(plan).discover().await.expect("config");
+        let admitted = proof(&plan);
+        admitted
+            .consume_for_prepared(&plan.request(), &plan.identity)
+            .expect("prefetch admission");
+        let before = RepositoryState::capture(root.path()).expect("before");
+        let plan = plan.inspect_pull_prefetch().await.expect("prefetch");
+        assert!(plan.phase == Phase::PullFetch);
+        assert_eq!(plan.pull_remote.as_deref(), Some("Up.stream"));
+        assert_eq!(
+            plan.pull_destinations,
+            ["git://example.invalid/prefetch-must-not-contact"]
+        );
+        assert!(plan.facets.iter().any(|facet| {
+            facet.nature == ToolNature::Network
+                && facet.resource_kind == Some(ToolResourceKind::Remote)
+                && facet.resource.as_deref()
+                    == Some("git://example.invalid/prefetch-must-not-contact")
+        }));
+        assert_eq!(
+            plan.pull_before.as_ref().expect("retained").branch(),
+            Some("Topic")
+        );
+        assert_eq!(
+            plan.pull_destinations,
+            ["git://example.invalid/prefetch-must-not-contact"]
+        );
+        assert!(plan.facets.iter().any(|facet| {
+            facet.nature == ToolNature::Network
+                && facet.resource_kind == Some(ToolResourceKind::Remote)
+                && facet.resource.as_deref()
+                    == Some("git://example.invalid/prefetch-must-not-contact")
+        }));
+        assert!(plan.facets.iter().all(|facet| {
+            facet.nature != ToolNature::Write
+                || facet.resource.as_deref() == Some("git:pull-repository-metadata")
+                || facet.resource.as_deref() == plan.repository.git_dir.to_str()
+                || facet.resource.as_deref() == plan.repository.common_dir.to_str()
+        }));
+        assert_eq!(
+            RepositoryState::capture(root.path()).expect("after"),
+            before
+        );
+        assert!(!root.path().join(".git/FETCH_HEAD").exists());
+        let admitted = proof(&plan);
+        std::fs::write(root.path().join(".git/logs/HEAD"), b"changed reflog\n").expect("reflog");
+        let PreparedNormalStage::Complete(changed) = plan.execute_stage(Box::new(admitted)).await
+        else {
+            panic!("changed reflog continued")
+        };
+        assert!(changed.result.is_error && changed.result.content.contains("evidence"));
+        assert!(!root.path().join(".git/FETCH_HEAD").exists());
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn pull_fetch_refuses_executable_reference_transaction_hook() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = fixture();
+        let git = |args: &[&str]| {
+            let output = std::process::Command::new("git")
+                .current_dir(root.path())
+                .args(args)
+                .output()
+                .expect("fixture Git");
+            assert!(output.status.success());
+        };
+        git(&["config", "remote.origin.url", "git://example.invalid/repo"]);
+        let hook = root.path().join(".git/hooks/reference-transaction");
+        std::fs::write(&hook, "#!/bin/sh\ntouch hook-ran\n").expect("hook");
+        std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o755)).expect("hook mode");
+        let mut plan = Box::new(
+            AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+                .expect("Pull"),
+        )
+        .discover()
+        .await
+        .expect("configuration");
+        for _ in 0..8 {
+            if plan.phase == Phase::PullFetch {
+                break;
+            }
+            let admission = proof(&plan)
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .expect("stage proof");
+            plan = plan
+                .discover_pull_prefetch(&admission)
+                .await
+                .expect("Pull discovery");
+        }
+        assert!(plan.phase == Phase::PullFetch);
+        let admission = proof(&plan);
+        let output = match plan.execute_stage(Box::new(admission)).await {
+            PreparedNormalStage::Complete(output) => output,
+            PreparedNormalStage::Continue(_) => panic!("fetch stage unexpectedly continued"),
+        };
+        assert!(output.result.is_error);
+        assert!(output.result.content.contains("Executable Git fetch hooks"));
+        assert!(!root.path().join("hook-ran").exists());
+        assert!(!root.path().join(".git/FETCH_HEAD").exists());
+    }
+
+    #[tokio::test]
+    async fn pull_unsupported_transport_is_shown_but_never_dispatched() {
+        let root = fixture();
+        let output = std::process::Command::new("git")
+            .current_dir(root.path())
+            .args([
+                "config",
+                "remote.origin.url",
+                "https://example.invalid/repo",
+            ])
+            .output()
+            .expect("fixture Git");
+        assert!(output.status.success());
+        let mut plan = Box::new(
+            AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+                .expect("Pull"),
+        )
+        .discover()
+        .await
+        .expect("configuration");
+        for _ in 0..8 {
+            if plan.phase == Phase::PullFetch {
+                break;
+            }
+            let admission = proof(&plan)
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .expect("stage proof");
+            plan = plan
+                .discover_pull_prefetch(&admission)
+                .await
+                .expect("Pull discovery");
+        }
+        assert!(plan.phase == Phase::PullFetch);
+        assert!(plan.facets.iter().any(|facet| {
+            facet.nature == ToolNature::Network
+                && facet.resource.as_deref() == Some("https://example.invalid/repo")
+        }));
+        let admission = proof(&plan);
+        let output = match plan.execute_stage(Box::new(admission)).await {
+            PreparedNormalStage::Complete(output) => output,
+            PreparedNormalStage::Continue(_) => panic!("fetch stage unexpectedly continued"),
+        };
+        assert!(output.result.is_error);
+        assert!(output.result.content.contains("transport"));
+        assert!(!root.path().join(".git/FETCH_HEAD").exists());
+    }
+
+    #[tokio::test]
+    async fn pull_fetch_requires_every_metadata_write_admission_before_dispatch() {
+        for missing in ["gitdir", "common"] {
+            let root = fixture();
+            let input = serde_json::json!({});
+            let mut plan = Box::new(
+                AddPlan::prepare_pull(root.path(), &input, ToolProvenance::Native).expect("Pull"),
+            )
+            .discover()
+            .await
+            .expect("configuration");
+            for _ in 0..8 {
+                if plan.phase == Phase::PullFetch {
+                    break;
+                }
+                let admission = proof(&plan)
+                    .consume_for_prepared(&plan.request(), &plan.identity)
+                    .expect("stage proof");
+                plan = plan
+                    .discover_pull_prefetch(&admission)
+                    .await
+                    .expect("Pull discovery");
+            }
+            assert!(plan.phase == Phase::PullFetch);
+            let missing_resource = match missing {
+                "gitdir" => plan.repository.git_dir.to_str().expect("gitdir"),
+                "common" => plan.repository.common_dir.to_str().expect("common dir"),
+                _ => "git:pull-repository-metadata",
+            };
+            plan.facets.retain(|facet| {
+                !(facet.nature == ToolNature::Write
+                    && facet.resource.as_deref() == Some(missing_resource))
+            });
+            let before = RepositoryState::capture(root.path()).expect("before");
+            let state = PermissionSessionState::new(PermissionEngine::with_workspace_root(
+                plan.workspace.clone(),
+            ));
+            let context = PermissionContext::new(
+                PermissionMode::Interactive,
+                InteractionCapability::Available,
+            );
+            let request = plan.request();
+            assert!(
+                state.propose(&request, &context, GrantScope::Once).is_err(),
+                "missing {missing} must fail permission compilation"
+            );
+            assert_eq!(
+                RepositoryState::capture(root.path()).expect("after"),
+                before
+            );
+            assert!(!root.path().join(".git/FETCH_HEAD").exists());
+        }
+    }
+
+    #[tokio::test]
+    async fn pull_config_admission_cannot_authorize_graph_probes() {
+        let root = fixture();
+        let input = serde_json::json!({});
+        let tool = super::super::GitPullTool::new(root.path().to_path_buf());
+        let prepared = tool
+            .prepare_normalized_with_provenance(&input, ToolProvenance::Native)
+            .expect("prepare")
+            .expect("prepared Pull");
+        #[cfg(unix)]
+        assert!(prepared.cleanup_receipt().is_some());
+        let PreparedNormalStage::Complete(denied) = prepared.execute_stage(Box::new(())).await
+        else {
+            panic!("missing admission continued")
+        };
+        assert!(denied.result.is_error);
+
+        let plan =
+            AddPlan::prepare_pull(root.path(), &input, ToolProvenance::Native).expect("Pull");
+        let old_proof = proof(&plan);
+        let plan = Box::new(plan).discover().await.expect("configuration");
+        let PreparedNormalStage::Complete(output) = plan.execute_stage(Box::new(old_proof)).await
+        else {
+            panic!("configuration proof authorized graph inspection")
+        };
+        assert!(output.result.is_error && output.result.content.contains("does not authorize"));
+
+        let plan =
+            AddPlan::prepare_pull(root.path(), &input, ToolProvenance::Native).expect("Pull");
+        let mut history = talos_core::tool::PreparedStageHistory::default();
+        assert!(history.record_profile(&plan.identity, &plan.facets));
+        let mut plan = Box::new(plan).discover().await.expect("config");
+        assert!(plan.pull_evidence.is_none());
+        assert!(plan.facets.iter().any(|facet| {
+            facet.nature == ToolNature::Read
+                && facet.resource.as_deref()
+                    == plan.repository.common_dir.join("info/grafts").to_str()
+        }));
+        for _ in 0..5 {
+            assert!(history.record_profile(&plan.identity, &plan.facets));
+            let admitted = proof(&plan)
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .expect("fresh exact inventory admission");
+            plan = plan
+                .discover_pull_prefetch(&admitted)
+                .await
+                .expect("inventory/prefetch");
+            if plan.phase == Phase::PullFetch {
+                break;
+            }
+            if plan.pull_graph_paths.as_ref().is_some_and(|paths| {
+                paths.contains(&plan.repository.common_dir.join("info/grafts"))
+            }) {
+                assert!(plan.pull_evidence.is_none());
+                assert!(plan.facets.iter().any(|facet| {
+                    facet.nature == ToolNature::Read
+                        && facet.resource.as_deref()
+                            == plan.repository.common_dir.join("info/grafts").to_str()
+                }));
+            }
+            assert!(plan.pull_before.is_none(), "no probes during inventory");
+        }
+        assert!(plan.phase == Phase::PullFetch);
+        assert!(history.record_profile(&plan.identity, &plan.facets));
+        assert!(!root.path().join(".git/FETCH_HEAD").exists());
+    }
+
+    #[tokio::test]
+    async fn pull_sparse_index_requires_object_discovery_before_source_capture() {
+        let root = fixture();
+        let git = |args: &[&str]| {
+            let output = std::process::Command::new("git")
+                .current_dir(root.path())
+                .args(args)
+                .output()
+                .expect("Git fixture");
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        };
+        git(&["config", "user.name", "Fixture"]);
+        git(&["config", "user.email", "fixture@example.invalid"]);
+        git(&["add", "file"]);
+        git(&["commit", "-m", "base"]);
+        std::fs::create_dir(root.path().join("kept")).expect("kept");
+        std::fs::write(root.path().join("kept/child"), "child").expect("child");
+        std::fs::create_dir(root.path().join("excluded")).expect("excluded");
+        std::fs::write(root.path().join("excluded/child"), "outside cone").expect("excluded child");
+        // More than 16 KiB of ls-tree output; identical blobs keep the object
+        // inventory small so this exercises listing capacity, not object count.
+        for number in 0..300 {
+            std::fs::write(
+                root.path().join(format!("excluded/entry-{number:04}")),
+                "outside cone",
+            )
+            .expect("large sparse tree entry");
+        }
+        git(&["add", "."]);
+        git(&["commit", "-m", "child"]);
+        git(&["sparse-checkout", "init", "--cone"]);
+        git(&["sparse-checkout", "set", "--sparse-index", "kept"]);
+        git(&["config", "index.sparse", "true"]);
+        git(&["config", "pull.rebase", "true"]);
+        git(&["branch", "-m", "Topic"]);
+        git(&["config", "remote.origin.url", "/missing-fixture-remote"]);
+        git(&[
+            "config",
+            "remote.origin.fetch",
+            "+refs/heads/*:refs/remotes/origin/*",
+        ]);
+        git(&["config", "branch.Topic.remote", "origin"]);
+        git(&["config", "branch.Topic.merge", "refs/heads/Topic"]);
+        git(&["update-ref", "refs/remotes/origin/Topic", "HEAD"]);
+        let index = super::super::pull_state::decode_index(&root.path().join(".git/index"), 40)
+            .expect("sparse index")
+            .0;
+        assert!(
+            index
+                .entries()
+                .iter()
+                .any(|entry| entry.mode.bits() == 0o040000)
+        );
+        let plan =
+            AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+                .expect("Pull");
+        let mut history = talos_core::tool::PreparedStageHistory::default();
+        assert!(history.record_profile(&plan.identity, &plan.facets));
+        let mut plan = Box::new(plan).discover().await.expect("configuration");
+        let original_index = std::fs::read(root.path().join(".git/index")).expect("index bytes");
+        let mut saw_descendant_continuation = false;
+        let mut stages = 1;
+        let mut stage_trace = Vec::new();
+        for _ in 0..8 {
+            assert!(history.record_profile(&plan.identity, &plan.facets));
+            stages += 1;
+            let admission = proof(&plan)
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .expect("admission");
+            match plan.discover_pull_prefetch(&admission).await {
+                Ok(next) => {
+                    stage_trace.push((
+                        stages,
+                        next.pull_graph_paths.is_some(),
+                        next.pull_inventory
+                            .as_ref()
+                            .is_some_and(|inventory| inventory.complete()),
+                        next.facets.len(),
+                    ));
+                    let descendant = next.repository.workdir.join("excluded/child");
+                    if next
+                        .facets
+                        .iter()
+                        .any(|facet| facet.resource.as_deref() == descendant.to_str())
+                        && !admission.iter().any(|token| {
+                            token.authorizes_path(
+                                "git_pull",
+                                ToolNature::Read,
+                                &next.workspace,
+                                descendant.to_str().expect("path"),
+                            )
+                        })
+                    {
+                        assert!(next.pull_sources.is_none());
+                        assert!(next.phase == Phase::PullPreparation);
+                        saw_descendant_continuation = true;
+                    }
+                    if next.phase == Phase::PullFetch {
+                        assert!(
+                            stages <= 6,
+                            "sparse preparation must reserve fetch and integration: {stages}; trace {stage_trace:?}"
+                        );
+                        assert!(saw_descendant_continuation);
+                        assert!(next.facets.iter().any(|facet| {
+                            facet.nature == ToolNature::Write
+                                && facet.resource.as_deref() == Some("git:pull-repository-metadata")
+                        }));
+                        assert!(next.facets.iter().any(|facet| {
+                            facet.nature == ToolNature::Write
+                                && facet.resource.as_deref() == next.repository.git_dir.to_str()
+                        }));
+                        assert!(!next.facets.iter().any(|facet| {
+                            facet.nature == ToolNature::Write
+                                && facet.resource.as_deref() == next.repository.workdir.to_str()
+                        }));
+                        assert!(history.record_profile(&next.identity, &next.facets));
+                        assert!(
+                            history.record_profile(&PreparedPlanIdentity::new(), &next.facets),
+                            "integration must fit actual shared history after fetch reservation"
+                        );
+                        assert_eq!(
+                            std::fs::read(root.path().join(".git/index")).expect("index after"),
+                            original_index
+                        );
+                        assert!(next.pull_graph_paths.as_ref().is_some_and(|paths| {
+                            paths.iter().any(|path| path.ends_with("excluded/child"))
+                        }));
+                        return;
+                    }
+                    plan = next
+                }
+                Err(error) => {
+                    panic!("sparse expansion failed: {error}");
+                }
+            }
+        }
+        panic!("sparse index did not reach prepared fetch");
+    }
+
+    #[tokio::test]
+    async fn pull_rebase_clean_probes_preserve_index_and_touch_semantics() {
+        for state in [
+            "clean",
+            "touch",
+            "dirty",
+            "staged",
+            "autostash",
+            "pull-autostash",
+            "pull-no-autostash",
+            "symbolic-policy",
+            "external-orderfile",
+            "binary",
+            "deleted",
+            "mode",
+            "gitlink",
+        ] {
+            let root = fixture();
+            let order_root = tempfile::tempdir().expect("external order fixture");
+            let order_path = order_root
+                .path()
+                .canonicalize()
+                .expect("order root")
+                .join("order");
+            let git = |args: &[&str]| {
+                let output = std::process::Command::new("git")
+                    .current_dir(root.path())
+                    .args(args)
+                    .output()
+                    .expect("fixture Git");
+                assert!(
+                    output.status.success(),
+                    "{}",
+                    String::from_utf8_lossy(&output.stderr)
+                );
+            };
+            git(&["config", "user.name", "Fixture"]);
+            git(&["config", "user.email", "fixture@example.invalid"]);
+            git(&["config", "commit.gpgSign", "false"]);
+            git(&["add", "file"]);
+            git(&["commit", "-m", "base"]);
+            git(&["config", "pull.rebase", "true"]);
+            if state == "external-orderfile" {
+                std::fs::write(&order_path, "file\n").expect("order file");
+                git(&[
+                    "config",
+                    "diff.orderFile",
+                    order_path.to_str().expect("path"),
+                ]);
+            }
+            if state == "symbolic-policy" {
+                git(&["branch", "-m", "Topic"]);
+                git(&["symbolic-ref", "refs/heads/Alias", "refs/heads/Topic"]);
+                git(&["symbolic-ref", "HEAD", "refs/heads/Alias"]);
+                git(&["config", "branch.Alias.rebase", "false"]);
+                git(&["config", "branch.Topic.rebase", "true"]);
+            }
+            if state == "gitlink" {
+                let head = std::process::Command::new("git")
+                    .current_dir(root.path())
+                    .args(["rev-parse", "HEAD"])
+                    .output()
+                    .expect("head");
+                assert!(head.status.success());
+                let oid = String::from_utf8(head.stdout).expect("oid");
+                git(&[
+                    "update-index",
+                    "--add",
+                    "--cacheinfo",
+                    &format!("160000,{},child", oid.trim()),
+                ]);
+            }
+            if state == "binary" {
+                std::fs::write(root.path().join("file"), b"changed\0binary").expect("binary");
+            } else if state == "deleted" {
+                std::fs::remove_file(root.path().join("file")).expect("delete");
+            } else if state == "mode" {
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    git(&["config", "core.fileMode", "true"]);
+                    std::fs::set_permissions(
+                        root.path().join("file"),
+                        std::fs::Permissions::from_mode(0o755),
+                    )
+                    .expect("mode");
+                }
+                #[cfg(not(unix))]
+                continue;
+            }
+            if state == "touch" {
+                let file = std::fs::OpenOptions::new()
+                    .write(true)
+                    .open(root.path().join("file"))
+                    .expect("file");
+                file.set_modified(
+                    std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1234567890),
+                )
+                .expect("mtime");
+            } else if matches!(
+                state,
+                "dirty" | "staged" | "autostash" | "pull-autostash" | "pull-no-autostash"
+            ) {
+                std::fs::write(root.path().join("file"), "changed\n").expect("change");
+                if state == "staged" {
+                    git(&["add", "file"]);
+                }
+                if state == "autostash" {
+                    git(&["config", "rebase.autostash", "true"]);
+                }
+                if state == "pull-autostash" {
+                    git(&["config", "rebase.autostash", "false"]);
+                    git(&["config", "pull.autostash", "true"]);
+                }
+                if state == "pull-no-autostash" {
+                    git(&["config", "rebase.autostash", "true"]);
+                    git(&["config", "pull.autostash", "false"]);
+                }
+            }
+            let index = std::fs::read(root.path().join(".git/index")).expect("index");
+            let plan =
+                AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+                    .expect("prepare");
+            let mut plan = Box::new(plan).discover().await.expect("configuration");
+            let mut outcome = None;
+            let mut late_source_admission = false;
+            for _ in 0..8 {
+                let admission = proof(&plan)
+                    .consume_for_prepared(&plan.request(), &plan.identity)
+                    .expect("admission");
+                match plan.discover_pull_prefetch(&admission).await {
+                    Ok(next) if next.phase == Phase::PullFetch => {
+                        if state == "external-orderfile" {
+                            assert!(
+                                next.facets
+                                    .iter()
+                                    .any(|facet| facet.nature == ToolNature::Read
+                                        && facet.resource.as_deref() == order_path.to_str())
+                            );
+                            assert!(
+                                next.pull_attributes
+                                    .iter()
+                                    .any(|entry| entry.path == order_path)
+                            );
+                            std::fs::write(&order_path, "changed\n").expect("change order file");
+                            assert!(
+                                next.revalidate().is_err(),
+                                "external rule change must invalidate plan"
+                            );
+                        }
+                        if state == "symbolic-policy" {
+                            assert!(
+                                late_source_admission,
+                                "alias policy must require fresh source admission"
+                            );
+                            assert!(!next.pull_attribute_paths.is_empty());
+                            assert_eq!(next.pull_attributes.len(), next.pull_attribute_paths.len());
+                        }
+                        if matches!(state, "autostash" | "pull-autostash") {
+                            let source = next.repository.workdir.join("file");
+                            assert!(
+                                !next.facets.iter().any(|facet| {
+                                    facet.nature == ToolNature::Read
+                                        && facet.resource.as_deref() == source.to_str()
+                                }),
+                                "autostash must not request prefetch clean-source Read"
+                            );
+                            assert!(next.pull_sources.is_none());
+                            assert!(next.pull_attributes.is_empty());
+                        }
+                        outcome = Some(Ok(()));
+                        break;
+                    }
+                    Ok(next) => {
+                        if state == "symbolic-policy" {
+                            let source = next.repository.workdir.join("file");
+                            if next
+                                .facets
+                                .iter()
+                                .any(|facet| facet.resource.as_deref() == source.to_str())
+                                && !admission.iter().any(|token| {
+                                    token.authorizes_path(
+                                        "git_pull",
+                                        ToolNature::Read,
+                                        &next.workspace,
+                                        source.to_str().expect("path"),
+                                    )
+                                })
+                            {
+                                assert!(next.pull_sources.is_none());
+                                assert!(next.pull_attributes.is_empty());
+                                late_source_admission = true;
+                            }
+                        }
+                        plan = next;
+                    }
+                    Err(error) => {
+                        outcome = Some(Err(error));
+                        break;
+                    }
+                }
+            }
+            let outcome = outcome.expect("bounded preparation");
+            if matches!(
+                state,
+                "dirty" | "staged" | "binary" | "deleted" | "mode" | "pull-no-autostash"
+            ) {
+                let error = outcome.expect_err("dirty source must refuse").to_string();
+                assert!(
+                    error.contains(if state == "staged" {
+                        "clean index"
+                    } else {
+                        "clean worktree"
+                    }),
+                    "{state}: {error}"
+                );
+            } else {
+                outcome.unwrap_or_else(|error| panic!("{state}: {error}"));
+            }
+            assert_eq!(
+                std::fs::read(root.path().join(".git/index")).expect("index after"),
+                index,
+                "{state}"
+            );
+            assert!(!root.path().join(".git/index.lock").exists());
+            assert!(!root.path().join(".git/FETCH_HEAD").exists());
+        }
+    }
+
+    #[tokio::test]
+    async fn pull_rebase_filter_refuses_without_running_helper() {
+        let root = fixture();
+        for args in [
+            vec!["config", "user.name", "Fixture"],
+            vec!["config", "user.email", "fixture@example.invalid"],
+            vec!["config", "commit.gpgSign", "false"],
+            vec!["add", "file"],
+            vec!["commit", "-m", "base"],
+            vec!["config", "pull.rebase", "true"],
+            vec!["config", "filter.probe.clean", "touch helper-ran; cat"],
+        ] {
+            let output = std::process::Command::new("git")
+                .current_dir(root.path())
+                .args(args)
+                .output()
+                .expect("fixture Git");
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+        std::fs::write(root.path().join(".gitattributes"), "file filter=probe\n").expect("rules");
+        let plan =
+            AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+                .expect("prepare");
+        let mut plan = Box::new(plan).discover().await.expect("configuration");
+        let mut refused = false;
+        for _ in 0..8 {
+            let admission = proof(&plan)
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .expect("fresh admission");
+            match plan.discover_pull_prefetch(&admission).await {
+                Ok(next) => {
+                    assert!(
+                        next.phase != Phase::PullFetch,
+                        "filtered source reached fetch"
+                    );
+                    plan = next;
+                }
+                Err(error) => {
+                    assert!(error.to_string().contains("configured filter"), "{error}");
+                    refused = true;
+                    break;
+                }
+            }
+        }
+        assert!(refused);
+        assert!(!root.path().join("helper-ran").exists());
+        assert!(!root.path().join(".git/FETCH_HEAD").exists());
+    }
+
+    #[tokio::test]
+    async fn pull_tracking_inventory_uses_shared_stage_budget() {
+        let root = fixture();
+        let git = |args: &[&str]| {
+            let output = std::process::Command::new("git")
+                .current_dir(root.path())
+                .args(args)
+                .output()
+                .expect("fixture Git");
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        };
+        git(&["symbolic-ref", "HEAD", "refs/heads/Topic"]);
+        git(&["config", "user.name", "Fixture"]);
+        git(&["config", "user.email", "fixture@example.invalid"]);
+        git(&["config", "commit.gpgSign", "false"]);
+        git(&["add", "file"]);
+        git(&["commit", "-m", "base"]);
+        git(&["config", "remote.origin.url", "/missing-fixture-remote"]);
+        git(&[
+            "config",
+            "remote.origin.fetch",
+            "+refs/heads/*:refs/remotes/origin/*",
+        ]);
+        git(&["config", "branch.Topic.remote", "origin"]);
+        git(&["config", "branch.Topic.merge", "refs/heads/Topic"]);
+        git(&["config", "pull.rebase", "true"]);
+        git(&["update-ref", "refs/remotes/origin/Topic", "HEAD"]);
+        let plan =
+            AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+                .expect("Pull");
+        let mut history = talos_core::tool::PreparedStageHistory::default();
+        assert!(history.record_profile(&plan.identity, &plan.facets));
+        let mut plan = Box::new(plan).discover().await.expect("configuration");
+        let mut stages = 1;
+        while plan.phase != Phase::PullFetch {
+            assert!(
+                history.record_profile(&plan.identity, &plan.facets),
+                "inventory exhausted stage budget"
+            );
+            stages += 1;
+            let admission = proof(&plan)
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .expect("fresh admission");
+            plan = plan
+                .discover_pull_prefetch(&admission)
+                .await
+                .expect("inventory");
+        }
+        assert!(history.record_profile(&plan.identity, &plan.facets));
+        assert!(
+            stages <= 6,
+            "fetch and integration stages must remain available"
+        );
+        for path in [
+            plan.repository.workdir.join(".gitattributes"),
+            plan.repository.common_dir.join("info/attributes"),
+        ] {
+            assert!(
+                plan.facets
+                    .iter()
+                    .any(|facet| facet.nature == ToolNature::Read
+                        && facet.resource_kind == Some(ToolResourceKind::Path)
+                        && facet.resource.as_deref() == path.to_str())
+            );
+        }
+        assert!(history.record_profile(&PreparedPlanIdentity::new(), &plan.facets));
+        assert!(!root.path().join(".git/FETCH_HEAD").exists());
+    }
+
+    #[tokio::test]
+    async fn pull_promisor_refuses_before_any_prefetch_probe() {
+        let root = fixture();
+        assert!(
+            std::process::Command::new("git")
+                .current_dir(root.path())
+                .args(["config", "remote.origin.promisor", "true"])
+                .status()
+                .expect("config")
+                .success()
+        );
+        let plan =
+            AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+                .expect("Pull");
+        let plan = Box::new(plan).discover().await.expect("config");
+        assert!(
+            plan.config
+                .as_ref()
+                .expect("config")
+                .prepare_pull_inspection()
+                .is_err()
+        );
+        let error = plan
+            .inspect_pull_prefetch()
+            .await
+            .err()
+            .expect("promisor refused");
+        assert!(error.to_string().contains("promisor remote"));
+        assert!(!root.path().join(".git/FETCH_HEAD").exists());
+    }
+
+    #[tokio::test]
+    async fn receiver_reference_tree_refuses_exact_paths_without_closed_capability() {
+        let sender = fixture();
+        let receiver = fixture();
+        let plan = AddPlan::prepare_push(
+            sender.path(),
+            &serde_json::json!({"remote": receiver.path()}),
+            ToolProvenance::Native,
+        )
+        .expect("plan");
+        let mut plan = Box::new(plan).discover().await.expect("sender discovery");
+        let authorization = proof(&plan)
+            .consume_for_prepared(&plan.request(), &plan.identity)
+            .expect("roots admission");
+        plan = plan.discover_receiver_roots(&authorization).expect("roots");
+        let authorization = proof(&plan)
+            .consume_for_prepared(&plan.request(), &plan.identity)
+            .expect("metadata admission");
+        plan = plan
+            .discover_receiver_metadata(&authorization)
+            .expect("metadata");
+        assert!(plan.require_receiver_reference_capability().is_ok());
+        let stale = proof(&plan);
+        plan.facets
+            .retain(|facet| facet.resource.as_deref() != Some("git:receiver-reference-tree"));
+        assert!(
+            stale
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .is_err()
+        );
+        let admission = proof(&plan);
+        let PreparedNormalStage::Complete(output) = plan.execute_stage(Box::new(admission)).await
+        else {
+            panic!("exact directory tokens cannot authorize descendant reads");
+        };
+        assert!(output.result.is_error);
+        assert!(
+            output
+                .result
+                .content
+                .contains("reference tree discovery capability missing")
+        );
+    }
+
+    #[tokio::test]
+    async fn prepared_push_transfers_objects_to_admitted_git_daemon() {
+        let root = fixture();
+        let receiver = tempfile::tempdir().expect("receiver");
+        let git = |cwd: &Path, args: &[&str]| {
+            let output = std::process::Command::new("git")
+                .current_dir(cwd)
+                .args(args)
+                .output()
+                .expect("git");
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            String::from_utf8(output.stdout)
+                .expect("utf8")
+                .trim()
+                .to_owned()
+        };
+        git(receiver.path(), &["init", "--bare"]);
+        std::fs::write(root.path().join("payload"), "approved object transfer\n").expect("payload");
+        git(root.path(), &["add", "payload"]);
+        git(
+            root.path(),
+            &[
+                "-c",
+                "user.name=Test",
+                "-c",
+                "user.email=test@example.invalid",
+                "commit",
+                "-m",
+                "fixture",
+            ],
+        );
+        let expected = git(root.path(), &["rev-parse", "HEAD"]);
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("port");
+        let port = listener.local_addr().expect("address").port();
+        drop(listener);
+        let mut daemon = tokio::process::Command::new("git")
+            .args([
+                "daemon",
+                "--reuseaddr",
+                "--listen=127.0.0.1",
+                "--export-all",
+                "--enable=receive-pack",
+            ])
+            .arg(format!("--port={port}"))
+            .arg(format!(
+                "--base-path={}",
+                receiver.path().parent().expect("parent").display()
+            ))
+            .arg(receiver.path())
+            .kill_on_drop(true)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .expect("daemon");
+        tokio::time::timeout(std::time::Duration::from_secs(5), async {
+            loop {
+                if std::net::TcpStream::connect_timeout(
+                    &std::net::SocketAddr::from(([127, 0, 0, 1], port)),
+                    std::time::Duration::from_millis(20),
+                )
+                .is_ok()
+                {
+                    break;
+                }
+                assert!(daemon.try_wait().expect("daemon state").is_none());
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .expect("daemon ready");
+        let destination = format!(
+            "git://127.0.0.1:{port}/{}",
+            receiver.path().file_name().expect("name").to_string_lossy()
+        );
+        let input = serde_json::json!({"remote":destination,"branch":"HEAD:refs/heads/approved"});
+        // Both stages reject absent proof before contacting the receiver.
+        let plan =
+            AddPlan::prepare_push(root.path(), &input, ToolProvenance::Native).expect("plan");
+        let PreparedNormalStage::Complete(denied) =
+            Box::new(plan).execute_stage(Box::new(())).await
+        else {
+            panic!("unapproved discovery continued");
+        };
+        assert!(denied.result.is_error);
+        let plan =
+            AddPlan::prepare_push(root.path(), &input, ToolProvenance::Native).expect("plan");
+        let next = Box::new(plan).discover().await.expect("discovery");
+        assert!(next.execute(Box::new(())).await.result.is_error);
+        assert!(git(receiver.path(), &["for-each-ref"]).is_empty());
+
+        // Discovery approval cannot authorize the generated mutation plan.
+        let plan =
+            AddPlan::prepare_push(root.path(), &input, ToolProvenance::Native).expect("plan");
+        let stale = proof(&plan);
+        let admission = proof(&plan);
+        let PreparedNormalStage::Continue(next) =
+            Box::new(plan).execute_stage(Box::new(admission)).await
+        else {
+            panic!("discovery failed");
+        };
+        let denied = next.execute(Box::new(stale)).await;
+        assert!(denied.result.is_error && denied.result.content.contains("does not authorize"));
+        assert!(git(receiver.path(), &["for-each-ref"]).is_empty());
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let hook = root.path().join(".git/hooks/pre-push");
+            let plan =
+                AddPlan::prepare_push(root.path(), &input, ToolProvenance::Native).expect("plan");
+            let next = Box::new(plan).discover().await.expect("discovery");
+            let admission = proof(&next);
+            // A hook appearing after approval must never run under Git's
+            // executable permission, even though its inspection was admitted.
+            std::fs::write(&hook, "#!/bin/sh\nprintf forbidden > hook-ran\n").expect("hook");
+            std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o755)).expect("mode");
+            let denied = next.execute(Box::new(admission)).await;
+            assert!(denied.result.is_error, "{}", denied.result.content);
+            assert!(!root.path().join("hook-ran").exists());
+            assert!(git(receiver.path(), &["for-each-ref"]).is_empty());
+            std::fs::remove_file(hook).expect("remove fixture hook");
+        }
+        let plan =
+            AddPlan::prepare_push(root.path(), &input, ToolProvenance::Native).expect("plan");
+        let next = Box::new(plan).discover().await.expect("discovery");
+        let admission = proof(&next);
+        let output = next.execute(Box::new(admission)).await;
+        assert!(!output.result.is_error, "{}", output.result.content);
+        assert_eq!(
+            git(receiver.path(), &["rev-parse", "refs/heads/approved"]),
+            expected
+        );
+        assert_eq!(
+            git(receiver.path(), &["show", "approved:payload"]),
+            "approved object transfer"
+        );
+        // The receive side owns its own policy. A denied deletion must report
+        // failure without claiming success or removing the existing ref.
+        git(receiver.path(), &["config", "receive.denyDeletes", "true"]);
+        let deletion = serde_json::json!({"remote":destination,"branch":":refs/heads/approved"});
+        let plan = AddPlan::prepare_push(root.path(), &deletion, ToolProvenance::Native)
+            .expect("delete plan");
+        let next = Box::new(plan).discover().await.expect("discovery");
+        let admission = proof(&next);
+        let output = next.execute(Box::new(admission)).await;
+        assert!(output.result.is_error, "{}", output.result.content);
+        assert!(
+            output.result.content.contains("denied") || output.result.content.contains("rejected"),
+            "{}",
+            output.result.content
+        );
+        assert!(
+            output
+                .result
+                .content
+                .contains("inspect every destination before retrying")
+        );
+        assert_eq!(
+            git(receiver.path(), &["rev-parse", "refs/heads/approved"]),
+            expected
+        );
+        git(
+            root.path(),
+            &["config", "remote.multiple.url", &destination],
+        );
+        git(
+            root.path(),
+            &["config", "--add", "remote.multiple.pushurl", &destination],
+        );
+        let missing = format!("git://127.0.0.1:{port}/missing-receiver.git");
+        git(
+            root.path(),
+            &["config", "--add", "remote.multiple.pushurl", &missing],
+        );
+        let input = serde_json::json!({"remote":"multiple", "branch":"HEAD:refs/heads/partial"});
+        let plan = AddPlan::prepare_push(root.path(), &input, ToolProvenance::Native)
+            .expect("multi-target plan");
+        let next = Box::new(plan).discover().await.expect("discovery");
+        assert_eq!(next.push_destinations, [destination, missing]);
+        let admission = proof(&next);
+        let output = next.execute(Box::new(admission)).await;
+        assert!(
+            output.result.is_error
+                && output
+                    .result
+                    .content
+                    .contains("partially updated remote references"),
+            "{}",
+            output.result.content
+        );
+        assert_eq!(
+            git(receiver.path(), &["rev-parse", "refs/heads/partial"]),
+            expected
+        );
+        // A global local receive-pack command is not a valid git:// service.
+        // Refuse both URL orders before updating either receiver.
+        let local = tempfile::tempdir().expect("local mixed receiver");
+        git(local.path(), &["init", "--bare"]);
+        for local_first in [false, true] {
+            let remote = if local_first {
+                "mixed-local-first"
+            } else {
+                "mixed-network-first"
+            };
+            let local_url = local.path().to_str().expect("local path");
+            let network_url = format!(
+                "git://127.0.0.1:{port}/{}",
+                receiver.path().file_name().expect("name").to_string_lossy()
+            );
+            let urls = if local_first {
+                [local_url, network_url.as_str()]
+            } else {
+                [network_url.as_str(), local_url]
+            };
+            for url in urls {
+                git(
+                    root.path(),
+                    &["config", "--add", &format!("remote.{remote}.pushurl"), url],
+                );
+            }
+            let input = serde_json::json!({"remote":remote,"branch":"HEAD:refs/heads/mixed"});
+            let mut plan: Box<dyn PreparedNormalToolInvocation> = Box::new(
+                AddPlan::prepare_push(root.path(), &input, ToolProvenance::Native)
+                    .expect("mixed plan"),
+            );
+            let state = PermissionSessionState::new(PermissionEngine::with_workspace_root(
+                root.path().into(),
+            ));
+            let context = PermissionContext::new(
+                PermissionMode::Interactive,
+                InteractionCapability::Available,
+            );
+            let mut stages = 0;
+            loop {
+                stages += 1;
+                assert!(stages <= 8);
+                let request =
+                    PermissionRequest::native("git_push", plan.permission_profile(), &input);
+                let proposal = state
+                    .propose(&request, &context, GrantScope::Once)
+                    .expect("proposal");
+                let pending = state
+                    .approve_once(proposal, &request, &context)
+                    .expect("approval");
+                let admission = state
+                    .try_admit_prepared_invocation(
+                        pending,
+                        &request,
+                        &context,
+                        plan.plan_identity().expect("identity"),
+                    )
+                    .expect("admission");
+                match plan.execute_stage(Box::new(admission)).await {
+                    PreparedNormalStage::Continue(next) => plan = next,
+                    PreparedNormalStage::Complete(output) => {
+                        assert!(output.result.is_error);
+                        assert!(
+                            output.result.content.contains("Mixed local and network"),
+                            "{}",
+                            output.result.content
+                        );
+                        break;
+                    }
+                }
+            }
+            for destination in [local.path(), receiver.path()] {
+                assert!(
+                    !std::process::Command::new("git")
+                        .current_dir(destination)
+                        .args(["rev-parse", "--verify", "refs/heads/mixed"])
+                        .output()
+                        .expect("reference probe")
+                        .status
+                        .success()
+                );
+            }
+        }
+        daemon.kill().await.expect("stop daemon");
+        daemon.wait().await.expect("join daemon");
+    }
+
+    #[tokio::test]
+    async fn push_rejects_legacy_destination_inserted_after_discovery() {
+        for directory in ["remotes", "branches"] {
+            let root = fixture();
+            let plan = AddPlan::prepare_push(
+                root.path(),
+                &serde_json::json!({"remote":"git://example.invalid/repo"}),
+                ToolProvenance::Native,
+            )
+            .expect("plan");
+            let next = Box::new(plan).discover().await.expect("discovery");
+            let admission = proof(&next);
+            let directory = root.path().join(".git").join(directory);
+            std::fs::create_dir_all(&directory).expect("legacy directory");
+            std::fs::write(directory.join("origin"), "URL: ext::unapproved-command\n")
+                .expect("legacy destination");
+            let result = next.execute(Box::new(admission)).await;
+            assert!(
+                result.result.is_error && result.result.content.contains("Legacy Git remote"),
+                "{}",
+                result.result.content
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn push_rejects_symbolic_and_detached_head_changes_after_discovery() {
+        for replacement in [
+            "ref: refs/heads/different\n",
+            "1111111111111111111111111111111111111111\n",
+        ] {
+            let root = fixture();
+            let plan = AddPlan::prepare_push(
+                root.path(),
+                &serde_json::json!({"remote":"git://example.invalid/repository", "branch":"HEAD:refs/heads/main"}),
+                ToolProvenance::Native,
+            ).expect("plan");
+            let next = Box::new(plan).discover().await.expect("discovery");
+            let admission = proof(&next);
+            std::fs::write(root.path().join(".git/HEAD"), replacement).expect("replace HEAD");
+            let output = next.execute(Box::new(admission)).await;
+            assert!(
+                output.result.is_error
+                    && output.result.content.contains("changed after preparation"),
+                "{}",
+                output.result.content
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn push_rejects_sender_ref_changes_after_discovery() {
+        for packed in [false, true] {
+            let root = fixture();
+            let plan =
+                AddPlan::prepare_push(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+                    .expect("plan");
+            let next = Box::new(plan).discover().await.expect("discovery");
+            assert!(next.revalidate().is_ok());
+            let path = if packed {
+                root.path().join(".git/packed-refs")
+            } else {
+                root.path().join(".git/refs/heads/other")
+            };
+            std::fs::write(
+                path,
+                if packed {
+                    "1111111111111111111111111111111111111111 refs/heads/other\n"
+                } else {
+                    "1111111111111111111111111111111111111111\n"
+                },
+            )
+            .expect("ref change");
+            assert!(
+                next.revalidate()
+                    .expect_err("stale refs")
+                    .to_string()
+                    .contains("changed after preparation")
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn local_push_receiver_requires_path_admission_without_receiver_reads() {
+        let root = fixture();
+        let receiver = root.path().join("not-created-receiver.git");
+        let plan = AddPlan::prepare_push(
+            root.path(),
+            &serde_json::json!({"remote": receiver}),
+            ToolProvenance::Native,
+        )
+        .expect("plan");
+        let admission = proof(&plan);
+        let PreparedNormalStage::Continue(next) =
+            Box::new(plan).execute_stage(Box::new(admission)).await
+        else {
+            panic!("discovery failed");
+        };
+        assert!(next.permission_profile().iter().any(|facet| {
+            facet.nature == ToolNature::Read && facet.resource.as_deref() == receiver.to_str()
+        }));
+        assert!(!next.permission_profile().iter().any(|facet| matches!(
+            facet.nature,
+            ToolNature::Network | ToolNature::Write | ToolNature::Execute
+        )));
+        assert!(!receiver.exists());
+        assert!(!root.path().join(".git/index").exists());
+    }
+
+    #[tokio::test]
+    async fn receiver_root_discovery_defers_external_gitdir_and_requires_fresh_proof() {
+        let root = fixture();
+        let receiver = tempfile::tempdir().expect("receiver");
+        // A nonexistent external target must only become a next-stage resource.
+        let external = root.path().join("unopened-metadata");
+        std::fs::write(
+            receiver.path().join(".git"),
+            format!("gitdir: {}\n", external.display()),
+        )
+        .expect("gitfile");
+        let plan = AddPlan::prepare_push(
+            root.path(),
+            &serde_json::json!({"remote":receiver.path()}),
+            ToolProvenance::Native,
+        )
+        .expect("sender plan");
+        let stale = proof(&plan);
+        let plan = Box::new(plan).discover().await.expect("sender discovery");
+        assert!(plan.phase == Phase::ReceiverRoots);
+        let wrong = Box::new(plan).execute_stage(Box::new(stale)).await;
+        assert!(matches!(wrong, PreparedNormalStage::Complete(output) if output.result.is_error));
+
+        let plan = AddPlan::prepare_push(
+            root.path(),
+            &serde_json::json!({"remote":receiver.path()}),
+            ToolProvenance::Native,
+        )
+        .expect("sender plan");
+        let plan = Box::new(plan).discover().await.expect("sender discovery");
+        let admission = proof(&plan);
+        let PreparedNormalStage::Continue(next) = plan.execute_stage(Box::new(admission)).await
+        else {
+            panic!("admitted root must produce metadata continuation");
+        };
+        assert!(
+            next.permission_profile()
+                .iter()
+                .any(|facet| facet.nature == ToolNature::Read
+                    && facet.resource.as_deref() == external.to_str())
+        );
+        assert!(
+            next.permission_profile()
+                .iter()
+                .all(|facet| facet.nature == ToolNature::Read)
+        );
+        assert!(!external.exists());
+        assert!(!root.path().join(".git/index").exists());
+    }
+
+    #[tokio::test]
+    async fn receiver_home_includes_refuse_ambiguous_interpolation() {
+        for (home, include) in [("/alias/../home", "~/config"), ("/home", "~//absolute")] {
+            let sender = fixture();
+            let receiver = fixture();
+            std::fs::write(
+                receiver.path().join(".git/config"),
+                format!("[include]\npath={include}\n"),
+            )
+            .expect("receiver config");
+            let plan = AddPlan::prepare_push(
+                sender.path(),
+                &serde_json::json!({"remote":receiver.path()}),
+                ToolProvenance::Native,
+            )
+            .expect("plan");
+            let mut plan = Box::new(plan).discover().await.expect("sender discovery");
+            plan.environment.insert("HOME".into(), home.into());
+            let authorization = proof(&plan)
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .expect("roots admission");
+            let plan = plan.discover_receiver_roots(&authorization).expect("roots");
+            let authorization = proof(&plan)
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .expect("metadata admission");
+            let plan = plan
+                .discover_receiver_metadata(&authorization)
+                .expect("metadata");
+            let authorization = proof(&plan)
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .expect("common admission");
+            assert!(plan.require_receiver_reference_capability().is_ok());
+            assert!(plan.discover_receiver_common(&authorization).is_err());
+        }
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn receiver_external_hook_is_deferred_to_fresh_read_admission() {
+        use std::os::unix::fs::PermissionsExt;
+        let sender = fixture();
+        let receiver = fixture();
+        let external = tempfile::tempdir().expect("external hooks");
+        let hook = external
+            .path()
+            .canonicalize()
+            .expect("canonical")
+            .join("pre-receive");
+        std::fs::write(
+            receiver.path().join(".git/config"),
+            format!(
+                "[core]\nrepositoryFormatVersion=0\nbare=false\nhooksPath={}\n",
+                hook.parent().expect("parent").display()
+            ),
+        )
+        .expect("config");
+        std::fs::write(&hook, "#!/bin/sh\nexit 99\n").expect("hook");
+        std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o755))
+            .expect("executable");
+        let plan = AddPlan::prepare_push(
+            sender.path(),
+            &serde_json::json!({"remote":receiver.path()}),
+            ToolProvenance::Native,
+        )
+        .expect("plan");
+        let plan = Box::new(plan).discover().await.expect("sender");
+        let authorization = proof(&plan)
+            .consume_for_prepared(&plan.request(), &plan.identity)
+            .expect("root admission");
+        let plan = plan.discover_receiver_roots(&authorization).expect("roots");
+        let authorization = proof(&plan)
+            .consume_for_prepared(&plan.request(), &plan.identity)
+            .expect("metadata admission");
+        let plan = plan
+            .discover_receiver_metadata(&authorization)
+            .expect("metadata");
+        let authorization = proof(&plan)
+            .consume_for_prepared(&plan.request(), &plan.identity)
+            .expect("common admission");
+        let plan = plan
+            .discover_receiver_common(&authorization)
+            .expect("common");
+        let stale = proof(&plan);
+        let authorization = proof(&plan)
+            .consume_for_prepared(&plan.request(), &plan.identity)
+            .expect("configuration admission");
+        let plan = plan
+            .discover_receiver_configuration(&authorization)
+            .await
+            .expect("configuration does not inspect executable hook");
+        assert!(
+            plan.facets
+                .iter()
+                .any(|facet| facet.nature == ToolNature::Read
+                    && facet.resource.as_deref() == hook.to_str())
+        );
+        assert!(
+            stale
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .is_err()
+        );
+        let admission = proof(&plan);
+        let PreparedNormalStage::Complete(output) = plan.execute_stage(Box::new(admission)).await
+        else {
+            panic!("refuse executable hook")
+        };
+        assert!(
+            output.result.is_error && output.result.content.contains("Executable receiver hook")
+        );
+        assert!(!receiver.path().join(".git/index").exists());
+        assert!(!sender.path().join(".git/index").exists());
+    }
+
+    #[tokio::test]
+    async fn receiver_multiple_destinations_keep_sibling_bisect_evidence_separate() {
+        let sender = fixture();
+        let first = fixture();
+        let second = fixture();
+        let linked = tempfile::tempdir().expect("linked roots");
+        for (index, receiver) in [first.path(), second.path()].into_iter().enumerate() {
+            let output = std::process::Command::new("git")
+                .current_dir(receiver)
+                .args(["worktree", "add", "-b", "sibling"])
+                .arg(linked.path().join(index.to_string()))
+                .output()
+                .expect("worktree");
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            let output = std::process::Command::new("git")
+                .current_dir(sender.path())
+                .args(["config", "--add", "remote.multiple.pushurl"])
+                .arg(receiver)
+                .output()
+                .expect("push destination");
+            assert!(output.status.success());
+        }
+        let plan = AddPlan::prepare_push(
+            sender.path(),
+            &serde_json::json!({"remote":"multiple"}),
+            ToolProvenance::Native,
+        )
+        .expect("plan");
+        let plan = Box::new(plan).discover().await.expect("sender discovery");
+        let authorization = proof(&plan)
+            .consume_for_prepared(&plan.request(), &plan.identity)
+            .expect("roots admission");
+        let plan = plan.discover_receiver_roots(&authorization).expect("roots");
+        let authorization = proof(&plan)
+            .consume_for_prepared(&plan.request(), &plan.identity)
+            .expect("metadata admission");
+        let plan = plan
+            .discover_receiver_metadata(&authorization)
+            .expect("metadata");
+        let authorization = proof(&plan)
+            .consume_for_prepared(&plan.request(), &plan.identity)
+            .expect("common admission");
+        let plan = plan
+            .discover_receiver_common(&authorization)
+            .expect("common");
+        let authorization = proof(&plan)
+            .consume_for_prepared(&plan.request(), &plan.identity)
+            .expect("configuration admission");
+        let plan = plan
+            .discover_receiver_configuration(&authorization)
+            .await
+            .expect("configuration");
+        assert_eq!(plan.receiver_effects.len(), 2);
+        assert_eq!(plan.receiver_siblings.len(), 2);
+        for (metadata, effects) in plan.receiver_metadata.iter().zip(&plan.receiver_effects) {
+            for sibling in &plan.receiver_siblings {
+                let belongs = sibling.spelling.parent()
+                    == Some(metadata.common_path.join("worktrees").as_path());
+                for leaf in ["BISECT_LOG", "BISECT_START"] {
+                    assert_eq!(
+                        effects.paths.contains(&sibling.canonical.join(leaf)),
+                        belongs
+                    );
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn receiver_layout_stages_accept_real_bare_normal_and_linked_repositories() {
+        for kind in ["bare", "normal", "linked"] {
+            let sender = fixture();
+            let target = tempfile::tempdir().expect("receiver fixture");
+            let repository = target.path().join("repository");
+            let mut init = std::process::Command::new("git");
+            init.arg("init");
+            if kind == "bare" {
+                init.arg("--bare");
+            }
+            assert!(
+                init.arg(&repository)
+                    .output()
+                    .expect("init")
+                    .status
+                    .success()
+            );
+            let receiver = if kind == "linked" {
+                let output = std::process::Command::new("git")
+                    .current_dir(&repository)
+                    .args([
+                        "-c",
+                        "user.name=Fixture",
+                        "-c",
+                        "user.email=fixture@example.invalid",
+                        "-c",
+                        "commit.gpgSign=false",
+                        "commit",
+                        "--allow-empty",
+                        "-m",
+                        "fixture",
+                    ])
+                    .output()
+                    .expect("commit");
+                assert!(
+                    output.status.success(),
+                    "{}",
+                    String::from_utf8_lossy(&output.stderr)
+                );
+                let linked = target.path().join("linked");
+                let output = std::process::Command::new("git")
+                    .current_dir(&repository)
+                    .args(["worktree", "add", "-b", "linked"])
+                    .arg(&linked)
+                    .output()
+                    .expect("worktree");
+                assert!(
+                    output.status.success(),
+                    "{}",
+                    String::from_utf8_lossy(&output.stderr)
+                );
+                let output = std::process::Command::new("git")
+                    .current_dir(&repository)
+                    .args(["worktree", "add", "-b", "other-linked"])
+                    .arg(target.path().join("other-linked"))
+                    .output()
+                    .expect("second worktree");
+                assert!(
+                    output.status.success(),
+                    "{}",
+                    String::from_utf8_lossy(&output.stderr)
+                );
+                linked
+            } else {
+                repository
+            };
+            let include = target.path().join("not-opened-include");
+            assert!(
+                std::process::Command::new("git")
+                    .current_dir(&receiver)
+                    .args(["config", "--local", "include.path"])
+                    .arg(&include)
+                    .output()
+                    .expect("declare include")
+                    .status
+                    .success()
+            );
+            let plan = AddPlan::prepare_push(
+                sender.path(),
+                &serde_json::json!({"remote":receiver}),
+                ToolProvenance::Native,
+            )
+            .expect("plan");
+            let plan = Box::new(plan).discover().await.expect("sender discovery");
+            let authorization = proof(&plan)
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .expect("root admission");
+            let plan = plan.discover_receiver_roots(&authorization).expect("roots");
+            let authorization = proof(&plan)
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .expect("metadata admission");
+            let plan = plan
+                .discover_receiver_metadata(&authorization)
+                .expect("metadata");
+            let authorization = proof(&plan)
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .expect("common admission");
+            let references = plan.receiver_metadata[0].common_path.join("refs");
+            let without_reference_read: Vec<_> = authorization
+                .iter()
+                .filter(|entry| {
+                    !entry.authorizes_path(
+                        plan.operation.name(),
+                        ToolNature::Read,
+                        &plan.workspace,
+                        references.to_str().expect("reference path"),
+                    )
+                })
+                .cloned()
+                .collect();
+            assert!(
+                plan.receiver_read_path(&references, &without_reference_read)
+                    .is_err()
+            );
+            let plan = plan
+                .discover_receiver_common(&authorization)
+                .expect("common");
+            let authorization = proof(&plan)
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .expect("backlink admission");
+            assert!(plan.require_receiver_reference_capability().is_ok());
+            plan.revalidate_receiver_common(&authorization)
+                .expect("consistent real layout");
+            assert!(
+                plan.facets
+                    .iter()
+                    .any(|facet| facet.nature == ToolNature::Read
+                        && facet.resource.as_deref() == include.to_str())
+            );
+            assert!(!include.exists());
+            assert!(plan.phase == Phase::ReceiverConfiguration);
+            assert_eq!(plan.receiver_common.len(), 1);
+            assert_eq!(
+                plan.receiver_common[0].backlink_target.is_some(),
+                kind == "linked"
+            );
+            assert!(
+                plan.facets
+                    .iter()
+                    .any(|facet| facet.nature == ToolNature::Execute)
+            );
+            assert!(
+                !plan
+                    .facets
+                    .iter()
+                    .any(|facet| matches!(facet.nature, ToolNature::Write | ToolNature::Network))
+            );
+            let stale = proof(&plan);
+            let authorization = proof(&plan)
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .expect("configuration admission");
+            let plan = plan
+                .discover_receiver_configuration(&authorization)
+                .await
+                .expect("configuration");
+            assert!(plan.phase == Phase::ReceiverAuxiliary);
+            assert!(plan.require_receiver_reference_capability().is_ok());
+            assert_eq!(plan.receiver_configs.len(), 1);
+            assert!(
+                plan.facets
+                    .iter()
+                    .all(|facet| facet.nature == ToolNature::Read)
+            );
+            assert!(
+                stale
+                    .consume_for_prepared(&plan.request(), &plan.identity)
+                    .is_err()
+            );
+            let admission = proof(&plan);
+            let authorization = admission
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .expect("auxiliary admission");
+            let plan = plan
+                .discover_receiver_auxiliary(&authorization)
+                .expect("auxiliary evidence");
+            assert!(plan.phase == Phase::ReceiverMutation);
+            assert!(plan.require_receiver_reference_capability().is_ok());
+            assert_eq!(plan.receiver_auxiliary.len(), 1);
+            let authorization = proof(&plan)
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .expect("revalidation admission");
+            plan.revalidate_receiver_auxiliary(&authorization)
+                .expect("unchanged auxiliaries");
+            let mut plan = plan;
+            let metadata_facet = plan
+                .facets
+                .iter()
+                .position(|facet| {
+                    facet.nature == ToolNature::Read
+                        && facet.resource_kind == Some(ToolResourceKind::Remote)
+                        && facet.resource.as_deref() == Some("git:receiver-metadata")
+                })
+                .expect("dedicated metadata capability");
+            let facet = plan.facets.remove(metadata_facet);
+            assert!(
+                plan.inspect_receiver_storage(&authorization)
+                    .expect_err("exact paths alone do not authorize metadata descendants")
+                    .to_string()
+                    .contains("Receiver metadata capability missing")
+            );
+            plan.facets.insert(metadata_facet, facet);
+            let inspection = plan
+                .inspect_receiver_storage(&authorization)
+                .expect("admitted storage");
+            assert_eq!(
+                inspection.len(),
+                plan.receiver_metadata.len() + plan.receiver_common.len()
+            );
+            for root in plan
+                .receiver_metadata
+                .iter()
+                .map(|metadata| &metadata.canonical)
+                .chain(plan.receiver_common.iter().map(|common| &common.canonical))
+            {
+                let without_root: Vec<_> = authorization
+                    .iter()
+                    .filter(|token| {
+                        !token.authorizes_path(
+                            "git_push",
+                            ToolNature::Read,
+                            &plan.workspace,
+                            root.to_str().expect("receiver root"),
+                        )
+                    })
+                    .cloned()
+                    .collect();
+                let failure = plan
+                    .inspect_receiver_storage(&without_root)
+                    .expect_err("exact root admission required");
+                assert!(
+                    !failure
+                        .to_string()
+                        .contains("Receiver mutation execution effects are not yet fully bound")
+                );
+            }
+            for leaf in ["HEAD", "config.worktree"] {
+                let path = plan.receiver_common[0].canonical.join(leaf);
+                let before = std::fs::read(&path).ok();
+                let without_read: Vec<_> = authorization
+                    .iter()
+                    .filter(|token| {
+                        !token.authorizes_path(
+                            "git_push",
+                            ToolNature::Read,
+                            &plan.workspace,
+                            path.to_str().expect("main worktree evidence"),
+                        )
+                    })
+                    .cloned()
+                    .collect();
+                assert!(plan.revalidate_receiver_auxiliary(&without_read).is_err());
+                std::fs::write(&path, "changed\n").expect("main worktree change");
+                assert!(plan.revalidate_receiver_auxiliary(&authorization).is_err());
+                if let Some(bytes) = before {
+                    std::fs::write(&path, bytes).expect("restore main worktree evidence");
+                } else {
+                    std::fs::remove_file(&path).expect("restore absence");
+                }
+                plan.revalidate_receiver_auxiliary(&authorization)
+                    .expect("restored main worktree");
+            }
+            for (path, merge, _) in &plan.receiver_rebase {
+                for read in std::iter::once(path.clone()).chain(
+                    super::super::receiver_state::RebaseState::leaves(*merge)
+                        .iter()
+                        .map(|leaf| path.join(leaf)),
+                ) {
+                    let without_read: Vec<_> = authorization
+                        .iter()
+                        .filter(|token| {
+                            !token.authorizes_path(
+                                "git_push",
+                                ToolNature::Read,
+                                &plan.workspace,
+                                read.to_str().expect("rebase path"),
+                            )
+                        })
+                        .cloned()
+                        .collect();
+                    assert!(plan.revalidate_receiver_auxiliary(&without_read).is_err());
+                }
+                std::fs::create_dir(path).expect("begin rebase");
+                assert!(plan.revalidate_receiver_auxiliary(&authorization).is_err());
+                std::fs::remove_dir(path).expect("restore absent rebase");
+                plan.revalidate_receiver_auxiliary(&authorization)
+                    .expect("restored rebase");
+            }
+            let bisect_roots: std::collections::BTreeSet<_> =
+                std::iter::once(plan.receiver_metadata[0].canonical.clone())
+                    .chain(std::iter::once(plan.receiver_common[0].canonical.clone()))
+                    .chain(
+                        plan.receiver_siblings
+                            .iter()
+                            .map(|sibling| sibling.canonical.clone()),
+                    )
+                    .collect();
+            if kind == "linked" {
+                assert_eq!(bisect_roots.len(), 3, "main, receiver and distinct sibling");
+            }
+            for path in bisect_roots
+                .iter()
+                .flat_map(|root| ["BISECT_LOG", "BISECT_START"].map(|leaf| root.join(leaf)))
+            {
+                assert!(
+                    plan.facets
+                        .iter()
+                        .any(|facet| facet.nature == ToolNature::Read
+                            && facet.resource.as_deref() == path.to_str())
+                );
+                let without_bisect: Vec<_> = authorization
+                    .iter()
+                    .filter(|token| {
+                        !token.authorizes_path(
+                            "git_push",
+                            ToolNature::Read,
+                            &plan.workspace,
+                            path.to_str().expect("bisect path"),
+                        )
+                    })
+                    .cloned()
+                    .collect();
+                assert!(plan.revalidate_receiver_auxiliary(&without_bisect).is_err());
+                std::fs::write(&path, "refs/heads/bisected\n").expect("bisect change");
+                assert!(plan.revalidate_receiver_auxiliary(&authorization).is_err());
+                std::fs::remove_file(&path).expect("restore absent bisect state");
+                plan.revalidate_receiver_auxiliary(&authorization)
+                    .expect("restored state");
+            }
+            for sibling in &plan.receiver_siblings {
+                let references = sibling.canonical.join("refs");
+                let without_refs: Vec<_> = authorization
+                    .iter()
+                    .filter(|token| {
+                        !token.authorizes_path(
+                            "git_push",
+                            ToolNature::Read,
+                            &plan.workspace,
+                            references.to_str().expect("refs path"),
+                        )
+                    })
+                    .cloned()
+                    .collect();
+                assert!(plan.revalidate_receiver_auxiliary(&without_refs).is_err());
+                let private = references.join("worktree");
+                let had_references = references.is_dir();
+                let had_private = private.is_dir();
+                std::fs::create_dir_all(&private).expect("private refs");
+                std::fs::write(
+                    private.join("occupied"),
+                    "0000000000000000000000000000000000000000\n",
+                )
+                .expect("private ref");
+                assert!(plan.revalidate_receiver_auxiliary(&authorization).is_err());
+                std::fs::remove_file(private.join("occupied")).expect("remove private ref");
+                if !had_private {
+                    std::fs::remove_dir(&private).expect("remove private namespace");
+                }
+                if !had_references {
+                    std::fs::remove_dir(&references).expect("restore absent refs");
+                }
+                plan.revalidate_receiver_auxiliary(&authorization)
+                    .expect("restored private refs");
+                let spelling = sibling.spelling.join("HEAD");
+                let without_head: Vec<_> = authorization
+                    .iter()
+                    .filter(|token| {
+                        !token.authorizes_path(
+                            "git_push",
+                            ToolNature::Read,
+                            &plan.workspace,
+                            spelling.to_str().expect("HEAD path"),
+                        )
+                    })
+                    .cloned()
+                    .collect();
+                assert!(plan.revalidate_receiver_siblings(&without_head).is_err());
+                let head = sibling.canonical.join("HEAD");
+                let saved = sibling.canonical.join("HEAD.saved-test");
+                std::fs::rename(&head, &saved).expect("retain sibling HEAD inode");
+                std::fs::write(&head, "ref: refs/heads/new-sibling-branch\n")
+                    .expect("changed sibling");
+                assert!(plan.revalidate_receiver_auxiliary(&authorization).is_err());
+                std::fs::remove_file(&head).expect("remove changed HEAD");
+                std::fs::rename(&saved, &head).expect("restore sibling");
+            }
+            let changed_ref = plan.receiver_common[0]
+                .canonical
+                .join("refs/heads/approval-change");
+            std::fs::write(&changed_ref, "ref: refs/heads/changed-target\n")
+                .expect("changed reference");
+            assert!(plan.revalidate_receiver_auxiliary(&authorization).is_err());
+            std::fs::remove_file(changed_ref).expect("restore missing reference");
+            let hook = plan.receiver_common[0].canonical.join("hooks/pre-receive");
+            std::fs::write(&hook, "nonexecutable replacement").expect("changed auxiliary");
+            assert!(plan.revalidate_receiver_auxiliary(&authorization).is_err());
+            std::fs::remove_file(&hook).expect("restore missing auxiliary");
+            let stale = proof(&plan);
+            let plan = plan
+                .prepare_receiver_mutation(&authorization)
+                .expect("final plan");
+            assert!(plan.phase == Phase::Mutation);
+            assert!(!plan.receiver_storage.is_empty());
+            assert!(
+                stale
+                    .consume_for_prepared(&plan.request(), &plan.identity)
+                    .is_err()
+            );
+            let authorization = proof(&plan)
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .expect("fresh mutation admission");
+            let root = &plan.receiver_common[0].canonical;
+            let without_write: Vec<_> = authorization
+                .iter()
+                .filter(|token| {
+                    !token.authorizes_path(
+                        "git_push",
+                        ToolNature::Write,
+                        &plan.workspace,
+                        root.to_str().expect("root"),
+                    )
+                })
+                .cloned()
+                .collect();
+            assert!(
+                plan.execute_admitted(&without_write)
+                    .await
+                    .expect_err("write required")
+                    .to_string()
+                    .contains("lacks Write admission")
+            );
+            let object = root.join("objects/unapproved-object");
+            std::fs::write(&object, "changed storage").expect("object change");
+            assert!(
+                plan.execute_admitted(&authorization)
+                    .await
+                    .expect_err("changed storage")
+                    .to_string()
+                    .contains("Receiver metadata changed after approval")
+            );
+            std::fs::remove_file(object).expect("remove changed storage");
+            assert!(!sender.path().join(".git/index").exists());
+        }
+    }
+
+    #[tokio::test]
+    async fn receiver_metadata_wave_defers_pointer_targets_and_binds_changes() {
+        for linked in [false, true] {
+            let root = fixture();
+            let receiver = tempfile::tempdir().expect("receiver");
+            let metadata = if linked {
+                let path = receiver.path().join("metadata");
+                std::fs::create_dir(&path).expect("metadata");
+                std::fs::write(receiver.path().join(".git"), "gitdir: metadata\n")
+                    .expect("gitfile");
+                path
+            } else {
+                receiver.path().to_owned()
+            };
+            // Nonexistent targets prove discovery does not require their contents.
+            let common = receiver.path().join("unopened-common");
+            let marker = receiver.path().join("unopened-worktree/.git");
+            std::fs::write(
+                metadata.join("commondir"),
+                format!("{}\n", common.display()),
+            )
+            .expect("common pointer");
+            std::fs::write(metadata.join("gitdir"), format!("{}\n", marker.display()))
+                .expect("backpointer");
+            let plan = AddPlan::prepare_push(
+                root.path(),
+                &serde_json::json!({"remote":receiver.path()}),
+                ToolProvenance::Native,
+            )
+            .expect("plan");
+            let plan = Box::new(plan).discover().await.expect("sender");
+            let authorization = proof(&plan)
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .expect("root proof");
+            let plan = plan.discover_receiver_roots(&authorization).expect("roots");
+            let stale = proof(&plan);
+            let authorization = proof(&plan)
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .expect("metadata proof");
+            let plan = plan
+                .discover_receiver_metadata(&authorization)
+                .expect("metadata wave");
+            assert!(plan.phase == Phase::ReceiverCommon);
+            assert_eq!(plan.receiver_metadata.len(), 1);
+            for path in [&common, &marker] {
+                assert!(
+                    plan.facets
+                        .iter()
+                        .any(|facet| facet.nature == ToolNature::Read
+                            && facet.resource.as_deref() == path.to_str())
+                );
+            }
+            assert!(
+                plan.facets
+                    .iter()
+                    .all(|facet| facet.nature == ToolNature::Read)
+            );
+            assert!(
+                stale
+                    .consume_for_prepared(&plan.request(), &plan.identity)
+                    .is_err()
+            );
+            let admission = proof(&plan);
+            std::fs::write(metadata.join("commondir"), "changed\n").expect("change pointer");
+            let PreparedNormalStage::Complete(output) =
+                plan.execute_stage(Box::new(admission)).await
+            else {
+                panic!("stale layout must refuse");
+            };
+            assert!(
+                output.result.is_error
+                    && output.result.content.contains("Receiver layout evidence")
+            );
+            assert!(!common.exists());
+            assert!(!marker.exists());
+            assert!(!root.path().join(".git/index").exists());
+        }
+    }
+
+    #[tokio::test]
+    async fn receiver_metadata_stage_rejects_changed_root_marker() {
+        let root = fixture();
+        let receiver = tempfile::tempdir().expect("receiver");
+        std::fs::write(receiver.path().join(".git"), "gitdir: unopened\n").expect("marker");
+        let plan = AddPlan::prepare_push(
+            root.path(),
+            &serde_json::json!({"remote":receiver.path()}),
+            ToolProvenance::Native,
+        )
+        .expect("plan");
+        let plan = Box::new(plan).discover().await.expect("sender discovery");
+        let admission = proof(&plan);
+        let authorizations = admission
+            .consume_for_prepared(&plan.request(), &plan.identity)
+            .expect("proof");
+        let plan = plan
+            .discover_receiver_roots(&authorizations)
+            .expect("root discovery");
+        assert_eq!(plan.receiver_layouts.len(), 1);
+        let admission = proof(&plan);
+        std::fs::write(receiver.path().join(".git"), "gitdir: replacement\n").expect("retarget");
+        let PreparedNormalStage::Complete(output) = plan.execute_stage(Box::new(admission)).await
+        else {
+            panic!("changed marker must refuse");
+        };
+        assert!(output.result.is_error);
+        assert!(
+            output.result.content.contains("Receiver layout evidence"),
+            "{}",
+            output.result.content
+        );
+        assert!(!receiver.path().join("unopened").exists());
+        assert!(!root.path().join(".git/index").exists());
+    }
+
+    #[tokio::test]
+    async fn push_discovery_binds_rewritten_destinations_and_requires_fresh_admission() {
+        let root = fixture();
+        for (key, value) in [
+            ("remote.origin.url", "short:repo"),
+            ("url.git://example.invalid/.pushInsteadOf", "short:"),
+        ] {
+            assert!(
+                std::process::Command::new("git")
+                    .args(["config", key, value])
+                    .current_dir(root.path())
+                    .output()
+                    .expect("config")
+                    .status
+                    .success()
+            );
+        }
+        let plan =
+            AddPlan::prepare_push(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+                .expect("plan");
+        assert!(
+            !plan
+                .facets
+                .iter()
+                .any(|facet| matches!(facet.nature, ToolNature::Network | ToolNature::Write))
+        );
+        let stale = proof(&plan);
+        let admission = proof(&plan);
+        let PreparedNormalStage::Continue(next) =
+            Box::new(plan).execute_stage(Box::new(admission)).await
+        else {
+            panic!("discovery failed")
+        };
+        assert!(
+            next.permission_profile()
+                .iter()
+                .any(|facet| facet.nature == ToolNature::Network
+                    && facet.resource.as_deref() == Some("git://example.invalid/repo"))
+        );
+        assert!(next.permission_profile().iter().any(|facet| {
+            facet.nature == ToolNature::Execute
+                && facet
+                    .description
+                    .as_deref()
+                    .is_some_and(|text| text.contains("object transfer"))
+        }));
+        let output = next.execute(Box::new(stale)).await;
+        assert!(output.result.is_error && output.result.content.contains("does not authorize"));
+        assert!(!root.path().join(".git/index").exists());
+    }
+
+    #[tokio::test]
+    async fn rerere_refuses_active_records_but_preserves_inert_and_disabled_configurations() {
+        for (enabled, cache, records, refused) in [
+            (Some("true"), false, false, false),
+            (Some("true"), true, true, true),
+            (Some("false"), true, true, false),
+            (None, true, true, true),
+            (None, false, true, false),
+        ] {
+            let root = fixture();
+            if let Some(value) = enabled {
+                assert!(
+                    std::process::Command::new("git")
+                        .args(["config", "rerere.enabled", value])
+                        .current_dir(root.path())
+                        .status()
+                        .expect("config")
+                        .success()
+                );
+            }
+            if cache {
+                std::fs::create_dir(root.path().join(".git/rr-cache")).expect("cache");
+            }
+            if records {
+                std::fs::write(root.path().join(".git/MERGE_RR"), "active record").expect("record");
+            }
+            let plan = AddPlan::prepare_commit(
+                root.path(),
+                &serde_json::json!({"message":"first"}),
+                ToolProvenance::Native,
+            )
+            .expect("plan");
+            let admission = proof(&plan);
+            match Box::new(plan).execute_stage(Box::new(admission)).await {
+                PreparedNormalStage::Continue(_) => assert!(!refused),
+                PreparedNormalStage::Complete(output) => {
+                    assert!(refused, "{}", output.result.content);
+                    assert!(
+                        output.result.is_error && output.result.content.contains("rerere replay")
+                    );
+                }
+            }
+            assert!(!root.path().join(".git/COMMIT_EDITMSG").exists());
+        }
+    }
+
+    #[test]
+    fn commit_refuses_unmerged_index_before_discovery() {
+        let root = fixture();
+        let git = |args: &[&str]| {
+            let output = std::process::Command::new("git")
+                .args(args)
+                .current_dir(root.path())
+                .output()
+                .expect("fixture Git");
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            String::from_utf8(output.stdout).expect("UTF8")
+        };
+        let oid = git(&["hash-object", "-w", "file"]);
+        use std::io::Write;
+        let mut child = std::process::Command::new("git")
+            .args(["update-index", "--index-info"])
+            .current_dir(root.path())
+            .stdin(std::process::Stdio::piped())
+            .spawn()
+            .expect("index fixture");
+        child
+            .stdin
+            .take()
+            .expect("stdin")
+            .write_all(format!("100644 {} 2\tfile\n", oid.trim()).as_bytes())
+            .expect("unmerged entry");
+        assert!(child.wait().expect("index").success());
+        let error = AddPlan::prepare_commit(
+            root.path(),
+            &serde_json::json!({"message":"conflicted"}),
+            ToolProvenance::Native,
+        )
+        .err()
+        .expect("unmerged refused");
+        assert!(error.to_string().contains("unmerged"));
+    }
+
+    #[tokio::test]
+    async fn commit_discovery_defers_hooks_and_ignores_inactive_template_and_tag_signing() {
+        let root = fixture();
+        let git = |args: &[&str]| {
+            let output = std::process::Command::new("git")
+                .args(args)
+                .current_dir(root.path())
+                .output()
+                .expect("Git fixture");
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        };
+        git(&["config", "commit.template", "/unavailable/unused-template"]);
+        git(&["config", "tag.gpgSign", "true"]);
+        git(&["config", "commit.gpgSign", "false"]);
+        let plan = AddPlan::prepare_commit(
+            root.path(),
+            &serde_json::json!({"message":"first"}),
+            ToolProvenance::Native,
+        )
+        .expect("commit");
+        let proof = proof(&plan);
+        let PreparedNormalStage::Continue(next) =
+            Box::new(plan).execute_stage(Box::new(proof)).await
+        else {
+            panic!("ordinary config discovery refused")
+        };
+        for name in [
+            "pre-commit",
+            "prepare-commit-msg",
+            "commit-msg",
+            "post-commit",
+            "reference-transaction",
+            "pre-auto-gc",
+        ] {
+            assert!(next.permission_profile().iter().any(|facet| {
+                facet.nature == ToolNature::Read
+                    && facet
+                        .resource
+                        .as_deref()
+                        .is_some_and(|resource| resource.ends_with(name))
+            }));
+        }
+        assert!(
+            !next
+                .permission_profile()
+                .iter()
+                .any(|facet| facet.resource.as_deref() == Some("/unavailable/unused-template"))
+        );
+        drop(next);
+        assert!(!root.path().join(".git/COMMIT_EDITMSG").exists());
+    }
+
+    pub(crate) async fn execute_approved(plan: AddPlan) -> ToolExecutionOutput {
+        let name = plan.operation.name();
+        let root = plan.workspace.clone();
+        let input = plan.input.clone();
+        let provenance = plan.provenance.clone();
+        let mut operation: Box<dyn PreparedNormalToolInvocation> = Box::new(plan);
+        let mut history = talos_core::tool::PreparedStageHistory::default();
+        loop {
+            if !history.record_profile(
+                operation.plan_identity().expect("identity"),
+                operation.permission_profile(),
+            ) {
+                return ToolExecutionOutput::error("stage limit");
+            }
+            let state =
+                PermissionSessionState::new(PermissionEngine::with_workspace_root(root.clone()));
+            let context = PermissionContext::new(
+                PermissionMode::Interactive,
+                InteractionCapability::Available,
+            );
+            let request = PermissionRequest::new(
+                name,
+                provenance.clone(),
+                operation.permission_profile(),
+                &input,
+            );
+            let proposal = state
+                .propose(&request, &context, GrantScope::Once)
+                .expect("proposal");
+            let pending = state
+                .approve_once(proposal, &request, &context)
+                .expect("approval");
+            let proof = state
+                .try_admit_prepared_invocation(
+                    pending,
+                    &request,
+                    &context,
+                    operation.plan_identity().expect("identity"),
+                )
+                .expect("admit");
+            match operation.execute_stage(Box::new(proof)).await {
+                PreparedNormalStage::Complete(output) => return output,
+                PreparedNormalStage::Continue(next) => operation = next,
+            }
+        }
+    }
+
+    fn fixture() -> tempfile::TempDir {
+        let root = tempfile::tempdir().expect("fixture");
+        let output = std::process::Command::new("git")
+            .arg("init")
+            .arg(root.path())
+            .output()
+            .expect("Git fixture");
+        assert!(output.status.success());
+        std::fs::write(root.path().join("file"), "before").expect("file");
+        root
+    }
+
+    #[test]
+    fn sender_location_redirection_refuses_before_repository_rediscovery() {
+        let root = fixture();
+        let plan = AddPlan::prepare(
+            root.path(),
+            &serde_json::json!({"paths": ["file"]}),
+            ToolProvenance::Native,
+        )
+        .expect("plan");
+        plan.revalidate().expect("original location");
+        // An invalid new root would fail discovery with a different error if
+        // the retained location pointer were not checked first.
+        std::fs::write(
+            plan.repository.git_dir.join("commondir"),
+            root.path().join("unadmitted-root").to_str().expect("path"),
+        )
+        .expect("redirect pointer");
+        let error = plan
+            .revalidate()
+            .expect_err("old admission must not follow the pointer");
+        assert!(
+            error.to_string().contains("location pointer changed"),
+            "{error}"
+        );
+        std::fs::remove_file(plan.repository.git_dir.join("commondir")).expect("restore pointer");
+        let replacement = fixture();
+        std::fs::rename(&plan.repository.git_dir, root.path().join("old-gitdir"))
+            .expect("retain original directory");
+        std::fs::rename(replacement.path().join(".git"), &plan.repository.git_dir)
+            .expect("replace directory");
+        let error = plan
+            .revalidate()
+            .expect_err("replacement root must refuse before content reads");
+        assert!(
+            error.to_string().contains("root identity changed"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn inherited_git_redirection_is_refused_without_echoing_values() {
+        for name in [
+            "GIT_DIR",
+            "GIT_WORK_TREE",
+            "GIT_INDEX_FILE",
+            "GIT_OBJECT_DIRECTORY",
+            "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+            "GIT_CONFIG_COUNT",
+            "GIT_CONFIG_PARAMETERS",
+            "GIT_TRACE",
+        ] {
+            let environment =
+                BTreeMap::from([(OsString::from(name), OsString::from("private-value"))]);
+            let error = validate_environment(&environment).expect_err("unsupported redirection");
+            assert!(!error.to_string().contains("private-value"));
+        }
+        assert!(
+            validate_environment(&BTreeMap::from([(
+                OsString::from("PATH"),
+                OsString::from("/usr/bin")
+            )]))
+            .is_ok()
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn executable_replacement_with_identical_bytes_invalidates_evidence() {
+        let root = tempfile::tempdir().expect("directory");
+        let program = root.path().join("git");
+        std::fs::write(&program, b"identical program bytes").expect("program");
+        let program = program.canonicalize().expect("canonical program");
+        let before = capture_program(&program).expect("evidence");
+        let replacement = root.path().join("replacement");
+        std::fs::write(&replacement, b"identical program bytes").expect("replacement");
+        std::fs::rename(&replacement, &program).expect("replace");
+        let after = capture_program(&program).expect("new evidence");
+        assert!(before != after);
+    }
+
+    fn prepare(root: &Path) -> AddPlan {
+        AddPlan::prepare(
+            root,
+            &serde_json::json!({"paths":["file"]}),
+            ToolProvenance::Native,
+        )
+        .expect("plan")
+    }
+
+    #[tokio::test]
+    async fn direct_and_forged_or_exchanged_proofs_cannot_stage() {
+        let root = fixture();
+        let tool = super::super::GitAddTool::new(root.path().to_owned());
+        let input = serde_json::json!({"paths":["file"]});
+        assert!(tool.execute(input.clone()).await.is_error);
+        assert!(tool.execute_authorized(input, &[]).await.is_error);
+        assert!(
+            Box::new(prepare(root.path()))
+                .execute(Box::new(()))
+                .await
+                .result
+                .is_error
+        );
+        let first = prepare(root.path());
+        let other = prepare(root.path());
+        assert!(
+            Box::new(other)
+                .execute(Box::new(proof(&first)))
+                .await
+                .result
+                .is_error
+        );
+        assert!(!root.path().join(".git/index").exists());
+    }
+
+    #[tokio::test]
+    async fn approval_is_bound_to_prepared_source_and_index() {
+        let root = fixture();
+        let plan = prepare(root.path());
+        let admission = proof(&plan);
+        std::fs::write(root.path().join("file"), "after!").expect("edit after approval");
+        let PreparedNormalStage::Complete(result) =
+            Box::new(plan).execute_stage(Box::new(admission)).await
+        else {
+            panic!("changed evidence must refuse discovery");
+        };
+        assert!(result.result.is_error);
+        assert!(result.result.content.contains("changed after preparation"));
+        assert!(!root.path().join(".git/index").exists());
+
+        let plan = prepare(root.path());
+        let admission = proof(&plan);
+        std::fs::write(root.path().join(".git/index"), "changed index").expect("index change");
+        let PreparedNormalStage::Complete(result) =
+            Box::new(plan).execute_stage(Box::new(admission)).await
+        else {
+            panic!("changed evidence must refuse discovery");
+        };
+        assert!(result.result.is_error);
+        assert_eq!(
+            std::fs::read(root.path().join(".git/index")).expect("index"),
+            b"changed index"
+        );
+    }
+
+    #[tokio::test]
+    async fn exact_approved_plan_stages_selected_file() {
+        let root = fixture();
+        let result = execute_approved(prepare(root.path())).await;
+        assert!(!result.result.is_error, "{}", result.result.content);
+        let output = std::process::Command::new("git")
+            .args(["ls-files", "-z"])
+            .current_dir(root.path())
+            .output()
+            .expect("index inspection");
+        assert!(output.status.success());
+        assert_eq!(output.stdout, b"file\0");
+    }
+
+    #[tokio::test]
+    async fn discovery_defers_auxiliary_reads_until_separate_admission() {
+        let root = fixture();
+        let outside = tempfile::tempdir().expect("outside workspace");
+        // A directory cannot be captured as an auxiliary file. Discovery must
+        // nevertheless complete because it has no authority to inspect it yet.
+        let status = std::process::Command::new("git")
+            .args(["config", "core.attributesFile"])
+            .arg(outside.path())
+            .current_dir(root.path())
+            .status()
+            .expect("fixture config");
+        assert!(status.success());
+        let plan = prepare(root.path());
+        let identity = plan.identity.clone();
+        let admission = proof(&plan);
+        let PreparedNormalStage::Continue(next) =
+            Box::new(plan).execute_stage(Box::new(admission)).await
+        else {
+            panic!("discovery must not read auxiliary directory");
+        };
+        assert!(
+            !next
+                .plan_identity()
+                .expect("new identity")
+                .same_plan(&identity)
+        );
+        assert!(next.permission_profile().iter().any(|facet| {
+            facet.nature == ToolNature::Read
+                && facet.resource_kind == Some(ToolResourceKind::Path)
+                && facet.resource.as_deref() == outside.path().to_str()
+        }));
+        drop(next); // Refuse the second stage: no mutation occurs.
+        assert!(!root.path().join(".git/index").exists());
+    }
+
+    #[tokio::test]
+    async fn included_config_preserves_mixed_duplicate_values() {
+        let root = fixture();
+        let included = root.path().join("included.config");
+        std::fs::write(&included, "[custom]\n value\n value =\n value = final\n").expect("include");
+        let status = std::process::Command::new("git")
+            .args(["config", "include.path"])
+            .arg(&included)
+            .current_dir(root.path())
+            .status()
+            .expect("config");
+        assert!(status.success());
+        let result = execute_approved(prepare(root.path())).await;
+        assert!(!result.result.is_error, "{}", result.result.content);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn configured_filter_hook_and_fsmonitor_refuse_before_effects() {
+        use std::os::unix::fs::PermissionsExt;
+        for helper in ["filter", "hook", "fsmonitor"] {
+            let root = fixture();
+            match helper {
+                "filter" => {
+                    std::fs::write(root.path().join(".gitattributes"), "file filter=blocked\n")
+                        .expect("attributes");
+                    let status = std::process::Command::new("git")
+                        .args(["config", "filter.blocked.clean", "touch helper-ran; cat"])
+                        .current_dir(root.path())
+                        .status()
+                        .expect("filter config");
+                    assert!(status.success());
+                }
+                "hook" => {
+                    let hook = root.path().join(".git/hooks/post-index-change");
+                    std::fs::write(&hook, "#!/bin/sh\ntouch helper-ran\n").expect("hook");
+                    std::fs::set_permissions(hook, std::fs::Permissions::from_mode(0o755))
+                        .expect("executable");
+                }
+                _ => {
+                    let status = std::process::Command::new("git")
+                        .args(["config", "core.fsmonitor", "touch helper-ran"])
+                        .current_dir(root.path())
+                        .status()
+                        .expect("fsmonitor config");
+                    assert!(status.success());
+                }
+            }
+            let result = execute_approved(prepare(root.path())).await;
+            assert!(result.result.is_error, "helper {helper} must be refused");
+            assert!(
+                result.result.content.contains(helper),
+                "{}",
+                result.result.content
+            );
+            assert!(!root.path().join("helper-ran").exists());
+            assert!(!root.path().join(".git/index").exists());
+        }
+    }
+
+    #[tokio::test]
+    async fn disabled_fsmonitor_spellings_match_host_git() {
+        for value in [
+            "false", "0", "off", "no", "FALSE", "Off", "", "00", "0k", "0M", "-0g",
+        ] {
+            let root = fixture();
+            let git = |args: &[&str]| {
+                let output = std::process::Command::new("git")
+                    .args(args)
+                    .current_dir(root.path())
+                    .output()
+                    .expect("host Git");
+                assert!(
+                    output.status.success(),
+                    "{}",
+                    String::from_utf8_lossy(&output.stderr)
+                );
+                output.stdout
+            };
+            git(&["config", "core.fsmonitor", value]);
+            assert_eq!(git(&["config", "--bool", "core.fsmonitor"]), b"false\n");
+            let result = execute_approved(prepare(root.path())).await;
+            assert!(
+                !result.result.is_error,
+                "{value:?}: {}",
+                result.result.content
+            );
+            assert_eq!(
+                git(&["show", ":file"]),
+                std::fs::read(root.path().join("file")).expect("source")
+            );
+        }
+    }
+}

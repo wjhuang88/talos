@@ -1,19 +1,20 @@
 //! Shared non-interactive process boundary for command tools.
 
+#[cfg(feature = "shell")]
 use std::process::Stdio;
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "shell"))]
 use std::sync::Arc;
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "shell"))]
 use async_trait::async_trait;
-#[cfg(unix)]
+#[cfg(all(unix, feature = "shell"))]
 use talos_core::background_job::{
     BACKGROUND_PROCESS_EVENT_CAPACITY, BackgroundJobLauncher, BackgroundOutputChunk,
     BackgroundOutputStream, BackgroundProcessControl, BackgroundProcessEvent,
     BackgroundProcessExit, LaunchedBackgroundJob,
 };
-#[cfg(unix)]
+#[cfg(all(unix, feature = "shell"))]
 use tokio::io::{AsyncRead, AsyncReadExt};
 use tokio::process::Command;
 
@@ -33,6 +34,7 @@ use talos_core::background_job::{
 /// Pipeline callers may explicitly request a piped stdin. Every other child receives EOF. On
 /// Unix, a new session also prevents programs such as `sudo` and `ssh` from bypassing stdin and
 /// opening Talos's controlling terminal through `/dev/tty`.
+#[cfg(feature = "shell")]
 pub(crate) fn isolate_terminal_input(cmd: &mut Command, pipe_stdin: bool) {
     if pipe_stdin {
         cmd.stdin(Stdio::piped());
@@ -92,24 +94,24 @@ pub(crate) fn apply_process_hardening(cmd: &mut Command) {
 }
 
 /// Unix launcher for one already validated shell or direct-exec command.
-#[cfg(unix)]
+#[cfg(all(unix, feature = "shell"))]
 pub(crate) struct UnixBackgroundLauncher {
     command: Command,
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "shell"))]
 impl UnixBackgroundLauncher {
     pub(crate) fn new(command: Command) -> Self {
         Self { command }
     }
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "shell"))]
 struct UnixProcessGroupControl {
     pgid: i32,
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "shell"))]
 #[async_trait]
 impl BackgroundProcessControl for UnixProcessGroupControl {
     async fn terminate(&self) -> Result<(), String> {
@@ -121,7 +123,7 @@ impl BackgroundProcessControl for UnixProcessGroupControl {
     }
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "shell"))]
 fn signal_process_group(pgid: i32, signal: i32) -> Result<(), String> {
     if pgid <= 0 {
         return Err("refusing to signal a non-positive process group id".to_owned());
@@ -140,7 +142,7 @@ fn signal_process_group(pgid: i32, signal: i32) -> Result<(), String> {
     }
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "shell"))]
 #[async_trait]
 impl BackgroundJobLauncher for UnixBackgroundLauncher {
     async fn launch(mut self: Box<Self>) -> Result<LaunchedBackgroundJob, String> {
@@ -202,7 +204,7 @@ impl BackgroundJobLauncher for UnixBackgroundLauncher {
     }
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "shell"))]
 async fn pump_output<R>(
     mut reader: R,
     stream: BackgroundOutputStream,
@@ -231,7 +233,7 @@ where
     }
 }
 
-#[cfg(all(test, unix))]
+#[cfg(all(test, unix, feature = "shell"))]
 mod tests {
     use super::*;
     use talos_core::background_job::{BackgroundJobLauncher, BackgroundProcessEvent};
