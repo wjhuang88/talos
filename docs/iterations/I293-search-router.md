@@ -1041,3 +1041,33 @@ two additional bounded stage controls using existing launcher operations; see it
 for metadata/uncertainty and fresh validation requirements. Latest main23e659e2 is included,
 preserving I303 Complete and I304's independent claim. I293/C remains Active/Claimed/incomplete;
 #643/#624 open and activation/full-chain gates unchanged.
+
+CI3197/run38685760669 on770d856e FAILED Windows454passed/1failed, five other jobs passed.
+I302 modes1–4 succeeded, narrowing but not resolving the original cold73->76 failure. Direct
+CreatePipe/CreateProcessW return/cleanup observation belongs to I302 and adds no Search or
+production launcher behavior. I293 remains Active/Claimed/incomplete and #643/#624 stay open.
+
+C-fixture residual from the next local preflight: untouched Linux deadline/EOF test failed
+with457tools passes/1failure. It requires EOF without first proving request/accept arrival and
+cannot distinguish read errors from no EOF. This is a source-level ambiguity, not proven cause;
+retain the failure and original2s/150ms bounds. I302 journal records exact receipt and separate
+validation. No retry-to-green/full-preflight pass or transfer to #705 is claimed.
+
+Bounded Linux fixture telemetry now records up to4 read ErrorKinds and, only at failed EOF
+assertion, accept count, up to4 request(length,header-complete) shapes and EOF count. No request
+content/path is logged; no error becomes EOF and all150ms/2s/10s bounds remain. The next full
+preflight tests materially new diagnostic source; retain the old failure and make no repair or
+scheduler-rootcause claim from a later pass. Independent protected review remains required.
+
+The failure snapshot is non-atomic: committed request shapes exclude any still-in-flight buffer,
+so an empty list is not proof that no bytes arrived; accepted==0 is absence of an accept receipt,
+not proof that no TCP connection reached the listen backlog. EOF counts read events, not unique
+connections. Error total and saved kinds are sampled separately; errors_unrepresented may
+reflect in-flight recording as well as the four-kind cap. Preserve these interpretation limits.
+
+Fresh pinned locked full preflight on the new combined diagnostic source passed3717primary+
+1existingchild/0failed/ignored and both SDK modes (only prior exact local socket filter).
+Windows cross-check/Clippy, graphs and governance pass; these are not native observations.
+The earlier457/1 Linux EOF failure remains unresolved evidence; a later pass does not prove a
+fixture repair or scheduling cause. Production transport and all original deadlines/assertions
+are unchanged. Fresh stable-head protected review and unfiltered full CI remain required.

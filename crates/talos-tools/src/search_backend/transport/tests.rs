@@ -246,6 +246,8 @@ struct Server {
     stop: Arc<AtomicBool>,
     accepted: Arc<AtomicUsize>,
     closed: Arc<AtomicUsize>,
+    read_errors: Arc<Mutex<Vec<std::io::ErrorKind>>>,
+    read_error_count: Arc<AtomicUsize>,
     requests: Arc<Mutex<Vec<Vec<u8>>>>,
     worker: Mutex<Option<thread::JoinHandle<()>>>,
 }
@@ -258,12 +260,16 @@ impl Server {
         let stop = Arc::new(AtomicBool::new(false));
         let accepted = Arc::new(AtomicUsize::new(0));
         let closed = Arc::new(AtomicUsize::new(0));
+        let read_errors = Arc::new(Mutex::new(Vec::with_capacity(4)));
+        let read_error_count = Arc::new(AtomicUsize::new(0));
         let requests = Arc::new(Mutex::new(Vec::new()));
-        let (s, a, c, r) = (
+        let (s, a, c, r, errors, error_count) = (
             stop.clone(),
             accepted.clone(),
             closed.clone(),
             requests.clone(),
+            read_errors.clone(),
+            read_error_count.clone(),
         );
         let worker = thread::spawn(move || {
             let mut responses: VecDeque<_> = responses.into();
@@ -301,7 +307,14 @@ impl Server {
                         {
                             continue;
                         }
-                        Err(_) => break,
+                        Err(error) => {
+                            error_count.fetch_add(1, Ordering::Relaxed);
+                            let mut errors = errors.lock().expect("read error receipt");
+                            if errors.len() < 4 {
+                                errors.push(error.kind());
+                            }
+                            break;
+                        }
                     }
                     assert!(bytes.len() <= 32_768, "fixture request bound");
                     if let Some(end) = bytes.windows(4).position(|s| s == b"\r\n\r\n") {
@@ -336,7 +349,14 @@ impl Server {
                                     e.kind(),
                                     std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
                                 ) => {}
-                            Err(_) => break,
+                            Err(error) => {
+                                error_count.fetch_add(1, Ordering::Relaxed);
+                                let mut errors = errors.lock().expect("read error receipt");
+                                if errors.len() < 4 {
+                                    errors.push(error.kind());
+                                }
+                                break;
+                            }
                         }
                     }
                 }
@@ -352,6 +372,8 @@ impl Server {
             stop,
             accepted,
             closed,
+            read_errors,
+            read_error_count,
             requests,
             worker: Mutex::new(Some(worker)),
         }
@@ -950,7 +972,19 @@ async fn enclosing_deadline_covers_dns_and_response_wait_and_drops_socket() {
         }
     })
     .await
-    .expect("owned connection closes");
+    .unwrap_or_else(|error| {
+        let (shapes, shapes_truncated) = {
+            let requests = server.requests.lock().expect("request receipt");
+            let shapes = requests.iter().take(4)
+                .map(|bytes| (bytes.len(), bytes.windows(4).any(|s| s == b"\r\n\r\n")))
+                .collect::<Vec<_>>();
+            (shapes, requests.len() > 4)
+        };
+        let errors = server.read_errors.lock().expect("read error receipt").clone();
+        let errors_unrepresented = server.read_error_count.load(Ordering::Relaxed) > errors.len();
+        panic!("owned connection closes: {error}; accepted={} committed_request_shapes={shapes:?} shapes_truncated={shapes_truncated} eof_reads={} read_errors={errors:?} errors_unrepresented={errors_unrepresented}",
+            server.accepted.load(Ordering::Relaxed), server.closed.load(Ordering::Relaxed));
+    });
 }
 
 #[tokio::test]

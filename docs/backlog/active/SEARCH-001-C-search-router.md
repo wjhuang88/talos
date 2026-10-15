@@ -127,3 +127,25 @@ jobs passed. Successful I302 observer/native fixtures are diagnostic evidence on
 stage controls and typed-evidence interpretation remain in TEST-003/I302, with fresh protected
 review/native CI required. Main23e659e2 is included without taking over I303/I304 work. I293/C
 stays Active/Claimed/incomplete, #643/#624 open; production/default activation gates unchanged.
+
+CI3197 on770d856e failed unchanged cold73->76; five other jobs passed, I302 modes1–4
+succeeded. Preparation-only controls did not increase counts; direct API-return/cleanup
+investigation stays in TEST-003/I302. C acceptance, #716 merge and #643/#624 closure remain
+blocked by the unresolved original failure and existing activation gates; no Search change.
+
+Local validation residual: the new full preflight also failed unchanged Linux fixture
+`enclosing_deadline_covers_dns_and_response_wait_and_drops_socket` at its2s EOF receipt
+(tools457pass/1fail). It lacks proof that the150ms request reached an accepted connection;
+other read terminal states also lack receipts. Actual cause remains unknown. Preserve this
+C-fixture residual and the failed run; no deadline/filter change or full-local-pass claim.
+
+Follow-up is bounded failure telemetry only: retain up to4 read ErrorKinds and report accepted
+count, up to4 request(length,headers-complete) shapes and EOF count when that assertion fails.
+No content/paths/arguments are output, no error is counted as EOF, and150ms/2s/fixture10s limits
+are unchanged. Revalidate the new diagnostic source; retain the prior failure even if it passes.
+This is not a production fix or proven cause. Separate I293 commit; I302 owns Windows observers.
+
+New diagnostic-source local full preflight passed3717primary+1existingchild and both SDK modes,
+with only the prior authorized local filter; old457/1 failure remains. No repair/rootcause or
+native pass is inferred. Fixed-source Windows cross-check/Clippy/graphs/gates pass; fresh exact
+protected review/full unfiltered CI remain. I293 remains Active/Claimed/incomplete, #643/#624 open.
