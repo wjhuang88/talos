@@ -727,19 +727,6 @@ impl AddPlan {
                 }
             };
             let (index, _) = super::pull_state::decode_index(&index_path, length)?;
-            let head = self.repository.git_dir.join("HEAD");
-            if !authorizations.iter().any(|token| {
-                token.authorizes_path(
-                    "git_pull",
-                    ToolNature::Read,
-                    &self.workspace,
-                    head.to_str().unwrap_or_default(),
-                )
-            }) {
-                return Err(GitToolError::InvalidInput(
-                    "Pull policy discovery lacks HEAD Read admission".into(),
-                ));
-            }
             let branch_output = self
                 .pull_probe(vec![
                     "symbolic-ref".into(),
@@ -1068,29 +1055,25 @@ impl AddPlan {
                 }
             }
         }
-        // Directory enumeration cannot discover absent reflogs or grafts.
-        // Request their exact paths without probing them, then require fresh
-        // admission through discover_pull_prefetch before evidence capture.
+        // The separately admitted metadata scope includes absent internal
+        // evidence names as well as existing descendants. Retain their paths
+        // for revalidation without spending a new exact-path admission stage.
         if let Some(paths) = &mut self.pull_graph_paths {
-            let required = super::pull_state::PullEvidence::required_paths(
+            for path in super::pull_state::PullEvidence::required_paths(
                 &self.repository,
                 tracking.as_deref(),
                 false,
-            )?;
-            let missing: Vec<_> = required
-                .into_iter()
-                .filter(|path| !paths.contains(path))
-                .collect();
-            if !missing.is_empty() {
-                for path in missing {
-                    self.facets.push(path_facet(
-                        ToolNature::Read,
-                        &path,
-                        "Pull exact reference/reflog evidence, including absent paths",
-                    )?);
+            )? {
+                if !path.starts_with(&self.repository.git_dir)
+                    && !path.starts_with(&self.repository.common_dir)
+                {
+                    return Err(GitToolError::InvalidInput(
+                        "Pull evidence escaped the admitted metadata roots".into(),
+                    ));
+                }
+                if !paths.contains(&path) {
                     paths.push(path);
                 }
-                supplemental_paths_added = true;
             }
         }
         if supplemental_paths_added {
@@ -1362,13 +1345,6 @@ impl AddPlan {
                 &self.repository.git_dir,
                 &self.repository.common_dir,
             );
-            for path in inventory.paths() {
-                self.facets.push(path_facet(
-                    ToolNature::Read,
-                    &path,
-                    "Pull graph namespace discovery; descendant bytes require subsequent admission",
-                )?);
-            }
             for path in
                 super::pull_state::PullEvidence::required_paths(&self.repository, None, false)?
             {
@@ -12046,6 +12022,8 @@ pub(super) mod tests {
         // Namespace depth must not consume prepared-runner stages now that
         // graph inspection uses the dedicated metadata Read capability.
         git(&["update-ref", "refs/heads/a/b/c/d/e/f/g/h/i/j/deep", "HEAD"]);
+        let absent_tracking_log = root.path().join(".git/logs/refs/remotes/origin/Topic");
+        std::fs::remove_file(&absent_tracking_log).expect("absent tracking reflog");
         let plan =
             AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
                 .expect("Pull");
@@ -12069,8 +12047,8 @@ pub(super) mod tests {
         }
         assert!(history.record_profile(&plan.identity, &plan.facets));
         assert!(
-            stages <= 6,
-            "fetch and integration stages must remain available"
+            stages <= 3,
+            "post-fetch discovery, reconciliation and integration stages must remain available"
         );
         for path in [
             plan.repository.workdir.join(".gitattributes"),
@@ -12086,6 +12064,11 @@ pub(super) mod tests {
         }
         assert!(history.record_profile(&PreparedPlanIdentity::new(), &plan.facets));
         assert!(!root.path().join(".git/FETCH_HEAD").exists());
+        std::fs::write(&absent_tracking_log, b"new evidence").expect("create reflog");
+        assert!(
+            plan.revalidate().is_err(),
+            "absent reflog must remain bound"
+        );
     }
 
     #[tokio::test]
