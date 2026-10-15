@@ -3077,6 +3077,180 @@ async fn fixture_durable_cancelled_turn_replays_latest_closed_prefix() {
     );
 }
 
+#[cfg(unix)]
+mod prepared_process_cleanup {
+    use super::*;
+    use serde_json::{Value, json};
+    use std::path::PathBuf;
+    use talos_core::tool::*;
+    use talos_permission::{AdmittedInvocation, PermissionRequest};
+    use talos_sandbox::{OwnedCommandExecutor, OwnedCommandOperation};
+    struct ProcessTool {
+        root: PathBuf,
+        owner: Arc<OwnedCommandExecutor>,
+    }
+    struct ProcessPlan {
+        root: PathBuf,
+        operation: OwnedCommandOperation,
+        identity: PreparedPlanIdentity,
+        provenance: ToolProvenance,
+        facets: Vec<ToolPermissionFacet>,
+        input: Value,
+    }
+    #[async_trait]
+    impl AgentTool for ProcessTool {
+        fn name(&self) -> &str {
+            "process_fixture"
+        }
+        fn description(&self) -> &str {
+            "owned process cancellation fixture"
+        }
+        fn parameters(&self) -> Value {
+            json!({"type":"object"})
+        }
+        fn cleanup_receipt(&self) -> Option<Arc<dyn ToolCleanupOwner>> {
+            Some(self.owner.clone())
+        }
+        async fn execute(&self, _: Value) -> ToolResult {
+            panic!("prepared route required")
+        }
+        fn prepare_normalized_with_provenance(
+            &self,
+            input: &Value,
+            provenance: ToolProvenance,
+        ) -> Result<Option<Box<dyn PreparedNormalToolInvocation>>, String> {
+            Ok(Some(Box::new(ProcessPlan {
+                root: self.root.clone(),
+                operation: self.owner.operation(),
+                identity: PreparedPlanIdentity::new(),
+                provenance,
+                // Test-only auto-admission permits exercising the real execution path.
+                facets: vec![ToolPermissionFacet::new(ToolNature::Read)],
+                input: input.clone(),
+            })))
+        }
+    }
+    #[async_trait]
+    impl PreparedNormalToolInvocation for ProcessPlan {
+        fn plan_identity(&self) -> Option<&PreparedPlanIdentity> {
+            Some(&self.identity)
+        }
+        fn permission_profile(&self) -> &[ToolPermissionFacet] {
+            &self.facets
+        }
+        fn cleanup_receipt(&self) -> Option<Arc<dyn ToolCleanupReceipt>> {
+            Some(Arc::new(self.operation.cleanup_receipt()))
+        }
+        async fn execute(
+            self: Box<Self>,
+            admission: Box<dyn std::any::Any + Send>,
+        ) -> ToolExecutionOutput {
+            let proof = admission
+                .downcast::<AdmittedInvocation>()
+                .expect("real admission");
+            proof
+                .consume_for_prepared(
+                    &PermissionRequest::new(
+                        "process_fixture",
+                        self.provenance.clone(),
+                        &self.facets,
+                        &self.input,
+                    ),
+                    &self.identity,
+                )
+                .expect("bound proof");
+            let mut command = std::process::Command::new("sh");
+            command.current_dir(&self.root).args([
+                "-c",
+                "(sleep 2; printf forbidden > delayed) & printf ready > ready; wait",
+            ]);
+            let result = self
+                .operation
+                .execute(command, Duration::from_secs(20), 1024)
+                .await;
+            ToolExecutionOutput::error(format!("fixture result: {result:?}"))
+        }
+    }
+
+    #[tokio::test]
+    async fn session_interrupt_confirms_real_descendant_cleanup_before_terminal() {
+        tokio::time::timeout(Duration::from_secs(12), async {
+            let root = tempfile::tempdir().expect("tempdir");
+            let owner = Arc::new(OwnedCommandExecutor::default());
+            let mut registry = ToolRegistry::new();
+            registry.register(Arc::new(ProcessTool {
+                root: root.path().into(),
+                owner: owner.clone(),
+            }));
+            let model = MockModel::new(vec![vec![
+                AgentEvent::ToolCall {
+                    call: talos_core::message::ToolCall {
+                        id: "process-1".into(),
+                        name: "process_fixture".into(),
+                        input: json!({}),
+                    },
+                    provenance: Default::default(),
+                    summary_fields: vec![],
+                },
+                AgentEvent::TurnEnd {
+                    stop_reason: StopReason::ToolUse,
+                    usage: Default::default(),
+                },
+            ]]);
+            let agent = Agent::with_security_and_hooks(
+                Arc::new(model),
+                registry,
+                Some(Arc::new(
+                    talos_permission::PermissionEngine::with_workspace_root(root.path().into()),
+                )),
+                None,
+                root.path().into(),
+                Arc::new(talos_plugin::HookRegistry::new()),
+            );
+            let config = SessionConfig {
+                runtime_policy: RuntimePolicy::interactive(),
+                workspace_root: root.path().into(),
+                initial_history: vec![],
+                model_context_limit: 128_000,
+            };
+            let (handle, mut actor) = AppServerSession::new(agent, config);
+            let mut eq_rx = handle.eq_rx;
+            let sq_tx = handle.sq_tx;
+            let actor_task = tokio::spawn(async move { actor.run().await });
+            sq_tx
+                .send(SessionOp::Submit {
+                    message: "run fixture".into(),
+                })
+                .await
+                .expect("submit");
+            while !root.path().join("ready").exists() {
+                while let Ok(event) = eq_rx.try_recv() {
+                    assert!(
+                        completed_status(&event).is_none(),
+                        "turn ended before process startup: {event:?}"
+                    );
+                }
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+            sq_tx.send(SessionOp::Interrupt).await.expect("interrupt");
+            loop {
+                let event = eq_rx.recv().await.expect("terminal event");
+                if let Some(status) = completed_status(&event) {
+                    assert!(matches!(status, TurnCompletionStatus::Cancelled));
+                    break;
+                }
+            }
+            // Terminal cancellation is the observable barrier; no extra receipt wait.
+            tokio::time::sleep(Duration::from_millis(2100)).await;
+            assert!(!root.path().join("delayed").exists());
+            sq_tx.send(SessionOp::Shutdown).await.expect("shutdown");
+            actor_task.await.expect("actor joined");
+        })
+        .await
+        .expect("session deadline");
+    }
+}
+
 #[tokio::test]
 async fn fresh_actor_admits_submit_without_recovery_sidecar_creation() {
     let dir = tempfile::tempdir().expect("isolated workspace");

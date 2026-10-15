@@ -23,6 +23,8 @@ use crate::{
 
 impl Agent {
     /// Sets the total budget for one permission decision and final hook gate.
+    /// Prepared normal-tool continuations share one absolute admission deadline;
+    /// admitted execution has a separate cumulative wall-clock budget.
     #[must_use]
     pub fn with_permission_deadline(mut self, deadline: std::time::Duration) -> Self {
         self.permission_deadline = deadline;
@@ -113,6 +115,7 @@ impl Agent {
             background_jobs: None,
             protocol_capability_cache: talos_core::tool::ProtocolCapabilityCache::new(),
             execution_ledger: crate::execution_ledger::ExecutionLedger::default(),
+            tool_cleanup: crate::tool_cleanup::ToolCleanup::default(),
         }
     }
 
@@ -269,6 +272,7 @@ impl Agent {
             background_jobs: None,
             protocol_capability_cache: talos_core::tool::ProtocolCapabilityCache::new(),
             execution_ledger: crate::execution_ledger::ExecutionLedger::default(),
+            tool_cleanup: crate::tool_cleanup::ToolCleanup::default(),
         }
     }
 
