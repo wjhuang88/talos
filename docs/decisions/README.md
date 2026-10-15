@@ -23,6 +23,7 @@ silently rewrite the reason or boundary that governed an earlier implementation.
 
 | ADR | State | Current Boundary / Gate |
 |---|---|---|
+| [093: OpenAI Responses Protocol Boundary](093-openai-responses-protocol-boundary.md) | **Proposed / #724 intake** | Contract for claiming PROVIDER-008; confirmed-support default, statelessness, reasoning replay confidentiality, catalog signals. No claim or implementation yet. |
 | [092: Embedded Skill Progressive Disclosure](092-embedded-skill-progressive-disclosure.md) | Accepted / I303 Complete | Effective at #720 merge `9b7ba281`; confined shared disclosure, RuntimeHandle skill context, opt-in `skill_read`. |
 | [091: Test-Only Current-Process Handle Snapshots](091-test-only-current-process-handle-snapshots.md) | **Accepted contract proposal / #718** | Ineffective until atomic main merge after protected native/security review/CI/CAS; no PSS implementation yet. |
 | [090: Invocation-Bound Search Endpoint Authority](090-invocation-bound-search-endpoint-authority.md) | Accepted contract / #712 activation proposed | Opt-in owned prepared network call; complete manifest/config Session grant binding, live Agent-minted authority, controlled compatibility rehosting and real-dispatch gates. Acceptance/effective scope only after exact-head protected review, CI and #712 merge. |

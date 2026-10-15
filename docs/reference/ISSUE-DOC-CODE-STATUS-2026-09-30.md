@@ -76,6 +76,7 @@
 | [#670](https://github.com/wjhuang88/talos/issues/670) | Converge storage and retrieval capability contracts without behavior change | [STORE-002](../backlog/active/STORE-002-storage-capability-contracts.md) | Intake / Unclaimed | Architecture issue newly opened; owner/iteration/claim still required before implementation. |
 | [#717](https://github.com/wjhuang88/talos/issues/717) | Test-only current-process handle evidence | [TEST-003](../backlog/active/TEST-003-windows-owned-handle-evidence.md) | In Progress / Claimed (proposed) | #718 atomic I302/ADR-091 claim is ineffective until main merge; no PSS implementation. |
 | [#719](https://github.com/wjhuang88/talos/issues/719) | Embedded Skill Level 1/2 progressive disclosure | [SKILL-006](../backlog/active/SKILL-006-embedded-skill-progressive-disclosure.md) | Complete / Closed | #721 merged as 6d72975e; closeout records Completion Commit. |
+| [#724](https://github.com/wjhuang88/talos/issues/724) | OpenAI Responses API support and protocol mode configuration | [PROVIDER-008](../backlog/active/PROVIDER-008-openai-responses-api-support.md) | Refinement / Unclaimed | Intake only; ADR-093 proposed; no claim, iteration or implementation. |
 
 ## Synchronization Notes
 
