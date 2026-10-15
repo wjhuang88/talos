@@ -1,3 +1,139 @@
+Current initialized-child validation (2026-10-15; unpublished): the approved
+standard `release_preflight.sh` completed outside the sandbox with exit 0
+(session 8083). It passed governance and claims validation, the full workspace
+test suite including the 699-test `talos-tools` batch, MCP Git transport tests,
+doctests, and both external runtime SDK fixture runs; the process-observation
+test `prepared_local_push_runs_all_eight_admitted_stages` also passed when run
+outside the sandbox with all features (session 52128). The earlier sandbox-only
+`PermissionDenied` result is environmental evidence, not a product failure.
+T7 remains Active; linked/ancestor compatibility, Pull/Push residuals,
+platform evidence, independent review, and publication are still open.
+
+Current Pull contract note (2026-10-15): historical entries below that describe
+`git:pull-repository-metadata` as proposed or unanswered are preserved session
+history and are superseded by the maintainer's acceptance recorded in ADR-089
+and the current I300 checkpoints above. Acceptance does not claim fetch or
+integration delivery; those production stages and their evidence remain open.
+
+Current Pull transport-admission checkpoint (2026-10-15; unpublished): resolved
+credential-free built-in `git://` fetch destinations now enter PullFetch as
+independent Network(Remote) facets, derived from retained Git configuration.
+Unsupported destination schemes remain fail-closed at dispatch. The focused
+Pull preparation selection passes 19/19 and locked talos-tools all-feature check
+passes. This binds the network approval target but does not spawn fetch or
+authorize local sources, helpers, credentials, redirects, or integration.
+Production fetch/integration, MCP Pull coverage, failure/cancellation evidence,
+independent review, current full preflight and publication remain outstanding;
+T7 remains Active.
+
+Current Pull hook-boundary checkpoint (2026-10-15; unpublished): Pull now
+derives `reference-transaction` and `pre-auto-gc` hook paths from the retained
+configuration and requires exact Read admission plus regular-file evidence at
+the PullFetch boundary. Executable hooks and configured fetch helpers fail
+closed; no hook or fetch process is started. Pull focused tests and locked
+tools checks remain required after this source change. This does not deliver
+production fetch/integration or close T7.
+
+Current Pull transport refusal regression (2026-10-15; unpublished): unsupported
+HTTPS destinations remain visible as exact Network(Remote) facets, but PullFetch
+refuses before command construction or FETCH_HEAD mutation. Executable-hook and
+unsupported-transport regressions bring the focused Pull selection to 21 passing
+tests. This improves approval visibility without authorizing helpers, credentials,
+redirects, production fetch or integration.
+
+GIT-001 release-crate recheck (2026-10-15): published gix 0.89.0 source has
+network-gated fetch, merge primitives, linked-worktree operations, and a
+clone-only `fetch_then_checkout`; these APIs do not provide Talos-equivalent
+pull reconciliation or branch-switch orchestration. Talos stays locked to
+0.87.1. The GIT-001 owner records exact source paths, feature/MSRV and breaking
+API constraints. No dependency upgrade or Git-removal date is claimed.
+
+Current initialized-child validation (2026-10-15; unpublished): real MCP Checkout
+matrix passes 40 Unix scenarios (7972, `/private/tmp/i300-initialized-mcp.log`),
+including initialized-child allow/deny/replay and target-configuration cases.
+Initialized child plus target configuration plus old-child deletion exceeds the
+unchanged eight-stage bound; both policy modes refuse before mutation and retain
+branch/child state. Production check-attr command construction now has a real Git
+ancestor-prefix regression, passed 37219,
+`/private/tmp/i300-child-filter-prefix.log`; independent focused re-review finds
+no new blocker for the fix. Latest tools all-target Clippy passes (59178), and
+both governance validators pass with zero warnings (26115/44453). Sandboxed full
+tools library result was 343 pass / 1 process-observation PermissionDenied; this
+did not establish a product failure. The intermediate outside-sandbox preflight
+28347 (`/private/tmp/i300-initialized-current-preflight.log`) is superseded by
+the passing session 8083 recorded above.
+Linked/ancestor full behavior, remaining Checkout/Push/Pull and final publication
+remain open. T7 remains Active.
+
+Startup-selection and external-worktree checkpoint (2026-10-15; unpublished):
+the temporary-borrow compilation error is fixed. Raw startup selection now
+matches native Git for stale private configuration, commondir presence,
+worktreeConfig override, bare and missing repositoryFormatVersion cases; two
+focused tests pass in `/private/tmp/i300-child-layout-native-rules.log`.
+Child discovery roots and effective worktree sources retain separate evidence;
+real native/prepared Checkout preserves a tracked file and both sentinel roots
+with external core.worktree. A configured external clean filter is refused without
+execution, and raw-target Read denial still preserves the parent branch and child.
+The strengthened fixture passes in `/private/tmp/i300-child-external-parity.log`
+(69259). Earlier child suite passes 25/25 and Checkout suite 47/47; those broader
+runs predate the final check-attr correction, which explicitly binds gitdir,
+effective worktree and cwd to prevent discovery-prefix path confusion found by
+independent review. Fresh broad validation, final review, linked/ancestor layouts,
+MCP denial/replay combinations and the full current-source gate remain required.
+This supersedes the conservative both-target compatibility residual below; T7
+remains Active and all later tasks remain unactivated. No completion SHA exists.
+
+Raw startup layout checkpoint (2026-10-15; unpublished): independently
+admitted common/config and gitdir/config.worktree now receive bounded Rust
+no-include parsing. Raw core.worktree targets enter the next Read frontier and
+retain canonical/path identity evidence before ordinary Git setup. Sources and
+targets remain in continuation profiles and are revalidated. Independent targeted
+review reports no new security blocker for this chain. cargo check passes
+(88345); raw include-masking evidence test passes (85382); real initialized-child
+fixture now additionally removes the external raw-target Read while include
+masks it, and confirms refusal before ordinary setup with branch/sentinel intact
+(5316, /private/tmp/i300-child-raw-denial.log). This supersedes the preceding raw
+startup security finding, not other open delivery gates. Compatibility residual:
+both raw targets are conservatively requested even when Git suppresses a stale
+config.worktree or linked common hint; implement actual startup selection rules
+and verify them before claiming broad layout parity. External worktree status,
+MCP/denial/replay combinations and fresh full standard gate remain open.
+
+Initialized-child continuation (2026-10-15; unpublished, not delivery evidence):
+added a separate CheckoutChildWorktree authorization frontier, retained bootstrap
+config origins, and bound admitted worktree pathname identities for revalidation.
+Discovery-only Git config now explicitly passes both --git-dir and --work-tree
+pointing at the previously admitted child directory. Source review of Git v2.54.0
+setup_explicit_git_dir confirms GIT_WORK_TREE wins before core.worktree resolution;
+a real fixture with a nonexistent configured worktree passes without accessing
+that target (21164, /private/tmp/i300-child-bound-config-test.log). Real native and
+prepared initialized-child preservation passes; focused new_gitlink tests pass
+3/3 (70780, /private/tmp/i300-child-bound-bootstrap-tests.log).
+OPEN SECURITY FINDING: merged --list --includes core.worktree does not establish
+the startup layout value. Git startup reads raw common/config and optional
+config.worktree without includes; an include can mask an unapproved raw target.
+Before ordinary setup, independently inventory/admit/bind those raw layout target
+spellings and retain their evidence. External effective-worktree status parity,
+denial/replay tests, stage-budget combinations, MCP coverage and full fresh gate
+remain open. This draft is not security approved and must not be published.
+
+Current-source checkpoint (2026-10-15): standard preflight session 52429
+finished successfully; `/private/tmp/i300-new-directory-preflight-approved.log`
+ends `release preflight: passed`. This validates the nonempty uninitialized
+new-gitlink directory checkpoint only. Subsequent initialized-child discovery
+changes compile but are not final-gate or security-review approved. Independent
+review found (1) ordinary child Git setup can resolve core.worktree before its
+Read scope is bound, and (2) child config origins must retain explicit Read in
+intermediate target-config/deletion stages. The second finding is patched by
+retaining each discovered config-file Read in both continuation and mutation
+profiles; regression validation remains pending. The first finding remains open:
+bootstrap configuration without ordinary worktree setup, discover and admit the
+effective worktree, then bind subsequent child status to that admitted location.
+Do not treat the prior full gate as validation of these newer production edits.
+T7 remains Active; later serial tasks and publication gates remain incomplete.
+
+# Next Task: Session Todo Handoff
+
 ## Proposed Pull Auto prerequisite sequencing — 2026-10-23
 
 The I300 governance amendment moves only shared prepared-command Auto assessment
@@ -8,7 +144,591 @@ PERM-007-H full built-in coverage follows I300 and is not activated or complete.
 I300 records scope, tests, API adaptation, independent review and native Windows
 gates. No production activation or successful Auto execution is claimed here.
 
-# Next Task: Session Todo Handoff
+
+Current gate handle (2026-10-15): full approved standard preflight is live
+as session 52429, `/private/tmp/i300-new-directory-preflight-approved.log`;
+resume this handle rather than restart. Governance and claims pass with zero
+warnings (76783). Strengthened native/prepared preservation fixture additionally
+passes (19900): bare-shaped HEAD/objects/refs and inert fsmonitor config, deep
+children, external broken symlink, FIFO and socket remain intact; socket receives
+no connection and command sentinel stays absent. Log:
+`/private/tmp/i300-new-directory-preservation.log`. Only tests changed after
+starting this production-source preflight. Full gate outcome is not yet inferred.
+
+New-directory continuation checkpoint (2026-10-15; unpublished): nonrecursive
+Checkout now admits existing nonempty ordinary directories when their bounded
+top-level name inventory has no Git metadata name or protected HFS/NTFS alias.
+A fresh exact Read precedes enumeration; retained directory identity and names
+are revalidated before mutation without opening/statting descendants. Limits
+are 4,096 entries and 1 MiB of names per directory per capture. Windows nonempty
+directories remain refused pending runtime evidence; initialized children remain
+an actual compatibility gap. Removed-gitlink empty-directory constraints remain
+separate and unchanged. Independent production review has no blocking finding.
+Checkout 46/46 passes (18419), focused evidence tests pass (80416), and Git
+all-target locked Clippy passes (89249). Real MCP Checkout matrix now has 33
+cases on Unix and passes (61664), including nonempty direct mutation, target
+configuration, old-child deletion, exact Read denial and Write denial/replay.
+Logs: `/private/tmp/i300-new-directory-checkout.log`,
+`/private/tmp/i300-new-directory-mcp.log`, `/private/tmp/i300-new-directory-clippy.log`.
+Full preflight 33389 predates this production edit and is no longer final-source
+evidence. T7 remains Active; all other functionality/publication residuals and
+later serial tasks remain open.
+
+Next concrete T7 gap (2026-10-15): native nonrecursive Checkout succeeds when a
+new gitlink meets an existing nonempty directory or initialized child `.git`,
+preserving sentinel/metadata. Both isolated fixtures exit 0; current structured
+implementation refuses them. Continue with admitted new-child discovery and
+effect binding, not a blanket refusal removal. Empty-directory coverage below
+does not establish full new-gitlink parity.
+
+Latest verification (2026-10-15): empty-directory Checkout public MCP matrix
+expanded to 26 cases and passes (89457), including exact Read denial with Write
+allowed, onbranch target config and simultaneous old-gitlink deletion. Unix
+late symlink replacement refuses with referent preserved (71549); MCP all-target
+Clippy passes (73082), and independent fixture review finds no blocking issue.
+Only tests/docs changed since full production preflight 33389. T7 remains Active;
+configuration-link and Pull proposals still lack acceptance in ADR-089, and all
+other recorded transport/platform/publication residuals remain open.
+
+Current final local validation (2026-10-15): empty-directory approved full
+preflight session 33389 exited 0; its log
+`/private/tmp/i300-empty-directory-preflight-approved.log` ends
+`release preflight: passed`. It covers the new exact-Read stage, workspace
+checks/Clippy/tests, doctests and both external Runtime SDK modes. Independent
+review has no blocking finding; governance/claim validators pass with zero
+warnings. Historical running entries below are superseded. T7 remains Active;
+no implementation publication/completion SHA or later-task activation is claimed.
+
+Latest production checkpoint (2026-10-15; unpublished): existing ordinary empty
+directories may become new target gitlinks after a separate exact-Read discovery
+stage. Directory identity/emptiness and final Read retention are revalidated;
+old discovery proof cannot authorize mutation. Checkout 46/46 (71610) and
+locked all-target Git Clippy (82271) pass; strengthened focused assertions pass
+(29074), and final independent review finds no remaining blocking finding.
+Full standard preflight is running as approved session 33389, log
+`/private/tmp/i300-empty-directory-preflight-approved.log`; poll this handle
+before restarting. This production edit postdates full preflight 1885;
+that earlier gate is not current-final validation. T7 remains Active and the
+serial queue remains unactivated. See I300 for residuals and next verification.
+
+Authoritative current validation result (2026-10-15): session 1885 exited 0;
+`/private/tmp/i300-socket-preflight-approved.log` ends `release preflight: passed`.
+Current socket/FIFO production changes pass full locked workspace validation,
+doctests and both external runtime SDK modes. Historical live-handle entries
+below are superseded. T7 remains Active; original functional residuals and final
+publication gates remain incomplete, and later serial tasks remain unactivated.
+
+Worktree-space audit (2026-10-15): `git worktree list --porcelain` reports only
+the current `feat/i300-git-repair` checkout at `55fef9f9`. There is no registered
+unused worktree to remove. Filesystem free space is approximately 5.6 GiB; no
+branch, source directory or build cache was deleted by this audit.
+
+Resume current-source gate (2026-10-15): approved socket-version standard
+preflight is live as session 1885, log
+`/private/tmp/i300-socket-preflight-approved.log`. Dedicated socket/FIFO/link
+type-replacement test passes (29377); MCP Clippy passes (94769); governance and
+claims pass zero warnings (84557). Poll 1885 rather than rerunning the gate.
+Config-link metadata and Pull metadata contracts remain explicitly proposed,
+unaccepted and disabled; prior Push-specific acceptance does not cover them.
+
+Latest continuation (2026-10-15): FIFO standard preflight 9204 passed completely,
+including SDK fixtures. Subsequent Unix socket deletion support passes Checkout
+45/45, dedicated no-connection/drift test and Clippy; independent security review
+finds no new blocking issue. Exact per-entry Read/Write remains mandatory.
+MCP socket matrix passed as 93230, log `/private/tmp/i300-socket-mcp.log`.
+The full preflight predates socket production changes, so final validation is
+still required. All original residuals and the full serial queue remain open.
+
+Current standard-gate handle (2026-10-15): 13206 ended 101 solely at sandbox
+process observation EPERM (tools 691/692). The identical approved outside-sandbox
+rerun is session 9204, `/private/tmp/i300-fifo-preflight-approved.log`.
+Resume 9204; 13206 is terminal. Current-source full validation remains unproven.
+
+FIFO public-path follow-up (2026-10-15): the real MCP Checkout matrix passes
+with admitted FIFO deletion, denied FIFO preservation and replay refusal (23059),
+`/private/tmp/i300-fifo-mcp.log`. Standard preflight 13206 is still running at
+`/private/tmp/i300-fifo-preflight.log`; resume that handle rather than restarting
+on an observation timeout. GIT-001 also records a live 2026-10-15 upstream recheck:
+gix remains 0.89.0 and full host-Git replacement blockers remain.
+
+Latest FIFO checkpoint (2026-10-15): I300 now supports Unix FIFO entries in
+nonrecursive Checkout child deletion through exact Read/Write admission without
+opening the pipe. Checkout passes 44/44 (78586); inode/type replacement regression
+passes (30551); Clippy passes (25346); independent security review reports no new
+blocking issue. Earlier full preflight predates this production change. Links,
+Pull, remaining transports/platforms and publication gates remain outstanding;
+T7 stays Active and no later queue item is activated.
+
+Current T7 standard validation checkpoint (2026-10-15): complete standard
+`release_preflight.sh` passes outside the sandbox (29306), including tools
+691/691 and both SDK consumer modes; log
+`/private/tmp/i300-current-preflight-approved.log`. The prior sandbox run failed
+only at process observation EPERM. Current code includes ordinary-directory
+`..` target includes and real target resource-limit admission regressions.
+Symlink configuration metadata authorization remains proposed, not accepted;
+Pull and other original residuals still prevent T7 completion. I300 remains
+Active, later queue items unactivated, with no implementation publication SHA.
+
+Missing hook-directory checkpoint (2026-10-15): optional directory-absence
+evidence now removes the functional residual recorded below, while required
+gitdir contexts still reject missing paths, including optional→required upgrades.
+Prepared tests exercise fresh exact admission and absent-hook capture through
+the production discovery stage, ending at the retained final effect-binding
+refusal. Checkout passes 40/40, final target-config passes 25/25 and Git all-target
+Clippy passes; see I300 owner for logs and review details. Ancestor-checkpoint
+governance and claims passed zero warnings. Final mutation, Pull execution and
+all original T7 delivery gates remain open; no queue advancement is claimed.
+
+Late-hook ancestor follow-up (2026-10-15): the owner I300 now records closure of
+the static parent-symlink recapture gap. Parent directories receive exact Read
+frontiers and identity guards before hook leaf capture/revalidation. Checkout
+40/40 and Git all-target Clippy pass, logs
+/private/tmp/i300-late-hook-guard-{checkout,clippy}.log; independent review confirms
+the fix. Missing target hook directory support remains a functional residual,
+alongside final effect binding, Pull execution and all original T7 delivery gates.
+No final mutation, publication, completion or serial advancement is claimed.
+
+Late checkout hook frontier checkpoint (2026-10-15): see the owner I300 checkpoint.
+Target discovery now emits fresh exact Read facets for late traditional-hook
+candidates; all tokens are checked before capture. Source non-null hooksPath
+cache semantics are preserved. Captured hook evidence joins revalidation and
+replacement/deletion protection, while final effect binding still refuses.
+Checkout tests pass 40/40 and Git all-target Clippy passes, logs
+/private/tmp/i300-late-hook-final-{checkout,clippy}.log. Ordinary-chain frontier
+coverage includes the shared stage budget and final-stage reservation; missing
+Read and later hook creation refuse. Final target mutation, Pull execution and
+all original T7 delivery gates remain open; the serial queue is unchanged.
+
+Previous reload-validator checkpoint governance and claims validation both
+completed successfully with zero warnings, logs
+/private/tmp/i300-reload-{governance,claims}.log.
+
+Checkout reload validator checkpoint (2026-10-15): fixed the qualified
+ConfigState call and verified the new ordered-record validator. Target promisor
+true/implicit/invalid values, partial-clone filters and partial-clone extensions
+refuse; false promisor is accepted and status.compareBranches uses the final
+value, rejecting a final implicit value. This check preserves source-cached
+effects and does not enable the final target mutation continuation.
+Focused test passes; checkout-filtered tests pass 37/37 and Git all-target
+Clippy passes, logs /private/tmp/i300-reload-{validator,checkout,clippy}.log.
+Next complete cache-specific target auxiliary effects and fresh final admission;
+Pull execution and original T7 delivery gates remain open. No completion or
+publication evidence is claimed and the serial queue is unchanged.
+
+Target-source effect protection checkpoint (2026-10-15): captured target
+configuration paths, including retained Missing sources, now join checkout's
+existing tree-replacement and recursive-deletion protection. Directory-only
+admission dependencies and pending sources are excluded. A real commit-tree
+regression compares ordinary file creation (allowed by the overlap check) with
+the same path captured as an absent target config source (refused), and verifies
+deletion overlap refusal. This is direct protection-helper evidence; the final
+target-stage mutation continuation remains disabled.
+
+Checkout-filtered tests pass 36/36 and Git all-target Clippy passes (64512),
+logs /private/tmp/i300-target-protection-{checkout,clippy}.log. Independent
+read-only review found no new static admission bypass; existing canonical-path
+revalidation TOCTOU limitations remain. Next complete source/target cache-specific
+effect generation and final admission, then the outstanding Pull and original T7
+delivery gates. No completion/publication or serial-queue advancement is claimed.
+
+Target-source revalidation and cache partition checkpoint (2026-10-15):
+AddPlan now revalidates captured target configuration after the repository location
+guard. Only already-admitted ancestors/files are revisited; pending sources are
+not read. A target-only file drift regression confirms refusal while HEAD/index
+and absent topic branch remain unchanged. Independent boundary review found no
+new admission-order defect. Checkout-filtered tests pass 34/34 and Clippy passes
+(88822), /private/tmp/i300-target-drift-{checkout,clippy}.log.
+
+Native Git 2.54 cache characterization now covers eight tracked/empty-index,
+source-hooksPath present/absent and malformed/valid target-chain combinations.
+Malformed target config fails after HEAD changes when source core.hooksPath is
+set; without that setting these fixtures succeed. Neither target file hooks nor
+target configured hook commands execute. Git repo_config_clear clears ordinary
+configset only, while configured hook lists retain their independent cache;
+a missing hooksPath can cause ordinary config to reload before HEAD moves.
+This is a bounded characterization, not proof for all later readers. The new
+native regression passes within target-config 24/24; final all-target Clippy
+passes (14285), /private/tmp/i300-cache-partition-{tests,clippy}.log.
+The earlier malformed-target fixture was rerun and retains its always/inherit
+failure result; its source hooksPath explains the distinguishing condition.
+Final target effects/admission remain unfinished and mutation still refuses.
+Next bind cache-specific readers and auxiliary effects, preserving source hook
+semantics and target-source evidence; Pull and all original delivery gates remain
+open. No completion/publication or serial-queue advancement is claimed.
+
+Physical tracking overlay checkpoint (2026-10-15): target discovery now predicts
+local config setters from captured exact-origin evidence before ordered include
+expansion. The overlay preserves native section placement, duplicate remote/rebase
+setter behavior, duplicate merge unset behavior, empty sections and standalone
+versus inline comments. Thirteen real Git checkout fixtures compare both physical
+record order and expanded include order. Independent review found and verified
+closure of frontmatter record misalignment; section tokens now enforce the
+16,384-item bound even for empty sections. Oversized write payloads also refuse.
+Final local verification passes target-config 23/23, Checkout-filtered 33/33 and
+Git all-target Clippy (5258); logs /private/tmp/i300-overlay-final.log,
+/private/tmp/i300-overlay-checkout.log and /private/tmp/i300-overlay-final-clippy.log.
+Read-only review found no remaining issue within overlay scope.
+
+This does not enable the final target mutation continuation. Next implement the
+source/target config-cache partition, bind post-switch auxiliary/effect facets,
+admit their reads and revalidate before original argv dispatch. Production Pull,
+other original T7 behavior and fixed-candidate publication gates remain open.
+No completion commit, publication or advancement of the serial queue is claimed.
+
+Tracking prediction and stale-source checkpoint (2026-10-15): retained invocation
+configuration now predicts local branch.remote/merge/rebase write intentions from
+native Git 2.54 tracking modes and the resolved starting reference. Create uses
+admitted symbolic HEAD (detached means no start); guessing uses the retained
+remote mapped reference. Execution recomputes intentions and revalidates before
+original argv dispatch. Native differential coverage passes 40 local/guessed
+merge/rebase combinations plus detached true/always/inherit; Checkout passes
+32/32, Git all-target Clippy passes, logs
+/private/tmp/i300-tracking-{matrix,detached,checkout,clippy}.log. Independent
+read-only review found no specific defect or increased authority, explicitly
+excluding physical config overlay and final conditional effects from its conclusion.
+
+The same-OID two-remote regression now also admits the discovered plan, changes
+checkout.defaultRemote, and consumes that exact proof. Execution refuses before
+continuation while HEAD, index, current branch and absent topic branch remain
+unchanged. This exercises snapshot drift refusal, not isolation of the later
+source-comparison check from configuration revalidation. Focused test and latest
+Git all-target Clippy pass (16560/69371), logs
+/private/tmp/i300-tracking-stale-{source,clippy}.log; diff check passes.
+
+Native setter experiments on Git 2.54.0 show replacement retains an existing
+key's position, but insertion uses the last matching section, including an empty
+section across an include. Duplicate remote fails its setter; duplicate merge
+unset returns positive 5. Actual checkout with autoSetupMerge=always continues
+past duplicate merge, preserving old merges and appending the new one (exit 0
+with warning). branch.c checks setter results for negative values, so assuming
+all nonzero results abort would be incorrect. Raw setter experiment artifact:
+/private/tmp/i300-tracking-config-order.json. Implement a section-aware local
+config overlay, verify full checkout parity including duplicates and empty
+sections, then evaluate the target chain with source/target cache partition and
+bind final effects. Appending intention records to expanded config is invalid.
+Target-stage mutation still explicitly refuses; Pull, Windows execution and all
+original publication/delivery gates remain open. No Complete or publication is
+claimed; the serial queue is unchanged.
+
+Remote-guess source checkpoint (2026-10-15): checkout now binds selected remote
+and mapped reference as well as OID; final execution compares that source then
+revalidates. A same-OID two-remote fixture verifies distinct retained sources
+without creating a branch. It does not directly test stale-source execution.
+Checkout 30/30 (33878) and Git all-target Clippy (98472) pass, logs
+/private/tmp/i300-tracking-source-{checkout,clippy}.log; diff check passes.
+Independent read-only review found no new flaw or authority expansion. Actual
+tracking writes, source/target cache partition and final target effects remain
+unimplemented; target mutation refusal remains. Next: predict tracking behavior
+from native Git 2.54 branch.c using retained remote/reference and normalized new
+name; preserve original argv and exact target Read admission. Pull and original
+publication gates remain open. Standing gix tracking in GIT-001 was refreshed:
+published latest remains 0.89.0 versus locked 0.87.1, no Git-removal date.
+Earlier status saying research was unfinished was inaccurate: previous tracking
+records already existed. No completion or publication is claimed.
+Governance and Collaboration Claim validators exit 0 (55213/39722), logs
+/private/tmp/i300-tracking-{governance,claims}.log.
+
+New-branch name binding checkpoint (2026-10-15): create and remote-guess
+paths now run native check-ref-format --branch inside admitted config discovery,
+retain its bounded single-line name, use that name for target onbranch context,
+and re-interpret/compare it before executing the original argv. Real regression
+creates the deleted previous branch via -b @{-1}, checks the retained normalized
+name, and rejects bad..name before mutation. Checkout passes 29/29 and Git
+all-target Clippy passes (85783), logs
+/private/tmp/i300-new-branch-{checkout,clippy}.log; diff check passes. Independent
+read-only review confirms native check_branch_ref interpretation, discovery Read/
+Execute/config-chain coverage, bounded output and execution/ref-log revalidation,
+with no new finding. Target Sources uses the accepted normalized name; tracking
+writes and their post-write predicted configuration/cache split are still not
+implemented, so final target mutation refusal remains. Symlink/component support,
+final effects, Pull and original delivery gates remain open. No completion or
+publication is claimed.
+
+Attached-HEAD review correction (2026-10-15): independent review found
+HEAD and @ preserve the current attached branch in native checkout, rather than
+always detaching. These exact inputs now obtain symbolic local context alongside
+previous-checkout expressions; revision suffixes/fully qualified revisions are
+not broadly converted to branch switches. Real onbranch execution regression
+covers both HEAD and @ preserving source branch/config. Final Checkout 28/28 and
+Git all-target Clippy pass (56288), logs
+/private/tmp/i300-head-context-{checkout,clippy}.log; diff check passes. The preceding
+previous-expression 28/28 and Clippy checkpoint remains valid. Review otherwise
+found no additional previous-expression flaw and confirmed reflog identity
+binding. This correction has focused verification; final stable-candidate review
+and full workspace gates remain required. Create-name normalization, predicted
+tracking config, symlink contexts and final effects remain open. No completion or
+publication is claimed.
+
+Previous-checkout expression checkpoint (2026-10-15): non-create exact
+@{-digits} expressions now obtain the symbolic local reference just like '-' and
+bind the local target OID before configuration preparation. Expressions with
+revision suffixes remain detached contexts. The real onbranch Checkout regression
+now alternates '-' and '@{-1}'; the same-OID reflog-change refusal regression uses
+explicit '@{-1}', proving OID equality does not admit changed history. Checkout
+passes 28/28 and all-target Git Clippy passes (43344), logs
+/private/tmp/i300-previous-expression-{checkout,clippy}.log. Diff check passes.
+Independent classification review remains pending. Create-name normalization and
+tracking/source-target configuration prediction still need closure, along with
+symlink support and final effects. No task completion or publication is claimed.
+
+Target-branch classification checkpoint (2026-10-15): checkout resolution
+now retains whether the OID came from remote candidate guessing or direct revision
+resolution, and execution rechecks that distinction as well as the OID. Target
+Sources has an explicit optional local branch: create/guessed paths select the new
+local name, existing local paths select the refs/heads suffix, and direct detached
+revisions have no onbranch context. Native differential tests confirm detached
+HEAD does not match *, **, empty or HEAD patterns. Target tests pass 21/21,
+Checkout 28/28 and all-target Git Clippy pass (52062), logs
+/private/tmp/i300-target-branch-{tests,checkout,clippy}.log. Diff check passes.
+Independent follow-up requested; result pending. This is not complete branch-name
+normalization for arbitrary previous-checkout expressions or tracking semantics.
+Post-tracking config prediction, source/target cache partition, symlink contexts
+and final effects remain open; production target-stage mutation still refuses.
+No publication or task completion is claimed.
+
+Linked-gitdir context checkpoint (2026-10-15): target Sources now requests
+the invocation gitdir and every ancestor explicitly as directory identity Read
+facets, sharing the cumulative request/path-byte budget. Whole-frontier admission
+precedes root-to-leaf capture; no directory enumeration or child-file read occurs.
+Completion waits for both file and directory frontiers, and captured identities
+are revalidated. This removes the previous dependency on enabled/present worktree
+config for linked-gitdir matching. Regression covers zero capture on denied
+gitdir, malformed unrequested config.worktree left unread, successful conditional
+matching, and replacement-directory drift. Target tests pass 20/20 (83504),
+/private/tmp/i300-directory-context-tests.log; Checkout passes 28/28 (80167),
+/private/tmp/i300-directory-context-checkout.log; Git all-target Clippy passes
+(58265), /private/tmp/i300-directory-context-clippy.log. Independent read-only
+review found no new permission/budget gap in either the preceding host-root work
+or this directory-context increment. Existing ancestor/path-access TOCTOU remains.
+Symlink contexts, actual target branch identity, post-tracking predicted config,
+cache partition and final effects remain incomplete; final mutation refusal stays.
+No publication or task completion is claimed.
+
+Ordered host-root checkpoint (2026-10-15): prepared target discovery now
+retains native system/global roots separately from the potential include-source
+set and appends repository config in read order. Completed capture evaluates
+those ordered roots instead of repository config alone. Worktree config is
+requested only after admitted direct repository-config records enable the
+extension; global/include declarations do not enable it. New worktree bytes wait
+for a fresh exact Read frontier. Native Git comparisons exercise repeated global
+sources via a system include, XDG/user order, direct/indirect extension selection,
+and final false override. Target tests pass 19/19 (12475),
+/private/tmp/i300-host-roots-tests.log; Checkout passes 28/28 (55618),
+/private/tmp/i300-host-roots-checkout.log; all-target Git Clippy passes (47859),
+/private/tmp/i300-host-roots-clippy.log. Diff whitespace check passes. Independent
+review requested; no result yet. Linked gitdir without an enabled worktree config
+still needs a separately captured directory-context frontier. Symlink contexts,
+actual target branch selection and final effect binding remain open; mutation is
+still refused. No completion or publication is claimed.
+
+Admitted gitdir matching checkpoint (2026-10-15): ordered expansion accepts
+an explicitly supplied gitdir only when retained non-symlink ancestor evidence
+binds that directory. Matching uses captured context without filesystem calls,
+with relative-origin literal prefixes, implicit **/ prefixes, trailing /**,
+HOME interpolation and case-insensitive variants. Native Git differential cases
+cover wildcard characters in the source parent, relative/absolute/HOME patterns,
+case and directory suffixes; an unadmitted gitdir is rejected. Pure lexical dot
+and repeated-separator normalization preserves the bound no-link context.
+Hasconfig URL comparisons additionally share a 4 MiB comparison-input budget,
+with an amplification regression. Target tests pass 18/18 and Git all-target
+Clippy passes (37896), /private/tmp/i300-gitdir-target-{tests,clippy}.log.
+Checkout passed 28/28 (74750) before the final lexical normalization adjustment,
+/private/tmp/i300-gitdir-checkout.log. Independent security review remains due.
+Symlink contexts are still unsupported; ordered host roots, actual target branch
+selection and final effects remain incomplete. Production still refuses mutation.
+No T7 completion or publication is claimed.
+
+Hasconfig evaluation checkpoint (2026-10-15): ordered target expansion now
+performs bounded remote-URL lookahead over captured bytes, enables hasconfig
+includes during scanning, forbids URLs in conditional descendants, and matches
+URL patterns with pathname semantics. All passes share source-byte, output-byte,
+visit and processed-record budgets. Native Git differential regressions cover
+later URL declarations, slash matching, unmatched conditional URL prohibition,
+indirect descendants and non-path conditional keys. The last case exposed and
+corrected a missing lookahead trigger. Target-config tests pass 16/16 (52938),
+/private/tmp/i300-hasconfig-condition-tests.log; Checkout passes 28/28 (10370),
+/private/tmp/i300-hasconfig-checkout.log; all-target Git Clippy passes (3035),
+/private/tmp/i300-hasconfig-clippy.log. This checkpoint has not received independent
+review. Production target-stage mutation remains disabled; gitdir context, host
+root ordering, symlink/component admission and final effect binding remain open.
+No completion or publication is claimed.
+
+Ordered target-config expansion checkpoint (2026-10-14): captured sources now
+expand in declaration order, preserving include directives, repeated includes,
+origin paths, implicit/empty values and onbranch selection. Expansion reads only
+bound bytes and never opens a file. Native Git comparisons cover insertion at
+include positions, ten-level depth, missing eleventh include and cycles; a removed
+source still expands captured bytes and separately fails revalidation. Independent
+review identified repeated comment-only parsing amplification; corrected with
+separate cumulative 4 MiB parsed-source and output-payload budgets plus 4096
+visits, all charged before work/allocation. Parser/source/expansion tests pass
+14/14 (72176), /private/tmp/i300-ordered-target-config.log. Checkout passes 28/28
+(46221) before the subsequent expansion-budget correction. Final all-target Clippy
+passes (40772), /private/tmp/i300-ordered-target-clippy.log. Independent follow-up
+confirms shared visits/source-byte/output budgets close the reported amplification
+gap, with no new correction finding.
+Production TargetConfiguration currently exercises repository-config expansion
+only and still refuses mutation. Full ordered host root selection, gitdir and
+hasconfig context/lookahead/prohibition, component/symlink paths and final effect
+binding remain open. The potential-source set cannot substitute for those semantics.
+No publication, Completion Commit or T7 completion is claimed.
+
+Admitted target-config source stage checkpoint (2026-10-14): conditional branch
+creation now reaches a separate Read-only TargetConfiguration phase instead of
+the earlier blanket refusal. Roots are retained source configs, repository roots
+and native system/global path declarations. Before any target-source lookup,
+Sources checks exact admission for the complete file/ancestor frontier. Directory
+identities are checked root-to-leaf, files retain regular/missing evidence, and
+new nested includes require a fresh next-stage identity/admission. Shared budgets
+cover 4096 requested paths, 4 MiB path bytes and 4 MiB file contents. Unsupported
+parent traversal and symbolic ancestors/leaves refuse rather than being followed;
+this currently includes common host symlink layouts and is not full compatibility.
+Source evidence is revalidated across advances, including absent-file creation.
+Tests pass 10/10 (91095), /private/tmp/i300-admitted-target-sources.log; Checkout
+passes 28/28 (93490), /private/tmp/i300-target-source-checkout.log. Latest
+all-target Git Clippy passes (90140), /private/tmp/i300-admitted-target-source-clippy.log;
+governance (19087) and Claim checks (14269) pass with zero warnings, logs under
+/private/tmp/i300-admitted-target-source-{governance,claims}.log. Independent
+read-only review found no new admission bypass or cumulative-budget gap. The
+existing metadata/open TOCTOU window remains; this is evidence revalidation, not
+race-free confinement. Potential-source deduplication is not ordered include
+expansion/depth proof. Stage completion still refuses mutation because ordered
+conditional/hasconfig evaluation, final effects and original-argv execution gates
+are not implemented. No T7 completion, publication or completion SHA is claimed.
+
+Independent lexical-frontier review correction (2026-10-14): gix wildmatch's
+64-level recursion guard returns false and logs the source pattern. Some(branch)
+now rejects patterns with 32 or more star bytes before calling the dependency,
+counted after trailing-slash expansion and conservatively including escaped stars.
+This prevents guard exhaustion from being interpreted as a missing dependency;
+it is an explicit complexity refusal, not full support for complex patterns.
+Native-compatible source discovery with None never invokes the matcher. The new
+65-star regression and parser suite pass 7/7 (81827),
+/private/tmp/i300-target-frontier-recursion.log. Full library tests passed 299/299
+(77343), /private/tmp/i300-target-lexical-frontier-all-tools.log, before this guard.
+Independent read-only review confirms both recursive calls consume a star, so
+this conservative guard prevents the dependency limit and pattern logging. Latest
+all-target Clippy passes (72326), /private/tmp/i300-target-frontier-recursion-clippy.log.
+Target-chain integration remains open; no completion or publication is claimed.
+
+Lexical target-config frontier checkpoint (2026-10-14): admitted-source include
+extraction now shares a pure declared_paths function. It preserves declaration
+order and repeats, resolves only lexical origin/HOME paths, and performs no
+existence/stat/read lookup. Optional target-branch selection applies Git-compatible
+onbranch pathname wildmatch, including trailing-slash ** expansion; patterns and
+branch names are bounded to 4096 bytes before dependency matching. Other condition
+kinds remain potential Read dependencies, not evaluated semantic results.
+Eight native Git onbranch comparisons and missing-path/order regression pass;
+complete parser tests pass 6/6 (7897), /private/tmp/i300-target-lexical-frontier.log.
+All-target Git Clippy passes (97282),
+/private/tmp/i300-target-lexical-frontier-clippy.log. The production capture caller
+uses no branch filter, retaining every declared dependency. Actual target-chain
+file admission/traversal and final effects remain unimplemented, and production
+conditional branch creation remains refused. Previous 297/297 library result
+predates this extraction refactor; it is not final-source broad-test evidence.
+
+Bounded pure configuration parser checkpoint (2026-10-14): captured admitted
+source bytes now retain ordered repeated include declarations using the locked
+pure gix parser, without opening include targets. Independent review identified
+allocation amplification from repeated subsection prefixes and dropped valid
+pre-section records. Both are corrected: cumulative 4 MiB key/value reservations
+precede cloning/normalization, and frontmatter uses the same record decoder as
+sections. Independent read-only follow-up confirms both corrections with no new concrete
+parser blocker. The 4 MiB budget bounds decoded payload, not total process RSS;
+parser events, buffers and collection capacity add bounded overhead. Record Debug
+redacts keys and values. Native Git differential fixtures
+cover frontmatter, case folding, empty/implicit values, escapes and continuations;
+parser tests pass 4/4. All talos-tools library tests pass 297/297 in an approved
+unsandboxed run (80997), log /private/tmp/i300-target-parser-all-tools-unsandboxed.log.
+The first sandboxed run passed 296/297; its sole failure was process observation
+EPERM, not parser behavior. Git all-target Clippy passes (86699), log
+/private/tmp/i300-target-parser-frontmatter-clippy.log. No automatic include
+traversal is enabled. Target-chain frontiers, conditional/hasconfig parity and
+final effect binding remain to implement; creating-branch conditional Checkout
+continues to refuse. These are local checkpoint results, not T7 completion or
+final-candidate publication evidence.
+
+Next T7 capability: complete ordered target-config evaluation and full effect
+binding on the newly admitted source evidence, including conditional/hasconfig
+lookahead, depth/cycles, source/target cache partition and tracking config writes.
+Extend component evidence for parent traversal/symlink roots without normalizing
+away dependencies or following an unadmitted referent. Preserve the original
+creation scope and eight-stage bound; do not force tracking off. The target Read
+phase is implemented, but potential-source discovery alone cannot enable mutation.
+No new named capability decision is needed for ordinary exact Path Read.
+
+Commit maintenance correction checkpoint (2026-10-14): independent review
+confirmed that native automatic maintenance can execute `gc.recentObjectsHook`
+via pack-objects. Parent Commit now refuses the configured command while
+maintenance is enabled, preserving inactive configuration when disabled.
+Focused regression and Commit suite 14/14 pass; Git all-target Clippy passes;
+independent review found no concrete gap. Logs:
+/private/tmp/i300-commit-recent-hook-enabled.log,
+/private/tmp/i300-commit-recent-hook-suite.log,
+/private/tmp/i300-commit-recent-hook-clippy.log. Native hook reachability is based
+on Git 2.54 source, not an auto-GC trigger in this regression.
+Previous-local-branch standard preflight session 56638 exited 0 and its log ends
+with release preflight: passed, but predates this correction; a final-source gate
+remains required.
+Post-correction standard preflight 70906 exited 0, and
+/private/tmp/i300-commit-recent-hook-standard-preflight.log ends with
+release preflight: passed, including both SDK consumer modes. Separate governance
+and Claim checks pass with zero warnings (logs under the same commit-recent-hook
+prefix). This proves the local correction checkpoint, not full T7 completion.
+Governance/claims session 93144 exited 0. T7 and the full serial queue remain open.
+
+Current deletion update (2026-10-14): I300 now supports exactly admitted child
+deletion inventories for nonempty gitlink→ordinary checkout, including external
+gitdir layouts. Checkout 26/26 and MCP 13-case allow/deny/replay/depth matrix pass;
+missing descendant Write and late-entry refusal regressions pass. Effective
+configuration deletion and symbolic/special entries still refuse. Owner Current
+Delivery State contains logs and remaining gates; historical blanket refusals
+below are superseded. Standard preflight session 49959 exited 0, with
+`release preflight: passed` in `/private/tmp/i300-deletion-standard-preflight.log`.
+T7 and the original serial queue remain incomplete.
+
+Current Checkout update (2026-10-14): the I300 Current Delivery State table
+supersedes historical present-directory refusals below. Empty uninitialized
+gitlinks can restore ordinary targets with parent/identity/emptiness revalidation;
+Unix tracked symlinks can become uninitialized gitlinks without modifying their
+referents. Checkout tests pass 24/24 and all-target Git Clippy passes; independent
+review confirmed the read-order correction and symlink effect binding. Nonempty
+or initialized child deletion, recursive behavior, production Pull and final T7
+delivery gates remain open. See I300 for current evidence and platform limits.
+
+Initialized-child deletion residual (2026-10-14): native Git can remove untracked or initialized child contents when converting a present gitlink directory to an ordinary file, even with nonrecursive settings. Exact-path Read/Write evidence currently retained by Talos does not safely model that recursive deletion set, so prepared Checkout continues to refuse present child directories and metadata. The refusal regression passed (59465); no permission widening or silent deletion was introduced.
+
+Initialized-child type-transition boundary (2026-10-14): native Git experiments show gitlink→ordinary-file checkout can delete untracked files and initialized dirty child repositories under nonrecursive settings. Prepared Checkout therefore continues to refuse present directories/child metadata; a regression now verifies refusal preserves parent branch/index and child HEAD/dirty bytes (59465), /private/tmp/i300-initialized-kind-refusal.log. This documents the required deletion-effect boundary rather than widening authorization.
+
+MCP prepared Git regression complete (2026-10-14): full `git_prepared` integration suite passed 6/6, covering checkout, commit, local push and network push approval/denial/replay; test log /private/tmp/i300-mcp-git-prepared-full.log. Test target Clippy passed, /private/tmp/i300-mcp-git-prepared-clippy.log. This strengthens real admission-chain evidence only; production Pull, unsupported transports, Windows execution and final publication remain open.
+
+MCP Checkout integration evidence (2026-10-14): `real_checkout_transport_denial_success_and_replay` now covers ordinary-file and gitlink target switches under allow/deny permissions, plus replay refusal; the four-case real MCP transport test passed (69642), /private/tmp/i300-mcp-gitlink.log. This confirms the new type-transition path through the shared permission gate, not only direct tool tests. Pull mutation and final T7 delivery gates remain open.
+
+Current audit checkpoint (2026-10-14): working tree passes `git diff --check` and `cargo fmt --all -- --check`. The authoritative owner table remains T7 Active, with T8/T2/T3/T4/T5/T1/T6 unactivated. ADR-089 Pull repository metadata is still explicitly proposed and disabled; `Phase::PullFetch` still rejects execution. No completion status is inferred from preparation tests or preflight alone.
+
+Current-source standard preflight passed (2026-10-14): 69747 exited 0, log /private/tmp/i300-checkout-current-preflight.log. This includes latest Checkout source changes, workspace tests and SDK consumers. Windows guard CI step has local YAML/PowerShell parse evidence only, not Windows execution. T7 remains Active with production Pull, remaining transport/submodule behavior and exact-head publication gates open. Current owner table takes precedence over historical running-state entries below.
+
+Reverse Checkout review complete (2026-10-14): independent review confirms missing/uninitialized gitlink→ordinary file or target subtree is safe under retained path/source/parent evidence; initialized children, existing directories and nonregular markers still refuse. Full checkout-filtered suite and all-target Clippy passed (16698), logs /private/tmp/i300-reverse-checkout.log and /private/tmp/i300-reverse-clippy.log. Governance/claim checks remain clean from 79370. This closes the bounded Checkout type-transition slice only; Pull mutation, transport effects, cross-platform gates and final publication remain open.
+
+Missing gitlink reverse implementation (2026-10-14): supersedes the refusal-only audit below. Checkout permits reverse type changes only when retained gitlink evidence is Missing with no child metadata; present directories/files/links still follow existing refusal. Target-effect protection now includes gitlink→ordinary file. Real forward/dirty/config-protected fixture also restores the original regular file from a missing gitlink and passes (61297), /private/tmp/i300-reverse-gitlink.log. Broader checkout suite/Clippy running at /private/tmp/i300-reverse-checkout.log and /private/tmp/i300-reverse-clippy.log; independent review requested. Original T7 scope and full closure gates remain open.
+
+Reverse gitlink-type audit (2026-10-14): native Git restores a regular file when an uninitialized gitlink is checked out in the opposite direction, but the current prepared path conservatively refuses all existing-gitlink→file transitions because initialized child metadata/content and recursive behavior require separate admission. This remains an explicit compatibility residual; no unsafe widening was made.
+
+Checkout extension validation (2026-10-14): complete Git-enabled tools suite passed 287/287 unsandboxed (46512), log /private/tmp/i300-checkout-final-git-suite.log. Latest all-target Clippy passed (16911); governance and Collaboration Claim validators passed with zero warnings (79370). This validates tracked regular-file→uninitialized gitlink support, dirty preservation and effective include-source rejection locally. Standard preflight 26739 passed before this extension; final stable-candidate preflight/exact-head review/CI remain required. Pull metadata contract remains proposed, actual fetch/integration disabled, mixed transport/SSH/HTTP/helpers/hooks and other original residuals remain open. No completion commit or publication evidence exists.
+
+Checkout protected-source regression (2026-10-14): real file-to-gitlink fixture now configures include.path=../file, verifies effective-configuration refusal, and retains branch/file/index before removing the include and exercising dirty refusal/clean success. Focused regression passed (19298), /private/tmp/i300-gitlink-config-refusal.log. Prior broader checkout suite and Clippy passed (50392); latest test-only Clippy passed (16911), /private/tmp/i300-gitlink-config-clippy.log. Independent review confirms target-effect inclusion is required and now present. Production Pull and other original T7 gates remain incomplete.
+
+Checkout file-to-gitlink implementation (2026-10-14): nonrecursive checkout now permits a target gitlink replacing only an already tracked regular-file source. Existing directories, symlinks and other added-path states still refuse. Config/hook target-effect detection now includes this replacement rather than excluding all target gitlinks. Native Git experiment and prepared regression (79376, /private/tmp/i300-file-gitlink.log) confirm clean success to uninitialized directory and dirty rejection preserving branch, bytes and index. Independent review checked native nonrecursive child behavior; final diff review and broader checkout suite/Clippy remain required. Mixed Push test-only Clippy passed (35818). Prior standard preflight 26739 passed before this production extension and is not final-source gate evidence. No T7 completion claimed.
+
+Stable standard gate passed (2026-10-14): 26739 exited 0; /private/tmp/i300-stable-capacity-preflight.log ends with release preflight: passed, including workspace tests and both SDK consumers. Implementation sources stayed unchanged during this run. Subsequent test-only mixed-Push regression passed (98607), /private/tmp/i300-mixed-refusal.log. Reviewer corrected the proposed mixed-transport implementation: global --receive-pack embeds the bound local Git command, but git:// sends it as daemon service, so merely removing the mixed rejection is invalid. Preserve rejection until per-destination semantics are implemented and reviewed. New test exercises both local/network URL orders and verifies neither receiver acquires the target ref. Production Pull and original delivery scope remain incomplete; no publication/completion SHA.
+
+Stable-source preflight restart (2026-10-14): 66523 terminated exit 101 on sparse cumulative-output budget, having compiled the intermediate 16 MiB probe cap. Corrected 1 MiB tree probe passed the same 300-file/six-stage regression (27792) and all-target Git Clippy (31503). Full standard preflight restarted after terminal confirmation in 26739, log /private/tmp/i300-stable-capacity-preflight.log; keep implementation sources unchanged while it runs. No full preflight pass claimed. Independent reviewer requested to identify an accepted-contract Push implementation step while Pull metadata decision remains pending.
+
+Sparse capacity validation in progress (2026-10-14): sparse fixture now includes 300 additional identical-content files, exceeding old 16 KiB ls-tree output without expanding object count. Initial 16 MiB command cap exhausted the unchanged 64 MiB cumulative worst-case stdout/stderr budget; adjusted only ls-tree probe cap to 1 MiB, retaining scalar 16 KiB and all cumulative/stage limits. Retry 27792 at /private/tmp/i300-large-sparse-retry.log passed the real 300-file sparse fixture, including unchanged six-stage reservation, fresh descendant admission and unchanged index. Git all-target Clippy passed (31503), log /private/tmp/i300-large-sparse-clippy.log. Standard preflight 66523 at /private/tmp/i300-reviewed-standard-preflight.log is live; sources changed during this invocation, so it cannot alone prove final stable-source validation. Prior reviewed Pull suite and Clippy 73152 exited 0. Production Pull and unanswered metadata contract remain open.
+
+Reviewed Pull graph checkpoint (2026-10-14): independent git_plan_review found no new admission-order bypass after moving exact-admitted inventory advance ahead of full-refs readiness. Added explicit local inventory revalidation before/after sparse ls-tree per review. Prior full Pull regression passed 38/38 (4082); final revalidation change tests and Clippy run in 73152, logs /private/tmp/i300-reviewed-pull.log and /private/tmp/i300-reviewed-clippy.log. SDK lock repair validation 97926 passed both default and coding consumer runs. Governance and claims passed with zero warnings (35425). These supersede running-state notes above; full standard preflight must still be rerun successfully, and production Pull/remaining T7 acceptance remains open.
+
+Pull replacement-symbolic correction (2026-10-14): early sparse ls-tree now requires the complete refs subtree in both metadata roots and current exact Read tokens, because replacement symbolic refs can target deep branch refs. Move the already-admitted inventory advance before readiness evaluation; unchanged six-stage sparse reservation test passes (78384). Added deep symbolic-target frontier regression (40928); focused log confirms pass. Broader Pull regression running in /private/tmp/i300-full-refs-pull.log. Standard preflight 48514 ended exit 1: workspace tests passed, external SDK fixture failed stale locked gix-hash SHA-256 dependency. Updated fixture lock offline without version upgrades; SDK validation retry 97926 remains running at /private/tmp/i300-sdk-lock-repair.log. No full preflight success or production Pull completion claimed. Pending Pull metadata decision unchanged.
 
 Status: Serial execution active; I299/C0 implementation merged and owner closure recorded; all seven original deliverables remain incomplete.
 Responsible recipient: Codex under maintainer direction; product claims remain separate.
@@ -17,6 +737,1368 @@ Baseline: local `main`, HEAD `63c3ab6` (merge PR #697). Recheck HEAD and both st
 Completion evidence: None for this long task. This document is a handoff, not an effective Collaboration Claim or implementation authorization.
 
 ## 2026-10-11 Receiving Checkpoint
+
+Current standard preflight (2026-10-14): sandbox-external `release_preflight.sh` running in session 48514 with CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0; log /private/tmp/i300-current-standard-preflight.log. Installer/governance phases progressed into workspace compilation; no final pass claimed. Poll this live handle, do not restart from missing output. Existing git_plan_review reviewer requested to audit current Pull prefetch boundaries read-only. Pending Pull metadata decision and production fetch/integration remain open; no task completion or publication evidence.
+
+Order-file runtime evidence (2026-10-14): shared config suite passes 17/17 and Git Clippy passes (84571). Real prepared cleanliness fixture now configures an external diff.orderFile, verifies its exact Read facet and retained file evidence, then changes its contents and confirms revalidation fails; focused matrix passes (96819). Index preservation assertions remain. These results close the order-file-specific regression, not pending metadata authorization or production fetch/integration.
+
+Order-file path parser test (2026-10-14): direct config-state fixture covers workdir-relative and absolute diff.orderFile paths. NUL case exposed missing explicit rejection in shared configured_path; added rejection before path conversion. Focused retry 60003 at /private/tmp/i300-orderfile-test.log; initial fixture setup and NUL assertion failures are superseded only after inspecting that result. Full shared-config regression/Clippy remain required for this parser change. No pending permission decision inferred.
+
+Pager/audit claim correction (2026-10-14): Pull probe helper and clean diff command now explicitly pass --no-pager. Previous text describing a frozen '--no-pager environment' was inaccurate; a command flag is not an environment property. Removed the unsupported assertion that orderFile was the only remaining configuration-backed read. Pull tests pass 36/36 (14198); exhaustive effect review and original production/delivery gates remain outstanding.
+
+Diff external-effect audit (2026-10-14): Pull clean probes explicitly use `--no-ext-diff`, `--no-textconv`, `--no-renames`, `diff.autoRefreshIndex=false`, `GIT_OPTIONAL_LOCKS=0`, and a frozen environment. Configured `diff.orderFile` is exact-admitted and evidence-bound; this is not an exhaustive proof of all Git configuration effects. Explicit pager suppression was added in the subsequent correction. Git-enabled Clippy and governance/claim validators pass (47575). Full tools Git suite previously passed unsandboxed (98071); final production Pull/fetch/integration and security review remain open.
+
+Pull diff.orderFile admission correction (2026-10-14): native `git diff --numstat` can read configured `diff.orderFile`; Pull policy discovery now resolves this path from admitted config, adds it to the fixed attribute/evidence set, and requires fresh exact Read before clean comparison. Pull suite remains 36/36 (73774), diff check passes. Added path is bounded by existing config path rules; content/filter and production mutation requirements remain open.
+
+Permission regression validation (2026-10-14): full locked talos-permission tests pass (75464): 145 unit tests, three integration tests and one doctest. Proposed Pull metadata remains rejected while accepted capabilities retain their tests. Fixed EVOLUTION lesson placement/index and named the concrete regression test. Pending maintainer decision is unchanged; no production Pull mutation or overall completion claimed.
+
+Symbolic-policy admission evidence (2026-10-14): strengthened Alias->Topic fixture verifies the newly discovered tracked source is absent from old exact tokens and no source/attribute content is captured at that continuation; fresh admission then completes preparation. Focused matrix passes (81809); production-fix Clippy passed (78388) before final assertion additions. This closes the specific late-policy admission test gap, not production fetch/integration or full delivery gates.
+
+Late policy attribute correction (2026-10-14): direct HEAD can name an alias whose policy differs from the fully resolved branch. Final prefetch policy now discovers fixed common/system/global attribute paths as well as source ancestors, requesting fresh exact admission before capture when newly required. Real Alias->Topic fixture with Alias rebase=false and Topic rebase=true passes in the cleanliness matrix (30039); captured attribute count matches discovered paths. Pull suite after production fix passed (69028); latest test addition still needs final Clippy. Pending Pull metadata decision and production fetch/integration remain unchanged.
+
+Decision-receipt correction (2026-10-14): an asynchronous input tool returned `accepted: true` as submission status, not the maintainer's answer. A provisional Pull metadata compiler change was reverted. Added `proposed_pull_metadata_capability_remains_rejected` (permission test passed) and recorded the reusable lesson in EVOLUTION.md. Governance and Collaboration Claim validators passed (32219). ADR-089 remains proposed; no Pull metadata Read/Write or fetch/integration mutation is enabled.
+
+Policy-scoped source discovery (2026-10-14): early source/attribute discovery now checks exact HEAD Read and obtains non-recursive symbolic HEAD, then applies admitted configuration policy. Only rebase without effective autostash requests prefetch clean-source/attribute facets. Later full graph/checkout/index checks remain. Pull suite 36/36 and Git Clippy passed (74753); sparse budget remained passing (65162). Added explicit autostash assertions for no tracked-file Read facet, no captured sources/attributes; focused run 48578 at /private/tmp/i300-policy-facets.log. Symbolic branch chains are conservatively handled by direct HEAD policy discovery; broader chain semantics need review. No mutation or Pull metadata capability enabled.
+
+Autostash precedence runtime validation (2026-10-14): prepared cleanliness matrix now covers pull.autostash=true overriding rebase.autostash=false and pull.autostash=false overriding rebase.autostash=true; all eleven scenarios pass (17145) with index preservation. Early source-name admission is still conservative and requests paths even for policies that skip cleanliness; narrowing it requires a branch-bound, exact-admitted policy discovery without adding stages. This remains an explicit residual, not implemented narrowing. No production mutation capability enabled.
+
+Full Git-enabled tools validation (2026-10-14): cargo test -p talos-tools --features git --locked passed outside the sandbox (98071; /private/tmp/i300-tools-git-full-unsandboxed.log), using compact debug/incremental settings. The sandbox run had 283 passes and one EPERM process-observation failure in prepared_local_push_runs_all_eight_admitted_stages (22239); unsandboxed retry exited 0. This is package/feature validation, not full workspace preflight or publication evidence. Production PullFetch still explicitly refuses because fetch/integration are unimplemented; metadata contract acceptance and original T7 delivery gates remain open.
+
+Staged gitlink prefetch fixture (2026-10-14): added a staged gitlink using update-index --cacheinfo to the real prepared cleanliness matrix. All nine cases pass (36897); gitlink-only staging reaches prepared PullFetch without changing original index bytes. This validates the implemented ignore-submodules=all prefetch behavior, consistent with the earlier Git 2.54 source audit; it is not native end-to-end rebase/integration parity. Pull metadata decision, production fetch/integration, security review and all original task gates remain open.
+
+Sparse real-history reservation evidence (2026-10-14): replacement-ref guard suite passed 36/36 and Git all-target Clippy passed (77756). Strengthened sparse fixture now records configuration and every discovery into actual PreparedStageHistory, then reserves fetch and a fresh integration identity under the retained profile; focused test passes (71056). This verifies stage/profile capacity for that fixture, not actual mutation-stage profiles or execution. Production fetch/integration, metadata contract acceptance, independent review and original delivery requirements remain open.
+
+Early sparse replacement-ref guard (2026-10-14): inspection found ls-tree may consult replacement refs before full graph readiness. Early expansion now additionally requires refs/replace subtree completion (or absence proved by its admitted parent's listing) and packed-refs completion, with exact current tokens for every existing replacement/packed path. Sparse tracking six-stage fixture still passes (44328). Added replacement-descendant/absent-subtree drift test (23407). Latest governance and claims logs passed before this source/test change. Full latest suite/Clippy and independent security review remain required; production fetch/integration remain disabled.
+
+Sparse listing validation (2026-10-14): parser now validates nonzero SHA-1/SHA-256-shaped hexadecimal IDs, bounded input and joined lexical paths; malformed mode/type/OID, unterminated listing, parent traversal and oversized output tests pass (66928). Path validation remains filesystem-free. ADR-089 Pull Repository Metadata Effects still explicitly reads proposed/not authorized; I300 and this handoff retain an unanswered earlier maintainer request. Do not confuse accepted Push receiver metadata with Pull authorization or re-request an already pending decision. Production fetch remains disabled pending authoritative acceptance and implementation/review. Full parser-change suite/Clippy/governance remain to run.
+
+Sparse stage coalescing repair (2026-10-14): object-subtree readiness is now separate from full reference inventory completion. Only fully visited object roots with no pending descendants and exact current tokens for every object path permit early ls-tree discovery; descendant source/attribute facets coalesce with remaining reference frontiers. Real sparse tracking fixture passes the unchanged six-stage reservation (30162). Pull suite 34/34 and Git all-target Clippy passed (45623). Added frontier assertions ensure pending object children cannot report ready; focused test running in /private/tmp/i300-subtree-frontier.log. Security review, stress/config/submodule cases, final lifecycle/production fetch/integration and all original delivery gates remain open.
+
+Sparse stage trace (2026-10-14): failing reservation test now records (stage, graph-ready, inventory-complete, facet-count): [(2,false,false,43),(3,false,false,56),(4,false,false,59),(5,false,false,60),(6,true,true,62),(7,true,true,62)] (21180). Next fix: allow tree-name discovery once object storage is fully inventoried and admitted, coalescing descendant facets with remaining deeper reference frontiers; never equate object-root Read with descendant Read. Six-stage reservation assertion remains intact. A diagnostic run with an eight-stage-only assertion passed (83528), but that weaker assertion was reverted and is NOT delivery evidence. No stage-budget repair claimed.
+
+Sparse tracking stage-budget regression (2026-10-14): strengthened sparse fixture now includes origin/Topic tracking and asserts preparation reserves both fetch/integration stages. It FAILS (46281): preparation uses seven stages, above the six-stage reservation budget. Preserve the assertion and fix discovery coalescing; do not widen lifecycle bounds or claim sparse delivery. Fixture branch setup now uses branch -m Topic rather than assuming master. Prior sparse implementation Clippy passed (41153). Governance/claims validation launched in 53498 with logs /private/tmp/i300-sparse-governance.log and /private/tmp/i300-sparse-claims.log. All production fetch/integration and original closure gates remain open.
+
+Sparse descendant preparation implemented (2026-10-14): after exact graph admission, sparse index tree OIDs are enumerated with bounded ls-tree -r -z; regular/symlink blob names are lexically validated, gitlinks omitted consistently with native clean checks. New descendants and ancestor attributes generate fresh exact Read facets before source capture. Real sparse fixture proves the old tokens lack the new descendant, the continuation has no captured sources, fresh admission reaches prepared PullFetch, and index bytes remain unchanged. Pull suite passed 34/34 (85523). This supersedes the earlier sparse refusal-only checkpoints. Still required: malformed/deep/large tree fixtures, shared lifecycle stage-budget coverage for sparse tracking repositories, object substitution/security review, latest Clippy/governance, and full fetch/integration implementation. The existing 16 KiB probe output bound remains and oversize errors refuse; no arbitrary-size support claimed.
+
+Sparse control-file evidence checkpoint (2026-10-14): Pull fixed evidence now includes per-worktree `info/sparse-checkout`, including its absent state. Creating, changing, deleting or replacing it with a symlink invalidates the retained Pull evidence; new Pull suite passed 34/34 (47281). This closes the control-file admission gap but does not implement sparse tree expansion: mode-040000 index entries still require admitted object descendants and fresh source/attribute facets. No fetch/integration capability enabled.
+
+Pull numstat edge validation (2026-10-14): extended the real prepared-flow cleanliness fixture with binary changes, tracked-file deletion and Unix executable-mode changes. All eight scenarios pass (2151), including original clean/touch/staged/dirty/autostash cases; original index bytes remain unchanged and no index.lock/FETCH_HEAD appears. Sparse expansion still requires an implementation that consumes admitted object storage, preserves bounded tree OIDs/names and returns new descendant source/attribute facets before reads. Existing checkout traversal cannot be adopted without auditing its discovery/read behavior. No sparse support or overall completion is claimed.
+
+Sparse-index boundary fixture (2026-10-14): real cone sparse index with kept and excluded directories retains a mode-040000 entry in the pure decoder, and the prepared rebase discovery route refuses with the explicit sparse-directory object-discovery requirement (43727 passed). Fixture setup initially selected all available subdirectories and was corrected; those failed setup attempts do not count as boundary evidence. This tests the existing refusal only, not sparse support. Next implementation must expand tree OIDs from admitted object bytes and request each descendant source/attribute Read before content capture. Prior clean suite passed 32/32 and all-target Git Clippy passed (67029). T7 and all production fetch/integration requirements remain open.
+
+Pull touch-only repair (2026-10-14): replaced quiet/exit-code probes with bounded NUL numstat, no-renames, no-ext-diff/no-textconv and diff.autoRefreshIndex=false plus GIT_OPTIONAL_LOCKS=0. Native experiments show numstat compares content without index writes, while quiet reports stale stat data as changed; mode-only changes produce nonempty 0/0 records. Real prepared-flow clean/touch/dirty/staged/autostash fixture now passes (88270), checks index bytes unchanged and no index.lock/FETCH_HEAD. Full Pull suite and all-target Git Clippy are running sequentially in 67029; logs /private/tmp/i300-clean-suite.log and /private/tmp/i300-clean-clippy.log. This supersedes the failing touch-only checkpoint but does not close sparse expansion, staged-gitlink/config variation coverage, independent review, production fetch/integration or original delivery gates.
+
+Pull clean-probe regression (2026-10-14): new HEAD/index and index/worktree probes are provisional and NOT publication-ready. Real clean/touch/dirty/staged/autostash fixture fails on touch-only: ordinary git diff --quiet rewrites index despite GIT_OPTIONAL_LOCKS=0 (also reproduced independently); disabling diff.autoRefreshIndex prevents the write but reports touch-only as dirty. Preserve the failing test pull_rebase_clean_probes_preserve_index_and_touch_semantics and repair semantic equivalence without unauthorized repository writes. A temporary-index experiment was removed; production must not create ad-hoc files inside gitdir under Read admission. Native Git 2.54 require_clean_work_tree ignores submodule changes in both comparisons, so probes now use ignore-submodules=all. Earlier assumption that staged gitlink changes must be rejected here was incorrect. Clippy found chunks_exact_to_as_chunks; corrected, fresh Clippy still required. No fetch/integration enabled; T7 remains Active.
+
+Pull filter refusal runtime evidence (2026-10-14): production check-attr change passed Pull suite (85325). Real Git fixture pull_rebase_filter_refuses_without_running_helper passed (15321): configured filter.probe.clean is refused before PullFetch; neither helper-ran nor FETCH_HEAD exists. This proves refusal without helper execution, not native clean-worktree comparisons or production fetch. Git all-target locked Clippy is running with compact build settings, log /private/tmp/i300-source-attribute-clippy.log. Remaining: native HEAD/index and index/worktree comparisons with optional locks disabled, touch-only and staged gitlink semantics, sparse expansion and independent security review. No original acceptance requirement is closed by this fixture alone.
+
+Pull attribute capture checkpoint (2026-10-14): source snapshot retry 65412 passed; governance and claims session 76456 exited 0. Exact-admitted attribute paths now retain bounded RegularEvidence and parent identities, checked before/after content reads and revalidation. Added missing-file creation, content drift, leaf-link and parent-link tests; Pull suite passed 30/30 (64983). Subsequent production check-attr filter refusal is now added and under test in session 85325, log /private/tmp/i300-pull-filter.log. Native clean comparisons, sparse expansion, real filter-helper negative fixture and independent review remain required before publication; fetch/integration remain disabled. Root-to-leaf parent checks conservatively refuse symlink ancestors, including externally configured attribute paths. No claim of race-free containment.
+
+Pull source snapshot checkpoint (2026-10-14): prepared prefetch now captures tracked source bytes and parent identities after exact-path admission for rebase clean-worktree inspection, and retains them for revalidation. New tests cover content drift, creation of a missing source and parent symlink replacement. This does not implement attribute capture, filter refusal, native clean comparisons, sparse expansion or fetch/integration. Initial focused test builds exited 101 on ENOSPC. After the already-authorized target/debug cleanup, free space was 8.4 GiB; retry uses CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 with cargo test -p talos-tools --features git --locked pull_. Session 65412 is running; poll it rather than restart, with output in /private/tmp/i300-pull-source-evidence-compact.log. No passing result or completion is claimed.
+
+Pull attribute-path admission review (2026-10-14): independent review found no new authorization defect. The new path set includes worktree ancestor .gitattributes, shared common_dir/info/attributes (correct for linked worktrees), and Git var GIT_ATTR_SYSTEM/GLOBAL results; the latter follows effective core.attributesFile/XDG defaults. Relative custom attribute paths remain conservatively refused by existing absolute-path helper. No attribute contents are read until fresh exact Read admission. Git-enabled tools Clippy passed (1987); Pull budget fixture passed (99417). Remaining source/attribute capture, filter checks, worktree comparisons, sparse expansion, and production fetch/integration stay open.
+
+Late-path continuation correction (2026-10-14): a completed inventory frontier that adds source or fixed evidence Read facets now returns a fresh continuation; inspection runs only after a subsequent proof consumes those exact tokens. This prevents newly discovered worktree paths from being read under the prior graph-only proof. Pull-filtered suite remains 26/26 (44015). Sparse expansion, source/attribute capture, worktree comparisons and production fetch/integration remain open.
+
+Early pure-index discovery verification (2026-10-14): ordinary source-name facets now share existing inventory continuations after exact index Read checks; real rebase stage-budget test passes without extending eight stages (63793). Current Pull-filtered suite passes 26/26 (80571). Independent review found no new authorization bypass; source discovery remains lexical, and unapproved paths at a completed frontier are refused. Follow-ups: return a fresh continuation for such late-added paths rather than an error, narrow source requests to relevant policy, then complete attribute/source binding and cleanliness checks. Early object-format stderr handling now matches later probes. Pure decoder validates nonzero SHA1/SHA256 checksums while allowing skipHash zero trailers (28486); its 16MiB input/single-allocation limits are not a total-memory claim. No production fetch/integration enabled.
+
+Pure-index/SHA-256 checkpoint (2026-10-14): Pull index decoding now retains the exact RegularEvidence used for parsing and requires PullEvidence to match it before accepting conflict/rebase decisions. The decoder is bounded, catches panics, rejects shared-index links, and does not invoke Git sparse expansion. gix sha256 support was explicitly enabled so SHA-256 index decoding is available; locked cargo check for talos-tools passed (95275), with the expected two-line Cargo.lock feature resolution change. The existing rebase stage-budget failure remains; sparse directory expansion and worktree clean comparisons remain unimplemented. No fetch/integration capability is enabled.
+
+Sparse-index read-boundary finding (2026-10-14): independent Git 2.54 source review shows repo_read_index may call clear_skip_worktree_from_present_files, probe worktree metadata and expand sparse trees even for ls-files --cached --sparse. Therefore existing Pull ls-files probes are not proven index-only in sparse configurations; do not advance or enable fetch on that basis. Next implementation must replace them with bounded pure index decoding (gix::index::State::from_bytes accepts bytes without implicit filesystem expansion), retain mode/OID for sparse directories, and admit tree/worktree descendants separately. This also enables ordinary index-name discovery to share an earlier inventory continuation and fix the preserved rebase budget failure. No stage limit change is authorized; existing failing rebase test remains a required repair.
+
+Rebase stage-budget regression (2026-10-13): source and missing tracking evidence facets now coalesce into one fresh continuation, avoiding a needless extra stage. Pull suite passed 25/25 before strengthening the budget fixture. The real shared-stage fixture now explicitly sets pull.rebase=true and FAILS (32168): preparation cannot reserve both fetch and integration within eight stages. Preserve this failing assertion; do not widen the lifecycle contract or claim stage reachability. Next: coalesce source discovery with an already necessary admitted index frontier/config continuation, or implement accepted metadata discovery only after its pending maintainer decision. Path enumeration still uses 16 KiB and needs a deliberate bounded inventory limit for normal larger repositories. No worktree content read or mutation is enabled.
+
+Pull clean-worktree path-discovery checkpoint (2026-10-13): production prefetch now identifies when rebase without autostash requires a clean worktree, then parses only ls-files --cached -z names into safe relative workdir paths. It requests exact Read facets and a fresh continuation before any worktree source capture; it rejects absolute, dot, dot-dot, empty-component, backslash and unterminated names without touching the worktree. This is only the admission/inventory half: content snapshots, attribute/filter checks, separate HEAD/index and index/worktree comparisons, touch-only semantics and full stage-budget evidence remain. Pull suite remains 24/24; literal-path parser focused test passed (38971).
+
+Pull checkout identity checkpoint (2026-10-13): prefetch initial and upstream-discovery probes now compare both branch and HEAD via same_checkout, while allowing newly discovered fork-point evidence. Focused tests cover unborn/born, same-branch OID changes, detached transitions and fork-point addition (1235). Independent review found no concrete defect and confirmed 16 KiB probe overflow propagates an error rather than a truncated clean result; the limit is unchanged. Current Git all-target Clippy passed (26224). Production clean-worktree admission and fetch/integration remain incomplete; no new permission contract is enabled.
+
+Pull rebase clean-worktree implementation boundary (2026-10-13): independent review identified the next production step: enumerate tracked names solely from the already admitted index, then request exact file and ancestor/system/global attribute Read in a fresh continuation before source capture. Do not call tracked_commit_sources before admission: literal_add_paths/capture_gitlink inspect the worktree. Reuse capture_tracked_sources and existing check-attr filter checks after admission; preserve promisor/fsmonitor refusal and independently compare HEAD/index and index/worktree. Native require_clean_work_tree ignores submodule worktrees; staged gitlink OID changes still require native comparison. Verify touch-only changes, no index writes, dirty/autostash policy and the eight-stage budget. Missing/empty/staged initial-index positive/negative fixture passed 24081; timestamp fix received final independent review with no new concrete defect. This records the concrete next implementation, not completed clean-worktree support.
+
+Pull unborn-index timestamp correction (2026-10-13): independent review found Git 2.54 is_index_unborn rejects an existing empty index based on nonzero index mtime, even with no entries. PullEvidence now retains exact index existence and mtime evidence, rechecks it during capture/revalidation, and applies the native seconds-to-u32 nonzero rule before the rebase initial-index probe. Real staged and existing-empty-index rejection scenarios pass; timestamp-only drift invalidation passes; Pull-focused suite passed 24/24 in earlier run, and current talos-tools Git Clippy passed (88118). Full preflight must be rerun for this source change; metadata contract and production fetch/integration remain pending.
+
+SDK recovery completed (2026-10-13): validator retry 46519 exited 0, with both default and coding external-consumer executions passing after space recovery. Combined local evidence now includes workspace check/Clippy/tests from 60116 (tools group 627/627; not the total workspace count) and the successful SDK retry. The original standard preflight still exited 1 on ENOSPC; do not relabel that invocation as passed or claim fixed-head publication gates. No build remains live from these sessions. T7 is still Active: production Pull fetch/integration and all documented transport/security/semantic residuals remain open, as do subsequent serial tasks.
+
+Full workspace and SDK recovery checkpoint (2026-10-13): sandbox-external standard preflight 60116 completed workspace check, Clippy and workspace tests, including tools 627/627 and the previously EPERM-blocked eight-stage maintenance-cancellation test. SDK default execution passed; coding compilation then failed in arborium-cpp archiving with errno=28 (disk full), so the standard preflight exited 1, not passed. Under existing target/debug cleanup authorization, only completed test executables named in that log were removed (1,844,082,960 bytes); dependencies and source were retained. SDK validator retry is live as 46519 (/private/tmp/i300-sdk-space-retry.log), default mode already passed again. Do not restart the live retry. Separate fixture target cleanup remains unapproved and untouched. Full fixed-candidate delivery gates and all T7 scope remain open.
+
+Full preflight sandbox result (2026-10-13): session 86088 ended with exit 101. Workspace check/Clippy completed; tools workspace test group passed 626 and failed one maintenance-cancellation fixture because spawning ps returned macOS EPERM at prepared_add.rs process observation. No skip or weakening applied. The tool escalation was approved and the standard full preflight is now running outside the sandbox as session 60116, log /private/tmp/i300-preflight-unsandboxed.log. Corrected Pull-filtered tests passed 23/23 (97952). Neither this mutable-worktree rerun nor its pending result establishes exact-head final delivery.
+
+Pull index authorization correction (2026-10-13): independent review found the new unmerged probe needed exact index Read. git_dir/index is now fixed evidence and a configuration-continuation facet; absent/changed index is bound by revalidation. Reviewer verified Git 2.54 ls-files does not refresh/write the ordinary index; existing RepositoryState sharedindex.* refusal excludes split-index implicit reads/freshening. Focused conflict regression passed (14879), and corrected Pull-filtered verification finished (97952; see /private/tmp/i300-pull-index-authorized.log). No dynamic Pull capability enabled. Full preflight 86088 remains live in workspace tests, not final exact-head evidence.
+
+Pull conflict-index production checkpoint (2026-10-13): admitted prefetch inspection now runs a read-only, owned ls-files --unmerged -z probe and refuses conflict entries before fetch. A real conflict-stage index regression is added; its focused locked verification is live in session 14879 (/private/tmp/i300-unmerged.log), waiting behind the confirmed live full preflight 86088. No pass is claimed yet. Independent review of MERGE_HEAD confirms exact token checks precede capture and no new continuation is added. Remaining rebase cleanliness, dynamic metadata decision, transport/integration and original T7 gates are unchanged.
+
+Pull pending-merge production checkpoint (2026-10-13): MERGE_HEAD is now a fixed exact Read resource retained by PullEvidence. Prefetch preparation refuses any existing marker (including empty content); creation after evidence capture invalidates revalidation. Pull-filtered locked tests pass 22/22 (27237). Unmerged-index and rebase cleanliness checks remain outstanding; no fetch mutation or pending metadata capability is enabled. Full standardized preflight is live in session 86088, log /private/tmp/i300-preflight-current.log; do not restart it merely for an observation timeout or treat its mutable-worktree result as exact-head final evidence.
+
+Pull unborn semantic evidence (2026-10-13): a real native comparison now verifies empty-tree read-tree coordination followed by compare-and-swap HEAD update for an initial pull. Clean and disjoint staged files succeed with identical HEAD/index/worktree/diffs; conflicting untracked contents are preserved and both routes fail. Focused locked test passed (16421). This test is preparation for production integration, not enabled Pull execution; metadata contract acceptance and complete effect binding remain outstanding.
+
+Pull reconciliation selector checkpoint (2026-10-13): the test-only integration selector now returns an explicit Reconcile plan when fetch moves the checked-out born HEAD, before candidate parsing or policy rejection. The real clean/disjoint/conflicting fixture executes that plan before selecting merge; an empty FETCH_HEAD assertion verifies reconciliation ordering (focused locked test passed, session 70131). Independent read-only review found no concrete defect in ordering or original/current HEAD selection. Production must bind successful reconciliation evidence to HEAD, index/worktree and FETCH_HEAD and revalidate before fresh integration authorization; the test-only boolean is not an execution credential. Dedicated Pull metadata acceptance remains pending, no fetch mutation is enabled, and T7/I300 remains Active with all original delivery gates outstanding.
+
+Pull current-branch semantic checkpoint (2026-10-13): while the dedicated Pull metadata contract remains pending maintainer response, a real native comparison now covers fetch updating the checked-out branch with --update-head-ok. Clean, disjoint dirty and conflicting dirty worktrees compare native pull against fetch plus read-tree -u -m old new plus merge. The fixture compares HEAD, file bytes, index entries, status and staged/unstaged diffs. All three pass (9652); all-target Git Clippy passes (61931). Conflict leaves the fetched HEAD update in place while preserving local bytes, proving a partial-effect reporting requirement. This is semantic evidence only: production reconciliation still refuses pending its complete admitted effect plan, and no pending permission contract was activated. Next is explicit reconciliation/target binding after maintainer decision, not treating this fixture as delivered Pull.
+
+Pull dynamic-metadata contract checkpoint (2026-10-13): inspection confirmed exact Path grants cannot authorize unknown fetched object names, locks or maintenance outputs; accepted receiver metadata remains git_push-only. ADR-089 now contains a proposed, inactive git_pull-only metadata Read/Write scope paired with exact identity-bound gitdir/common roots and a bound Git Command. Independent review requested explicit index/merge/rebase/autostash/local tracking-config coverage; the proposal now names it and requires a fresh integration Write plan separate from fetch. Worktree/external paths/helpers/network remain separately admitted. Maintainer acceptance was requested asynchronously; no reply or activation is recorded here. No fetch mutation is enabled. Governance/claims passed (29480/37518) before the final scope wording addition. Next: consume the maintainer decision without re-requesting it; if accepted, implement the dedicated compiler/executor checks, replace the per-level production inventory, then complete fetch/integration and real Agent/MCP gates. Original scope and Active status remain unchanged.
+
+Pull stage compression checkpoint (2026-10-13): a completed admitted inventory frontier now proceeds to prefetch inspection under its consumed exact-path proof rather than returning an identical-profile continuation. Fixed evidence paths (logs/HEAD, shallow and info/grafts) are requested in the configuration continuation even when absent; the completed graph set still checks every path token before probes. Dynamic missing tracking evidence still produces a fresh identity/admission. Independent review confirmed the retained token checks and found no new concrete defect. Pull-filtered tests pass 19/19 (59970); ordinary origin/Topic tracking with a real core PreparedStageHistory passes (47492). The strengthened test reserves both future fetch and integration positions; this does not execute those operations or prove arbitrary deep reference capacity. All-target Git Clippy passes (7939) before the final capacity assertion. Remaining next work is actual fetch transport/effects and integration admission, real Agent/MCP execution, deeper-layout stage policy and all original T7 delivery gates. No completion or publication is claimed.
+
+Pull exact-frontier checkpoint (2026-10-13; supersedes the no-producer checkpoint below): production configuration continuation now seeds a bounded exact-path inventory. Each admitted frontier enumerates directory names only, returns fresh identity/facets, and defers child metadata to the next admission. Existing path identities and directory listings are retained; new entries and symlinks refuse. PullEvidence exposes a shared required-path set; absent reflog/grafts paths are added without probing and require a separate fresh admission before capture. Pull-filtered tests pass 19/19 (45082), including unapproved-child, added-entry, symlink and absent-evidence checks; Git-enabled all-target Clippy passes (85713) before the final assertion additions. Independent review confirms the frontier/absent-path mechanism but identifies unresolved eight-stage capacity: ordinary tracking reflog depth plus configuration, supplemental evidence and fetch/integration can exhaust the runner limit. The empty-repository test now uses core PreparedStageHistory; this is not typical-repository or complete Agent/MCP reachability evidence. Do not widen the bound silently or claim Pull delivery. Next: compress admitted discovery stages and verify typical tracking repositories through the real runner budget, then complete fetch/integration effects and all original T7 gates. No implementation commit/publication or task completion is claimed.
+
+Pull production configuration checkpoint (2026-10-13): GitPullTool now
+prepares an owned, identity-bound configuration discovery stage using the accepted
+closed configuration-chain capability. It grants no Write/Network authority and
+requires fresh continuation admission. Ordered Pull configuration conversion,
+owned prefetch inspection and evidence retention are implemented internally, but
+independent review found root Read does not authorize descendant reflog/object
+bytes. Production prefetch therefore refuses before probes until a complete
+bounded graph-resource inventory is independently admitted; the private inventory
+has no producer yet. Direct inspection fixtures are semantic evidence only.
+Review confirms this guard has no production bypass. Tests cover tool preparation
+and cleanup receipt, missing/stale proofs, changed configuration, configured
+remote retention, reflog changes and promisor rejection. Full Git-enabled tools
+library passes 264/264 (4916); the first sandbox run could not execute ps for an
+existing maintenance test, so the permitted rerun verified that case. Graph
+inventory/admission, actual fetch/integration and all prior T7 delivery gates
+remain open. This intermediate stage does not close Pull or T7.
+
+Repository-location and Pull-evidence checkpoint (2026-10-13): production
+AddPlan revalidation now checks retained workdir/gitdir/common identities and
+location pointers before repository rediscovery, preventing reads through a
+changed commondir or replaced .git root. PullEvidence remains test-only: it
+binds bounded reflogs, shallow/grafts and post-fetch FETCH_HEAD bytes, rejects
+parent symlink mappings, and detects absent-leaf creation. The additional shared
+file-evidence budget is 16 MiB. Independent review found no further specific
+regression after root identity binding; non-Unix identity strength and path
+TOCTOU remain limitations, not confinement guarantees. Prior execution evidence:
+Git-enabled tools library 260/260 passed (12658), all-target Clippy and targeted
+location tests passed (36520). Production Pull stage wiring, current-branch
+reconciliation, unborn mutation, transport/helper effects and full delivery
+gates remain open. No implementation commit or T7 completion is claimed.
+
+Pull split-integration checkpoint (2026-10-13): test-only BeforeFetch now
+selects an executable merge/rebase continuation from bounded FETCH_HEAD and
+owned-runner graph probes. It preserves ff-only precedence, unspecified-policy
+divergence refusal, rebase fast-forward optimization, retained fork-point/octopus
+selection, rebase mode and selected autostash. Twelve real scenarios compare
+explicit fetch plus selected integration against native Pull for status, final
+tree and commit subjects; both paths verify dirty edit restoration and stash
+state. Probe infrastructure failure propagates. Post-fetch symbolic HEAD/commit
+movement refuses explicitly; native current-branch reconciliation is still to
+be implemented, not silently approximated. Independent review identified this
+boundary and missing split-worktree assertions; both are now explicit/covered.
+Eight Pull-state tests and all-target Clippy pass (79647). Production Pull still
+requires configuration/fetch/integration stage wiring, ref/reflog/FETCH_HEAD
+snapshot binding, unborn mutation and recursive/transport/helper effects.
+T7 and all subsequent handoff tasks remain incomplete.
+
+Pull missing-upstream checkpoint (2026-10-13): pre-fetch probes now quietly
+resolve the configured tracking commit before fork-point traversal. A normally
+absent reference skips fork-point; malformed successful evidence and process
+failures still refuse. The real native Pull fixture deletes its tracking ref
+before inspection and verifies successful rebase with no retained fork-point.
+Eight Pull-state tests (2717), owned-runner budget/movement regression and
+all-target Git-enabled Clippy (85755) pass. Production Pull, reference/reflog
+snapshot binding and all remaining T7/handoff delivery gates remain open.
+
+Pull upstream-mapping prototype (2026-10-13): tracking_reference now derives
+fork-point input from the matching branch.remote, first branch.merge and first
+matching positive fetch mapping; negative fetch mappings do not erase existing
+upstream lookup. gix validates Fetch refspec syntax inside catch_unwind before
+mapping. Native source remote.c set_merge/branch_get_upstream was inspected.
+Eight Pull-state tests pass (10091), including a real refs/custom/Topic mapping
+compared to Git @{upstream} before actual Pull; Clippy passes (61824). Explicit
+other remotes do not reuse branch upstream. Local '.' full refs are covered;
+local abbreviated/DWIM refs still require admitted discovery, not guessed paths.
+Test-only status remains: production fetch authorization and integration are not
+wired, and these checks do not close T7 or later handoff tasks.
+
+Pull remote-selection prototype (2026-10-13): verified upstream v2.54 remote.c
+remote_for_branch semantics (local source /private/tmp/i300-remote-2.54.c).
+fetch_remote preserves explicit input, branch subsection case/last remote value,
+sole configured remote fallback, then origin. It preserves '.' and remote names
+containing dots; pushDefault does not influence fetch. Unrepresentable remote
+names refuse rather than silently changing destination. Seven Pull-state tests
+pass (84326), including actual native Pull using branch remote Up.stream and
+matching fork-point tracking reference; Clippy passes (8188). Selection remains
+test-only, not an admitted production transport plan. Original T7/full handoff
+scope, fetch effects, integration effects and publication gates remain open.
+
+Pull actual probe prototype (2026-10-13): BeforeFetch::probe now executes
+symbolic-ref, quiet HEAD commit lookup and (for configured rebase with a born
+branch) merge-base --fork-point through a caller-owned bounded runner. Only
+quiet exit 1 denotes absent; transport/collection failures propagate. It rereads
+branch/HEAD and rejects movement across inspection. All nine pull-filtered tests
+pass (76470); real owned-runner unborn/budget/branch-movement test passes (39431).
+Clippy passes (23312 before the added movement fixture, final run 8762).
+The rewritten-upstream baseline now obtains retained evidence from actual probes.
+Still test-only: production configuration-stage permission binding, reference/
+reflog snapshots and post-admission revalidation, fetch/integration continuation,
+and Windows remain outstanding. No Pull delivery or T7 completion claim.
+
+Pull retained pre-fetch prototype (2026-10-13): BeforeFetch captures owned
+branch/original HEAD/fork-point/config policy from completed admitted probe
+outputs. It distinguishes detached HEAD and unborn branches, validates object
+width/nonzero hex/newline framing, and rejects fork-point without a branch and
+original HEAD. Six filtered Pull tests pass (26723), including retained pre-fetch
+values in the real rewritten-upstream fixture; all-target Clippy passes (17404).
+This remains test-only: production probes, snapshot revalidation, authorized
+fetch and integration continuations are not wired. Next work must bind this state
+to the admitted executor rather than treating the prototype as delivered Pull.
+
+Probe integration verification (2026-10-13): complete Git-enabled tools library
+passes 253/253 before the checkout caller migration (48303). Independent reviewer
+git_plan_review found no definite output-collector regression; non-Unix descendant
+cleanup parity remains open. Checkout now uses a quiet commit-target probe:
+only exit 1 with both streams empty permits candidate guessing; budget/spawn/
+timeout/diagnostic failures propagate instead of being swallowed by fallback.
+All 22 checkout-filtered tests pass (89971); missing-reference versus exhausted
+budget regression passes (49105); all-target Clippy passes (33189). Follow-up
+independent review found no definite caller-migration regression. Production Pull remains
+unimplemented; this shared probe is preparation, not Pull delivery evidence.
+
+Pull process-boundary checkpoint (2026-10-13): AddPlan now separates bounded
+owned process collection (run_command_output) from success-only command handling.
+Existing mutation/discovery callers retain their success-only behavior; probes
+can inspect status/stdout/stderr without converting legitimate exit 1 into a
+process error. The same shared allowance, hardening, deadline and owned operation
+remain applied. Non-Unix collector also retains Output, but Windows validation
+remains outstanding. Real missing Git config probe, nonexistent executable and
+timeout test passes (17943); three cumulative budget tests pass; all-target
+Git-enabled Clippy passes (13267). Production Pull and fork-point probe wiring
+remain outstanding; no completion or publication claim is made.
+
+Pull rewritten-upstream baseline (2026-10-13): the real native Pull fixture now
+includes upstream history replacement. Before fetch it confirms fork-point is
+the old upstream tip; after pull it verifies the new upstream is an ancestor,
+the obsolete tip is not, and exactly the base/new-upstream/local commits remain.
+All five filtered Pull tests pass (46476); all-target Git-enabled Clippy passes
+(74970). This is native semantic baseline evidence only, not prepared execution.
+Integration inspection identifies AddPlan::discover as configuration capture and
+run_command as the owned process boundary. Fork-point probing needs exit-status
+preservation: a legitimate no-fork-point result must not be confused with process
+failure, timeout or cancellation. Production Pull integration remains outstanding.
+
+Pull policy verification checkpoint (2026-10-13): test-only policy capture now
+preserves branch subsection case and branch.rebase/pull.rebase precedence,
+pull.ff and pull.autostash precedence. Upstream Git v2.54 rebase.c confirms
+implicit rebase values use Git boolean semantics. Five filtered tests pass
+(25183), including real divergent pulls proving branch-selected merge/rebase
+topology, ff-only refusal without HEAD movement, and explicit pull.autostash
+on/off overriding rebase.autostash while preserving uncommitted edits.
+Git-enabled all-target Clippy passes (49647). These are prototype and native Git
+baseline checks, not production prepared-Pull execution. Next: retain pre-fetch
+HEAD/fork-point and bind admitted fetch and integration continuations. T7 remains
+Active; all later handoff tasks and publication gates remain outstanding.
+
+Pull prototype checkpoint (2026-10-13): test-only pull_state.rs now parses bounded
+FETCH_HEAD merge targets; three tests pass (18597), including real multi-branch
+fetch selecting configured upstream and excluding not-for-merge entries. It is
+not connected to production; retained pre-fetch state/config policy and admitted
+fetch/target-effect/merge-rebase stages remain implementation work. Git-enabled
+all-target Clippy passes (90761); diff whitespace check passes. No build is live.
+
+Latest validation/Pull checkpoint (2026-10-13): complete tools library passes
+247/247 (6272) including corrected real maintenance cancellation. No build is
+live. Pull implementation source review found pre-fetch fork-point/original HEAD
+must be retained; fetch may update current HEAD before worktree reconciliation.
+Preserve configured ff/rebase/autostash precedence, FETCH_HEAD merge selection,
+unborn/multiple-head behavior and recursive child effects. See owner checkpoint
+and upstream Git v2.54 builtin/pull.c (/private/tmp/i300-pull-2.54.c).
+Next implementation is Pull pre-fetch evidence and admitted fetch continuation,
+then fresh target-effect admission. Pull remains unimplemented, not Complete.
+Old I299 governance worktree was removed after confirming clean state and no
+open-file users; its branch and be35835a commit remain, releasing about 27 MiB.
+
+Maintenance cancellation implemented (2026-10-13; supersedes below): the ninth
+real local push scenario positively observes automatic pack-refs under the
+receiver maintenance/receive-pack chain, cancels after ref update, confirms
+cleanup and child exit, preserves the fixture lock and checks no late packed-refs
+write after lock release. Test 85061 passes unsandboxed; 48356 was blocked by
+sandbox ps restrictions. Independent review found a post-cancel observation
+ambiguity: failed ps with empty stdout could pass. The assertion now accepts only
+exit 1 with both streams empty (absent), or success with empty stderr and zombie
+state; corrected test 72880 passes. Clippy 31460 passed before that assertion
+correction. All builds are terminal; remaining scope is unchanged.
+
+Latest cancellation checkpoint (2026-10-13): real local receiver cancellation
+now passes after objects transfer while reference update waits on a fixture lock.
+Cleanup is confirmed, the fixture lock is preserved, and releasing it causes no
+late ref update. Receiver automatic loose-object maintenance also demonstrably
+finishes before push returns (12219). This covers receiver cancellation and
+maintenance completion separately; maintenance-phase cancellation remains open.
+Independent reviewer git_plan_review confirmed this evidence boundary and proposed
+blocking automatic pack-refs with packed-refs.lock after refs update. Git 2.54
+source inspection confirms pack-refs auto triggers at 16 loose refs when no packed
+refs exist; use at least 17 fixture refs, core.packedRefsTimeout=30000, and prove
+the actual maintenance/pack-refs descendant starts before cancellation. Source
+copies: /private/tmp/i300-gc-2.54.c and /private/tmp/i300-files-backend.c.
+Current Clippy passed (67597); no build remains live. All accepted contracts
+remain in force. Maintenance cancellation fixture is not yet implemented.
+
+Local execution continuation (2026-10-13; supersedes disabled-transport notes
+below): real eight-stage admitted local/file push passes for bare, normal,
+linked and file URL receivers (29677). MCP success, Write denial and duplicate
+request replay protection pass (4893); that build is terminal. Independent
+review confirmed shell restrictions and rr-cache/MERGE_RR coverage, with no new
+definite maintenance namespace omission. This remains partial candidate evidence:
+cancellation, multi-destination partial effects, Pull, other transports, Windows
+and full publication gates remain open. Full tools validation passed 247/247
+(92388); all-target Clippy passed (47702). The expanded eight-stage test then
+passed for two local pushurl destinations (5084), with neither written before
+final admission. All these builds are terminal.
+No additional maintainer decision is pending for the accepted metadata scope.
+Partial local multi-destination failure is now verified (26449): first receiver
+updates, divergent second receiver stays unchanged, and execution reports partial
+effects. Governance/claims pass with zero warnings (22133/30900). Next resume item
+is cancellation/descendant cleanup, followed by remaining transport and Pull work;
+do not treat these local tests as complete security review or T7 closure.
+
+Final-plan continuation (2026-10-13): local receiver discovery now produces a
+fresh Mutation plan preserving sender facets and adding receiver Write/Execute.
+Storage evidence is retained and checked at execution entry and immediately before
+spawn; consumed proof tokens are retained for exact Write checks. Fixed receiver
+command is wired into production push arguments, but local transport remains
+disabled until the shell baseline and execution validation are closed. Tests
+cover stale proof, missing Write and changed object storage for bare/normal/linked
+layouts; full Git-enabled tools library passes 245/245 (7378). T7 remains Active.
+Independent review confirms final-spawn evidence recheck and command wiring;
+Clippy passes (29970), governance/claims pass (43655/94418). No build remains live.
+Next is shell-baseline closure, then replacing the local transport rejection
+with complete destination validation and exercising actual admitted push.
+
+Latest storage continuation (2026-10-13): dedicated metadata Read and exact roots
+are tested through real bare/normal/linked discovery chains; missing capability
+or exact root refuses. Full Git-enabled tools library passes 244/244 (37939).
+Storage now rechecks missing leaves and parent mapping; independent review
+confirms the fix. Unix hardlinked regular metadata refuses (3/3 storage tests,
+87272); final inode/nlink recheck subsequently passes all-target Clippy (33737)
+and all three storage tests (41154). Independent review confirms five remaining local
+push items: final sender/receiver Write plan, retained and revalidated storage,
+production fixed receiver command/Execute facets, shell baseline, and actual
+admitted mutation/failure/cancellation tests. No new authorization is needed for
+the accepted metadata scope. Local mutation stays disabled; I300/T7 stays Active.
+
+Receiver metadata contract checkpoint (2026-10-13): maintainer accepted the
+dedicated git_push-only `git:receiver-metadata` Read/Write scope. Grant compiler
+and permission regression now require matching absolute Path roots, a bound
+absolute Git Command and push tool; ADR-089 records exclusions. Child evidence
+now binds receive-pack and maintenance Git to the sender executable. Git source
+review showed local transport removes configuration parameter environment, so a
+fixed, shell-quoted receive-pack command carrying foreground maintenance settings
+was added and tested. Mutation remains disabled until dynamic receiver writes,
+quarantine/locks/reflogs, environment/startup effects and cancellation ownership
+are fully bound and independently reviewed.
+
+Latest verified continuation (2026-10-13): clean rebuild 15092 completed with
+239/239 Git-enabled tools library tests passing. This includes the subsequent
+main-worktree HEAD/config.worktree binding and sibling marker/common/backlink
+verification, with relative backlinks deferred to a new Read wave before target
+resolution. Independent reviews found no new definite blocker in those additions.
+Governance/claim validators pass with zero warnings (87877/64556); diff whitespace
+check passes. Git-enabled all-target Clippy passes with warnings denied (45407);
+no build remains live at this checkpoint. Local receiver child/maintenance/write effects,
+object reads for detached rebase occupancy, prepared Pull, remaining transports,
+Windows lifecycle and final delivery gates remain open. No task completion or
+implementation publication is claimed. This supersedes the rebuild-in-progress
+and pointer-binding-pending notes immediately below.
+
+Current continuation (2026-10-13): maintainer explicitly accepted the dedicated
+receiver-reference-tree scope; ADR-089 records it. Rebase directory/fixed-file
+evidence and sibling private refs now have fresh exact Read admission, retained
+evidence and later revalidation. Common and sibling reference trees share the
+65,536-entry/16 MiB reference-file-content budget across destinations. Independent
+read-only reviews found and verified fixes for admitted rebase mapping and root
+set mismatch, then found no new definite sibling-reference/budget blocker.
+Full Git-enabled tools library passes 238/238 (53679), including multi-destination
+bisect grouping, rebase state and shared-budget regressions. Main/common HEAD and
+config.worktree evidence was subsequently added; its latest compilation (98377)
+failed from disk exhaustion before test execution. No build remained live;
+previously authorized target/debug cleanup completed (67285), restoring 2.7 GiB.
+Fresh full tools validation is rebuilding from clean outputs. Do not duplicate
+or restart a live build. Local push mutation, sibling pointer targets, child and
+maintenance effects, prepared Pull, remaining transports, Windows lifecycle,
+full preflight and publication remain incomplete. I300/T7 stays Active; all
+accepted decisions remain required and no original task is declared complete.
+
+Sibling follow-through (2026-10-13): independent review found no new definite
+authorization bypass in the metadata wave. Sibling root symlinks resolving to an
+explicitly admitted canonical target are accepted, unlike inventory-root links;
+do not claim blanket rejection. Auxiliary capture now revalidates siblings again
+before returning. Real-layout regression (92006) proves removal of exact sibling
+HEAD Read authority refuses despite retained directory authority, and retains
+the HEAD replacement regression. Git v2.54.0 wt-status.c shows detached-HEAD
+occupancy checks access rebase-apply/applying/patch/head-name/onto,
+rebase-merge/interactive/head-name/onto, BISECT_LOG and BISECT_START; directory
+existence also matters. get_branch may abbreviate an object ID, so these files
+alone do not close object-store read effects. These remain implementation
+prerequisites, not completed scope. Local receiver mutation stays closed.
+
+Sibling metadata checkpoint (2026-10-13): common discovery now emits exact
+HEAD/gitdir/commondir Read facets for each inventoried sibling. Configuration
+entry checks these authorizations before bounded Metadata capture, retains the
+results, and lists pointer targets as fresh resources without opening them.
+Configuration completion and both auxiliary entry/revalidation check retained
+siblings. Receiver suite passes 34/34 (59972); expanded real bare/normal/linked
+pipeline regression passes (3332), including sibling HEAD replacement rejection.
+Private refs, rebase/bisect state, main-worktree configuration, pointer-target
+verification and receiver write/child effects remain required. Independent review
+is pending; local mutation remains closed and no completion is claimed.
+
+Worktree inventory review correction (2026-10-13): independent review found
+that a directory-to-symlink exchange before PathIdentity capture could accept an
+external listing. Inventory capture now binds the initial lstat leaf identity
+and parent identity, checks canonical mapping against admission before read_dir,
+and repeats mapping/type/identity checks afterward, including missing roots.
+Receiver tests pass 34/34 (73652); expanded same-name directory replacement and
+root-link regressions pass 2/2 (80355). Read_dir ancestor/instantaneous exchange
+TOCTOU remains; no OS containment or complete sibling-state binding is claimed.
+Independent recheck confirms the specific persistent-redirection defect repaired;
+same-name inode replacement detection is Unix-only. Clippy passes (4632).
+Final local push remains closed.
+
+Receiver worktree inventory checkpoint (2026-10-13): the metadata wave now
+names the shared worktrees directory as an exact Read resource. After admission,
+the common wave captures at most 1024 immediate registration names without child
+metadata/content reads, emits fresh child Read candidates, and retains the
+inventory for later common revalidation. Stable root symlinks refuse; child
+symlinks remain names only. Original Git-enabled library tests pass 231/231
+(83639); the two new inventory regressions pass (69101). Independent review is
+pending. Sibling HEAD/private refs, gitdir targets, rebase/bisect state, main
+worktree config and execution/write effects remain required before local push
+activation. This inventory is not complete receiver effect binding and final
+mutation remains closed.
+
+Production-chain checkpoint (2026-10-13): accepted ADR/I300 decisions remain
+required in full, per maintainer clarification; no ordinary operation is removed
+from acceptance to close T7. Real MCP transport integration passes 5/5 (78360),
+covering add/commit/checkout and direct Git-daemon push approval/denial/replay.
+Production Agent two-file add passes 3/3 (71337), including unrelated staged
+entry preservation and discovery-approved/mutation-denied behavior. Local push,
+prepared Pull, other transports, Windows lifecycle and full delivery gates remain
+open. A Windows-only retained-executable-guard Git startup test was added but
+cannot be validated on this macOS host. This is partial progress, not completion.
+
+Windows executable guard candidate (2026-10-13): ProgramEvidence now retains
+a read-only File opened with FILE_SHARE_READ and OPEN_REPARSE_POINT. It reads
+the bounded snapshot through that same handle, rejecting reparse points before
+content access. This avoids unstable std identity APIs and does not lock mutable
+refs/config evidence. A Windows-only regression checks write/delete/rename
+refusal while either evidence handle survives and successful rename after both
+drop. It has not run on this macOS host. Same-file and cap-std alternatives were
+inspected; their 64-bit Windows identity paths were not adopted as a claimed ReFS
+identity guarantee. No new library or Talos unsafe was introduced.
+The macOS Git-enabled library suite passes 231/231 (44582). Windows compilation,
+native Git/shell startup compatibility, ancestor mapping and cancellation/process
+lifetime ownership remain delivery gates; the retained handle currently follows
+the plan lifetime and does not prove protection after a detached child outlives
+that plan. Independent implementation review is pending. Receiver mutation stays
+closed; no cross-platform completion is claimed.
+
+Executable leaf-open correction (2026-10-13): independent review found
+capture_program used a general snapshot reader whose ordinary open could follow
+a concurrently substituted leaf symlink or block on a FIFO. It now uses
+capture_regular, retaining outer program identity checks. Review confirms the
+specific Unix leaf window is closed by O_NOFOLLOW/O_NONBLOCK and opened-file
+identity checks; ancestor/content races remain. Full tools library tests pass
+231/231 after this correction (18376, then 97856).
+Windows capture_regular now requests FILE_FLAG_OPEN_REPARSE_POINT and rejects
+reparse attributes before reading. An attempted standard-library Windows identity
+implementation was removed after review confirmed volume_serial_number/file_index
+are unstable in Rust 1.99.0. Windows stable identity binding and native validation
+remain required; this is not cross-platform closure. Final receiver mutation and
+the pending reference-tree contract are unchanged.
+
+Receiver child executable checkpoint (2026-10-13): sender discovery now queries
+the admitted Git for its compiled shell path and derives receive-pack from the
+reported exec-path. These become fresh exact Read facets; receiver-root discovery
+captures them only after admission, retaining path mapping, bytes/permissions and
+Unix file identity. Every later receiver layout revalidation checks this evidence.
+Regressions cover link retargeting, equal-byte inode replacement, missing Read
+admission through execute_stage, and replacement between production stages.
+The full Git-enabled tools library suite passes 231/231 (20724); all-target
+Clippy with warnings denied passes (87601). Governance and Collaboration Claim
+validators pass with zero warnings (69314/61782); git diff --check passes.
+The earlier filtered run passed
+181 tests (13891) and is not the full library result.
+
+This is executable discovery and evidence binding only: it grants no child
+Execute authority and does not enable receiver mutation. Missing exec-path
+receive-pack or an unavailable/nonabsolute compiled shell refuses; PATH fallback
+and shell startup/environment effects are not yet covered. Independent review
+of this addition remains pending. The reference-tree capability still awaits
+maintainer acceptance. Sibling worktree state, maintenance contexts/effects,
+final mutation facets/dispatch, prepared Pull, remaining transports, full
+preflight and publication remain open. No task completion is claimed.
+
+Receiver reference authorization checkpoint (2026-10-13): auxiliary evidence now
+retains regular-file identity as well as bytes/permissions, repairing the
+identical-content replacement gap recorded below. The files reference backend
+retains bounded shared/private refs trees and packed-refs; chained symbolic
+retargets, inode replacement, stable symlinks and unsupported backends have
+regressions. Git-enabled tools pass 228/228 (session 93235), including rejection
+through execute_stage when exact directory tokens lack the closed tree capability.
+The earlier 227/227 result (73288) predates that authorization correction.
+Permission validation also passes: 143 unit tests, three public API integration
+tests and one doctest (10514). Tools/permission all-target Clippy passes with
+warnings denied (17533); both governance validators pass with zero warnings
+(96625/16033), and git diff --check passes.
+
+Independent review rejected treating exact directory Read tokens as subtree
+authority. The candidate now adds closed Read(Remote
+git:receiver-reference-tree) plus independently checked exact refs roots; the
+one-use prepared proof binds both. The grant compiler restricts the name to
+git_push with an absolute refs Path facet; it does not itself prove prepared
+identity. Discovery and all later read-only stages retain the capability, and
+missing capability refuses before tree reads. Review confirms that specific
+binding, conditional on maintainer acceptance of the new scope; it is not
+mutation approval. ADR-089 records the candidate. Concurrent ancestor exchanges
+can still cause a read before postcheck rejection; no OS isolation is claimed.
+
+Next: obtain the concrete tree-scope decision after validation; bind receive-pack
+and shell executable identity, sibling worktree HEAD/state and maintenance
+configuration/effects, then final mutation facets and dispatch. Git v2.54.0
+config.c resolves the HEAD symbolic chain for onbranch, while receive-pack.c
+enumerates all refs and checks get_worktrees/find_shared_symref. connect.c uses
+a shell for local receive-pack. These are required execution/read effects, not
+covered by the current reference snapshot. Prepared Pull, remaining transports,
+full preflight, exact-head review/CI and all later handoff tasks remain open.
+Authorized target/debug cleanup restored 4.5 GiB; subsequent builds use
+CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0
+CARGO_BUILD_JOBS=1. No completion commit, publication or task closure is claimed.
+
+Receiver auxiliary retention checkpoint (2026-10-13): auxiliary capture now
+retains its path/entry evidence across a fresh identity transition into the still
+Read-only ReceiverMutation gate. That gate revalidates sender, layout, configuration,
+all auxiliary path mappings and recaptured content/permissions/missing entries
+before its explicit mutation refusal. Real bare/normal/linked regressions now
+verify an absent hook becoming a regular file invalidates this evidence.
+Alternate-store detection uses exact inventory paths, not a filename heuristic.
+Git-enabled tools pass 223/223 (session 56137); Clippy passes (92851).
+Independent review found no new retention-stage blocker. Auxiliary snapshots
+still lack cross-stage inode identity: identical-byte/permission replacement
+can pass, unlike the separately retained layout pointers. This remains a
+mutation prerequisite. This supersedes the discarded
+evidence limitation below, but does not enable writes: ref/backend evidence,
+maintenance/child contexts, mutation facets and full delivery gates remain open.
+
+Receiver auxiliary inventory checkpoint (2026-10-13): receiver configuration
+now contributes fresh Read facets for conventional hooks, receive.fsck.skipList,
+object alternates and shallow evidence, without opening those targets. The admitted
+auxiliary stage checks all receiver path mappings then uses bounded regular-file
+capture. Executable hooks and nonempty alternates refuse explicitly; configuration
+hook commands, alternateRefsCommand and updateInstead refuse during inventory.
+Maintenance-enabled recentObjectsHook/repackFilterTo are explicit unsupported
+helper/external-write cases. No setting is silently disabled; ordinary automatic
+maintenance remains required scope, not replaced by a maintenance-off subset.
+Independent review found no new auxiliary-discovery blocker, but evidence retention
+and final revalidation, maintenance child contexts, other-worktree effects and
+child executable identity still block mutation. The auxiliary stage remains terminal.
+Metadata now also retains/rechecks HEAD bytes and leaf identity. Review confirms
+this binds the HEAD file only: downstream symbolic refs can still change onbranch
+matching and require retained ref/backend evidence. A real-host 12-case
+bare/normal/linked gitdir/onbranch comparison matched
+config inventory with receive-pack advertiseAtomic output across two HEAD names;
+this is bounded condition evidence, not full receive-pack equivalence.
+Git-enabled tools pass 223/223 (session 23905). Full preflight, remaining transports,
+prepared Pull and later serial handoff tasks remain open; no completion/publication.
+
+Receiver configuration discovery checkpoint (2026-10-13): source review of
+Git v2.54.0 setup.c corrected the earlier global/include bootstrap prerequisite.
+read_repository_format and read_worktree_config use git_config_from_file without
+include expansion; global/include worktreeConfig cannot activate config.worktree.
+A real-host regression confirms this distinction. Direct layout hints still need
+Read admission because ordinary config setup may resolve core.worktree.
+The fresh ReceiverConfiguration stage now admits Execute plus the existing closed
+configuration-chain capability, runs a fixed bounded config inventory with an
+absolute gitdir, verifies identical repeated output and retained layout, then
+returns fresh source Read facets and ReceiverAuxiliary. The latter still refuses;
+no receiver mutation or complete receive-pack equivalence is claimed.
+Review found relative-origin ambiguity and recursive configuration snapshots.
+Native capture now rejects nonabsolute receiver origins before source access;
+configuration snapshots use bounded regular-only/no-follow reads with opened-file
+and post-read identity checks. HOME/rooted-suffix guards cover discovered nested
+include declarations too. Ancestor/content races and weaker non-Unix opens remain.
+Git-enabled tools pass 219/219 (session 3936); all-target Clippy passes (80649).
+Independent review confirms the discovery read blockers repaired. Conditional
+include/HEAD and cwd comparison matrix, receiver auxiliary effects, final mutation,
+full preflight and publication remain open. All later handoff tasks remain in scope.
+
+Receiver include inventory checkpoint (2026-10-13): local/shared and enabled
+worktree configuration now inventory all include/includeIf path declarations,
+including duplicates and inactive conditions, without target reads. Each candidate
+becomes a fresh Read facet resolved against its source directory or frozen HOME.
+Independent review identified ambiguous HOME parent traversal and rooted ~/ suffixes;
+both now refuse before joining, with integration regressions and reviewer recheck.
+Implicit/empty path declarations also have regression coverage; the suspected gix
+implicit-value defect was disproved by parser inspection, not patched around.
+Git-enabled tools pass 214/214 (session 8022); all-target Clippy passes (92503).
+After verification, authorized target/debug cleanup restored 4.9 GiB free space.
+Effective global/include layout
+closure, receiver configuration, auxiliary effects, final mutation and full
+preflight remain open. This does not enable local push or complete I300.
+
+Receiver worktree bootstrap checkpoint (2026-10-13): explicit local
+extensions.worktreeConfig=true now captures already-admitted gitdir/config.worktree
+and adds its core.worktree candidate alongside the shared candidate. Both config
+snapshots are rechecked before returning, and retained for next-stage comparison.
+Disabled local flags leave worktree config unread; include/global activation is
+still unresolved and the effective-configuration stage remains closed. The gix
+boolean API mismatch found at compile time was corrected to Result<Option<bool>>.
+Independent review found no new blocker under the current closed execution gate;
+its stale-comment and same-capture consistency suggestions were applied.
+Sixteen receiver tests pass, and the pre-review-tweak Git-enabled suite passed
+211/211 (session 11821). Full preflight, effective-chain closure, auxiliary effects
+and mutation admission remain unfinished. No completion or publication claimed.
+
+Receiver local-layout bootstrap (2026-10-13): the admitted Common wave now
+captures common/config with the existing 16 KiB regular-file/no-follow pointer
+reader and retains its evidence. A catch_unwind-guarded gix byte parser extracts
+only the local core.worktree hint without include expansion or Git execution;
+that path is a fresh continuation Read facet. This is not effective configuration:
+worktree-specific/global/include-driven overrides still require closure before
+repository-setup commands. Quoted/duplicate keys, absent includes, changed bytes
+and oversize refusal have a focused regression. Fourteen existing receiver tests
+passed after integration; the new focused regression is tracked separately.
+Full preflight and independent review remain required. Local push stays disabled.
+
+Receiver configuration prerequisite audit (2026-10-13): independent source
+review of Git v2.54.0 found receive-pack enters the actual gitdir and sets
+GIT_DIR=. before repo_config, whereas ordinary git config has its own repository
+setup. Therefore neither worktree-cwd config nor gitdir-cwd --git-dir=. has yet
+been proved equivalent for core.worktree and conditional includes. A local
+isolated fixture with nonexistent core.worktree returned exit 0 for receiver-cwd
+explicit-file, neutral-cwd explicit-file and gitdir-cwd effective probes. Those
+exit codes do not prove absence of filesystem access and do not establish a
+startup failure; do not claim the experiment reproduced one. Before enabling
+configuration execution, inspect layout keys using a bounded Rust parser without
+include expansion, admit newly named paths, and close include-driven layout
+paths before any repository-setup command. Validate bare/normal/linked, relative
+core.worktree and includeIf gitdir/onbranch against receive-pack semantics.
+No command override of core.worktree/core.bare is authorized as a substitute.
+Current ReceiverConfiguration remains fail-closed; this records a concrete
+implementation prerequisite, not configuration or push delivery.
+
+Receiver real-layout and alias correction (2026-10-13): the integrated
+layout pipeline now has a regression using real host-Git-created bare, normal
+and linked-worktree repositories through all four admitted layout waves.
+Independent review identified a symlink-parent plus leading-parent backlink
+ambiguity; backlink parsing now uses the already-admitted canonical marker
+parent instead of its raw spelling. A dedicated regression verifies canonical
+resolution without consulting the lexical alternative. Fourteen receiver tests
+and all 209 Git-enabled tools tests pass (session 33298, exit 0). Configuration
+command semantics and fresh review remain open; no receiver execution is enabled.
+
+Receiver backlink checkpoint (2026-10-13): ReceiverConfiguration now verifies
+an independently admitted backlink target against the retained canonical gitdir
+and directory identity before its existing configuration-stage refusal. Tests
+cover missing/wrong admission, inconsistent backlink, matching target and Unix
+same-path directory replacement. Twelve receiver-focused tests pass. Configuration
+discovery, auxiliary effects, final mutation, fresh independent review and full
+preflight remain open; local push is still disabled and no completion is claimed.
+
+Receiver common wave checkpoint (2026-10-13): admitted shared directories
+and linked-worktree markers now retain evidence in ReceiverCommon. Marker bytes
+are opened only after their parent/leaf mapping matches the current admission;
+leaf symlinks are rejected. Backlink targets remain unresolved next-stage Read
+facets. ReceiverConfiguration currently revalidates the retained layout then
+refuses: backlink consistency, configuration-chain execution, auxiliary evidence
+and final mutation authorization remain unfinished. Eleven receiver-focused
+tests pass (session 25200, exit 0). This change has not received fresh independent
+review or full preflight and does not enable local push. Existing TOCTOU and
+non-Unix limitations remain. No completion or publication is claimed.
+
+Receiver metadata wave checkpoint (2026-10-13): fresh ReceiverMetadata
+admission now permits bounded commondir/gitdir pointer capture in each admitted
+gitdir, retaining directory identity and pointer bytes/Unix leaf identity.
+New targets are only Read facets on the fresh ReceiverCommon continuation;
+previous root/gitdir scopes remain present for revalidation. ReceiverCommon
+revalidates retained evidence then explicitly refuses pending common/worktree,
+configuration and auxiliary effect binding. No receiver mutation is enabled.
+Independent review found no new blocker within the documented path-based
+TOCTOU/non-Unix limitations. Ten receiver-focused tests and all 205 Git-enabled
+tools tests pass with pinned Rust 1.99.0 and --locked (session 37793, exit 0).
+The focused test's initial macOS raw/canonical alias assertion was corrected;
+production authorization continues comparing normalized paths. Next implement
+the admitted common/worktree wave, config-chain discovery, auxiliary evidence
+and final all-destination mutation gate. Publication and full preflight remain
+open; all later serial tasks retain their original scope and order.
+
+Receiver root evidence checkpoint (2026-10-13): root discovery now retains raw
+spelling, admitted canonical mapping, directory identity, .git marker kind,
+Unix leaf identity and bounded gitfile bytes. The fresh ReceiverMetadata proof
+rechecks retained roots before its existing terminal refusal. Tests cover marker
+retargeting, same-byte inode replacement, root symlink retargeting, directory
+marker replacement and the production stage refusal. Seven receiver-related
+tests pass with the pinned toolchain and --locked. Independent review found
+marker canonicalization could query a concurrently substituted symlink target;
+marker identity now uses symlink_metadata instead, without canonicalizing that
+leaf. Unix pointer opens use O_NOFOLLOW/O_NONBLOCK and fstat identity checks.
+Ancestor/content TOCTOU and weaker non-Unix identity/open guarantees remain;
+this is not OS confinement. Metadata/commondir/backpointer waves, configuration,
+auxiliary evidence and final mutation admission remain unfinished. No local/file
+transport activation, completion transition or publication is claimed.
+
+Receiver root discovery checkpoint (2026-10-13): local destinations now enter
+an admitted Read-only ReceiverRoots phase, bounded to 64 receiver roots. It
+checks the admitted normalized root before inspecting its .git entry; gitfiles
+are bounded to 16 KiB and external gitdir targets become fresh continuation Read
+facets without target access. ReceiverMetadata still explicitly refuses: layout
+identity retention/revalidation, commondir/backpointer waves, configuration,
+auxiliary evidence and final mutation remain unimplemented. Independent review
+found no immediate blocker within the existing path-based TOCTOU limitations.
+Tests cover stale/fresh proof and an absent external target; Git-enabled tools
+pass 198/198. The legacy-remote regression now uses an explicit direct Git URL
+so it still reaches mutation revalidation after local paths gained extra stages.
+This is partial integrated discovery, not local/file push support.
+
+Explicit phase checkpoint (2026-10-13): AddPlan dispatch uses SenderConfiguration
+and Mutation phases rather than config.is_some(). Direct mutation dispatch with
+a valid discovery proof now refuses before repository access. The new regression
+and corrected stale-discovery entrypoint tests pass; Git-enabled tools 197/197.
+Next add actual admitted receiver layout waves, then configuration/auxiliary
+evidence and final all-destination mutation admission. The receiver implementation
+is still missing; this checkpoint must not be treated as transport delivery.
+
+Receiver path prerequisite (2026-10-13): local destination classification now
+rejects parent traversal following an ordinary component, preventing permission
+lexical normalization from disagreeing with Git's symlink/parent traversal.
+Leading relative parents remain allowed. The classifier regression passes;
+this is not receiver execution support. Next replace config.is_some() stage
+dispatch with explicit phases, defer all mutation-only facets, and bind each
+receiver layout wave to fresh returned path authorizations before reading it.
+Independent review established the integration sequence in the migration inventory.
+
+Command-budget diagnostic checkpoint (2026-10-13): configuration and attribute
+path discovery preserve the explicit cumulative-budget error rather than
+misdiagnosing exhaustion as an installation failure. The targeted case and
+all 196 Git-enabled tools tests pass with the pinned, locked toolchain; governance
+and Collaboration Claim validators report zero warnings. Receiver stages and
+later handoff tasks remain open.
+
+Runner budget regression checkpoint (2026-10-13): Agent and MCP now test
+first-stage oversize refusal with zero effects and cumulative profile exhaustion
+after two admitted stages. MCP proves sticky request replay refusal; Agent
+proves no additional effects but initial oversize precedes ledger reservation.
+Agent 5/5 and MCP
+6/6 pass after fixture input binding was updated to preserve exact proof input.
+No receiver transport was enabled; continue its staged layout/config/evidence
+implementation and the outstanding shared evidence/helper budgets. All original
+handoff deliverables and publication requirements remain in scope.
+
+Trace2 contract accepted (2026-10-13): the maintainer explicitly authorized
+fixed suppression of GIT_TRACE2/GIT_TRACE2_EVENT/GIT_TRACE2_PERF for structured
+Git children. This supersedes historical pending-acceptance notes below.
+ADR-089 records the accepted diagnostic scheduling/output difference; receiver
+support, complete validation and publication remain unfinished.
+
+Cumulative budget checkpoint (2026-10-13): profile reservation is bounded to
+65,536 facets and 16 MiB of resource/description UTF-8 bytes before cloning;
+Git discovery/mutation share 128 Talos-spawned commands and 64 MiB of reserved
+stdout/stderr capacity. Core budget tests and 195 tools tests pass. The initial
+Agent/MCP clone bypass found in review is fixed and independently rechecked;
+Agent tests pass 5/5 after the fix. Descendant/helper and evidence-byte accounting
+remain unresolved; these bounds do not authorize receiver transports.
+
+Current runner continuation checkpoint (2026-10-13): the candidate now has an
+eight-stage bound, invocation-wide identity history and separate cumulative
+permission/execution deadlines. This supersedes the historical two-stage
+constraint below. Focused Agent tests pass 5/5 and MCP transport tests 6/6;
+no receiver transport was enabled. Continue with cumulative resource accounting
+and the remaining concurrency tests, then admitted receiver discovery. The I300
+owner and bounded-stage proposal retain the unfinished scope and review findings.
+
+MCP continuation verification (2026-10-13): session 67957 exited 0 for
+`cargo test --locked -p talos-mcp --test prepared_replay` with the pinned
+toolchain and reduced-debug, single-job, non-incremental settings. All five
+transport tests passed, including fresh two-stage progression, third-stage
+refusal, repeated identity/request refusal, cancellation, transport error and
+EOF cleanup. This verifies the shared two-stage history refactor; it does not
+implement the proposed larger stage budget or receiver support.
+
+Full preflight retry passed (2026-10-13): session 84462 exited 0; log
+`/private/tmp/i300-preflight-retry-20261013.log` ends with
+`talos-runtime external fixture passed` and `release preflight: passed`.
+The standard script completed governance/claim checks, formatting, locked
+workspace check, Clippy, workspace tests and the external Runtime SDK fixture
+using pinned Rust 1.99.0 and reduced-debug, single-job, non-incremental builds.
+This supersedes the failed run below. The local candidate is still unpublished;
+remaining push transports, pull migration, final independent review and pending
+trace2 contract acceptance prevent I300 completion. Next implement receiver
+discovery and effect binding for local/file push, including bare repositories.
+
+Local/file push design review (2026-10-13): independent review defined the
+required receiver sequence: sender destination discovery; bounded receiver
+layout discovery only after Path Read admission; separate admissions for every
+external `.git`, `commondir`, linked-worktree or metadata root; fixed config-chain
+discovery after layout closure; auxiliary Read evidence for receiver refs,
+objects, hooks, attributes, fsck skiplist and child executables; then one final
+mutation admission covering all destinations before any receiver write. Bare and
+non-bare receivers both remain in scope. `receive.denyCurrentBranch=updateInstead`
+can mutate a sibling worktree and is not yet represented. This review produced
+implementation guidance and documentation only; local/file execution remains
+disabled pending code, tests and fresh security review.
+
+Pull legacy-route containment (2026-10-13): `GitPullTool` previously invoked
+`git pull` directly after its ordinary permission profile, bypassing prepared
+discovery and fresh mutation admission. Direct execution now refuses with an
+actionable message until fetch, merge/rebase, hooks, worktree and remote effects
+are represented by a prepared plan. A regression test covers this refusal. This
+is containment evidence, not pull support; the prepared pull migration remains
+open.
+
+Pull refusal verification (2026-10-13): with the `git` feature enabled, the
+focused tools test passed 1/1 (191 other tests filtered). Formatting passed.
+The tool description now states that pull is temporarily unavailable until
+prepared fetch/merge authorization exists, so Agent/MCP callers are not invited
+to retry an operation that is deliberately fail-closed. Independent review
+found no safety issue in the containment change.
+
+Git tools regression verification (2026-10-13): `cargo test --locked -p
+talos-tools --features git` passed **192/192** unit tests plus integration and
+doc-test targets. This covers the pull containment change and the existing
+prepared add/commit/checkout/direct-git transport regressions after removing the
+legacy pull helper path. It does not expand transport support or complete I300.
+
+Governance verification (2026-10-13): project governance and Collaboration
+Claim validators both passed with zero warnings after the pull containment and
+documentation updates. SQLite consumer and delivery workflow fixture checks
+also passed as part of the governance validator run. I300 remains the effective
+claimed work slice; no T8 activation or completion transition is made.
+
+Preflight resource failure (2026-10-13): session 70897 completed the main
+workspace tests and began the external Runtime SDK fixture, but its second
+fixture build failed while compiling `ring`: the compiler could not create
+object files because the disk was full (`No space left on device`). No Rust
+test failure was reported. The authorized rebuildable `target/debug` directory
+was then removed, restoring about 8 GiB. A fresh full preflight is deferred
+until enough disk headroom exists; this is verification infrastructure evidence,
+not a passing preflight.
+
+SDK recovery verification (2026-10-13): after freeing the authorized build
+artifacts, session 10528 ran `python3 scripts/validate_runtime_sdk_fixture.py`
+with pinned-toolchain, reduced-debug, single-job, non-incremental settings.
+It exited 0: both default and `coding` external consumer modes passed using
+their independent lockfile and `--locked`. Log:
+`/private/tmp/i300-sdk-isolated-20261013.log`. Disk remained at approximately
+5.8 GiB free. This completes the previously failed fixture checks separately;
+it does not retroactively change session 70897 into a successful preflight.
+No Rust source changed between that preflight and the isolated fixture run.
+
+Post-review source check (2026-10-13): after withdrawing the unconnected
+receiver-layout prototype, `cargo check --locked -p talos-tools --features git`
+passed with the pinned toolchain. No speculative receiver authorization code is
+left in the tree; local/file push remains disabled until a complete evidence
+model is implemented.
+
+Prepared-stage architecture constraint (2026-10-13): Agent and MCP runners cap
+prepared invocations at two stages. The reviewed local/file receiver sequence
+needs at least four stages, so Git cannot safely add it within the current
+runner contract. Any stage-budget increase requires a separate security/API
+review covering proof consumption, replay, cancellation and bounded work. This
+is an implementation dependency, not a reason to weaken the existing cap.
+
+Prepared-stage extension proposal (2026-10-13): documented the bounded multi-stage
+runner design and required security/API evidence in
+`docs/proposals/i300-bounded-prepared-stage-extension.md`. It preserves fresh
+proofs, plan identities, replay reservations, cancellation and cleanup receipts;
+it does not change the current two-stage implementation or activate local/file
+push.
+
+Independent proposal review (2026-10-13): required explicit initial-plus-final
+stage counting, invocation-wide identity/replay tracking, atomic proof
+consumption, per-stage scope binding, cumulative deadline/output/helper/request
+budgets, cancellation-vs-admission serialization, single cleanup-owner handoff,
+seal/cancel/join/wait ordering, and bounded replay-reservation lifetime. These
+requirements are now stated in the proposal; no runner cap or security contract
+has changed.
+
+Follow-up proposal review (2026-10-13): the proposal now requires the Agent/MCP
+runner-owned stage ledger, unforgeable admission context, cleanup-owner transfer
+on Continue/Complete/error/drop, no external effect before Continue, and a
+concurrency matrix for cancellation, disconnect, replay, stage jumps, parallel
+proof consumption, budget expiry and cleanup timeout precedence.
+
+Proposal wording correction (2026-10-13): clarified that an admitted read-only
+discovery stage may execute bounded Git inspection commands before returning a
+continuation, consistent with ADR-089. Such children must finish with confirmed
+cleanup; only unaccounted or uncertain mutation is forbidden from becoming a
+retryable continuation.
+
+Stage-history refactor (2026-10-13): introduced the shared core
+`PreparedStageHistory` ledger and replaced duplicate Agent/MCP two-stage identity
+tracking with it. The bound remains two; this additive type does not grant
+authority, consume proofs or enable multi-stage Git. Its core boundary test
+passes 1/1, and formatting passes. Full Agent/MCP validation remains required
+before publication.
+
+Stage-history validation (2026-10-13): locked `cargo check -p talos-agent -p
+talos-mcp` exited 0 (session 1050). Independent review found the replacements
+equivalent and no safety blocker: the shared history still reserves before
+admission, refuses duplicate identities or a third stage without mutation, and
+does not move proof consumption. The additive public type is not approval of
+the broader multi-stage proposal. Runtime tests remain required before release.
+
+Full validation checkpoint (2026-10-13): preflight in session 76242 exited 101
+at the permission unit suite after workspace check and Clippy passed. The
+configuration-chain regression still expected `git_push` to be refused despite
+its implemented prepared discovery route. Updated that assertion to allow push
+and retained a negative assertion for the still-unmigrated `git_pull`; generic
+read and missing-executable rejection checks remain. The permission library
+suite now passes 142/142 with the pinned toolchain and `--locked`. Full preflight
+must be rerun; no workspace-pass or completion claim follows from this result.
+
+Pack-started cancellation acceptance (2026-10-13): the cancellation fixture now
+also advertises an empty receiver, observes actual `PACK` bytes from an 8 MiB
+pseudorandom payload and confirms the invocation remains active before abort.
+Joined cancellation yields a confirmed cleanup receipt, socket EOF/reset and
+unchanged local index. Targeted test passes for both connection-wait and
+pack-started cases. This supersedes the earlier pack-transfer evidence gap; it
+does not promise rollback of remote effects or cover every transport protocol.
+
+MCP push success acceptance (2026-10-13): real JSON-RPC calls through the
+registered GitPushTool now push to a loopback Git daemon. After sender HEAD
+advances, replay of the same request ID refuses and receiver HEAD remains the
+first approved commit. Explicit handler cleanup and daemon shutdown complete.
+MCP `git_prepared` passes 5/5. This closes the MCP success/replay evidence gap for
+direct Git transport only; remaining transports and the serial queue stay open.
+
+Push connected cancellation acceptance (2026-10-13): a real TCP listener accepts
+the prepared Git connection and intentionally withholds protocol response. Abort
+and join then produce a confirmed operation cleanup receipt, the peer observes
+EOF/reset, and the local index remains unchanged. Targeted regression passes.
+The first fixture timed out because no valid explicit source ref was present;
+it now creates an empty commit and supplies an explicit refspec. This covers
+connection-wait cancellation, not cancellation during pack transfer or rollback
+of remote updates already accepted.
+
+Multi-destination partial push acceptance (2026-10-13): real daemon regression
+configures two push URLs, verifies both resolved destinations in the plan, then
+observes the first receiver update while the second missing receiver fails.
+The result is an error with explicit partial-update guidance; the successful
+first update is verified by OID. Targeted test and diff check pass. This proves
+the need for inspection before retry, not cross-destination atomicity.
+
+Push partial-failure output (2026-10-13): errors from the actual push command
+now explicitly state that remote references may be partially updated and require
+inspection of every destination before retrying. Discovery/admission failures
+retain their pre-mutation diagnostics. The real receive-policy rejection test
+asserts the new guidance; this does not imply atomic push or automatic retry.
+
+Remote push rejection acceptance (2026-10-13): the real loopback daemon fixture
+now enables receiver `receive.denyDeletes`, attempts an admitted deletion refspec,
+and confirms an error plus unchanged remote ref. The targeted daemon test and
+diff check pass. This proves graceful receive-policy rejection for the direct
+transport, not atomic rollback for arbitrary multi-ref partial failures.
+
+Empty push alias correction (2026-10-13): upstream `remote.c::add_pushurl`
+clears generated push destinations when a pushInsteadOf rewrite yields an empty
+string. Native discovery now mirrors that reset and falls back to fetch URLs
+when the resulting push list is empty. A real host-Git comparison regression
+passes. Trace2 diagnostic suppression remains a pending maintainer contract
+decision; automatic goal continuation is not recorded as acceptance.
+
+Independent push review (2026-10-13): reviewer identified late legacy remote
+insertion and early trace2 configuration output as blocking findings. Push now
+rechecks legacy remotes/branches on every revalidation; regression inserts each
+after discovery and verifies mutation refusal. The trace2 finding remains open:
+system/global trace targets may write during the first Git configuration command,
+before values can be inspected. Resolve the pre-discovery logging boundary and
+re-review before publication; current tests do not prove read-only discovery.
+
+Reference evidence consolidation (2026-10-13): review confirmed RepositoryState
+already binds shared/per-worktree refs, HEAD and packed-refs. Removed the later
+redundant SenderRefs snapshot, retaining push loose/packed/HEAD-change tests
+against the shared revalidation path. Earlier claims that this was a missing
+binding were incorrect; the added tests strengthen evidence, while the duplicate
+implementation added no required coverage. No reference guard was removed from
+RepositoryState and no transport scope was expanded.
+
+Ordered host evidence (2026-10-13): configuration capture now retains the exact
+ordered origin/key/value output internally, and host reinspection compares it
+in addition to grouped values and origin paths. A regression proves that
+cross-key reordering with identical grouped values is rejected. This protects
+ordered recursion and URL rewrite semantics during discovery/reinspection;
+configuration values remain internal and are not printed to the model.
+
+Push recursion parser correction (2026-10-13): source inspection of Git 2.54
+`submodule-config.c::parse_push_recurse` confirms boolean true is invalid for
+`push.recurseSubmodules`, unlike `submodule.recurse`. The ordered parser now
+rejects invalid early values even when a later setting disables recursion;
+tests cover true/yes/1/ON and invalid text. Named modes remain supported for
+effect classification, with enabled child execution still requiring its own
+authorization. This preserves Git failure semantics before network activity.
+
+Ordered recursion checkpoint (2026-10-13): push discovery now preserves the
+host configuration record order when applying `submodule.recurse` and
+`push.recurseSubmodules` to their shared effective setting. Later explicit
+disable values are accepted; later enabling values remain refused before child
+execution. This supersedes the mixed-setting compatibility residual below.
+Existing 184 tools tests passed after implementation; added cross-key override
+regression covers both orders and malformed values.
+
+Push recursive-config correction (2026-10-13): Git 2.54 `builtin/push.c`
+also maps `submodule.recurse=true` to on-demand child push. Discovery now refuses
+this unbound child transport effect as well as `push.recurseSubmodules`; explicit
+false remains accepted. Config regressions cover both values. Mixed settings
+are conservatively refused if either setting enables recursion, even when Git's
+declaration order could ultimately disable it; exact ordered override support
+remains a compatibility residual, not silently altered execution semantics.
+
+Push HEAD checkpoint (2026-10-13): current RepositoryState already retains
+HEAD content. A new prepared-execution regression verifies both symbolic HEAD
+retargeting and replacement with a detached OID invalidate the admitted push
+before transport. Focused test and diff check pass; this is additional evidence
+for existing binding, not a new transport capability or completion claim.
+
+MCP push denial checkpoint (2026-10-13): a real JSON-RPC transport fixture
+allows configuration discovery/local facets but denies Network. The continuation
+returns a permission error, duplicate request IDs refuse replay, a bound loopback
+listener receives no connection, and no index is created. Explicit handler
+shutdown joins cleanup. MCP `git_prepared` passes 4/4 with `--locked`; successful
+push evidence remains the tools daemon fixture, not yet MCP success acceptance.
+
+Push attribute traversal (2026-10-13): admitted execution now captures and
+rechecks per-directory `.gitattributes`, including untracked directories that
+may correspond to historical object paths, without reading ordinary file
+bodies. The worktree Read facet explains directory/attribute traversal. Worktree
+symlinks and nested repositories conservatively refuse rather than traverse
+outside admitted paths; support for those layouts remains incomplete. Bounded
+traversal reuses directory identity checks. Tests cover changed historical-path
+rules, unchanged ordinary bodies and external directory links; tools 183/183
+pass. This supersedes the per-directory evidence gap below, not the outstanding
+transport, pull or full publication gates.
+
+Attribute-read checkpoint (2026-10-13): Git 2.54 `pack-objects` consults the
+`delta` attribute through the index while packing. Push discovery now additionally retains
+the root worktree attribute path alongside the existing common and global
+attribute evidence, and opens/revalidates it after continuation admission.
+per-directory attribute stacks and other configured helper effects remain
+conservative residuals. Tools tests pass 181/181.
+
+Push authorization acceptance (2026-10-13): loopback daemon tests cover missing
+proof, replaying a discovery proof, and a pre-push hook introduced after
+discovery; each refuses before remote refs change. Git 2.54 source inspection
+also confirms send-pack starts built-in pack-objects, while pack-objects reads
+configuration and attributes for delta decisions. Promisor/negotiation effects
+remain refused, and executable hooks are checked before mutation. Historical
+tree attribute-read coverage still needs review before publication; these tests
+do not prove complete process/read-effect coverage. Tools tests remain 181/181.
+
+Direct push checkpoint (2026-10-12): prepared mutation now admits only built-in
+`git://` transport, after sender configuration, hook, executable and reference
+revalidation. A loopback Git daemon regression proves object transfer, receiver
+ref update and payload contents. File/SSH/HTTP/helper transport effects remain
+unimplemented and explicitly refuse; this is an incremental implementation, not
+full push delivery or T7 closure. Pull and all later serial work remain open.
+
+Push sender checkpoint (2026-10-12): discovery now retains bounded loose and
+packed sender-reference evidence, including non-HEAD branches and tags, and
+revalidation refuses changes before mutation admission. Linked reference entries
+are refused rather than read through. Loose/packed-ref change regressions pass;
+Git tools tests pass 180/180. Transport execution is still closed; receiver and
+network helper binding remain next, followed by pull and the serial queue.
+
+Push destination checkpoint (2026-10-12): local/file receivers now produce Path
+Read/Write facets instead of Network authority, without opening the receiver
+during configuration discovery. Custom remote helpers refuse pending executable
+effect binding. URL classification and actual prepared-discovery tests pass;
+Git-enabled tools tests pass 179/179. Push mutation remains closed until receiver
+configuration/hooks/process and transport effects are bound; pull migration and
+the remaining serial deliverables remain open. gix tracking was refreshed in
+GIT-001 (Talos 0.87.1, published 0.89.0); no dependency upgrade or full Git removal
+is claimed. Earlier pending-decision notes below are historical checkpoints;
+the maintainer has since accepted configuration discovery, cleanup lifecycle and
+foreground maintenance decisions.
+
+Real prepared-plan process cancellation test passes: abort/join plus local receipt
+prevents a delayed descendant write. MCP sealing experiment was reverted; restored
+11 unit/3 replay-EOF tests pass. Shared registry/connection ownership remains the
+next lifecycle correction; full Agent/MCP process acceptance still required.
+
+MCP EOF transport regression passes: disconnect during active invocation drops
+execution, awaits its receipt, and completes explicit shutdown after release.
+Shared registry/owner isolation, arbitrary transport failure and real descendant
+cleanup remain unfinished. No Commit activation or whole-T7 completion claimed.
+
+MCP review correction: each continuation receipt is retained and waited under a
+shared deadline; request cleanup failure remains sticky at shutdown. 11 unit and
+3 transport tests pass. Cross-connection owner isolation and EOF/transport-error
+cancellation acceptance remain mandatory; Commit remains disabled.
+
+Latest MCP checkpoint: explicit handler shutdown and CLI post-transport caller
+integration exist. MCP/CLI checks and three transport tests pass; cancellation
+fixture now proves Drop-before-wait and blocked-until-released cleanup. Next:
+review connection shutdown races/sticky failures/shared owners, complete real
+process lifecycle acceptance, then enable Commit only after required evidence.
+
+MCP request cleanup now waits after its execution future leaves select scope,
+with bounded timeout/panic containment and retained replay reservation. MCP check
+and three existing real transport tests pass. Connection-level owner shutdown,
+active-handler joining and dedicated cleanup transport evidence remain open.
+
+Latest Agent correction: invocation cleanup is now keyed by internal TurnId,
+with confirmed receipts released and failed/pending receipts retained. Check and
+two focused cleanup tests pass, covering cross-turn isolation. MCP async owner
+shutdown and real cancellation acceptance remain next; no completion claim.
+
+Agent cleanup checkpoint: prepared operation receipts are registered before each
+stage and awaited after Agent cancellation join or normal/error completion, with
+one bounded remaining budget and panic-to-Unconfirmed conversion. Agent tests
+pass 467/467. MCP explicit owner shutdown and final end-to-end acceptance remain.
+
+Git lifecycle checkpoint: Add/Commit owner and per-plan operation scopes are
+wired through all discovery/inspection/mutation commands. Sealing regression
+rejects both existing continuation and new discovery without index creation;
+tools tests pass 147/147. Next required implementation is Agent invocation-local
+receipt collection before dispatch, cancellation join/wait, then MCP shutdown.
+Commit remains disabled and the full serial task remains incomplete.
+
+Latest Runtime checkpoint: tool owner finalizer registration and pre-cancel
+sealing are wired. Owner seal panics become failure; abnormal barriers cannot
+claim completed cleanup. Runtime check/61 tests pass; final corrected candidate
+still needs revalidation. Git operation scopes, Agent receipt integration and
+MCP explicit async owner shutdown remain unfinished. No T7 completion claim.
+
+Latest lifecycle checkpoint: typed sandbox-to-core cleanup evidence and registry
+owner retention now exist; core 112/112, sandbox 45/45 and targeted Clippy pass.
+Next: Runtime owner finalizer registration with seal before cancellation, Git
+operation-local scopes shared across stages, Agent cancellation joining, MCP
+explicit async shutdown. These integrations and real acceptance remain open.
+
+Latest decision: maintainer accepted cleanup lifecycle amendment after the
+explanation and resumed the goal. Earlier pending-decision notes are superseded.
+Core contracts/default hooks and Unix aggregate/local receipt primitives now
+exist locally; integration into Git/Agent/Runtime/MCP remains open. Core tests
+pass 111/111. Commit remains disabled until actual lifecycle/behavior acceptance.
+
+Stable validation (2026-10-12): session 21275 exited 0; full standard preflight
+including workspace tests, validators and both SDK fixtures passed without code
+edits during the run. Log: `/private/tmp/i300-preflight-checkout-boundary.log`.
+No build remains live. This supersedes the pending checkout preflight notes.
+Cleanup receipt API decision remains pending; Commit mutation and full family
+migration/publication remain unfinished. All later serial tasks remain pending.
+
+Latest T7 correction (2026-10-12): checkout branch/path ambiguity reproduced
+and fixed with a trailing argument separator. Missing branch matching a tracked
+file now fails without restoring edits; branch creation, previous-branch and
+unique remote tracking remain supported. Tools tests pass 146/146 and independent
+review accepted the local boundary. Final preflight is required after this code
+change; 8828 validated its predecessor. Cleanup API decision remains pending,
+Commit disabled, and the full serial queue is not complete.
+
+Latest verified continuation (2026-10-12): status-reader stable preflight 8828
+exited 0, including workspace tests and SDK fixtures; log is
+`/private/tmp/i300-preflight-status-reviewed.log`. A test-only symlink diff
+host-comparison added during that run passed separately, as did subsequent
+Git-feature all-target Clippy and diff checks. Include this new test in final
+candidate preflight. No build remains live. Cleanup receipt API remains pending;
+Commit is still disabled and no T7 completion/publication is claimed.
+
+Status review continuation (2026-10-12): actual workspace execution succeeded.
+The original preflight session `5976` exited 0, including the SDK fixture,
+with log `/private/tmp/i300-preflight-stable.log`. Source changed after it
+started, so a stable-candidate rerun is required. Status ignore reads are now non-recursive and per-directory
+identity is retained and rechecked throughout capture. Independent review
+confirmed both reported defects repaired. Tools tests pass 143/143; prior Clippy
+passes. Unix ignore leaf opens now reject links/FIFO substitution and compare
+opened identity, with independent review. Ancestor/content races, Windows
+limitations and conservative traversal remain in the migration inventory.
+Commit mutation stays disabled; cleanup receipt API approval remains pending.
+
+Latest continuation (2026-10-12): I300 remains Active on `feat/i300-git-repair`,
+based on effective claim `55fef9f9`, with uncommitted implementation preserved.
+Latest commit activation checkpoint: parent config/hook/filter checks now run
+before final child evidence revalidation; both commit modes refuse configured
+filters without helper execution or index mutation. Tools tests 137/137 and
+Clippy pass. No-change host commit invokes status with untracked directory/ignore
+reads not yet bound, so mutation remains closed. Cleanup API decision is pending.
+Full preflight session `8197` exited 1 after workspace tests/doctests passed:
+the independent Runtime SDK lock omitted talos-tools' new talos-permission edge.
+The fixture lock is now synchronized (one dependency line; no version upgrades).
+Retry `34549` exited 1 at formatting while status-evidence edits were in progress;
+formatting is now applied. Neither process remains live. Full preflight must be
+rerun on the stable candidate. Latest local tools tests pass 140/140: commit now
+declares worktree Read for status enumeration, captures directory names/types and
+ignore rules without untracked file bodies, and revalidates parent/child evidence.
+Child external excludes are declared from frozen config/environment. Independent
+review remains open and commit mutation is still disabled.
+Latest review corrections: parent config identity now rejects equal-content
+replacement/ancestor retarget; child attribute paths are discovered in each
+child cwd, including defaults when the parent overrides core.attributesFile.
+Promisor/partialCloneFilter/extensions.partialClone refusal now covers commit
+and child object inspection even with maintenance disabled. Tools tests 136/136
+and Clippy pass. Commit mutation remains disabled and cleanup API is pending.
+Latest promisor checkpoint: Git pack-objects may fetch missing promisor objects;
+automatic maintenance now refuses enabled promisor remotes before mutation.
+Tools tests 134/134 and Clippy pass. Network/helper authority and lifecycle
+remain incomplete; GitCommit stays disabled.
+Latest Git child-resolution audit: Git 2.54 source and isolated trap binaries
+show maintenance/status/repack/pack-objects built-ins dispatch internally;
+`git-<subcommand>` PATH helpers were not invoked. This narrows executable
+identity scope but does not complete configured internal helper effects or
+lifecycle integration. Commit mutation remains disabled.
+Latest maintenance validation: isolated host auto-maintenance reproduced external
+pack/index/reverse-index writes through gc.repackFilterTo. Maintenance entry is
+rechecked after inspection; late-retarget regression passes. Tools tests 133/133
+and Clippy pass. Full helper/lifecycle binding and GitCommit enablement stay open.
+Latest maintenance checkpoint: nonempty gc.repackFilterTo is refused when
+automatic maintenance is enabled because the destination write is not represented;
+explicit maintenance.auto=false preserves discovery. Tools tests 132/132 and
+Clippy pass. This is a conservative configured fallback, not complete maintenance
+effect binding; GitCommit stays disabled and lifecycle decision remains pending.
+Latest evidence retention: child filter inspection returns retained attributes/
+tracked-content evidence for later revalidation; late-edit regression passes,
+tools tests 131/131. Mutation remains disabled. Cleanup receipt public-interface
+decision has been explicitly presented and remains awaiting maintainer response;
+other authorized implementation work may continue independently.
+Latest tracked-source checkpoint: child filter inspection compares tracked
+membership/content before and after, with directory replacements captured by
+kind rather than recursively reading untracked descendants. Tools tests 130/130
+and Clippy pass. Final mutation/source binding and lifecycle remain unfinished;
+GitCommit execution stays disabled and the full queue remains incomplete.
+Latest attribute snapshot correction: admitted child filter inspection now
+captures local .gitattributes from every tracked source ancestor as well as
+external attribute sources, and rechecks them after inspection. Tools tests
+129/129 and Clippy pass. Untracked-child trace confirms status invocation only;
+it does not prove reads of untracked file bodies. Commit remains disabled.
+Latest ordinary-commit correction: no-staged-changes host trace exits 1 and calls
+child `status --porcelain=2`. Both commit modes now receive child discovery/filter
+checks; earlier success-only traces do not establish absence of child effects.
+Both modes pass helper-refusal regression; tools tests 129/129 and Clippy pass.
+Recursive/untracked child status and remaining lifecycle work stay open.
+Latest child status checkpoint: commit-all now checks admitted child attributes
+before status and refuses configured filters; isolated same-length edit regression
+proves helper execution does not occur. Nested gitlinks remain refused pending
+discovery. Tools tests 129/129 and Clippy pass; commit mutation remains disabled.
+Latest admitted metadata checkpoint: continuation now captures and rechecks child
+RepositoryState against discovered checkout/gitdir/common-dir after proof
+consumption. External separate-git-dir regression passes; tools tests 128/128
+and Clippy pass. Index evidence is byte-level only. Child status source/filter/
+helper effects and lifecycle still prevent enabling commit mutation.
+Latest location checkpoint: admitted child discovery binds gitdir/common-dir
+identity and commondir bytes, rechecks around config discovery, and declares
+new shared metadata Read facets for continuation. Pointer-retarget/directory-
+replacement/link regressions cover the new boundary. Child HEAD/index/source
+and execution lifecycle work remain incomplete; commit mutation stays disabled.
+Latest identity checkpoint: child config origins bind canonical paths and Unix
+device/inode identities through canonical ancestors; pre/post-read checks reject
+equal-content ancestor retarget and identical-byte file replacement. Windows
+identity remains limited to canonical paths. Child repository/common-dir identity
+and the remaining commit effects are still unfinished; mutation remains closed.
+Latest child configuration checkpoint: admitted commit all=true discovery now
+inspects child configuration chains, binds values/origins/source bytes internally
+and declares child origin Read facets on the continuation. A real external-include
+fsmonitor regression verifies refusal before helper execution and support for
+explicit false. Tools tests 123/123 and Clippy pass. Child metadata and broader
+status/filter/helper/lifecycle integration remain open; commit stays disabled.
+Latest child-read correction: GitCommit preparation no longer reads child
+RepositoryState before admission. It binds checkout kind/local .git marker and
+declares the destination Read path. External invalid-config and marker-retarget
+regressions pass; tools tests 122/122 and Clippy pass. Admitted child state/config
+capture remains unfinished; mutation stays disabled. Earlier claims of child
+HEAD binding apply only to the superseded pre-admission implementation.
+Latest gitlink checkpoint: typed commit sources bind index OID, checkout kind
+and child metadata without recursive child worktree snapshots; 121 tools tests
+pass. Host trace confirms commit -a starts child `status --porcelain=2 -uno` in
+the dirty-submodule fixture, unlike ordinary commit. Child configuration/helper
+effects and premature external child metadata reads remain review findings to
+resolve before enabling mutation. Existing temporary commit refusal remains.
+Latest metadata checkpoint: scalar commit state cannot be directories, and
+cache/sequencer roots cannot be ordinary files. Types are checked before snapshot
+recursion; wrong-type and MERGE_RR symlink regressions pass. Locked tools tests
+pass 119/119; mutation remains disabled with gitlink/lifecycle work outstanding.
+Latest commit evidence: tools git-feature tests pass 117/117. Active enabled
+rerere records and unmerged index entries explicitly refuse, while inert/disabled
+rerere discovery remains supported. Admitted `--exec-path` discovery now produces
+concrete child-program Read/Execute facets for continuation identity validation.
+Commit mutation remains closed pending typed gitlinks, remaining maintenance
+helper resolution and lifecycle/source boundary completion.
+Current commit checkpoint supersedes earlier "legacy route" notes: GitCommit
+now prepares two-stage admission and refuses direct execution, but its mutation
+stage is deliberately disabled while effect/lifecycle review completes. Git
+tools library tests pass 115/115 and the closed permission discovery regression
+passes. Remaining concrete commit work: maintenance helper executable binding,
+active rerere worktree effects, typed gitlinks, source/stat scope, final metadata
+ancestor checks and lifecycle integration. The maintainer accepted foreground
+maintenance overrides (ADR-089), and isolated Git 2.54 trace2 confirmed
+`maintenance run --auto --no-quiet --no-detach`; no complete migration is claimed.
+The maintainer additionally authorized rebuildable `target/debug` cleanup;
+it recovered about 11 GiB from a 116 MiB free-space floor. Tests rebuilt after
+cleanup. Source/Git data remained intact; no publication occurred.
+Latest reference checkpoint: bounded loose-reference snapshots now detect branch
+movement without object creation. Real Git regressions also cover shared packed
+references and isolated linked-worktree private references; reference symlinks
+are refused. The complete tools git-feature library suite passes 112/112 and
+all-target Clippy passes with warnings denied. This snapshot is currently shared
+with Add, so unrelated reference changes conservatively invalidate that plan;
+operation-specific scope still needs review during commit migration. Commit has
+not migrated, and full preflight/security review/publication remain open.
+Execution tools were directly called successfully; no evidence establishes
+subagent context leakage as the cause of earlier false unavailable-tool reports.
+Latest boundary checkpoint: unstaged diff previously exposed outside file content
+through a replaced ancestor symlink. The regression now passes after ancestor
+validation in worktree content/mode reads; removed parent directories still
+produce deletions. Tools git-feature suite 108/108 and Clippy passed. This is
+not race-free containment; independent boundary review remains outstanding.
+Follow-up: pre-existing special worktree files are refused before opening;
+Unix FIFO prompt-rejection regression passes. Current tools git-feature library
+suite passes 109/109 and all-target Clippy passes. Broader gates remain open.
+Latest local checkpoint: checkout previous-branch shorthand regression reproduced
+and repaired by normalizing non-creating `-` to `@{-1}`. Real branch-switch and
+creating-checkout refusal tests pass; git-feature tools library suite 105/105.
+Latest local checkpoint update: Git `core.fsmonitor` false spellings now match
+host behavior (`false`, `0`, `off`, `no`, empty and numeric zero); true/nonzero
+and command-valued configurations remain refused before effects. gix integer
+suffix parsing also covers host-compatible zero forms such as `0k`; malformed
+values still fail closed. Real-host coverage and the complete git-feature suite
+pass 107/107; tools Clippy passes. The closed `git:configuration-chain`
+permission pair remains intentionally restricted to `git_add`; it is not
+evidence that commit/checkout/push/pull have been migrated.
+Previous checkpoint: execution tools restored; positional option-injection
+input checks verified. Current git-feature tools library tests pass 104/104 and
+all-target tools Clippy passes with warnings denied, using the pinned locked
+toolchain and incremental compilation disabled. Approximately 731 MiB remains;
+no additional cleanup performed. Cleanup receipt API acceptance, remaining write
+migration, full gates and publication are still outstanding.
+Previous checkpoint: absent/empty submodule checkout and ordinary-file
+replacement host-comparison tests passed; focused Git tests now 23/23.
+Previous checkpoint: native unstaged submodule OID/dirty/ignore handling added;
+real host comparison and stale .gitmodules removal regression pass, focused Git
+21/21. Missing/deinitialized checkout and type replacement remain unverified.
+Previous checkpoint: core.fileMode=false worktree fidelity repaired after
+a failing real-Git comparison; owner executable-bit handling also corrected
+after independent review and real-Git reproduction. Git focused tests now 20/20. GIT-001 corrective
+candidate documentation synchronized. Staged gitlink add/change/delete fidelity repaired;
+Git tests 18/18 and complete tools library with git feature 97/97 passed.
+Unstaged submodule state remains unverified. Real Runtime Git approval/discovery-denial/mutation-denial
+focused test passed; real MCP Git transport policy-denial/replay/retry focused
+test passed including final response-ID assertions. User-facing candidate
+boundaries are recorded in both READMEs. Git 30/30, real Agent Git scenarios 3/3 and sandbox
+42/42 passed with locked builds; affected-crate all-targets Clippy passed.
+System/global attribute paths now come from fixed admitted Git path-only queries,
+with content reads deferred to concrete continuation admission. Object namespace
+links/special entries, nonempty alternates and split-index layouts refuse before
+mutation with explicit fallback. Selected directory rules are enumerated even
+without ordinary file leaves. The current Unix implementation reuses ADR-082's
+supervisor; the earlier experimental bare-PGID cleanup remains rejected.
+Production cancellation/shutdown cannot yet wait the private per-call receipt.
+A concrete additive tool-receipt proposal is recorded in the I300 migration
+inventory and awaits a maintainer architectural decision; this is a publication
+gate. No implementation commit/PR, full preflight or final approval is claimed.
+Prepared-stage tests also passed 3/3: bounded continuation, reused identity,
+forged proof and request replay remain denied as applicable. Both governance
+validators passed with zero warnings; subsequent Agent all-targets Clippy passed.
+Earlier checkpoints below retain their historical results, not current gate closure.
+Independent incremental review found and verified a fix for blocking proof
+consumption; all 141 permission unit tests, three public API integration tests
+and one doctest passed. GitAdd now uses a one-use prepared admission with repository,
+source, program and configuration evidence. T7 and the full queue remain incomplete.
+The host installation configuration gap is now addressed by maintainer-accepted
+separately admitted configuration discovery followed by fresh mutation admission.
+The focused Git suite passed 23/23; real Agent approval, discovery denial and
+mutation denial passed 3/3. An experimental Unix cleanup was rejected by review
+for stale-PGID/runtime-lifetime risks and removed; process-tree ownership remains
+open. Independent review found premature auxiliary reads; these were
+moved behind second-stage Path Read admission with a passing regression test.
+See I300's latest checkpoint for remaining cross-platform and same-family work.
+Maintainer-authorized incremental cache cleanup recovered approximately 1.8 GiB.
+No implementation publication or release occurred.
 
 I299's original C0 claim became effective when #698 merged at `50781eab`. The
 maintainer accepted ADR-088's producer-owned, transient Todo display metadata contract;
@@ -107,8 +2189,8 @@ Synchronize product owners before derived Backlog, Board and iteration indexes.
 | Item | Current execution state | Required closure evidence |
 |---|---|---|
 | C0 preserved TUI/process candidate | Complete; I299 owner closed | #701 merge `69092675`; full preflight, all native observations, exact-head CI/review and CAS recorded in I299 |
-| T7 structured Git resources/diff | [I300](../iterations/I300-structured-git-repair.md) Active / Claimed proposed by #704, ineffective until merge; ADR-089 Accepted | Real-wrapper reproduction, cause, approved/denied/escape tests, diff fidelity, protected-boundary review and delivered repair |
-| T8 all-built-in Auto approval (added 2026-10-11) | [PERM-007-H](../backlog/active/PERM-007-H-all-builtin-auto-review.md) Refinement / Unclaimed; immediately after T7 | Complete native inventory, shared effect-aware model review, real admission/execution tests, policy reconciliation, visible decisions, independent security review and merged evidence |
+| T7 structured Git resources/diff | [I300](../iterations/I300-structured-git-repair.md) Active / Claimed after #704 merged as `55fef9f9`; ADR-089 and API amendment accepted | Real-wrapper reproduction, cause, approved/denied/escape tests, diff fidelity, protected-boundary review and delivered repair |
+| T8 all-built-in Auto approval (accepted 2026-10-11) | [PERM-007-H](../backlog/active/PERM-007-H-all-builtin-auto-review.md) Refinement / Unclaimed; immediately after T7 | Complete registered native-tool inventory, shared effect-aware model review, real admission/execution tests, policy reconciliation, visible decisions, independent security review and merged evidence |
 | T2/T3 MODEL-014 | Unactivated; consolidated implementation/test slice | Accepted authority/schema decisions, inference/override/variant/adapter tests, walkthrough, docs and merged evidence |
 | T4 compaction policy/controls | Unactivated | Whole-request policy, safe summary replacement, failure/cancellation tests, observable status, runnable manual command and integrated evidence |
 | T5 Actor compaction/recovery | Unactivated | Safe-boundary model-callable operation, bounded authoritative history recovery, discovery/concurrency/privacy tests and merged evidence |
@@ -493,3 +2575,118 @@ Known fact: the source hardening default is 2 GiB and the current model-visible 
 - Run both governance validators after governance edits and standardized locked preflight before merge. Require appropriate exact-head CI and API/privacy/permission/security review for affected slices.
 - Review staged diff, secrets and conventional commit requirements. Completion status needs existing implementation SHAs, never a status-only self-reference. No publication, tag or release is authorized.
 - Related prior checkpoint: `docs/tasks/2026-10-10-session-todo-recovery.md`. This handoff supersedes its incomplete failure diagnosis, not the product scope owners.
+
+## 2026-10-12 MCP Cleanup Verification Checkpoint
+
+T7/I300 remains Active. Shared registry connections now retain local cleanup
+receipts without closing other connections' owners; CLI stdio explicitly owns
+aggregate shutdown. Verified MCP EOF and ConnectionReset cancellation plus a
+real descendant delayed-write cancellation test with shared-owner isolation.
+Locked MCP tests: 13 library, 4 replay/transport, 1 real process test passed;
+CLI check and MCP/CLI all-target Clippy passed. See the I300 owner for remaining
+Agent/Runtime, Git commit/--all, mutation migration and full delivery gates.
+This checkpoint does not complete T7 or advance the serial queue.
+
+## 2026-10-12 Commit Execution Checkpoint
+
+Previous-branch conditional Checkout checkpoint (2026-10-14): `checkout -` now
+permits conditional configuration only when bounded native symbolic resolution
+selects an existing local branch whose captured commit matches native resolution.
+Full refs/reflog revalidation is retained, including a same-OID reflog-name drift
+test under active conditional config. Bidirectional marker switches, complete
+Checkout suite 28/28 and Clippy pass (49062), logs
+`/private/tmp/i300-previous-conditional-suite.log` and
+`/private/tmp/i300-previous-conditional-clippy.log`. Independent review found no
+concrete defect in the limited extension. New production-source preflight remains
+required; detached previous targets are not
+enabled by this change.
+
+Conditional-source protection evidence (2026-10-14): target rewrites of empty and
+populated inactive `includeIf.onbranch` destinations now have direct prepared
+regressions, preserving branch/index/source/marker on refusal and allowing an
+unchanged existing branch. Prior unconditional-source creation coverage remains.
+Focused regression and all-target Clippy pass (88038), logs
+`/private/tmp/i300-inactive-include-protection.log` and
+`/private/tmp/i300-inactive-include-clippy.log`. Production code is unchanged from
+the passing preflight checkpoint; all original T7 residuals remain open.
+
+Latest real MCP Checkout evidence (2026-10-14): the 15-case matrix adds approved
+and denied existing-local-branch switches using external conditional config
+sources. It checks current marker, retained external bytes, denial preservation
+and replay refusal. Matrix and test-target Clippy pass
+(`/private/tmp/i300-onbranch-mcp.log`, `/private/tmp/i300-onbranch-mcp-clippy.log`).
+This is additional end-to-end evidence, not T7 completion.
+
+Latest Checkout conditional-config checkpoint (2026-10-14): explicit existing local
+branch switches now support `includeIf.onbranch` with initial-config retention,
+native/captured target commit agreement and full revalidation. Real regression
+covers benign bidirectional switches, stale active config refusal preserving
+branch/index, and inactive target hooks that are refused on the following switch
+when active. Checkout suite passes 28/28 (`/private/tmp/i300-onbranch-checkout-suite.log`).
+Creating/tracking and other target forms remain refused. Git-enabled tools
+all-target Clippy passes (`/private/tmp/i300-onbranch-clippy.log`). Follow-up
+review and post-correction preflight results are recorded below; preflight 23429
+failed with sandbox EPERM (`/private/tmp/i300-onbranch-standard-preflight.log`).
+This supersedes the
+historical blanket branch-conditional refusal, not T7's original scope or gates.
+
+Follow-up security correction (2026-10-14): Git 2.54 active
+`hook.<name>.command` configuration can execute without a hook file. Parent
+configuration capture now refuses all such entries before mutation, including
+entries supplied by an active `includeIf.onbranch` source. Independent follow-up
+found no remaining concrete defect in this limited slice. Admission-before-drift
+ordering is now exercised directly. The Checkout suite still passes 28/28
+(`/private/tmp/i300-onbranch-hook-checkout.log`) and all-target Clippy passes
+(`/private/tmp/i300-onbranch-hook-clippy.log`); the prior standard preflight failed at the existing
+process-observation assertion with sandbox `EPERM`, so a post-correction
+unsandboxed preflight 72934 exited 0 with `release preflight: passed`, including
+tools 648/648 and both external SDK modes
+(`/private/tmp/i300-onbranch-hook-standard-preflight.log`). Governance and claims
+also pass with zero warnings (52109). Final delivery gates and original T7
+residuals remain open; no implementation completion SHA exists.
+
+T7 remains Active. Agent and Runtime real descendant cancellation tests passed;
+Runtime additionally proves owner admission is closed after shutdown. Following
+independent review and source-capture/revalidation fixes, prepared commit's local
+temporary refusal was removed. Real ordinary/index-only, --all/untracked,
+no-change, and configured automatic-maintenance tests pass. These are partial
+acceptance only; push/pull/checkout migration and full delivery gates remain.
+
+## Checkout Production Continuation Checkpoint
+
+Supersedes earlier notes calling checkout absent or prototype-only: checkout now
+runs through the production prepared permission route. Current/index/target filter
+checks, target ref/reflog drift checks and linked-worktree metadata authorization
+are integrated. Same-path nonrecursive gitlinks preserve dirty child worktrees,
+declare child index refresh writes, and refuse configured child fsmonitor before
+mutation. Git library tests passed 164/164 and Git-enabled all-target Clippy
+passed. Added/removed/type-changing gitlinks and recursive checkout remain
+explicit unsupported cases; push/pull still use their old route and require
+migration. Full final-candidate preflight, review and publication remain pending.
+No T7 completion or advancement of the remaining serial queue is claimed.
+
+Latest continuation supersedes the blanket gitlink-add/remove limitation above:
+missing-path additions and nonrecursive removals now pass real acceptance while
+preserving dirty child contents. File/directory transitions and conflicting edits
+are covered; real MCP checkout denial/success/replay/cleanup acceptance was added.
+Independent checkout review found target-created hooks and target-rewritten
+configuration sources. These are now checked before mutation, including aliases,
+empty/missing include destinations and system/global/local/worktree config paths.
+Branch-conditional includes remain explicit unsupported configuration. Gitlink
+existing-path additions/type transitions, recursive checkout, push/pull migration,
+final validation and publication remain pending. See the latest I300 owner entry;
+this is concrete partial implementation, not T7 or whole-queue completion.
+
+Push continuation: production preparation now uses independently admitted config
+discovery and resolved-destination continuation facets with owned cleanup. Direct
+execution and stale discovery proofs refuse. Mutation remains explicitly closed
+while transport effect implementation/review is pending; restore supported push
+before delivery. Pull now fails closed before the old route and remains without
+prepared support. Latest tools library verification passes 173 tests. This does
+not complete T7 or any subsequent serial deliverable.
+
+Push review continuation: corrected URL rewrite tie order against real Git and
+added pre-push/reference hook paths plus signing/recursive/custom-transport helper
+checks. Latest tools library tests pass 176/176; all-target Clippy passes. Push
+transport remains disabled pending complete effects implementation and review;
+Pull migration and all later serial deliverables remain open.

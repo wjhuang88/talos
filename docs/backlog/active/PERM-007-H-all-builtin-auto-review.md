@@ -15,6 +15,10 @@ Auto mode evaluates built-in tool requests consistently by their actual effects,
 user intent and bound resources. Do not force an otherwise assessable operation
 to manual approval solely because its tool name is absent from a shell-specific
 allowlist. This is an implementation requirement, not only an inventory task.
+The maintainer accepted this full native-tool scope. An operation requiring a
+human-only boundary remains visible in the inventory with its precise reason;
+the acceptance does not authorize a model to override explicit Deny, an
+unenforceable effect boundary, or a hard safety constraint.
 
 ## Current Evidence
 
@@ -52,6 +56,10 @@ registration and all approval entrypoints before final design.
   allow/deny/uncertain/error/cancel/stale-evidence tests, across applicable hosts.
   Include representative non-shell operations and a coverage check detecting new
   built-ins that lack a declared/tested disposition.
+- Treat coverage as a registry-level invariant, including feature-gated production
+  registrations: a newly registered built-in without review evidence/disposition
+  must fail the coverage check, not silently fall back to a shell-only allowlist.
+  Existing policy-allowed read-only calls must remain free of extra model latency.
 - Update Auto user documentation and tool behavior/migration notes; independent
   permission/security/API review and normal exact-head gates remain mandatory.
 

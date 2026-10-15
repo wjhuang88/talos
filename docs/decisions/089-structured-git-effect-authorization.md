@@ -99,6 +99,225 @@ implementation; source-breaking changes are next pre-1.0 minor only. This contra
 does not permit dropping ordinary Git functionality simply to make tests pass.
 Unsupported configurations must have an explicit explanation and tracked residual.
 
+## Accepted API Amendment (2026-10-11)
+
+The maintainer accepted this additive API contract on 2026-10-11. Independent
+source review found that `ToolExecutionAuthorization` only carries exact Path
+authorizations. `PermissionEngine::execution_authorizations` skips Command and
+Remote facets; `AgentTool::permission_profile` is recomputed separately from
+dispatch. Thus a successful permission decision cannot attest the selected Git
+operation, worktree, actual index, configured programs or effective environment.
+Representing a source file as a Write(Path) would be false: `git add` reads that
+file and writes Git metadata. The browser-only `PreparedToolInvocation` uses a
+separate resolver and cannot be reused unchanged without bypassing normal policy.
+
+Additive, pre-1.0 API contract:
+
+1. Add an optional normal-tool preparation hook to `AgentTool`, defaulting to the
+   existing execution path. A Git tool prepares one immutable, non-serializable
+   semantic plan before permission evaluation: exact operation and normalized
+   input, selected literal entries/subtrees, canonical worktree/gitdir/index,
+   effective Git environment/configuration and programs that may execute. Its
+   reviewable facets distinguish source reads, Git metadata writes, command
+   execution and any remote/network effects. Unknown effects fail preparation.
+2. Pass that same plan's facets and invocation identity through the existing
+   `PermissionPipeline` and `PermissionSessionState` decision/admission path.
+   Deny, explicit-Ask, configured policy, approval lifetime and Auto rules keep
+   their existing precedence. Admission produces a non-clone, one-use capability
+   bound to tool, normalized input and plan identity; no persistent grant schema
+   or generic workspace authority is added. All facets must be admitted together.
+3. Immediately before dispatch, consume the capability and revalidate repository,
+   worktree, actual index, effective config/environment and selected path-entry
+   identities against the reviewed plan. A mismatch fails before mutation. This
+   is an application-level TOCTOU reduction, **not** OS-enforced containment or
+   a claim that external Git helpers cannot have additional effects. Unsupported
+   configured behavior must fail with an actionable reason rather than silently
+   disabling hooks/filters or running them under file-only approval.
+4. Keep `AgentTool::execute` and `execute_authorized_with_output` source-compatible
+   for existing tools and callers. Git mutation tools require the new one-shot
+   route and fail closed through direct/unmigrated wrappers. Migrate Agent,
+   Runtime, CLI/TUI and MCP permission-aware composition roots before enabling
+   Git writes; browser's raw-argument prepared route remains isolated. Update
+   the public API migration reference, tests and downstream examples. A future
+   breaking removal of legacy methods requires its own decision and version.
+
+Before implementation, verify the exact list of wrappers and whether Git's
+configured helpers can be represented and enforced without a broader process
+authority. If not, narrow the supported configuration explicitly and return to
+the maintainer; acceptance is not a security waiver or permission to run an
+unrepresentable helper.
+
+## Configured-Helper Boundary Accepted (2026-10-11)
+
+The maintainer accepted a bounded fallback for configurations whose hooks,
+filters, signing programs or transport helpers cannot be represented and
+enforced by the reviewed plan: the built-in Git mutation refuses **before**
+mutation and explains the unsupported configured effect. It may point to a
+separately authorized shell Git invocation; it must not execute that fallback
+itself or treat model approval as authority to bypass the refusal. Ordinary
+configurations remain in scope and must not be disabled wholesale. Tests must
+cover both the supported path and pre-mutation refusal.
+
+## Separately Admitted Discovery Accepted (2026-10-12)
+
+The maintainer accepted a separately authorized read-only host Git configuration
+discovery stage, followed by preparation and normal admission of the mutation.
+Native gix omits installation configuration by default; enabling its installation
+discovery would execute host Git before admission. An arbitrary installation's
+compiled configuration prefix cannot reliably be inferred from the executable.
+
+Discovery must bind the normalized request, provenance, repository, environment
+and executable to its own one-use identity and Execute/Read facets. It runs only
+bounded read-only inspection commands after normal permission and hook gates.
+Its result remains internal and must not expose credential-bearing configuration.
+Configuration origins and selected effects discovered there form a new immutable
+mutation plan with a fresh identity and complete facets. Every continuation must
+pass the normal permission pipeline and final hook again; a discovery proof is
+never mutation authority. Denial, cancellation, stale evidence and replay fail
+closed. A bounded stage count prevents unbounded approval or execution loops.
+Direct and unmigrated wrappers remain denied. Agent, Runtime and standalone MCP
+must implement the same sequence before Git writes can be published.
+
+The maintainer additionally accepted the closed configuration-chain discovery
+capability on 2026-10-12: it covers the system/global/include files Git normally
+parses, including origins not known until inspection finishes. This is represented
+as Read(Remote `git:configuration-chain`) together with the bound executable's
+Execute facet, never as repository Read or a filesystem-root grant. `Remote` here
+is the existing opaque named-resource carrier, not a network destination. Only
+the immutable discovery stage may consume that capability for the fixed config
+inspection command and fixed `git var GIT_ATTR_SYSTEM` / `GIT_ATTR_GLOBAL`
+path-only queries; generic file tools cannot consume it as Path authority.
+The latter report installation/global attribute paths without reading their contents.
+Checkout discovery also uses fixed `git var GIT_CONFIG_SYSTEM` and
+`GIT_CONFIG_GLOBAL` path-only queries under this configuration-chain capability.
+They identify configuration entrypoints even when files are empty or absent and
+therefore contribute no `--show-origin` values. Their contents still require fresh
+continuation Path Read admission. Include declarations likewise contribute their
+origin-relative destination paths, including empty/missing destinations. This
+prevents checkout from introducing configuration that a later Git child reloads
+without that source appearing in the reviewed plan. Branch-conditional includes
+permit explicit existing-local-branch switches and `-` resolving to an existing
+local branch under retained initial configuration and ref/commit/reflog binding.
+Creating/tracking or other target forms still refuse
+pending target-chain discovery; no new configuration-read authority is inferred.
+Discovered paths become concrete continuation Read facets; discovery does not
+authorize attribute-file contents. An installation lacking these queries refuses
+with an explicit separately authorized fallback rather than guessing its prefix.
+Configuration values and host inspection diagnostics remain internal. The fresh
+mutation plan enumerates discovered origin files as individual Read facets.
+
+## Unix Process Ownership Implementation
+
+### Target-branch configuration through ordinary Path admission (2026-10-14)
+
+Creating/tracking branches can clear Git's repository configuration cache before
+HEAD switches; Git 2.54 `format_tracking_info` subsequently reloads configuration
+through `status.comparebranches`. Source-cached hook selection does not prove
+that target-only includes are unread. Native malformed-target fixtures confirm
+that `branch.autoSetupMerge=always/inherit` can fail reading the new branch's
+include after HEAD has already changed.
+
+Use existing exact Path Read admission for predicted target configuration rather
+than expanding `git:configuration-chain`. The initial native stage retains its
+accepted current-configuration scope. Target discovery computes a path frontier
+without opening, statting or resolving new destinations; each frontier is admitted
+through the ordinary pipeline before Rust reads or parses those exact files.
+Root files, missing destinations, environment-derived file inputs and hasconfig
+lookahead files need the same evidence. Pure in-memory environment entries remain
+bound to the frozen invocation environment. Symlink/realpath dependencies require
+their own admission; no new filesystem authority is inferred from a path string.
+
+Retain the normalized request, source HEAD, start refs, repository layout,
+configuration bytes and identities across all frontiers. Changed evidence
+invalidates the plan. Parse in memory, preserving value order, implicit versus
+empty values, conditional matching, repeated include occurrences, Git's depth
+rules and hasconfig URL lookahead/prohibition. Do not mutate HEAD/config or create
+a temporary repository projection to discover the target chain. Do not use gix
+automatic include I/O: it has no admission callback or cumulative byte bound and
+documents include-order and hasconfig deviations. Reuse only pure parsing where
+parity is verified; keep configuration values and parse diagnostics internal.
+
+The completed target chain and actual source/target cache partition must inform
+tracking configuration writes and all subsequent read/write/execute effects.
+Generate fresh concrete facets, obtain final admission, revalidate, then execute
+the original Git arguments without forcing tracking off. The unchanged eight-stage
+and existing snapshot budgets still apply; exhaustion refuses before mutation.
+This records the reviewed implementation route using existing permission types,
+not new authorization or a claim that target-chain execution is delivered.
+
+### Proposed target configuration link metadata capability (2026-10-15)
+
+Status: Proposed; not accepted or enabled. Independent review confirms exact
+Path tokens canonicalize aliases and therefore do not independently authorize
+reading the alias entry itself. The fixed-command `git:configuration-chain`
+capability does not authorize Rust link traversal in the target continuation.
+
+Propose Read(Remote `git:configuration-link-metadata`) for structured Checkout
+target configuration discovery only. Its immutable scope is the initial config
+entrypoints and include destinations derived from already admitted config bytes,
+plus component/link targets discovered from that same chain. It permits only
+`symlink_metadata` and `read_link` needed to resolve those paths, not directory
+enumeration, file contents, writes or program execution. It is not consumable by
+generic file tools. Every referent file and required directory dependency still
+requires fresh concrete Path Read admission before content capture.
+
+Retain raw origin spellings (Git resolves relative includes against the spelled
+origin), link text and identities, and actual component traversal order including
+`..`. Do not reuse `PathIdentity::capture` under this capability: its implicit
+`canonicalize/metadata` operations exceed the listed operations. Capture link
+and component identity directly from admitted `symlink_metadata` results;
+ordinary Path Read evidence remains a separate authorization boundary.
+Bound discovery to 64 link hops per complete source resolution, without resetting
+the count at component or continuation boundaries. Apply the existing cumulative
+4096-path/4-MiB budgets to paths, link text and identity evidence across the whole
+discovery; cycles or exhaustion refuse. Revalidate
+directories and links before referent bytes, and protect aliases, cancelled
+ancestors, link hops and referents from Checkout replacement/deletion. Missing
+entries remain bound absence evidence. Identity checks reduce substitution risk
+but are not race-free directory-handle confinement. Final mutation needs a fresh
+plan and proof; discovery authority cannot authorize writes.
+
+Maintainer acceptance and authorization/denial/drift tests are required before
+the compiler or production continuation accepts this capability.
+
+Independent boundary review confirmed the ordinary-directory route (including
+`..`, excluding symlink metadata traversal) needs no new named capability:
+each file read obtains normal Path Read permission. Required implementation gates
+include ordered/parser native parity, nested conditional and hasconfig cases,
+denied frontier preserving all repository state, approval-between-stage drift,
+budgets, final effects, real prepared Agent/Runtime/MCP execution, and independent
+security review. Full support remains outstanding until those gates pass.
+
+### Foreground maintenance accepted (2026-10-12)
+
+The maintainer accepted explicit `maintenance.autoDetach=false` and
+`gc.autoDetach=false` overrides in structured Git invocations. Maintenance work
+remains enabled according to its normal configuration and thresholds, but runs
+in the foreground under the invocation's lifetime and deadline. The execution
+facet and user-facing documentation must disclose this scheduling difference.
+This does not authorize disabling hooks, signing, filters or maintenance work.
+The admitted discovery stage also uses the fixed path-only `git --exec-path`
+query for commit maintenance. It does not read child executable contents under
+configuration-chain authority: the reported child path becomes concrete Read
+and Execute facets for fresh continuation admission. The current candidate
+requires that path to resolve to the already-bound Git binary; other layouts
+need separately reviewed evidence rather than a guessed PATH fallback.
+
+Independent review of Git 2.54.0 found that ordinary commit invokes automatic
+maintenance by default, and its detached path can escape the owned process
+group. The overrides prevent that specific detach path; they do not by themselves
+prove ownership of arbitrary configured helpers. Helper effects, executable
+resolution, cancellation and shutdown still need their required verification.
+Source evidence: `run-command.c:prepare_auto_maintenance` and
+`builtin/gc.c:maintenance_run_tasks` at Git tag v2.54.0.
+
+Reuse ADR-082's existing sandbox supervisor for Git's admitted host execution.
+Its standard-library Child remains unreaped until the last group signal, avoiding
+stale PGID reuse. Add a bounded-output entrypoint rather than introducing another
+supervisor or dependency. The helper executes only an already-admitted command;
+it supplies lifecycle ownership, not permission admission or OS containment.
+Cleanup failure must remain an error, including during cancellation or runtime teardown.
+
 ## Verification
 
 Production Agent admission/Runtime composition must reproduce the reported failure
@@ -122,3 +341,162 @@ remain required. Revert the bounded repair if approval/effect binding regresses.
 - [ADR-026](026-multi-resource-tool-permissions.md)
 - [ADR-047](047-external-path-tool-authorization.md)
 - [Handoff T7](../tasks/2026-10-10-session-todo-handoff.md)
+
+## Accepted Cleanup Lifecycle Amendment (2026-10-12 continuation)
+
+The maintainer accepted the reviewed cleanup receipt contract after the detailed
+decision explanation. This authorizes additive core interfaces and integration
+through Git, Agent, Runtime and MCP; it grants no execution/file/network authority.
+Owner admission sealing is separate from invocation-local waiting. Shutdown must
+retain replaced owners, stop new admissions and continuations, cancel/join actual
+execution, and await cleanup within one shared deadline. Single-call cancellation
+must not wait for unrelated calls. Failure remains sticky; timeout/cancellation
+never implies transaction rollback or automatic mutation retry.
+
+Migration defaults preserve existing tool implementors. Embedders using managed
+Git commands must retain receipts and keep the async runtime alive through bounded
+shutdown. Non-Unix parity is unproven and must not be inferred. Full acceptance and
+remaining implementation are owned by the
+[migration inventory](../reference/I300-GIT-AUTHORIZATION-MIGRATION.md).
+
+## Early Trace Output Contract (2026-10-13)
+
+Independent review reproduced system/global `trace2.*Target` creating output
+before `git config` discovery returns. The local candidate sets `GIT_TRACE2=0`,
+`GIT_TRACE2_EVENT=0` and `GIT_TRACE2_PERF=0` in structured child environments,
+inherited by descendants. Parent environment and configuration files are unchanged;
+configuration values remain discoverable internally. Caller-provided GIT_*
+overrides continue to refuse before this injection. Trace-required execution
+needs a separately authorized invocation with its output effects represented.
+
+The maintainer explicitly accepted this diagnostic-output exception on
+2026-10-13. Publication still requires fresh candidate validation and independent
+review. A production-runner fixture exercises isolated global config
+with all three file targets and a Unix stream socket target; all remain untouched.
+The command facet discloses suppression. 189 tools tests and Git-enabled Clippy
+passed; independent read-only review accepted both this code boundary and the
+legacy-remote revalidation correction. Acceptance does not establish I300 completion.
+
+## Receiver Reference Read Scope (accepted contract, 2026-10-13)
+
+Receiver configuration can depend on the current branch, so retaining only the
+HEAD file is insufficient when HEAD follows a symbolic reference. Before the
+receiver common stage reads reference content, its new permission profile names
+the shared and per-worktree `refs` directories as distinct Path Read facets and
+names `packed-refs` as an exact file Read facet. Independent review found that
+those exact directory authorizations alone cannot authorize recursive reads.
+The revised candidate therefore adds the closed Read(Remote
+`git:receiver-reference-tree`) facet, compilable only for a `git_push` request
+with an absolute `refs` Path Read facet. The compiler does not itself prove that
+the request is prepared or that the named root belongs to a receiver; the
+one-use prepared proof and each stage's exact receiver-root checks do that. Its
+one-use invocation proof, together with the separately checked exact roots,
+covers bounded descendant inspection (65,536 entries and 16 MiB of reference
+file content combined across receiver and sibling roots per evidence pass).
+This is not a total process-memory or cumulative revalidation-I/O limit;
+path names and tree bookkeeping are outside the file-content byte count.
+It is not a generic subpath capability:
+`ToolExecutionAuthorization::authorizes_path` still matches only exact paths;
+other tool names cannot compile this closed facet. The maintainer explicitly
+accepted this bounded, dedicated scope on 2026-10-13. Independent implementation
+review and complete receiver effect binding remain required before mutation is enabled.
+Stable directory symlink redirection and nonregular entries refuse; path checks are not a race-free
+filesystem handle. The initial candidate refused final receiver mutation;
+the execution checkpoint below records subsequent local implementation progress.
+
+## Pull Repository Metadata Effects (accepted contract, 2026-10-13)
+
+Status: accepted by the maintainer in the handoff continuation; authorized as a
+dedicated contract, but not enabled until the implementation, review and real
+Agent/MCP evidence below are complete. Owner: I300 Pull continuation.
+The accepted receiver capabilities below remain git_push-only and cannot be
+reused by git_pull. Exact Path permissions cannot represent object names,
+temporary files and maintenance outputs that fetch creates dynamically.
+
+The proposed closed Remote resource `git:pull-repository-metadata` supports
+Read and Write only for prepared git_pull stages. Compilation requires exact
+absolute Path roots of matching nature and the absolute bound Git Command.
+The executor additionally verifies that these are this invocation's retained,
+identity-bound gitdir/common roots, checks each root's exact authorization and
+consumes the immutable stage proof before using the closed capability. No
+generic authorizes_path behavior or other tool's grants change.
+
+Read covers the Git metadata used by this Pull's graph/ref/reflog inspection and
+fetch/integration, including objects, refs, packed-refs, HEAD, FETCH_HEAD,
+shallow, grafts and commit-graph metadata under the individually approved roots.
+Write covers this Pull's objects, refs, reflogs, FETCH_HEAD, shallow metadata,
+locks, temporary/quarantine files and accepted foreground maintenance outputs
+under those roots. A separately admitted integration Write stage also covers
+index/index.lock, ORIG_HEAD, MERGE_HEAD/MERGE_MSG/MERGE_MODE/AUTO_MERGE,
+REBASE_HEAD, rebase-merge/rebase-apply state, autostash objects and refs/stash
+with their logs, and repository-local branch-tracking configuration updates
+when required by the actual operation. External configuration files remain
+excluded. Fetch admission cannot authorize this later integration stage: its
+new immutable plan binds the actual merge/rebase/autostash effects and targets.
+Read and Write are separately admitted; discovery Read never
+implies fetch Write. This is directory-scoped metadata authority, not an exact
+file list or a total I/O limit. Existing invocation deadlines, process/output
+budgets and bounded explicit evidence remain applicable.
+
+The capability excludes worktree files, external alternate object stores,
+redirected metadata, additional sibling worktree roots, hooks, filters, remote
+helpers, credentials and arbitrary programs. Such paths/executables/effects
+require separate fresh facets and admission. Configuration-chain discovery
+remains separately authorized; this capability cannot grant general system or
+global configuration reads. Stable symlink and nonregular metadata redirection
+must refuse; path identity/evidence checks reduce TOCTOU and are not confinement.
+
+The proposed lifecycle is configuration discovery, newly admitted metadata
+graph Read, prefetch evidence/transport-effect discovery, separately admitted
+fetch Write, then a fresh integration plan binding post-fetch FETCH_HEAD and
+target worktree effects. Any further discovered scope requires ordinary fresh
+admission within the unchanged core stage budget. No mutation precedes its
+effect plan; partial fetch/integration failure is terminal and reports possible
+effects, never automatic retry or rollback. Cancellation retains the same owned
+execution/cleanup lifecycle across every continuation.
+
+Before activation: maintainer acceptance, independent security/API review,
+compiler rejection tests for wrong tools/missing roots/missing command/nature
+mismatch, real Agent/MCP approved and denied metadata stages, stale-root and
+escape tests, native Pull parity, failure/cancellation checks and all I300 gates.
+Acceptance alone does not enable fetch or claim Pull delivery. The implementation
+must replace the layer-by-layer production inventory with admitted bounded
+evidence under this dedicated scope rather than retain two contradictory modes.
+
+## Receiver Metadata Effects (accepted contract, 2026-10-13)
+
+The maintainer accepted a dedicated git_push-only receiver metadata Read/Write
+capability. The closed Remote resource `git:receiver-metadata` accompanies
+separately admitted, identity-bound receiver gitdir/common Path roots and the
+fixed executable plan. It covers objects, refs, reflogs, locks, quarantine and
+maintenance metadata under those roots for this invocation and accepted
+foreground maintenance. It does not authorize worktree mutation, external
+alternate stores, hooks, arbitrary programs or effects outside admitted roots.
+External reads/writes and program execution remain independently admitted.
+
+The compiler requires git_push, a bound absolute Command facet and an absolute
+Path facet of the matching Read/Write nature. This syntactic eligibility is not
+proof of receiver ownership: the one-use prepared identity and runtime receiver
+root/evidence checks must establish that. Exact Path authorization remains exact
+for other consumers. The prior reference-tree discovery budget remains in force;
+this capability does not retroactively widen discovery or its limits. No new
+public resource enum or generic recursive file permission is introduced.
+
+Implementation and review must bind executable/environment/maintenance effects,
+refuse unrepresented configurations before mutation, and test denial, replay,
+layout changes, actual receiver updates and cancellation before enabling writes.
+Contract acceptance alone does not complete I300 or authorize an incomplete
+receiver execution plan.
+
+Local implementation checkpoint (2026-10-13): eight admitted stages now reach
+actual local/file receiver mutation in the candidate. Retained receiver storage
+and configuration evidence is checked again immediately before spawn. Supported
+shell spelling is `/bin/sh`, with macOS `/bin/sh` or Linux dash/bash canonical
+paths; retained executable evidence and system installation trust underpin this
+baseline, not a cryptographic assertion of shell implementation. Other shells
+and startup overrides refuse pending their own represented effects. Storage
+inspection includes rr-cache, MERGE_RR and its lock for foreground rerere cleanup.
+Real prepared tests cover four receiver layouts; MCP covers success, denial and
+replay. Independent namespace/shell review found no new definite omission, but
+cancellation, partial effects and complete security/publication gates remain
+open. No cross-platform or complete I300 delivery claim follows from these tests.
