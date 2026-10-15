@@ -1025,3 +1025,11 @@ unsafe block count is unchanged; this is source evidence, not compiled-binary eq
 native cleanup execution. No new local workspace/native pass is claimed. Fresh stable-head
 protected diagnostic review and native full CI remain necessary. Proposal is not scope approval;
 Cargo feature unification must be verified before any test-only feature-isolation claim.
+
+2026-10-15 adjacent diagnostic: #718 / ADR-091 / TEST-003 / I302 claim is effective via
+f4313237. Current main9b7ba281 and original7165c49a8bd are combined before reconstructed
+I302 diagnostic publication. Unpublished d1d818e2 was lost in workspace maintenance; its local
+receipts are historical, not current evidence. Cold40/+2 and CI3175-3178 failures remain;
+3178 known cleanup BOOLs succeeded without resolving73->76. Three owned workers qualify
+bounded types/observer/cleanup evidence, not a production fix or716 merge. Fresh review/full
+native CI pending;643/624 open, D/activation/rollback gates unchanged,705/721 independent.

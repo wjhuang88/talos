@@ -7,10 +7,11 @@ is an Active/Claimed atomic proposal for #719 under ADR-092 in #720; ineffective
 No implementation yet; non-overlapping with I293/I294/I300/I301/I302.
 
 [I302](I302-windows-owned-handle-evidence.md) / [TEST-003](../backlog/active/TEST-003-windows-owned-handle-evidence.md)
-is an Active/Claimed atomic proposal in #718 after maintainer scope acceptance on2026-10-14.
-ADR-091/claim are ineffective until #718 main merge; no PSS implementation yet.
+is Review/Claimed for recovered bounded diagnostic candidate #716 from current main.
+#718 merged f4313237 / ADR-091 effective; fresh review/native CI pending, original failure retained.
 I293/I294/I300 remain Active; I301/I277 retain Review, I249 Planned and I164 Paused.
-I302 records the full inventory/non-overlap; #716 may later carry separate diagnostic commits.
+I302 records the full inventory/non-overlap and workspace-recovery receipts; separate I302 commits
+in #716 do not close original defects or authorize Search activation/merge.
 
 [I293](I293-search-router.md) retains SEARCH-001-C ownership. The maintainer accepted bounded
 production endpoint-authority/search wiring on 2026-10-13; [ADR-090](../decisions/090-invocation-bound-search-endpoint-authority.md)

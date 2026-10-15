@@ -829,6 +829,9 @@ fn quote_windows_arg(value: &str) -> String {
 }
 
 #[cfg(all(test, windows))]
+mod handle_snapshot;
+
+#[cfg(all(test, windows))]
 mod windows_tests {
     use super::*;
     use std::collections::BTreeMap;
@@ -1043,7 +1046,7 @@ mod windows_tests {
             .terminate()
             .await
             .expect("Job Object termination succeeds");
-        let _ = tokio::time::timeout(Duration::from_secs(10), async {
+        tokio::time::timeout(Duration::from_secs(10), async {
             while let Some(event) = events.recv().await {
                 if matches!(event, BackgroundProcessEvent::Exited(_)) {
                     break;
@@ -1206,100 +1209,103 @@ mod windows_tests {
     async fn windows_partial_setup_failures_release_every_parent_handle() {
         const TEST: &str = "process_boundary::windows_tests::windows_partial_setup_failures_release_every_parent_handle";
         const CHILD_RECEIPT: &str = "TALOS_WINDOWS_HANDLE_COUNT_RECEIPT";
+        const MODE: &str = "TALOS_WINDOWS_HANDLE_SNAPSHOT_MODE";
         let Some(receipt) = std::env::var_os(CHILD_RECEIPT) else {
             // GetProcessHandleCount covers the whole process. Other concurrently running
             // tests must not change this fixture's baseline or final sample.
-            let directory = tempfile::Builder::new()
-                .prefix("talos-handle-count-")
-                .tempdir()
-                .expect("owned receipt directory");
-            let receipt = directory.path().join("receipt.json");
-            let mut environment = BTreeMap::new();
-            environment.insert(
-                CHILD_RECEIPT.to_owned(),
-                receipt.to_str().expect("receipt path").to_owned(),
-            );
-            // The outer Job also owns descendants created before the inner fault
-            // reaches assignment. Its last control drop kills the whole tree.
-            let launcher = WindowsBackgroundLauncher::new(
-                std::env::current_exe()
-                    .expect("test executable")
-                    .into_os_string()
-                    .into_string()
-                    .expect("test executable path"),
-                ["--exact", TEST, "--test-threads=1", "--nocapture"]
-                    .map(str::to_owned)
-                    .to_vec(),
-                std::env::current_dir().expect("test working directory"),
-                environment,
-            );
-            let launched = Box::new(launcher)
-                .launch()
-                .await
-                .expect("owned exact-test child");
-            let control = launched.control;
-            let mut events = launched.events;
-            let mut output = Vec::new();
-            let mut overflow = false;
-            let result = tokio::time::timeout(Duration::from_secs(60), async {
-                while let Some(event) = events.recv().await {
-                    match event {
-                        BackgroundProcessEvent::Output(chunk) => {
-                            let remaining = 16_384 - output.len();
-                            overflow |= chunk.bytes.len() > remaining;
-                            // Retention is bounded; keep draining after the cap.
-                            output.extend_from_slice(
-                                &chunk.bytes[..chunk.bytes.len().min(remaining)],
-                            );
-                        }
-                        BackgroundProcessEvent::Exited(exit) => return Ok(exit.success),
-                        BackgroundProcessEvent::SupervisionFailed(error) => return Err(error),
+            let mut outcomes = Vec::new();
+            let mut controls = Vec::new();
+            // Cold, observer, native cleanup fixtures: separate owned processes. Retain
+            // original failure, but attempt all workers before asserting any outcome.
+            for mode in [0u8, 1, 2] {
+                let directory = tempfile::Builder::new()
+                    .prefix("talos-handle-count-")
+                    .tempdir()
+                    .expect("owned receipt directory");
+                let receipt = directory.path().join("receipt.json");
+                let mut environment = BTreeMap::new();
+                environment.insert(
+                    CHILD_RECEIPT.to_owned(),
+                    receipt.to_str().expect("receipt path").to_owned(),
+                );
+                // Explicit zero prevents an inherited observer marker warming the cold child.
+                environment.insert(MODE.to_owned(), mode.to_string());
+                // The intentional caught-panic fixture must not inherit an unbounded
+                // backtrace setting; no process-global environment mutation is used.
+                environment.insert("RUST_BACKTRACE".to_owned(), "0".to_owned());
+                // The outer Job also owns descendants created before the inner fault
+                // reaches assignment. Its last control drop kills the whole tree.
+                let launcher = WindowsBackgroundLauncher::new(
+                    std::env::current_exe()
+                        .expect("test executable")
+                        .into_os_string()
+                        .into_string()
+                        .expect("test executable path"),
+                    ["--exact", TEST, "--test-threads=1", "--nocapture"]
+                        .map(str::to_owned)
+                        .to_vec(),
+                    std::env::current_dir().expect("test working directory"),
+                    environment,
+                );
+                let launched = match Box::new(launcher).launch().await {
+                    Ok(launched) => launched,
+                    Err(error) => {
+                        outcomes.push((mode, Err(format!("launch failed: {error}"))));
+                        continue;
                     }
-                }
-                Err("handle child ended without Exited".to_owned())
-            })
-            .await;
-            if !matches!(&result, Ok(Ok(true))) || overflow {
-                let cleanup = control.force_terminate().await;
-                let terminal = matches!(&result, Ok(Ok(_)))
-                    || tokio::time::timeout(Duration::from_secs(10), async {
-                        while let Some(event) = events.recv().await {
-                            if matches!(event, BackgroundProcessEvent::Exited(_)) {
-                                return true;
+                };
+                let control = launched.control;
+                let mut events = launched.events;
+                let mut output = Vec::new();
+                let mut overflow = false;
+                let result = tokio::time::timeout(Duration::from_secs(60), async {
+                    while let Some(event) = events.recv().await {
+                        match event {
+                            BackgroundProcessEvent::Output(chunk) => {
+                                let remaining = 16_384 - output.len();
+                                overflow |= chunk.bytes.len() > remaining;
+                                // Retention is bounded; keep draining after the cap.
+                                output.extend_from_slice(
+                                    &chunk.bytes[..chunk.bytes.len().min(remaining)],
+                                );
                             }
+                            BackgroundProcessEvent::Exited(exit) => return Ok(exit.success),
+                            BackgroundProcessEvent::SupervisionFailed(error) => return Err(error),
                         }
-                        false
-                    })
-                    .await
-                    .unwrap_or(false);
-                eprintln!("handle fixture cleanup={cleanup:?} terminal={terminal}");
+                    }
+                    Err("handle child ended without Exited".to_owned())
+                })
+                .await;
+                if !matches!(&result, Ok(Ok(true))) || overflow {
+                    let cleanup = control.force_terminate().await;
+                    let terminal = matches!(&result, Ok(Ok(_)))
+                        || tokio::time::timeout(Duration::from_secs(10), async {
+                            while let Some(event) = events.recv().await {
+                                if matches!(event, BackgroundProcessEvent::Exited(_)) {
+                                    return true;
+                                }
+                            }
+                            false
+                        })
+                        .await
+                        .unwrap_or(false);
+                    eprintln!("handle fixture cleanup={cleanup:?} terminal={terminal}");
+                }
+                eprintln!("{}", String::from_utf8_lossy(&output));
+                let validation = if matches!(result, Ok(Ok(true))) && !overflow {
+                    validate_handle_receipt(&receipt, mode)
+                } else {
+                    Err(format!("exit={result:?}; overflow={overflow}"))
+                };
+                outcomes.push((mode, validation));
+                controls.push(control); // retain Jobs through every worker/receipt check
             }
-            eprintln!("{}", String::from_utf8_lossy(&output));
-            assert!(
-                matches!(result, Ok(Ok(true))) && !overflow,
-                "isolated handle fixture failed: {result:?}; output overflow={overflow}"
-            );
-            assert!(
-                std::fs::metadata(&receipt).expect("receipt metadata").len() <= 1024,
-                "receipt byte bound"
-            );
-            let data: serde_json::Value = serde_json::from_slice(
-                &std::fs::read(receipt).expect("completed child receipt, not zero selected tests"),
-            )
-            .expect("receipt JSON");
-            let child_pid = u32::try_from(data["child_pid"].as_u64().expect("child PID"))
-                .expect("u32 child PID");
-            assert_ne!(child_pid, 0);
-            assert_ne!(child_pid, std::process::id(), "different process");
-            assert_eq!(data["attempts"].as_u64(), Some(40));
-            let before =
-                u32::try_from(data["before"].as_u64().expect("before count")).expect("u32 count");
-            let after =
-                u32::try_from(data["after"].as_u64().expect("after count")).expect("u32 count");
-            assert!(
-                after <= before.saturating_add(2),
-                "receipt leaked handles: before={before}, after={after}"
-            );
+            eprintln!("handle worker outcomes={outcomes:?}");
+            assert_eq!(outcomes.len(), 3);
+            for (mode, result) in outcomes {
+                assert!(result.is_ok(), "handle worker mode={mode}: {result:?}");
+            }
+            drop(controls);
             return;
         };
         assert_eq!(
@@ -1333,7 +1339,38 @@ mod windows_tests {
                     .as_path()
             )
         );
+        let mode = match std::env::var_os(MODE) {
+            None => 0,
+            Some(value) if value == "0" => 0,
+            Some(value) if value == "1" => 1,
+            Some(value) if value == "2" => 2,
+            Some(_) => panic!("invalid owned handle worker mode"),
+        };
+        if mode == 2 {
+            handle_snapshot::native_fixtures(); // exactly four captures in its own Job
+            std::fs::write(
+                receipt,
+                serde_json::to_vec(&serde_json::json!({
+                    "child_pid":std::process::id(),"snapshots":4,"native_checks":true
+                }))
+                .expect("native fixture JSON"),
+            )
+            .expect("native fixture receipt");
+            return;
+        }
         let launcher = powershell("Start-Sleep -Seconds 30");
+        let mut phases = Vec::new();
+        let mut observer_counts = Vec::new();
+        if mode == 1 {
+            for phase in ["baseline", "observer_control"] {
+                let before = current_process_handle_count();
+                phases.push((
+                    phase,
+                    handle_snapshot::capture().expect("checked self snapshot"),
+                ));
+                observer_counts.push((phase, before, current_process_handle_count()));
+            }
+        }
         let before = current_process_handle_count();
         // Fixed storage and read-only counts keep diagnostics out of the sampled work.
         // Index 0 is the baseline; each group of eight follows the fault order below.
@@ -1371,6 +1408,14 @@ mod windows_tests {
                 );
                 attempts += 1;
                 counts[attempts] = current_process_handle_count();
+                if mode == 1 && attempts == 1 {
+                    let before = current_process_handle_count();
+                    phases.push((
+                        "first_pipe",
+                        handle_snapshot::capture().expect("checked self snapshot"),
+                    ));
+                    observer_counts.push(("first_pipe", before, current_process_handle_count()));
+                }
             }
         }
         let after = current_process_handle_count();
@@ -1379,6 +1424,20 @@ mod windows_tests {
         eprintln!(
             "WINDOWS_HANDLE_COUNT_TRACE fault_order=Pipe,Job,AttributeList,Assignment,Resume attempts_per_fault=8 counts={counts:?} before={before} after={after}"
         );
+        if mode == 1 {
+            phases.push((
+                "final_40",
+                handle_snapshot::capture().expect("checked self snapshot"),
+            ));
+            observer_counts.push(("final_40", after, current_process_handle_count()));
+            assert_eq!(attempts, 40);
+            let output =
+                handle_snapshot::differences(&phases).expect("bounded complete differences");
+            eprintln!("PSS_OBSERVER_COUNTS {observer_counts:?}");
+            eprintln!("PSS_HANDLE_TYPES {}", String::from_utf8_lossy(&output));
+            std::fs::write(receipt, output).expect("snapshot receipt");
+            return; // observer success cannot replace the independent cold40/+2 failure
+        }
         assert!(
             after <= before.saturating_add(2),
             "partial launch failures leaked handles: before={before}, after={after}"
@@ -1395,6 +1454,84 @@ mod windows_tests {
         )
         .expect("receipt write");
         eprintln!("WINDOWS_HANDLE_COUNT_RECEIPT attempts={attempts} before={before} after={after}");
+    }
+
+    fn validate_handle_receipt(path: &std::path::Path, mode: u8) -> Result<(), String> {
+        let cap = if mode == 0 {
+            1024
+        } else {
+            handle_snapshot::OUTPUT_CAP
+        };
+        if std::fs::metadata(path)
+            .map_err(|_| "missing receipt")?
+            .len()
+            > cap as u64
+        {
+            return Err("receipt byte cap".to_owned());
+        }
+        let bytes = std::fs::read(path).map_err(|_| "receipt read failed")?;
+        if bytes.len() > cap {
+            return Err("receipt byte cap".to_owned());
+        }
+        let data: serde_json::Value =
+            serde_json::from_slice(&bytes).map_err(|_| "invalid receipt JSON")?;
+        let pid = data["child_pid"]
+            .as_u64()
+            .and_then(|pid| u32::try_from(pid).ok())
+            .ok_or("invalid child PID")?;
+        if pid == 0 || pid == std::process::id() {
+            return Err("receipt not another process".to_owned());
+        }
+        if mode == 0 {
+            if data["attempts"].as_u64() != Some(40) {
+                return Err("wrong fault count".to_owned());
+            }
+            let before = data["before"]
+                .as_u64()
+                .and_then(|v| u32::try_from(v).ok())
+                .ok_or("invalid baseline")?;
+            let after = data["after"]
+                .as_u64()
+                .and_then(|v| u32::try_from(v).ok())
+                .ok_or("invalid final count")?;
+            if after > before.saturating_add(2) {
+                return Err(format!(
+                    "receipt leaked handles: before={before}, after={after}"
+                ));
+            }
+        } else {
+            if data["snapshots"].as_u64() != Some(4) {
+                return Err("wrong snapshot count".to_owned());
+            }
+            if mode == 1
+                && data["changes"]
+                    .as_array()
+                    .is_none_or(|changes| changes.len() > 32)
+            {
+                return Err("missing/oversized type differences".to_owned());
+            }
+            if mode == 2 && data["native_checks"] != true {
+                return Err("native fixtures missing".to_owned());
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn handle_receipt_failures_are_results_not_early_panics() {
+        let directory = tempfile::tempdir().expect("fixture directory");
+        let path = directory.path().join("receipt.json");
+        assert!(validate_handle_receipt(&path, 0).is_err());
+        std::fs::write(&path, b"bad JSON").expect("fixture write");
+        assert!(validate_handle_receipt(&path, 0).is_err());
+        std::fs::write(&path, vec![b'x'; 1025]).expect("fixture write");
+        assert!(validate_handle_receipt(&path, 0).is_err());
+        std::fs::write(
+            &path,
+            br#"{"child_pid":1,"attempts":40,"before":73,"after":76}"#,
+        )
+        .expect("fixture write");
+        assert!(validate_handle_receipt(&path, 0).is_err());
     }
 
     fn windows_process_exists(pid: u32) -> bool {

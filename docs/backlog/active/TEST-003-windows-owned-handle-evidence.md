@@ -1,6 +1,6 @@
 # TEST-003: Test-Only Current-Process Handle Evidence
 
-**Status**: In Progress / Claimed; proposed atomic selection, ineffective until #718 merges
+**Status**: Review / Claimed; #716 diagnostic candidate, native evidence/acceptance pending
 **Type**: Spike / Technical Story
 **Parent Epic**: None; related SEARCH-001-C/#643 and #716 CI blocker
 **Source Issue**: #717
@@ -19,8 +19,8 @@
 | Governance Claim PR | #718 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer accepted bounded self-snapshot scope 2026-10-14 at14:50 Asia/Shanghai and authorized continued GitHub delivery; no distinct maintainer reviewer available. Independent protected Agent native/security review, exact-head CI, validators and CAS are mandatory; no natural-person approval claim. |
-| Implementation PR | Not started; later #716 follow-up after effective claim refresh |
-| Last Updated | 2026-10-14 |
+| Implementation PR | #716; separate I302 diagnostic work after effective #718 main refresh |
+| Last Updated | 2026-10-15 |
 | Handoff / Release Condition | No implementation before finalized atomic claim and ADR merge into main; no automatic original-defect closure or #716 merge. |
 
 ## Identity / Goal / Value
@@ -100,3 +100,17 @@ refresh; sharing a PR transfers no ownership between the two slices.
 
 Finalized #718 proposes Active/Claimed I302 and accepted ADR-091 atomically; all remain ineffective
 until merge. Independent complete contract preview found no blocker. No PSS code is in this PR.
+
+## Effective Claim And Recovery — 2026-10-15
+
+#718 merged f4313237c4212e59f57202e22df2ed9b10f78681 after protected contract review
+6163000640, applicable CI3180 and CAS6163082933; proposal statements above are historical.
+Current main9b7ba281 retains this claim. Recovered implementation starts from that main and
+merges original7165c49a8bd as a separate baseline commit. #721/I303 and #705 remain independent.
+
+Workspace maintenance removed the unpublished d1d818e2/treeeed12027 source, toolchain and logs.
+Old local validation/review receipts are historical, not evidence for reconstructed code. This
+candidate is reimplemented/reviewed/validated anew; see I302 execution journal. Three owned
+workers retain cold40/+2, four observer snapshots and four native cleanup-fixture captures.
+Diagnostic publication is not original-defect repair, Complete state or716 merge authority.
+No Completion Commit or native observation is claimed. #643/#624 remain open.

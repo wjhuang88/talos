@@ -115,3 +115,9 @@ all40 attempts/threshold/cleanup. This is diagnostic evidence, not a fixed or me
 CI3177 trace failed cold73→76: first Pipe+1/first Assignment+2, later samples stable. Known cleanup
 BOOL checks are prepared without new native calls; richer self-only metadata requires separately
 accepted diagnostic scope/ADR/claim. No warmup or original-threshold change; #716 stays unmerged.
+
+2026-10-15: #718 merged f4313237 establishes the separate accepted TEST-003/I302/ADR-091
+self-only diagnostic scope. Recovered #716 candidate incorporates current main9b7ba281 and
+keeps I293 search commits separate from I302 observer work. Native execution/review/acceptance
+pending; original40/+2 and all failed history retained. Diagnostic collection does not fix the
+original defect or authorize716 merge, default Search activation or full C/Epic closure.

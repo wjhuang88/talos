@@ -2,10 +2,10 @@
 
 ## Status
 
-Accepted contract proposal in #718; ineffective until target-main merge. Maintainer accepted
-the scope packet on2026-10-14 at14:50 Asia/Shanghai. This contract becomes effective only with
-finalized TEST-003/I302 atomic claim merge, independent protected
-native/security review, exact-head CI and CAS. It does not authorize implementation beforehand.
+Accepted and effective via #718 merge f4313237c4212e59f57202e22df2ed9b10f78681 after
+maintainer acceptance2026-10-14 at14:50 Asia/Shanghai, independent protected contract review
+6163000640, applicable exact-head CI3180 and CAS6163082933. This diagnostic contract does
+not establish native execution, original defect repair, TEST-003 completion or #716 merge readiness.
 
 ## Context
 

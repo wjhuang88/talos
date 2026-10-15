@@ -1,9 +1,10 @@
 # Proposed: Test-Only Current-Process Handle Type Evidence
 
-Status: Proposed / Unclaimed. No PSS implementation, new native binding/feature or unsafe code
-is authorized by this packet. Maintainer scope acceptance, a separate effective diagnostic
-claim/ADR and protected review must precede implementation. SEARCH-001-C/I293 scope and
-ADR-068/090 are not silently widened; #716 remains unmerged.
+Status: Accepted packet under effective #718 / ADR-091 / TEST-003 / I302, main merge
+f4313237c4212e59f57202e22df2ed9b10f78681 after protected review/CI/CAS. The original
+proposal below remains historical; current implementation/evidence is recorded in I302.
+SEARCH-001-C/I293 is separate; diagnostic acceptance does not fix the original regression or
+authorize #716 merge. No broader native/production authority follows from this packet.
 
 ## Concrete Failure
 

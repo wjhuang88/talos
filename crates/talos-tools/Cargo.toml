@@ -112,6 +112,9 @@ talos-permission = { version = "0.10.1", path = "../talos-permission" }
 tempfile = "3"
 tokio = { version = "1.53.1", features = ["fs", "macros", "rt", "rt-multi-thread", "test-util"] }
 
+[target.'cfg(windows)'.dev-dependencies]
+windows-sys = { version = "0.61.2", features = ["Win32_System_Diagnostics_ProcessSnapshotting"] }
+
 [[test]]
 name = "installed_language_plugins"
 required-features = ["plugin-acceptance"]

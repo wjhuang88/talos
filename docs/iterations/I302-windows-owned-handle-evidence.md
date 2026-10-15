@@ -1,6 +1,6 @@
 # Iteration I302: Windows Current-Process Handle Evidence
 
-> Document status: Active
+> Document status: Review
 > Published plan date: 2026-10-14
 > Planned objective: qualify cold-worker resource growth with bounded self-only native metadata.
 > MVP deliverable: reproducible operator-visible handle type/cleanup evidence or explicit uncertainty.
@@ -18,8 +18,8 @@
 | Governance Claim PR | #718 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer accepted bounded self-snapshot scope 2026-10-14 at14:50 Asia/Shanghai and authorized continued GitHub delivery; no distinct maintainer reviewer available. Independent protected Agent native/security review, exact-head CI, validators and CAS are mandatory; no natural-person approval claim. |
-| Implementation PR | Not started; later #716 follow-up after effective main refresh |
-| Last Updated | 2026-10-14 |
+| Implementation PR | #716; separate I302 diagnostic work after effective #718 main refresh |
+| Last Updated | 2026-10-15 |
 | Handoff / Release Condition | No PSS code before this finalized claim/ADR reaches main; diagnostic completion does not close the original failure or permit #716 merge. |
 
 ## Published Baseline
@@ -101,3 +101,71 @@ included. Eight changed files are documentation only; native code/manifests/lock
 unchanged. Trusted target-branch classifier determines the applicable governance CI route; no
 native execution/full implementation validation is claimed here. Fresh exact-head protected
 review, applicable CI, current-main/head/tree/Issue/inventory CAS still precede merge.
+
+## Effective Main / Recovery Candidate — 2026-10-15
+
+#718 merged f4313237c4212e59f57202e22df2ed9b10f78681; protected contract review6163000640,
+applicable CI3180 and CAS6163082933 establish the effective ADR-091/claim. Earlier proposal
+paragraphs are preserved history. Current main9b7ba281 also contains independent #720/I303;
+#721 skill implementation and #705 latency work retain their owners. New worktree starts from
+this main and locally merges original7165c49a8bd in a separate baseline-refresh commit.
+
+Workspace maintenance removed unpublished local candidate d1d818e2/treeeed12027, source,
+toolchain and logs before remote publication. Reviewer retains its historical local APPROVE,
+not restorable complete source or a remote commit. Prior3705primary+1child local passes,
+feature graphs and cross-Clippy therefore do not qualify this reconstructed candidate. Old
+Issue comment6163468017 records that old unpublished checkpoint, not delivered code.
+
+Reimplementation follows the same accepted boundary with fresh fingerprint/evidence: PSS only
+cfg(test,windows), current process, fixed HANDLES|NAME/zero context, bounded owned value/types;
+no ObjectName/union/reserved-field inspection. Successful OS walk/live marker establishes type
+buffer provenance; null/alignment/even128-byte UTF16 checks alone are not arbitrary-pointer
+safety. Checked marker-before-snapshot release consumes ownership before calling free, attempts
+both cleanups even on error and never retries uncertain descriptors. Collection panic is caught
+before checked cleanup; fallback releases only resources never attempted.
+
+Three exact-test children use existing assigned-before-resume/kill-on-close outer Jobs,60s
+event wait, failure termination/10s terminal drain,16KiB retained output with continued draining.
+Cold mode0 is explicitly set in its owned environment; no observer warmup, original40 exact
+faults/baseline/independent final/+2 remain. Mode1 records four snapshots: baseline, no-launch
+observer control, first Pipe and final40; counts around each observer expose observer effects.
+Mode2 alone exercises four native captures: valid owned copy, precise post-capture error,
+precise post-marker error, caught post-marker panic with exact error/no cleanup suffix.
+Shared-harness tests make no PSS call. All launch/exit/receipt failures are Results recorded
+before attempting later workers and printed before final assertions; original failure stays.
+Every worker uses a fresh owned directory/receipt.json with checked child_pid and mode receipt.
+
+Caps remain1024entries/4captures per worker/32changed entries/16KiB output;12KiB JSON reserves
+4KiB for harness/controls/trace. Cap/API/invalid-data failures are not zero or complete evidence.
+Pure fixtures exercise rejection-only fabricated pointers, real owned valid buffer, invalid UTF16,
+unknown type, ordered dual-release errors/no retry, entry/change/output caps and bad receipts.
+Existing grandchild-reap fixture loses only its redundant let-unit binding, retaining wait,
+deadline and expect; no lint waiver/production launcher change.
+
+New local protected preview found no blocker. Pinned1.99 toolchain/Windows target and verified
+local MinGW/cache are being restored. Fresh check/Clippy/tests/full preflight, both validators,
+actual Windows production/test graphs, remote protected review and unfiltered native CI are
+Pending until recorded below. Only prior exact local socket filter is authorized. CI3175-3178
+remain failed history;3178 all known cleanup BOOLs passed but cold73->76 unresolved. No release,
+default Search activation, diagnostic completion, root-cause closure or716 merge follows.
+
+### Fresh Local Checkpoint
+
+Reconstructed candidate pinned1.99 locked release_preflight passed: workspace check/Clippy/tests,
+public-site/installer/text/classifier/governance/claims and both Runtime SDK fixture modes.
+Harness receipts:3705 primary passes plus1 existing exact-selection child pass;0failed/ignored.
+The457 sibling filters in that child are not additional parent-suite skips.
+The temporary external cargo wrapper adds ONLY the previously authorized exact Unix-socket
+filter to the workspace test command; source scripts/CI remain unchanged and remote tests are
+unfiltered. Root Cargo.lock unchanged. The old failed unfiltered run is preserved history,
+not represented as a new unfiltered pass. Windows coding test-target Clippy(-D warnings)
+cross-compiled anew with restored Windows GNU std and six SHA256-verified local MinGW archives.
+Cross-compilation is not native execution. Actual Windows coding and full-workspace/all-feature
+normal+build graphs exclude ProcessSnapshotting; coding dev/test graph includes it.
+Both governance validators pass with0warnings; diff/fmt/scale checks pass.
+
+Owned child environments explicitly set RUST_BACKTRACE=0 so the intentional caught-panic fixture
+does not inherit an unbounded backtrace; no process-global mutation. Fallback diagnostic writes
+ignore broken-pipe errors to avoid a second panic after resource cleanup. Fresh exact-head
+protected publication review and new full CI/native observations are still required. This is a
+stable diagnostic stage, not an existing defect repair or merge-ready candidate.
