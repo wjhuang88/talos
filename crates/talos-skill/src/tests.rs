@@ -2319,3 +2319,179 @@ fn entry_budget_is_global_across_search_roots() {
         "later root sentinel must not be discovered after budget exhaustion"
     );
 }
+
+fn disk_skill(root: &Path, name: &str, body: &str) -> Skill {
+    let dir = root.join(name);
+    fs::create_dir_all(&dir).expect("create skill dir");
+    fs::write(
+        dir.join("SKILL.md"),
+        format!("---\nname: {name}\ndescription: d\n---\n{body}\n"),
+    )
+    .expect("write SKILL.md");
+    Skill {
+        name: name.to_string(),
+        description: "d".to_string(),
+        triggers: Vec::new(),
+        body: body.to_string(),
+        source_path: dir.join("SKILL.md"),
+        source: SkillSource::default(),
+    }
+}
+
+fn manager_with(skill: Skill) -> SkillManager {
+    let name = skill.name.clone();
+    let loader = SkillLoader {
+        skills: vec![skill],
+        search_paths: Vec::new(),
+        discover_shared: false,
+        workspace_root: None,
+        discovery_policy: SkillDiscoveryPolicy::default(),
+        discovery_warnings: Vec::new(),
+    };
+    let mut manager = SkillManager::new(loader);
+    manager.load_skill(&name).expect("load");
+    manager
+}
+
+#[test]
+fn confined_read_returns_nested_reference() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    let skill = disk_skill(dir.path(), "s", "body");
+    fs::create_dir_all(dir.path().join("s/recipes")).expect("mkdir");
+    fs::write(dir.path().join("s/recipes/a.md"), "recipe").expect("write");
+
+    let text = read_skill_file(&skill, "recipes/a.md", &SkillReadLimits::default())
+        .expect("confined read");
+    assert_eq!(text, "recipe");
+}
+
+#[test]
+fn load_reference_rejects_traversal_absolute_and_directories() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    let skill = disk_skill(dir.path(), "s", "body");
+    fs::write(dir.path().join("secret.txt"), "secret").expect("write");
+    fs::create_dir_all(dir.path().join("s/sub")).expect("mkdir");
+    let manager = manager_with(skill);
+
+    for path in [
+        "../secret.txt",
+        "sub/../../secret.txt",
+        dir.path().join("secret.txt").to_str().expect("utf8"),
+        "",
+        "sub",
+    ] {
+        let error = manager
+            .load_reference("s", path)
+            .expect_err("path must be rejected");
+        assert!(matches!(error, SkillError::IoError(_)), "{path}: {error}");
+    }
+    assert!(matches!(
+        manager.load_reference("s", "missing.txt"),
+        Err(SkillError::FileNotFound(_))
+    ));
+}
+
+#[cfg(unix)]
+#[test]
+fn load_reference_rejects_symlink_escape_but_allows_internal_link() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    let skill = disk_skill(dir.path(), "s", "body");
+    fs::write(dir.path().join("secret.txt"), "secret").expect("write");
+    fs::write(dir.path().join("s/inner.txt"), "inner").expect("write");
+    std::os::unix::fs::symlink(dir.path().join("secret.txt"), dir.path().join("s/out.txt"))
+        .expect("symlink");
+    std::os::unix::fs::symlink(dir.path(), dir.path().join("s/updir")).expect("symlink");
+    std::os::unix::fs::symlink(dir.path().join("s/inner.txt"), dir.path().join("s/in.txt"))
+        .expect("symlink");
+    let manager = manager_with(skill.clone());
+
+    for path in ["out.txt", "updir/secret.txt"] {
+        let error = manager.load_reference("s", path).expect_err("escape");
+        assert!(error.to_string().contains("escapes"), "{error}");
+    }
+    assert_eq!(
+        manager.load_reference("s", "in.txt").expect("internal"),
+        "inner"
+    );
+
+    let listing = list_skill_files(&skill, &SkillReadLimits::default()).expect("list");
+    assert_eq!(listing.files, vec!["SKILL.md", "inner.txt"]);
+}
+
+#[test]
+fn confined_read_enforces_size_and_utf8() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    let skill = disk_skill(dir.path(), "s", "body");
+    fs::write(dir.path().join("s/big.txt"), "x".repeat(33)).expect("write");
+    fs::write(dir.path().join("s/bin.dat"), [0xff_u8, 0xfe, 0x00]).expect("write");
+    let limits = SkillReadLimits {
+        max_file_bytes: 32,
+        ..SkillReadLimits::default()
+    };
+
+    let big = read_skill_file(&skill, "big.txt", &limits).expect_err("oversize");
+    assert!(big.to_string().contains("byte limit"));
+    let bin = read_skill_file(&skill, "bin.dat", &limits).expect_err("binary");
+    assert!(bin.to_string().contains("UTF-8"));
+}
+
+#[test]
+fn listing_is_sorted_relative_and_bounded() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    let skill = disk_skill(dir.path(), "s", "body");
+    fs::create_dir_all(dir.path().join("s/b")).expect("mkdir");
+    fs::write(dir.path().join("s/b/z.md"), "z").expect("write");
+    fs::write(dir.path().join("s/a.md"), "a").expect("write");
+
+    let all = list_skill_files(&skill, &SkillReadLimits::default()).expect("list");
+    assert_eq!(all.files, vec!["SKILL.md", "a.md", "b/z.md"]);
+    assert!(!all.truncated);
+
+    let limits = SkillReadLimits {
+        max_listed_files: 2,
+        ..SkillReadLimits::default()
+    };
+    let capped = list_skill_files(&skill, &limits).expect("list");
+    assert_eq!(capped.files.len(), 2);
+    assert!(capped.truncated);
+}
+
+#[test]
+fn chunk_text_respects_utf8_and_continuation() {
+    let text = "你好世界abc";
+    let first = chunk_text(text, 0, 7);
+    assert_eq!(first.text, "你好");
+    assert_eq!(first.next_offset, Some(6));
+    let middle = chunk_text(text, 4, 6);
+    assert_eq!(middle.offset, 3);
+    assert_eq!(middle.text, "好世");
+    let last = chunk_text(text, 12, 100);
+    assert_eq!(last.text, "abc");
+    assert_eq!(last.next_offset, None);
+    assert_eq!(last.total_bytes, text.len());
+    let tiny = chunk_text(text, 0, 1);
+    assert_eq!(tiny.text, "你");
+}
+
+#[test]
+fn activation_matches_cli_format() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    let skill = disk_skill(dir.path(), "s", "Do X.");
+    fs::write(dir.path().join("s/guide.md"), "guide").expect("write");
+
+    let mut activation = SkillActivation::new(&skill, 1024);
+    assert_eq!(activation.content(), "## Skill Body\nDo X.\n");
+    activation
+        .add_reference("guide.md", 1024, &SkillReadLimits::default())
+        .expect("reference");
+    assert_eq!(
+        activation.content(),
+        "## Skill Body\nDo X.\n\n## Reference: guide.md\nguide\n"
+    );
+    assert!(
+        activation
+            .add_reference("../x", 1024, &SkillReadLimits::default())
+            .is_err()
+    );
+    assert_eq!(activation.references(), ["guide.md"]);
+}

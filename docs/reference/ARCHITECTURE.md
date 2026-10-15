@@ -135,6 +135,7 @@ modules:
 | `types.rs` | Public session data types and in-memory branch helpers. |
 | `jsonl.rs` | Append-only JSONL source-of-truth persistence, replay, preview scanning, and compatibility reads for old JSONL lines. |
 | `topology.rs` | Workspace directory identity helpers for workspace-scoped session layout. |
+| `disclosure.rs` | Public confined Level 1/2 reads, bounded listings, UTF-8 chunking and activation-context rendering shared by CLI and runtime (ADR-092). |
 | `manager.rs` | `SessionManager` disk scanning, resume/list/search coordination, and lazy SQLite index access. |
 | `sqlite.rs` | SQLite FTS/session index implementation. |
 | `error.rs` | Session error surface. |

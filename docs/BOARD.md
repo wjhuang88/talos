@@ -28,7 +28,7 @@ PR #682 merged as `a3a4753d6e42123e33ead1d7e6f769a96f85f37e`, with final accepta
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
-| Embedded Skill progressive disclosure | Active / Claimed (proposed) | [SKILL-006](backlog/active/SKILL-006-embedded-skill-progressive-disclosure.md) / [I303](iterations/I303-embedded-skill-progressive-disclosure.md) / #719 | #720 proposes atomic ADR-092/claim; ineffective until exact-head CI/CAS and main merge. No implementation yet. |
+| Embedded Skill progressive disclosure | Review / Claimed | [SKILL-006](backlog/active/SKILL-006-embedded-skill-progressive-disclosure.md) / [I303](iterations/I303-embedded-skill-progressive-disclosure.md) / #719 | Claim #720 effective at 9b7ba281; implementation candidate needs exact-head CI and independent security/API review. |
 | Windows self-only handle evidence | Active / Claimed (proposed) | [TEST-003](backlog/active/TEST-003-windows-owned-handle-evidence.md) / [I302](iterations/I302-windows-owned-handle-evidence.md) / #717 | #718 proposes atomic ADR-091/claim; ineffective until protected review/CI/CAS and main merge. No PSS code yet. |
 | Missing pending-sidecar startup recovery | Review / Claimed | [RUNTIME-010](backlog/active/RUNTIME-010-missing-pending-sidecar-startup.md) / [I301](iterations/I301-missing-pending-sidecar-startup.md) | Claim #710 effective at 42b86112; implementation needs full preflight, exact-head CI and storage/API review. |
 | I300 structured Git repair / T7 | Active / Claimed (proposed) | [I300](iterations/I300-structured-git-repair.md) | #704 proposes atomic claim/activation under accepted ADR-089; ineffective until merge, no implementation yet. |
