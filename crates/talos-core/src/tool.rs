@@ -7,6 +7,7 @@
 mod agent_tool;
 mod authorization;
 mod browser_arguments;
+mod cleanup;
 mod network;
 mod prepared;
 mod protocol;
@@ -16,10 +17,13 @@ mod todo_presentation;
 
 pub use self::{agent_tool::*, authorization::*, protocol::*, registry::*, result_presentation::*};
 pub use browser_arguments::{BrowserRawArguments, BrowserRawArgumentsError};
+pub use cleanup::{ToolCleanupError, ToolCleanupOwner, ToolCleanupReceipt};
 pub use network::*;
 pub use prepared::{
-    AuthorizedToolInvocation, PreparedExecutionOutput, PreparedFailureCode,
-    PreparedInvocationError, PreparedToolInvocation,
+    AuthorizedToolInvocation, PREPARED_INVOCATION_TIMEOUT, PreparedExecutionOutput,
+    PreparedFailureCode, PreparedInvocationError, PreparedNormalStage,
+    PreparedNormalToolInvocation, PreparedPlanIdentity, PreparedStageHistory,
+    PreparedToolInvocation,
 };
 pub use todo_presentation::{
     TodoDisplaySpan, TodoDisplayStatus, TodoPresentation, VisibleTodoPresentation,
