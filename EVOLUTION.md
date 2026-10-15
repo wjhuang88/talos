@@ -1276,3 +1276,11 @@ Returned handle values retained after cleanup are historical numbers, not proof 
 - Preserve PDB GUID/age mismatch instead of treating symbol-server retrieval as strict matching.
   Keep unknown handle types unknown and original cold/+2 failures visible. Diagnostic metadata
   collection must be bounded and cannot suppress the original full test command.
+
+## 2026-10-16 — Exact Binary Lookup Beyond Auxiliary Index Coverage
+
+CI3202's installed-file hashes were absent from auxiliary indexes. Do not turn nearby-version
+cache disassembly into exact-runner attribution. Decode only validated symbol-store identity
+fields from the same capped hash prefix, then require full hash agreement on an official download.
+This does not establish loaded-module identity or binary trust. Preserve native failures, download
+integrity failures and disposable fixture results as distinct evidence.

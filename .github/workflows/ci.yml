@@ -309,10 +309,17 @@ jobs:
               $expectedLength = $stream.Length
               $hash = [Security.Cryptography.SHA256]::Create()
               $buffer = [byte[]]::new(16384)
+              $header = [byte[]]::new(4096)
+              $headerCount = 0
               $total = 0L
               while ($total -lt $limit) {
                 $count = $stream.Read($buffer, 0, [int][Math]::Min($buffer.Length, $limit - $total))
                 if ($count -eq 0) { break }
+                $copyCount = [int][Math]::Min($count, $header.Length - $headerCount)
+                if ($copyCount -gt 0) {
+                  [Array]::Copy($buffer, 0, $header, $headerCount, $copyCount)
+                  $headerCount += $copyCount
+                }
                 $null = $hash.TransformBlock($buffer, 0, $count, $buffer, 0)
                 $total += $count
               }
@@ -320,9 +327,23 @@ jobs:
                 throw 'incomplete identity'
               }
               $null = $hash.TransformFinalBlock([byte[]]::new(0), 0, 0)
+              # Decode only the symbol-store lookup fields from the hashed prefix.
+              if ($headerCount -lt 64 -or [BitConverter]::ToUInt16($header, 0) -ne 0x5a4d) {
+                throw 'unsupported DOS header'
+              }
+              $pe = [BitConverter]::ToInt32($header, 60)
+              if ($pe -lt 64 -or $pe -gt $headerCount - 88) { throw 'PE header outside prefix' }
+              if ([BitConverter]::ToUInt32($header, $pe) -ne 0x4550 -or
+                  [BitConverter]::ToUInt16($header, $pe + 4) -ne 0x8664) { throw 'unsupported PE header' }
+              $optionalSize = [BitConverter]::ToUInt16($header, $pe + 20)
+              if ($optionalSize -lt 112 -or $optionalSize -gt $headerCount - $pe - 24 -or
+                  [BitConverter]::ToUInt16($header, $pe + 24) -ne 0x20b) { throw 'unsupported optional header' }
+              $imageSize = [BitConverter]::ToUInt32($header, $pe + 80)
+              if ($imageSize -eq 0 -or $imageSize -gt 0x80000000L) { throw 'unsupported image size' }
               $record = @{
                 file = $moduleName; phase = 'before_workspace_tests'; status = 'ok'; bytes = $total
                 sha256 = [BitConverter]::ToString($hash.Hash).Replace('-', '').ToLowerInvariant()
+                pe_timestamp = [BitConverter]::ToUInt32($header, $pe + 8); image_size = $imageSize
               }
             } catch {
               # Do not disclose paths, exception bodies, bytes or environment contents.

@@ -19,7 +19,7 @@
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer accepted bounded self-snapshot scope 2026-10-14 at14:50 Asia/Shanghai and authorized continued GitHub delivery; no distinct maintainer reviewer available. Independent protected Agent native/security review, exact-head CI, validators and CAS are mandatory; no natural-person approval claim. |
 | Implementation PR | #716; separate I302 diagnostic work after effective #718 main refresh |
-| Last Updated | 2026-10-15 |
+| Last Updated | 2026-10-16 |
 | Handoff / Release Condition | No PSS code before this finalized claim/ADR reaches main; diagnostic completion does not close the original failure or permit #716 merge. |
 
 ## Published Baseline
@@ -427,3 +427,62 @@ Compatibility checks passed: actual pinned locked-metadata governance SQLite17/d
 0warnings, claims0warnings/text23/diff; incoming owner/ADR/index and new provider rows match
 main exactly. Independent protected resolution preview found no blocker; source/workflow bytes
 are unchanged from the reviewed installed-file stage. No native result exists for that stage yet.
+
+## CI3202 Exact-File Lookup — 2026-10-16
+
+Exact ee8d23a1/treebfd248a1 received protected remote review6194813899 (21 blobs/base0ef5).
+CI3202/run38753803604 FAILED: Windows job116486870567 tools455pass/1fail/0ignored/0filtered,
+other five jobs pass; cold73->76, modes1–6 succeed. All installed-file receipts succeeded:
+
+| Fixed file | Bytes | SHA256 |
+|---|---|---|
+| kernelbase.dll | 4129456 | f4acdac5f1dc54b20c84a51ad0f507f421f5d1170e276a5a75d4e7dcf88750e2 |
+| kernel32.dll | 836208 | 347f1ac1b7dbec710cf06fb3f67d131bceebbc19076bc77daacd31cfe452b496 |
+| ntdll.dll | 2509664 | 65894b316bd1f171c88de20dafadcb00ec2bfca625f54d5bf7eb1bc942dc0c8b |
+
+Mode5 counts73/76/76/74: returnedPipe296/300 disappear after cleanup; extraFile292 exists at
+successful return. Mode6 counts79/83/83/76: all seven returned values (Process324/Thread320,
+four pipes/Job) disappear after cleanup; unknown336/Key340 already exist at return and remain.
+Before/after PSS counts match; these are process-local interval observations, not lifetime/object
+identity, cold causal attribution or all-resource cleanup proof. Raw receipts #717 comment6204372217.
+
+Fresh auxiliary Winbindex indexes and hash searches contain none of these hashes. Earlier public
+samples differ and cannot qualify this runner's cache/leak cause. Index absence says nothing about
+availability on Microsoft's server. SHA alone cannot construct a symbol-store key for an unindexed
+file. Installed-file identity is still not attestation of the later process's mapped modules.
+
+Same-scope follow-up accumulates only the first4096 actual bytes during the existing16KiB hash
+loop, with unchanged actual32MiB cap/three fixed files. No added read/seek/reopen, persisted/raw
+bytes, paths, exception/environment output, PE execution, process/PSS observation, PInvoke/native
+ABI or Rust/dependency/production change. Validate actual>=64bytes, MZ, signed e_lfanew>=64 in
+prefix, PE/AMD64 COFF, declared optional-header range, >=112 fixed PE32+ optional bytes and magic.
+Decode only unsigned TimeDateStamp(PE+8) and SizeOfImage(optional+56); reject zero/>2GiB image
+size, never allocate from either field. This is fixed-field identity decoding, not full PE validity/
+trust validation. TimeDateStamp need not be a calendar date. Old no-parser wording describes the
+previous stage. Under2KiB fixed records; incomplete metadata/independent guarded Dispose/original
+cargo execution and failure-exit priority remain. Server results are candidates until their full
+SHA256 matches the native receipt. No threshold/warmup/newskip/retry of old failed head/repair.
+
+Primary layout: https://learn.microsoft.com/en-us/windows/win32/debug/pe-format . Official symbol
+store: https://learn.microsoft.com/en-us/windows-hardware/drivers/debugger/symbol-stores-and-symbol-servers .
+Independent protected scope/design review accepted this fixed-file extension within I302, without
+new native/observation permission or ADR. Review/Claimed/incomplete; no Completion Commit or merge.
+
+Local exact-step PowerShell parser passed. Disposable fixtures independently verify hash/fields
+with normal and7-byte short reads, exact4096-boundary optional header, and13 malformed/truncated/
+negative/large-offset/signature/machine/optional-size/magic/image-size cases. Both Dispose failures
+retain all six attempts/incomplete receipts; invalid metadata still runs cargo with failure exit7
+priority or incomplete exit1 after successful tests. No fixtures/mocks enter CI or the repository;
+Linux PowerShell is not Windows execution. Text23/classifier14/diff pass; governance/claims/final
+fingerprint review/new native CI pending. Rust source unchanged, no new Rust/full-preflight pass.
+Workspace maintenance removed old artifacts; checkout restored at ee8. A Rustc download failed
+SHA256 and was not executed; fresh official request matched published digest before extraction.
+An executor transport interruption was recovered separately; neither infrastructure event is a
+source/native outcome. Preserve integrity checks/Cargo.lock and all earlier failures. I293 and
+PROVIDER008/#705 keep ownership; #624/#643/#717 remain open.
+
+Stable local convergence: pinned1.99 actual locked-metadata governance passed SQLite17/delivery12,
+0warnings; claims0warnings/text23/classifier14/diff and exact-step PowerShell parser/fixtures pass.
+Independent protected four-file draft review found no blocker, including actual-prefix bounds and
+unchanged cleanup/exit contracts. Only workflow/docs changed; no new Rust/full-preflight/native
+pass claimed. Stable fingerprint/remote review and new full native CI precede evidence acceptance.

@@ -20,7 +20,7 @@
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer accepted bounded self-snapshot scope 2026-10-14 at14:50 Asia/Shanghai and authorized continued GitHub delivery; no distinct maintainer reviewer available. Independent protected Agent native/security review, exact-head CI, validators and CAS are mandatory; no natural-person approval claim. |
 | Implementation PR | #716; separate I302 diagnostic work after effective #718 main refresh |
-| Last Updated | 2026-10-15 |
+| Last Updated | 2026-10-16 |
 | Handoff / Release Condition | No implementation before finalized atomic claim and ADR merge into main; no automatic original-defect closure or #716 merge. |
 
 ## Identity / Goal / Value
@@ -216,3 +216,21 @@ threshold/warmup/skip/waiver. Identity failure cannot skip original full tests a
 evidence result. On-disk identity at collection time is not loaded-module identity. Owner remains
 Review/Claimed/incomplete; fresh workflow review/native CI required, no original defect repair,
 Completion Commit or716 merge. #643/#624 remain open; #705 workflow ownership is preserved.
+
+## CI3202 And Direct Symbol Lookup — 2026-10-16
+
+CI3202 on ee8d23a1/treebfd248a1 FAILED Windows455/1, other five jobs pass, original cold73->76;
+modes1–6 and all fixed-file identity receipts succeed. Exact hashes/call values in I302 and
+#717 comment6204372217. None matches auxiliary indexes, so nearby-version cache analysis cannot
+qualify runner resources; unknown336/Key340 remain unattributed. No repair/completion/merge.
+
+Follow-up retains first4096 actual bytes from the same capped hash stream, validates signed
+PE offsets/actual and declared optional-header bounds/MZ/PE/AMD64/PE32+, and outputs only two
+unsigned lookup fields: TimeDateStamp and SizeOfImage. No extra reads/PE execution/native ABI/
+process observation/raw header/path/content persistence or output; same three files/32MiB cap,
+independent cleanup catches/original cargo command and exit priority. Under2KiB fixed receipts.
+This explicit fixed-field decoder extends only the prior stage's no-parser description; it is
+not full binary trust validation, calendar interpretation or loaded-module attestation. Official
+server candidates require full native SHA match. Protected scope review/local parser/bounds/
+short-read/cleanup/exit fixtures pass; governance/fingerprint/native gates pending. Review/Claimed,
+incomplete; no Completion Commit. I293/PROVIDER008/#705 unchanged, #643/#624 stay open.
