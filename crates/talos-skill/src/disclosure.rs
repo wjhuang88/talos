@@ -1,7 +1,7 @@
 //! Confined, bounded Level 1/2 skill disclosure shared by hosts (ADR-092).
 
 use crate::{Result, Skill, SkillError};
-use std::io::{Error as IoError, ErrorKind};
+use std::io::{Error as IoError, ErrorKind, Read};
 use std::path::{Component, Path, PathBuf};
 
 /// Default byte budget for an activated Skill body.
@@ -108,14 +108,21 @@ pub fn read_skill_file(
     limits: &SkillReadLimits,
 ) -> Result<String> {
     let path = resolve_skill_file(skill, relative_path)?;
-    let len = std::fs::metadata(&path)?.len();
-    if len > limits.max_file_bytes {
+    let file = std::fs::File::open(&path)?;
+    let metadata = file.metadata()?;
+    if !metadata.is_file() {
+        return Err(rejected("reference path is not a regular file"));
+    }
+    if metadata.len() > limits.max_file_bytes {
         return Err(rejected(format!(
-            "reference file is {len} bytes, exceeding the {} byte limit",
+            "reference file is {} bytes, exceeding the {} byte limit",
+            metadata.len(),
             limits.max_file_bytes
         )));
     }
-    let bytes = std::fs::read(&path)?;
+    let mut bytes = Vec::new();
+    file.take(limits.max_file_bytes.saturating_add(1))
+        .read_to_end(&mut bytes)?;
     if bytes.len() as u64 > limits.max_file_bytes {
         return Err(rejected("reference file grew beyond the byte limit"));
     }
@@ -123,15 +130,23 @@ pub fn read_skill_file(
 }
 
 /// Lists regular files inside the skill directory without following symbolic links.
+///
+/// At most `max_listed_files` entries are returned and at most sixteen times that many
+/// directory entries are visited; `truncated` reports either limit.
 pub fn list_skill_files(skill: &Skill, limits: &SkillReadLimits) -> Result<SkillFileListing> {
     let root = skill_dir(skill)?;
     let mut files = Vec::new();
     let mut truncated = false;
+    let max_visited = limits.max_listed_files.saturating_mul(16).max(1);
     let walker = walkdir::WalkDir::new(root)
         .follow_links(false)
         .max_depth(limits.max_list_depth)
         .sort_by_file_name();
-    for entry in walker {
+    for (visited, entry) in walker.into_iter().enumerate() {
+        if visited >= max_visited {
+            truncated = true;
+            break;
+        }
         let Ok(entry) = entry else {
             continue;
         };

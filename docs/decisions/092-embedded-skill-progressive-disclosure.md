@@ -87,6 +87,9 @@ No dependency, sandbox, `talos-permission` or `unsafe` change. No release is aut
 
 ## Residual Risks
 
-Canonicalize-then-open leaves a check/use window against a concurrently replaced symlink inside a
-host-owned skill directory; skill roots are host-trusted, and the window is documented, not closed.
+Canonicalize-then-open leaves a check/use window against a concurrently replaced symlink or
+special file inside a host-owned skill directory (a FIFO swapped in after the check could block the
+blocking reader); the opened handle's metadata and a bounded read cap memory. Hardlinks to outside
+inodes are not detectable by path confinement. Skill roots are host-trusted and require write
+access to exploit; these windows are documented, not closed.
 Skill content remains untrusted model input.

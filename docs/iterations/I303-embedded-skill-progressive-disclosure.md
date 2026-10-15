@@ -90,8 +90,13 @@ binaries ok, clippy `-D warnings`, external runtime fixture). New tests: talos-s
 symlink escape (Unix), size/UTF-8, listing, chunking and activation format; runtime unit
 `skill_read` chunk/escape/unknown-skill; runtime public-API tests proving the provider request
 contains/omits the `SKILL.md` body after set/clear, active-turn rejection event, opt-in
-registration with two bound skills, and caller-tool precedence. Exact-head CI and independent
-Agent security/API review pending. No Completion Commit exists; not Complete.
+registration with two bound skills, and caller-tool precedence.
+
+Independent Agent security/API review of head `a20ece17` (base `9b7ba281`): APPROVE, no blocking
+findings. Non-blocking hardening adopted in the next candidate: read through the opened handle's
+metadata with a `take`-bounded read; cap visited listing entries; ADR-092 residuals now name
+special-file swaps and hardlinks. Full preflight re-passed locally. Exact-head CI and a fresh
+review of the corrected head are pending. No Completion Commit exists; not Complete.
 
 ## Variance And Residuals
 
