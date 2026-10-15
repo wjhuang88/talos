@@ -221,3 +221,117 @@ normal+build graphs exclude ProcessSnapshotting; coding test/dev graph includes 
 claims(0warnings), text boundary23, classifier14, fmt/diff and scale checks pass. Independent
 protected local previews found no blocker; final exact local/remote fingerprint review and new
 native CI remain required. CI3190 remains failed evidence; stage controls are not a repair.
+
+## CI3197 / Root-Cause Experiment — 2026-10-15
+
+CI3197/run38685760669 on770d856e/treeabef7bb2 FAILED cold73->76, Windows454passed/1failed/
+0ignored/0filtered, five other jobs successful. Exact protected remote review6184988997 approved
+publication only after all20 remote blobs matched. Modes1/2/3/4 succeeded. Mode3 sizes/counts
+73/74/74/76 at baseline/Pipe/attribute rejection/suspended-process cleanup; mode4 73/73/73/76
+at baseline/path/env/suspended-process cleanup. Snapshot before/after counts match. Mode3 adds/
+retypes File\u0000 value176 at first Pipe, unknown336/Key\u0000 value340 at final. Mode4 final
+adds/retypes File\u0000 value188, unknown336, Key\u0000 value340. Values are local to each
+worker and reusable, not shared identities. This still does not prove a resource leak or cache.
+
+Success criteria for the next experiment: distinguish growth in the API-return interval from
+growth during cleanup, and compare API-returned numeric values with observed survivors. No new
+native API/unsafe/rights/features or fault is necessary. Optional concrete test-only observer
+in existing hooks is None for original workers. Modes5/6 use existing Pipe/Assignment faults
+and exactly four checkpoints each: before call, successful API return, before cleanup, after
+cleanup. Copy only seven existing returned handle slots into bounded receipts; no dereference,
+duplicate, close or ObjectName lookup. Post-cleanup values mean historical returns, not owners.
+Each checkpoint's counts/PSS/copy/storage are guarded together; error/panic records incompleteness
+and lets original cleanup finish. Explicit output/receipt assertions follow cleanup, although an
+ordinary caught-panic hook may output earlier. Original mask and cold40/+2 assertions remain.
+
+Fixed four slots and existing4captures/1024entries/32differences/12KiB JSON+4KiB reserve caps
+remain; final JSON cap includes the new call records. Parent validates exact four checkpoint
+order/roles/counts/seven numbers; pure fixtures reject missing, wrong-mode and malformed records
+without native calls. All seven worker launch/exit/receipt outcomes are attempted before final
+assertions. Total parent waiting budget increases with workers; individual60s wait/10s failure
+drain is unchanged. Independent protected design and implementation previews found no blocker.
+
+Primary API docs establish returned-resource responsibilities, not Windows internal cache identity:
+[CreatePipe](https://learn.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-createpipe),
+[CreateProcessW](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessw),
+[CloseHandle](https://learn.microsoft.com/en-us/windows/win32/api/handleapi/nf-handleapi-closehandle).
+No authoritative source found establishing this runner's +3 as legitimate initialization. PSS can
+change first-use behavior, so these controls alone cannot replace original cold evidence. A
+surviving returned numeric value may have been reused; a non-returned value is not automatically
+an OS-owned legal cache. Keep uncertainty until direct evidence supports a specific conclusion.
+
+Maintenance pruned the previous source/toolchain/cache again. Recovered source starts from exact
+remote770d856e and main23e659e2; old local passes are historical. Fresh pinned locked preflight,
+Windows coding test-target cross-check/Clippy, graphs and governance checks are being repeated.
+No repair, Complete state, production activation, #716 merge or #643/#624 closure is claimed.
+
+Interpretation checks for the next receipt:
+
+- Growth already present at successful API return, beyond its recorded returned slots, supports
+  acquisition inside that instrumented call interval; it does not prove a legal OS cache.
+- Growth first appearing during cleanup redirects investigation to that interval. Successful
+  known closes and observed numeric disappearance still do not identify every resource lifetime.
+- Any before/after-snapshot change exposes observer effects. Missing/error/oversized receipts
+  fail collection, and matching numbers alone cannot exclude all first-use observer effects.
+- Original cold failure remains authoritative alongside the instrumented evidence; no changed
+  baseline, warmup, skip or threshold follows from a diagnostic success.
+
+### Local Failures And Separate Ownership Findings
+
+First Windows cross-check failed on the new fixture's unsupported json!([0;6]) syntax. Fixed
+to a Rust vec! expression; fresh fixed-source coding --tests check and Clippy(-D warnings) passed.
+Native helper/features/lock unchanged; actual Windows coding/full-workspace all-feature normal+
+build graphs exclude ProcessSnapshotting, while coding test/dev graph includes it. Governance
+(SQL17/delivery12), claims0warnings, text23, classifier14, fmt/diff/scale checks passed.
+
+Fresh full local release_preflight FAILED, not passed. Workspace check/Clippy passed; tools unit
+target reported457passed/1failed/0ignored/0filtered. Failure was untouched Linux test
+search_backend::transport::tests::enclosing_deadline_covers_dns_and_response_wait_and_drops_socket,
+tests.rs:953, "owned connection closes: Elapsed(())". No rerun-to-green or new filter was used;
+only the prior authorized exact Unix-socket filter was in the external wrapper. The failed
+script stopped before remaining targets/SDK; their independent checks must not be combined into
+a claimed full-preflight pass. This Windows-only change has no established causal link to that
+Linux failure. Preserve the failed log/receipt and merge gate.
+
+Source review shows a separate fixture ambiguity: second request has150ms total budget without
+first proving accept/request arrival, yet requires peer EOF within2s afterward. Deadline before
+connect and non-timeout read errors both leave closed==0; the current failure cannot distinguish
+those paths from non-release. These are hypotheses/contract gaps, not this run's proven cause.
+Independent protected review found no blocker for diagnostic publication with this explicit
+failed local gate, original native failure and fresh exact-head review/full CI retained. No
+merge or all-validation approval follows. Separate I293 test-only terminal telemetry is added after this failure; no transport behavior,
+deadline, EOF success condition or skip changes. A later pass is not proof of repair.
+
+Another confirmed API-contract gap is outside I302 production authority: CreatePipe documents
+indeterminate output parameters on return0, but the launcher passes owned slots directly and
+later closes any non-null value. Initial null is not proof of ownership after a failed call.
+This needs separately claimed ADR-068 production launcher/security maintenance with success-only
+commit of temporary outputs. It is NOT the observed +3 cause: current Pipe injection is after
+successful return, and all40 exact fault checks reached their intended errors. Independent
+protected source review agrees; no production repair or ownership transfer is made in this slice.
+
+The adjacent I293 fixture snapshot is non-atomic: committed shapes exclude in-flight request
+buffers; accepted==0 lacks an accept receipt but does not exclude a queued TCP connection. EOF
+counts reads, not unique connections. errors_unrepresented can reflect in-flight recording or
+the four-kind cap. These receipts aid the next failure diagnosis; they are not atomic proof.
+
+### Fresh Combined Diagnostic-Source Checkpoint
+
+After adding the bounded I293 terminal receipts (a materially new diagnostic version), pinned
+locked full release_preflight PASSED:3717 primary+1 existing exact-selection child,0failed/
+ignored, workspace check/Clippy and both SDK modes. Original rootcause-preflight FAILED and
+its457/1 EOF receipt above remain evidence: the later pass is not a repair or scheduling-cause
+proof. Only the already-authorized local exact Unix-socket filter is used externally; scripts
+and remote CI remain unfiltered. The457 sibling filters belong to the existing child invocation.
+Independently continued TUI609 and normal tools-integration/workspace-doc71 receipts passed;
+those overlap later validation and are not added to its totals. Standalone SDK modes also passed.
+An initial continuation command lacked required feature gates and executed no tests; corrected
+to coding/normal targets, without retrying the failed unit target as a pass substitute.
+
+Combined final-source Windows coding --tests check/Clippy(-D warnings) passed, with no native
+execution claimed. Both governance validators0warnings/text23/classifier14/fmt/diff/scale and
+actual production/test feature graphs passed. Root lock/manifest/native helper/ABI/unsafe sites
+are unchanged; native call-site inventory/order is unchanged apart from cfg(test) observations.
+Independent protected design/code/combined previews found no blocker. Stable local and remote
+fingerprint review plus new unfiltered native CI still precede interpretation/acceptance. No
+rootcause closure, local-failure erasure, Complete state, production repair or merge authority.

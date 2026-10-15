@@ -1260,3 +1260,7 @@ CI3190 self-only type metadata still does not identify resource lifetimes. Sourc
 also shows injected Assignment short-circuits before AssignProcessToJobObject: a fault label
 names an error boundary, not proof that its namesake API executed. Read actual control flow
 before attribution; use existing-operation stage controls and retain cold failure/uncertainty.
+
+When observing a launcher with live raw resources, contain the entire checkpoint (counts,
+capture, numeric copy and storage), then report observer failure only after original cleanup.
+Returned handle values retained after cleanup are historical numbers, not proof of live owners.

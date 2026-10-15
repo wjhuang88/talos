@@ -149,3 +149,48 @@ workspace check/Clippy and both SDK modes, with only the previously authorized l
 filter. Final-source Windows test-target cross-check/Clippy, feature graphs, governance/claims,
 text/classifier/fmt/diff/scale pass; no new native execution claimed. Full receipts are in I302.
 Stable exact-head protected review and unfiltered native CI precede evidence acceptance.
+
+## CI3197 And Direct Call-Boundary Investigation — 2026-10-15
+
+Exact head770d856e01b5f99155f2e202cd29382aab44f9bb/treeabef7bb2 had protected remote
+publication review6184988997 (all20 remote blobs matched). Full CI3197/run38685760669 FAILED:
+Windows454passed/1failed/0ignored/0filtered; five other jobs passed. Original cold73->76 remains.
+Modes1/2/3/4 succeeded. Mode3 counts73/74/74/76 at baseline/Pipe cleanup/attribute rejection/
+suspended-process cleanup; mode4 counts73/73/73/76 at baseline/path/env/suspended-process cleanup.
+The two preparation controls showed no additional count growth. This narrows the interval, not
+a particular API, identity, legitimate cache or leak. Raw File/Key names retain trailing NUL;
+other data stays unknown. Full native count/type receipts are in #717 comment6187417883.
+
+The maintainer requested deeper root-cause investigation on2026-10-15. Independent protected
+design/implementation previews found no blocker for two further same-scope owned workers:
+mode5 captures before first CreatePipe/after its successful return/before cleanup/after cleanup;
+mode6 captures before CreateProcessW/after successful return/before cleanup/after cleanup.
+Each records counts before/after each snapshot plus seven numeric API-return slots (stdout pipe
+read/write, stderr pipe read/write, Job, process, thread). After cleanup these remain historical
+returned values, NOT live ownership or object IDs. Never dereference/duplicate/close an observed
+value. Compare direct returned resources with bounded type differences; handle reuse and observer
+effects prevent automatic root-cause inference.
+
+The explicit concrete observer is test-only and None on existing workers. Entire checkpoint
+count/capture/numeric-copy/storage is panic-contained; observer errors do not escape the live raw
+owner interval or short-circuit original cleanup. Fixed four-slot storage, unchanged native helper,
+ABI/features/rights/faults/production behavior. Explicit receipt assertions/output follow cleanup;
+a caught panic may still invoke the ordinary panic hook. Keep the original cleanup-mask assertion.
+Four captures/worker and all output/entry caps remain. Seven workers increase total parent wait
+budget; only the individual worker60s wait/10s failure-drain bounds are unchanged. Cold40/+2 and
+all prior failed runs remain. New exact-head protected review/native CI are required; no fix claim.
+
+New local full preflight FAILED on an untouched Linux deadline/EOF fixture (tools457pass/1fail);
+workspace check/Clippy and fixed-source Windows cross-check/Clippy passed. First Windows fixture
+JSON syntax error was corrected; failed receipts remain in I302. SDK/unreached targets are
+independently checked, not a replacement full-pass receipt. No new filter or retry-to-green.
+The Linux fixture does not establish connection arrival before requiring EOF, so its current
+failure is ambiguous rather than proof of this Windows-only change's effect. Original full CI
+and merge gates remain. See I302 for the separate CreatePipe failed-output ownership contract
+gap: real, outside this production claim, and not the success-then-injected-fault +3 cause.
+
+On the materially new combined diagnostic source, fresh pinned locked full preflight passed
+3717primary+1existingchild/0failed/ignored and both SDK modes, with the same sole authorized
+local filter; fixed-source Windows coding cross-check/Clippy and graphs/gates pass. This does
+NOT erase the old Linux failure or prove repair/scheduling cause. Exact receipts/independent
+continuations and limits are in I302. Fresh stable-head protected review/native CI are pending.

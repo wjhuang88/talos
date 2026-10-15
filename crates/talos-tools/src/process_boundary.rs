@@ -452,8 +452,9 @@ enum WindowsLaunchFault {
 #[cfg(windows)]
 #[cfg(test)]
 #[derive(Default)]
-struct WindowsLaunchTestHooks {
+struct WindowsLaunchTestHooks<'a> {
     fault: Option<WindowsLaunchFault>,
+    observer: Option<&'a mut windows_tests::LaunchObservation>,
 }
 
 #[cfg(windows)]
@@ -490,7 +491,7 @@ fn create_windows_job_with_hooks(
     args: &[String],
     cwd: &std::path::Path,
     extra_env: &std::collections::BTreeMap<String, String>,
-    #[cfg(test)] hooks: WindowsLaunchTestHooks,
+    #[cfg(test)] mut hooks: WindowsLaunchTestHooks<'_>,
 ) -> Result<WindowsLaunchHandles, String> {
     use std::mem::{size_of, zeroed};
     use std::os::windows::io::FromRawHandle;
@@ -536,10 +537,28 @@ fn create_windows_job_with_hooks(
     let mut attrs: windows_sys::Win32::System::Threading::LPPROC_THREAD_ATTRIBUTE_LIST =
         std::ptr::null_mut();
     let mut attr_storage = Vec::<usize>::new();
+    // Test-only fixed observers cannot propagate errors/panics past live raw owners.
+    #[cfg(test)]
+    macro_rules! observe {
+        ($phase:literal) => {
+            if let Some(observer) = hooks.observer.as_deref_mut() {
+                observer.record(
+                    $phase,
+                    [
+                        out_read, out_write, err_read, err_write, job, process, thread,
+                    ],
+                );
+            }
+        };
+    }
     let result = (|| unsafe {
+        #[cfg(test)]
+        observe!("before_pipe");
         if CreatePipe(&mut out_read, &mut out_write, &security, 0) == 0 {
             return Err(last_windows_error("CreatePipe"));
         }
+        #[cfg(test)]
+        observe!("pipe_created");
         #[cfg(test)]
         if hooks.fault == Some(WindowsLaunchFault::Pipe) {
             return Err("injected pipe setup failure".to_owned());
@@ -617,6 +636,8 @@ fn create_windows_job_with_hooks(
         startup.StartupInfo.hStdOutput = out_write;
         startup.StartupInfo.hStdError = err_write;
         let mut info: PROCESS_INFORMATION = zeroed();
+        #[cfg(test)]
+        observe!("before_process");
         if CreateProcessW(
             program_w.as_mut_ptr(),
             command_w.as_mut_ptr(),
@@ -634,6 +655,8 @@ fn create_windows_job_with_hooks(
         }
         process = info.hProcess;
         thread = info.hThread;
+        #[cfg(test)]
+        observe!("process_created");
         #[cfg(test)]
         let assignment_failed = hooks.fault == Some(WindowsLaunchFault::Assignment)
             || AssignProcessToJobObject(job, process) == 0;
@@ -681,6 +704,8 @@ fn create_windows_job_with_hooks(
         })
     })();
     if result.is_err() {
+        #[cfg(test)]
+        observe!("before_cleanup");
         #[cfg(test)]
         let mut cleanup_failures = 0u16;
         unsafe {
@@ -733,6 +758,8 @@ fn create_windows_job_with_hooks(
         }
         // Report only after every cleanup operation has been attempted. Test failures
         // must not short-circuit release of a later handle or termination of the child.
+        #[cfg(test)]
+        observe!("after_cleanup");
         #[cfg(test)]
         assert_eq!(cleanup_failures, 0, "Windows launch cleanup failure mask");
     }
@@ -838,6 +865,118 @@ mod windows_tests {
     use std::path::PathBuf;
     use std::time::Duration;
     use talos_core::background_job::{BackgroundJobLauncher, BackgroundProcessEvent};
+
+    const RETURNED_ORDER: [&str; 7] = [
+        "stdout_read",
+        "stdout_write",
+        "stderr_read",
+        "stderr_write",
+        "job",
+        "process",
+        "thread",
+    ];
+
+    #[derive(serde::Serialize)]
+    struct CallSample {
+        phase: &'static str,
+        before_snapshot: u32,
+        after_snapshot: u32,
+        // Values returned to this launcher, NOT still-live ownership or object IDs.
+        returned: [usize; 7],
+        #[serde(skip)]
+        handles: handle_snapshot::Handles,
+    }
+
+    pub(super) struct LaunchObservation {
+        phases: [&'static str; 4],
+        samples: [Option<CallSample>; 4],
+        next: usize,
+        error: Option<String>,
+    }
+
+    impl LaunchObservation {
+        fn new(mode: u8) -> Self {
+            Self {
+                phases: if mode == 5 {
+                    [
+                        "before_pipe",
+                        "pipe_created",
+                        "before_cleanup",
+                        "after_cleanup",
+                    ]
+                } else {
+                    [
+                        "before_process",
+                        "process_created",
+                        "before_cleanup",
+                        "after_cleanup",
+                    ]
+                },
+                samples: std::array::from_fn(|_| None),
+                next: 0,
+                error: None,
+            }
+        }
+
+        pub(super) fn record(
+            &mut self,
+            phase: &'static str,
+            returned: [windows_sys::Win32::Foundation::HANDLE; 7],
+        ) {
+            if self.error.is_some() || !self.phases.contains(&phase) {
+                return;
+            }
+            // Cover count, capture, numeric copy AND storage. Never unwind past the
+            // launcher's live raw resources or return early from its cleanup.
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                if self.next >= 4 || self.phases[self.next] != phase {
+                    return Err("call checkpoint order/cap".to_owned());
+                }
+                let before_snapshot = current_process_handle_count();
+                let handles = handle_snapshot::capture()?;
+                let after_snapshot = current_process_handle_count();
+                self.samples[self.next] = Some(CallSample {
+                    phase,
+                    before_snapshot,
+                    after_snapshot,
+                    returned: returned.map(|handle| handle as usize),
+                    handles,
+                });
+                self.next += 1;
+                Ok(())
+            }))
+            .unwrap_or_else(|_| Err("call observer panicked; evidence incomplete".to_owned()));
+            if let Err(error) = result {
+                self.error = Some(error);
+            }
+        }
+
+        fn finish(self) -> Result<Vec<u8>, String> {
+            if let Some(error) = self.error {
+                return Err(error);
+            }
+            let samples = self
+                .samples
+                .into_iter()
+                .collect::<Option<Vec<_>>>()
+                .ok_or("missing call checkpoint; evidence incomplete")?;
+            let calls = serde_json::to_value(&samples).map_err(|_| "call receipt encoding")?;
+            let phases = samples
+                .into_iter()
+                .map(|sample| (sample.phase, sample.handles))
+                .collect::<Vec<_>>();
+            let mut receipt: serde_json::Value =
+                serde_json::from_slice(&handle_snapshot::differences(&phases)?)
+                    .map_err(|_| "call differences JSON")?;
+            receipt["calls"] = calls;
+            receipt["returned_order"] = serde_json::json!(RETURNED_ORDER);
+            let output = serde_json::to_vec(&receipt).map_err(|_| "call receipt encoding")?;
+            if output.len() > handle_snapshot::OUTPUT_CAP - 4096 {
+                return Err("call receipt byte cap".to_owned());
+            }
+            Ok(output)
+        }
+    }
 
     fn powershell(script: &str) -> WindowsBackgroundLauncher {
         WindowsBackgroundLauncher::new(
@@ -1132,6 +1271,7 @@ mod windows_tests {
             &launcher.env,
             WindowsLaunchTestHooks {
                 fault: Some(WindowsLaunchFault::UnsupportedHost),
+                ..Default::default()
             },
         ) {
             Ok(_) => panic!("unsupported Job host must fail closed"),
@@ -1177,6 +1317,7 @@ mod windows_tests {
             &launcher.env,
             WindowsLaunchTestHooks {
                 fault: Some(WindowsLaunchFault::Assignment),
+                ..Default::default()
             },
         ) {
             Ok(_) => panic!("injected assignment failure must fail closed"),
@@ -1197,6 +1338,7 @@ mod windows_tests {
             &launcher.env,
             WindowsLaunchTestHooks {
                 fault: Some(WindowsLaunchFault::Resume),
+                ..Default::default()
             },
         ) {
             Ok(_) => panic!("injected resume failure must fail closed"),
@@ -1217,7 +1359,7 @@ mod windows_tests {
             let mut controls = Vec::new();
             // Cold, observer, native cleanup fixtures and stage controls: owned processes. Retain
             // original failure, but attempt all workers before asserting any outcome.
-            for mode in [0u8, 1, 2, 3, 4] {
+            for mode in [0u8, 1, 2, 3, 4, 5, 6] {
                 let directory = tempfile::Builder::new()
                     .prefix("talos-handle-count-")
                     .tempdir()
@@ -1301,7 +1443,7 @@ mod windows_tests {
                 controls.push(control); // retain Jobs through every worker/receipt check
             }
             eprintln!("handle worker outcomes={outcomes:?}");
-            assert_eq!(outcomes.len(), 5);
+            assert_eq!(outcomes.len(), 7);
             for (mode, result) in outcomes {
                 assert!(result.is_ok(), "handle worker mode={mode}: {result:?}");
             }
@@ -1346,6 +1488,8 @@ mod windows_tests {
             Some(value) if value == "2" => 2,
             Some(value) if value == "3" => 3,
             Some(value) if value == "4" => 4,
+            Some(value) if value == "5" => 5,
+            Some(value) if value == "6" => 6,
             Some(_) => panic!("invalid owned handle worker mode"),
         };
         if mode == 2 {
@@ -1361,6 +1505,43 @@ mod windows_tests {
             return;
         }
         let launcher = powershell("Start-Sleep -Seconds 30");
+        if matches!(mode, 5 | 6) {
+            let mut observer = LaunchObservation::new(mode);
+            let fault = if mode == 5 {
+                WindowsLaunchFault::Pipe
+            } else {
+                WindowsLaunchFault::Assignment
+            };
+            let result = create_windows_job_with_hooks(
+                &launcher.program,
+                &launcher.args,
+                &launcher.cwd,
+                &launcher.env,
+                WindowsLaunchTestHooks {
+                    fault: Some(fault),
+                    observer: Some(&mut observer),
+                },
+            );
+            assert_eq!(
+                result.err().as_deref(),
+                Some(if mode == 5 {
+                    "injected pipe setup failure"
+                } else {
+                    "injected AssignProcessToJobObject failure"
+                })
+            );
+            // Explicit receipt assertions/output follow original cleanup. A caught
+            // observer panic may already have invoked the ordinary panic hook.
+            let output = observer
+                .finish()
+                .expect("complete bounded call-boundary receipt");
+            eprintln!(
+                "PSS_CALL_BOUNDARY mode={mode} {}",
+                String::from_utf8_lossy(&output)
+            );
+            std::fs::write(receipt, output).expect("call-boundary receipt");
+            return;
+        }
         if matches!(mode, 3 | 4) {
             let mut phases = Vec::new();
             let mut observations = Vec::new();
@@ -1445,7 +1626,10 @@ mod windows_tests {
                     &launcher.args,
                     &launcher.cwd,
                     &launcher.env,
-                    WindowsLaunchTestHooks { fault: Some(fault) },
+                    WindowsLaunchTestHooks {
+                        fault: Some(fault),
+                        ..Default::default()
+                    },
                 );
                 assert!(result.is_err(), "{fault:?} must fail closed");
                 let expected = match fault {
@@ -1580,6 +1764,18 @@ mod windows_tests {
                         "environment_built",
                         "suspended_process_cleanup",
                     ],
+                    5 => [
+                        "before_pipe",
+                        "pipe_created",
+                        "before_cleanup",
+                        "after_cleanup",
+                    ],
+                    6 => [
+                        "before_process",
+                        "process_created",
+                        "before_cleanup",
+                        "after_cleanup",
+                    ],
                     _ => return Err("invalid observer mode".to_owned()),
                 };
                 let phases = data["phase_sizes"]
@@ -1592,6 +1788,30 @@ mod windows_tests {
                     })
                 {
                     return Err("observer phase order/entry cap invalid".to_owned());
+                }
+                if matches!(mode, 5 | 6) {
+                    if data["returned_order"] != serde_json::json!(RETURNED_ORDER) {
+                        return Err("invalid returned-handle role order".to_owned());
+                    }
+                    let calls = data["calls"].as_array().ok_or("missing call checkpoints")?;
+                    if calls.len() != 4
+                        || calls.iter().zip(expected).any(|(entry, phase)| {
+                            entry["phase"].as_str() != Some(phase)
+                                || ["before_snapshot", "after_snapshot"]
+                                    .into_iter()
+                                    .any(|key| {
+                                        entry[key]
+                                            .as_u64()
+                                            .and_then(|n| u32::try_from(n).ok())
+                                            .is_none()
+                                    })
+                                || entry["returned"].as_array().is_none_or(|values| {
+                                    values.len() != 7 || values.iter().any(|v| v.as_u64().is_none())
+                                })
+                        })
+                    {
+                        return Err("invalid call checkpoint receipt".to_owned());
+                    }
                 }
             }
             if mode == 2 && data["native_checks"] != true {
@@ -1625,13 +1845,47 @@ mod windows_tests {
             &launcher.args,
             &launcher.cwd,
             &launcher.env,
-            WindowsLaunchTestHooks { fault },
+            WindowsLaunchTestHooks {
+                fault,
+                ..Default::default()
+            },
         );
         assert_eq!(
             result.err().as_deref(),
             Some(expected),
             "must reach the intended stage"
         );
+    }
+
+    #[test]
+    fn call_receipt_requires_complete_matching_checkpoints() {
+        let directory = tempfile::tempdir().expect("fixture directory");
+        let path = directory.path().join("receipt.json");
+        let phases = [
+            "before_pipe",
+            "pipe_created",
+            "before_cleanup",
+            "after_cleanup",
+        ];
+        let mut data = serde_json::json!({"child_pid":std::process::id().wrapping_add(1).max(1),
+            "snapshots":4,"changes":[],"returned_order":RETURNED_ORDER,
+            "phase_sizes":phases.map(|phase| (phase,73)),
+            "calls":phases.map(|phase| serde_json::json!({"phase":phase,
+                "before_snapshot":73,"after_snapshot":73,"returned":vec![0u64;7]}))});
+        std::fs::write(&path, serde_json::to_vec(&data).expect("fixture JSON")).expect("write");
+        assert!(validate_handle_receipt(&path, 5).is_ok());
+        assert!(validate_handle_receipt(&path, 6).is_err());
+        data["calls"][2]["returned"] = serde_json::json!(vec![0u64; 6]);
+        std::fs::write(&path, serde_json::to_vec(&data).expect("fixture JSON")).expect("write");
+        assert!(validate_handle_receipt(&path, 5).is_err());
+        let mut observer = LaunchObservation::new(5);
+        // Wrong first phase rejects before any native capture; failure stays contained.
+        observer.record("pipe_created", [std::ptr::null_mut(); 7]);
+        assert_eq!(
+            observer.finish().err().as_deref(),
+            Some("call checkpoint order/cap")
+        );
+        assert!(LaunchObservation::new(6).finish().is_err());
     }
 
     #[test]
