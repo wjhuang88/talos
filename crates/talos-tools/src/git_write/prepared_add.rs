@@ -667,6 +667,35 @@ impl AddPlan {
         authorizations: &[talos_core::tool::ToolExecutionAuthorization],
     ) -> Result<Box<Self>, GitToolError> {
         self.revalidate()?;
+        // execute_stage consumed the immutable profile proof before entering
+        // discovery. The closed capability additionally requires each retained
+        // metadata root's exact Read token; it never covers worktree sources.
+        if !self.facets.iter().any(|facet| {
+            facet.nature == ToolNature::Read
+                && facet.resource_kind == Some(ToolResourceKind::Remote)
+                && facet.resource.as_deref() == Some("git:pull-repository-metadata")
+        }) || [&self.repository.git_dir, &self.repository.common_dir]
+            .iter()
+            .any(|root| {
+                !authorizations.iter().any(|token| {
+                    token.authorizes_path(
+                        "git_pull",
+                        ToolNature::Read,
+                        &self.workspace,
+                        root.to_str().unwrap_or_default(),
+                    )
+                })
+            })
+        {
+            return Err(GitToolError::InvalidInput(
+                "Pull graph discovery lacks dedicated metadata Read admission".into(),
+            ));
+        }
+        let metadata_roots = [
+            self.repository.git_dir.clone(),
+            self.repository.common_dir.clone(),
+        ];
+        let metadata_path = |path: &Path| metadata_roots.iter().any(|root| path.starts_with(root));
         if self.pull_graph_paths.is_none() {
             let index_path = self.repository.git_dir.join("index");
             if !authorizations.iter().any(|token| {
@@ -750,16 +779,11 @@ impl AddPlan {
                 .pull_inventory
                 .take()
                 .ok_or_else(|| GitToolError::Git("Missing Pull graph inventory".into()))?;
-            inventory.advance(|path| {
-                authorizations.iter().any(|token| {
-                    token.authorizes_path(
-                        "git_pull",
-                        ToolNature::Read,
-                        &self.workspace,
-                        path.to_str().unwrap_or_default(),
-                    )
-                })
-            })?;
+            // Descendant names are covered by the separately admitted closed
+            // metadata scope, rather than consuming one runner stage per depth.
+            while !inventory.complete() {
+                inventory.advance(metadata_path)?;
+            }
             let objects_ready = {
                 [&self.repository.git_dir, &self.repository.common_dir]
                     .iter()
@@ -772,24 +796,6 @@ impl AddPlan {
                         inventory.subtree_complete(&objects)
                             && inventory.subtree_complete(&references)
                             && inventory.subtree_complete(&packed)
-                            && inventory
-                                .paths()
-                                .iter()
-                                .filter(|path| {
-                                    path.starts_with(&objects)
-                                        || path.starts_with(&references)
-                                        || **path == packed
-                                })
-                                .all(|path| {
-                                    authorizations.iter().any(|token| {
-                                        token.authorizes_path(
-                                            "git_pull",
-                                            ToolNature::Read,
-                                            &self.workspace,
-                                            path.to_str().unwrap_or_default(),
-                                        )
-                                    })
-                                })
                     })
             };
             let mut encoded = Vec::new();
@@ -872,6 +878,9 @@ impl AddPlan {
             }
             let mut added_facets = false;
             for path in &paths {
+                if metadata_path(path) && !self.pull_attribute_paths.contains(path) {
+                    continue;
+                }
                 if !self.facets.iter().any(|facet| {
                     facet.nature == ToolNature::Read
                         && facet.resource_kind == Some(ToolResourceKind::Path)
@@ -899,22 +908,23 @@ impl AddPlan {
             // Inspect under that same
             // admission instead of spending an identical-profile continuation.
         }
-        // Exact root Read permits directory discovery, not descendant bytes.
-        // The graph inventory must be discovered and admitted separately before
-        // any reflog/object inspection. Configuration discovery cannot grant it.
+        // The dedicated metadata admission covers internal graph evidence.
+        // Worktree sources and attribute files still require exact Read tokens.
         let paths = self.pull_graph_paths.as_ref().filter(|paths| !paths.is_empty())
             .ok_or_else(|| GitToolError::InvalidInput(
                 "Pull reference/reflog/object graph read inventory requires separate discovery and admission; no prefetch probe performed".into(),
             ))?;
         for path in paths {
-            if !authorizations.iter().any(|token| {
-                token.authorizes_path(
-                    "git_pull",
-                    ToolNature::Read,
-                    &self.workspace,
-                    path.to_str().unwrap_or_default(),
-                )
-            }) {
+            if (!metadata_path(path) || self.pull_attribute_paths.contains(path))
+                && !authorizations.iter().any(|token| {
+                    token.authorizes_path(
+                        "git_pull",
+                        ToolNature::Read,
+                        &self.workspace,
+                        path.to_str().unwrap_or_default(),
+                    )
+                })
+            {
                 return Err(GitToolError::InvalidInput(
                     "Pull graph resource lacks exact Read admission".into(),
                 ));
@@ -11980,6 +11990,29 @@ pub(super) mod tests {
     }
 
     #[tokio::test]
+    async fn pull_graph_read_requires_closed_capability_after_configuration() {
+        let root = fixture();
+        let plan =
+            AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+                .expect("Pull");
+        let mut plan = Box::new(plan).discover().await.expect("configuration");
+        plan.facets
+            .retain(|facet| facet.resource.as_deref() != Some("git:pull-repository-metadata"));
+        let admission = proof(&plan)
+            .consume_for_prepared(&plan.request(), &plan.identity)
+            .expect("exact-path admission without closed capability");
+        let Err(error) = plan.discover_pull_prefetch(&admission).await else {
+            panic!("missing metadata capability continued");
+        };
+        assert!(
+            error
+                .to_string()
+                .contains("dedicated metadata Read admission")
+        );
+        assert!(!root.path().join(".git/FETCH_HEAD").exists());
+    }
+
+    #[tokio::test]
     async fn pull_tracking_inventory_uses_shared_stage_budget() {
         let root = fixture();
         let git = |args: &[&str]| {
@@ -12010,6 +12043,9 @@ pub(super) mod tests {
         git(&["config", "branch.Topic.merge", "refs/heads/Topic"]);
         git(&["config", "pull.rebase", "true"]);
         git(&["update-ref", "refs/remotes/origin/Topic", "HEAD"]);
+        // Namespace depth must not consume prepared-runner stages now that
+        // graph inspection uses the dedicated metadata Read capability.
+        git(&["update-ref", "refs/heads/a/b/c/d/e/f/g/h/i/j/deep", "HEAD"]);
         let plan =
             AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
                 .expect("Pull");
