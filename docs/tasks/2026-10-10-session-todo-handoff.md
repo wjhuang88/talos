@@ -1,3 +1,18 @@
+Pull scoped graph discovery checkpoint (2026-10-16, `2c867bb3`): production
+prefetch discovery now requires the closed metadata Read facet and exact Read
+tokens for both identity-bound repository roots, then completes the bounded
+metadata inventory within one admitted stage. Descendant depth no longer causes
+one approval continuation per directory. Worktree sources and attribute files,
+including common-dir info/attributes, retain separate exact Read admission.
+The real shared-stage-budget regression includes a ten-level reference namespace;
+a missing-capability regression refuses after configuration discovery. Locked
+all-feature Pull library tests pass 45/45, all-target all-feature tools Clippy
+passes, and diff checks pass. Independent security/API review, current-head
+workspace preflight and Agent/MCP evidence remain open. Fetch and integration
+remain disabled; the next implementation slice must bind fresh post-fetch Read
+and integration Write plans within the unchanged eight-stage bound. I300/T7 and
+the complete handoff queue remain unfinished; this commit is local/unpublished.
+
 Pull current-branch fetch checkpoint (2026-10-16): implementation commit
 `cd94435e` adds native Pull's `--update-head-ok` to the fixed fetch command;
 regression commit `d819eb8c` verifies with real Git that an explicit current-branch
