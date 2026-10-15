@@ -2,6 +2,10 @@
 
 ## Purpose
 
+[I303](I303-embedded-skill-progressive-disclosure.md) / [SKILL-006](../backlog/active/SKILL-006-embedded-skill-progressive-disclosure.md)
+is an Active/Claimed atomic proposal for #719 under ADR-092 in #720; ineffective until #720 merges.
+No implementation yet; non-overlapping with I293/I294/I300/I301/I302.
+
 [I302](I302-windows-owned-handle-evidence.md) / [TEST-003](../backlog/active/TEST-003-windows-owned-handle-evidence.md)
 is an Active/Claimed atomic proposal in #718 after maintainer scope acceptance on2026-10-14.
 ADR-091/claim are ineffective until #718 main merge; no PSS implementation yet.
