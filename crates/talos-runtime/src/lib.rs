@@ -48,7 +48,7 @@ use talos_permission::{
     GrantSource, InteractionCapability, PermissionContext, PermissionEngine, PermissionSessionState,
 };
 use talos_plugin::HookRegistry;
-use talos_skill::SkillIndex;
+use talos_skill::{Skill, SkillIndex};
 use thiserror::Error;
 use tokio::sync::mpsc;
 
@@ -534,6 +534,7 @@ impl LanguageProviderHost {
 }
 
 mod shutdown;
+mod skill_read;
 
 pub use shutdown::{
     ActiveTurnPolicy, RuntimeShutdownHandle, ShutdownActiveTurnOutcome, ShutdownActorOutcome,
@@ -846,6 +847,10 @@ pub use talos_sandbox::{
 };
 pub use talos_session::{DurableSession, PersistencePolicy, SessionError, SessionManager};
 pub use talos_skill::SkillIndex as RuntimeSkillIndex;
+pub use talos_skill::{
+    Skill as RuntimeSkill, SkillActivation as RuntimeSkillActivation,
+    SkillLoader as RuntimeSkillLoader, SkillReadLimits as RuntimeSkillReadLimits,
+};
 
 /// Explicit built-in capability preset for embedded runtimes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1065,6 +1070,7 @@ pub struct RuntimeBuilder {
     append_prompt: Option<String>,
     hook_registry: Option<Arc<HookRegistry>>,
     skill_index: Vec<SkillIndex>,
+    skill_read_skills: Vec<Skill>,
     durable_session: Option<(DurableSession, PersistencePolicy)>,
     shutdown_finalizers: Vec<Arc<dyn RuntimeFinalizer>>,
     #[cfg(feature = "shared-composition")]
@@ -1094,6 +1100,7 @@ impl RuntimeBuilder {
             append_prompt: None,
             hook_registry: None,
             skill_index: Vec::new(),
+            skill_read_skills: Vec::new(),
             durable_session: None,
             shutdown_finalizers: Vec::new(),
             #[cfg(feature = "shared-composition")]
@@ -1320,10 +1327,37 @@ impl RuntimeBuilder {
     /// from a local or remote skill store) can inject the Level 0 index here,
     /// following the same pattern as the CLI's `skill_runtime.rs`.
     ///
+    /// This injects **Level 0 only**: each skill's name and description. The
+    /// model does not see `SKILL.md` bodies or reference files. To deliver them,
+    /// either activate a skill with [`RuntimeHandle::set_skill_context`] (render
+    /// content with [`RuntimeSkillActivation`]) or opt into the model-initiated
+    /// reader with [`RuntimeBuilder::skill_read_tool`].
+    ///
     /// If not called, the runtime has no skills in its system prompt.
     #[must_use]
     pub fn skill_index(mut self, skills: Vec<SkillIndex>) -> Self {
         self.skill_index = skills;
+        self
+    }
+
+    /// Opts into the built-in read-only `skill_read` tool for these skills.
+    ///
+    /// The model may call `skill_read` with a bound `skill` name to receive its
+    /// full `SKILL.md` body and file list, or with a skill-relative `reference`
+    /// to receive a reference file. Reads are confined to each skill directory
+    /// (no absolute paths, `..` or symbolic links escaping it), limited to UTF-8
+    /// regular files of at most 2 MiB, and returned in 48 KiB chunks with an
+    /// `offset` continuation. Results are ordinary tool results: they enter
+    /// conversation history and durable sessions like other tool output and do
+    /// not change the system prompt. The tool uses the normal permission
+    /// pipeline as a `Read` tool.
+    ///
+    /// Not registered when `skills` is empty or when a caller tool named
+    /// `skill_read` was registered with [`RuntimeBuilder::tool`]. Usually paired
+    /// with [`RuntimeBuilder::skill_index`] so the model knows which skills exist.
+    #[must_use]
+    pub fn skill_read_tool(mut self, skills: Vec<RuntimeSkill>) -> Self {
+        self.skill_read_skills = skills;
         self
     }
 
@@ -1361,6 +1395,16 @@ impl RuntimeBuilder {
             }
             #[cfg(not(feature = "shared-composition"))]
             return Err(RuntimeError::CodingPresetRequiresFeature);
+        }
+        if !self.skill_read_skills.is_empty()
+            && !tools
+                .iter()
+                .any(|tool| tool.name() == skill_read::SKILL_READ_TOOL_NAME)
+        {
+            tools.push(Arc::new(skill_read::SkillReadTool::new(
+                std::mem::take(&mut self.skill_read_skills),
+                talos_skill::SkillReadLimits::default(),
+            )));
         }
         let agent_engine = Arc::new(build_permission_engine(
             self.workspace_root.clone(),
@@ -1534,6 +1578,49 @@ pub struct RuntimeHandle {
 impl RuntimeHandle {
     /// Submits a user message as a new turn.
     pub async fn submit(&self, message: impl Into<String>) -> RuntimeResult<()> {
+        self.send_admitted(SessionOp::Submit {
+            message: message.into(),
+        })
+        .await
+    }
+
+    /// Activates skill content for subsequent provider requests.
+    ///
+    /// `content` is rendered in the system prompt under `# Activated Skill:
+    /// <name>`; use [`RuntimeSkillActivation`] to build the same bounded
+    /// body/reference text as the CLI `/skills activate`. One skill context is
+    /// active at a time; setting replaces the previous one.
+    ///
+    /// Commands are processed in order, so calling this before
+    /// [`Self::submit`] applies to that turn. `Ok` means the change was queued.
+    /// If a turn is active or submissions are pending, the session rejects the
+    /// change and emits [`SessionEvent::Error`] ("cannot change active skill
+    /// while a turn is active"); retry after the turn completes. The context is
+    /// not stored in durable sessions and must be set again after a rebuild.
+    /// Changing it changes the cacheable system-prompt prefix.
+    pub async fn set_skill_context(
+        &self,
+        name: impl Into<String>,
+        content: impl Into<String>,
+    ) -> RuntimeResult<()> {
+        self.send_admitted(SessionOp::SetSkillContext {
+            name: Some(name.into()),
+            content: Some(content.into()),
+        })
+        .await
+    }
+
+    /// Clears the activated skill context; same ordering and turn rules as
+    /// [`Self::set_skill_context`].
+    pub async fn clear_skill_context(&self) -> RuntimeResult<()> {
+        self.send_admitted(SessionOp::SetSkillContext {
+            name: None,
+            content: None,
+        })
+        .await
+    }
+
+    async fn send_admitted(&self, op: SessionOp) -> RuntimeResult<()> {
         if !self.coordinator.is_admission_open() {
             return Err(RuntimeError::RuntimeClosing);
         }
@@ -1545,12 +1632,7 @@ impl RuntimeHandle {
             }
         })?;
         self.coordinator
-            .commit_reserved(
-                permit,
-                SessionOp::Submit {
-                    message: message.into(),
-                },
-            )
+            .commit_reserved(permit, op)
             .map_err(|_| RuntimeError::RuntimeClosing)
     }
 
@@ -1837,6 +1919,7 @@ pub async fn collect_until_turn_completed(
 #[cfg(test)]
 mod tests {
     mod network_invocation;
+    mod skill_disclosure;
     use std::sync::Mutex as StdMutex;
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
     use std::time::Duration;
