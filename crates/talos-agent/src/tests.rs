@@ -846,6 +846,507 @@ struct CaptureApprovalProjection {
     requests: Arc<Mutex<Vec<PermissionApprovalRequest>>>,
 }
 
+struct I300DenyApproval {
+    allow_discovery: bool,
+    requests: Arc<Mutex<Vec<PermissionApprovalRequest>>>,
+}
+
+#[async_trait]
+impl ApprovalResolver for I300DenyApproval {
+    async fn resolve(
+        &self,
+        request: PermissionApprovalRequest,
+        _remaining: std::time::Duration,
+    ) -> Result<talos_core::ApprovalChoice, ApprovalResolverError> {
+        let mut requests = self.requests.lock().await;
+        requests.push(request);
+        Ok(if self.allow_discovery && requests.len() == 1 {
+            talos_core::ApprovalChoice::ApproveOnce
+        } else {
+            talos_core::ApprovalChoice::Deny
+        })
+    }
+}
+
+// The initial characterization on 55fef9f9 failed before approval with an
+// untyped facet. Exercise the repaired production admission and exact staging.
+#[tokio::test]
+async fn i300_real_git_add_two_files_approved_preserves_unrelated_index() {
+    i300_git_add_admission(true, false).await;
+}
+
+#[tokio::test]
+async fn i300_real_git_add_denied_preserves_index_bytes() {
+    i300_git_add_admission(false, false).await;
+}
+
+#[tokio::test]
+async fn i300_real_git_add_discovery_approved_mutation_denied_preserves_index() {
+    i300_git_add_admission(false, true).await;
+}
+
+async fn i300_git_add_admission(approve: bool, allow_discovery: bool) {
+    let root = tempfile::tempdir().expect("workspace");
+    let init = std::process::Command::new("git")
+        .arg("init")
+        .current_dir(root.path())
+        .output()
+        .expect("host Git fixture");
+    assert!(init.status.success());
+    for name in ["first.txt", "second.txt"] {
+        std::fs::write(root.path().join(name), "fixture\n").expect("fixture file");
+    }
+    std::fs::write(root.path().join("unrelated.txt"), "staged before\n").expect("unrelated");
+    let staged = std::process::Command::new("git")
+        .args(["add", "unrelated.txt"])
+        .current_dir(root.path())
+        .output()
+        .expect("initial stage");
+    assert!(staged.status.success());
+    let before_index = std::fs::read(root.path().join(".git/index")).expect("initial index");
+    std::fs::write(root.path().join("unrelated.txt"), "unstaged after\n").expect("unstaged edit");
+    let responses = vec![
+        vec![
+            AgentEvent::TurnStart,
+            AgentEvent::ToolCall {
+                call: ToolCall {
+                    id: "i300-two-files".into(),
+                    name: "git_add".into(),
+                    input: serde_json::json!({"paths": ["first.txt", "second.txt"]}),
+                },
+                provenance: Default::default(),
+                summary_fields: vec![],
+            },
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::ToolUse,
+                usage: Usage::default(),
+            },
+        ],
+        vec![AgentEvent::TurnEnd {
+            stop_reason: StopReason::EndTurn,
+            usage: Usage::default(),
+        }],
+    ];
+    let requests = Arc::new(Mutex::new(Vec::new()));
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(talos_tools::git::GitAddTool::new(
+        root.path().to_path_buf(),
+    )));
+    let resolver: Arc<dyn ApprovalResolver> = if approve {
+        Arc::new(CaptureApprovalProjection {
+            requests: requests.clone(),
+        })
+    } else {
+        Arc::new(I300DenyApproval {
+            allow_discovery,
+            requests: requests.clone(),
+        })
+    };
+    let agent = Agent::with_security_and_hooks(
+        Arc::new(MockModel::new(responses)),
+        registry,
+        Some(Arc::new(PermissionEngine::with_workspace_root(
+            root.path().to_path_buf(),
+        ))),
+        None,
+        root.path().to_path_buf(),
+        Arc::new(HookRegistry::new()),
+    )
+    .with_approval_resolver(resolver);
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    agent
+        .run_streaming("stage first.txt and second.txt".into(), vec![], tx)
+        .await
+        .expect("agent turn");
+    let mut result = None;
+    while let Ok(event) = rx.try_recv() {
+        if let AgentEvent::ToolResult {
+            result: tool_result,
+            ..
+        } = event
+        {
+            if tool_result.tool_use_id == "i300-two-files" {
+                result = Some(tool_result);
+            }
+        }
+    }
+    let result = result.expect("production tool result");
+    if !approve {
+        assert!(result.is_error, "denied invocation must fail");
+        assert!(
+            requests.lock().await.len() == if allow_discovery { 2 } else { 1 },
+            "must reach the selected approval stage, not fail preparation"
+        );
+        assert_eq!(
+            std::fs::read(root.path().join(".git/index")).expect("index"),
+            before_index
+        );
+        return;
+    }
+    assert!(!result.is_error, "{}", result.content);
+    assert!(
+        requests.lock().await.len() == 2,
+        "discovery and mutation must request separate approval"
+    );
+    let index = std::process::Command::new("git")
+        .args(["ls-files", "-z"])
+        .current_dir(root.path())
+        .output()
+        .expect("inspect index");
+    assert!(index.status.success());
+    assert_eq!(index.stdout, b"first.txt\0second.txt\0unrelated.txt\0");
+    let unrelated = std::process::Command::new("git")
+        .args(["show", ":unrelated.txt"])
+        .current_dir(root.path())
+        .output()
+        .expect("unrelated index content");
+    assert!(unrelated.status.success());
+    assert_eq!(unrelated.stdout, b"staged before\n");
+}
+
+struct NormalPreparedFixture {
+    executions: Arc<std::sync::atomic::AtomicUsize>,
+    expose_identity: bool,
+    stages: usize,
+    reuse_identity: bool,
+    stage_delay: std::time::Duration,
+}
+
+struct NormalPreparedOperation {
+    identity: talos_core::tool::PreparedPlanIdentity,
+    expose_identity: bool,
+    executions: Arc<std::sync::atomic::AtomicUsize>,
+    profile: Vec<ToolPermissionFacet>,
+    input: Value,
+    stages: usize,
+    reuse_identity: bool,
+    stage_delay: std::time::Duration,
+}
+
+#[async_trait]
+impl talos_core::tool::PreparedNormalToolInvocation for NormalPreparedOperation {
+    fn plan_identity(&self) -> Option<&talos_core::tool::PreparedPlanIdentity> {
+        self.expose_identity.then_some(&self.identity)
+    }
+    fn permission_profile(&self) -> &[ToolPermissionFacet] {
+        &self.profile
+    }
+
+    async fn execute_stage(
+        self: Box<Self>,
+        admission: Box<dyn std::any::Any + Send>,
+    ) -> talos_core::tool::PreparedNormalStage {
+        let next = (self.stages > 1).then(|| {
+            Box::new(Self {
+                identity: if self.reuse_identity {
+                    self.identity.clone()
+                } else {
+                    Default::default()
+                },
+                expose_identity: self.expose_identity,
+                executions: self.executions.clone(),
+                profile: self.profile.clone(),
+                input: self.input.clone(),
+                stages: self.stages - 1,
+                reuse_identity: self.reuse_identity,
+                stage_delay: self.stage_delay,
+            })
+        });
+        let output = self.execute(admission).await;
+        if !output.result.is_error
+            && let Some(next) = next
+        {
+            talos_core::tool::PreparedNormalStage::Continue(next)
+        } else {
+            talos_core::tool::PreparedNormalStage::Complete(output)
+        }
+    }
+
+    async fn execute(
+        self: Box<Self>,
+        admission: Box<dyn std::any::Any + Send>,
+    ) -> talos_core::tool::ToolExecutionOutput {
+        let Ok(admission) = admission.downcast::<talos_permission::AdmittedInvocation>() else {
+            return talos_core::tool::ToolExecutionOutput::error("missing admission proof");
+        };
+        let request = talos_permission::PermissionRequest::native(
+            "normal_prepared_fixture",
+            &self.profile,
+            &self.input,
+        );
+        if admission
+            .consume_for_prepared(&request, &self.identity)
+            .is_err()
+        {
+            return talos_core::tool::ToolExecutionOutput::error("invalid admission proof");
+        }
+        tokio::time::sleep(self.stage_delay).await;
+        self.executions
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        talos_core::tool::ToolExecutionOutput::from_result(talos_core::tool::ToolResult::success(
+            "prepared",
+        ))
+    }
+}
+
+#[async_trait]
+impl AgentTool for NormalPreparedFixture {
+    fn name(&self) -> &str {
+        "normal_prepared_fixture"
+    }
+    fn description(&self) -> &str {
+        "normal prepared admission fixture"
+    }
+    fn parameters(&self) -> Value {
+        serde_json::json!({"type":"object"})
+    }
+    async fn execute(&self, _input: Value) -> talos_core::tool::ToolResult {
+        panic!("prepared operation must never use legacy execution")
+    }
+    fn prepare_normalized_invocation(
+        &self,
+        input: &Value,
+    ) -> Result<Option<Box<dyn talos_core::tool::PreparedNormalToolInvocation>>, String> {
+        Ok(Some(Box::new(NormalPreparedOperation {
+            identity: talos_core::tool::PreparedPlanIdentity::new(),
+            expose_identity: self.expose_identity,
+            executions: self.executions.clone(),
+            input: input.clone(),
+            profile: vec![ToolPermissionFacet::new(ToolNature::Read).with_description(
+                "x".repeat(input["profile_bytes"].as_u64().unwrap_or(0) as usize),
+            )],
+            stages: self.stages,
+            reuse_identity: self.reuse_identity,
+            stage_delay: self.stage_delay,
+        })))
+    }
+}
+
+#[tokio::test]
+async fn normal_prepared_operation_rejects_forged_direct_admission() {
+    use talos_core::tool::PreparedNormalToolInvocation;
+
+    let executions = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let operation: Box<dyn PreparedNormalToolInvocation> = Box::new(NormalPreparedOperation {
+        identity: talos_core::tool::PreparedPlanIdentity::new(),
+        expose_identity: true,
+        executions: executions.clone(),
+        profile: vec![ToolPermissionFacet::new(ToolNature::Read)],
+        input: serde_json::json!({}),
+        stages: 1,
+        reuse_identity: false,
+        stage_delay: std::time::Duration::ZERO,
+    });
+    let result = operation.execute(Box::new(())).await;
+    assert!(result.result.is_error);
+    assert_eq!(executions.load(std::sync::atomic::Ordering::SeqCst), 0);
+}
+
+#[tokio::test]
+async fn normal_prepared_operation_requires_pipeline_and_refuses_replay() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    for (with_pipeline, expose_identity) in [(false, true), (true, true), (true, false)] {
+        let executions = Arc::new(AtomicUsize::new(0));
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(NormalPreparedFixture {
+            executions: executions.clone(),
+            expose_identity,
+            stages: 1,
+            reuse_identity: false,
+            stage_delay: std::time::Duration::ZERO,
+        }));
+        let agent = Agent::with_security_and_hooks(
+            Arc::new(MockModel::new(vec![])),
+            registry,
+            with_pipeline
+                .then(|| Arc::new(PermissionEngine::with_workspace_root(PathBuf::from(".")))),
+            None,
+            PathBuf::from("."),
+            Arc::new(HookRegistry::new()),
+        );
+        let context = HookContext::new(TurnId::new(), PathBuf::from("."));
+        let calls = [ToolCall {
+            id: "normal-prepared-id".into(),
+            name: "normal_prepared_fixture".into(),
+            input: serde_json::json!({}),
+        }];
+        let policy = talos_core::tool::ToolPresentationPolicy::default();
+        let names = std::collections::HashSet::from(["normal_prepared_fixture".to_string()]);
+        let private = crate::transient_text::PrivateTokens::default();
+        let (results, _) = agent
+            .execute_tools_with_presentation(&context, &calls, None, &policy, &names, &private)
+            .await
+            .expect("execution");
+        assert_eq!(
+            results[0].is_error,
+            !with_pipeline || !expose_identity,
+            "{}",
+            results[0].content
+        );
+        assert_eq!(
+            executions.load(Ordering::SeqCst),
+            usize::from(with_pipeline && expose_identity)
+        );
+        let (results, _) = agent
+            .execute_tools_with_presentation(&context, &calls, None, &policy, &names, &private)
+            .await
+            .expect("replay");
+        assert!(results[0].is_error);
+        assert_eq!(
+            executions.load(Ordering::SeqCst),
+            usize::from(with_pipeline && expose_identity)
+        );
+    }
+}
+
+#[tokio::test]
+async fn normal_prepared_continuations_are_bounded_and_require_fresh_identity() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    for (stages, reuse_identity, profile_bytes, expected_effects, expected_error) in [
+        (2, false, 0, 2, false),
+        (8, false, 0, 8, false),
+        (9, false, 0, 8, true),
+        (2, true, 0, 1, true),
+        (1, false, 16 * 1024 * 1024 + 1, 0, true),
+        (3, false, 8 * 1024 * 1024, 2, true),
+    ] {
+        let executions = Arc::new(AtomicUsize::new(0));
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(NormalPreparedFixture {
+            executions: executions.clone(),
+            expose_identity: true,
+            stages,
+            reuse_identity,
+            stage_delay: std::time::Duration::ZERO,
+        }));
+        let agent = Agent::with_security_and_hooks(
+            Arc::new(MockModel::new(vec![])),
+            registry,
+            Some(Arc::new(PermissionEngine::with_workspace_root(
+                PathBuf::from("."),
+            ))),
+            None,
+            PathBuf::from("."),
+            Arc::new(HookRegistry::new()),
+        );
+        let context = HookContext::new(TurnId::new(), PathBuf::from("."));
+        let calls = [ToolCall {
+            id: "bounded-prepared-stages".into(),
+            name: "normal_prepared_fixture".into(),
+            input: serde_json::json!({"profile_bytes":profile_bytes}),
+        }];
+        let policy = talos_core::tool::ToolPresentationPolicy::default();
+        let names = std::collections::HashSet::from(["normal_prepared_fixture".to_string()]);
+        let private = crate::transient_text::PrivateTokens::default();
+        let (results, _) = agent
+            .execute_tools_with_presentation(&context, &calls, None, &policy, &names, &private)
+            .await
+            .expect("staged execution");
+        assert_eq!(
+            results[0].is_error, expected_error,
+            "{}",
+            results[0].content
+        );
+        assert_eq!(executions.load(Ordering::SeqCst), expected_effects);
+        let (replay, _) = agent
+            .execute_tools_with_presentation(&context, &calls, None, &policy, &names, &private)
+            .await
+            .expect("replay refusal");
+        assert!(replay[0].is_error);
+        assert_eq!(executions.load(Ordering::SeqCst), expected_effects);
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn normal_prepared_stages_share_one_deadline() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    let executions = Arc::new(AtomicUsize::new(0));
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(NormalPreparedFixture {
+        executions: executions.clone(),
+        expose_identity: true,
+        stages: 3,
+        reuse_identity: false,
+        stage_delay: std::time::Duration::from_millis(60),
+    }));
+    let agent = Agent::with_security_and_hooks(
+        Arc::new(MockModel::new(vec![])),
+        registry,
+        Some(Arc::new(PermissionEngine::with_workspace_root(
+            PathBuf::from("."),
+        ))),
+        None,
+        PathBuf::from("."),
+        Arc::new(HookRegistry::new()),
+    )
+    .with_permission_deadline(std::time::Duration::from_millis(100));
+    let context = HookContext::new(TurnId::new(), PathBuf::from("."));
+    let calls = [ToolCall {
+        id: "deadline-prepared-stages".into(),
+        name: "normal_prepared_fixture".into(),
+        input: serde_json::json!({}),
+    }];
+    let policy = talos_core::tool::ToolPresentationPolicy::default();
+    let names = std::collections::HashSet::from(["normal_prepared_fixture".to_string()]);
+    let private = crate::transient_text::PrivateTokens::default();
+    let (results, _) = agent
+        .execute_tools_with_presentation(&context, &calls, None, &policy, &names, &private)
+        .await
+        .expect("bounded execution");
+    assert!(results[0].is_error);
+    assert!(results[0].content.contains("deadline exceeded"));
+    assert_eq!(executions.load(Ordering::SeqCst), 2);
+    let (replay, _) = agent
+        .execute_tools_with_presentation(&context, &calls, None, &policy, &names, &private)
+        .await
+        .expect("replay refusal");
+    assert!(replay[0].is_error);
+    assert_eq!(executions.load(Ordering::SeqCst), 2);
+}
+
+#[tokio::test(start_paused = true)]
+async fn normal_prepared_execution_has_cumulative_wall_clock_budget() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    let executions = Arc::new(AtomicUsize::new(0));
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(NormalPreparedFixture {
+        executions: executions.clone(),
+        expose_identity: true,
+        stages: 3,
+        reuse_identity: false,
+        stage_delay: std::time::Duration::from_secs(360),
+    }));
+    let agent = Agent::with_security_and_hooks(
+        Arc::new(MockModel::new(vec![])),
+        registry,
+        Some(Arc::new(PermissionEngine::with_workspace_root(
+            PathBuf::from("."),
+        ))),
+        None,
+        PathBuf::from("."),
+        Arc::new(HookRegistry::new()),
+    )
+    .with_permission_deadline(std::time::Duration::from_secs(900));
+    let context = HookContext::new(TurnId::new(), PathBuf::from("."));
+    let calls = [ToolCall {
+        id: "wall-clock-prepared-stages".into(),
+        name: "normal_prepared_fixture".into(),
+        input: serde_json::json!({}),
+    }];
+    let policy = talos_core::tool::ToolPresentationPolicy::default();
+    let names = std::collections::HashSet::from(["normal_prepared_fixture".to_string()]);
+    let private = crate::transient_text::PrivateTokens::default();
+    let (results, _) = agent
+        .execute_tools_with_presentation(&context, &calls, None, &policy, &names, &private)
+        .await
+        .expect("bounded execution");
+    assert!(results[0].is_error);
+    assert!(results[0].content.contains("effects may be incomplete"));
+    assert_eq!(executions.load(Ordering::SeqCst), 1);
+}
+
 #[async_trait]
 impl ApprovalResolver for CaptureApprovalProjection {
     async fn resolve(

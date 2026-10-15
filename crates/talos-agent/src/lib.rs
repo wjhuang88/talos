@@ -65,6 +65,7 @@ pub mod prompt;
 mod request_plan;
 mod scheduler;
 pub mod session;
+mod tool_cleanup;
 mod tool_execution;
 
 pub use scheduler::{
@@ -341,6 +342,7 @@ pub struct Agent {
     protocol_capability_cache: talos_core::tool::ProtocolCapabilityCache,
     /// Per-turn custody ledger preventing replay after ambiguous execution.
     execution_ledger: execution_ledger::ExecutionLedger,
+    tool_cleanup: tool_cleanup::ToolCleanup,
 }
 impl Agent {
     async fn assess_protocol_recovery(
