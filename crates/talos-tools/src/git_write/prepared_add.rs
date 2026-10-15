@@ -6116,6 +6116,93 @@ pub(super) mod tests {
         assert!(pull_fetch_command(Path::new("git"), &workdir, "origin", &environment).is_err());
     }
 
+    #[tokio::test]
+    async fn pull_fetch_command_preserves_current_branch_update_for_later_reconciliation() {
+        let root = tempfile::tempdir().expect("fixture");
+        let source = root.path().join("source");
+        let local = root.path().join("local");
+        std::fs::create_dir(&source).expect("source");
+        let git = |cwd: &Path, args: &[&str]| {
+            let output = std::process::Command::new("git")
+                .current_dir(cwd)
+                .env("GIT_CONFIG_NOSYSTEM", "1")
+                .env("GIT_CONFIG_GLOBAL", root.path().join("absent-config"))
+                .args(args)
+                .output()
+                .expect("fixture Git");
+            assert!(output.status.success(), "{args:?}: {output:?}");
+            output.stdout
+        };
+        git(&source, &["init", "-b", "Topic"]);
+        std::fs::write(source.join("tracked"), b"before\n").expect("base file");
+        git(&source, &["add", "tracked"]);
+        git(
+            &source,
+            &[
+                "-c",
+                "user.name=Fixture",
+                "-c",
+                "user.email=fixture@example.invalid",
+                "-c",
+                "commit.gpgSign=false",
+                "commit",
+                "-m",
+                "base",
+            ],
+        );
+        git(
+            root.path(),
+            &[
+                "clone",
+                source.to_str().expect("source path"),
+                local.to_str().expect("local path"),
+            ],
+        );
+        git(
+            &local,
+            &[
+                "config",
+                "--replace-all",
+                "remote.origin.fetch",
+                "+refs/heads/Topic:refs/heads/Topic",
+            ],
+        );
+        std::fs::write(source.join("tracked"), b"after\n").expect("remote update");
+        git(&source, &["add", "tracked"]);
+        git(
+            &source,
+            &[
+                "-c",
+                "user.name=Fixture",
+                "-c",
+                "user.email=fixture@example.invalid",
+                "-c",
+                "commit.gpgSign=false",
+                "commit",
+                "-m",
+                "remote",
+            ],
+        );
+        let expected = git(&source, &["rev-parse", "HEAD"]);
+        let program = resolve_git(&execution_environment()).expect("absolute Git");
+        let mut environment = trace_suppressed_environment(execution_environment());
+        environment.insert("GIT_CONFIG_NOSYSTEM".into(), "1".into());
+        environment.insert(
+            "GIT_CONFIG_GLOBAL".into(),
+            root.path().join("absent-config").into_os_string(),
+        );
+        environment.insert("GIT_TERMINAL_PROMPT".into(), "0".into());
+        let mut command =
+            pull_fetch_command(&program, &local, "origin", &environment).expect("bound fetch");
+        let output = command.output().await.expect("execute fixed fetch");
+        assert!(output.status.success(), "{output:?}");
+        assert_eq!(git(&local, &["rev-parse", "HEAD"]), expected);
+        assert_eq!(
+            std::fs::read(local.join("tracked")).expect("worktree"),
+            b"before\n"
+        );
+    }
+
     #[cfg(windows)]
     #[tokio::test]
     async fn windows_program_guard_allows_real_git_startup() {
