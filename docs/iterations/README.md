@@ -3,8 +3,9 @@
 ## Purpose
 
 [I304](I304-absent-journal-pause.md) / [RUNTIME-011](../backlog/active/RUNTIME-011-absent-journal-pause.md)
-is Review / Claimed for the absent-journal pause no-op, distinct from I301 recovery reads.
-Claim #722 is effective at `23e659e2`; implementation review/full CI and post-repair Windows comparison remain pending.
+is Complete / Closed for the absent-journal pause no-op, distinct from I301 recovery reads.
+#726 merged as `c869a9af` after CI3203/review/CAS; CI3206 post-repair Windows comparison passed
+2220/2220 original-budget executions. I304 retains prior failures and #705 timeout residuals.
 The full selection inventory/non-overlap and preserved #705 failures are in I304.
 
 [I303](I303-embedded-skill-progressive-disclosure.md) / [SKILL-006](../backlog/active/SKILL-006-embedded-skill-progressive-disclosure.md)
@@ -14,7 +15,8 @@ after exact-head CI, independent security/API review and CAS.
 [I302](I302-windows-owned-handle-evidence.md) / [TEST-003](../backlog/active/TEST-003-windows-owned-handle-evidence.md)
 is an Active/Claimed atomic proposal in #718 after maintainer scope acceptance on2026-10-14.
 ADR-091/claim are ineffective until #718 main merge; no PSS implementation yet.
-I293/I294/I300 remain Active; I301/I277 retain Review, I249 Planned and I164 Paused.
+I293/I294/I300 remain Active; I277 retains Review, I249 Planned and I164 Paused.
+I301 bounded startup closeout is recorded below.
 I302 records the full inventory/non-overlap; #716 may later carry separate diagnostic commits.
 
 [I293](I293-search-router.md) retains SEARCH-001-C ownership. The maintainer accepted bounded
@@ -27,9 +29,10 @@ positive TLS failures require365-day synthetic leaf correction and fresh exact-h
 WebSearch default activation and full C/EP acceptance remain Pending, #643/#624 open. I300 and
 PERM-007-H retain their separate scopes.
 
-[I301](I301-missing-pending-sidecar-startup.md) / RUNTIME-010 is Review / Claimed after #710
-merge `42b86112`. PR #711 preserves ParentDir/error/custody behavior; full remote CI
-and independent implementation review remain pending. #705 retains independent diagnostic residuals.
+[I301](I301-missing-pending-sidecar-startup.md) / RUNTIME-010 is Complete / Closed.
+#711 implementation `98fa04cb` merged `9cad344b` after CI3161/review/CAS; post-merge startup
+comparisons satisfy the bounded storage acceptance. I301 retains prior failures and #705
+retains independent broader timeout/integration residuals.
 
 [I300](I300-structured-git-repair.md) plans handoff T7 Git permission/diff repair.
 PR #704 proposes Active / Claimed under accepted ADR-089; both are ineffective

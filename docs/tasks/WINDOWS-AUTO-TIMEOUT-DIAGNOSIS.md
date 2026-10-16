@@ -2,7 +2,7 @@
 
 Date: 2026-10-11. Baseline: `444a8137f054b33802f26bffdb55fb0f83a7a861`.
 
-Current stage (2026-10-16): post-#726 production-baseline comparison; fresh Windows execution pending.
+Current stage (2026-10-16): owned-child lifetime versus parent observation diagnostic; native execution pending.
 Earlier matrices, pending statements and tool availability below are preserved staged history;
 the latest checkpoint defines the current fixed 120-process / 2220-test experiment.
 
@@ -700,3 +700,71 @@ fixtures17cases and delivery fixtures12cases. Both governance validators therefo
 all initial failures are retained. Final staged diff/whitespace review passes with exactly the
 three diagnostic files relative to actual mainc869a9af. No local full-preflight or Windows
 execution is claimed. Next: exact-remote review and all eight CI jobs on this stable candidate.
+
+
+## Owned-Child Lifetime Versus Observation — 2026-10-16
+
+Current production main is3bc38d780804799133f20cfdede583901fb5ada4 (#728). I301 and I304 are
+Complete/Closed in their own bounded source owners; this continuation does not reopen them.
+The baseline comparison at diagnosticff84ec7 completed CI3206/run38832452061:120processes,
+2220pass/0fail. Retain CI3163's2205pass/15fail and CI3182's2219pass/1fail as failed evidence.
+Comments6211820088,6209483437 and6211905052 preserve closeout and raw timing interpretation.
+Search #716 remains independently owned; no Git/PSS/Skill work is transferred.
+
+Offline round verified the CI3206 artifact ZIP SHA256 against GitHub digests:
+baseline12017369938=1faed5ecf6261634cb26b97f82a1360d61d80dedb86260855470f7a7fd412f8e;
+instrumented12018356958=2fcf78709cd7614c4f5f3e004a4c316506121ec122ab54dbfa85a599d52b36cb.
+All60 child samples have unique assigned/resumed, wait-return and pipe-join endpoints and an
+ordered first stdout-read return paired with positive byte count for the same log/PID/handle.
+Assigned-to-positive-read median181.3484ms/max4846.9981ms; positive-read-to-wait-return
+median16.4012ms/max65.2970ms; wait-return-to-pipe-join median0.18025ms/max0.2497ms.
+The slowest successful sample spends98.6707435% of its4912.2951ms assigned-to-wait window before
+that positive read. This is parent-observed read completion, not child write/script-entry time.
+The optional waiter-entry timestamp in parallel-7 was interleaved; no timestamp was reconstructed.
+Eighteen of20 evaluator branches have intact intermediate timing markers, with maximum
+host-ready-to-Stopped328.0706ms. Two branches are incomplete due to interleaving. This proxy span
+is not the exact outer5s timer; the old uninstrumented failure remains phase-unknown.
+
+Hypothesis for the next native round: a material part of observed assigned-to-wait time could be
+parent observation delay after the child has already exited. The existing GetProcessTimes call
+already fills initialized creation/exit FILETIMEs but only CPU fields were emitted. The sole
+probe increment emits those two existing values with process handle/PID/thread, only when the
+existing wait returns WAIT_OBJECT_0 and GetProcessTimes succeeds. No extra native call, unsafe
+site, access right, other PID, PSS, child command, await or timer is introduced. Failure/timeout
+emits no lifetime record; absence is unknown, never zero. Exit code259 alone is not used to infer
+liveness. Existing CPU/IO/wait records and their order are retained.
+
+Primary API contract:
+https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getprocesstimes
+Creation/exit FILETIMEs are wall-clock points in100ns units since1601; exit is undefined while
+running. Successful read plus a signaled owned-process wait gates use of exit. In analysis, require
+matching identity/lifetime, valid ordering and intact records before subtracting. Preserve raw
+values and reject negative/inconsistent spans rather than clamping. Wall-clock adjustments,
+resolution and logging/scheduling overhead limit attribution; these are not monotonic spans.
+Compare recorded exit with native_wait_observed and process_wait_return; the latter also includes
+sampling/logging/CloseHandle overhead. Compare creation-to-exit separately from assigned-to-exit:
+creation precedes assignment/resume. An exit substantially before observation supports an
+observation-delay component; an exit close to observation leaves the long child lifecycle to be
+explained. Neither result proves Defender, disk or any particular startup/execution cause.
+
+The bounded CI/fixture-maintenance exception remains applicable. Fresh-first baseline/instrumented
+runners, all original assertions, Rust1.99.0, dependencies/lockfile, Auto15s/cleanup10s/tool120s/
+evaluator5s, process counts and enclosing budgets remain unchanged. The unchanged workflow runs
+on this substantively new diagnostic head, not an unchanged-head retry to replace old failures.
+The six raw production snapshots must still restore with exact readback. No prewarm, skip,
+threshold relaxation, retry-to-green, release, production repair or merge of #705 is authorized.
+Old10s/15s failures, evaluator5s, existing-journal cost and Plugin uncertainty remain open.
+Local and exact-remote review/validation evidence follows; native results must be recorded after
+execution, without promoting a successful sample to universal reliability or root-cause closure.
+
+
+Local preparation for this delta: diagnostic self-test including restoration/mismatch fixtures
+passed; pinned Rust1.99 rustfmt parsed all six generated overlays without changing production
+sources. A disposable Rust harness executes the actual generated lifetime guard over nine
+wait/success combinations (signaled/timeout/failed times zero/positive/negative BOOL), emitting
+only two signaled-success records; high-word FILETIME conversion also passes. This is mocked
+value verification, not native execution. Classifier14, text boundary23crates, whitespace and
+both governance validators pass with0warnings (SQLite17 and delivery12 fixture cases). Actual
+locked Cargo metadata used the pinned environment. No new Windows or local full-preflight pass
+is claimed; the exact-head native workflow remains required. Incoming main closeout files are
+preserved byte-for-byte and only the same three diagnostic files differ from current main.

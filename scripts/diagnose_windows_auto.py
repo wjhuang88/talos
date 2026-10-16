@@ -158,6 +158,10 @@ fn windows_auto_probe(stage: &str, identity: usize) {
                     let times_read_ok = windows_sys::Win32::System::Threading::GetProcessTimes(process, &mut created, &mut exited, &mut kernel, &mut user);
                     let ticks = |value: windows_sys::Win32::Foundation::FILETIME| ((value.dwHighDateTime as u64) << 32) | value.dwLowDateTime as u64;
                     eprintln!("WINDOWS_AUTO_DIAG times_read_ok={} kernel_100ns={} user_100ns={} identity={}", times_read_ok, ticks(kernel), ticks(user), process as usize);
+                    // Exit FILETIME is undefined until exit; only use a successful read after a signaled wait.
+                    if observed == windows_sys::Win32::Foundation::WAIT_OBJECT_0 && times_read_ok != 0 {
+                        eprintln!("WINDOWS_AUTO_DIAG lifetime_read_ok=1 created_100ns={} exited_100ns={} identity={} pid={} thread={:?}", ticks(created), ticks(exited), process as usize, std::process::id(), std::thread::current().id());
+                    }
                     let mut io = windows_sys::Win32::System::Threading::IO_COUNTERS {
                         ReadOperationCount: 0, WriteOperationCount: 0, OtherOperationCount: 0,
                         ReadTransferCount: 0, WriteTransferCount: 0, OtherTransferCount: 0,
@@ -526,6 +530,9 @@ def main() -> int:
         assert "WaitForSingleObject(process, 1_000)" in patched[BOUNDARY]
         assert "observed != windows_sys::Win32::Foundation::WAIT_TIMEOUT" in patched[BOUNDARY]
         assert "GetProcessTimes(process," in patched[BOUNDARY]
+        assert patched[BOUNDARY].count("GetProcessTimes(process,") == 1
+        assert patched[BOUNDARY].count("if observed == windows_sys::Win32::Foundation::WAIT_OBJECT_0 && times_read_ok != 0 {") == 1
+        assert patched[BOUNDARY].count("lifetime_read_ok=1 created_100ns={}") == 1
         assert patched[BOUNDARY].count("GetProcessIoCounters(process, &mut io)") == 1
         assert "let io_error = if io_read_ok == 0 { windows_sys::Win32::Foundation::GetLastError() } else { 0 };" in patched[BOUNDARY]
         assert all(field + ": 0" in patched[BOUNDARY] for field in (
