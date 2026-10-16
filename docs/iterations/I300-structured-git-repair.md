@@ -1,3 +1,12 @@
+Attribute missing-file correction (2026-10-16): `f464b8df` keeps absent
+`.gitattributes` evidence as an empty rule layer instead of demanding an index
+fallback. Native `git check-attr` reads worktree attribute sources for ordinary
+(non-`--cached`) inspection; index fallback remains limited to current
+`.gitmodules` declarations. Pull tests pass 76/76 after the correction and
+Clippy passes. This does not close T7: child identity/config/remote admission,
+object checks/retries, nested fetch, integration execution, lifecycle budgets,
+security review and delivery gates remain open.
+
 Post-rebase verification (2026-10-16): local I300 history now descends from
 origin/main `3bc38d78`; the attribute ancestor inventory is `1c0a386b` after
 rebase. The staged child-attribute admission implementation passes locked
