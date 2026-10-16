@@ -116,3 +116,38 @@ object identity probe, production change, threshold/warmup/skip or root-cause ac
 The unchanged original cold40/+2 worker remains authoritative. Counts and checked closes do not
 prove process exit/reaping, cache ownership or absence of leaks. Fresh protected review/full native
 CI remain required; this clarification adds no native permission beyond the existing lifecycle.
+
+## Maintainer-Accepted TEST-004 Amendment — 2026-10-16
+
+Maintainer accepted #717 proposal6217718821 at22:39 Asia/Shanghai. This governance-only amendment
+becomes effective ONLY with finalized I305/TEST-004 claim merge into main; before then the original
++2 rule above remains authoritative. It does not rewrite I302's original baseline or failed history.
+
+After that merge, TEST-004/#729 may replace the +2 pass/fail oracle with acceptance for enumerated
+Talos-owned resources returned successfully from the existing Windows native boundary. Preserve
+all40 exact faults, original baseline/separate final raw count trace, direct controls and all failed
+runs. No warmup/raised threshold/new skip. Unknown process-wide/native resource attribution stays
+an OPEN TEST-003/#717 residual. No cache/no-leak/global-repair or automatic #716 merge claim follows.
+
+The replacement requires complete independently reviewed/enforced native acquisition/transfer/
+release/termination/attribute site inventory, actual outputs and API results, role+acquisition
+generation, and real negative operation-path controls. A balanced ledger or mutated JSON alone
+is insufficient. Failed outputs never become owned. Attributes delete only after successful init,
+with stable value/backing storage through Delete; that void call proves invocation only.
+
+TEST-004 uses existing ADR-068 WaitForSingleObject on a still-owned CreateProcessW-returned handle.
+Positive TerminateProcess plus bounded<=5s wait must observe signalled exit before close. Timeout/
+failure/unexpected result fails the gate while all cleanup continues. An intentionally omitted
+termination is observed with timeout0/WAIT_TIMEOUT, then explicitly terminated/waited/closed.
+No OpenProcess, external PID lookup, extra rights/privilege or new observation API is authorized.
+Real omitted-close/delete fixtures retain ownership/storage for explicit recovery; duplicate-release
+fixtures prove rejection BEFORE a second native release, never blind CloseHandle reuse/debugger
+exceptions. No fixture resumes an unassigned child; retain outer kill-on-close Job containment,
+original worker/output bounds and panic-contained native integration. Native wait/recovery failure
+remains a failed/incomplete result, not false success or a retry of uncertain descriptors.
+
+Only cfg(test,windows) instrumentation/assertions may change. No production launcher/search/API/
+permission/dependency/lock change. Positive/all40 and real negative sensitivity plus protected
+exact-head review, full native CI and final CAS precede acceptance. Any untracked native acquisition
+or broader process-resource/OS lifetime claim remains outside this narrowed proof and is recorded
+in #717. I305 selection and amendment authorize implementation only after effective main merge.
