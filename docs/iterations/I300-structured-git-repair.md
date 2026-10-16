@@ -3714,3 +3714,11 @@ remote helpers and Git proxy programs. Disabled signing/recursion retain discove
 All 176 tools Git library tests and all-target Clippy pass. Transport execution
 remains closed and incomplete; these checks do not establish full push effect
 coverage or replace the missing independent transport review.
+Pull child configuration continuation checkpoint (2026-10-16, `88246a89`):
+configuration-chain discovery now has explicit state. The first continuation
+records Git-reported include sources and returns for fresh exact Read admission;
+the next continuation verifies every source before recapturing configuration,
+clearing stale captures to prevent duplicate child configs. Locked all-feature
+Pull tests pass 76/76 and `cargo check --locked -p talos-tools --all-features`
+passes. Child remote semantics, object admission, recursive fetch, integration,
+and delivery gates remain open; Production Pull remains disabled.
