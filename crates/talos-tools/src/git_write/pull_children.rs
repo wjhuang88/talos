@@ -5,12 +5,37 @@ use std::collections::BTreeMap;
 
 use super::GitToolError;
 
+/// Historical invalid modes are retained: native Git treats them as demand
+/// policy rather than aborting historical blob discovery.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum Recursion {
+    Off,
+    On,
+    OnDemand,
+    Invalid,
+}
+
+impl Recursion {
+    fn parse(value: Option<&[u8]>) -> Self {
+        if value == Some(b"on-demand".as_slice()) {
+            Self::OnDemand
+        } else {
+            match super::config_state::git_boolean(value) {
+                Ok(true) => Self::On,
+                Ok(false) => Self::Off,
+                Err(_) => Self::Invalid,
+            }
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub(super) struct Tree {
     pub(super) gitlinks: BTreeMap<String, String>,
     pub(super) modules_blob: Option<String>,
     pub(super) changed_gitlinks: BTreeMap<String, String>,
     pub(super) module_names: BTreeMap<String, String>,
+    pub(super) module_recursion: BTreeMap<String, Recursion>,
     pub(super) declared_names: std::collections::BTreeSet<String>,
 }
 
@@ -22,6 +47,7 @@ pub(super) struct Changed {
     pub(super) commit: String,
     pub(super) path: String,
     pub(super) objects: std::collections::BTreeSet<String>,
+    pub(super) historical_recursion: Option<Recursion>,
 }
 
 pub(super) fn collect_named_changes(
@@ -40,6 +66,7 @@ pub(super) fn collect_named_changes(
             let changed = result.entry(name.clone()).or_insert_with(|| Changed {
                 commit: commit.clone(),
                 path: path.clone(),
+                historical_recursion: tree.module_recursion.get(name).copied(),
                 objects: std::collections::BTreeSet::new(),
             });
             changed.objects.insert(object.clone());
@@ -61,6 +88,7 @@ impl Tree {
             modules_blob: None,
             module_names: BTreeMap::new(),
             declared_names: std::collections::BTreeSet::new(),
+            module_recursion: BTreeMap::new(),
             changed_gitlinks: BTreeMap::new(),
         };
         if bytes.is_empty() {
@@ -156,11 +184,12 @@ impl Tree {
         if bytes.len() > 1024 * 1024 {
             return Err(invalid());
         }
-        let (names, declared_names) = std::panic::catch_unwind(|| {
+        let (names, declared_names, module_recursion) = std::panic::catch_unwind(|| {
             use gix::config::parse::EventRef as Event;
             let file =
                 gix::config::parse::Events::from_bytes(bytes, None).map_err(|_| invalid())?;
             let mut by_name = BTreeMap::new();
+            let mut recursion = BTreeMap::new();
             let mut declared = std::collections::BTreeSet::new();
             for section in file.sections() {
                 let Event::SectionHeader {
@@ -182,34 +211,46 @@ impl Tree {
                     return Err(invalid());
                 }
                 declared.insert(name.to_owned());
-                if by_name.contains_key(name) {
-                    continue;
-                }
                 // Preserve the first declaration, including whether it had '='.
                 // Body value queries select different duplicates for implicit keys.
                 let mut is_path = false;
+                let mut is_recursion = false;
                 let mut explicit = false;
                 let mut raw = Vec::new();
                 let mut first_path = None;
                 for event in section.body() {
                     match event {
                         Event::SectionValueName(key) => {
-                            is_path = key.eq_ignore_ascii_case(b"path");
+                            is_path = key.eq_ignore_ascii_case(b"path")
+                                && !by_name.contains_key(name)
+                                && first_path.is_none();
+                            is_recursion = key.eq_ignore_ascii_case(b"fetchrecursesubmodules")
+                                && !recursion.contains_key(name);
                             explicit = false;
                             raw.clear();
                         }
                         Event::KeyValueSeparator => explicit = true,
-                        Event::ValueNotDone(value) if is_path => {
+                        Event::ValueNotDone(value) if is_path || is_recursion => {
                             raw.extend_from_slice(value.as_ref());
                         }
-                        Event::Value(value) | Event::ValueDone(value) if is_path => {
-                            if !explicit {
-                                return Err(invalid());
-                            }
+                        Event::Value(value) | Event::ValueDone(value)
+                            if is_path || is_recursion =>
+                        {
                             raw.extend_from_slice(value.as_ref());
-                            first_path =
-                                Some(gix::config::value::normalize(raw.as_slice()).into_owned());
-                            break;
+                            let normalized = gix::config::value::normalize(raw.as_slice());
+                            if is_path {
+                                if !explicit {
+                                    return Err(invalid());
+                                }
+                                first_path = Some(normalized.into_owned());
+                            } else {
+                                recursion.insert(
+                                    name.to_owned(),
+                                    Recursion::parse(explicit.then_some(normalized.as_ref())),
+                                );
+                            }
+                            is_path = false;
+                            is_recursion = false;
                         }
                         _ => {}
                     }
@@ -235,11 +276,12 @@ impl Tree {
                     return Err(invalid());
                 }
             }
-            Ok((by_path, declared))
+            Ok((by_path, declared, recursion))
         })
         .map_err(|_| invalid())??;
         self.module_names = names;
         self.declared_names = declared_names;
+        self.module_recursion = module_recursion;
         Ok(())
     }
 }
@@ -257,6 +299,14 @@ mod tests {
             tree.changed_gitlinks
                 .insert("undeclared".into(), "c".repeat(40));
             tree.module_names.insert(path.into(), "Child".into());
+            tree.module_recursion.insert(
+                "Child".into(),
+                if commit == "z" {
+                    Recursion::Off
+                } else {
+                    Recursion::On
+                },
+            );
             // Module names are case sensitive.
             tree.changed_gitlinks.insert("lower".into(), "d".repeat(40));
             tree.module_names.insert("lower".into(), "child".into());
@@ -267,6 +317,7 @@ mod tests {
         assert_eq!(changed.len(), 2);
         assert_eq!(changed["Child"].commit, "z");
         assert_eq!(changed["Child"].path, "renamed");
+        assert_eq!(changed["Child"].historical_recursion, Some(Recursion::Off));
         assert_eq!(changed["Child"].objects.len(), 2);
         assert_eq!(changed["child"].objects.len(), 1);
         assert!(collect_named_changes(&["missing".into()], &trees).is_err());
@@ -376,6 +427,35 @@ mod tests {
                 .expect("non-links");
             assert!(tree.changed_gitlinks.is_empty());
         }
+    }
+
+    #[test]
+    fn pull_historical_recursion_is_first_per_key_across_sections() {
+        let mut tree = Tree::parse(b"", 40).expect("tree");
+        tree.bind_modules(
+            br#"[submodule "child"]
+path = nested/child
+[submodule "child"]
+fetchRecurseSubmodules = on-demand
+fetchRecurseSubmodules = false
+[submodule "implicit"]
+fetchRecurseSubmodules
+[submodule "empty"]
+fetchRecurseSubmodules =
+[submodule "invalid"]
+fetchRecurseSubmodules = unsupported
+fetchRecurseSubmodules = true
+[submodule "Child"]
+fetchRecurseSubmodules = true
+"#,
+        )
+        .expect("historical policy");
+        assert_eq!(tree.module_recursion["child"], Recursion::OnDemand);
+        assert_eq!(tree.module_recursion["implicit"], Recursion::On);
+        assert_eq!(tree.module_recursion["empty"], Recursion::Off);
+        assert_eq!(tree.module_recursion["invalid"], Recursion::Invalid);
+        assert_eq!(tree.module_recursion["Child"], Recursion::On);
+        assert_eq!(tree.module_names["nested/child"], "child");
     }
 
     #[test]
