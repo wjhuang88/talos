@@ -1,6 +1,6 @@
 //! Fetched target parsing for the pending prepared Pull continuation.
 //! Pre-fetch evidence is used by the prepared production discovery stage.
-//! Integration selection remains test-only until mutation effects are admitted.
+//! Integration selection is read-only; mutation requires a separate effect plan.
 
 use super::GitToolError;
 
@@ -360,8 +360,7 @@ impl PullEvidence {
         Ok(())
     }
 
-    #[cfg(test)]
-    fn fetch_head(&self) -> Result<&[u8], GitToolError> {
+    pub(super) fn fetch_head(&self) -> Result<&[u8], GitToolError> {
         let path = self.repository.git_dir.join("FETCH_HEAD");
         self.entries
             .iter()
@@ -855,8 +854,7 @@ impl BeforeFetch {
 
     // Run only after fetch and admitted object inspection. The caller must bind
     // FETCH_HEAD and these graph observations to the next mutation admission.
-    #[cfg(test)]
-    async fn integration<F, Fut>(
+    pub(super) async fn integration<F, Fut>(
         &self,
         fetched: &[u8],
         oid_length: usize,
@@ -870,7 +868,6 @@ impl BeforeFetch {
             .await
     }
 
-    #[cfg(test)]
     async fn integration_stage<F, Fut>(
         &self,
         fetched: &[u8],
@@ -1230,8 +1227,7 @@ impl BeforeFetch {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-#[cfg(test)]
-enum Integration {
+pub(super) enum Integration {
     Unborn(String),
     Command(Vec<String>),
     Reconcile { original: String, current: String },
@@ -1465,7 +1461,6 @@ fn pull_policy_preserves_branch_override_and_autostash_precedence() {
 
 /// Keep merge candidates in FETCH_HEAD order, without interpreting or exposing
 /// the remote-description field (which may contain credentials or non-UTF-8).
-#[cfg(test)]
 fn merge_candidates(bytes: &[u8], oid_length: usize) -> Result<Vec<String>, GitToolError> {
     let invalid =
         || GitToolError::InvalidInput("Invalid or oversized Pull FETCH_HEAD evidence".into());
