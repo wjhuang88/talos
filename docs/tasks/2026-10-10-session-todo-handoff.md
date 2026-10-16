@@ -1,3 +1,13 @@
+Pull fetch destination checkpoint (2026-10-16, `595d6f64`): prefetch
+evidence now binds FETCH_HEAD as well as post-fetch evidence. Previously a
+stable symlink at that fetch output was outside the prefetch evidence set.
+The new regression checks absent-file creation, regular-content drift and
+external symlink refusal with an unchanged external sentinel. Locked
+all-feature Pull tests pass 48/48; formatting and staged-diff checks pass.
+The prior full-preflight pass predates this change. Production fetch and
+integration remain disabled; fresh full validation and delivery gates remain
+open, and I300/T7 remains Active.
+
 Pull metadata redirection and full-gate checkpoint (2026-10-16,
 `e7ef0081`): added direct regressions for a discovered ref directory
 replaced by a symlink and for a redirected metadata root before its first
