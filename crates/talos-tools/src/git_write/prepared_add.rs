@@ -1756,11 +1756,16 @@ impl AddPlan {
                             &mut metadata,
                             macros,
                         ),
-                        // A missing worktree attribute file contributes no
-                        // rules. Git does not substitute the index for
-                        // `.gitattributes`; the Missing evidence is retained
-                        // so later creation invalidates this decision.
-                        snapshot::Entry::Missing => {}
+                        snapshot::Entry::Missing if !local => {}
+                        // Git may fall back to the index for a missing
+                        // worktree attribute file. This stage has not yet
+                        // admitted the index blob, so refuse rather than
+                        // silently evaluating an incomplete rule set.
+                        snapshot::Entry::Missing => {
+                            return Err(GitToolError::InvalidInput(
+                                "Pull activity requires admitted index attribute fallback".into(),
+                            ));
+                        }
                         _ => {
                             return Err(GitToolError::InvalidInput(
                                 "Invalid Pull activity attribute evidence".into(),

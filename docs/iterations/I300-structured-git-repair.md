@@ -1,3 +1,13 @@
+Correction (2026-10-16): the missing-attribute conclusions in the two checkpoints
+below are incorrect and superseded. A native Git regression now stages root and
+nested `.gitattributes`, removes both worktree files, and confirms ordinary
+`check-attr` still returns the nested index attribute value. Missing worktree
+rules therefore require index fallback; until implemented, activity resolution
+refuses them. Missing system/global/info sources remain empty layers. The prior
+76/76 and final-source Clippy claims were not supported by a full run at that
+head; only the earlier 75-test run and a separate focused test were observed.
+T7 remains Active; this correction is not completion evidence.
+
 Pull activity evaluation checkpoint (2026-10-16, `5251f731`): admitted
 attribute snapshots now build a gix attribute search in the dedicated
 `PullChildAttributes` stage and resolve `submodule.active` attribute pathspecs
