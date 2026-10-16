@@ -4356,7 +4356,7 @@ impl AddPlan {
                 ));
             }
         }
-        if matches!(self.operation, Operation::Push(_)) {
+        if matches!(self.operation, Operation::Push(_) | Operation::Pull(_)) {
             super::remote_state::reject_legacy_remotes(&self.repository.common_dir)?;
         }
         for layout in &self.checkout_child_layouts {
@@ -11417,6 +11417,50 @@ pub(super) mod tests {
         assert!(output.result.is_error);
         assert!(output.result.content.contains("transport"));
         assert!(!root.path().join(".git/FETCH_HEAD").exists());
+    }
+
+    #[tokio::test]
+    async fn pull_rejects_legacy_destinations_before_configuration_and_after_fetch_planning() {
+        for directory in ["remotes", "branches"] {
+            for after_planning in [false, true] {
+                let root = fixture();
+                let input = serde_json::json!({"remote":"origin"});
+                let mut plan = Box::new(
+                    AddPlan::prepare_pull(root.path(), &input, ToolProvenance::Native)
+                        .expect("Pull plan"),
+                );
+                if after_planning {
+                    plan = plan.discover().await.expect("configuration");
+                    while plan.phase != Phase::PullFetch {
+                        let admission = proof(&plan)
+                            .consume_for_prepared(&plan.request(), &plan.identity)
+                            .expect("discovery admission");
+                        plan = plan
+                            .discover_pull_prefetch(&admission)
+                            .await
+                            .expect("fetch planning");
+                    }
+                }
+                let admission = proof(&plan);
+                let legacy = root.path().join(".git").join(directory);
+                std::fs::create_dir_all(&legacy).expect("legacy directory");
+                std::fs::write(legacy.join("origin"), "URL: ext::unapproved-command\n")
+                    .expect("legacy destination");
+                let PreparedNormalStage::Complete(output) =
+                    plan.execute_stage(Box::new(admission)).await
+                else {
+                    panic!("legacy destination continued");
+                };
+                assert!(output.result.is_error, "{}", output.result.content);
+                assert!(
+                    output.result.content.contains("Legacy Git remote"),
+                    "{}",
+                    output.result.content
+                );
+                assert!(!root.path().join(".git/FETCH_HEAD").exists());
+                assert!(!root.path().join(".git/index").exists());
+            }
+        }
     }
 
     #[tokio::test]
