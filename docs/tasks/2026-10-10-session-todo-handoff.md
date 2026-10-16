@@ -1,3 +1,20 @@
+Pull legacy-remote checkpoint (2026-10-16, `4fee02d5`): Pull rejects
+legacy `.git/remotes` and `.git/branches` destination files before configuration
+discovery and after fetch planning. Locked all-feature Pull tests pass 49/49;
+tools all-target all-feature Clippy, formatting and both governance validators
+pass. Sandboxed standard preflight failed with 749 tools tests passing and one
+process-observation `PermissionDenied`; log
+`/private/tmp/i300-rebased-legacy-preflight.log`. Approved outside-sandbox standard
+`release_preflight.sh` passed against source commit `4fee02d5`: 750 tools tests
+passed, the external runtime fixture passed, and the final log reports
+`release preflight: passed` at
+`/private/tmp/i300-rebased-legacy-preflight-approved.log`. The sandbox-only
+process-observation failure is environmental. Separate commit `87340529` updates
+gix release tracking only. Production Pull fetch/integration, independent review,
+Agent/MCP evidence and publication remain open. I300/T7 remains Active; later
+tasks remain queued. Keep independently verifiable implementation and
+documentation stages in separate commits, as requested by the maintainer.
+
 Rebase checkpoint (2026-10-16): integrated `origin/main` at `c869a9af`
 (PR #726) into `feat/i300-git-repair`. The append-position conflict in
 session tests preserves both the upstream absent-journal regression and the
