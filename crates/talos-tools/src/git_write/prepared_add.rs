@@ -1466,8 +1466,13 @@ impl AddPlan {
             .as_ref()
             .ok_or_else(|| GitToolError::Git("Missing Pull pre-fetch recursion policy".into()))?;
         for (name, child) in &mut self.pull_changed_children {
-            child.effective_recursion =
-                Some(before.child_recursion(name, child.historical_recursion)?);
+            // Selection still needs current-index/active-policy evidence. Keep
+            // invalid current policy dormant until this candidate is selected.
+            child.effective_recursion = Some(
+                before
+                    .child_recursion(name, child.historical_recursion)
+                    .unwrap_or(super::pull_children::Recursion::Invalid),
+            );
         }
         self.pull_integration = Some(
             self.pull_before
