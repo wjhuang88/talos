@@ -1,3 +1,11 @@
+Pull child configuration checkpoint (2026-10-16): `PullChildIdentity` now
+transitions active children into `PullChildConfiguration`. Each child requests
+exact Read admission for its identity-bound common-dir `config`, captures the
+configuration through the existing bounded host inspection, and only then
+returns to integration selection. Pull tests pass 76/76 and cargo check passes
+(`/private/tmp/i300-child-config.log`). Include-chain expansion, remote-specific
+admission, child object checks and recursive execution remain open.
+
 Pull child identity checkpoint (2026-10-16): after admitted activity
 resolution, selected active children now enter a separate `PullChildIdentity`
 stage. It requests exact Read admission for each child worktree and `.git`
