@@ -1,3 +1,13 @@
+Parent fetch execution checkpoint (2026-10-16, `747d0a84`): PullFetch now invokes
+the owned command runner after retained evidence, metadata Write, transport and
+hook checks. Nonzero exits report possible partial effects; successful fetch
+creates a new plan identity with Read/Execute facets only. PullPostFetch still
+refuses integration explicitly, retaining fetched metadata. A local fake-peer
+regression exercises actual fetch failure and passes; locked all-feature tools
+check passes; locked all-feature Pull regression passes 54/54. Successful-fetch continuation evidence,
+post-fetch inventory capture, child recursion, integration, independent review
+and final publication remain open. This is a local stage, not T7 completion.
+
 Post-fetch Pull evidence checkpoint (2026-10-16, `6f710376`): fetched metadata
 can now be rebound to the retained gitdir/common-dir/worktree identities after
 the parent fetch changes refs and objects. The fresh capture checks the old
