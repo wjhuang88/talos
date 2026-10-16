@@ -272,3 +272,12 @@ Maintainer accepted narrower known-resource acceptance at22:39 Asia/Shanghai. Ne
 and I305/#730 own the proposed criterion/instrumentation/real-negative correction, only after their
 claim/amendedADR reaches main. This owner retains PSS diagnostics and unexplained/untracked
 process-wide/native resources as an OPEN residual; no completion/status takeover or #716 merge.
+
+
+## Effective TEST-004 Boundary — 2026-10-16
+
+#730 merged c81782b6 establishes TEST004/I305 and the accepted ADR091 amendment. The #716
+candidate may replace the global+2 oracle with actual enumerated-resource acceptance only under
+that independent owner. New instrumentation/all40/real negative native evidence remains pending;
+raw counts/direct controls/history stay. TEST003 remains Review/Claimed with unexplained/untracked
+native-resource residual OPEN; no Completion Commit or cache/global-leak-absence conclusion.

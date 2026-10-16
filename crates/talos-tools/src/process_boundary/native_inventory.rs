@@ -1,0 +1,81 @@
+//! Fail-closed source inventory: any change to these native boundary files needs
+//! a refreshed baseline AND independent protected source review. This is a change
+//! detector, not semantic proof of resource ownership or alias absence.
+const SOURCES: [&str; 4] = [
+    include_str!("../process_boundary.rs"),
+    include_str!("resource_acceptance.rs"),
+    include_str!("handle_lifecycle_control.rs"),
+    include_str!("handle_snapshot.rs"),
+];
+const EXPECTED: [u64; 4] = [
+    0x4d12244ea7cc5fb0,
+    0xaaf4ee820de4ea11,
+    0x2c2394169b451d76,
+    0xa95c60b55dcdf0fc,
+];
+fn fingerprint(source: &str) -> u64 {
+    source
+        .replace("\r\n", "\n")
+        .bytes()
+        .fold(0xcbf29ce484222325u64, |hash, byte| {
+            (hash ^ u64::from(byte)).wrapping_mul(0x100000001b3)
+        })
+}
+fn validate(sources: [&str; 4]) -> bool {
+    sources
+        .into_iter()
+        .zip(EXPECTED)
+        .all(|(source, expected)| fingerprint(source) == expected)
+}
+#[test]
+fn reviewed_native_sites_and_instrumentation_are_unchanged() {
+    assert!(
+        validate(SOURCES),
+        "native inventory changed: review every acquisition/transfer/release/unsafe site before updating baseline"
+    );
+}
+#[test]
+fn inventory_rejects_uncovered_calls_and_removed_or_moved_observation() {
+    for (index, original) in SOURCES.into_iter().enumerate() {
+        let added = format!("{original}\nunsafe {{ alias::CreatePipe(a,b,c,0); }}");
+        let mut changed = SOURCES;
+        changed[index] = &added;
+        assert!(
+            !validate(changed),
+            "uncovered acquisition must invalidate inventory"
+        );
+    }
+    for mutation in [
+        SOURCES[0].replacen("acquired!(OutRead, out_read);", "", 1),
+        SOURCES[0].replacen(
+            "acquired!(OutRead, out_read);",
+            "acquired!(OutWrite, out_write);",
+            1,
+        ),
+        SOURCES[0].replacen("checked_close!(Thread, thread)", "CloseHandle(thread)", 1),
+        SOURCES[1].replacen(
+            "let omit = self.negative == Some(Negative::Attributes);",
+            "let omit = false;",
+            1,
+        ),
+    ] {
+        assert_ne!(mutation, SOURCES[0]);
+        let mut changed = SOURCES;
+        let index = if mutation.contains("pub(super) struct ResourceAudit") {
+            1
+        } else {
+            0
+        };
+        changed[index] = &mutation;
+        assert!(
+            !validate(changed),
+            "missing/misplaced instrumentation or operation-path hook must invalidate inventory"
+        );
+    }
+}
+
+#[test]
+fn checkout_crlf_preserves_reviewed_native_inventory() {
+    let crlf = SOURCES.map(|source| source.replace("\n", "\r\n"));
+    assert!(validate(std::array::from_fn(|index| crlf[index].as_str())));
+}

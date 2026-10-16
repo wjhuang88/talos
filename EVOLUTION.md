@@ -1295,3 +1295,12 @@ integrity failures and disposable fixture results as distinct evidence.
 - Fix: Allocate the handle-list elements separately before acquiring resources, do not resize/mutate after native borrowing, and keep them alive through DeleteProcThreadAttributeList.
 - Prevention: Review both attribute allocation and input-value ownership, including subsequent Rust borrows and every error/unwind cleanup path.
 - Promoted to rule/check: ADR-091 direct-control clarification and protected native review; no production ownership expansion.
+
+
+## 2026-10-16 — Negative controls must reject through the actual acceptance predicate
+
+- Trigger: TEST-004 protected review rejected omission detectors derived only from injection flags.
+- Root cause: recovering before final validation could let a negative pass even when the real gate no longer rejected missing operations.
+- Fix: call the same per-role release/termination predicates before recovery and in final acceptance; require the precise missing release or native live timeout, then checked in-frame recovery.
+- Prevention: consume termination/release attempt state before native invocation, reject duplicate requests before another call, and test failed results/wait timeout/no retry separately from real native negative fixtures.
+- Promoted to check: TEST-004 source inventory mutations and independent protected native review. Whole-file fingerprints detect source change, not semantic ownership proof; keep unknown resources residual.

@@ -455,6 +455,7 @@ enum WindowsLaunchFault {
 struct WindowsLaunchTestHooks<'a> {
     fault: Option<WindowsLaunchFault>,
     observer: Option<&'a mut windows_tests::LaunchObservation>,
+    audit: Option<&'a mut resource_acceptance::ResourceAudit>,
 }
 
 #[cfg(windows)]
@@ -537,6 +538,19 @@ fn create_windows_job_with_hooks(
     let mut attrs: windows_sys::Win32::System::Threading::LPPROC_THREAD_ATTRIBUTE_LIST =
         std::ptr::null_mut();
     let mut attr_storage = Vec::<usize>::new();
+    #[cfg(test)]
+    let mut attrs_initialized = false;
+    // Keep native-borrowed list storage alive through audited Delete, including negatives.
+    #[cfg(test)]
+    let mut audit_handle_list = [std::ptr::null_mut(); 2];
+    #[cfg(test)]
+    macro_rules! acquired {
+        ($role:ident, $value:expr) => {
+            if let Some(audit) = hooks.audit.as_deref_mut() {
+                audit.acquired(resource_acceptance::Role::$role, $value as usize);
+            }
+        };
+    }
     // Test-only fixed observers cannot propagate errors/panics past live raw owners.
     #[cfg(test)]
     macro_rules! observe {
@@ -551,6 +565,18 @@ fn create_windows_job_with_hooks(
             }
         };
     }
+    #[cfg(test)]
+    macro_rules! checked_close {
+        ($role:ident, $handle:expr) => {
+            if let Some(audit) = hooks.audit.as_deref_mut() {
+                audit.close(resource_acceptance::Role::$role, $handle as usize, || {
+                    CloseHandle($handle)
+                })
+            } else {
+                CloseHandle($handle)
+            }
+        };
+    }
     let result = (|| unsafe {
         #[cfg(test)]
         observe!("before_pipe");
@@ -558,13 +584,22 @@ fn create_windows_job_with_hooks(
             return Err(last_windows_error("CreatePipe"));
         }
         #[cfg(test)]
-        observe!("pipe_created");
+        {
+            acquired!(OutRead, out_read);
+            acquired!(OutWrite, out_write);
+            observe!("pipe_created");
+        }
         #[cfg(test)]
         if hooks.fault == Some(WindowsLaunchFault::Pipe) {
             return Err("injected pipe setup failure".to_owned());
         }
         if CreatePipe(&mut err_read, &mut err_write, &security, 0) == 0 {
             return Err(last_windows_error("CreatePipe"));
+        }
+        #[cfg(test)]
+        {
+            acquired!(ErrRead, err_read);
+            acquired!(ErrWrite, err_write);
         }
         if SetHandleInformation(out_read, HANDLE_FLAG_INHERIT, 0) == 0
             || SetHandleInformation(err_read, HANDLE_FLAG_INHERIT, 0) == 0
@@ -575,6 +610,8 @@ fn create_windows_job_with_hooks(
         if job.is_null() || job == INVALID_HANDLE_VALUE {
             return Err(last_windows_error("CreateJobObjectW"));
         }
+        #[cfg(test)]
+        acquired!(Job, job);
         #[cfg(test)]
         if hooks.fault == Some(WindowsLaunchFault::Job) {
             return Err("injected Job Object setup failure".to_owned());
@@ -600,10 +637,21 @@ fn create_windows_job_with_hooks(
             return Err(last_windows_error("InitializeProcThreadAttributeList"));
         }
         #[cfg(test)]
+        {
+            attrs_initialized = true;
+            acquired!(Attributes, attrs);
+        }
+        #[cfg(test)]
         if hooks.fault == Some(WindowsLaunchFault::AttributeList) {
             return Err("injected attribute-list setup failure".to_owned());
         }
+        #[cfg(not(test))]
         let handles = [out_write, err_write];
+        #[cfg(test)]
+        let handles = {
+            audit_handle_list.copy_from_slice(&[out_write, err_write]);
+            &audit_handle_list
+        };
         if UpdateProcThreadAttribute(
             attrs,
             0,
@@ -656,7 +704,11 @@ fn create_windows_job_with_hooks(
         process = info.hProcess;
         thread = info.hThread;
         #[cfg(test)]
-        observe!("process_created");
+        {
+            acquired!(Process, process);
+            acquired!(Thread, thread);
+            observe!("process_created");
+        }
         #[cfg(test)]
         let assignment_failed = hooks.fault == Some(WindowsLaunchFault::Assignment)
             || AssignProcessToJobObject(job, process) == 0;
@@ -710,6 +762,9 @@ fn create_windows_job_with_hooks(
         let mut cleanup_failures = 0u16;
         unsafe {
             if !thread.is_null() {
+                #[cfg(test)]
+                let _closed = checked_close!(Thread, thread);
+                #[cfg(not(test))]
                 let _closed = CloseHandle(thread);
                 #[cfg(test)]
                 if _closed == 0 {
@@ -717,8 +772,26 @@ fn create_windows_job_with_hooks(
                 }
             }
             if !process.is_null() {
+                #[cfg(test)]
+                let _terminated = if let Some(audit) = hooks.audit.as_deref_mut() {
+                    audit.terminate(
+                        process as usize,
+                        || windows_sys::Win32::System::Threading::TerminateProcess(process, 1),
+                        |millis| {
+                            windows_sys::Win32::System::Threading::WaitForSingleObject(
+                                process, millis,
+                            )
+                        },
+                    )
+                } else {
+                    windows_sys::Win32::System::Threading::TerminateProcess(process, 1)
+                };
+                #[cfg(not(test))]
                 let _terminated =
                     windows_sys::Win32::System::Threading::TerminateProcess(process, 1);
+                #[cfg(test)]
+                let _closed = checked_close!(Process, process);
+                #[cfg(not(test))]
                 let _closed = CloseHandle(process);
                 #[cfg(test)]
                 {
@@ -731,9 +804,21 @@ fn create_windows_job_with_hooks(
                 }
             }
             if !attrs.is_null() {
+                #[cfg(test)]
+                if let Some(audit) = hooks.audit.as_deref_mut() {
+                    audit.delete(attrs as usize, attrs_initialized, || {
+                        DeleteProcThreadAttributeList(attrs)
+                    });
+                } else {
+                    DeleteProcThreadAttributeList(attrs);
+                }
+                #[cfg(not(test))]
                 DeleteProcThreadAttributeList(attrs);
             }
             if !job.is_null() {
+                #[cfg(test)]
+                let _closed = checked_close!(Job, job);
+                #[cfg(not(test))]
                 let _closed = CloseHandle(job);
                 #[cfg(test)]
                 if _closed == 0 {
@@ -744,6 +829,13 @@ fn create_windows_job_with_hooks(
             let mut pipe_bit = 1u16 << 4;
             for handle in [out_read, out_write, err_read, err_write] {
                 if !handle.is_null() {
+                    #[cfg(test)]
+                    let _closed = if let Some(audit) = hooks.audit.as_deref_mut() {
+                        audit.close_pipe(handle as usize, || CloseHandle(handle))
+                    } else {
+                        CloseHandle(handle)
+                    };
+                    #[cfg(not(test))]
                     let _closed = CloseHandle(handle);
                     #[cfg(test)]
                     if _closed == 0 {
@@ -854,6 +946,12 @@ fn quote_windows_arg(value: &str) -> String {
     quoted.push('"');
     quoted
 }
+
+#[cfg(test)]
+mod native_inventory;
+
+#[cfg(all(test, windows))]
+mod resource_acceptance;
 
 #[cfg(all(test, windows))]
 mod handle_snapshot;
@@ -1361,8 +1459,8 @@ mod windows_tests {
             let mut outcomes = Vec::new();
             let mut controls = Vec::new();
             // Cold, observer, native cleanup fixtures and stage controls: owned processes. Retain
-            // original failure, but attempt all workers before asserting any outcome.
-            for mode in [0u8, 1, 2, 3, 4, 5, 6, 7] {
+            // historical failures; attempt all workers before asserting any outcome.
+            for mode in [0u8, 1, 2, 3, 4, 5, 6, 7, 8] {
                 let directory = tempfile::Builder::new()
                     .prefix("talos-handle-count-")
                     .tempdir()
@@ -1446,7 +1544,7 @@ mod windows_tests {
                 controls.push(control); // retain Jobs through every worker/receipt check
             }
             eprintln!("handle worker outcomes={outcomes:?}");
-            assert_eq!(outcomes.len(), 8);
+            assert_eq!(outcomes.len(), 9);
             for (mode, result) in outcomes {
                 assert!(result.is_ok(), "handle worker mode={mode}: {result:?}");
             }
@@ -1494,6 +1592,7 @@ mod windows_tests {
             Some(value) if value == "5" => 5,
             Some(value) if value == "6" => 6,
             Some(value) if value == "7" => 7,
+            Some(value) if value == "8" => 8,
             Some(_) => panic!("invalid owned handle worker mode"),
         };
         if mode == 2 {
@@ -1556,6 +1655,7 @@ mod windows_tests {
                 WindowsLaunchTestHooks {
                     fault: Some(fault),
                     observer: Some(&mut observer),
+                    ..Default::default()
                 },
             );
             assert_eq!(
@@ -1631,6 +1731,19 @@ mod windows_tests {
             std::fs::write(receipt, output).expect("stage-control receipt");
             return;
         }
+        if mode == 8 {
+            let summary = resource_acceptance::negative_controls(&launcher);
+            let output = serde_json::to_vec(&serde_json::json!({
+                "child_pid":std::process::id(), "negative_controls":summary,
+            }))
+            .expect("negative receipt encoding");
+            eprintln!(
+                "WINDOWS_RESOURCE_NEGATIVES {}",
+                String::from_utf8_lossy(&output)
+            );
+            std::fs::write(receipt, output).expect("negative receipt write");
+            return;
+        }
         let mut phases = Vec::new();
         let mut observer_counts = Vec::new();
         if mode == 1 {
@@ -1649,6 +1762,7 @@ mod windows_tests {
         let mut counts = [0u32; 41];
         counts[0] = before;
         let mut attempts = 0;
+        let mut known = resource_acceptance::Summary::default();
         for fault in [
             WindowsLaunchFault::Pipe,
             WindowsLaunchFault::Job,
@@ -1657,6 +1771,7 @@ mod windows_tests {
             WindowsLaunchFault::Resume,
         ] {
             for _ in 0..8 {
+                let mut audit = resource_acceptance::ResourceAudit::new(fault, attempts + 1, None);
                 let result = create_windows_job_with_hooks(
                     &launcher.program,
                     &launcher.args,
@@ -1664,6 +1779,7 @@ mod windows_tests {
                     &launcher.env,
                     WindowsLaunchTestHooks {
                         fault: Some(fault),
+                        audit: Some(&mut audit),
                         ..Default::default()
                     },
                 );
@@ -1681,6 +1797,7 @@ mod windows_tests {
                     expected,
                     "must reach the requested fault, not fail earlier"
                 );
+                known.add(audit.finish().expect("actual known-resource cleanup"));
                 attempts += 1;
                 counts[attempts] = current_process_handle_count();
                 if mode == 1 && attempts == 1 {
@@ -1711,28 +1828,30 @@ mod windows_tests {
             eprintln!("PSS_OBSERVER_COUNTS {observer_counts:?}");
             eprintln!("PSS_HANDLE_TYPES {}", String::from_utf8_lossy(&output));
             std::fs::write(receipt, output).expect("snapshot receipt");
-            return; // observer success cannot replace the independent cold40/+2 failure
+            return; // observer metadata cannot substitute for the cold worker resource proof
         }
-        assert!(
-            after <= before.saturating_add(2),
-            "partial launch failures leaked handles: before={before}, after={after}"
-        );
+        // Effective TEST-004/ADR091: raw totals remain diagnostics, not ownership proof.
+        known.require_all40();
         // Receipt I/O and diagnostics are deliberately outside the sampled interval.
         assert_eq!(attempts, 40);
         std::fs::write(
             receipt,
             serde_json::to_vec(&serde_json::json!({
                 "child_pid": std::process::id(), "attempts": attempts,
-                "before": before, "after": after,
+                "before": before, "after": after, "known_resources": known,
             }))
             .expect("receipt encoding"),
         )
         .expect("receipt write");
         eprintln!("WINDOWS_HANDLE_COUNT_RECEIPT attempts={attempts} before={before} after={after}");
+        eprintln!(
+            "WINDOWS_KNOWN_RESOURCE_RECEIPT {}",
+            serde_json::to_string(&known).expect("known-resource receipt")
+        );
     }
 
     fn validate_handle_receipt(path: &std::path::Path, mode: u8) -> Result<(), String> {
-        let cap = if matches!(mode, 0 | 7) {
+        let cap = if matches!(mode, 0 | 7 | 8) {
             1024
         } else {
             handle_snapshot::OUTPUT_CAP
@@ -1757,7 +1876,11 @@ mod windows_tests {
         if pid == 0 || pid == std::process::id() {
             return Err("receipt not another process".to_owned());
         }
-        if mode == 7 {
+        if mode == 8 {
+            if data["negative_controls"] != resource_acceptance::negative_receipt() {
+                return Err("negative resource controls incomplete".to_owned());
+            }
+        } else if mode == 7 {
             if data["direct_cycles"].as_u64() != Some(2)
                 || data["snapshots"].as_u64() != Some(0)
                 || data["native_failure_check"] != true
@@ -1771,7 +1894,7 @@ mod windows_tests {
             {
                 return Err("invalid direct lifecycle receipt".to_owned());
             }
-            // Count growth is evidence, never a replacement threshold or pass for mode0.
+            // Count growth is diagnostic; mode0 independently proves known-resource cleanup.
         } else if mode == 0 {
             if data["attempts"].as_u64() != Some(40) {
                 return Err("wrong fault count".to_owned());
@@ -1784,10 +1907,9 @@ mod windows_tests {
                 .as_u64()
                 .and_then(|v| u32::try_from(v).ok())
                 .ok_or("invalid final count")?;
-            if after > before.saturating_add(2) {
-                return Err(format!(
-                    "receipt leaked handles: before={before}, after={after}"
-                ));
+            let _diagnostic_counts = (before, after);
+            if data["known_resources"] != resource_acceptance::all40_receipt() {
+                return Err("known resource proof incomplete".to_owned());
             }
         } else {
             if data["snapshots"].as_u64() != Some(4) {
@@ -1990,6 +2112,36 @@ mod windows_tests {
         std::fs::write(&path, serde_json::to_vec(&data).expect("fixture JSON"))
             .expect("fixture write");
         assert!(validate_handle_receipt(&path, 3).is_err());
+    }
+
+    #[test]
+    fn known_resource_receipts_require_actual_complete_summary_and_negatives() {
+        let directory = tempfile::tempdir().expect("receipt directory");
+        let path = directory.path().join("receipt.json");
+        let mut data = serde_json::json!({"child_pid":1,"attempts":40,"before":73,"after":76,
+            "known_resources":resource_acceptance::all40_receipt()});
+        std::fs::write(&path, data.to_string()).expect("receipt");
+        assert!(validate_handle_receipt(&path, 0).is_ok());
+        for field in [
+            "attempts",
+            "resources",
+            "closes",
+            "deletes",
+            "terminations",
+            "exits",
+            "generation_sum",
+        ] {
+            let original = data["known_resources"][field].take();
+            std::fs::write(&path, data.to_string()).expect("incomplete receipt");
+            assert!(validate_handle_receipt(&path, 0).is_err(), "{field}");
+            data["known_resources"][field] = original;
+        }
+        data = serde_json::json!({"child_pid":1,"negative_controls":resource_acceptance::negative_receipt()});
+        std::fs::write(&path, data.to_string()).expect("negative receipt");
+        assert!(validate_handle_receipt(&path, 8).is_ok());
+        data["negative_controls"]["recovered"] = 3.into();
+        std::fs::write(&path, data.to_string()).expect("incomplete recovery");
+        assert!(validate_handle_receipt(&path, 8).is_err());
     }
 
     #[test]

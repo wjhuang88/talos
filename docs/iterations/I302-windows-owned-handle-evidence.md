@@ -613,3 +613,18 @@ kernel32 exports the matching name and contains the candidate mechanisms. Runtim
 resolution into that module is NOT proven by these file bytes. Conditional execution, mapped
 modules, PSS unknown type, object identity and legal lifetime remain unqualified. Static review
 approves recording candidates only, not original failure closure. No extra runtime probe is added.
+
+### CI3213 And Effective TEST-004 Follow-up
+
+CI3213/run38886975683 on exact#7160ca03ff1 FAILED Windows456passed/1failed/0ignored/
+0filtered, other5jobs successful. Mode0 still73->76; modes1–7 succeeded. Mode7 direct counts
+73/74/76/76 with2cycles,0PSS and real missing-cwd failure cleanup checked. All3 fixed installed
+DLL identities match static samples; this is not loaded-module/object ownership/legal lifetime
+proof. Raw #7176217692460 and refined proposal6217718821 remain; failed history is retained.
+
+Maintainer accepted the concrete narrower TEST004 criterion at22:39 Asia/Shanghai. Governance#730
+merged c81782b6 after CI3217/protectedreview/CAS. Its TEST004/I305 owner separately owns known-
+resource acceptance, inventory and real negatives. Existing I302 stays Review/Claimed, incomplete,
+with unexplained process-wide/native resource lifetime and future untracked acquisitions as OPEN
+#717 residual. No original global-leak closure or natural-person/native acceptance is inferred.
+#716 may carry separate I305 commits after baseline refresh; no automatic merge, #643/#624 open.
