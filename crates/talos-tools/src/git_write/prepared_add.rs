@@ -221,6 +221,8 @@ pub(super) struct AddPlan {
     pull_graph_paths: Option<Vec<PathBuf>>,
     pull_inventory: Option<super::pull_inventory::Inventory>,
     pull_integration: Option<super::pull_state::Integration>,
+    pull_ref_tips: Option<Vec<String>>,
+    pull_new_commits: Vec<String>,
     identity: PreparedPlanIdentity,
     workspace: PathBuf,
     input: Value,
@@ -617,6 +619,8 @@ impl AddPlan {
             pull_graph_paths: None,
             pull_inventory: None,
             pull_integration: None,
+            pull_ref_tips: None,
+            pull_new_commits: Vec::new(),
             identity: PreparedPlanIdentity::new(),
             workspace: workspace.to_owned(),
             input: input.clone(),
@@ -649,7 +653,10 @@ impl AddPlan {
     async fn pull_probe(&self, args: Vec<String>) -> Result<std::process::Output, GitToolError> {
         // Tree listings carry one record per path, unlike small scalar probes.
         // Keep repeated listings within the unchanged cumulative output budget.
-        let output_limit = if args.first().is_some_and(|arg| arg == "ls-tree") {
+        let output_limit = if args
+            .first()
+            .is_some_and(|arg| matches!(arg.as_str(), "ls-tree" | "for-each-ref" | "rev-list"))
+        {
             1024 * 1024
         } else {
             16 * 1024
@@ -1213,6 +1220,15 @@ impl AddPlan {
                 "Pull branch or HEAD changed during upstream discovery".into(),
             ));
         }
+        let refs = self
+            .pull_probe(vec!["for-each-ref".into(), "--format=%(objectname)".into()])
+            .await?;
+        if !refs.status.success() || !refs.stderr.is_empty() {
+            return Err(GitToolError::Git(
+                "Pull pre-fetch reference listing failed".into(),
+            ));
+        }
+        self.pull_ref_tips = Some(super::pull_state::graph_oids(&refs.stdout, oid_length)?);
         evidence.revalidate()?;
         self.revalidate()?;
         let recursion = before.fetch_recursion_description();
@@ -1348,6 +1364,38 @@ impl AddPlan {
                 ));
             }
         };
+        let fetched = super::pull_state::fetched_tips(
+            self.pull_evidence
+                .as_ref()
+                .ok_or_else(|| GitToolError::Git("Missing post-fetch evidence".into()))?
+                .fetch_head()?,
+            width,
+            false,
+        )?;
+        let before_tips = self.pull_ref_tips.as_ref().ok_or_else(|| {
+            GitToolError::Git("Missing pre-fetch reference tips for child discovery".into())
+        })?;
+        if !fetched.is_empty() {
+            let mut args = vec!["rev-list".into()];
+            args.extend(fetched);
+            args.push("--not".into());
+            args.extend(before_tips.iter().cloned());
+            args.push("--".into());
+            // Bound argv independently of output; large ref sets must not reach
+            // host argument limits or silently lose exclusions.
+            if args.iter().map(|arg| arg.len() + 1).sum::<usize>() > 32 * 1024 {
+                return Err(GitToolError::InvalidInput(
+                    "Pull graph revision argument budget exhausted".into(),
+                ));
+            }
+            let graph = self.pull_probe(args).await?;
+            if !graph.status.success() || !graph.stderr.is_empty() {
+                return Err(GitToolError::Git(
+                    "Pull fetched graph traversal failed".into(),
+                ));
+            }
+            self.pull_new_commits = super::pull_state::graph_oids(&graph.stdout, width)?;
+        }
         self.pull_integration = Some(
             self.pull_before
                 .as_ref()
@@ -12058,6 +12106,7 @@ pub(super) mod tests {
                 "{}",
                 String::from_utf8_lossy(&output.stderr)
             );
+            output.stdout
         };
         git(&[
             "-c",
@@ -12070,6 +12119,22 @@ pub(super) mod tests {
             "initial",
         ]);
         git(&["config", "remote.origin.url", "git://example.invalid/repo"]);
+        // A dangling commit is already stored but is not reachable from any
+        // pre-fetch ref. Fetching it must include it in child-graph discovery
+        // while excluding its already-reachable parent.
+        let target = git(&[
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit-tree",
+            "HEAD^{tree}",
+            "-p",
+            "HEAD",
+            "-m",
+            "new fetched history",
+        ]);
+        let target = std::str::from_utf8(&target).expect("object ID").trim();
         let mut plan = Box::new(
             AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
                 .expect("Pull"),
@@ -12092,7 +12157,7 @@ pub(super) mod tests {
         assert!(plan.phase == Phase::PullFetch);
         // Exercise the post-fetch boundary with actual Git metadata mutation,
         // independently of a network daemon or successful transport fixture.
-        git(&["fetch", "--no-recurse-submodules", ".", "HEAD"]);
+        git(&["fetch", "--no-recurse-submodules", ".", target]);
         assert!(
             plan.revalidate().is_err(),
             "old FETCH_HEAD evidence must expire"
@@ -12110,6 +12175,7 @@ pub(super) mod tests {
             .await
             .expect("postfetch");
         assert!(next.phase == Phase::PullIntegration);
+        assert_eq!(next.pull_new_commits, [target]);
         assert!(matches!(
             next.pull_integration,
             Some(super::super::pull_state::Integration::Command(_))

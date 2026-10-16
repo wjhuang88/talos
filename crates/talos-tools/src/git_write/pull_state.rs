@@ -1462,6 +1462,16 @@ fn pull_policy_preserves_branch_override_and_autostash_precedence() {
 /// Keep merge candidates in FETCH_HEAD order, without interpreting or exposing
 /// the remote-description field (which may contain credentials or non-UTF-8).
 fn merge_candidates(bytes: &[u8], oid_length: usize) -> Result<Vec<String>, GitToolError> {
+    fetched_tips(bytes, oid_length, true)
+}
+
+/// Include not-for-merge tips for recursive fetch: their histories may introduce
+/// child commits even though they are not candidates for parent integration.
+pub(super) fn fetched_tips(
+    bytes: &[u8],
+    oid_length: usize,
+    merge_only: bool,
+) -> Result<Vec<String>, GitToolError> {
     let invalid =
         || GitToolError::InvalidInput("Invalid or oversized Pull FETCH_HEAD evidence".into());
     if !matches!(oid_length, 40 | 64) || bytes.len() > 4 * 1024 * 1024 {
@@ -1489,11 +1499,43 @@ fn merge_candidates(bytes: &[u8], oid_length: usize) -> Result<Vec<String>, GitT
                     .map_err(|_| invalid())?
                     .to_ascii_lowercase(),
             ),
+            b"not-for-merge" if !merge_only => candidates.push(
+                std::str::from_utf8(oid)
+                    .map_err(|_| invalid())?
+                    .to_ascii_lowercase(),
+            ),
             b"not-for-merge" => {}
             _ => return Err(invalid()),
         }
     }
     Ok(candidates)
+}
+
+/// Validate bounded object-ID listings before retaining them or using them as
+/// revision arguments. No ref name or untrusted revision syntax is accepted.
+pub(super) fn graph_oids(bytes: &[u8], width: usize) -> Result<Vec<String>, GitToolError> {
+    let invalid = || GitToolError::InvalidInput("Invalid or oversized Pull graph listing".into());
+    if !matches!(width, 40 | 64) || bytes.len() > 1024 * 1024 {
+        return Err(invalid());
+    }
+    let mut result = Vec::new();
+    for line in bytes.split_inclusive(|byte| *byte == b'\n') {
+        let oid = line.strip_suffix(b"\n").ok_or_else(invalid)?;
+        if oid.len() != width
+            || !oid.iter().all(u8::is_ascii_hexdigit)
+            || oid.iter().all(|byte| *byte == b'0')
+        {
+            return Err(invalid());
+        }
+        result.push(
+            std::str::from_utf8(oid)
+                .map_err(|_| invalid())?
+                .to_ascii_lowercase(),
+        );
+    }
+    result.sort();
+    result.dedup();
+    Ok(result)
 }
 
 #[cfg(test)]
@@ -1509,10 +1551,39 @@ fn fetched_heads_preserve_merge_order_and_ignore_description_bytes() {
         bytes.extend_from_slice(b"non-utf8 \xff\tcomment\n");
         assert_eq!(
             merge_candidates(&bytes, width).expect("heads"),
-            [first, second]
+            [first.clone(), second.clone()]
+        );
+        assert_eq!(
+            fetched_tips(&bytes, width, false).expect("all fetched tips"),
+            [first, ignored, second]
         );
     }
     assert!(merge_candidates(b"", 40).expect("empty").is_empty());
+}
+
+#[cfg(test)]
+#[test]
+fn pull_graph_listings_accept_only_complete_object_ids() {
+    for width in [40, 64] {
+        let oid = "a".repeat(width);
+        assert_eq!(
+            graph_oids(format!("{oid}\n{}\n", oid.to_uppercase()).as_bytes(), width)
+                .expect("normalized tips"),
+            std::slice::from_ref(&oid)
+        );
+        for bad in [
+            oid.clone(),
+            format!("{}\n", "0".repeat(width)),
+            format!("{}\n", "g".repeat(width)),
+            format!("{oid}\n--all\n"),
+            format!("{oid}\0\n"),
+        ] {
+            assert!(graph_oids(bad.as_bytes(), width).is_err());
+        }
+    }
+    assert!(graph_oids(b"", 40).expect("empty refs").is_empty());
+    assert!(graph_oids(b"", 32).is_err());
+    assert!(graph_oids(&vec![b'a'; 1024 * 1024 + 1], 40).is_err());
 }
 
 #[cfg(test)]
