@@ -163,6 +163,7 @@ enum Phase {
     PullFetch,
     PullPostFetch,
     PullChildAttributes,
+    PullChildIdentity,
     PullIntegration,
 }
 
@@ -1703,6 +1704,68 @@ impl AddPlan {
         self.pull_attributes = evidence;
         self.revalidate()?;
         self.resolve_pull_child_activity().await?;
+        for child in self.pull_changed_children.values() {
+            if matches!(
+                child.activity,
+                Some(super::pull_children::Activity::Enabled)
+            ) {
+                let path = self.repository.workdir.join(&child.path);
+                self.facets.push(path_facet(
+                    ToolNature::Read,
+                    &path,
+                    "Pull selected child identity",
+                )?);
+                self.facets.push(path_facet(
+                    ToolNature::Read,
+                    &path.join(".git"),
+                    "Pull selected child Git marker",
+                )?);
+            }
+        }
+        self.identity = PreparedPlanIdentity::new();
+        self.phase = if self.pull_changed_children.values().any(|child| {
+            matches!(
+                child.activity,
+                Some(super::pull_children::Activity::Enabled)
+            )
+        }) {
+            Phase::PullChildIdentity
+        } else {
+            Phase::PullIntegration
+        };
+        Ok(self)
+    }
+
+    fn discover_pull_child_identity(
+        mut self: Box<Self>,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<Box<Self>, GitToolError> {
+        for child in self.pull_changed_children.values() {
+            if !matches!(
+                child.activity,
+                Some(super::pull_children::Activity::Enabled)
+            ) {
+                continue;
+            }
+            let path = self.repository.workdir.join(&child.path);
+            for candidate in [&path, &path.join(".git")] {
+                if !authorizations.iter().any(|token| {
+                    token.authorizes_path(
+                        "git_pull",
+                        ToolNature::Read,
+                        &self.workspace,
+                        candidate.to_str().unwrap_or_default(),
+                    )
+                }) {
+                    return Err(GitToolError::InvalidInput(
+                        "Pull child identity lacks exact Read admission".into(),
+                    ));
+                }
+            }
+            let location = super::repository_state::ChildLocation::capture(&path)?;
+            self.child_locations.push((path, location));
+        }
+        self.revalidate()?;
         self.identity = PreparedPlanIdentity::new();
         self.phase = Phase::PullIntegration;
         Ok(self)
@@ -5952,6 +6015,7 @@ impl PreparedNormalToolInvocation for AddPlan {
                 }),
             Phase::PullPreparation => self.discover_pull_prefetch(&authorizations).await,
             Phase::PullChildAttributes => self.discover_pull_child_attributes(&authorizations).await,
+            Phase::PullChildIdentity => self.discover_pull_child_identity(&authorizations),
             Phase::PullPostFetch => self.discover_pull_postfetch(&authorizations).await.map_err(|error| GitToolError::Git(format!("Pull parent fetch completed; post-fetch discovery failed: {error}; fetched effects are retained; inspect repository before retrying"))),
             Phase::PullIntegration => {
                 if let Err(error) = self.revalidate() {
