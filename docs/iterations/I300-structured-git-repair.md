@@ -3717,8 +3717,15 @@ coverage or replace the missing independent transport review.
 Pull child configuration continuation checkpoint (2026-10-16, `88246a89`):
 configuration-chain discovery now has explicit state. The first continuation
 records Git-reported include sources and returns for fresh exact Read admission;
-the next continuation verifies every source before recapturing configuration,
-clearing stale captures to prevent duplicate child configs. Locked all-feature
-Pull tests pass 76/76 and `cargo check --locked -p talos-tools --all-features`
-passes. Child remote semantics, object admission, recursive fetch, integration,
-and delivery gates remain open; Production Pull remains disabled.
+the next continuation verifies every source. Correction (`b11c91ee`): retain
+the original snapshots, revalidate them, and compare Git-reported values and
+origins before accepting the second discovery. A changed include chain refuses
+before capturing new origins. Shared preparation regression tests pass 129/129;
+configuration identity/origin tests pass 3/3. `8a312b3e` also restores the distinct
+Commit/Checkout gitdir interpretation during shared child revalidation.
+Broader validation: `cargo test --locked -p talos-tools --all-features --lib`
+passes 779/779. This is crate-library evidence, not workspace or delivery closure.
+External Pull gitdir/commondir admission waves remain incomplete: resolving a
+marker is not evidence of an executable, independently admitted identity flow.
+Child remote semantics, object admission, recursive fetch, integration, and
+delivery gates remain open; Production Pull remains disabled.

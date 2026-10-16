@@ -3162,9 +3162,12 @@ transport remains disabled pending complete effects implementation and review;
 Pull migration and all later serial deliverables remain open.
 Pull child configuration continuation repair checkpoint (2026-10-16, `88246a89`):
 the Pull child configuration stage now records an explicit discovery state and
-the complete Git-reported source frontier. The continuation verifies exact Read
-admission for every source before recapturing configuration and clears stale
-captures, preventing duplicate configs or a second read before authorization.
+the complete Git-reported source frontier. Correction (`b11c91ee`): the next
+continuation verifies exact Read admission, retains and revalidates the original
+snapshots, and compares values/origins before accepting discovery; changed
+includes refuse before new source capture. Shared preparation tests pass 129/129
+and configuration identity/origin tests pass 3/3. `8a312b3e` restores the distinct
+Commit/Checkout gitdir interpretation in shared revalidation.
 Locked Pull tests pass 76/76, `cargo check --locked -p talos-tools --all-features`
 passes, and all-target all-feature Clippy with `-D warnings` passes. Child
 remote semantics, object admission, recursive fetch, integration, and delivery
@@ -3172,7 +3175,9 @@ gates remain open; Production Pull remains disabled.
 Pull child gitdir binding correction checkpoint (2026-10-16, `afc61b1c`):
 Pull child identity admission now resolves the `.git` marker before capturing
 `ChildLocation`, so external gitdirs and linked common directories are bound to
-the actual metadata roots. The stage also requires the dedicated configuration-
+the actual metadata roots. This only establishes helper-level resolution:
+external gitdir/commondir authorization waves are not yet executable and remain
+required work. The stage also requires the dedicated configuration-
 chain capability before invoking Git with includes. Locked Pull tests pass
 76/76, cargo check and all-target all-feature Clippy with `-D warnings` pass.
 Dedicated external-gitdir/include fixtures, object admission, recursive fetch,
