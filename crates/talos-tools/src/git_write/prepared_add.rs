@@ -248,6 +248,8 @@ pub(super) struct AddPlan {
     maintenance_program: Option<PathBuf>,
     config: Option<super::config_state::ConfigState>,
     child_configs: Vec<(PathBuf, super::config_state::ChildConfig)>,
+    pull_config_sources_discovered: bool,
+    pull_config_source_paths: Vec<PathBuf>,
     child_locations: Vec<(PathBuf, super::repository_state::ChildLocation)>,
     child_attributes: std::collections::BTreeSet<PathBuf>,
 }
@@ -653,6 +655,8 @@ impl AddPlan {
             maintenance_program: None,
             config,
             child_configs: Vec::new(),
+            pull_config_sources_discovered: false,
+            pull_config_source_paths: Vec::new(),
             child_locations: Vec::new(),
             child_attributes: std::collections::BTreeSet::new(),
         })
@@ -1781,6 +1785,23 @@ impl AddPlan {
         mut self: Box<Self>,
         authorizations: &[talos_core::tool::ToolExecutionAuthorization],
     ) -> Result<Box<Self>, GitToolError> {
+        if self.pull_config_sources_discovered {
+            for path in &self.pull_config_source_paths {
+                if !authorizations.iter().any(|token| {
+                    token.authorizes_path(
+                        "git_pull",
+                        ToolNature::Read,
+                        &self.workspace,
+                        path.to_str().unwrap_or_default(),
+                    )
+                }) {
+                    return Err(GitToolError::InvalidInput(
+                        "Pull child configuration include source lacks exact Read admission".into(),
+                    ));
+                }
+            }
+            self.child_configs.clear();
+        }
         for (workdir, location) in &self.child_locations {
             let config_path = location.common_dir.join("config");
             if !authorizations.iter().any(|token| {
@@ -1797,6 +1818,22 @@ impl AddPlan {
             }
             let output = self.inspect_config_at(workdir).await?;
             let config = super::config_state::ChildConfig::capture(&output, workdir)?;
+            for (path, _) in &config.files {
+                if !self.pull_config_source_paths.contains(path) {
+                    self.pull_config_source_paths.push(path.clone());
+                }
+                if !self.facets.iter().any(|facet| {
+                    facet.nature == ToolNature::Read
+                        && facet.resource_kind == Some(ToolResourceKind::Path)
+                        && facet.resource.as_deref() == path.to_str()
+                }) {
+                    self.facets.push(path_facet(
+                        ToolNature::Read,
+                        path,
+                        "Pull child configuration include-chain source",
+                    )?);
+                }
+            }
             config.prepare_pull_transport("origin")?;
             if let Some(url) = config.remote_url("origin")? {
                 self.facets.push(
@@ -1811,6 +1848,11 @@ impl AddPlan {
                 );
             }
             self.child_configs.push((workdir.clone(), config));
+        }
+        if !self.pull_config_sources_discovered {
+            self.pull_config_sources_discovered = true;
+            self.identity = PreparedPlanIdentity::new();
+            return Ok(self);
         }
         self.revalidate()?;
         self.identity = PreparedPlanIdentity::new();
