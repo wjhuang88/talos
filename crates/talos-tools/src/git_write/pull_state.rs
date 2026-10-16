@@ -836,6 +836,17 @@ impl BeforeFetch {
         path: &str,
         workdir: &std::path::Path,
     ) -> Result<Option<bool>, GitToolError> {
+        self.child_active_with_attributes(name, path, workdir, None)
+    }
+
+    /// Evaluate attributes only from caller-supplied, admitted in-memory rules.
+    pub(super) fn child_active_with_attributes(
+        &self,
+        name: &str,
+        path: &str,
+        workdir: &std::path::Path,
+        attributes: Option<(&gix::attrs::Search, &gix::attrs::search::MetadataCollection)>,
+    ) -> Result<Option<bool>, GitToolError> {
         if let Some(value) = self.child_activity.get(name.as_bytes()) {
             return super::config_state::git_boolean(value.as_deref()).map(Some);
         }
@@ -855,9 +866,10 @@ impl BeforeFetch {
                         })
                 })
                 .collect::<Result<Vec<_>, _>>()?;
-            if patterns
-                .iter()
-                .any(|pattern| !pattern.attributes.is_empty())
+            if attributes.is_none()
+                && patterns
+                    .iter()
+                    .any(|pattern| !pattern.attributes.is_empty())
             {
                 return Ok(None);
             }
@@ -871,7 +883,16 @@ impl BeforeFetch {
                     .pattern_matching_relative_path(
                         gix::bstr::BStr::new(path.as_bytes()),
                         Some(true),
-                        &mut |_path, _case, _is_dir, _out| false,
+                        &mut |path, case, is_dir, out| {
+                            let Some((rules, collection)) = attributes else {
+                                return false;
+                            };
+                            out.initialize(collection);
+                            rules.pattern_matching_relative_path(path, case, Some(is_dir), out);
+                            // Unmatched attributes are Unspecified, which is a
+                            // valid match for the pathspec's !attr requirement.
+                            true
+                        },
                     )
                     .is_some_and(|item| !item.is_excluded())
             }))
@@ -1579,6 +1600,95 @@ fn pull_historical_activity_matches_pathspecs_without_child_reads() {
             policy.child_active("named", path, root).expect("match"),
             Some(expected),
             "{specs:?} {path}"
+        );
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn pull_activity_matches_admitted_attribute_states() {
+    let root = std::path::Path::new("/repo");
+    let mut rules = gix::attrs::Search::default();
+    let mut metadata = gix::attrs::search::MetadataCollection::default();
+    rules.add_patterns_buffer(
+        b"* enabled -disabled color=green\n",
+        root.join(".gitattributes"),
+        Some(root),
+        &mut metadata,
+        true,
+    );
+    for (requirement, expected) in [
+        ("enabled", true),
+        ("-enabled", false),
+        ("-disabled", true),
+        ("disabled", false),
+        ("color=green", true),
+        ("color=red", false),
+        ("!absent", true),
+        ("absent", false),
+        ("enabled -disabled color=green !absent", true),
+    ] {
+        let config = format!("submodule.active\n:(attr:{requirement})**\0");
+        let policy = BeforeFetch::capture(config.as_bytes(), None, None, None, 40).expect("policy");
+        assert_eq!(
+            policy
+                .child_active("child", "child", root)
+                .expect("unresolved"),
+            None
+        );
+        assert_eq!(
+            policy
+                .child_active_with_attributes("child", "child", root, Some((&rules, &metadata)))
+                .expect("admitted attributes"),
+            Some(expected),
+            "{requirement}"
+        );
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn pull_activity_attribute_precedence_and_exclusions() {
+    let root = std::path::Path::new("/repo");
+    let mut rules = gix::attrs::Search::default();
+    let mut metadata = gix::attrs::search::MetadataCollection::default();
+    for (source, base, bytes, macros) in [
+        ("/system", None, b"* color=system\n".as_slice(), true),
+        ("/global", None, b"* color=global\n", true),
+        ("/repo/.gitattributes", Some(root), b"* color=root\n", true),
+        (
+            "/repo/nested/.gitattributes",
+            Some(root),
+            b"* color=nested\nchild -enabled\nchild enabled\n",
+            false,
+        ),
+        (
+            "/repo/.git/info/attributes",
+            None,
+            b"private !color\n",
+            true,
+        ),
+    ] {
+        rules.add_patterns_buffer(bytes, source.into(), base, &mut metadata, macros);
+    }
+    for (path, spec, expected) in [
+        ("child", ":(attr:color=root)**", true),
+        ("nested/child", ":(attr:color=nested enabled)**", true),
+        ("nested/child", ":(attr:color=root)**", false),
+        ("other/child", ":(attr:color=root)**", true),
+        ("private", ":(attr:!color)**", true),
+        ("private", ":(attr:color=root)**", false),
+        ("nested/child", ":(exclude,attr:enabled)**", false),
+        ("child", ":(exclude,attr:enabled)**", true),
+    ] {
+        let config = format!("submodule.active\n{spec}\0");
+        let policy = BeforeFetch::capture(config.as_bytes(), None, None, None, 40).expect("policy");
+        assert_eq!(
+            policy
+                .child_active_with_attributes("child", path, root, Some((&rules, &metadata)))
+                .expect("attribute precedence"),
+            Some(expected),
+            "{path}: {spec}"
         );
     }
 }
