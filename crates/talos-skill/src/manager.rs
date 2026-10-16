@@ -1,4 +1,4 @@
-use crate::{Result, Skill, SkillError, SkillIndex, SkillLoader, estimate_tokens};
+use crate::{Result, Skill, SkillError, SkillIndex, SkillLoader, SkillReadLimits, estimate_tokens};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -104,28 +104,29 @@ impl SkillManager {
     ///
     /// Reads the file at `file_path` relative to the skill's source directory.
     /// The skill must already be loaded at Level 1 (via [`load_skill`]).
+    /// The read is confined and bounded by [`SkillReadLimits::default`]: absolute,
+    /// root/prefix and `..` paths, symbolic links resolving outside the skill
+    /// directory, non-regular files, oversize files and non-UTF-8 content are rejected.
     ///
     /// # Errors
     ///
-    /// Returns [`SkillError::FileNotFound`] if the skill is not loaded or
-    /// the reference file does not exist.
+    /// Returns [`SkillError::FileNotFound`] if the skill is not loaded or the
+    /// reference file does not exist, and [`SkillError::IoError`] when the path
+    /// is rejected or cannot be read.
     pub fn load_reference(&self, skill_name: &str, file_path: &str) -> Result<String> {
         let skill = self.active_skills.get(skill_name).ok_or_else(|| {
             SkillError::FileNotFound(PathBuf::from(format!(
                 "skill '{skill_name}' not loaded (call load_skill first)"
             )))
         })?;
-
-        let skill_dir = skill.source_path.parent().ok_or_else(|| {
-            SkillError::InvalidFrontmatter("skill has no parent directory".into())
-        })?;
-
-        let ref_path = skill_dir.join(file_path);
-        if !ref_path.exists() {
-            return Err(SkillError::FileNotFound(ref_path));
-        }
-
-        std::fs::read_to_string(&ref_path).map_err(SkillError::IoError)
+        crate::disclosure::read_skill_file(skill, file_path, &SkillReadLimits::default()).map_err(
+            |error| match error {
+                SkillError::IoError(io) if io.kind() == std::io::ErrorKind::NotFound => {
+                    SkillError::FileNotFound(PathBuf::from(file_path.trim()))
+                }
+                other => other,
+            },
+        )
     }
 
     /// Matches a task description to a skill based on trigger keywords.

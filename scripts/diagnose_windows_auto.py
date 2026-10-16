@@ -2,7 +2,8 @@
 """Bounded Windows CI experiment; restore every temporary Rust probe afterward.
 
 No production patch, timeout change, retry-to-green, credentials, or command-content logging.
-Run --self-test on any host to validate exact probe anchors without writing source files.
+Run --self-test on any host to validate anchors and byte-restoration fixtures without
+modifying checkout sources.
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -85,6 +87,45 @@ def replace_once(text: str, old: str, new: str) -> str:
     if text.count(old) != 1:
         raise ValueError(f"probe anchor must occur exactly once: {old[:100]!r}")
     return text.replace(old, new, 1)
+
+
+def restore_sources(root: Path, original_bytes: dict[str, bytes], output: Path) -> None:
+    for path, data in original_bytes.items():
+        (root / path).write_bytes(data)
+    restoration = {}
+    for path, data in original_bytes.items():
+        actual = (root / path).read_bytes()
+        restoration[path] = {
+            "original_raw_sha256": hashlib.sha256(data).hexdigest(),
+            "restored_raw_sha256": hashlib.sha256(actual).hexdigest(),
+            "matches": actual == data,
+        }
+    (output / "restoration.json").write_text(json.dumps(restoration, indent=2), encoding="utf-8")
+    if not all(entry["matches"] for entry in restoration.values()):
+        raise RuntimeError("temporary source restoration readback mismatch; see restoration.json")
+
+
+def restoration_self_test() -> None:
+    from unittest.mock import patch
+
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        original = {"first.rs": b"fixture\r\n", "second.rs": b"\xff\x00\n"}
+        restore_sources(root, original, root)
+        assert all((root / path).read_bytes() == data for path, data in original.items())
+        read_bytes = Path.read_bytes
+        # Simulate a bad readback after writes: every file was restored, but the
+        # evidence must reject the mismatch rather than claim successful cleanup.
+        with patch.object(Path, "read_bytes", lambda path: b"mismatch" if path.name == "first.rs" else read_bytes(path)):
+            try:
+                restore_sources(root, original, root)
+            except RuntimeError:
+                pass
+            else:
+                raise AssertionError("restoration mismatch must fail closed")
+        receipt = json.loads((root / "restoration.json").read_text(encoding="utf-8"))
+        assert not receipt["first.rs"]["matches"] and receipt["second.rs"]["matches"]
+        assert all((root / path).read_bytes() == data for path, data in original.items())
 
 
 def probes(originals: dict[str, str]) -> dict[str, str]:
@@ -183,6 +224,25 @@ fn windows_auto_probe(stage: &str, identity: usize) {
 
 '''
     host = replace_once(host, "#[allow(clippy::too_many_arguments)]\nasync fn run_host(", host_helper + "#[allow(clippy::too_many_arguments)]\nasync fn run_host(")
+    host = replace_once(host, "    impl Drop for EvaluationDropReceipt {\n        fn drop(&mut self) {\n            self.0.notify_one();", '    impl Drop for EvaluationDropReceipt {\n        fn drop(&mut self) {\n            windows_auto_host_stage("eval_assessor_drop");\n            self.0.notify_one();')
+    host = replace_once(host, "            let _receipt = EvaluationDropReceipt(self.dropped.clone());\n            self.started.notify_one();", '            let _receipt = EvaluationDropReceipt(self.dropped.clone());\n            windows_auto_host_stage("eval_assessor_enter");\n            self.started.notify_one();')
+    begin = host.index("    async fn paused_evaluation_does_not_block_interrupt_or_shutdown()")
+    end = host.index("    #[async_trait::async_trait]\n    impl talos_runtime::EvaluatorAssessor for EvaluationFixtureAssessor", begin)
+    evaluation = host[begin:end]
+    for old, new in [
+        ("        for interrupt in [true, false] {", '        for interrupt in [true, false] {\n            windows_auto_host_stage(if interrupt { "eval_interrupt_case_begin" } else { "eval_shutdown_case_begin" });'),
+        ('            .expect("host");', '            .expect("host");\n            windows_auto_host_stage("eval_host_ready");'),
+        ('                    .expect("evaluate");', '                    .expect("evaluate");\n                windows_auto_host_stage("eval_evaluate_sent");'),
+        ('                started.notified().await;', '                windows_auto_host_stage("eval_wait_started");\n                started.notified().await;\n                windows_auto_host_stage("eval_started_observed");'),
+        ('                .expect("stop command");', '                .expect("stop command");\n                windows_auto_host_stage(if interrupt { "eval_interrupt_enqueued" } else { "eval_shutdown_enqueued" });'),
+        ('                dropped.notified().await;', '                windows_auto_host_stage("eval_wait_drop");\n                dropped.notified().await;\n                windows_auto_host_stage("eval_drop_observed");'),
+        ('                                assert_eq!(reason, "evaluation cancelled");', '                                assert_eq!(reason, "evaluation cancelled");\n                                windows_auto_host_stage("eval_cancel_receipt");'),
+        ('                    host.try_send(RuntimeCommand::Shutdown).expect("shutdown");', '                    host.try_send(RuntimeCommand::Shutdown).expect("shutdown");\n                    windows_auto_host_stage("eval_shutdown_after_cancel_enqueued");'),
+        ('                        RuntimeOutput::Stopped => break,', '                        RuntimeOutput::Stopped => { windows_auto_host_stage("eval_stopped_receipt"); break; },'),
+        ('            .await\n            .expect("host must respond before the 30-second evaluator deadline");', '            .await\n            .inspect_err(|_| windows_auto_host_stage(if interrupt { "eval_interrupt_composite_timeout" } else { "eval_shutdown_composite_timeout" }))\n            .expect("host must respond before the 30-second evaluator deadline");'),
+    ]:
+        evaluation = replace_once(evaluation, old, new)
+    host = host[:begin] + evaluation + host[end:]
     for old, new in [
         ("                            let approval_root = workspace_root.clone();", '                            windows_auto_host_stage("provider_return");\n                            windows_auto_host_stage("session_setup_enter");\n                            let approval_root = workspace_root.clone();'),
         ("                            let mut builder = RuntimeBuilder::new()", '                            windows_auto_host_stage("session_setup_return");\n                            windows_auto_host_stage("builder_setup_enter");\n                            let mut builder = RuntimeBuilder::new()'),
@@ -314,6 +374,10 @@ fn windows_auto_probe(stage: &str, identity: usize) {
     body_begin = pause.index("        let _guard = self.guard()?;")
     body_end = pause.rindex("\n    }")
     body = pause[body_begin:body_end]
+    body = replace_once(body, "        if !self.sidecar_exists()? {", '''        let inspection_started = std::time::Instant::now();
+        let sidecar_exists = self.sidecar_exists()?;
+        windows_auto_store_timing(if sidecar_exists { "pause_inspection_existing" } else { "pause_inspection_absent" }, inspection_started.elapsed());
+        if !sidecar_exists {''')
     for stage, operation in [
         ("pause_guard", "        let _guard = self.guard()?;"),
         ("pause_connection", "        let mut connection = self.connection()?;"),
@@ -453,6 +517,7 @@ def main() -> int:
     originals = {path: data.decode("utf-8").replace("\r\n", "\n") for path, data in original_bytes.items()}
     patched = probes(originals)
     if args.self_test:
+        restoration_self_test()
         assert all(patched[path] != originals[path] for path in originals)
         assert "Duration::from_secs(15)" in patched[AUTO]
         assert "Duration::from_secs(10)" in patched[AUTO]
@@ -475,6 +540,13 @@ def main() -> int:
         assert patched[STORE].count(".await") == originals[STORE].count(".await")
         assert patched[STORE].count('windows_auto_store_timing("pending_recover_total"') == 1
         assert patched[STORE].count('windows_auto_store_timing("pending_pause_total"') == 1
+        assert patched[STORE].count('"pause_inspection_absent"') == 1
+        assert patched[STORE].count("self.sidecar_exists()?") == originals[STORE].count("self.sidecar_exists()?")
+        assert patched[HOST].count("Duration::from_secs(5)") == originals[HOST].count("Duration::from_secs(5)")
+        assert patched[HOST].count('"eval_assessor_enter"') == 1
+        assert patched[HOST].count('"eval_assessor_drop"') == 1
+        assert patched[HOST].count('"eval_interrupt_composite_timeout"') == 1
+        assert patched[HOST].count('"eval_shutdown_composite_timeout"') == 1
         assert patched[SESSION].count("self.pending_store.pause_unstarted()") == 5
         assert all(patched[SESSION].count('windows_auto_actor_stage("pause_' + site + '_begin")') == 1 for site in ("custody_failure", "missing_completion", "sq_disconnect", "interrupt", "shutdown"))
         # The pre-existing host heartbeat adds one sleep; shutdown adds no await.
@@ -540,9 +612,8 @@ def main() -> int:
             if code == 124:
                 raise RuntimeError("controlled pipe watchdog expired; stopped experiment")
     finally:
-        for path, data in original_bytes.items():
-            (ROOT / path).write_bytes(data)
-        print("WINDOWS_AUTO_DIAG temporary Rust probes restored", flush=True)
+        restore_sources(ROOT, original_bytes, output)
+        print("WINDOWS_AUTO_DIAG temporary Rust probes restored; raw readback verified", flush=True)
     return int(any(result["exit_code"] != 0 for result in results))
 
 

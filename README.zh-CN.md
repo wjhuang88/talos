@@ -479,6 +479,22 @@ YAML frontmatter 中的 `name` 和 `description` 为必填字段。`triggers` �
 Skill 主体和引用内容不会被直接打印到滚动历史、诊断信息或可见对话导出中。引用路径必须是
 相对路径，并且不能逃逸出当前激活 Skill 的目录。
 
+### 嵌入式运行时中的 Skill
+
+`RuntimeBuilder::skill_index` 只注入第 0 层（名称和简介），模型看不到 `SKILL.md` 正文和参考文件。
+嵌入方有两种方式提供更多内容：
+
+- **宿主激活**：用 `RuntimeSkillActivation` 生成与 `/skills activate`、`/skills reference`
+  相同格式和预算的内容，在 `submit` 之前调用 `RuntimeHandle::set_skill_context`；
+  `clear_skill_context` 清除。回合进行中修改会被拒绝并发出 `SessionEvent::Error`；该上下文不写入持久会话。
+- **模型按需读取（需显式开启）**：`RuntimeBuilder::skill_read_tool(skills)` 为一个或多个绑定技能注册只读
+  `skill_read` 工具，返回 `SKILL.md` 正文和文件清单，或技能目录内的相对 `reference` 文件；每次最多 48 KiB，
+  用 `offset` 续读。拒绝绝对路径、`..`、指向目录外的符号链接、非 UTF-8 文件和超过 2 MiB 的文件。
+  结果是普通工具结果（保留在历史中），不修改系统提示词。调用方自行注册的同名 `skill_read` 工具优先，
+  因此切换到内置实现后即可移除自定义实现。
+
+`SkillManager::load_reference` 也采用相同的路径限制和大小检查。
+
 ## 内置能力
 
 Talos 自带一组面向编码 Agent 工作流的工具：
@@ -557,6 +573,9 @@ Rust 应用可以依赖 `talos-runtime` crate，在不链接 Talos CLI 或 TUI c
 核心 Agent 循环。当前 pre-1.0 初始 facade 提供 `RuntimeBuilder` 和 `RuntimeHandle`，
 用于注入 provider/tool、接收类型化事件流、中断、关闭和显式 request preview。
 嵌入方也可以通过 `RuntimeBuilder` 提供审批处理器，并替换或追加运行时系统提示词。
+
+关闭过程中，若 pending journal 确实不存在，暂停未启动任务会返回零，不创建 SQLite 或父目录。
+这只是操作时的空快照；其他 store 实例之后仍可持久接纳任务，Running 状态保持原语义。
 
 运行时关闭现在具有有界且可共享的契约。`RuntimeHandle::shutdown_controller()` 返回可克隆、
 只能发起关闭的 controller；`ShutdownOptions` 在同一个单调总 deadline 下选择

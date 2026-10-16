@@ -2,7 +2,7 @@
 
 Date: 2026-10-11. Baseline: `444a8137f054b33802f26bffdb55fb0f83a7a861`.
 
-Current stage (2026-10-12): post-#711 production-baseline experiment, Windows execution pending.
+Current stage (2026-10-16): post-#726 production-baseline comparison; fresh Windows execution pending.
 Earlier matrices, pending statements and tool availability below are preserved staged history;
 the latest checkpoint defines the current fixed 120-process / 2220-test experiment.
 
@@ -594,3 +594,109 @@ bytes. This local restoration check is not a retroactive readback proof for old 
 Independent storage/native/security/scope review found no blocker; new exact remote review and
 Windows execution remain required. No product test, full preflight or Windows execution is inferred
 from the focused Linux typecheck.
+
+## Retained CI3182 And Actual Pause-Repair Baseline — 2026-10-16
+
+CI3182/run38528907908 exact55dbe63aa40cb0cfc0e172604dfee61966432f53 remains FAILED:
+six ordinary jobs succeeded; instrumented1110pass/0fail, baseline1109pass/1fail,0ignored.
+All120processes/2220executions completed (2219pass/1fail). Evidence6184082259 and independent
+completed-log/source review6184141769 retain the original counts and limitations. Oct15 ZIP
+reverification: instrumented11877915517 SHA256c3d0b7060a9fd8a9ec3e4e1985b85316737073e796dd683f9ad625c3cb08b9be;
+baseline11876894822 SHA256efa31584406af5470a75c28b7198f9f9fed28cb98487ea0d8feef0566cf14998,
+retained untilOct28. No unchanged-head rerun replaces that failed evidence.
+
+The only failure was baseline first-suite paused_evaluation_does_not_block_interrupt_or_shutdown:
+outer5s spans Evaluate send, assessor start, Interrupt-or-Shutdown, assessor drop, cancellation
+receipt and Stopped, over two branches. The original30s expect wording names the evaluator
+budget; baseline cannot identify which branch/substage stalled. All60 matched instrumented
+original Auto outcomes succeeded. Largest successful sample parallel3 PID7412/thread71/handle740:
+pause1.5210834s, caller pause_shutdown1.5214184s, RuntimeHandle.shutdown1.5225249s; executor394.4us/
+terminal69.6us. Connection431.9367ms (open166.3619ms/PRAGMA264.7039ms), BEGIN197.0203ms/schema973us/
+update24us/commit485.2577ms. This links caller cost in successful samples, not the cause of the
+baseline5s or older10s/15s failures. Totals include observation/scheduling/drops; unexplained
+remainder is not assigned entirely to physical I/O.
+
+The separately governed repair is now merged: #726 headaa1c477f1a457dc44ad039cc72bf9ed19842bf83,
+main merge c869a9afc2871d82c7fe0a18d1bfddf903831b59, tree1a239eee60205d7a421472b4c66b5b6e8b21d4de.
+Effective claim #722/23e659e2 owns RUNTIME-011/I304. Exact CI3203/run38755790909 passed all6jobs
+on attempt1; independent exact-remote storage/custody/API APPROVE6195119208 and CAS6205402481
+precede merge. Completed macOS logs verify full preflight including the unchanged Unixsocket
+case, PermissionDenied fixture and both SDK modes. Windows logs verify new Actor/Runtime tests,
+Plugin admission and both governance validators0warnings. Local failures remain in I304/#726;
+capable native success is not a waiver or erasure of those failures. Shared Agent identity is
+not another natural person's formal approval. I304 and I301 stay Review/Claimed pending their
+own acceptance; no #590 reopening, release, Search/Git/PSS/Skill takeover or #705 merge.
+
+This diagnostic candidate integrates that actual production merge. Only the same three diagnostic
+files differ from main; all six Rust originals are production-identical. Five are unchanged from
+55dbe63; pending_submission normalized SHA256 is now
+e80131fd58cb0e9b14ff69dcebdc8ad73427b435e60383061613d8505c30c7fd through #726. Other production
+changes since CI3182, VM variation and observation prevent a controlled causal latency benchmark.
+The unchanged workflow retains two fresh-first runners,60attempts/1110expected executions each,
+120/2220 total if suite106, all original assertions, Auto15s/cleanup10s/tool120s/evaluator5s,
+35/40/45minute enclosing bounds, source restoration and every failed attempt. Baseline never
+overlays probes. No new Windows comparison outcome is claimed before actual artifacts.
+
+Temporary metadata-only additions under the same bounded CI/fixture-maintenance exception:
+- Pause inspection executes once under the original guard, emitting constant absent/existing
+  classification and elapsed captured before logging. Early zero still exits the typed Result
+  closure; original guard drops and pending_pause_total remain observable. SQL/errors/order are
+  unchanged, and absent later markers are not measured zero durations.
+- The paused-evaluator fixture emits branch/wait/enqueue/receipt stages and assessor entry/drop.
+  inspect_err observes the outer5s Result before the unchanged expect. No new await/task/native
+  call, deadline, assertion or authority is introduced. Drop is not a durable receipt. Missing or
+  interleaved markers cannot establish cause, and uninstrumented failures remain phase-unknown.
+  Added stderr may perturb scheduling, which is why the unchanged baseline remains mandatory.
+- Finally restores the same six raw snapshots, reads them back and writes restoration.json with
+  expected/restored raw SHA256 and exact byte-match flags (distinct from normalized manifest
+  hashes). Mismatch/read/write/artifact errors fail the job. Earlier Windows printouts are not
+  retroactive readback proof. Disposable CRLF/non-UTF8 fixtures and an injected mismatch exercise
+  fail-closed verification without modifying checkout sources.
+
+Previous local preparation on the identical production tree passed self-test, pinned1.99 syntax
+parsing of all six overlays and cargo check --locked --workspace --tests; every source was then
+restored with all six raw readbacks matching. Independent Agent local review found no blocking
+scope/storage/native/ABI/security issue. Workspace maintenance removed that unpublished checkout
+and its raw logs. Reconstructed script blob40a44187adddf5fccf2c1190ab827b2ab1dacda5 matches the
+recorded prior40a44187 prefix; self-test passed again. These are retained preparation facts, not
+fresh Windows execution or a full-preflight pass. Current validation is appended below before
+publication. The six existing owned-handle wait/CPU/I/O probes, initialized buffers, ABI/rights
+and unsafe sites remain unchanged; no PSS/otherPID observation is added.
+
+Fresh exact-remote review, both validators and full native CI are required. Native-child latency,
+old early-request/no-result and10s failures, existing-journal costs, previous Plugin uncertainty
+and evaluator phase attribution remain unresolved. A green sample cannot prove universal speed;
+diagnostic success alone cannot complete I304/I301 or authorize merging this temporary PR.
+
+
+### Fresh Reconstruction Validation — 2026-10-16
+
+The reconstructed candidate passes diagnostic self-test (including raw restoration/mismatch
+fixtures), Python AST, workflow YAML parsing, all14 CI classifier tests, pinned Rust1.99
+workspace formatting and syntax parsing of all six generated overlays outside the checkout.
+Independent byte comparison confirms all six production sources remained unchanged. The first
+standalone rustfmt preview attempt could not resolve host child modules in its disposable
+directory; rerunning with skip_children=true parses each of the six previews successfully.
+This is syntax validation, not a fresh workspace typecheck or Windows execution. The prior
+same-tree locked workspace/test typecheck above remains historical evidence.
+
+Fresh local independent Agent review APPROVE covers script40a44187adddf5fccf2c1190ab827b2ab1dacda5,
+workflow455c97d8b86495a40a9d907248345e935559907f and the owner before this validation appendix.
+It found no blocking storage-order/native/ABI/security issue. Published-head review remains due;
+shared Agent/GitHub identity is not another natural person's formal approval.
+
+The freshly installed pinned compiler initially could not load LLVM. The installed LLVM file
+was67108864bytes while the same1.99 official compiler archive member was208094144bytes.
+The official rustc archive SHA256 was verified as
+77171ba2a0345fdf2abc4fedda55d6de078dae7a68527c28be8c77dcc9604bd5 before restoring its three
+compiler-library members into the same toolchain. rustc -Vv and pinned rustfmt then succeeded.
+The installation truncation cause is unknown and does not establish the cause of an earlier
+GNU SIGBUS. No toolchain version, dependency, lockfile or production source changed.
+
+Collaboration claim validation passes with0warnings. The first project-governance invocation
+failed because cargo was absent from that command's PATH; the corrected explicit pinned
+Cargo/Rustup environment then passes full project governance with0warnings, SQLite consumer
+fixtures17cases and delivery fixtures12cases. Both governance validators therefore pass;
+all initial failures are retained. Final staged diff/whitespace review passes with exactly the
+three diagnostic files relative to actual mainc869a9af. No local full-preflight or Windows
+execution is claimed. Next: exact-remote review and all eight CI jobs on this stable candidate.

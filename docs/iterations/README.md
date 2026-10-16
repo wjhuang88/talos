@@ -2,6 +2,15 @@
 
 ## Purpose
 
+[I304](I304-absent-journal-pause.md) / [RUNTIME-011](../backlog/active/RUNTIME-011-absent-journal-pause.md)
+is Review / Claimed for the absent-journal pause no-op, distinct from I301 recovery reads.
+Claim #722 is effective at `23e659e2`; implementation review/full CI and post-repair Windows comparison remain pending.
+The full selection inventory/non-overlap and preserved #705 failures are in I304.
+
+[I303](I303-embedded-skill-progressive-disclosure.md) / [SKILL-006](../backlog/active/SKILL-006-embedded-skill-progressive-disclosure.md)
+is Complete / Closed for #719 under ADR-092; implementation #721 merged as `6d72975e`
+after exact-head CI, independent security/API review and CAS.
+
 [I302](I302-windows-owned-handle-evidence.md) / [TEST-003](../backlog/active/TEST-003-windows-owned-handle-evidence.md)
 is an Active/Claimed atomic proposal in #718 after maintainer scope acceptance on2026-10-14.
 ADR-091/claim are ineffective until #718 main merge; no PSS implementation yet.

@@ -1,15 +1,19 @@
 //! Runtime skill discovery and session prompt wiring.
 
 use std::collections::HashMap;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 
-use anyhow::{Result, anyhow, bail};
+use anyhow::{Result, anyhow};
 use talos_agent::Agent;
 use talos_conversation::SkillDiagnostic;
-use talos_skill::{SkillDiscoveryWarningKind, SkillIndex, SkillLoader, SkillManager};
+use talos_skill::disclosure::{
+    DEFAULT_ACTIVATION_BODY_BYTES, DEFAULT_ACTIVATION_REFERENCE_BYTES, bounded_text,
+};
+use talos_skill::{
+    SkillActivation, SkillDiscoveryWarningKind, SkillIndex, SkillLoader, SkillManager,
+    SkillReadLimits,
+};
 
-const MAX_SKILL_BODY_BYTES: usize = 24 * 1024;
-const MAX_SKILL_REFERENCE_BYTES: usize = 16 * 1024;
 const MAX_INVALID_SKILL_DIAGNOSTIC_BYTES: usize = 512;
 
 /// Skill metadata discovered for a runtime session.
@@ -19,8 +23,7 @@ pub(crate) struct RuntimeSkills {
     index_tokens: usize,
     manager: SkillManager,
     active_name: Option<String>,
-    activated_content: Option<String>,
-    loaded_references: Vec<String>,
+    activation: Option<SkillActivation>,
     invalid_activation_diagnostics: HashMap<String, String>,
 }
 
@@ -62,34 +65,25 @@ impl RuntimeSkills {
                 |diagnostic| anyhow!("skill '{name}' is invalid: {diagnostic}"),
             )
         })?;
-        let body = bounded_text(&skill.body, MAX_SKILL_BODY_BYTES);
-        let content = format!("## Skill Body\n{body}\n");
-        self.active_name = Some(skill.name.clone());
-        self.activated_content = Some(content.clone());
-        self.loaded_references.clear();
+        let activation = SkillActivation::new(skill, DEFAULT_ACTIVATION_BODY_BYTES);
+        let content = activation.content().to_string();
+        self.active_name = Some(activation.name().to_string());
+        self.activation = Some(activation);
         Ok(content)
     }
 
     /// Loads a bounded reference for the active Skill and returns combined context.
     pub(crate) fn load_reference(&mut self, relative_path: &str) -> Result<String> {
-        let active = self
-            .active_name
-            .clone()
+        let activation = self
+            .activation
+            .as_mut()
             .ok_or_else(|| anyhow!("activate a skill before loading references"))?;
-        let skill = self
-            .manager
-            .get_active_skills()
-            .into_iter()
-            .find(|skill| skill.name == active)
-            .ok_or_else(|| anyhow!("active skill '{active}' is not loaded"))?;
-        let reference = read_confined_reference(skill.source_path.as_path(), relative_path)?;
-        let reference = bounded_text(&reference, MAX_SKILL_REFERENCE_BYTES);
-        let base = self.activated_content.clone().unwrap_or_default();
-        let display_path = relative_path.trim();
-        let combined = format!("{base}\n## Reference: {display_path}\n{reference}\n");
-        self.activated_content = Some(combined.clone());
-        self.loaded_references.push(display_path.to_string());
-        Ok(combined)
+        let content = activation.add_reference(
+            relative_path,
+            DEFAULT_ACTIVATION_REFERENCE_BYTES,
+            &SkillReadLimits::default(),
+        )?;
+        Ok(content.to_string())
     }
 }
 
@@ -133,8 +127,7 @@ pub(crate) fn discover_runtime_skills_with_home(
         index_tokens,
         manager,
         active_name: None,
-        activated_content: None,
-        loaded_references: Vec::new(),
+        activation: None,
         invalid_activation_diagnostics,
     })
 }
@@ -173,58 +166,16 @@ pub(crate) fn apply_runtime_skills(agent: &mut Agent, runtime_skills: &RuntimeSk
     agent.set_skill_index(runtime_skills.index.clone());
     if let (Some(name), Some(content)) = (
         runtime_skills.active_name.as_deref(),
-        runtime_skills.activated_content.as_deref(),
+        runtime_skills
+            .activation
+            .as_ref()
+            .map(SkillActivation::content),
     ) {
         agent.set_activated_skill_context(Some(talos_agent::ActivatedSkillContext {
             name: name.to_string(),
             content: content.to_string(),
         }));
     }
-}
-
-fn bounded_text(text: &str, max_bytes: usize) -> String {
-    if text.len() <= max_bytes {
-        return text.to_string();
-    }
-    let mut end = 0usize;
-    for (idx, ch) in text.char_indices() {
-        let next = idx + ch.len_utf8();
-        if next > max_bytes {
-            break;
-        }
-        end = next;
-    }
-    format!(
-        "{}\n\n[truncated: original_bytes={}, kept_bytes={}]",
-        &text[..end],
-        text.len(),
-        end
-    )
-}
-
-fn read_confined_reference(skill_path: &Path, relative_path: &str) -> Result<String> {
-    let rel = Path::new(relative_path.trim());
-    if rel.as_os_str().is_empty() {
-        bail!("reference path is required");
-    }
-    if rel.is_absolute()
-        || rel
-            .components()
-            .any(|component| matches!(component, Component::ParentDir | Component::Prefix(_)))
-    {
-        bail!("reference path must stay inside the active skill directory");
-    }
-
-    let skill_dir = skill_path
-        .parent()
-        .ok_or_else(|| anyhow!("skill has no parent directory"))?;
-    let canonical_dir = skill_dir.canonicalize()?;
-    let candidate = canonical_dir.join(rel);
-    let canonical_candidate = candidate.canonicalize()?;
-    if !canonical_candidate.starts_with(&canonical_dir) {
-        bail!("reference path escapes the active skill directory");
-    }
-    std::fs::read_to_string(canonical_candidate).map_err(Into::into)
 }
 
 #[cfg(test)]

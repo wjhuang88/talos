@@ -28,6 +28,8 @@ PR #682 merged as `a3a4753d6e42123e33ead1d7e6f769a96f85f37e`, with final accepta
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
+| Absent-journal pause without initialization | Review / Claimed | [RUNTIME-011](backlog/active/RUNTIME-011-absent-journal-pause.md) / [I304](iterations/I304-absent-journal-pause.md) | #722 effective at `23e659e2`; guarded no-op and shutdown regressions candidate. Exact-head review/full CI and CI3182 Windows comparison pending; local validation failures retained in I304. |
+| Embedded Skill progressive disclosure | Complete / Closed | [SKILL-006](backlog/active/SKILL-006-embedded-skill-progressive-disclosure.md) / [I303](iterations/I303-embedded-skill-progressive-disclosure.md) / #719 | #721 merged as `6d72975e`; exact-head CI, independent security/API review and CAS passed. |
 | Windows self-only handle evidence | Active / Claimed (proposed) | [TEST-003](backlog/active/TEST-003-windows-owned-handle-evidence.md) / [I302](iterations/I302-windows-owned-handle-evidence.md) / #717 | #718 proposes atomic ADR-091/claim; ineffective until protected review/CI/CAS and main merge. No PSS code yet. |
 | Missing pending-sidecar startup recovery | Review / Claimed | [RUNTIME-010](backlog/active/RUNTIME-010-missing-pending-sidecar-startup.md) / [I301](iterations/I301-missing-pending-sidecar-startup.md) | Claim #710 effective at 42b86112; implementation needs full preflight, exact-head CI and storage/API review. |
 | I300 structured Git repair / T7 | Active / Claimed (proposed) | [I300](iterations/I300-structured-git-repair.md) | #704 proposes atomic claim/activation under accepted ADR-089; ineffective until merge, no implementation yet. |

@@ -845,6 +845,25 @@ Activated Skill bodies and references are added to provider context only. Talos
 does not print the full content into scrollback command output or transcript
 history, and reference paths must stay inside the active Skill directory.
 
+### Skills in embedded runtimes
+
+`RuntimeBuilder::skill_index` injects **Level 0 only** (name and description); the model does not
+see `SKILL.md` bodies or reference files from it. Embedders have two ways to deliver more:
+
+- **Host activation**: build bounded content with `RuntimeSkillActivation` (same format and budgets
+  as `/skills activate` and `/skills reference`) and call `RuntimeHandle::set_skill_context` before
+  `submit`; `clear_skill_context` removes it. Changes are rejected with a `SessionEvent::Error`
+  while a turn is active, and the context is not stored in durable sessions.
+- **Model-initiated reads (opt-in)**: `RuntimeBuilder::skill_read_tool(skills)` registers a
+  read-only `skill_read` tool for one or more bound skills. It returns the `SKILL.md` body and file
+  list, or a skill-relative `reference` file, in 48 KiB chunks with `offset` continuation. Reads
+  reject absolute paths, `..`, symbolic links leaving the skill directory, non-UTF-8 files and
+  files over 2 MiB. Results are normal tool results (kept in history) and do not change the system
+  prompt. A caller-registered tool named `skill_read` takes precedence, so a custom implementation
+  can be removed after switching to the built-in one.
+
+`SkillManager::load_reference` applies the same confinement and size checks.
+
 ## MCP Tools
 
 Configure MCP servers in `~/.talos/config.toml`. Talos supports four transport types: `stdio`
@@ -921,6 +940,10 @@ one total monotonic deadline, and every caller receives the same redacted `Shutd
 shutdown fence closes, new SDK submissions return typed `RuntimeClosing` without enqueueing. The
 existing consuming `RuntimeHandle::shutdown()` remains available and returns
 `ShutdownIncomplete` instead of reporting incomplete cleanup as success.
+
+When the pending journal is genuinely absent, pausing unstarted work during shutdown returns zero
+without initializing SQLite or creating its parent directories. This is an operation snapshot; later
+admission by another store instance remains durable, and Running records keep their existing state.
 
 After actor-owned durable reconciliation, shutdown runs a build-time frozen set of Talos-owned
 resource finalizers once in fixed order under the same total deadline. `ShutdownReport::finalizers()`
