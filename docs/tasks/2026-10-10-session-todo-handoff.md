@@ -3169,3 +3169,11 @@ Locked Pull tests pass 76/76, `cargo check --locked -p talos-tools --all-feature
 passes, and all-target all-feature Clippy with `-D warnings` passes. Child
 remote semantics, object admission, recursive fetch, integration, and delivery
 gates remain open; Production Pull remains disabled.
+Pull child gitdir binding correction checkpoint (2026-10-16, `afc61b1c`):
+Pull child identity admission now resolves the `.git` marker before capturing
+`ChildLocation`, so external gitdirs and linked common directories are bound to
+the actual metadata roots. The stage also requires the dedicated configuration-
+chain capability before invoking Git with includes. Locked Pull tests pass
+76/76, cargo check and all-target all-feature Clippy with `-D warnings` pass.
+Dedicated external-gitdir/include fixtures, object admission, recursive fetch,
+integration and delivery gates remain open; Production Pull remains disabled.
