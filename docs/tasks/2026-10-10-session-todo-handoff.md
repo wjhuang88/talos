@@ -1,3 +1,20 @@
+Fetched graph checkpoint (2026-10-16, `14e34ef4`): prefetch now retains validated
+all-ref object tips; admitted post-fetch discovery traverses every FETCH_HEAD
+tip, including not-for-merge entries, excluding the retained prefetch tips.
+The resulting new commit set is retained for pending child tree discovery.
+A real self-fetch of a dangling commit proves that commit is included while its
+reachable parent is excluded. Graph listings accept only complete nonzero
+SHA-1/SHA-256 IDs, bounded to 1 MiB; revision argv is bounded to 32 KiB and
+refuses without dropping exclusions. Probes use the existing owned runner and
+unchanged cumulative command/output budget. Locked all-feature Pull tests pass
+57/57 and all-target all-feature tools Clippy passes (after fixing a test-only
+cloned_ref_to_slice_refs warning). `d0a8d2ed` adds six native child-policy cases:
+explicit global recursion overrides per-child values; only default global mode
+uses child values. The initial opposite assumption failed the native fixture
+and was corrected. Child tree/config discovery, per-child authorization/fetch,
+integration writes, runtime evidence, independent review and final preflight
+remain open. Production fetch remains disabled and I300/T7 stays Active.
+
 Network continuation checkpoint (2026-10-16, `05668643`): a real loopback Git
 daemon now exercises the implemented parent fetch through execute_stage. All
 three fresh-read outcomes are covered: approval reaches integration selection;
