@@ -1751,11 +1751,19 @@ fn pull_activity_attributes_agree_with_native_git() {
             Some(true)
         );
     }
+    git(&["add", "--", ".gitattributes", "nested/.gitattributes"]);
+    std::fs::remove_file(root.join(".gitattributes")).expect("remove worktree rules");
+    std::fs::remove_file(root.join("nested/.gitattributes")).expect("remove nested rules");
+    assert_eq!(
+        git(&["check-attr", "-z", "color", "--", "nested/child"]),
+        b"nested/child\0color\0nested\0",
+        "ordinary check-attr falls back to index when worktree rules are absent"
+    );
 }
 
 #[cfg(test)]
 #[test]
-fn pull_activity_missing_attribute_file_is_unspecified() {
+fn pull_activity_empty_rule_set_is_unspecified() {
     let root = std::path::Path::new("/repo");
     let rules = gix::attrs::Search::default();
     let metadata = gix::attrs::search::MetadataCollection::default();
