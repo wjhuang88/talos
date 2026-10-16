@@ -179,7 +179,7 @@ impl PullEvidence {
     pub(super) fn required_paths(
         repository: &super::repository_state::RepositoryState,
         tracking: Option<&str>,
-        fetched: bool,
+        _fetched: bool,
     ) -> Result<std::collections::BTreeSet<std::path::PathBuf>, GitToolError> {
         let invalid = || GitToolError::InvalidInput("Invalid Pull evidence reference".into());
         if let Some(reference) = tracking {
@@ -208,9 +208,10 @@ impl PullEvidence {
         // The read-only unmerged-index probe below reads this exact index.
         // Root Read does not authorize descendants.
         paths.insert(repository.git_dir.join("index"));
-        if fetched {
-            paths.insert(repository.git_dir.join("FETCH_HEAD"));
-        }
+        // Fetch opens this destination directly. Bind its absence or existing
+        // regular contents before fetch as well as after it; otherwise a stable
+        // symlink could redirect the admitted metadata write outside its root.
+        paths.insert(repository.git_dir.join("FETCH_HEAD"));
         Ok(paths)
     }
 
@@ -1758,6 +1759,40 @@ async fn real_pull_obeys_branch_ff_and_autostash_policy() {
             );
         }
     }
+}
+
+#[cfg(test)]
+#[cfg(unix)]
+#[test]
+fn pull_prefetch_binds_fetch_head_destination_before_mutation() {
+    let root = tempfile::tempdir().expect("fixture");
+    let work = root.path().join("work");
+    std::fs::create_dir(&work).expect("worktree");
+    let output = std::process::Command::new("git")
+        .args(["init", "-b", "Topic"])
+        .current_dir(&work)
+        .output()
+        .expect("fixture Git");
+    assert!(output.status.success());
+    let repository = super::repository_state::RepositoryState::capture(&work).expect("repository");
+    let path = repository.git_dir.join("FETCH_HEAD");
+    let absent = PullEvidence::capture(&repository, None, false).expect("absent destination");
+    std::fs::write(&path, b"previous fetch\n").expect("create destination");
+    assert!(absent.revalidate().is_err());
+    let present = PullEvidence::capture(&repository, None, false).expect("regular destination");
+    present.revalidate().expect("unchanged destination");
+    std::fs::write(&path, b"changed fetch\n").expect("change destination");
+    assert!(present.revalidate().is_err());
+    std::fs::remove_file(&path).expect("remove destination");
+    let outside = root.path().join("sentinel");
+    std::fs::write(&outside, b"preserved\n").expect("sentinel");
+    std::os::unix::fs::symlink(&outside, &path).expect("redirect destination");
+    assert!(PullEvidence::capture(&repository, None, false).is_err());
+    assert!(absent.revalidate().is_err());
+    assert_eq!(
+        std::fs::read(outside).expect("sentinel retained"),
+        b"preserved\n"
+    );
 }
 
 #[cfg(test)]
