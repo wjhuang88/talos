@@ -95,3 +95,10 @@ claims0warnings/text23/classifier14/diff passed. Independent protected nine-file
 contract review APPROVES governance proposal, not effectiveness/implementation/native execution.
 Authorization is the maintainer's22:39 session acceptance of proposal6217718821, not the older
 proposal comment's content. Fresh exact-remote review, applicable CI and final CAS remain.
+
+CI3216/run38918577883 on5631af7e FAILED remote Issue reconciliation: the new #729 row
+contained two owner links where the actual parser requires exactly one. Corrected to TEST-004
+as sole owner; I305 remains linked by owner docs. Actual parser now recognizes729 and validates
+its source/owner identity. Added the required exact Status reconciliation comment; no validator
+weakening, scope change or unrelated reconciliation batch. Prior failure remains recorded.
+Fresh exact-head checks/review/CI precede merge; still no implementation.
