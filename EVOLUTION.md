@@ -5,6 +5,15 @@
 Record reusable lessons from failures, corrections, and unexpected successes. Check here before
 repeating known mistakes.
 
+## 2026-10-16 - Git config write calls do not define declaration order
+
+- Trigger: Native recursive-fetch parity fixture for I300.
+- Symptom: An expected `on` policy was read as `off` despite reversed `git config --add` calls.
+- Root cause: Git inserts new keys into existing sections, so write-call order differs from configuration declaration order.
+- Fix: Append explicit sections in the intended order and compare retained policy with actual native fetch child effects.
+- Prevention: Inspect serialized configuration when testing cross-key precedence; do not infer order from mutation calls.
+- Promoted to rule/check: `pull_parent_fetch_defers_recursive_child_effects` covers four ordered recursion combinations against native Git.
+
 ## 2026-10-14 - Git hooks are not limited to executable files
 
 - Trigger: Independent review of branch-conditional Checkout support against Git 2.54.
@@ -16,6 +25,7 @@ repeating known mistakes.
 
 ## Lesson Index
 
+- [Git config write calls do not define declaration order](#2026-10-16---git-config-write-calls-do-not-define-declaration-order) — I300.
 - [Git hooks are not limited to executable files](#2026-10-14---git-hooks-are-not-limited-to-executable-files) — I300.
 - [Async decision receipts are not authorization](#2026-10-14---async-decision-receipts-are-not-authorization) — I300.
 
