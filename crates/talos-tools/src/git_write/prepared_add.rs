@@ -223,6 +223,7 @@ pub(super) struct AddPlan {
     pull_integration: Option<super::pull_state::Integration>,
     pull_ref_tips: Option<Vec<String>>,
     pull_new_commits: Vec<String>,
+    pull_child_trees: BTreeMap<String, super::pull_children::Tree>,
     identity: PreparedPlanIdentity,
     workspace: PathBuf,
     input: Value,
@@ -621,6 +622,7 @@ impl AddPlan {
             pull_integration: None,
             pull_ref_tips: None,
             pull_new_commits: Vec::new(),
+            pull_child_trees: BTreeMap::new(),
             identity: PreparedPlanIdentity::new(),
             workspace: workspace.to_owned(),
             input: input.clone(),
@@ -1395,6 +1397,25 @@ impl AddPlan {
                 ));
             }
             self.pull_new_commits = super::pull_state::graph_oids(&graph.stdout, width)?;
+        }
+        for commit in &self.pull_new_commits {
+            let output = self
+                .pull_probe(vec![
+                    "ls-tree".into(),
+                    "-r".into(),
+                    "-z".into(),
+                    "--full-tree".into(),
+                    commit.clone(),
+                    "--".into(),
+                ])
+                .await?;
+            if !output.status.success() || !output.stderr.is_empty() {
+                return Err(GitToolError::Git("Pull child tree listing failed".into()));
+            }
+            self.pull_child_trees.insert(
+                commit.clone(),
+                super::pull_children::Tree::parse(&output.stdout, width)?,
+            );
         }
         self.pull_integration = Some(
             self.pull_before
@@ -12122,18 +12143,36 @@ pub(super) mod tests {
         // A dangling commit is already stored but is not reachable from any
         // pre-fetch ref. Fetching it must include it in child-graph discovery
         // while excluding its already-reachable parent.
+        let child_oid = git(&["rev-parse", "HEAD"]);
+        let child_oid = std::str::from_utf8(&child_oid).expect("child OID").trim();
+        git(&[
+            "update-index",
+            "--add",
+            "--cacheinfo",
+            &format!("160000,{child_oid},missing/child"),
+        ]);
+        std::fs::write(
+            root.path().join(".gitmodules"),
+            "[submodule \"child\"]\npath = missing/child\nurl = git://example.invalid/child\n",
+        )
+        .expect("module declaration");
+        git(&["add", ".gitmodules"]);
+        let tree_oid = git(&["write-tree"]);
+        let tree_oid = std::str::from_utf8(&tree_oid).expect("tree OID").trim();
         let target = git(&[
             "-c",
             "user.name=Fixture",
             "-c",
             "user.email=fixture@example.invalid",
             "commit-tree",
-            "HEAD^{tree}",
+            tree_oid,
             "-p",
             "HEAD",
             "-m",
             "new fetched history",
         ]);
+        git(&["reset", "--mixed", "HEAD"]);
+        std::fs::remove_file(root.path().join(".gitmodules")).expect("remove fixture config");
         let target = std::str::from_utf8(&target).expect("object ID").trim();
         let mut plan = Box::new(
             AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
@@ -12176,6 +12215,15 @@ pub(super) mod tests {
             .expect("postfetch");
         assert!(next.phase == Phase::PullIntegration);
         assert_eq!(next.pull_new_commits, [target]);
+        assert!(next.pull_child_trees.contains_key(target));
+        let child_tree = &next.pull_child_trees[target];
+        assert_eq!(
+            child_tree.gitlinks.get("missing/child").map(String::as_str),
+            Some(child_oid)
+        );
+        assert!(child_tree.modules_blob.is_some());
+        assert!(!root.path().join("missing").exists());
+        assert!(!root.path().join(".gitmodules").exists());
         assert!(matches!(
             next.pull_integration,
             Some(super::super::pull_state::Integration::Command(_))

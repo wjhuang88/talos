@@ -1519,6 +1519,7 @@ pub(super) fn graph_oids(bytes: &[u8], width: usize) -> Result<Vec<String>, GitT
         return Err(invalid());
     }
     let mut result = Vec::new();
+    let mut seen = std::collections::BTreeSet::new();
     for line in bytes.split_inclusive(|byte| *byte == b'\n') {
         let oid = line.strip_suffix(b"\n").ok_or_else(invalid)?;
         if oid.len() != width
@@ -1527,14 +1528,15 @@ pub(super) fn graph_oids(bytes: &[u8], width: usize) -> Result<Vec<String>, GitT
         {
             return Err(invalid());
         }
-        result.push(
-            std::str::from_utf8(oid)
-                .map_err(|_| invalid())?
-                .to_ascii_lowercase(),
-        );
+        let oid = std::str::from_utf8(oid)
+            .map_err(|_| invalid())?
+            .to_ascii_lowercase();
+        if seen.insert(oid.clone()) {
+            result.push(oid);
+        }
     }
-    result.sort();
-    result.dedup();
+    // Keep revision walk order: child name/path association must use the first
+    // encountered changed commit, not lexicographic object-ID order.
     Ok(result)
 }
 
@@ -1566,6 +1568,11 @@ fn fetched_heads_preserve_merge_order_and_ignore_description_bytes() {
 fn pull_graph_listings_accept_only_complete_object_ids() {
     for width in [40, 64] {
         let oid = "a".repeat(width);
+        let newer = "b".repeat(width);
+        assert_eq!(
+            graph_oids(format!("{newer}\n{oid}\n{newer}\n").as_bytes(), width).expect("walk order"),
+            [newer, oid.clone()]
+        );
         assert_eq!(
             graph_oids(format!("{oid}\n{}\n", oid.to_uppercase()).as_bytes(), width)
                 .expect("normalized tips"),
