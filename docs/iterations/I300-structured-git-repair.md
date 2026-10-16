@@ -1,3 +1,18 @@
+Child tree checkpoint (2026-10-16, `db4d9414`): admitted post-fetch discovery
+now lists each newly reachable commit tree through the owned bounded runner,
+retaining gitlink paths/OIDs and the root .gitmodules blob OID. The pure parser
+validates SHA-1/SHA-256 IDs, mode/type pairs, framing, duplicate paths and path
+traversal; symlink/gitlink .gitmodules is refused. It performs no child filesystem
+access. A real self-fetch fixture retains a gitlink and module blob even though
+neither the child path nor .gitmodules exists in the worktree. Locked all-feature
+Pull tests pass 58/58; the subsequent graph-order regression and all-target
+all-feature tools Clippy pass. Graph IDs now deduplicate without sorting, retaining
+revision walk order needed for later first-seen child name/path association.
+These are tree inventories, not native changed-gitlink selection or child fetch
+plans. Module blob parsing, native change/policy selection, per-child identity and
+approval, nested execution, integration, independent review, Agent/MCP and final
+preflight remain open. Production fetch remains disabled; I300/T7 stays Active.
+
 Fetched graph checkpoint (2026-10-16, `14e34ef4`): prefetch now retains validated
 all-ref object tips; admitted post-fetch discovery traverses every FETCH_HEAD
 tip, including not-for-merge entries, excluding the retained prefetch tips.
