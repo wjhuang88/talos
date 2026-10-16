@@ -2933,6 +2933,41 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn empty_shutdown_preserves_receipts_without_creating_pending_storage() {
+        let dir = tempfile::tempdir().expect("isolated workspace");
+        let root = dir.path().join("missing-workspace");
+        let runtime = RuntimeBuilder::new()
+            .workspace_root(&root)
+            .provider(Arc::new(MockProvider::new().with_response("unused")))
+            .build()
+            .expect("runtime builds");
+        let report = runtime
+            .shutdown_with(ShutdownOptions::interrupt(Duration::from_secs(1)).expect("options"))
+            .await
+            .expect("shutdown report");
+        assert!(report.is_complete());
+        assert_eq!(report.active_turn(), ShutdownActiveTurnOutcome::Idle);
+        assert_eq!(
+            report.durable_reconciliation(),
+            ShutdownDurableOutcome::Completed {
+                rejected_pending: 0
+            }
+        );
+        assert!(matches!(
+            runtime.submit("too late").await,
+            Err(RuntimeError::RuntimeClosing)
+        ));
+        runtime
+            .shutdown()
+            .await
+            .expect("legacy caller joins report");
+        assert!(
+            !root.join(".talos/runtime").exists(),
+            "empty shutdown must not create pending storage"
+        );
+    }
+
+    #[tokio::test]
     async fn interrupt_closes_admission_and_finalizes_the_active_turn() {
         let (runtime, entered, _release) = gated_runtime().await;
         let entered_wait = entered.notified();

@@ -1,15 +1,17 @@
 # Iteration I301: Missing Pending-Sidecar Startup Recovery
 
-> Document status: Review
+> Document status: Complete
 > Published plan date: 2026-10-12
 > Planned objective: eliminate database initialization during recovery of an absent pending sidecar.
 > MVP deliverable: new/legacy Runtime admits commands without a recovery-only SQLite side effect.
+
+Completion Commit: 98fa04cbdfdb7b30ff4a32d06036427872a41703
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | Missing pending-sidecar recovery read fast path, storage/Actor regressions and startup documentation only; no existing-store durability or custody change. |
@@ -18,9 +20,9 @@
 | Governance Claim PR | #710 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer repeatedly authorized continuing the intermittent-timeout investigation and repair through GitHub CI. No separate maintainer reviewer is available; independent Agent storage/API review, exact-head CI, both validators and merge-time CAS remain required. |
-| Implementation PR | #711 (Review) |
-| Last Updated | 2026-10-12 |
-| Handoff / Release Condition | No implementation before this atomic claim and activation merges into main; release only after evidence-bearing closeout or explicit handoff. |
+| Implementation PR | #711 (merged as 9cad344b8f7adef855ca6b858e6ccc7723103767) |
+| Last Updated | 2026-10-16 |
+| Handoff / Release Condition | Bounded startup storage acceptance complete; #705 retains broader timeout investigation. No release. |
 
 ## Published Baseline
 
@@ -167,3 +169,107 @@ Corrected stable-stage checks: affected733 tests pass; format and focused sessio
 pass. Exact permission fixture passed one case and printed `filesystem_error=PermissionDenied`
 locally; this supersedes the earlier unsupported root-identity inference. Both governance validators
 passed. No production/dependency byte changed in this correction; full new-head CI remains required.
+
+
+## Implementation Merge And Startup Acceptance — 2026-10-16
+
+Current status is Complete / Closed for RUNTIME-010 only. Published objective/acceptance/exclusions
+and all earlier failures remain intact; earlier Review/pending paragraphs are historical. This
+closeout names an existing implementation commit, not itself, and follows effective claim#710.
+
+#711 exact98fa04cbdfdb7b30ff4a32d06036427872a41703/tree9d3c18e5d7202156fdb47f81f66778705d1335d9
+merged as9cad344b8f7adef855ca6b858e6ccc7723103767. CI3161/run38283574722 completedSUCCESS,
+attempt1/all6jobsSUCCESS; independent exact-head review6129237320 and merge CAS6129422889.
+Root freshly reread completed Windows114926496803 and macOS114926496894 logs: actual fresh Actor
+admission and conservative ParentDir recovery pass; macOS original Unix-socket/full release
+preflight, both independent external SDK executable modes and actualPermissionDenied pass.
+The retained failed local preflight and failedCI3160 Windows fixture candidate are not passes.
+
+### Requirement-To-Evidence Mapping
+
+Source Story's first four acceptance rows are covered by the11storage regressions and actual
+fresh_actor_admits_submit_without_recovery_sidecar_creation in the reviewed implementation.
+missing_sidecar_recovery_is_read_only_and_admission_stays_durable checks structural absence and
+later persisted admission; existing_sidecar_recovery_preserves_running_pending_and_schema_errors
+covers actual Running/Pending and schema behavior; absent_read_then_cross_instance_ack_is_recoverable
+checks acknowledged concurrent custody. Invalid parents/permissions, links/loops and ParentDir
+regressions preserve conservative behavior. Original WAL/FULL/schema/query/receipt authority and
+public API remain unchanged. README2/runtime SDK contract changes shipped with #711.
+
+Current main7b33bc9f2a7c446781b2311e7b171f86cf35b4a4 contains the separately closed I304 repair.
+Source comparison98fa04cb→main shows pending_submission.rs production differences only in
+pause_unstarted and a helper comment (read→operation snapshot); recover_states/sidecar_exists
+behavior is unchanged. No startup logic or published acceptance is broadened by this closeout.
+
+### Post-Merge Original-Budget Comparison
+
+Retained CI3153 successful target parallel5/PID9060/thread72 had actor-entry→reconcile-return
+4.5720454s, followed by recover63.7013ms/restore574.9591ms; these include scheduling/observation.
+Post-#711 CI3163 at48ed767e first-recovery60targets median0.2307ms/max69.1622ms, Actor reconcile
+median0.2905ms/max69.2491ms. Its actual120/2220 result remains2205pass15fail; baseline Auto15s
+no-result and instrumented3Auto+10other host failures are retained. CI3182 remains2219pass1fail
+(evaluator5s composite branch/phase unknown). Earlier checkpoint6129850034 kept this slice Review
+pending evidence-bearing closeout and separately investigated shutdown cost; I304 now closes
+only that distinct pause optimization, never these historical failures.
+
+CI3206/run38832452061 exactff84ec7064edb54ace27ba7c2700f028e5dfaef6 includes actualmainc869a9af,
+with only3temporary diagnostic files and unchanged I301 startup code. All8jobsSUCCESS attempt1;
+fixed120processes/2220pass0fail0ignored, independently validated in#705 comments6209342583 and
+6209379440. Two65-file ZIPs, expireOct30:
+- baseline12017369938 SHA256
+  1faed5ecf6261634cb26b97f82a1360d61d80dedb86260855470f7a7fd412f8e;
+- instrumented12018356958 SHA256
+  2fcf78709cd7614c4f5f3e004a4c316506121ec122ab54dbfa85a599d52b36cb.
+Both manifests match exactff84ec7/image20261007.264.1/4CPU; normalized production hashes and
+all12WindowsCRLF original/restored raw hashes match actual production sources. No original
+Auto15s/cleanup10s/tool120s/evaluator5s assertion or deadline changes, warmup or retry-to-green.
+
+Fresh root recount of the60unique matched original-Auto PID/thread groups:
+- First recovery only60samples: median0.19485ms/max136.6005ms.
+- All three recovery calls per target180samples: median0.137ms/max140.7649ms.
+- Logged actor_reconcile_elapsed_ns60samples: median0.24525ms/max145.0001ms.
+  Outer actor-entry→reconcile-return markers instead measure median0.29335ms/max145.0726ms;
+  these include additional observation and are a separate metric.
+The all180population must not be described as60first-startup timings. Timers do not themselves
+label absence, establish exact I/O cost or eliminate scheduling. Structural no-storage/admission
+regressions plus reviewed production branches establish the bounded optimization. Different
+production baselines/runner images/VM/probe overhead prevent a controlled causal speedup claim.
+
+### Scope, Retrospective And Residuals
+
+SOP3a: this existing slice is SDK/library-only pending-store/Actor startup with ParentNone and no
+new CLI capability/binary-entry acceptance. Real external SDK executables plus Actor/Runtime
+execution establish this layer; Auto test executables are budget comparisons, not actual talos
+CLI walkthroughs. Broader CLI/PowerShell integration and timeout acceptance remains open in#705.
+No behavior-facing parent is marked Done by this storage closeout.
+
+Structural absence/reopen/custody tests prevented a timing-only conclusion. The ParentDir
+counterexample showed why naive NotFound is insufficient; platform-specific side effects required
+a corrected fixture with all-platform custody assertions preserved. Separate startup/pause/child
+spans allowed bounded completion while retaining the unexplained failures. No new ADR/dependency/
+release or runtime implementation is introduced here. I304 staysComplete independently; other
+Search/Git/PSS/Skill owners and terminal#590 are unchanged.
+
+#711 CI3160 remains retained here. #705 remainsOPEN/UNMERGED with oldCI3163/3182 failures,
+native-child waiting (current
+successful assigned→waitreturn4.9122951s sample incomment6209483437), old10s/15s attribution,
+evaluator5s phase uncertainty, existing-journal costs and prior Plugin uncertainty. Neither a
+successful sample nor this closeout guarantees universal latency or closes the full investigation.
+Applicable exact-closeout-head CI/review, both validators and CAS remain mandatory before merge.
+
+
+### Closeout Evidence Review And Validation
+
+Fresh root acceptance reconciliation: #711 comment6211705932. Independent Agent evidence/local
+six-file closeout review6211716953 APPROVE confirms the exact implementation/native gates, first60/all180
+populations, logged Actor field and library-only acceptance. Root freshly rehashed bothZIPs,
+reparsed raw60target logs and both1110test summaries, and matched all12normalized/CRLFsource
+restoration receipts to current production. Earlier raw failures remain retained, not new passes.
+
+Local pinned Rust/Cargo1.99.0 project governance0warnings (SQLite17fixtures/delivery12),
+Collaboration Claims0warnings, classifier14/14 and staged scope/whitespace review PASS.
+Only six governance/docs files change; manifest audit date is already2026-10-16 and only its
+scope comment includes I301 alongside I304. No profile/claim/source/dependency/lock/CI change.
+This documentation-only closeout does not claim a fresh full local Rust preflight; runtime
+acceptance comes from the existing exact implementation/native CI and bounded comparison.
+Exact published-head review, applicable CI and merge-time CAS remain gates before main update.
