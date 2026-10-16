@@ -1,3 +1,19 @@
+Post-fetch Pull evidence checkpoint (2026-10-16, `6f710376`): fetched metadata
+can now be rebound to the retained gitdir/common-dir/worktree identities after
+the parent fetch changes refs and objects. The fresh capture checks the old
+location guard before rediscovery, binds FETCH_HEAD and fixed evidence again,
+and refuses changed location pointers or replacement roots. A real local-fetch
+regression proves intended ref/object drift is accepted while changed
+FETCH_HEAD, commondir redirection and gitdir replacement are rejected. The
+Pull suite passes 53/53 and all-target all-feature tools Clippy passes. Approved
+standard preflight passed against source `6f710376`: tools 754/754, workspace
+checks/tests/Clippy, governance/claims, doctests and both external Runtime SDK
+fixtures; log `/private/tmp/i300-policy-postfetch-preflight-approved.log`.
+The sandboxed run reached 753/754 and hit only the known process-observation
+`PermissionDenied`; log `/private/tmp/i300-policy-postfetch-preflight.log`.
+Production fetch, child discovery/approval, integration, independent review and
+Agent/MCP Pull evidence remain open. I300/T7 stays Active.
+
 Recursive Pull policy checkpoint (2026-10-16, `e41d7ec1`): retained prefetch
 evidence now distinguishes default, off, on and on-demand modes and respects
 the declaration order of `submodule.recurse` and `fetch.recurseSubmodules`.
