@@ -8,6 +8,13 @@ refuses them. Missing system/global/info sources remain empty layers. The prior
 head; only the earlier 75-test run and a separate focused test were observed.
 T7 remains Active; this correction is not completion evidence.
 
+Index attribute fallback checkpoint (2026-10-16): the dedicated child-attribute
+stage now probes only the already admitted index through bounded `ls-files --stage`
+and `cat-file blob :path` calls. Missing index entries remain empty layers;
+nonzero or noisy probes refuse. Locked Pull tests pass 76/76 and all-target
+all-feature Clippy passes (logs `/private/tmp/i300-index-attribute-{fallback,clippy}.log`).
+Child identity/config/remote authorization and recursive execution remain open.
+
 Pull activity evaluation checkpoint (2026-10-16, `5251f731`): admitted
 attribute snapshots now build a gix attribute search in the dedicated
 `PullChildAttributes` stage and resolve `submodule.active` attribute pathspecs

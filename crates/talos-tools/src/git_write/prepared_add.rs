@@ -1669,7 +1669,7 @@ impl AddPlan {
         Ok(self)
     }
 
-    fn discover_pull_child_attributes(
+    async fn discover_pull_child_attributes(
         mut self: Box<Self>,
         authorizations: &[talos_core::tool::ToolExecutionAuthorization],
     ) -> Result<Box<Self>, GitToolError> {
@@ -1702,14 +1702,52 @@ impl AddPlan {
         self.revalidate()?;
         self.pull_attributes = evidence;
         self.revalidate()?;
-        self.resolve_pull_child_activity()?;
+        self.resolve_pull_child_activity().await?;
         self.identity = PreparedPlanIdentity::new();
         self.phase = Phase::PullIntegration;
         Ok(self)
     }
 
-    fn resolve_pull_child_activity(&mut self) -> Result<(), GitToolError> {
+    async fn resolve_pull_child_activity(&mut self) -> Result<(), GitToolError> {
         use super::pull_children::Activity;
+        let mut index_rules = BTreeMap::new();
+        for path in &self.pull_attribute_paths {
+            let Some(relative) = path
+                .strip_prefix(&self.repository.workdir)
+                .ok()
+                .and_then(Path::to_str)
+            else {
+                continue;
+            };
+            let listing = self
+                .pull_probe(vec![
+                    "ls-files".into(),
+                    "--stage".into(),
+                    "--".into(),
+                    relative.to_owned(),
+                ])
+                .await?;
+            if !listing.status.success() || !listing.stderr.is_empty() {
+                return Err(GitToolError::Git(
+                    "Pull index attribute lookup failed".into(),
+                ));
+            }
+            if !listing.stdout.is_empty() {
+                let output = self
+                    .pull_probe(vec![
+                        "cat-file".into(),
+                        "blob".into(),
+                        format!(":{relative}"),
+                    ])
+                    .await?;
+                if !output.status.success() || !output.stderr.is_empty() {
+                    return Err(GitToolError::Git(
+                        "Pull index attribute blob read failed".into(),
+                    ));
+                }
+                index_rules.insert(path.clone(), output.stdout);
+            }
+        }
         for (name, child) in &mut self.pull_changed_children {
             let Some(Activity::Pathspec { attributes }) = &child.activity else {
                 continue;
@@ -1762,9 +1800,15 @@ impl AddPlan {
                         // admitted the index blob, so refuse rather than
                         // silently evaluating an incomplete rule set.
                         snapshot::Entry::Missing => {
-                            return Err(GitToolError::InvalidInput(
-                                "Pull activity requires admitted index attribute fallback".into(),
-                            ));
+                            if let Some(bytes) = index_rules.get(&path) {
+                                rules.add_patterns_buffer(
+                                    bytes,
+                                    path,
+                                    Some(self.repository.workdir.as_path()),
+                                    &mut metadata,
+                                    macros,
+                                );
+                            }
                         }
                         _ => {
                             return Err(GitToolError::InvalidInput(
@@ -5907,7 +5951,7 @@ impl PreparedNormalToolInvocation for AddPlan {
                     GitToolError::InvalidInput(format!("target-branch discovery: {error}"))
                 }),
             Phase::PullPreparation => self.discover_pull_prefetch(&authorizations).await,
-            Phase::PullChildAttributes => self.discover_pull_child_attributes(&authorizations),
+            Phase::PullChildAttributes => self.discover_pull_child_attributes(&authorizations).await,
             Phase::PullPostFetch => self.discover_pull_postfetch(&authorizations).await.map_err(|error| GitToolError::Git(format!("Pull parent fetch completed; post-fetch discovery failed: {error}; fetched effects are retained; inspect repository before retrying"))),
             Phase::PullIntegration => {
                 if let Err(error) = self.revalidate() {
@@ -12512,11 +12556,12 @@ pub(super) mod tests {
                 path.to_str().expect("path"),
             )));
             if denied {
-                assert!(plan.discover_pull_child_attributes(&stale).is_err());
+                assert!(plan.discover_pull_child_attributes(&stale).await.is_err());
                 continue;
             }
             let next = plan
                 .discover_pull_child_attributes(&admission)
+                .await
                 .expect("capture");
             assert!(next.phase == Phase::PullIntegration);
             assert_eq!(next.pull_attributes.len(), 1);
