@@ -1,3 +1,16 @@
+Historical module checkpoint (2026-10-16, `a1580b8d`): post-fetch tree
+discovery now reads each .gitmodules blob by its validated object ID through
+the owned runner, then parses it with gix without includes and with a panic
+boundary. It retains case-sensitive path-to-name mappings, first path per name,
+and refuses malformed/oversize declarations, traversal and ambiguous duplicate
+paths atomically. It does not authorize child paths or use module URLs as remote
+authority. The real self-fetch fixture verifies mapping without a worktree
+.gitmodules or child directory. Locked all-feature Pull tests pass 59/59 and
+all-target all-feature tools Clippy passes. Native changed-gitlink/policy
+selection, child identity/config/remotes and fresh admission, nested fetch,
+integration, runtime evidence, independent review and full preflight remain
+open. Production fetch stays disabled; I300/T7 remains Active.
+
 Child tree checkpoint (2026-10-16, `db4d9414`): admitted post-fetch discovery
 now lists each newly reachable commit tree through the owned bounded runner,
 retaining gitlink paths/OIDs and the root .gitmodules blob OID. The pure parser
