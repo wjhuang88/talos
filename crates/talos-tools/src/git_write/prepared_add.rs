@@ -1461,6 +1461,14 @@ impl AddPlan {
             &self.pull_new_commits,
             &self.pull_child_trees,
         )?;
+        let before = self
+            .pull_before
+            .as_ref()
+            .ok_or_else(|| GitToolError::Git("Missing Pull pre-fetch recursion policy".into()))?;
+        for (name, child) in &mut self.pull_changed_children {
+            child.effective_recursion =
+                Some(before.child_recursion(name, child.historical_recursion)?);
+        }
         self.pull_integration = Some(
             self.pull_before
                 .as_ref()
@@ -12278,6 +12286,10 @@ pub(super) mod tests {
         assert_eq!(changed.commit, target);
         assert_eq!(changed.path, "missing/child");
         assert!(changed.objects.contains(child_oid));
+        assert_eq!(
+            changed.effective_recursion,
+            Some(super::super::pull_children::Recursion::OnDemand)
+        );
         assert!(child_tree.modules_blob.is_some());
         assert_eq!(
             child_tree
