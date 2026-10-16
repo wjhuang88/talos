@@ -3116,4 +3116,8 @@ async fn fresh_actor_admits_submit_without_recovery_sidecar_creation() {
         .await
         .expect("bounded shutdown")
         .expect("actor task");
+    assert!(
+        !sidecar.exists(),
+        "shutdown must not initialize an absent pending journal"
+    );
 }

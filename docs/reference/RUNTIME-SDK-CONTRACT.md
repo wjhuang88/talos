@@ -194,6 +194,20 @@ from shell syntax such as `&`, `nohup`, `Start-Job`, or `-d`, and do not busy-po
 The CLI and TUI render a bounded job summary while retaining the structured result for the model;
 foreground tool output keeps its existing projection.
 
+### Pending Journal Pause During Shutdown
+
+Pausing unstarted custody under the existing store guard returns zero without creating storage
+when the pending journal is genuinely absent. This empty result describes an operation snapshot;
+it is not a cross-instance admission fence. The Runtime admission/start arbiter still owns closing.
+Later normal admission by another store instance remains durable and recoverable.
+
+Existing journals and ambiguous ParentDir paths retain the original immediate transaction,
+schema validation, accepted_pending UPDATE, commit, WAL and FULL behavior. Running records are not
+relabeled. Invalid parents, permission failures, malformed journals, unsupported schemas and
+invalid links remain errors; an existing final symlink retains the SQLite route. Actor terminal
+and durable-reconciliation receipts retain their existing meaning. This removes unnecessary
+initialization, without promising a universal shutdown latency or changing any deadline.
+
 ### Pattern 1a: Bounded Shared Shutdown
 
 ```rust,ignore

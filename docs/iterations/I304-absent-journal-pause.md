@@ -1,6 +1,6 @@
 # Iteration I304: Absent-Journal Pause Without Initialization
 
-> Document status: Active
+> Document status: Review
 > Published plan date: 2026-10-15
 > Planned objective: avoid initializing SQLite only to pause an absent pending journal.
 > MVP deliverable: real Actor/Runtime shutdown preserves receipts without creating an empty journal.
@@ -113,3 +113,117 @@ claimed, no pin/dependency/lock/assertion/CI policy is changed. The unchanged re
 CI must run both complete validators successfully on the exact integrated head in its capable
 environment before merge; independent review and CAS remain mandatory. This is a retained local
 environment failure, never replacement success or a waiver of the remote validation gate.
+
+## Effective Claim And Implementation Checkpoint — 2026-10-15
+
+Claim #722 merged as `23e659e2403739b74bc018ec46305346e8e2c7ad` after exact integrated
+head `13656eb21d1c3d93d7752c0beb247d10a4d27898` passed CI3195/run38684420862:
+four required documentation jobs passed, two Rust jobs mechanically skipped. The completed
+job116255949682 ran both full governance validators successfully. Independent exact-remote
+review6184799657 and CAS6184836666 precede merge. Shared maintainer identity is not another
+natural person's formal approval. The preceding proposal/blocked-toolchain records remain history.
+
+The rebuilt candidate starts from later main `0ef5a532930642d730bcc6d974f2a79605efaaee`.
+Its only extra main change is #725's separately owned PROVIDER-008 intake/Proposed ADR-093.
+I303 is Complete; I301 remains Review; I293/I294 Search, I300 Git, I302 PSS/#716 and #705
+diagnostics retain independent ownership. No release or #590/I290/I291 reopening is implied.
+
+Production change: acquire the original store guard, reuse the existing error-preserving
+`sidecar_exists`, and return zero only on verified absence. Existing/ambiguous paths execute the
+unchanged connection/PRAGMA/SQLite immediate transaction/schema/UPDATE/commit/drop path. The
+helper comment now says operation snapshot. No new admission fence, cache, connection lifetime,
+schema, SQL, dependency, feature, lockfile, native call, unsafe or API is introduced.
+
+Storage regressions cover no directories/files on absence and later durable admission; existing
+Accepted/Running/Paused exact records, receipts, payloads and FIFO after reopen; independent-store
+pause/admission interleaving and post-ack pause; invalid parent, malformed database and schema;
+ParentDir with previously acknowledged custody and empty conservative initialization; poisoned
+guard; final/ancestor symlinks, directory links and loops. Permission-denied inspection is also
+asserted for pause before restoring the fixture's mode (privileged NotFound remains an explicit
+alternative). Windows may normalize ParentDir before access; only the intermediate-directory
+creation assertion is Unix-specific. No ignored test or weakened original assertion is added.
+
+The existing real Actor legacy-submit fixture now checks sidecar absence AFTER shutdown/task
+join. A real Runtime empty-shutdown fixture verifies complete/idle/durable-zero receipts,
+post-close `RuntimeClosing`, the legacy joining wrapper and no `.talos/runtime` storage. Its own
+one-second bound is not an edit to an existing deadline. Existing admission/start-fence,
+nonempty pending, terminal and truthful reconciliation-failure fixtures remain unchanged.
+This is the SDK/Actor storage slice, not a claim of new CLI functionality or full product closure;
+post-repair real Windows Auto/binary comparison remains acceptance work below.
+
+### Retained Previous Local Attempt (Not Rebuilt-Head Evidence)
+
+The prior scratch workspace and unpublished candidate were removed before this continuation.
+The following are retained execution notes from that attempt, not reproducible raw logs or
+validation of this rebuilt candidate. Independent review must examine the new exact candidate.
+
+- A real test-first run of `absent_pause_creates_no_storage_and_later_admission_remains_durable`
+  failed before the production change at the no-parent-directory assertion. After the change,
+  `cargo test --locked -p talos-session` passed241 tests; the exact permission fixture passed with
+  observed PermissionDenied. Agent passed495; Runtime passed66/failed1 at the unchanged Unix
+  socket fixture (`runtime_evidence_rejects_directory_symlinks_and_socket_entries`, Operation
+  not permitted). These were not an affected-crates full pass.
+- Standard `./scripts/release_preflight.sh` passed site/installers, both governance validators,
+  text/classifier/fmt, workspace check and workspace Clippy `-D warnings`, then failed workspace
+  tests: completed suites1941passed/1failed/0ignored. The failure was the unchanged Plugin
+  `wasm::tests::language_provider_admission_accepts_complete_boundary` is_ok assertion, not the
+  Runtime socket case (not reached). SDK validation was not reached. The assertion did not expose
+  its error, so the root cause is UNKNOWN; a default500ms admission deadline is a source fact,
+  not proof that contention caused the failure. No Plugin fix or retry-to-green is authorized by
+  this storage slice. Preserve the failed attempt even if the rebuilt run succeeds.
+- Prior GNU SIGBUS was bypassed by a separately installed, SHA-verified official GNU1.99 toolchain;
+  native procedural macro and real project builds worked. An intermediate musl experiment found
+  extracted core.rmeta shorter than its verified archive member; streaming restoration recovered
+  its probe. That does not establish the cause of earlier GNU SIGBUS or extraction truncation.
+  No project pin/lock/flags or CI policy changed. All that temporary environment is now gone.
+
+### Rebuilt Candidate Validation And Remaining Gates
+
+The current Rust1.99.0 installation reports b940084d7/LLVM23.1.1; unchanged locked dependencies.
+Results below will be appended from this checkout before stable publication. Historical successes
+above cannot stand in for the new candidate. No assertion/deadline/skip/filter/CI waiver is allowed.
+
+Still required: stable exact-head native Windows/macOS full CI, both validators, independent
+storage/custody/API review and merge-time CAS. After implementation merge, compare a separately
+bounded #705 diagnostic candidate against preserved CI3182 while retaining Auto15s/cleanup10s/
+tool120s/evaluator5s and all historical failures. That later Windows evidence, original composite
+failure phase, native-child latency, old10s attribution and existing-journal cost remain open.
+Review / Claimed is truthful; no Completion Commit or universal timeout guarantee exists.
+
+Rebuilt local checkpoint: before changing production, the exact absence test executed1case and
+FAILED at `!dir.path().join("missing").exists()` (0pass/1fail/0ignored). After the guarded change,
+`cargo test --locked -p talos-session` PASSED241 tests (214unit/27integration,0fail/ignored;
+doctests0). The exact permission fixture separately PASSED1case with actual PermissionDenied,
+so the new pause error assertion ran. Independent Agent static review against base0ef5a532
+APPROVE found no blocking storage/custody/API/scope defect; final exact-head validation remains
+separate. Standard preflight has passed both governance validators0warnings, text23/classifier14,
+site/installers/fmt and is currently running workspace checks. Final outcome is appended below.
+
+Rebuilt standard `./scripts/release_preflight.sh` actually exited101: workspace check PASSED,
+workspace Clippy `-- -D warnings` PASSED, then completed test suites2195passed/1failed/0ignored
+before fail-fast stopped at Runtime. Its73 Runtime unit cases were72pass/1fail; the sole failure
+is the unchanged Unix socket fixture at lib.rs2138: PermissionDenied / Operation not permitted.
+The new Runtime empty-shutdown, Actor post-join absence, existing start-commit/grace/fence and
+truthful durable-reconciliation failure tests all PASSED. Plugin's73 unit tests all PASSED,
+including the old admission assertion; this does not explain or erase its previous failure.
+No filter/ignore/waiver was applied, and this is NOT a local full-preflight pass. SDK and later
+workspace suites were not reached by that invocation. Capable native CI must run the unchanged
+full suite before merge. Separate `cargo clippy --locked -p talos-session --all-targets --
+-D warnings` also PASSED. Agent/Runtime doctests and both external SDK modes are being completed
+separately below; they do not replace the failed standard invocation.
+
+Independent environment observation: a disposable Python stdlib probe importing no Talos code
+also failed with PermissionError errno1 / Operation not permitted at `socket(AF_UNIX, SOCK_STREAM)`,
+before bind. This supports the local socket-creation capability limit; it is not a passing Talos
+test and does not waive native execution. Separate locked Agent/Runtime doctests PASSED12/0,
+0fail/ignored. The external SDK validator confirmed its independent Cargo root and one direct
+Talos dependency; its two executable modes are still running at this checkpoint.
+
+Final local fixture outcome: the separate chained validation exited0. Both independently locked
+external SDK executable modes (default and `--features coding`) printed
+`talos-runtime external fixture passed`; the independent-root/single-direct-dependency boundary
+check passed. No workspace or fixture lockfile changed. Final staged diff review covers exactly12
+intended files and no generated artifacts/secrets/unrelated owners. This supersedes only the
+in-progress checkpoint wording above, never the retained failed full preflight. Final governance,
+format and diff checks are rerun on these completed notes before publication. Exact remote CI,
+review/CAS and Windows comparison remain acceptance gates; Review / Claimed remains unchanged.
