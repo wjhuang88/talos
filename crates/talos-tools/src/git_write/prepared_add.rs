@@ -1753,7 +1753,8 @@ impl AddPlan {
                 continue;
             }
             let path = self.repository.workdir.join(&child.path);
-            for candidate in [&path, &path.join(".git")] {
+            let marker = path.join(".git");
+            for candidate in [&path, &marker] {
                 if !authorizations.iter().any(|token| {
                     token.authorizes_path(
                         "git_pull",
@@ -1767,11 +1768,37 @@ impl AddPlan {
                     ));
                 }
             }
-            let location = super::repository_state::ChildLocation::capture(&path)?;
+            let metadata_path = child_metadata_path(&path, &marker)?;
+            if !authorizations.iter().any(|token| {
+                token.authorizes_path(
+                    "git_pull",
+                    ToolNature::Read,
+                    &self.workspace,
+                    metadata_path.to_str().unwrap_or_default(),
+                )
+            }) {
+                return Err(GitToolError::InvalidInput(
+                    "Pull child Git metadata path lacks exact Read admission".into(),
+                ));
+            }
+            let location = super::repository_state::ChildLocation::capture(&metadata_path)?;
+            self.facets.push(
+                ToolPermissionFacet::with_resource(
+                    ToolNature::Read,
+                    "git:configuration-chain",
+                    ToolResourceKind::Remote,
+                )
+                .with_description("discover Pull child Git configuration chain"),
+            );
             self.facets.push(path_facet(
                 ToolNature::Read,
                 &location.common_dir.join("config"),
                 "Pull selected child configuration",
+            )?);
+            self.facets.push(path_facet(
+                ToolNature::Read,
+                &location.common_dir,
+                "Pull selected child Git metadata for object admission",
             )?);
             self.child_locations.push((path, location));
         }
@@ -1785,6 +1812,15 @@ impl AddPlan {
         mut self: Box<Self>,
         authorizations: &[talos_core::tool::ToolExecutionAuthorization],
     ) -> Result<Box<Self>, GitToolError> {
+        if !self.facets.iter().any(|facet| {
+            facet.nature == ToolNature::Read
+                && facet.resource_kind == Some(ToolResourceKind::Remote)
+                && facet.resource.as_deref() == Some("git:configuration-chain")
+        }) {
+            return Err(GitToolError::InvalidInput(
+                "Pull child configuration-chain capability missing".into(),
+            ));
+        }
         if self.pull_config_sources_discovered {
             for path in &self.pull_config_source_paths {
                 if !authorizations.iter().any(|token| {
@@ -1803,6 +1839,18 @@ impl AddPlan {
             self.child_configs.clear();
         }
         for (workdir, location) in &self.child_locations {
+            if !authorizations.iter().any(|token| {
+                token.authorizes_path(
+                    "git_pull",
+                    ToolNature::Read,
+                    &self.workspace,
+                    location.common_dir.to_str().unwrap_or_default(),
+                )
+            }) {
+                return Err(GitToolError::InvalidInput(
+                    "Pull child Git metadata lacks dedicated Read admission".into(),
+                ));
+            }
             let config_path = location.common_dir.join("config");
             if !authorizations.iter().any(|token| {
                 token.authorizes_path(
@@ -5114,7 +5162,9 @@ impl AddPlan {
             }
         }
         for (path, expected) in &self.child_locations {
-            if &super::repository_state::ChildLocation::capture(path)? != expected {
+            let marker = path.join(".git");
+            let metadata_path = child_metadata_path(path, &marker)?;
+            if &super::repository_state::ChildLocation::capture(&metadata_path)? != expected {
                 return Err(GitToolError::InvalidInput(
                     "Submodule location changed after discovery".into(),
                 ));
@@ -5650,6 +5700,50 @@ fn capture_gitlink(
         entry,
         metadata_path,
         marker: marker_entry,
+    })
+}
+
+fn child_metadata_path(worktree: &Path, marker: &Path) -> Result<PathBuf, GitToolError> {
+    let metadata = std::fs::symlink_metadata(marker)
+        .map_err(|_| GitToolError::InvalidInput("Submodule Git marker unavailable".into()))?;
+    if metadata.is_dir() {
+        return Ok(marker.to_path_buf());
+    }
+    if !metadata.is_file() || metadata.file_type().is_symlink() {
+        return Err(GitToolError::InvalidInput(
+            "Submodule Git marker must be a regular file or directory".into(),
+        ));
+    }
+    let entry = snapshot::Entry::capture(
+        marker,
+        &mut snapshot::Budget {
+            entries: 1,
+            bytes: 16 * 1024,
+        },
+    )
+    .map_err(|_| GitToolError::InvalidInput("Submodule Git marker unavailable".into()))?;
+    let snapshot::Entry::File(_, bytes) = entry else {
+        return Err(GitToolError::InvalidInput(
+            "Submodule Git marker changed during inspection".into(),
+        ));
+    };
+    let raw = bytes
+        .strip_prefix(b"gitdir: ")
+        .and_then(|bytes| bytes.strip_suffix(b"\n").or(Some(bytes)))
+        .and_then(|bytes| bytes.strip_suffix(b"\r").or(Some(bytes)))
+        .ok_or_else(|| GitToolError::InvalidInput("Invalid submodule Git marker".into()))?;
+    let raw = std::str::from_utf8(raw)
+        .map_err(|_| GitToolError::InvalidInput("Submodule Git marker is not UTF-8".into()))?;
+    if raw.is_empty() || raw.contains(['\0', '\n', '\r']) {
+        return Err(GitToolError::InvalidInput(
+            "Invalid submodule Git marker".into(),
+        ));
+    }
+    let path = PathBuf::from(raw);
+    Ok(if path.is_absolute() {
+        path
+    } else {
+        worktree.join(path)
     })
 }
 
