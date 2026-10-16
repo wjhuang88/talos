@@ -1,3 +1,20 @@
+Current module source checkpoint (2026-10-16, `4d751699`): Pull now admits
+worktree .gitmodules as an exact Read path before capturing regular-file or
+absence evidence. Revalidation binds that evidence across parent fetch and
+post-fetch discovery. Current declarations use overwrite semantics and reject
+invalid recursion values immediately; historical first-value semantics remain
+unchanged. Missing worktree declarations fall back to admitted index objects,
+then HEAD objects. Includes are not followed. Real self-fetch coverage exercises
+worktree/index/HEAD/absent sources and independent module/FETCH_HEAD tampering;
+a missing exact Read token refuses before source capture. SHA-1/SHA-256 index
+coverage retains the module blob and rejects a symlink declaration. Locked
+all-feature Pull tests pass 67/67; all-target all-feature tools Clippy passes
+(logs: /private/tmp/i300-current-modules-tests.log and
+/private/tmp/i300-current-modules-clippy.log). Candidate active/pathspec selection,
+legacy populated-path fallback, child identity/config/remote admissions, nested
+fetch, integration and final delivery gates remain open. Production Pull stays
+disabled; I300/T7 remains Active. This is local stage evidence, not delivery.
+
 Current-index child checkpoint (2026-10-16, `34650804`): post-fetch
 continuation now retains current index gitlinks separately from historical
 changed children. Sparse index directories expand through bounded admitted
