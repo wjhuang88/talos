@@ -9,6 +9,7 @@ use super::GitToolError;
 pub(super) struct Tree {
     pub(super) gitlinks: BTreeMap<String, String>,
     pub(super) modules_blob: Option<String>,
+    pub(super) changed_gitlinks: BTreeMap<String, String>,
     pub(super) module_names: BTreeMap<String, String>,
 }
 
@@ -24,6 +25,7 @@ impl Tree {
             gitlinks: BTreeMap::new(),
             modules_blob: None,
             module_names: BTreeMap::new(),
+            changed_gitlinks: BTreeMap::new(),
         };
         if bytes.is_empty() {
             return Ok(tree);
@@ -76,6 +78,39 @@ impl Tree {
             }
         }
         Ok(tree)
+    }
+
+    /// Retain only new-side gitlinks named by Git's combined diff. Deleted
+    /// links and regular files are not child-fetch candidates. No paths are opened.
+    pub(super) fn bind_changes(&mut self, bytes: &[u8]) -> Result<(), GitToolError> {
+        let invalid = || GitToolError::InvalidInput("Invalid Pull child change listing".into());
+        if bytes.len() > 1024 * 1024 {
+            return Err(invalid());
+        }
+        let mut changed = BTreeMap::new();
+        let mut seen = std::collections::BTreeSet::new();
+        if !bytes.is_empty() {
+            for path in bytes
+                .strip_suffix(&[0])
+                .ok_or_else(invalid)?
+                .split(|b| *b == 0)
+            {
+                let path = std::str::from_utf8(path).map_err(|_| invalid())?;
+                if path.contains('\\')
+                    || path.split('/').any(|part| {
+                        matches!(part, "" | "." | "..") || part.eq_ignore_ascii_case(".git")
+                    })
+                    || !seen.insert(path)
+                {
+                    return Err(invalid());
+                }
+                if let Some(oid) = self.gitlinks.get(path) {
+                    changed.insert(path.to_owned(), oid.clone());
+                }
+            }
+        }
+        self.changed_gitlinks = changed;
+        Ok(())
     }
 
     /// Resolve path-to-name declarations from an already admitted blob. Git
@@ -145,6 +180,112 @@ impl Tree {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pull_combined_changes_exclude_links_inherited_from_a_parent() {
+        let root = tempfile::tempdir().expect("repository");
+        let git = |args: &[&str]| {
+            let output = std::process::Command::new("git")
+                .current_dir(root.path())
+                .env("GIT_CONFIG_NOSYSTEM", "1")
+                .env("GIT_CONFIG_GLOBAL", root.path().join("absent"))
+                .env("GIT_AUTHOR_NAME", "Fixture")
+                .env("GIT_AUTHOR_EMAIL", "fixture@example.invalid")
+                .env("GIT_COMMITTER_NAME", "Fixture")
+                .env("GIT_COMMITTER_EMAIL", "fixture@example.invalid")
+                .args(args)
+                .output()
+                .expect("Git");
+            assert!(output.status.success(), "{output:?}");
+            output.stdout
+        };
+        git(&["init", "-q"]);
+        let text = |bytes: Vec<u8>| String::from_utf8(bytes).expect("OID").trim().to_owned();
+        let empty = text(git(&["write-tree"]));
+        let base = text(git(&["commit-tree", &empty, "-m", "base"]));
+        git(&[
+            "update-index",
+            "--add",
+            "--cacheinfo",
+            &format!("160000,{base},child"),
+        ]);
+        let first_tree = text(git(&["write-tree"]));
+        let first = text(git(&[
+            "commit-tree",
+            &first_tree,
+            "-p",
+            &base,
+            "-m",
+            "first",
+        ]));
+        git(&[
+            "update-index",
+            "--cacheinfo",
+            &format!("160000,{first},child"),
+        ]);
+        let second_tree = text(git(&["write-tree"]));
+        let second = text(git(&[
+            "commit-tree",
+            &second_tree,
+            "-p",
+            &base,
+            "-m",
+            "second",
+        ]));
+        git(&[
+            "update-index",
+            "--cacheinfo",
+            &format!("160000,{second},child"),
+        ]);
+        let novel_tree = text(git(&["write-tree"]));
+        for (tree_oid, expected) in [
+            (&first_tree, false),
+            (&second_tree, false),
+            (&novel_tree, true),
+        ] {
+            let commit = text(git(&[
+                "commit-tree",
+                tree_oid,
+                "-p",
+                &first,
+                "-p",
+                &second,
+                "-m",
+                "merge",
+            ]));
+            let listing = git(&["ls-tree", "-r", "-z", "--full-tree", &commit]);
+            let mut tree = Tree::parse(&listing, 40).expect("tree");
+            let changes = git(&[
+                "diff-tree",
+                "-r",
+                "--cc",
+                "--name-only",
+                "-z",
+                "--no-commit-id",
+                "--no-renames",
+                "--no-ext-diff",
+                "--no-textconv",
+                "--ignore-submodules=none",
+                &commit,
+                "--",
+            ]);
+            tree.bind_changes(&changes).expect("changes");
+            assert_eq!(!tree.changed_gitlinks.is_empty(), expected);
+            let retained = tree.changed_gitlinks.clone();
+            for bad in [
+                b"child".as_slice(),
+                b"../escape\0",
+                b"child\0child\0",
+                b"/absolute\0",
+            ] {
+                assert!(tree.bind_changes(bad).is_err());
+                assert_eq!(tree.changed_gitlinks, retained);
+            }
+            tree.bind_changes(b"deleted\0ordinary\0")
+                .expect("non-links");
+            assert!(tree.changed_gitlinks.is_empty());
+        }
+    }
 
     #[test]
     fn pull_module_blob_maps_names_without_following_includes() {

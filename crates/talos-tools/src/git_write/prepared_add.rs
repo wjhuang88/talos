@@ -658,7 +658,7 @@ impl AddPlan {
         let output_limit = if args.first().is_some_and(|arg| {
             matches!(
                 arg.as_str(),
-                "ls-tree" | "for-each-ref" | "rev-list" | "cat-file"
+                "ls-tree" | "for-each-ref" | "rev-list" | "cat-file" | "diff-tree"
             )
         }) {
             1024 * 1024
@@ -848,11 +848,13 @@ impl AddPlan {
             }
             if needs_sources {
                 attributes.insert(self.repository.common_dir.join("info/attributes"));
-                if let Some(path) =
-                    config.pull_diff_order_file(&self.repository.workdir, &self.environment)?
-                {
-                    attributes.insert(path);
-                }
+            }
+            // Post-fetch combined diffs also honor diff.orderFile, even when
+            // pre-fetch cleanliness checks do not need worktree sources.
+            if let Some(path) =
+                config.pull_diff_order_file(&self.repository.workdir, &self.environment)?
+            {
+                attributes.insert(path);
             }
             for variable in ["GIT_ATTR_SYSTEM", "GIT_ATTR_GLOBAL"]
                 .into_iter()
@@ -1095,11 +1097,7 @@ impl AddPlan {
             self.identity = PreparedPlanIdentity::new();
             return Ok(self);
         }
-        if initial.requires_clean_worktree() && self.pull_graph_paths.is_some() {
-            self.pull_sources = Some(PullSources::capture(
-                &self.repository.workdir,
-                source_names,
-            )?);
+        if self.pull_graph_paths.is_some() {
             let mut budget = snapshot::Budget {
                 entries: 4096,
                 bytes: 4 * 1024 * 1024,
@@ -1109,6 +1107,12 @@ impl AddPlan {
                 .iter()
                 .map(|path| PullAttribute::capture(path, &mut budget))
                 .collect::<Result<_, _>>()?;
+        }
+        if initial.requires_clean_worktree() && self.pull_graph_paths.is_some() {
+            self.pull_sources = Some(PullSources::capture(
+                &self.repository.workdir,
+                source_names,
+            )?);
             if let Some(sources) = &self.pull_sources {
                 for batch in sources.paths.chunks(16) {
                     let mut args = vec![
@@ -1424,6 +1428,31 @@ impl AddPlan {
                 }
                 tree.bind_modules(&modules.stdout)?;
             }
+            // Combined diff selects paths changed against every parent. The
+            // retained full tree supplies new-side modes/OIDs without reading
+            // child repositories or invoking submodule diff helpers.
+            let changes = self
+                .pull_probe(vec![
+                    "diff-tree".into(),
+                    "-r".into(),
+                    "--cc".into(),
+                    "--name-only".into(),
+                    "-z".into(),
+                    "--no-commit-id".into(),
+                    "--no-renames".into(),
+                    "--no-ext-diff".into(),
+                    "--no-textconv".into(),
+                    "--ignore-submodules=none".into(),
+                    commit.clone(),
+                    "--".into(),
+                ])
+                .await?;
+            if !changes.status.success() || !changes.stderr.is_empty() {
+                return Err(GitToolError::Git(
+                    "Pull child change discovery failed".into(),
+                ));
+            }
+            tree.bind_changes(&changes.stdout)?;
             self.pull_child_trees.insert(commit.clone(), tree);
         }
         self.pull_integration = Some(
@@ -12149,6 +12178,8 @@ pub(super) mod tests {
             "initial",
         ]);
         git(&["config", "remote.origin.url", "git://example.invalid/repo"]);
+        std::fs::write(root.path().join("diff-order"), "missing/*\n").expect("order file");
+        git(&["config", "diff.orderFile", "diff-order"]);
         // A dangling commit is already stored but is not reachable from any
         // pre-fetch ref. Fetching it must include it in child-graph discovery
         // while excluding its already-reachable parent.
@@ -12203,6 +12234,12 @@ pub(super) mod tests {
                 .expect("prefetch");
         }
         assert!(plan.phase == Phase::PullFetch);
+        assert!(
+            plan.pull_attributes
+                .iter()
+                .any(|attribute| attribute.path == plan.repository.workdir.join("diff-order"))
+        );
+
         // Exercise the post-fetch boundary with actual Git metadata mutation,
         // independently of a network daemon or successful transport fixture.
         git(&["fetch", "--no-recurse-submodules", ".", target]);
@@ -12230,6 +12267,7 @@ pub(super) mod tests {
             child_tree.gitlinks.get("missing/child").map(String::as_str),
             Some(child_oid)
         );
+        assert_eq!(child_tree.changed_gitlinks, child_tree.gitlinks);
         assert!(child_tree.modules_blob.is_some());
         assert_eq!(
             child_tree
