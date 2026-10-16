@@ -5558,6 +5558,14 @@ impl PreparedNormalToolInvocation for AddPlan {
                         ));
                     }
                 };
+                // ADR-089 permits implementation before activation, but requires
+                // recursive child execution and independent runtime evidence
+                // before production fetch can mutate a repository.
+                if !cfg!(test) {
+                    return PreparedNormalStage::Complete(ToolExecutionOutput::error(
+                        "Pull execution awaits recursive-child, integration and independent activation gates; no fetch started",
+                    ));
+                }
                 let output = match self
                     .run_command_output(command, std::time::Duration::from_secs(120), 1024 * 1024)
                     .await
