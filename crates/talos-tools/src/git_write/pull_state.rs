@@ -655,9 +655,68 @@ pub(super) struct BeforeFetch {
     head: Option<String>,
     fork_point: Option<String>,
     policy: Policy,
+    fetch_recursion: FetchRecursion,
+}
+
+/// Retain the configured mode even though the parent command disables native
+/// recursion. Default must remain distinct: it still permits `.gitmodules`
+/// defaults and per-submodule overrides during separately admitted discovery.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FetchRecursion {
+    Default,
+    Off,
+    On,
+    OnDemand,
+}
+
+impl FetchRecursion {
+    fn capture(config: &[u8]) -> Result<Self, GitToolError> {
+        // Validate record framing, but do not iterate the keyed map: Git
+        // applies both global keys to one variable in declaration order.
+        super::config_state::parse_host(config)?;
+        let mut mode = Self::Default;
+        for record in config
+            .split(|byte| *byte == 0)
+            .filter(|record| !record.is_empty())
+        {
+            let (key, value) = match record.iter().position(|byte| *byte == b'\n') {
+                Some(split) => (&record[..split], Some(&record[split + 1..])),
+                None => (record, None),
+            };
+            if key.eq_ignore_ascii_case(b"submodule.recurse") {
+                mode = if super::config_state::git_boolean(value)? {
+                    Self::On
+                } else {
+                    Self::Off
+                };
+            } else if key.eq_ignore_ascii_case(b"fetch.recursesubmodules") {
+                mode = if value == Some(b"on-demand".as_slice()) {
+                    Self::OnDemand
+                } else if super::config_state::git_boolean(value)? {
+                    Self::On
+                } else {
+                    Self::Off
+                };
+            }
+        }
+        Ok(mode)
+    }
+
+    fn description(self) -> &'static str {
+        match self {
+            Self::Default => "default (child policy remains to be discovered)",
+            Self::Off => "off",
+            Self::On => "on",
+            Self::OnDemand => "on-demand",
+        }
+    }
 }
 
 impl BeforeFetch {
+    pub(super) fn fetch_recursion_description(&self) -> &'static str {
+        self.fetch_recursion.description()
+    }
+
     pub(super) fn policy_requires_clean_worktree(
         config: &[u8],
         branch: Option<&str>,
@@ -1047,11 +1106,13 @@ impl BeforeFetch {
             return Err(invalid());
         }
         let policy = Policy::capture(config, branch.as_deref())?;
+        let fetch_recursion = FetchRecursion::capture(config)?;
         Ok(Self {
             branch,
             head,
             fork_point,
             policy,
+            fetch_recursion,
         })
     }
 }
@@ -1198,6 +1259,60 @@ fn prefetch_evidence_distinguishes_detached_unborn_and_rejects_invalid_probes() 
     for bad in ["0".repeat(40), "g".repeat(40), "a".repeat(39)] {
         assert!(
             BeforeFetch::capture(b"", None, Some(format!("{bad}\n").as_bytes()), None, 40).is_err()
+        );
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn pull_fetch_recursion_preserves_modes_and_declaration_order() {
+    for (config, expected) in [
+        (b"".as_slice(), FetchRecursion::Default),
+        (
+            b"submodule.Child.fetchrecursesubmodules\ntrue\0",
+            FetchRecursion::Default,
+        ),
+        (
+            b"fetch.recursesubmodules\non-demand\0",
+            FetchRecursion::OnDemand,
+        ),
+        (b"fetch.recursesubmodules\0", FetchRecursion::On),
+        (b"fetch.recursesubmodules\n\0", FetchRecursion::Off),
+        (
+            b"submodule.recurse\ntrue\0fetch.recursesubmodules\nfalse\0",
+            FetchRecursion::Off,
+        ),
+        (
+            b"fetch.recursesubmodules\nfalse\0submodule.recurse\ntrue\0",
+            FetchRecursion::On,
+        ),
+        (
+            b"submodule.recurse\nfalse\0fetch.recursesubmodules\non-demand\0",
+            FetchRecursion::OnDemand,
+        ),
+        (
+            b"fetch.recursesubmodules\non-demand\0submodule.recurse\nfalse\0",
+            FetchRecursion::Off,
+        ),
+        (
+            b"fetch.recursesubmodules\ntrue\0fetch.recursesubmodules\nfalse\0",
+            FetchRecursion::Off,
+        ),
+    ] {
+        let retained = BeforeFetch::capture(config, None, None, None, 40).expect("retained policy");
+        assert_eq!(retained.fetch_recursion, expected, "{config:?}");
+    }
+    // An invalid earlier declaration is fatal even if a later value overrides
+    // it, because native fetch validates configuration before parsing argv.
+    for config in [
+        b"fetch.recursesubmodules\ninvalid\0fetch.recursesubmodules\nfalse\0".as_slice(),
+        b"submodule.recurse\non-demand\0fetch.recursesubmodules\nfalse\0",
+        b"fetch.recursesubmodules\nON-DEMAND\0",
+        b"fetch.recursesubmodules\nfalse",
+    ] {
+        assert!(
+            BeforeFetch::capture(config, None, None, None, 40).is_err(),
+            "{config:?}"
         );
     }
 }

@@ -1211,6 +1211,7 @@ impl AddPlan {
         }
         evidence.revalidate()?;
         self.revalidate()?;
+        let recursion = before.fetch_recursion_description();
         self.pull_before = Some(before);
         self.pull_evidence = Some(evidence);
         self.pull_remote = Some(remote);
@@ -1253,7 +1254,9 @@ impl AddPlan {
             ToolNature::Write,
             "git:pull-repository-metadata",
             ToolResourceKind::Remote,
-        ));
+        ).with_description(format!(
+            "Parent fetch only; native recursion disabled. Retained recursive-fetch policy: {recursion}; child effects require fresh admission"
+        )));
         self.identity = PreparedPlanIdentity::new();
         self.phase = Phase::PullFetch;
         Ok(self)
@@ -6116,6 +6119,44 @@ pub(super) mod tests {
         let parent = root.path().join("parent");
         let native = root.path().join("native");
         let prepared = root.path().join("prepared");
+        let policy_cases = [
+            (
+                "off-last",
+                [
+                    ("submodule.recurse", "true"),
+                    ("fetch.recurseSubmodules", "false"),
+                ],
+                "off",
+                false,
+            ),
+            (
+                "on-last",
+                [
+                    ("fetch.recurseSubmodules", "false"),
+                    ("submodule.recurse", "true"),
+                ],
+                "on",
+                true,
+            ),
+            (
+                "demand-last",
+                [
+                    ("submodule.recurse", "false"),
+                    ("fetch.recurseSubmodules", "on-demand"),
+                ],
+                "on-demand",
+                true,
+            ),
+            (
+                "off-over-demand",
+                [
+                    ("fetch.recurseSubmodules", "on-demand"),
+                    ("submodule.recurse", "false"),
+                ],
+                "off",
+                false,
+            ),
+        ];
         let git = |cwd: &Path, args: &[&str]| {
             let output = std::process::Command::new("git")
                 .current_dir(cwd)
@@ -6173,6 +6214,29 @@ pub(super) mod tests {
                 ],
             );
         }
+        for (name, config, _, _) in &policy_cases {
+            let checkout = root.path().join(name);
+            git(
+                root.path(),
+                &[
+                    "clone",
+                    "--recurse-submodules",
+                    path(&parent_remote),
+                    path(&checkout),
+                ],
+            );
+            // `git config --add` inserts into existing sections. Append fresh
+            // sections explicitly so this fixture tests actual declaration order.
+            use std::io::Write;
+            let mut file = std::fs::OpenOptions::new()
+                .append(true)
+                .open(checkout.join(".git/config"))
+                .expect("fixture configuration");
+            for (key, value) in config {
+                let (section, name) = key.split_once('.').expect("global key");
+                writeln!(file, "\n[{section}]\n\t{name} = {value}").expect("ordered config");
+            }
+        }
 
         std::fs::write(child.join("file"), b"two\n").expect("new child source");
         git(&child, &["add", "file"]);
@@ -6202,6 +6266,29 @@ pub(super) mod tests {
             has_child_object(&native),
             "native fetch recursively imports child objects"
         );
+        for (name, _, expected_mode, fetches_child) in &policy_cases {
+            let checkout = root.path().join(name);
+            assert!(!has_child_object(&checkout));
+            let config = git(&checkout, &["config", "--null", "--list"]);
+            let retained =
+                super::super::pull_state::BeforeFetch::probe(&config, None, 40, |args| {
+                    let output = std::process::Command::new("git")
+                        .current_dir(&checkout)
+                        .args(args)
+                        .output()
+                        .expect("native policy probe");
+                    async move { Ok(output) }
+                })
+                .await
+                .expect("retained recursive-fetch policy");
+            assert_eq!(
+                retained.fetch_recursion_description(),
+                *expected_mode,
+                "{name}"
+            );
+            git(&checkout, &["fetch", "--update-head-ok", "origin"]);
+            assert_eq!(has_child_object(&checkout), *fetches_child, "{name}");
+        }
 
         let program = resolve_git(&execution_environment()).expect("absolute Git");
         let mut environment = trace_suppressed_environment(execution_environment());
@@ -11389,6 +11476,7 @@ pub(super) mod tests {
             ("branch.Topic.remote", "Up.stream"),
             ("branch.Topic.merge", "refs/heads/main"),
             ("branch.Topic.rebase", "true"),
+            ("fetch.recurseSubmodules", "on-demand"),
         ] {
             git(&["config", key, value]);
         }
@@ -11404,6 +11492,14 @@ pub(super) mod tests {
         let plan = plan.inspect_pull_prefetch().await.expect("prefetch");
         assert!(plan.phase == Phase::PullFetch);
         assert_eq!(plan.pull_remote.as_deref(), Some("Up.stream"));
+        assert!(plan.facets.iter().any(|facet| {
+            facet.nature == ToolNature::Write
+                && facet.resource.as_deref() == Some("git:pull-repository-metadata")
+                && facet.description.as_deref().is_some_and(|description| {
+                    description.contains("policy: on-demand")
+                        && description.contains("child effects require fresh admission")
+                })
+        }));
         assert_eq!(
             plan.pull_destinations,
             ["git://example.invalid/prefetch-must-not-contact"]
