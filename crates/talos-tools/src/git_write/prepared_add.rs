@@ -162,6 +162,7 @@ enum Phase {
     PullPreparation,
     PullFetch,
     PullPostFetch,
+    PullChildAttributes,
     PullIntegration,
 }
 
@@ -1630,6 +1631,72 @@ impl AddPlan {
                 )
                 .await?,
         );
+        self.revalidate()?;
+        self.identity = PreparedPlanIdentity::new();
+        self.phase = Phase::PullIntegration;
+        let mut attributes = std::collections::BTreeSet::new();
+        for child in self.pull_changed_children.values() {
+            if let Some(super::pull_children::Activity::Pathspec { attributes: paths }) =
+                &child.activity
+            {
+                attributes.extend(paths.iter().map(|path| self.repository.workdir.join(path)));
+            }
+        }
+        if !attributes.is_empty() {
+            attributes.insert(self.repository.common_dir.join("info/attributes"));
+            for variable in ["GIT_ATTR_SYSTEM", "GIT_ATTR_GLOBAL"] {
+                attributes.insert(
+                    self.inspect_attribute_path_at(&self.repository.workdir, variable)
+                        .await?,
+                );
+            }
+            for path in attributes {
+                if !self.pull_attribute_paths.contains(&path) {
+                    self.facets.push(path_facet(
+                        ToolNature::Read,
+                        &path,
+                        "Pull child activity attribute evidence",
+                    )?);
+                    self.pull_attribute_paths.push(path);
+                }
+            }
+            self.phase = Phase::PullChildAttributes;
+        }
+        Ok(self)
+    }
+
+    fn discover_pull_child_attributes(
+        mut self: Box<Self>,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<Box<Self>, GitToolError> {
+        // Check the entire frontier before capturing any newly discovered file.
+        for path in &self.pull_attribute_paths {
+            if !authorizations.iter().any(|token| {
+                token.authorizes_path(
+                    "git_pull",
+                    ToolNature::Read,
+                    &self.workspace,
+                    path.to_str().unwrap_or_default(),
+                )
+            }) {
+                return Err(GitToolError::InvalidInput(
+                    "Pull child attributes lack exact Read admission; fetched effects are retained"
+                        .into(),
+                ));
+            }
+        }
+        self.revalidate()?;
+        let mut budget = snapshot::Budget {
+            entries: 4096,
+            bytes: 4 * 1024 * 1024,
+        };
+        let evidence = self
+            .pull_attribute_paths
+            .iter()
+            .map(|path| PullAttribute::capture(path, &mut budget))
+            .collect::<Result<Vec<_>, _>>()?;
+        self.revalidate()?;
+        self.pull_attributes = evidence;
         self.revalidate()?;
         self.identity = PreparedPlanIdentity::new();
         self.phase = Phase::PullIntegration;
@@ -5747,6 +5814,7 @@ impl PreparedNormalToolInvocation for AddPlan {
                     GitToolError::InvalidInput(format!("target-branch discovery: {error}"))
                 }),
             Phase::PullPreparation => self.discover_pull_prefetch(&authorizations).await,
+            Phase::PullChildAttributes => self.discover_pull_child_attributes(&authorizations),
             Phase::PullPostFetch => self.discover_pull_postfetch(&authorizations).await.map_err(|error| GitToolError::Git(format!("Pull parent fetch completed; post-fetch discovery failed: {error}; fetched effects are retained; inspect repository before retrying"))),
             Phase::PullIntegration => {
                 if let Err(error) = self.revalidate() {
@@ -12316,6 +12384,53 @@ pub(super) mod tests {
         }
         daemon.kill().await.expect("stop daemon");
         daemon.wait().await.expect("reap daemon");
+    }
+
+    #[tokio::test]
+    async fn pull_child_attributes_require_fresh_exact_admission() {
+        for denied in [true, false] {
+            let root = fixture();
+            let mut plan = Box::new(
+                AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+                    .expect("Pull"),
+            )
+            .discover()
+            .await
+            .expect("configuration");
+            let stale = proof(&plan)
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .expect("old tokens");
+            let path = plan.repository.workdir.join(".gitattributes");
+            std::fs::write(&path, "* selected\n").expect("rules");
+            plan.pull_attribute_paths.push(path.clone());
+            plan.facets
+                .push(path_facet(ToolNature::Read, &path, "child attributes").expect("facet"));
+            plan.phase = Phase::PullChildAttributes;
+            plan.identity = PreparedPlanIdentity::new();
+            assert!(plan.pull_attributes.is_empty());
+            let admission = proof(&plan)
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .expect("fresh tokens");
+            // The previous frontier has no token for this new worktree file.
+            assert!(!stale.iter().any(|token| token.authorizes_path(
+                "git_pull",
+                ToolNature::Read,
+                &plan.workspace,
+                path.to_str().expect("path"),
+            )));
+            if denied {
+                assert!(plan.discover_pull_child_attributes(&stale).is_err());
+                continue;
+            }
+            let next = plan
+                .discover_pull_child_attributes(&admission)
+                .expect("capture");
+            assert!(next.phase == Phase::PullIntegration);
+            assert_eq!(next.pull_attributes.len(), 1);
+            next.revalidate().expect("retained evidence");
+            std::fs::write(path, "* -selected\n").expect("tamper");
+            assert!(next.revalidate().is_err());
+        }
     }
 
     #[tokio::test]

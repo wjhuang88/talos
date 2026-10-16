@@ -1,3 +1,30 @@
+Post-rebase verification (2026-10-16): local I300 history now descends from
+origin/main `3bc38d78`; the attribute ancestor inventory is `1c0a386b` after
+rebase. The staged child-attribute admission implementation passes locked
+all-feature Pull tests (72/72), all-target all-feature Clippy with `-D warnings`,
+workspace formatting, project governance (zero warnings), and collaboration
+claim validation. Logs: `/private/tmp/i300-post-rebase-{pull-tests,clippy,fmt,governance,claims}.log`.
+The Board conflict retained remote I301 completion and effective local I300
+claim status. These are local checkpoint checks, not full preflight, independent
+security review, remote CI or completion evidence. Attribute evaluation and all
+previously listed T7 residuals remain open; Production Pull remains disabled.
+
+Child attribute admission checkpoint (2026-10-16): after rebasing the local
+implementation onto origin/main `7b33bc9f`, `3a484f47` retains lexical ancestor
+attribute paths. Post-fetch discovery now requests those exact worktree paths
+plus Git-reported system/global and common-dir info attributes in a fresh
+PullChildAttributes stage. It checks the complete frontier before capturing
+bounded regular-file/absence and parent evidence, then revalidates before and
+after capture. Old tokens cannot cover newly discovered paths; a focused fixture
+also exercises refusal with those tokens and detects later content tampering.
+Locked all-feature Pull tests pass 72/72
+(/private/tmp/i300-child-attribute-admission.log). This is admission and evidence
+capture only: attribute matching, index fallback, child discovery/execution,
+integration, full lifecycle budget/security/runtime evidence and publication
+remain open. Production Pull remains disabled; no completion status changes.
+Earlier local checkpoint SHAs below describe pre-rebase history and are not
+pushed completion evidence.
+
 Child selection policy checkpoint (2026-10-16, `e9321876`, `03da666e`):
 current-index declared candidates now retain On/OnDemand eligibility by module
 name, preserving unmapped paths for separately admitted legacy discovery. This
