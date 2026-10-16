@@ -1755,6 +1755,28 @@ fn pull_activity_attributes_agree_with_native_git() {
 
 #[cfg(test)]
 #[test]
+fn pull_activity_missing_attribute_file_is_unspecified() {
+    let root = std::path::Path::new("/repo");
+    let rules = gix::attrs::Search::default();
+    let metadata = gix::attrs::search::MetadataCollection::default();
+    let policy = BeforeFetch::capture(
+        b"submodule.active\n:(attr:!enabled)**\0",
+        None,
+        None,
+        None,
+        40,
+    )
+    .expect("policy");
+    assert_eq!(
+        policy
+            .child_active_with_attributes("child", "child", root, Some((&rules, &metadata)))
+            .expect("missing file is valid evidence"),
+        Some(true)
+    );
+}
+
+#[cfg(test)]
+#[test]
 fn pull_child_recursion_precedence_and_candidate_validation() {
     use super::pull_children::Recursion;
     let retained =
