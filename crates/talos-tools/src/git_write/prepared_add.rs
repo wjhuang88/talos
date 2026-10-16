@@ -655,10 +655,12 @@ impl AddPlan {
     async fn pull_probe(&self, args: Vec<String>) -> Result<std::process::Output, GitToolError> {
         // Tree listings carry one record per path, unlike small scalar probes.
         // Keep repeated listings within the unchanged cumulative output budget.
-        let output_limit = if args
-            .first()
-            .is_some_and(|arg| matches!(arg.as_str(), "ls-tree" | "for-each-ref" | "rev-list"))
-        {
+        let output_limit = if args.first().is_some_and(|arg| {
+            matches!(
+                arg.as_str(),
+                "ls-tree" | "for-each-ref" | "rev-list" | "cat-file"
+            )
+        }) {
             1024 * 1024
         } else {
             16 * 1024
@@ -1412,10 +1414,17 @@ impl AddPlan {
             if !output.status.success() || !output.stderr.is_empty() {
                 return Err(GitToolError::Git("Pull child tree listing failed".into()));
             }
-            self.pull_child_trees.insert(
-                commit.clone(),
-                super::pull_children::Tree::parse(&output.stdout, width)?,
-            );
+            let mut tree = super::pull_children::Tree::parse(&output.stdout, width)?;
+            if let Some(blob) = &tree.modules_blob {
+                let modules = self
+                    .pull_probe(vec!["cat-file".into(), "blob".into(), blob.clone()])
+                    .await?;
+                if !modules.status.success() || !modules.stderr.is_empty() {
+                    return Err(GitToolError::Git("Pull module blob read failed".into()));
+                }
+                tree.bind_modules(&modules.stdout)?;
+            }
+            self.pull_child_trees.insert(commit.clone(), tree);
         }
         self.pull_integration = Some(
             self.pull_before
@@ -12222,6 +12231,13 @@ pub(super) mod tests {
             Some(child_oid)
         );
         assert!(child_tree.modules_blob.is_some());
+        assert_eq!(
+            child_tree
+                .module_names
+                .get("missing/child")
+                .map(String::as_str),
+            Some("child")
+        );
         assert!(!root.path().join("missing").exists());
         assert!(!root.path().join(".gitmodules").exists());
         assert!(matches!(
