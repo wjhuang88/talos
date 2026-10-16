@@ -8,8 +8,14 @@ only the execution boundary and evidence; production fetch remains disabled.
 Post-fetch parent discovery, per-child identity/config/remote plans, fresh child
 Read/Write/Network approvals, nested iteration, partial/cancel/budget handling,
 independent review and Agent/MCP gates remain unimplemented. ADR-089 now records
-the accepted timing difference and authorization contract. The earlier approved
-full preflight applies to `4fee02d5`, not this source. I300/T7 remains Active.
+the accepted timing difference and authorization contract. Standard full
+preflight against source commit `01a03688` passed outside the sandbox: tools
+752/752, workspace tests/checks/Clippy, governance/claims zero warnings and
+external runtime SDK fixture; log
+`/private/tmp/i300-recursive-preflight-approved.log`. The first sandboxed run
+reached 751/752 tools tests and hit `PermissionDenied` only in the existing
+process-observation case; log `/private/tmp/i300-recursive-preflight.log`.
+I300/T7 remains Active.
 
 Pull bundle-source checkpoint (2026-10-16, `205458e5`): configuration
 preparation now refuses a nonempty or valueless final `fetch.bundleURI` before
