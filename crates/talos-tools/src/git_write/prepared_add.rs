@@ -1599,6 +1599,15 @@ impl AddPlan {
                 |name, recursion| before.child_recursion(name, recursion),
             )?;
         for (name, child) in &mut self.pull_changed_children {
+            use super::pull_children::Activity;
+            child.activity = Some(
+                match before.child_active(name, &child.path, &self.repository.workdir) {
+                    Ok(Some(true)) => Activity::Enabled,
+                    Ok(Some(false)) => Activity::Disabled,
+                    Ok(None) => Activity::Pathspec,
+                    Err(_) => Activity::Invalid,
+                },
+            );
             // Selection still needs current-index/active-policy evidence. Keep
             // invalid current policy dormant until this candidate is selected.
             child.effective_recursion = Some(

@@ -114,6 +114,17 @@ pub(super) struct Changed {
     pub(super) objects: std::collections::BTreeSet<String>,
     pub(super) historical_recursion: Option<Recursion>,
     pub(super) effective_recursion: Option<Recursion>,
+    pub(super) activity: Option<Activity>,
+}
+
+/// Historical activity may require further admitted attribute evidence. Invalid
+/// values stay dormant until a candidate survives current-index scheduling.
+#[derive(Debug, PartialEq, Eq)]
+pub(super) enum Activity {
+    Enabled,
+    Disabled,
+    Pathspec,
+    Invalid,
 }
 
 pub(super) fn collect_named_changes(
@@ -134,6 +145,7 @@ pub(super) fn collect_named_changes(
                 path: path.clone(),
                 historical_recursion: tree.module_recursion.get(name).copied(),
                 effective_recursion: None,
+                activity: None,
                 objects: std::collections::BTreeSet::new(),
             });
             changed.objects.insert(object.clone());

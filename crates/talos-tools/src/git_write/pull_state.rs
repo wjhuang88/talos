@@ -768,6 +768,9 @@ pub(super) struct BeforeFetch {
     policy: Policy,
     fetch_recursion: FetchRecursion,
     child_recursion: std::collections::BTreeMap<Vec<u8>, Option<Vec<u8>>>,
+    child_activity: std::collections::BTreeMap<Vec<u8>, Option<Vec<u8>>>,
+    child_urls: std::collections::BTreeSet<Vec<u8>>,
+    active_pathspecs: Option<Vec<Option<Vec<u8>>>>,
 }
 
 /// Retain the configured mode even though the parent command disables native
@@ -825,6 +828,59 @@ impl FetchRecursion {
 }
 
 impl BeforeFetch {
+    /// Resolve native historical-candidate precedence without filesystem reads.
+    /// `None` requires admitted pathspec/attribute evaluation; it is not inactive.
+    pub(super) fn child_active(
+        &self,
+        name: &str,
+        path: &str,
+        workdir: &std::path::Path,
+    ) -> Result<Option<bool>, GitToolError> {
+        if let Some(value) = self.child_activity.get(name.as_bytes()) {
+            return super::config_state::git_boolean(value.as_deref()).map(Some);
+        }
+        if let Some(values) = &self.active_pathspecs {
+            let patterns = values
+                .iter()
+                .map(|value| {
+                    let value = value.as_deref().ok_or_else(|| {
+                        GitToolError::InvalidInput(
+                            "Valueless submodule.active pathspec is invalid".into(),
+                        )
+                    })?;
+                    std::panic::catch_unwind(|| gix::pathspec::parse(value, Default::default()))
+                        .map_err(|_| GitToolError::InvalidInput("Pathspec parser panicked".into()))?
+                        .map_err(|_| {
+                            GitToolError::InvalidInput("Invalid submodule.active pathspec".into())
+                        })
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            if patterns
+                .iter()
+                .any(|pattern| !pattern.attributes.is_empty())
+            {
+                return Ok(None);
+            }
+            let mut search = std::panic::catch_unwind(|| {
+                gix::pathspec::Search::from_specs(patterns, None, workdir)
+            })
+            .map_err(|_| GitToolError::InvalidInput("Pathspec matcher panicked".into()))?
+            .map_err(|_| GitToolError::InvalidInput("Invalid submodule.active pathspec".into()))?;
+            let matched = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                search
+                    .pattern_matching_relative_path(
+                        gix::bstr::BStr::new(path.as_bytes()),
+                        Some(true),
+                        &mut |_path, _case, _is_dir, _out| false,
+                    )
+                    .is_some_and(|item| !item.is_excluded())
+            }))
+            .map_err(|_| GitToolError::InvalidInput("Pathspec matcher panicked".into()))?;
+            return Ok(Some(matched));
+        }
+        Ok(Some(self.child_urls.contains(name.as_bytes())))
+    }
+
     /// Resolve only the named candidate. Explicit global policy bypasses even
     /// invalid per-module values, as native fetch does. No child paths are read.
     pub(super) fn child_recursion(
@@ -1251,7 +1307,25 @@ impl BeforeFetch {
         }
         let policy = Policy::capture(config, branch.as_deref())?;
         let fetch_recursion = FetchRecursion::capture(config)?;
-        let child_recursion = super::config_state::parse_host(config)?
+        let parsed = super::config_state::parse_host(config)?;
+        let mut child_activity = std::collections::BTreeMap::new();
+        let mut child_urls = std::collections::BTreeSet::new();
+        for (key, values) in &parsed {
+            if let Some(key) = key.strip_prefix(b"submodule.") {
+                if let Some(name) = key.strip_suffix(b".active")
+                    && let Some(value) = values.last()
+                {
+                    child_activity.insert(name.to_vec(), value.clone());
+                }
+                if let Some(name) = key.strip_suffix(b".url")
+                    && values.last().is_some_and(Option::is_some)
+                {
+                    child_urls.insert(name.to_vec());
+                }
+            }
+        }
+        let active_pathspecs = parsed.get(b"submodule.active".as_slice()).cloned();
+        let child_recursion = parsed
             .into_iter()
             .filter_map(|(key, mut values)| {
                 let name = key
@@ -1267,6 +1341,9 @@ impl BeforeFetch {
             policy,
             fetch_recursion,
             child_recursion,
+            child_activity,
+            child_urls,
+            active_pathspecs,
         })
     }
 }
@@ -1412,6 +1489,96 @@ fn prefetch_evidence_distinguishes_detached_unborn_and_rejects_invalid_probes() 
     for bad in ["0".repeat(40), "g".repeat(40), "a".repeat(39)] {
         assert!(
             BeforeFetch::capture(b"", None, Some(format!("{bad}\n").as_bytes()), None, 40).is_err()
+        );
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn pull_historical_activity_preserves_overrides_and_unresolved_pathspecs() {
+    let retained =
+        |config: &[u8]| BeforeFetch::capture(config, None, None, None, 40).expect("policy");
+    let policy = retained(b"submodule.Child.url\n\0submodule.Child.active\nfalse\0submodule.Child.active\ntrue\0submodule.off.url\nremote\0submodule.off.active\nfalse\0submodule.bad.active\ninvalid\0");
+    assert_eq!(
+        policy
+            .child_active("Child", "Child", std::path::Path::new("/repo"))
+            .expect("last override"),
+        Some(true)
+    );
+    assert_eq!(
+        policy
+            .child_active("child", "child", std::path::Path::new("/repo"))
+            .expect("case sensitive"),
+        Some(false)
+    );
+    assert_eq!(
+        policy
+            .child_active("off", "off", std::path::Path::new("/repo"))
+            .expect("URL overridden"),
+        Some(false)
+    );
+    assert!(
+        policy
+            .child_active("bad", "bad", std::path::Path::new("/repo"))
+            .is_err()
+    );
+    let policy = retained(b"submodule.Child.url\n\0submodule.valueless.url\0");
+    assert_eq!(
+        policy
+            .child_active("Child", "Child", std::path::Path::new("/repo"))
+            .expect("empty URL present"),
+        Some(true)
+    );
+    assert_eq!(
+        policy
+            .child_active("valueless", "valueless", std::path::Path::new("/repo"))
+            .expect("no URL value"),
+        Some(false)
+    );
+    let policy = retained(b"submodule.active\n:(attr:enabled)**\0submodule.Child.url\nremote\0submodule.off.active\nfalse\0");
+    assert_eq!(
+        policy
+            .child_active("Child", "Child", std::path::Path::new("/repo"))
+            .expect("pathspec before URL"),
+        None
+    );
+    assert_eq!(
+        policy
+            .child_active("off", "off", std::path::Path::new("/repo"))
+            .expect("override before pathspec"),
+        Some(false)
+    );
+}
+
+#[cfg(test)]
+#[test]
+fn pull_historical_activity_matches_pathspecs_without_child_reads() {
+    let root = std::path::Path::new("/repo");
+    for (specs, path, expected) in [
+        (vec!["path/**"], "path/child", true),
+        (vec!["path/**"], "other", false),
+        (
+            vec!["path/**", ":(exclude)path/private"],
+            "path/private",
+            false,
+        ),
+        (vec![":(exclude)path/private"], "other", true),
+        (vec![":(icase)PATH/CHILD"], "path/child", true),
+        (vec![":(literal)path/*"], "path/child", false),
+        (vec!["path/"], "path", true),
+        (vec!["/repo/path"], "path", true),
+    ] {
+        let mut config = Vec::new();
+        for spec in &specs {
+            config.extend_from_slice(b"submodule.active\n");
+            config.extend_from_slice(spec.as_bytes());
+            config.push(0);
+        }
+        let policy = BeforeFetch::capture(&config, None, None, None, 40).expect("policy");
+        assert_eq!(
+            policy.child_active("named", path, root).expect("match"),
+            Some(expected),
+            "{specs:?} {path}"
         );
     }
 }
