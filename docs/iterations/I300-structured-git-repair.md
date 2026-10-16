@@ -1,3 +1,17 @@
+Pull bundle-source checkpoint (2026-10-16, `205458e5`): configuration
+preparation now refuses a nonempty or valueless final `fetch.bundleURI` before
+fetch planning. A native Git regression demonstrates that a bundle imports
+objects even when the selected remote subsequently fails; the prepared stage
+refuses without importing the object or creating FETCH_HEAD. Empty final values
+retain Git's bundle-disable semantics, including duplicate-value precedence.
+Locked all-feature Pull tests pass 50/50; tools all-target all-feature Clippy and
+formatting pass. This is a bounded authorization prerequisite, not completed
+Pull execution. Full preflight for this source, recursive-submodule effect
+analysis, production fetch/integration, independent review and Agent/MCP gates
+remain open. The prior full preflight applies to `4fee02d5`, not this source.
+Remote refresh confirms origin/main has no commits missing from this branch.
+I300/T7 remains Active; no merge, push or completion is claimed.
+
 Pull legacy-remote checkpoint (2026-10-16, `4fee02d5`): Pull now rejects
 legacy `.git/remotes` and `.git/branches` destination files both before
 configuration discovery and after fetch planning. Four prepared-stage cases
