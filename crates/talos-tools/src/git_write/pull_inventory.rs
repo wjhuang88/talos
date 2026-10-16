@@ -1,5 +1,6 @@
-//! Incremental exact-path discovery for Pull graph reads. Each frontier must
-//! receive a fresh admission before its entries are inspected or enumerated.
+//! Bounded frontier discovery for Pull graph reads. The caller must authorize
+//! every frontier before inspection, either by exact paths or the dedicated
+//! identity-bound metadata scope. Neither mode permits traversing links.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -240,6 +241,48 @@ mod tests {
         let mut inventory = Inventory::new(&root, &root);
         inventory.advance(|_| true).expect("names only");
         assert!(inventory.advance(|_| true).is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn discovered_directory_replacement_refuses_even_with_closed_scope() {
+        let temp = tempfile::tempdir().expect("fixture");
+        let root = temp.path().canonicalize().expect("root");
+        let metadata = root.join("metadata");
+        let external = root.join("external");
+        std::fs::create_dir(&metadata).expect("metadata");
+        std::fs::create_dir_all(metadata.join("refs/heads")).expect("refs");
+        std::fs::create_dir(&external).expect("external");
+        std::fs::write(external.join("outside"), b"unapproved reference").expect("outside");
+        let mut inventory = Inventory::new(&metadata, &metadata);
+        inventory.advance(|_| true).expect("discover refs");
+        inventory.advance(|_| true).expect("discover heads");
+        std::fs::rename(metadata.join("refs/heads"), metadata.join("saved-heads"))
+            .expect("move discovered directory");
+        std::os::unix::fs::symlink(&external, metadata.join("refs/heads"))
+            .expect("redirect discovered directory");
+        assert!(inventory.revalidate().is_err());
+        assert!(inventory.advance(|_| true).is_err());
+        assert!(
+            !inventory
+                .paths()
+                .contains(&metadata.join("refs/heads/outside"))
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn redirected_metadata_parent_refuses_before_initial_enumeration() {
+        let temp = tempfile::tempdir().expect("fixture");
+        let root = temp.path().canonicalize().expect("root");
+        let external = root.join("external");
+        std::fs::create_dir_all(external.join("refs")).expect("external refs");
+        std::fs::write(external.join("refs/outside"), b"unapproved reference").expect("outside");
+        let redirected = root.join("metadata");
+        std::os::unix::fs::symlink(&external, &redirected).expect("redirect root");
+        let mut inventory = Inventory::new(&redirected, &redirected);
+        assert!(inventory.advance(|_| true).is_err());
+        assert!(!inventory.paths().contains(&redirected.join("refs/outside")));
     }
 
     #[test]
