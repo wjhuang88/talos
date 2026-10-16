@@ -767,6 +767,7 @@ pub(super) struct BeforeFetch {
     fork_point: Option<String>,
     policy: Policy,
     fetch_recursion: FetchRecursion,
+    child_recursion: std::collections::BTreeMap<Vec<u8>, Option<Vec<u8>>>,
 }
 
 /// Retain the configured mode even though the parent command disables native
@@ -824,6 +825,40 @@ impl FetchRecursion {
 }
 
 impl BeforeFetch {
+    /// Resolve only the named candidate. Explicit global policy bypasses even
+    /// invalid per-module values, as native fetch does. No child paths are read.
+    pub(super) fn child_recursion(
+        &self,
+        name: &str,
+        historical: Option<super::pull_children::Recursion>,
+    ) -> Result<super::pull_children::Recursion, GitToolError> {
+        use super::pull_children::Recursion;
+        match self.fetch_recursion {
+            FetchRecursion::Off => return Ok(Recursion::Off),
+            FetchRecursion::On => return Ok(Recursion::On),
+            FetchRecursion::OnDemand => return Ok(Recursion::OnDemand),
+            FetchRecursion::Default => {}
+        }
+        if let Some(value) = self.child_recursion.get(name.as_bytes()) {
+            return if value.as_deref() == Some(b"on-demand".as_slice()) {
+                Ok(Recursion::OnDemand)
+            } else {
+                super::config_state::git_boolean(value.as_deref()).map(|enabled| {
+                    if enabled {
+                        Recursion::On
+                    } else {
+                        Recursion::Off
+                    }
+                })
+            };
+        }
+        Ok(match historical {
+            Some(Recursion::Off) => Recursion::Off,
+            Some(Recursion::On) => Recursion::On,
+            _ => Recursion::OnDemand,
+        })
+    }
+
     pub(super) fn fetch_recursion_description(&self) -> &'static str {
         self.fetch_recursion.description()
     }
@@ -1216,12 +1251,22 @@ impl BeforeFetch {
         }
         let policy = Policy::capture(config, branch.as_deref())?;
         let fetch_recursion = FetchRecursion::capture(config)?;
+        let child_recursion = super::config_state::parse_host(config)?
+            .into_iter()
+            .filter_map(|(key, mut values)| {
+                let name = key
+                    .strip_prefix(b"submodule.")?
+                    .strip_suffix(b".fetchrecursesubmodules")?;
+                Some((name.to_vec(), values.pop()?))
+            })
+            .collect();
         Ok(Self {
             branch,
             head,
             fork_point,
             policy,
             fetch_recursion,
+            child_recursion,
         })
     }
 }
@@ -1369,6 +1414,68 @@ fn prefetch_evidence_distinguishes_detached_unborn_and_rejects_invalid_probes() 
             BeforeFetch::capture(b"", None, Some(format!("{bad}\n").as_bytes()), None, 40).is_err()
         );
     }
+}
+
+#[cfg(test)]
+#[test]
+fn pull_child_recursion_precedence_and_candidate_validation() {
+    use super::pull_children::Recursion;
+    let retained =
+        |config: &[u8]| BeforeFetch::capture(config, None, None, None, 40).expect("policy");
+    for (global, expected) in [
+        ("false", Recursion::Off),
+        ("true", Recursion::On),
+        ("on-demand", Recursion::OnDemand),
+    ] {
+        let config = format!(
+            "fetch.recursesubmodules\n{global}\0submodule.Child.fetchrecursesubmodules\ninvalid\0"
+        );
+        assert_eq!(
+            retained(config.as_bytes())
+                .child_recursion("Child", Some(Recursion::Off))
+                .expect("global override"),
+            expected
+        );
+    }
+    let policy = retained(b"submodule.Child.fetchrecursesubmodules\nfalse\0submodule.Child.fetchrecursesubmodules\non-demand\0submodule.child.fetchrecursesubmodules\ntrue\0submodule.bad.fetchrecursesubmodules\ninvalid\0");
+    assert_eq!(
+        policy
+            .child_recursion("Child", Some(Recursion::Off))
+            .expect("last local"),
+        Recursion::OnDemand
+    );
+    assert_eq!(
+        policy
+            .child_recursion("child", Some(Recursion::Off))
+            .expect("case sensitive"),
+        Recursion::On
+    );
+    assert!(policy.child_recursion("bad", None).is_err());
+    for (historical, expected) in [
+        (None, Recursion::OnDemand),
+        (Some(Recursion::Invalid), Recursion::OnDemand),
+        (Some(Recursion::Off), Recursion::Off),
+        (Some(Recursion::On), Recursion::On),
+    ] {
+        assert_eq!(
+            policy
+                .child_recursion("absent", historical)
+                .expect("historical fallback"),
+            expected
+        );
+    }
+    assert_eq!(
+        retained(b"submodule.Child.fetchrecursesubmodules\0")
+            .child_recursion("Child", None)
+            .expect("implicit"),
+        Recursion::On
+    );
+    assert_eq!(
+        retained(b"submodule.Child.fetchrecursesubmodules\n\0")
+            .child_recursion("Child", None)
+            .expect("empty"),
+        Recursion::Off
+    );
 }
 
 #[cfg(test)]

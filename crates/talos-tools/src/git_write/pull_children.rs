@@ -48,6 +48,7 @@ pub(super) struct Changed {
     pub(super) path: String,
     pub(super) objects: std::collections::BTreeSet<String>,
     pub(super) historical_recursion: Option<Recursion>,
+    pub(super) effective_recursion: Option<Recursion>,
 }
 
 pub(super) fn collect_named_changes(
@@ -67,6 +68,7 @@ pub(super) fn collect_named_changes(
                 commit: commit.clone(),
                 path: path.clone(),
                 historical_recursion: tree.module_recursion.get(name).copied(),
+                effective_recursion: None,
                 objects: std::collections::BTreeSet::new(),
             });
             changed.objects.insert(object.clone());
