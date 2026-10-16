@@ -1,6 +1,8 @@
 # RUNTIME-010: Missing Pending-Sidecar Startup Recovery
 
-> Document status: Review
+> Document status: Complete
+
+Completion Commit: 98fa04cbdfdb7b30ff4a32d06036427872a41703
 
 **Type**: Technical / Runtime State Story
 **Parent Epic**: None
@@ -10,7 +12,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | Missing pending-sidecar recovery read fast path, storage/Actor regressions and startup documentation only; no existing-store durability or custody change. |
@@ -19,9 +21,9 @@
 | Governance Claim PR | #710 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer repeatedly authorized continuing the intermittent-timeout investigation and repair through GitHub CI. No separate maintainer reviewer is available; independent Agent storage/API review, exact-head CI, both validators and merge-time CAS remain required. |
-| Implementation PR | #711 (Review) |
-| Last Updated | 2026-10-12 |
-| Handoff / Release Condition | No implementation before this atomic claim and activation merges into main; release only after evidence-bearing closeout or explicit handoff. |
+| Implementation PR | #711 (merged as 9cad344b8f7adef855ca6b858e6ccc7723103767) |
+| Last Updated | 2026-10-16 |
+| Handoff / Release Condition | Bounded startup storage acceptance complete; #705 retains broader timeout investigation. No release. |
 
 ## Identity / Goal / Value
 
@@ -116,3 +118,53 @@ Local locked session/Agent tests passed 733 cases including 11 storage regressio
 Submit. Full local preflight is blocked by the unchanged Unix-socket fixture; remote exact-head
 full CI, explicit nonprivileged PermissionDenied evidence and independent storage/API review are
 mandatory before merge. #705 still owns PowerShell latency and historical-failure attribution.
+
+
+## Bounded Acceptance Closeout — 2026-10-16
+
+Current delivery is Complete / Closed for this existing storage slice. Earlier proposal/Review/
+pending paragraphs are retained execution history. Completion names the already-existing
+implementation98fa04cbdfdb7b30ff4a32d06036427872a41703, not this status update.
+
+#711 merged as9cad344b8f7adef855ca6b858e6ccc7723103767 after CI3161/run38283574722 exact98fa04cb,
+attempt1/all6jobsSUCCESS, independent storage/API review6129237320 and CAS6129422889.
+Completed Windows/macOS logs verify actual fresh Actor admission, absence/later admission,
+existing Running/Pending/schema/error/concurrent-store and ParentDir regression cases. macOS
+full release preflight includes the original Unix-socket fixture and both external SDK executable
+modes; the permission gate explicitly observes PermissionDenied. Retained local failed full
+preflight and CI3160's200pass/2fail Windows fixture attempt remain failures, not replaced results.
+
+Acceptance mapping:
+- Missing-parent recovery returns empty and creates no directory/database; later admission and
+  reopened recovery preserve the receipt/submission. Actual Actor Submit reaches success without
+  a recovery-created journal. Tests run against production store/Actor paths, not a substitute.
+- Existing Pending/Running/state/order/restart custody and invalid-parent/schema/error/link cases
+  retain their original SQLite behavior. Cross-instance acknowledged work remains recoverable.
+  ParentDir and final symlinks keep the conservative route; absence is a snapshot, never a fence.
+- The published post-merge Windows comparison is fulfilled by retained #705 CI3163 plus CI3206.
+  CI3163 first-recovery60target samples median0.2307ms/max69.1622ms, but that matrix remainsRED
+  2205pass/15fail. CI3182 remainsRED2219pass/1fail. Neither is relabeled by subsequent passes.
+  CI3206 exactff84ec7 integrates actual #726 main and unchanged I301 recovery logic:120processes/
+  2220pass0fail0ignored, attempt1/all8jobsSUCCESS, same original15s/10s/120s/5s budgets and assertions.
+  Independent evidence checks cover exact sources, two ZIPs and12raw restoration receipts.
+- Current60first recovery spans have median0.19485ms/max136.6005ms. All180recovery spans (three
+  per target) median0.137ms/max140.7649ms are a separate population. These timers do not classify
+  absence; structural regressions and source semantics establish the no-initialization boundary.
+  Different production baselines/VM/probes prevent a controlled speedup or universal guarantee.
+
+README.md, README.zh-CN.md and runtime SDK contract changes shipped in #711. SOP3a scope:
+this is an SDK/library-only pending-store/Actor startup repair with no new CLI capability or
+binary-entry acceptance claim. Real external SDK executables and Actor/Runtime execution establish
+this layer; Auto tests are budget comparisons, not actual talos CLI walkthroughs. Parent Epic is
+None; broader CLI/PowerShell timeout/integration behavior remains an open residual in #705.
+
+I304 is separately Complete via #726/#727. No I301 scope absorbs its pause operation. Historical
+15s/10s failures, evaluator5s phase uncertainty, native-child waiting, existing-journal costs and
+prior Plugin uncertainty remain #705 residuals. #590/I290/I291 and other owner states are unchanged;
+no release or whole-intermittent-timeout closure is claimed. I301 records full evidence/limits.
+
+
+Fresh root reconciliation is recorded at #711 comment6211705932; independent completed-evidence
+and local closeout review6211716953 APPROVE is retained in that PR conversation. Both governance validators
+pass0warnings locally; published exact-head review/CI and merge CAS remain required before this
+owner update reaches main. The existing#710 claim covers this owner/derived synchronization.
