@@ -162,6 +162,7 @@ enum Phase {
     PullPreparation,
     PullFetch,
     PullPostFetch,
+    PullIntegration,
 }
 
 pub(super) struct AddPlan {
@@ -219,6 +220,7 @@ pub(super) struct AddPlan {
     pull_hook_evidence: Vec<(PathBuf, snapshot::RegularEvidence)>,
     pull_graph_paths: Option<Vec<PathBuf>>,
     pull_inventory: Option<super::pull_inventory::Inventory>,
+    pull_integration: Option<super::pull_state::Integration>,
     identity: PreparedPlanIdentity,
     workspace: PathBuf,
     input: Value,
@@ -614,6 +616,7 @@ impl AddPlan {
             pull_hook_evidence: Vec::new(),
             pull_graph_paths: None,
             pull_inventory: None,
+            pull_integration: None,
             identity: PreparedPlanIdentity::new(),
             workspace: workspace.to_owned(),
             input: input.clone(),
@@ -1260,6 +1263,108 @@ impl AddPlan {
         )));
         self.identity = PreparedPlanIdentity::new();
         self.phase = Phase::PullFetch;
+        Ok(self)
+    }
+
+    async fn discover_pull_postfetch(
+        mut self: Box<Self>,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<Box<Self>, GitToolError> {
+        self.repository.revalidate_location()?;
+        if !self.facets.iter().any(|facet| {
+            facet.nature == ToolNature::Read
+                && facet.resource_kind == Some(ToolResourceKind::Remote)
+                && facet.resource.as_deref() == Some("git:pull-repository-metadata")
+        }) || [&self.repository.git_dir, &self.repository.common_dir]
+            .iter()
+            .any(|root| {
+                !authorizations.iter().any(|token| {
+                    token.authorizes_path(
+                        "git_pull",
+                        ToolNature::Read,
+                        &self.workspace,
+                        root.to_str().unwrap_or_default(),
+                    )
+                })
+            })
+        {
+            return Err(GitToolError::InvalidInput(
+                "Post-fetch discovery lacks dedicated metadata Read admission".into(),
+            ));
+        }
+        let config = self
+            .config
+            .as_ref()
+            .ok_or_else(|| GitToolError::Git("Missing Pull configuration".into()))?;
+        config.revalidate()?;
+        let records = config.pull_records()?;
+        let before = self
+            .pull_before
+            .as_ref()
+            .ok_or_else(|| GitToolError::Git("Missing Pull pre-fetch state".into()))?;
+        let remote = self
+            .pull_remote
+            .as_deref()
+            .ok_or_else(|| GitToolError::Git("Missing Pull remote".into()))?;
+        let tracking = before
+            .branch()
+            .map(|branch| super::pull_state::tracking_reference(&records, branch, remote))
+            .transpose()?
+            .flatten();
+        let mut inventory = super::pull_inventory::Inventory::new(
+            &self.repository.git_dir,
+            &self.repository.common_dir,
+        );
+        while !inventory.complete() {
+            self.repository.revalidate_location()?;
+            inventory.advance(|path| {
+                path.starts_with(&self.repository.git_dir)
+                    || path.starts_with(&self.repository.common_dir)
+            })?;
+        }
+        let evidence =
+            super::pull_state::PullEvidence::capture(&self.repository, tracking.as_deref(), true)?;
+        self.repository.revalidate_location()?;
+        let repository = RepositoryState::capture(&self.repository.workdir)?;
+        evidence.revalidate()?;
+        inventory.revalidate()?;
+        self.repository = repository;
+        self.pull_evidence = Some(evidence);
+        self.pull_inventory = Some(inventory);
+        self.revalidate()?;
+        let format = self
+            .pull_probe(vec!["rev-parse".into(), "--show-object-format".into()])
+            .await?;
+        let width = match (
+            format.status.success(),
+            format.stderr.is_empty(),
+            format.stdout.as_slice(),
+        ) {
+            (true, true, b"sha1\n") => 40,
+            (true, true, b"sha256\n") => 64,
+            _ => {
+                return Err(GitToolError::Git(
+                    "Pull post-fetch object format unavailable".into(),
+                ));
+            }
+        };
+        self.pull_integration = Some(
+            self.pull_before
+                .as_ref()
+                .ok_or_else(|| GitToolError::Git("Missing Pull pre-fetch state".into()))?
+                .integration(
+                    self.pull_evidence
+                        .as_ref()
+                        .ok_or_else(|| GitToolError::Git("Missing post-fetch evidence".into()))?
+                        .fetch_head()?,
+                    width,
+                    |args| self.pull_probe(args),
+                )
+                .await?,
+        );
+        self.revalidate()?;
+        self.identity = PreparedPlanIdentity::new();
+        self.phase = Phase::PullIntegration;
         Ok(self)
     }
 
@@ -5368,17 +5473,13 @@ impl PreparedNormalToolInvocation for AddPlan {
                     GitToolError::InvalidInput(format!("target-branch discovery: {error}"))
                 }),
             Phase::PullPreparation => self.discover_pull_prefetch(&authorizations).await,
-            Phase::PullPostFetch => {
-                // The fetch intentionally invalidated the pre-fetch content
-                // snapshot. Keep the original location guard until fresh Read
-                // admission instead of revalidating those obsolete contents.
-                if let Err(error) = self.repository.revalidate_location() {
-                    return PreparedNormalStage::Complete(ToolExecutionOutput::error(format!(
-                        "Pull fetch completed; post-fetch location validation failed: {error}; effects may be partial; inspect repository before retrying"
-                    )));
+            Phase::PullPostFetch => self.discover_pull_postfetch(&authorizations).await.map_err(|error| GitToolError::Git(format!("Pull parent fetch completed; post-fetch discovery failed: {error}; fetched effects are retained; inspect repository before retrying"))),
+            Phase::PullIntegration => {
+                if let Err(error) = self.revalidate() {
+                    return PreparedNormalStage::Complete(ToolExecutionOutput::error(error.to_string()));
                 }
                 return PreparedNormalStage::Complete(ToolExecutionOutput::error(
-                    "Pull parent fetch completed; post-fetch discovery and integration are not yet implemented; fetched metadata is retained; inspect repository before retrying",
+                    "Pull parent fetch and integration selection completed; integration effect admission and execution are not yet implemented; fetched metadata is retained; inspect repository before retrying",
                 ));
             }
             Phase::PullFetch => {
@@ -11726,6 +11827,81 @@ pub(super) mod tests {
         assert!(output.result.content.contains("Executable Git fetch hooks"));
         assert!(!root.path().join("hook-ran").exists());
         assert!(!root.path().join(".git/FETCH_HEAD").exists());
+    }
+
+    #[tokio::test]
+    async fn pull_postfetch_rebuilds_evidence_before_selecting_integration() {
+        let root = fixture();
+        let git = |args: &[&str]| {
+            let output = std::process::Command::new("git")
+                .current_dir(root.path())
+                .args(args)
+                .output()
+                .expect("Git");
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        };
+        git(&[
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit",
+            "--allow-empty",
+            "-m",
+            "initial",
+        ]);
+        git(&["config", "remote.origin.url", "git://example.invalid/repo"]);
+        let mut plan = Box::new(
+            AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+                .expect("Pull"),
+        )
+        .discover()
+        .await
+        .expect("configuration");
+        for _ in 0..8 {
+            if plan.phase == Phase::PullFetch {
+                break;
+            }
+            let admission = proof(&plan)
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .expect("proof");
+            plan = plan
+                .discover_pull_prefetch(&admission)
+                .await
+                .expect("prefetch");
+        }
+        assert!(plan.phase == Phase::PullFetch);
+        // Exercise the post-fetch boundary with actual Git metadata mutation,
+        // independently of a network daemon or successful transport fixture.
+        git(&["fetch", "--no-recurse-submodules", ".", "HEAD"]);
+        assert!(
+            plan.revalidate().is_err(),
+            "old FETCH_HEAD evidence must expire"
+        );
+        plan.facets
+            .retain(|facet| matches!(facet.nature, ToolNature::Read | ToolNature::Execute));
+        plan.identity = PreparedPlanIdentity::new();
+        plan.phase = Phase::PullPostFetch;
+        let admission = proof(&plan)
+            .consume_for_prepared(&plan.request(), &plan.identity)
+            .expect("fresh proof");
+        assert!(!admission.is_empty());
+        let next = plan
+            .discover_pull_postfetch(&admission)
+            .await
+            .expect("postfetch");
+        assert!(next.phase == Phase::PullIntegration);
+        assert!(matches!(
+            next.pull_integration,
+            Some(super::super::pull_state::Integration::Command(_))
+        ));
+        next.revalidate().expect("fresh evidence");
+        std::fs::write(root.path().join(".git/FETCH_HEAD"), "tampered").expect("tamper");
+        assert!(next.revalidate().is_err());
     }
 
     #[tokio::test]
