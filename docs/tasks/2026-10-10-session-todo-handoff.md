@@ -1,3 +1,16 @@
+Pull recursive-child checkpoint (2026-10-16, `18beb0bc`): maintainer accepted
+staged equivalent recursion. The fixed parent fetch now includes
+`--no-recurse-submodules`; a native Git 2.54 fixture proves native parent fetch
+imports a changed child object while the prepared parent fetch updates the same
+parent remote-tracking ref and leaves the child object untouched. Locked Pull
+tests pass 51/51 and tools all-target all-feature Clippy passes. This commits
+only the execution boundary and evidence; production fetch remains disabled.
+Post-fetch parent discovery, per-child identity/config/remote plans, fresh child
+Read/Write/Network approvals, nested iteration, partial/cancel/budget handling,
+independent review and Agent/MCP gates remain unimplemented. ADR-089 now records
+the accepted timing difference and authorization contract. The earlier approved
+full preflight applies to `4fee02d5`, not this source. I300/T7 remains Active.
+
 Pull bundle-source checkpoint (2026-10-16, `205458e5`): configuration
 preparation now refuses a nonempty or valueless final `fetch.bundleURI` before
 fetch planning. A native Git regression demonstrates that a bundle imports
