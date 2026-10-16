@@ -1,3 +1,11 @@
+Pull child remote discovery checkpoint (2026-10-16): admitted child
+configuration now exposes only the last `remote.<name>.url` value through a
+bounded parser. The Pull configuration stage adds a Network facet for the
+selected child `origin` URL without contacting it; invalid/non-UTF-8/empty
+values refuse. Pull tests pass 76/76 and cargo check passes
+(`/private/tmp/i300-child-remote-discovery.log`). Remote helper validation,
+child object admission, recursive fetch and integration remain open.
+
 Pull child configuration checkpoint (2026-10-16): `PullChildIdentity` now
 transitions active children into `PullChildConfiguration`. Each child requests
 exact Read admission for its identity-bound common-dir `config`, captures the

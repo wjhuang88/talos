@@ -1797,6 +1797,18 @@ impl AddPlan {
             }
             let output = self.inspect_config_at(workdir).await?;
             let config = super::config_state::ChildConfig::capture(&output, workdir)?;
+            if let Some(url) = config.remote_url("origin")? {
+                self.facets.push(
+                    ToolPermissionFacet::with_resource(
+                        ToolNature::Network,
+                        url,
+                        ToolResourceKind::Remote,
+                    )
+                    .with_description(
+                        "Pull selected child remote discovery; fetch remains deferred",
+                    ),
+                );
+            }
             self.child_configs.push((workdir.clone(), config));
         }
         self.revalidate()?;

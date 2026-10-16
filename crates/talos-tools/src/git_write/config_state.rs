@@ -198,6 +198,26 @@ fn startup_values(entry: &snapshot::Entry) -> Result<StartupValues, GitToolError
 }
 
 impl ChildConfig {
+    /// Return the last configured URL for a named child remote without
+    /// contacting it or resolving helpers.
+    pub(super) fn remote_url(&self, remote: &str) -> Result<Option<String>, GitToolError> {
+        let key = format!("remote.{remote}.url");
+        let Some(value) = self
+            .values
+            .get(key.as_bytes())
+            .and_then(|values| values.last())
+            .and_then(|value| value.as_deref())
+        else {
+            return Ok(None);
+        };
+        let value =
+            std::str::from_utf8(value).map_err(|_| unsupported("Child remote URL is not UTF-8"))?;
+        if value.is_empty() || value.contains(['\0', '\n', '\r']) {
+            return Err(unsupported("Child remote URL is invalid"));
+        }
+        Ok(Some(value.to_owned()))
+    }
+
     pub(super) fn receiver_effects(
         &self,
         gitdir: &std::path::Path,
