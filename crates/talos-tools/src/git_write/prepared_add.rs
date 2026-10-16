@@ -161,6 +161,7 @@ enum Phase {
     TargetConfiguration,
     PullPreparation,
     PullFetch,
+    PullPostFetch,
 }
 
 pub(super) struct AddPlan {
@@ -5367,6 +5368,19 @@ impl PreparedNormalToolInvocation for AddPlan {
                     GitToolError::InvalidInput(format!("target-branch discovery: {error}"))
                 }),
             Phase::PullPreparation => self.discover_pull_prefetch(&authorizations).await,
+            Phase::PullPostFetch => {
+                // The fetch intentionally invalidated the pre-fetch content
+                // snapshot. Keep the original location guard until fresh Read
+                // admission instead of revalidating those obsolete contents.
+                if let Err(error) = self.repository.revalidate_location() {
+                    return PreparedNormalStage::Complete(ToolExecutionOutput::error(format!(
+                        "Pull fetch completed; post-fetch location validation failed: {error}; effects may be partial; inspect repository before retrying"
+                    )));
+                }
+                return PreparedNormalStage::Complete(ToolExecutionOutput::error(
+                    "Pull parent fetch completed; post-fetch discovery and integration are not yet implemented; fetched metadata is retained; inspect repository before retrying",
+                ));
+            }
             Phase::PullFetch => {
                 if let Err(error) = self.revalidate() {
                     return PreparedNormalStage::Complete(ToolExecutionOutput::error(
@@ -5430,21 +5444,48 @@ impl PreparedNormalToolInvocation for AddPlan {
                         "Pull fetch hook evidence changed after discovery",
                     ));
                 }
-                if let Some(remote) = &self.pull_remote
-                    && let Err(error) = pull_fetch_command(
-                        &self.program,
-                        &self.repository.workdir,
-                        remote,
-                        &self.environment,
-                    )
+                let command = match pull_fetch_command(
+                    &self.program,
+                    &self.repository.workdir,
+                    self.pull_remote.as_deref().unwrap_or_default(),
+                    &self.environment,
+                ) {
+                    Ok(command) => command,
+                    Err(error) => {
+                        return PreparedNormalStage::Complete(ToolExecutionOutput::error(
+                            error.to_string(),
+                        ));
+                    }
+                };
+                let output = match self
+                    .run_command_output(command, std::time::Duration::from_secs(120), 1024 * 1024)
+                    .await
                 {
-                    return PreparedNormalStage::Complete(ToolExecutionOutput::error(
-                        error.to_string(),
-                    ));
+                    Ok(output) => output,
+                    Err(error) => {
+                        return PreparedNormalStage::Complete(ToolExecutionOutput::error(
+                            error.to_string(),
+                        ));
+                    }
+                };
+                if !output.status.success() {
+                    let diagnostics = if output.stderr.is_empty() {
+                        &output.stdout
+                    } else {
+                        &output.stderr
+                    };
+                    return PreparedNormalStage::Complete(ToolExecutionOutput::error(format!(
+                        "Pull parent fetch failed ({}): {}; effects may be partial; inspect repository before retrying",
+                        output.status,
+                        String::from_utf8_lossy(diagnostics).trim(),
+                    )));
                 }
-                return PreparedNormalStage::Complete(ToolExecutionOutput::error(
-                    "git_pull fetch and integration execution is not yet implemented",
-                ));
+                let mut plan = self;
+                plan.facets
+                    .retain(|facet| matches!(facet.nature, ToolNature::Read | ToolNature::Execute));
+                plan.identity = PreparedPlanIdentity::new();
+                plan.phase = Phase::PullPostFetch;
+                Ok(plan)
             }
             Phase::SenderConfiguration => self.discover().await,
             Phase::ReceiverRoots => self.discover_receiver_roots(&authorizations),
@@ -11685,6 +11726,66 @@ pub(super) mod tests {
         assert!(output.result.content.contains("Executable Git fetch hooks"));
         assert!(!root.path().join("hook-ran").exists());
         assert!(!root.path().join(".git/FETCH_HEAD").exists());
+    }
+
+    #[tokio::test]
+    async fn pull_failed_parent_fetch_reports_possible_partial_effects() {
+        let root = fixture();
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("listener");
+        let remote = format!("git://{}/repo", listener.local_addr().expect("address"));
+        let output = std::process::Command::new("git")
+            .current_dir(root.path())
+            .args(["config", "remote.origin.url", &remote])
+            .output()
+            .expect("configure remote");
+        assert!(output.status.success());
+        let mut plan = Box::new(
+            AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+                .expect("Pull"),
+        )
+        .discover()
+        .await
+        .expect("configuration");
+        while plan.phase != Phase::PullFetch {
+            let admission = proof(&plan)
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .expect("proof");
+            plan = plan
+                .discover_pull_prefetch(&admission)
+                .await
+                .expect("prefetch");
+        }
+        // A local fake peer closes the connection without advertising refs.
+        // No external service or host Git daemon is required.
+        listener.set_nonblocking(true).expect("nonblocking");
+        let peer = tokio::spawn(async move {
+            let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
+            loop {
+                match listener.accept() {
+                    Ok((stream, _)) => {
+                        drop(stream);
+                        break;
+                    }
+                    Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                        assert!(
+                            tokio::time::Instant::now() < deadline,
+                            "fetch never connected"
+                        );
+                        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                    }
+                    Err(error) => panic!("peer accept: {error}"),
+                }
+            }
+        });
+        let admission = proof(&plan);
+        let PreparedNormalStage::Complete(output) = plan.execute_stage(Box::new(admission)).await
+        else {
+            panic!("failed fetch continued");
+        };
+        peer.await.expect("peer");
+        assert!(output.result.is_error);
+        assert!(output.result.content.contains("Pull parent fetch failed"));
+        assert!(output.result.content.contains("effects may be partial"));
     }
 
     #[tokio::test]
