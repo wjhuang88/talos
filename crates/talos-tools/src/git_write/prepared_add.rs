@@ -229,6 +229,10 @@ pub(super) struct AddPlan {
     pull_new_commits: Vec<String>,
     pull_child_trees: BTreeMap<String, super::pull_children::Tree>,
     pull_changed_children: BTreeMap<String, super::pull_children::Changed>,
+    pull_child_layouts: Vec<(
+        super::receiver_state::Root,
+        Option<super::receiver_state::Metadata>,
+    )>,
     pull_index_children: BTreeMap<String, String>,
     pull_current_fetch_children: BTreeMap<String, super::pull_children::Recursion>,
     pull_current_modules: Option<super::pull_children::Tree>,
@@ -636,6 +640,7 @@ impl AddPlan {
             pull_new_commits: Vec::new(),
             pull_child_trees: BTreeMap::new(),
             pull_changed_children: BTreeMap::new(),
+            pull_child_layouts: Vec::new(),
             pull_index_children: BTreeMap::new(),
             pull_current_fetch_children: BTreeMap::new(),
             pull_current_modules: None,
@@ -1745,6 +1750,10 @@ impl AddPlan {
         mut self: Box<Self>,
         authorizations: &[talos_core::tool::ToolExecutionAuthorization],
     ) -> Result<Box<Self>, GitToolError> {
+        self.revalidate()?;
+        if !self.pull_child_layouts.is_empty() {
+            return self.discover_pull_child_metadata(authorizations);
+        }
         for child in self.pull_changed_children.values() {
             if !matches!(
                 child.activity,
@@ -1755,33 +1764,86 @@ impl AddPlan {
             let path = self.repository.workdir.join(&child.path);
             let marker = path.join(".git");
             for candidate in [&path, &marker] {
-                if !authorizations.iter().any(|token| {
-                    token.authorizes_path(
-                        "git_pull",
-                        ToolNature::Read,
-                        &self.workspace,
-                        candidate.to_str().unwrap_or_default(),
-                    )
-                }) {
-                    return Err(GitToolError::InvalidInput(
-                        "Pull child identity lacks exact Read admission".into(),
-                    ));
-                }
+                self.child_read(candidate, authorizations)?;
             }
-            let metadata_path = child_metadata_path(&path, &marker)?;
-            if !authorizations.iter().any(|token| {
-                token.authorizes_path(
-                    "git_pull",
-                    ToolNature::Read,
-                    &self.workspace,
-                    metadata_path.to_str().unwrap_or_default(),
-                )
-            }) {
+            let layout = super::receiver_state::Root::capture(
+                &path,
+                self.child_read(&path, authorizations)?,
+            )?;
+            if layout.metadata_path == layout.canonical {
                 return Err(GitToolError::InvalidInput(
-                    "Pull child Git metadata path lacks exact Read admission".into(),
+                    "Pull selected child has no Git marker".into(),
                 ));
             }
-            let location = super::repository_state::ChildLocation::capture(&metadata_path)?;
+            for candidate in std::iter::once(layout.metadata_path.clone())
+                .chain(["commondir", "gitdir", "HEAD"].map(|leaf| layout.metadata_path.join(leaf)))
+            {
+                self.facets.push(path_facet(
+                    ToolNature::Read,
+                    &candidate,
+                    "Pull child Git directory and fixed layout pointers; targets deferred",
+                )?);
+            }
+            self.pull_child_layouts.push((layout, None));
+        }
+        self.identity = PreparedPlanIdentity::new();
+        Ok(self)
+    }
+
+    fn discover_pull_child_metadata(
+        mut self: Box<Self>,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<Box<Self>, GitToolError> {
+        if self
+            .pull_child_layouts
+            .iter()
+            .any(|(_, metadata)| metadata.is_none())
+        {
+            let mut discovered = Vec::new();
+            for (layout, _) in &self.pull_child_layouts {
+                self.child_read(&layout.metadata_path, authorizations)?;
+                for leaf in ["commondir", "gitdir", "HEAD"] {
+                    self.child_read(&layout.metadata_path.join(leaf), authorizations)?;
+                }
+            }
+            for (layout, _) in &self.pull_child_layouts {
+                let metadata = super::receiver_state::Metadata::capture(
+                    &layout.metadata_path,
+                    self.child_read(&layout.metadata_path, authorizations)?,
+                )?;
+                if metadata
+                    .worktree_marker
+                    .as_ref()
+                    .is_some_and(|marker| marker != &layout.canonical.join(".git"))
+                {
+                    return Err(GitToolError::InvalidInput(
+                        "Pull child backlink names an unadmitted worktree".into(),
+                    ));
+                }
+                discovered.push(metadata);
+            }
+            for ((_, slot), metadata) in self.pull_child_layouts.iter_mut().zip(discovered) {
+                self.facets.push(path_facet(
+                    ToolNature::Read,
+                    &metadata.common_path,
+                    "Pull child shared metadata identity; configuration contents deferred",
+                )?);
+                *slot = Some(metadata);
+            }
+            self.identity = PreparedPlanIdentity::new();
+            return Ok(self);
+        }
+        for (layout, metadata) in &self.pull_child_layouts {
+            let metadata = metadata.as_ref().ok_or_else(|| {
+                GitToolError::InvalidInput("Pull child metadata evidence missing".into())
+            })?;
+            let admitted = self.child_read(&metadata.common_path, authorizations)?;
+            let location = super::repository_state::ChildLocation::capture(&layout.metadata_path)?;
+            if location.common_dir != admitted {
+                return Err(GitToolError::InvalidInput(
+                    "Pull child common directory differs from admission".into(),
+                ));
+            }
             self.facets.push(
                 ToolPermissionFacet::with_resource(
                     ToolNature::Read,
@@ -1800,7 +1862,8 @@ impl AddPlan {
                 &location.common_dir,
                 "Pull selected child Git metadata for object admission",
             )?);
-            self.child_locations.push((path, location));
+            self.child_locations
+                .push((layout.spelling.clone(), location));
         }
         self.revalidate()?;
         self.identity = PreparedPlanIdentity::new();
@@ -2714,7 +2777,7 @@ impl AddPlan {
         Ok(self)
     }
 
-    fn checkout_child_read<'a>(
+    fn child_read<'a>(
         &self,
         path: &Path,
         authorizations: &'a [talos_core::tool::ToolExecutionAuthorization],
@@ -2723,7 +2786,7 @@ impl AddPlan {
             .iter()
             .find(|token| {
                 token.authorizes_path(
-                    "git_checkout",
+                    self.operation.name(),
                     ToolNature::Read,
                     &self.workspace,
                     path.to_str().unwrap_or_default(),
@@ -2731,7 +2794,7 @@ impl AddPlan {
             })
             .map(|token| token.normalized_path())
             .ok_or_else(|| {
-                GitToolError::InvalidInput("New child path requires separate Read admission".into())
+                GitToolError::InvalidInput("Child path requires separate Read admission".into())
             })
     }
 
@@ -2748,13 +2811,13 @@ impl AddPlan {
             .collect();
         // Check the complete frontier before any marker contents are inspected.
         for root in &roots {
-            self.checkout_child_read(root, authorizations)?;
-            self.checkout_child_read(&root.join(".git"), authorizations)?;
+            self.child_read(root, authorizations)?;
+            self.child_read(&root.join(".git"), authorizations)?;
         }
         for root in roots {
             let layout = super::receiver_state::Root::capture(
                 &root,
-                self.checkout_child_read(&root, authorizations)?,
+                self.child_read(&root, authorizations)?,
             )?;
             for path in std::iter::once(layout.metadata_path.clone())
                 .chain(["commondir", "gitdir", "HEAD"].map(|leaf| layout.metadata_path.join(leaf)))
@@ -2775,15 +2838,15 @@ impl AddPlan {
     ) -> Result<Box<Self>, GitToolError> {
         self.revalidate()?;
         for layout in &self.checkout_child_layouts {
-            self.checkout_child_read(&layout.metadata_path, authorizations)?;
+            self.child_read(&layout.metadata_path, authorizations)?;
             for leaf in ["commondir", "gitdir", "HEAD"] {
-                self.checkout_child_read(&layout.metadata_path.join(leaf), authorizations)?;
+                self.child_read(&layout.metadata_path.join(leaf), authorizations)?;
             }
         }
         for layout in &self.checkout_child_layouts {
             let metadata = super::receiver_state::Metadata::capture(
                 &layout.metadata_path,
-                self.checkout_child_read(&layout.metadata_path, authorizations)?,
+                self.child_read(&layout.metadata_path, authorizations)?,
             )?;
             // A linked child's backlink must name the already admitted marker.
             // Do not inspect a newly declared unrelated worktree marker.
@@ -2843,9 +2906,9 @@ impl AddPlan {
         }
         // No command runs until every newly discovered shared root is admitted.
         for metadata in &self.checkout_child_metadata {
-            self.checkout_child_read(&metadata.common_path, authorizations)?;
-            self.checkout_child_read(&metadata.common_path.join("config"), authorizations)?;
-            self.checkout_child_read(&metadata.canonical.join("config.worktree"), authorizations)?;
+            self.child_read(&metadata.common_path, authorizations)?;
+            self.child_read(&metadata.common_path.join("config"), authorizations)?;
+            self.child_read(&metadata.canonical.join("config.worktree"), authorizations)?;
         }
         for (layout, metadata) in self
             .checkout_child_layouts
@@ -2916,11 +2979,11 @@ impl AddPlan {
         // Admit the entire worktree frontier before any ordinary Git setup.
         for startup in &self.checkout_child_startup {
             for target in &startup.targets {
-                self.checkout_child_read(target, authorizations)?;
+                self.child_read(target, authorizations)?;
             }
         }
         for (worktree, config) in &self.checkout_child_bootstrap {
-            let admitted = self.checkout_child_read(worktree, authorizations)?;
+            let admitted = self.child_read(worktree, authorizations)?;
             let identity = snapshot::PathIdentity::capture(worktree).map_err(|_| {
                 GitToolError::InvalidInput("Child worktree identity unavailable".into())
             })?;
@@ -2935,7 +2998,7 @@ impl AddPlan {
         }
         for startup in &self.checkout_child_startup {
             for target in &startup.targets {
-                let admitted = self.checkout_child_read(target, authorizations)?;
+                let admitted = self.child_read(target, authorizations)?;
                 let identity = snapshot::PathIdentity::capture(target).map_err(|_| {
                     GitToolError::InvalidInput("Child startup target unavailable".into())
                 })?;
@@ -2955,8 +3018,7 @@ impl AddPlan {
         {
             let location = super::repository_state::ChildLocation::capture(&layout.metadata_path)?;
             if location.git_dir != metadata.canonical
-                || location.common_dir
-                    != self.checkout_child_read(&metadata.common_path, authorizations)?
+                || location.common_dir != self.child_read(&metadata.common_path, authorizations)?
             {
                 return Err(GitToolError::InvalidInput(
                     "New child shared directory changed after admission".into(),
@@ -5162,6 +5224,12 @@ impl AddPlan {
         for layout in &self.checkout_child_layouts {
             layout.revalidate(&layout.canonical)?;
         }
+        for (layout, metadata) in &self.pull_child_layouts {
+            layout.revalidate(&layout.canonical)?;
+            if let Some(metadata) = metadata {
+                metadata.revalidate(&metadata.canonical)?;
+            }
+        }
         for metadata in &self.checkout_child_metadata {
             metadata.revalidate(&metadata.canonical)?;
         }
@@ -5182,7 +5250,13 @@ impl AddPlan {
         }
         for (path, expected) in &self.child_locations {
             let metadata_path = if matches!(self.operation, Operation::Pull(_)) {
-                child_metadata_path(path, &path.join(".git"))?
+                self.pull_child_layouts
+                    .iter()
+                    .find(|(layout, _)| &layout.spelling == path)
+                    .map(|(layout, _)| layout.metadata_path.clone())
+                    .ok_or_else(|| {
+                        GitToolError::InvalidInput("Pull child layout evidence missing".into())
+                    })?
             } else {
                 path.clone()
             };
@@ -5722,50 +5796,6 @@ fn capture_gitlink(
         entry,
         metadata_path,
         marker: marker_entry,
-    })
-}
-
-fn child_metadata_path(worktree: &Path, marker: &Path) -> Result<PathBuf, GitToolError> {
-    let metadata = std::fs::symlink_metadata(marker)
-        .map_err(|_| GitToolError::InvalidInput("Submodule Git marker unavailable".into()))?;
-    if metadata.is_dir() {
-        return Ok(marker.to_path_buf());
-    }
-    if !metadata.is_file() || metadata.file_type().is_symlink() {
-        return Err(GitToolError::InvalidInput(
-            "Submodule Git marker must be a regular file or directory".into(),
-        ));
-    }
-    let entry = snapshot::Entry::capture(
-        marker,
-        &mut snapshot::Budget {
-            entries: 1,
-            bytes: 16 * 1024,
-        },
-    )
-    .map_err(|_| GitToolError::InvalidInput("Submodule Git marker unavailable".into()))?;
-    let snapshot::Entry::File(_, bytes) = entry else {
-        return Err(GitToolError::InvalidInput(
-            "Submodule Git marker changed during inspection".into(),
-        ));
-    };
-    let raw = bytes
-        .strip_prefix(b"gitdir: ")
-        .and_then(|bytes| bytes.strip_suffix(b"\n").or(Some(bytes)))
-        .and_then(|bytes| bytes.strip_suffix(b"\r").or(Some(bytes)))
-        .ok_or_else(|| GitToolError::InvalidInput("Invalid submodule Git marker".into()))?;
-    let raw = std::str::from_utf8(raw)
-        .map_err(|_| GitToolError::InvalidInput("Submodule Git marker is not UTF-8".into()))?;
-    if raw.is_empty() || raw.contains(['\0', '\n', '\r']) {
-        return Err(GitToolError::InvalidInput(
-            "Invalid submodule Git marker".into(),
-        ));
-    }
-    let path = PathBuf::from(raw);
-    Ok(if path.is_absolute() {
-        path
-    } else {
-        worktree.join(path)
     })
 }
 
@@ -12106,28 +12136,100 @@ pub(super) mod tests {
     }
 
     #[test]
-    fn pull_child_metadata_path_resolves_external_gitdir_marker() {
-        let root = tempfile::tempdir().expect("fixture");
-        let worktree = root.path().join("child");
-        let gitdir = root.path().join("metadata");
-        let common = root.path().join("common");
-        std::fs::create_dir(&worktree).expect("worktree");
-        std::fs::create_dir(&gitdir).expect("gitdir");
-        std::fs::create_dir(&common).expect("common");
-        std::fs::write(worktree.join(".git"), "gitdir: ../metadata\n").expect("marker");
-        std::fs::write(gitdir.join("commondir"), b"../common\n").expect("commondir");
-        let marker = worktree.join(".git");
-        let resolved = child_metadata_path(&worktree, &marker).expect("metadata path");
-        assert_eq!(resolved, worktree.join("../metadata"));
-        let location = super::super::repository_state::ChildLocation::capture(&resolved)
-            .expect("child location");
-        assert_eq!(
-            location.git_dir,
-            gitdir.canonicalize().expect("canonical gitdir")
+    fn pull_child_identity_defers_external_gitdir_and_common_targets() {
+        let root = fixture();
+        let external = tempfile::tempdir().expect("external fixture");
+        let child = root.path().join("child");
+        let gitdir = external.path().join("metadata");
+        let common = external.path().join("common");
+        std::fs::create_dir(&child).expect("child");
+        std::fs::write(
+            child.join(".git"),
+            format!("gitdir: {}\n", gitdir.display()),
+        )
+        .expect("marker");
+        let mut plan =
+            AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+                .expect("prepare");
+        plan.phase = Phase::PullChildIdentity;
+        plan.pull_changed_children.insert(
+            "child".into(),
+            super::super::pull_children::Changed {
+                commit: "0".repeat(40),
+                path: "child".into(),
+                objects: Default::default(),
+                historical_recursion: None,
+                effective_recursion: None,
+                activity: Some(super::super::pull_children::Activity::Enabled),
+            },
         );
+        for path in [&child, &child.join(".git")] {
+            plan.facets
+                .push(path_facet(ToolNature::Read, path, "child identity").expect("facet"));
+        }
+        let mut plan = Box::new(plan);
+        let tokens = proof(&plan)
+            .consume_for_prepared(&plan.request(), &plan.identity)
+            .expect("marker proof");
+        plan = plan
+            .discover_pull_child_identity(&tokens)
+            .expect("marker wave");
+        assert!(!gitdir.exists(), "marker wave must not resolve its target");
+        assert!(plan.child_locations.is_empty());
+        assert!(
+            plan.facets
+                .iter()
+                .any(|facet| facet.resource.as_deref() == gitdir.to_str())
+        );
+        // Creating the newly named target after discovery is legal: it was
+        // intentionally unopened until the next independently admitted wave.
+        std::fs::create_dir(&gitdir).expect("gitdir");
+        std::fs::write(gitdir.join("commondir"), b"../common\n").expect("pointer");
+        std::fs::write(gitdir.join("HEAD"), b"ref: refs/heads/main\n").expect("HEAD");
+        assert!(plan.child_read(&gitdir, &tokens).is_err());
+        let tokens = proof(&plan)
+            .consume_for_prepared(&plan.request(), &plan.identity)
+            .expect("gitdir proof");
+        plan = plan
+            .discover_pull_child_identity(&tokens)
+            .expect("metadata wave");
+        assert!(
+            !common.exists(),
+            "metadata wave must not resolve common target"
+        );
+        assert!(plan.child_locations.is_empty());
+        assert!(plan.child_read(&common, &tokens).is_err());
+        std::fs::create_dir(&common).expect("common");
+        let tokens = proof(&plan)
+            .consume_for_prepared(&plan.request(), &plan.identity)
+            .expect("common proof");
+        plan = plan
+            .discover_pull_child_identity(&tokens)
+            .expect("common wave");
+        assert!(matches!(plan.phase, Phase::PullChildConfiguration));
+        assert_eq!(plan.child_locations.len(), 1);
         assert_eq!(
-            location.common_dir,
-            common.canonicalize().expect("canonical common")
+            plan.child_locations[0].1.common_dir,
+            common.canonicalize().expect("common identity")
+        );
+        plan.revalidate().expect("stable layout");
+        std::fs::write(child.join(".git"), "gitdir: /unadmitted/new/target\n")
+            .expect("redirect marker");
+        assert!(
+            plan.revalidate().is_err(),
+            "retained marker evidence must reject redirection"
+        );
+        std::fs::write(
+            child.join(".git"),
+            format!("gitdir: {}\n", gitdir.display()),
+        )
+        .expect("restore marker");
+        plan.revalidate().expect("restored marker");
+        std::fs::write(gitdir.join("commondir"), b"/unadmitted/common\n")
+            .expect("redirect common pointer");
+        assert!(
+            plan.revalidate().is_err(),
+            "retained metadata must reject common-directory redirection"
         );
     }
 
