@@ -100,3 +100,14 @@ refresh; sharing a PR transfers no ownership between the two slices.
 
 Finalized #718 proposes Active/Claimed I302 and accepted ADR-091 atomically; all remain ineffective
 until merge. Independent complete contract preview found no blocker. No PSS code is in this PR.
+
+
+## Retained Residual And TEST-004 Selection — 2026-10-16
+
+CI3213 on #7160ca03ff1 FAILED Windows456/1, other5jobs pass. Direct Win32 mode7 observed
+73/74/76/76 with2cycles/zeroPSS and passed its missing-cwd cleanup fixture; modes1–7 succeeded,
+original cold40/+2 failed73->76. This is not legalcache/resourceidentity/all-leak-absence proof.
+Maintainer accepted narrower known-resource acceptance at22:39 Asia/Shanghai. New TEST-004/#729
+and I305/#730 own the proposed criterion/instrumentation/real-negative correction, only after their
+claim/amendedADR reaches main. This owner retains PSS diagnostics and unexplained/untracked
+process-wide/native resources as an OPEN residual; no completion/status takeover or #716 merge.
