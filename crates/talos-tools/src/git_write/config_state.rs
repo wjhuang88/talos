@@ -2554,6 +2554,27 @@ mod tests {
         }
     }
 
+    #[test]
+    fn child_configuration_rejects_new_origins_before_source_capture() {
+        let root = tempfile::tempdir().expect("fixture");
+        let source = root.path().join("config");
+        std::fs::write(&source, "[custom]\n value = same\n").expect("source");
+        let output = format!("file:{}\0custom.value\nsame\0", source.display());
+        let config = ChildConfig::capture(output.as_bytes(), root.path()).expect("capture");
+        config.verify_host(output.as_bytes()).expect("unchanged");
+        // The newly reported origin is deliberately not a readable regular
+        // configuration file. Output comparison must reject it without capture.
+        let changed = format!("file:{}\0custom.value\nsame\0", root.path().display());
+        assert!(
+            config
+                .verify_host(changed.as_bytes())
+                .expect_err("new origin")
+                .to_string()
+                .contains("changed during discovery")
+        );
+        config.revalidate().expect("original evidence retained");
+    }
+
     #[cfg(unix)]
     #[test]
     fn child_configuration_rejects_equal_content_ancestor_retarget() {

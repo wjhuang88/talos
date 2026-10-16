@@ -1836,7 +1836,10 @@ impl AddPlan {
                     ));
                 }
             }
-            self.child_configs.clear();
+            // Retain the original evidence until both its sources and the new
+            // discovery output have been checked. Clearing it here would let
+            // a changed include chain replace the admitted configuration.
+            self.revalidate()?;
         }
         for (workdir, location) in &self.child_locations {
             if !authorizations.iter().any(|token| {
@@ -1865,6 +1868,22 @@ impl AddPlan {
                 ));
             }
             let output = self.inspect_config_at(workdir).await?;
+            if self.pull_config_sources_discovered {
+                let expected = self
+                    .child_configs
+                    .iter()
+                    .find(|(path, _)| path == workdir)
+                    .ok_or_else(|| {
+                        GitToolError::InvalidInput(
+                            "Pull child configuration evidence missing".into(),
+                        )
+                    })?;
+                // Compare origins before snapshotting: a newly introduced
+                // include has no exact source admission in this continuation.
+                expected.1.verify_host(&output)?;
+                expected.1.revalidate()?;
+                continue;
+            }
             let config = super::config_state::ChildConfig::capture(&output, workdir)?;
             for (path, _) in &config.files {
                 if !self.pull_config_source_paths.contains(path) {
