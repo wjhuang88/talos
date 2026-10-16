@@ -11,6 +11,7 @@ pub(super) struct Tree {
     pub(super) modules_blob: Option<String>,
     pub(super) changed_gitlinks: BTreeMap<String, String>,
     pub(super) module_names: BTreeMap<String, String>,
+    pub(super) declared_names: std::collections::BTreeSet<String>,
 }
 
 /// A declared module's changed objects, in parent revision-walk order.
@@ -59,6 +60,7 @@ impl Tree {
             gitlinks: BTreeMap::new(),
             modules_blob: None,
             module_names: BTreeMap::new(),
+            declared_names: std::collections::BTreeSet::new(),
             changed_gitlinks: BTreeMap::new(),
         };
         if bytes.is_empty() {
@@ -154,35 +156,65 @@ impl Tree {
         if bytes.len() > 1024 * 1024 {
             return Err(invalid());
         }
-        let names = std::panic::catch_unwind(|| {
-            let file = gix::config::File::from_bytes_no_includes(
-                bytes,
-                gix::config::file::Metadata::default(),
-                Default::default(),
-            )
-            .map_err(|_| invalid())?;
+        let (names, declared_names) = std::panic::catch_unwind(|| {
+            use gix::config::parse::EventRef as Event;
+            let file =
+                gix::config::parse::Events::from_bytes(bytes, None).map_err(|_| invalid())?;
             let mut by_name = BTreeMap::new();
+            let mut declared = std::collections::BTreeSet::new();
             for section in file.sections() {
-                let header = section.header();
-                if !header.name().eq_ignore_ascii_case(b"submodule") {
+                let Event::SectionHeader {
+                    name: section_name,
+                    subsection_name,
+                    ..
+                } = section.header()
+                else {
+                    return Err(invalid());
+                };
+                if !section_name.eq_ignore_ascii_case(b"submodule") {
                     continue;
                 }
-                let Some(name) = header.subsection_name() else {
+                let Some(name) = subsection_name else {
                     continue;
                 };
                 let name = std::str::from_utf8(name.as_ref()).map_err(|_| invalid())?;
                 if name.is_empty() || name.contains(['\0', '\n', '\r']) {
                     return Err(invalid());
                 }
-                // Historical Git configuration keeps the first path for a
-                // module name, including repeated sections.
+                declared.insert(name.to_owned());
                 if by_name.contains_key(name) {
                     continue;
                 }
-                if section.body().value_implicit("path") == Some(None) {
-                    return Err(invalid());
+                // Preserve the first declaration, including whether it had '='.
+                // Body value queries select different duplicates for implicit keys.
+                let mut is_path = false;
+                let mut explicit = false;
+                let mut raw = Vec::new();
+                let mut first_path = None;
+                for event in section.body() {
+                    match event {
+                        Event::SectionValueName(key) => {
+                            is_path = key.eq_ignore_ascii_case(b"path");
+                            explicit = false;
+                            raw.clear();
+                        }
+                        Event::KeyValueSeparator => explicit = true,
+                        Event::ValueNotDone(value) if is_path => {
+                            raw.extend_from_slice(value.as_ref());
+                        }
+                        Event::Value(value) | Event::ValueDone(value) if is_path => {
+                            if !explicit {
+                                return Err(invalid());
+                            }
+                            raw.extend_from_slice(value.as_ref());
+                            first_path =
+                                Some(gix::config::value::normalize(raw.as_slice()).into_owned());
+                            break;
+                        }
+                        _ => {}
+                    }
                 }
-                let Some(path) = section.body().values("path").into_iter().next() else {
+                let Some(path) = first_path else {
                     continue;
                 };
                 let path = std::str::from_utf8(path.as_ref()).map_err(|_| invalid())?;
@@ -203,10 +235,11 @@ impl Tree {
                     return Err(invalid());
                 }
             }
-            Ok(by_path)
+            Ok((by_path, declared))
         })
         .map_err(|_| invalid())??;
         self.module_names = names;
+        self.declared_names = declared_names;
         Ok(())
     }
 }
@@ -343,6 +376,22 @@ mod tests {
                 .expect("non-links");
             assert!(tree.changed_gitlinks.is_empty());
         }
+    }
+
+    #[test]
+    fn pull_module_first_path_preserves_implicit_declaration_order() {
+        let mut tree = Tree::parse(b"", 40).expect("tree");
+        tree.bind_modules(b"[submodule \"child\"]\npath = \"nested/child\"\npath\n[submodule \"name-only\"]\nurl = ignored\n".as_slice())
+            .expect("later implicit duplicate ignored");
+        assert_eq!(tree.module_names["nested/child"], "child");
+        assert!(tree.declared_names.contains("name-only"));
+        let retained = tree.module_names.clone();
+        assert!(
+            tree.bind_modules(b"[submodule \"child\"]\npath\npath = later\n")
+                .is_err()
+        );
+        assert_eq!(tree.module_names, retained);
+        assert!(tree.declared_names.contains("name-only"));
     }
 
     #[test]
