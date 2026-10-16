@@ -39,6 +39,54 @@ pub(super) struct Tree {
     pub(super) declared_names: std::collections::BTreeSet<String>,
 }
 
+/// Current index candidates and sparse subtrees. Construction reads no paths.
+pub(super) struct Index {
+    pub(super) gitlinks: BTreeMap<String, String>,
+    pub(super) sparse: BTreeMap<String, String>,
+}
+
+impl Index {
+    pub(super) fn parse(index: &gix::index::State, width: usize) -> Result<Self, GitToolError> {
+        std::panic::catch_unwind(|| {
+            let mut listing = Vec::new();
+            let mut sparse = BTreeMap::new();
+            for entry in index.entries() {
+                if entry.stage_raw() != 0 {
+                    return Err(GitToolError::InvalidInput(
+                        "Pull index has unresolved stages".into(),
+                    ));
+                }
+                let mode = entry.mode.bits();
+                if !matches!(mode, 0o040000 | 0o160000) {
+                    continue;
+                }
+                let raw = entry.path(index);
+                let path = if mode == 0o040000 {
+                    raw.strip_suffix(b"/").unwrap_or(raw)
+                } else {
+                    raw
+                };
+                // Reuse strict tree path/OID validation for both candidate kinds.
+                listing.extend_from_slice(format!("160000 commit {}\t", entry.id).as_bytes());
+                listing.extend_from_slice(path);
+                listing.push(0);
+                if mode == 0o040000 {
+                    let name = std::str::from_utf8(path).map_err(|_| {
+                        GitToolError::InvalidInput("Invalid Pull sparse path".into())
+                    })?;
+                    sparse.insert(name.to_owned(), entry.id.to_string());
+                }
+            }
+            let mut gitlinks = Tree::parse(&listing, width)?.gitlinks;
+            for path in sparse.keys() {
+                gitlinks.remove(path);
+            }
+            Ok(Self { gitlinks, sparse })
+        })
+        .map_err(|_| GitToolError::Git("Pull index child decoder panicked".into()))?
+    }
+}
+
 /// A declared module's changed objects, in parent revision-walk order.
 /// Unnamed gitlinks remain in Tree until separately admitted populated-path
 /// discovery can resolve Git's legacy name fallback.
@@ -291,6 +339,44 @@ impl Tree {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pull_index_children_preserve_sparse_trees_and_reject_ambiguous_paths() {
+        use gix::index::entry::{Flags, Mode};
+        for (kind, width) in [(gix::hash::Kind::Sha1, 40), (gix::hash::Kind::Sha256, 64)] {
+            let oid = gix::hash::ObjectId::from_hex("a".repeat(width).as_bytes()).expect("OID");
+            let mut index = gix::index::State::new(kind);
+            let push = |index: &mut gix::index::State, mode, path: &str| {
+                index.dangerously_push_entry(
+                    Default::default(),
+                    oid,
+                    Flags::empty(),
+                    mode,
+                    gix::bstr::BStr::new(path),
+                );
+            };
+            push(&mut index, Mode::COMMIT, "nested/child");
+            push(&mut index, Mode::DIR, "sparse/");
+            push(&mut index, Mode::FILE, "ordinary");
+            let candidates = Index::parse(&index, width).expect("candidates");
+            assert_eq!(candidates.gitlinks.len(), 1);
+            assert_eq!(candidates.gitlinks["nested/child"], oid.to_string());
+            assert_eq!(candidates.sparse["sparse"], oid.to_string());
+            index.entries_mut()[2].flags = Flags::STAGE_MASK;
+            assert!(
+                Index::parse(&index, width).is_err(),
+                "conflict even on ordinary files"
+            );
+            index.entries_mut()[2].flags = Flags::empty();
+            push(&mut index, Mode::COMMIT, "nested/child");
+            assert!(Index::parse(&index, width).is_err(), "duplicate candidate");
+            for path in ["../outside", "a/.git/b", "/absolute", "a\\b"] {
+                let mut invalid = gix::index::State::new(kind);
+                push(&mut invalid, Mode::COMMIT, path);
+                assert!(Index::parse(&invalid, width).is_err(), "{path}");
+            }
+        }
+    }
 
     #[test]
     fn pull_named_changes_keep_first_revision_path_and_all_objects() {
