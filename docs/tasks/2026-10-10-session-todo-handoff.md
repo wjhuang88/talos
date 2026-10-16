@@ -1,3 +1,13 @@
+Rebase checkpoint (2026-10-16): integrated `origin/main` at `c869a9af`
+(PR #726) into `feat/i300-git-repair`. The append-position conflict in
+session tests preserves both the upstream absent-journal regression and the
+I300 prepared-process cleanup tests. Locked Agent session tests pass after
+rebase; branch diff whitespace checks pass. Prior FETCH_HEAD implementation
+`595d6f64` is now `cfe17104`; its owner checkpoint `497a6356` is now
+`c5616b2f`. Earlier SHA references remain historical checkpoints, not new
+exact-head validation. Pull production fetch/integration and fresh full
+preflight remain open; no completion or publication is claimed.
+
 Pull fetch destination checkpoint (2026-10-16, `595d6f64`): prefetch
 evidence now binds FETCH_HEAD as well as post-fetch evidence. Previously a
 stable symlink at that fetch output was outside the prefetch evidence set.
