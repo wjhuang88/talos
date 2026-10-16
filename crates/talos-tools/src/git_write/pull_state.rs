@@ -1695,6 +1695,66 @@ fn pull_activity_attribute_precedence_and_exclusions() {
 
 #[cfg(test)]
 #[test]
+fn pull_activity_attributes_agree_with_native_git() {
+    let temp = tempfile::tempdir().expect("repository");
+    let root = temp.path();
+    let git = |args: &[&str]| {
+        let output = std::process::Command::new("git")
+            .current_dir(root)
+            .env_clear()
+            .env("PATH", std::env::var_os("PATH").unwrap_or_default())
+            .env("HOME", root)
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_ATTR_NOSYSTEM", "1")
+            .args(args)
+            .output()
+            .expect("Git process");
+        assert!(output.status.success(), "{:?}", output.stderr);
+        output.stdout
+    };
+    git(&["init", "-q"]);
+    std::fs::create_dir(root.join("nested")).expect("directory");
+    let mut rules = gix::attrs::Search::default();
+    let mut metadata = gix::attrs::search::MetadataCollection::default();
+    for (name, bytes, macros) in [
+        (
+            ".gitattributes",
+            b"* selected color=root\n".as_slice(),
+            true,
+        ),
+        (
+            "nested/.gitattributes",
+            b"* -selected color=nested\nunknown !selected\n",
+            false,
+        ),
+    ] {
+        std::fs::write(root.join(name), bytes).expect("attributes");
+        rules.add_patterns_buffer(bytes, root.join(name), Some(root), &mut metadata, macros);
+    }
+    for (path, attr, value, requirement) in [
+        ("child", "selected", "set", "selected"),
+        ("nested/child", "selected", "unset", "-selected"),
+        ("nested/unknown", "selected", "unspecified", "!selected"),
+        ("nested/child", "color", "nested", "color=nested"),
+        ("child", "absent", "unspecified", "!absent"),
+    ] {
+        assert_eq!(
+            git(&["check-attr", "-z", attr, "--", path]),
+            format!("{path}\0{attr}\0{value}\0").as_bytes()
+        );
+        let config = format!("submodule.active\n:(attr:{requirement})**\0");
+        let policy = BeforeFetch::capture(config.as_bytes(), None, None, None, 40).expect("policy");
+        assert_eq!(
+            policy
+                .child_active_with_attributes("child", path, root, Some((&rules, &metadata)))
+                .expect("match"),
+            Some(true)
+        );
+    }
+}
+
+#[cfg(test)]
+#[test]
 fn pull_child_recursion_precedence_and_candidate_validation() {
     use super::pull_children::Recursion;
     let retained =

@@ -214,6 +214,7 @@ pub(super) struct AddPlan {
     pull_sources: Option<PullSources>,
     pull_attribute_paths: Vec<PathBuf>,
     pull_attributes: Vec<PullAttribute>,
+    pull_activity_globals: Vec<PathBuf>,
     pull_remote: Option<String>,
     pull_destinations: Vec<String>,
     pull_transport_supported: bool,
@@ -618,6 +619,7 @@ impl AddPlan {
             pull_sources: None,
             pull_attribute_paths: Vec::new(),
             pull_attributes: Vec::new(),
+            pull_activity_globals: Vec::new(),
             pull_remote: None,
             pull_destinations: Vec::new(),
             pull_transport_supported: false,
@@ -1644,11 +1646,13 @@ impl AddPlan {
         }
         if !attributes.is_empty() {
             attributes.insert(self.repository.common_dir.join("info/attributes"));
+            self.pull_activity_globals.clear();
             for variable in ["GIT_ATTR_SYSTEM", "GIT_ATTR_GLOBAL"] {
-                attributes.insert(
-                    self.inspect_attribute_path_at(&self.repository.workdir, variable)
-                        .await?,
-                );
+                let path = self
+                    .inspect_attribute_path_at(&self.repository.workdir, variable)
+                    .await?;
+                attributes.insert(path.clone());
+                self.pull_activity_globals.push(path);
             }
             for path in attributes {
                 if !self.pull_attribute_paths.contains(&path) {
@@ -1698,9 +1702,70 @@ impl AddPlan {
         self.revalidate()?;
         self.pull_attributes = evidence;
         self.revalidate()?;
+        self.resolve_pull_child_activity()?;
         self.identity = PreparedPlanIdentity::new();
         self.phase = Phase::PullIntegration;
         Ok(self)
+    }
+
+    fn resolve_pull_child_activity(&mut self) -> Result<(), GitToolError> {
+        use super::pull_children::Activity;
+        for (name, child) in &mut self.pull_changed_children {
+            let Some(Activity::Pathspec { attributes }) = &child.activity else {
+                continue;
+            };
+            let mut sources: Vec<_> = self
+                .pull_activity_globals
+                .iter()
+                .map(|path| (path.clone(), false, true))
+                .collect();
+            sources.extend(
+                attributes
+                    .iter()
+                    .enumerate()
+                    .map(|(depth, path)| (self.repository.workdir.join(path), true, depth == 0)),
+            );
+            sources.push((
+                self.repository.common_dir.join("info/attributes"),
+                false,
+                true,
+            ));
+            let (rules, metadata) = std::panic::catch_unwind(|| {
+                let mut rules = gix::attrs::Search::default();
+                let mut metadata = gix::attrs::search::MetadataCollection::default();
+                rules.add_patterns_buffer(b"[attr]binary -diff -merge -text", "[builtin]".into(), None, &mut metadata, true);
+                for (path, local, macros) in sources {
+                    let evidence = self.pull_attributes.iter().find(|entry| entry.path == path)
+                        .ok_or_else(|| GitToolError::Git("Missing admitted Pull activity attributes".into()))?;
+                    match &evidence.evidence.entry {
+                        snapshot::Entry::File(_, bytes) => rules.add_patterns_buffer(bytes, path,
+                            local.then_some(self.repository.workdir.as_path()), &mut metadata, macros),
+                        snapshot::Entry::Missing if !local => {},
+                        snapshot::Entry::Missing => return Err(GitToolError::InvalidInput(
+                            "Pull activity needs index attribute fallback; fetched effects are retained".into())),
+                        _ => return Err(GitToolError::InvalidInput("Invalid Pull activity attribute evidence".into())),
+                    }
+                }
+                Ok((rules, metadata))
+            }).map_err(|_| GitToolError::Git("Pull attribute parser panicked".into()))??;
+            let active = self
+                .pull_before
+                .as_ref()
+                .ok_or_else(|| GitToolError::Git("Missing Pull activity policy".into()))?
+                .child_active_with_attributes(
+                    name,
+                    &child.path,
+                    &self.repository.workdir,
+                    Some((&rules, &metadata)),
+                )?
+                .ok_or_else(|| GitToolError::Git("Unresolved Pull activity attributes".into()))?;
+            child.activity = Some(if active {
+                Activity::Enabled
+            } else {
+                Activity::Disabled
+            });
+        }
+        Ok(())
     }
 
     async fn discover(mut self: Box<Self>) -> Result<Box<Self>, GitToolError> {
