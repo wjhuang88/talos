@@ -13,11 +13,15 @@ import difflib
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import threading
 import time
+import datetime
+import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
 BOUNDARY = "crates/talos-tools/src/process_boundary.rs"
@@ -28,6 +32,206 @@ SESSION = "crates/talos-agent/src/session.rs"
 STORE = "crates/talos-session/src/pending_submission.rs"
 END_BY = float("inf")
 CONTROLLED_TEST = "process_boundary::windows_tests::windows_auto_diagnostic_descendant_pipe_hold_is_observable_and_cleanup_bounded"
+
+
+def filetime_text(ticks: int) -> str:
+    seconds, fraction = divmod(ticks, 10_000_000)
+    value = datetime.datetime(1601, 1, 1, tzinfo=datetime.timezone.utc) + datetime.timedelta(seconds=seconds)
+    if not 2000 <= value.year <= 2100:
+        raise ValueError("unsupported event time")
+    return value.strftime("%Y-%m-%dT%H:%M:%S") + f".{fraction:07d}Z"
+
+
+def first_child_window(text: str) -> tuple[int, int, int]:
+    lifetime = re.findall(r"^WINDOWS_AUTO_DIAG lifetime_read_ok=1 created_100ns=(\d+) exited_100ns=(\d+) identity=(\d+) pid=(\d+) thread=ThreadId\(\d+\)$", text, re.M)
+    if len(lifetime) != 1:
+        raise ValueError("ambiguous lifetime")
+    created, exited, handle, parent = map(int, lifetime[0])
+    if not 0 < parent <= 0xFFFFFFFF or not 0 < handle <= 0xFFFFFFFFFFFFFFFF:
+        raise ValueError("invalid owner identity")
+    # An intact adjacent receipt is required; never repair interleaved identities.
+    children = re.findall(rf"^WINDOWS_AUTO_DIAG time=SystemTime \{{ intervals: \d+ \}} pid={parent} thread=ThreadId\(\d+\) stage=create_process_return identity={handle}\nWINDOWS_AUTO_DIAG child_pid=(\d+) identity={handle}$", text, re.M)
+    if len(children) != 1 or not 0 < int(children[0]) <= 0xFFFFFFFF:
+        raise ValueError("ambiguous child")
+    if not 0 < exited - created <= 90 * 10_000_000:
+        raise ValueError("unsupported lifetime")
+    filetime_text(created)
+    filetime_text(exited)
+    return int(children[0]), created, exited
+
+
+def lifecycle_query(child: int, created: int, exited: int) -> str:
+    return ("*[System[Provider[@Name='PowerShell'] and (EventID=400 or EventID=403) "
+            f"and Execution[@ProcessID={child}] and TimeCreated[@SystemTime>='{filetime_text(created)}' "
+            f"and @SystemTime<='{filetime_text(exited)}']]]")
+
+
+def lifecycle_metadata(raw: bytes, child: int, created: int, exited: int) -> list[dict]:
+    # Query output is transient only; never persist XML, EventData, rendered messages or errors.
+    if len(raw) > 131_072:
+        raise ValueError("event byte cap")
+    text = raw.decode("utf-16") if raw.startswith((b"\xff\xfe", b"\xfe\xff")) else raw.decode("utf-16-le")
+    if "<!DOCTYPE" in text.upper() or "<!ENTITY" in text.upper():
+        raise ValueError("unsupported XML declaration")
+    root = ET.fromstring(text)
+    ns = {"e": "http://schemas.microsoft.com/win/2004/08/events/event"}
+    events = list(root)
+    if root.tag != "Events" or len(events) > 16:
+        raise ValueError("event count or root")
+    result = []
+    for event in events:
+        system = event.find("e:System", ns)
+        if system is None or event.tag != "{" + ns["e"] + "}Event":
+            raise ValueError("event schema")
+        event_id = int(system.findtext("e:EventID", namespaces=ns))
+        pid = int(system.find("e:Execution", ns).attrib["ProcessID"])
+        stamp = system.find("e:TimeCreated", ns).attrib["SystemTime"]
+        # Canonical UTC 100ns text only, so lexical bounds are exact.
+        if not re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{7}Z", stamp):
+            raise ValueError("event timestamp")
+        if (event_id not in (400, 403) or pid != child
+                or system.find("e:Provider", ns).attrib.get("Name") != "PowerShell"
+                or system.findtext("e:Channel", namespaces=ns) != "Windows PowerShell"
+                or not filetime_text(created) <= stamp <= filetime_text(exited)):
+            raise ValueError("event identity or lifetime")
+        result.append({"event_id": event_id, "child_pid": pid, "time_utc": stamp})
+    return result
+
+
+def collect_first_child_events(output: Path) -> None:
+    receipt = {"status": "unavailable", "events": []}
+    cleanup_failed = False
+    try:
+        # All original attempts AND source restoration precede this collector.
+        # Do not start a host utility if the existing experiment margin is exhausted.
+        if END_BY - time.monotonic() < 45:
+            raise ValueError("collection budget")
+        with (output / "instrumented-suite-first-1.log").open("rb") as source:
+            data = source.read(8_388_609)
+        if len(data) > 8_388_608:
+            raise ValueError("source byte cap")
+        child, created, exited = first_child_window(data.decode("utf-8"))
+        receipt.update(child_pid=child, created_100ns=created, exited_100ns=exited)
+        command = [str(Path(os.environ["SystemRoot"]) / "System32" / "wevtutil.exe"),
+                   "qe", "Windows PowerShell", "/q:" + lifecycle_query(child, created, exited),
+                   "/c:17", "/f:xml", "/e:Events", "/uni:true"]
+        # No Popen context: its __exit__ would add an unbounded wait/pipe close.
+        utility = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        captured = []
+        def read_bounded() -> None:
+            try:
+                with utility.stdout as stream:
+                    captured.append(stream.read(131_073))
+            except OSError:
+                pass
+        reader = threading.Thread(target=read_bounded, daemon=True)
+        try:
+            reader.start()
+        except RuntimeError:
+            try:
+                utility.kill()
+                utility.wait(timeout=5)
+            except (OSError, subprocess.TimeoutExpired):
+                cleanup_failed = True
+            utility.stdout.close()  # No reader started, so no competing read lock.
+            raise ValueError("reader unavailable") from None
+        try:
+            code = utility.wait(timeout=30)
+        except (OSError, subprocess.TimeoutExpired):
+            code = -1
+            try:
+                utility.kill()  # Exact owned collector only; never taskkill or other PIDs.
+                utility.wait(timeout=5)
+            except (OSError, subprocess.TimeoutExpired):
+                cleanup_failed = True
+        # The reader owns its pipe. Never close it synchronously from this thread.
+        reader.join(timeout=5)
+        if code != 0 or reader.is_alive() or len(captured) != 1:
+            raise ValueError("query unavailable")
+        receipt["events"] = lifecycle_metadata(captured[0], child, created, exited)
+        receipt["status"] = "records" if receipt["events"] else "no_matching_records"
+    except (OSError, ValueError, OverflowError, KeyError, TypeError, AttributeError, ET.ParseError):
+        # Missing logs, unsupported schema and identities are unknown, never zero-duration evidence.
+        pass
+    (output / "first-child-engine-events.json").write_text(json.dumps(receipt, indent=2), encoding="utf-8")
+    if cleanup_failed:
+        raise RuntimeError("owned event collector cleanup unconfirmed")
+
+
+def lifecycle_self_test() -> None:
+    import io
+    from unittest.mock import patch
+
+    created, exited = 134366156919094391, 134366157056455513
+    source = ("WINDOWS_AUTO_DIAG time=SystemTime { intervals: 134366156919112821 } pid=8892 thread=ThreadId(69) stage=create_process_return identity=608\n"
+              "WINDOWS_AUTO_DIAG child_pid=3400 identity=608\n"
+              f"WINDOWS_AUTO_DIAG lifetime_read_ok=1 created_100ns={created} exited_100ns={exited} identity=608 pid=8892 thread=ThreadId(135)\n")
+    assert first_child_window(source) == (3400, created, exited)
+    for bad in (source + source, source.replace("child_pid=3400", "child_pid=0"),
+                source.replace("identity=608\nWINDOWS_AUTO_DIAG child", "identity=608\ninterleaved\nWINDOWS_AUTO_DIAG child")):
+        try:
+            first_child_window(bad)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("ambiguous child must be rejected")
+    stamp = filetime_text(created + 1)
+    assert stamp == "2026-10-16T09:14:51.9094392Z"
+    xml = (f'<Events><Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System>'
+           f'<Provider Name="PowerShell"/><EventID>400</EventID><Execution ProcessID="3400"/>'
+           f'<TimeCreated SystemTime="{stamp}"/><Channel>Windows PowerShell</Channel></System>'
+           '<EventData><Data>DO_NOT_PERSIST_COMMAND_OR_SECRET</Data></EventData></Event></Events>')
+    raw = xml.encode("utf-16")
+    expected = [{"event_id": 400, "child_pid": 3400, "time_utc": stamp}]
+    assert lifecycle_metadata(raw, 3400, created, exited) == expected
+    for bad in (raw + b"x" * 131073, xml.replace('ProcessID="3400"', 'ProcessID="3401"').encode("utf-16"),
+                xml.replace("<EventID>400", "<EventID>800").encode("utf-16"),
+                xml.replace(stamp, filetime_text(exited + 1)).encode("utf-16"),
+                ("<!DOCTYPE Events>" + xml).encode("utf-16"),
+                ("<Events>" + xml[8:-9] * 17 + "</Events>").encode("utf-16")):
+        try:
+            lifecycle_metadata(bad, 3400, created, exited)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("unqualified events must be rejected")
+
+    class Utility:
+        def __init__(self, timeout: bool, reap_failure: bool):
+            self.stdout = io.BytesIO(raw)
+            self.timeout, self.reap_failure, self.killed = timeout, reap_failure, False
+        def wait(self, timeout: int) -> int:
+            if (timeout == 30 and self.timeout) or (timeout == 5 and self.reap_failure):
+                raise subprocess.TimeoutExpired("fixture", timeout)
+            return 0
+        def kill(self) -> None:
+            self.killed = True
+
+    with tempfile.TemporaryDirectory() as directory:
+        output = Path(directory)
+        (output / "instrumented-suite-first-1.log").write_text(source)
+        for timeout, reap_failure in ((False, False), (True, False), (True, True)):
+            utility = Utility(timeout, reap_failure)
+            with patch.dict(os.environ, {"SystemRoot": directory}), patch.object(subprocess, "Popen", return_value=utility) as launch:
+                try:
+                    collect_first_child_events(output)
+                except RuntimeError:
+                    assert reap_failure
+                else:
+                    assert not reap_failure
+            receipt = json.loads((output / "first-child-engine-events.json").read_text())
+            assert receipt["status"] == ("unavailable" if timeout else "records")
+            assert "DO_NOT_PERSIST" not in json.dumps(receipt)
+            assert utility.killed == timeout
+            argv = launch.call_args.args[0]
+            assert argv[1:3] == ["qe", "Windows PowerShell"] and "/c:17" in argv
+            assert argv[3] == "/q:" + lifecycle_query(3400, created, exited)
+        utility = Utility(False, False)
+        with patch.dict(os.environ, {"SystemRoot": directory}), patch.object(subprocess, "Popen", return_value=utility), patch.object(threading.Thread, "start", side_effect=RuntimeError("fixture")):
+            collect_first_child_events(output)
+        assert utility.killed and utility.stdout.closed
+        assert json.loads((output / "first-child-engine-events.json").read_text())["status"] == "unavailable"
+
 CONTROLLED_FIXTURE = '''    #[tokio::test(flavor = "current_thread")]
     async fn windows_auto_diagnostic_descendant_pipe_hold_is_observable_and_cleanup_bounded() {
         let script = r#"$child = 'Write-Output "WINDOWS_AUTO_PIPE_HOLDER_READY"; Start-Sleep -Seconds 60'; $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($child)); Start-Process -FilePath "$env:WINDIR\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -ArgumentList @('-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand', $encoded) -NoNewWindow | Out-Null; exit 0"#;
@@ -522,6 +726,7 @@ def main() -> int:
     patched = probes(originals)
     if args.self_test:
         restoration_self_test()
+        lifecycle_self_test()
         assert all(patched[path] != originals[path] for path in originals)
         assert "Duration::from_secs(15)" in patched[AUTO]
         assert "Duration::from_secs(10)" in patched[AUTO]
@@ -577,12 +782,14 @@ def main() -> int:
     overlay = "".join("".join(difflib.unified_diff(originals[path].splitlines(keepends=True), patched[path].splitlines(keepends=True), fromfile=path, tofile=path)) for path in originals)
     (output / "probe-overlay.patch").write_text(overlay, encoding="utf-8")
     results: list[dict] = []
+    fresh_matrix_completed = False
     try:
         if args.fresh_phase:
             if args.fresh_phase == "instrumented":
                 for path, text in patched.items():
                     (ROOT / path).write_text(text, encoding="utf-8", newline="\n")
             matrix(build(output, args.fresh_phase), output, args.fresh_phase, results, fresh_first=True)
+            fresh_matrix_completed = True
             return int(any(result["exit_code"] != 0 for result in results))
         if not args.controlled_only:
             matrix(build(output, "baseline"), output, "baseline", results, args.stress)
@@ -621,6 +828,8 @@ def main() -> int:
     finally:
         restore_sources(ROOT, original_bytes, output)
         print("WINDOWS_AUTO_DIAG temporary Rust probes restored; raw readback verified", flush=True)
+        if args.fresh_phase == "instrumented" and fresh_matrix_completed:
+            collect_first_child_events(output)
     return int(any(result["exit_code"] != 0 for result in results))
 
 

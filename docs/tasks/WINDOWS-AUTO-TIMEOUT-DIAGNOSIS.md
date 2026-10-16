@@ -2,7 +2,7 @@
 
 Date: 2026-10-11. Baseline: `444a8137f054b33802f26bffdb55fb0f83a7a861`.
 
-Current stage (2026-10-16): owned-child lifetime versus parent observation diagnostic; native execution pending.
+Current stage (2026-10-16): post-test first-child engine-event metadata; native execution pending.
 Earlier matrices, pending statements and tool availability below are preserved staged history;
 the latest checkpoint defines the current fixed 120-process / 2220-test experiment.
 
@@ -768,3 +768,100 @@ both governance validators pass with0warnings (SQLite17 and delivery12 fixture c
 locked Cargo metadata used the pinned environment. No new Windows or local full-preflight pass
 is claimed; the exact-head native workflow remains required. Incoming main closeout files are
 preserved byte-for-byte and only the same three diagnostic files differ from current main.
+
+
+## CI3211 Retained Failure And Next Engine-Event Observation — 2026-10-16
+
+CI3211/run38878126240 at exact819c5f1222a77b5e677d4ba1109f608c98e90c26, attempt1, is FAILED.
+Seven jobs succeeded; baseline first-call diagnostics failed. All120processes completed:
+baseline1109pass/1fail; instrumented1110pass/0fail; total2219pass/1fail/0ignored.
+Baseline-suite-first-1 original Auto allow-once hits the unchanged15s watchdog after decision
+111.7885ms and tool-request139.8818ms, with no ToolResult. It has no native instrumentation;
+the exact stalled phase and cause remain unknown. Later passing processes do not replace it.
+
+Artifacts (65files/CRC each, retained untilOct30) verified against GitHub digests:
+baseline12037036276 SHA2563960c8bc77a73ced606d754dd868081e3522a295ce8be1cdeea2bba4848e03ef;
+instrumented12036218858 SHA2567c13f8133d71d79c999f58b855eacf9160d346512c320a54dae776fd65204cde.
+All six normalized source hashes match main3bc38d78; all12expected WindowsCRLF/raw source
+restoration receipts match. Independent Agent completed-evidence review confirms these facts
+and the bounded arithmetic below; shared account is not distinct human approval. Evidence and
+review: comments6213194395 and6212170280. Main and other owners remain unchanged.
+
+A near-threshold successful original sample, instrumented-suite-first-1 PID8892/child3400/
+handle608/waiter135, has ToolResult14.8179905s and recorded child lifecycle13736.1122ms.
+Exit-to-native-observation8.1979ms, exit-to-wait-return8.7137ms, later pipe-join0.2387ms;
+first positive stdout13629.3446ms after creation; final cumulative child CPU0.765625s.
+All60unique lifetime records match intact owned identities and parent observation endpoints.
+Exit-to-native-observation median8.43405/max12.786ms; exit-to-wait median8.97335/max13.2955ms;
+join median0.23825/max0.4125ms. Only59assignment records are intact: the slow sample's assignment
+header is interleaved, so no assigned-to-exit time is reconstructed for it. An initial extraction
+requiring assignment omitted that case; creation/exit FILETIMEs independently retain it for
+lifecycle analysis. Several early counter plateaus followed by progress are visible, without
+identifying a wait reason, physical I/O, Defender or scheduler cause. This tests and limits the
+parent-observation-delay hypothesis for these samples; it cannot explain the uninstrumented
+failure or distinguish engine startup from command execution/formatting.
+
+Next hypothesis: existing PowerShell lifecycle-event timestamps may divide the first owned
+child's recorded lifecycle around an engine-state observation. The collector runs only AFTER
+all original instrumented attempts and successful raw source restoration, in the existing
+finally block. Baseline never invokes it. No child command, cold-first order, Rust probe, native
+call/rights/unsafe, assertion, deadline, dependency, lockfile, toolchain or workflow is changed.
+
+It requires one intact creation-return/adjacent child-PID receipt and one lifetime record from
+instrumented-suite-first-1 (8MiB source-read cap), not its damaged assignment marker. PID/handle/
+parent must match; lifetime must be positive and at most the existing90s owned-test cap, with
+supported2000..2100 UTC bounds. No identity is inferred from time proximity or partial lines.
+It then uses the explicit temporary host-utility bridge wevtutil.exe from SystemRoot/System32,
+qe only, fixed Windows PowerShell channel/PowerShell provider/IDs400+403, exact child PID and
+creation-through-exit UTC window. No enabling/configuring/clearing/exporting event logs, security
+settings or tracing, no discovery across logs, other-PID queries, PSS or unrelated task is added.
+The replacement/removal trigger is completion or rejection of this bounded diagnostic experiment;
+no product dependency on wevtutil is introduced.
+
+Primary utility contract:
+https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/wevtutil
+https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.diagnostics/get-winevent?view=powershell-5.1
+The latter documents the Windows PowerShell event400 engine-Available example. This is an event
+observation, not proof of exact script-entry or exclusive startup cost. Classic-provider PID and
+seven-digit timestamp availability on this runner are unverified assumptions. Query absence,
+access failure, unsupported schema, missing identity or ambiguous transitions remain unknown;
+no matching record is not zero initialization time, and no trace policy is changed to force one.
+
+Read-only query caps:17events requested to detect overflow beyond16,131072actual bytes accepted,
+one capped pipe reader, query30s/kill-wait5s/reader-join5s. It launches only with45s left in the
+existing35minute experiment budget. No Popen context manager or main-thread close of an active
+reader pipe can introduce an unbounded cleanup wait. A thread-start failure kills/reaps the owned
+utility within5s; failed reaping writes unavailable evidence and raises a constant failure.
+Reader is daemon-owned and closes its own pipe; utility output is never sent through execute(),
+printed or written. Stderr is discarded. Raw XML/EventData/rendered messages/command payloads
+remain transient and are not persisted. Only eventID, childPID and canonical UTC timestamp survive
+in first-child-engine-events.json, with fixed status and the selected child lifetime metadata.
+All returned records are independently rechecked for fixed namespace/root/provider/channel/ID/
+PID/time bounds; malformed XML/DTD/entities, byte/count overflow and inconsistent records are
+rejected as a whole. Duplicate transitions are retained as ambiguous records, not auto-selected.
+
+The unchanged original result codes remain authoritative; optional collection cannot turn an
+original failure into success. No retry, warmup or new test skipping. CI3163(2205/15),CI3182
+(2219/1),CI3211(2219/1) remain failed evidence, CI3206(2220/0) successful observation only.
+Old10s/15s, evaluator5s, Plugin uncertainty and existing-journal costs stay open. I301/I304 stay
+Complete/Closed for their separate slices, #705OPEN/unmerged. The same bounded CI/fixture
+maintenance exception applies. Local/independent review and fresh native evidence follow.
+
+
+Local preparation: new scalar-only event/identity/query self-tests pass, including mocked query
+success/timeout/reap-failure/thread-start-failure, actual100ns conversion, malformed/interleaved
+identity rejection, wrongPID/ID/window/DTD/byte/count caps and command-content sentinel exclusion.
+No native utility is invoked by self-test. The first independent design review REQUEST CHANGES
+identified Popen context cleanup as potentially unbounded; that unpublished form was replaced
+by the explicit bounded wait/reap/reader paths above, and failed-cleanup fixtures now pass.
+All six generated Rust overlays compare byte-for-byte equal to prior819c5f12's equivalents,
+and all six originals compare byte-for-byte to actualmain3bc38d78. Workflow, dependencies,
+Cargo.lock and toolchain have no delta. Classifier14, text boundary23crates, Python parsing,
+whitespace and both governance validators pass0warnings (SQLite17/delivery12 fixtures). No new
+Rust build, full-preflight or actual Windows event/schema success is claimed before CI.
+
+A second design finding required an explicit fresh-matrix-completed gate before the collector;
+that gate is now set only after matrix returns, and successful restoration precedes collection.
+Three disposable main-flow fixtures verify completed60with an original failure retains exit1
+and collects once, build-abort and matrix-watchdog-abort collect zero times, and all six raw
+snapshots restore in every path. These are mocked flow checks, not new native passing tests.
