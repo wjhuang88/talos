@@ -226,6 +226,8 @@ pub(super) struct AddPlan {
     pull_child_trees: BTreeMap<String, super::pull_children::Tree>,
     pull_changed_children: BTreeMap<String, super::pull_children::Changed>,
     pull_index_children: BTreeMap<String, String>,
+    pull_current_modules: Option<super::pull_children::Tree>,
+    pull_modules_evidence: Option<PullAttribute>,
     identity: PreparedPlanIdentity,
     workspace: PathBuf,
     input: Value,
@@ -627,6 +629,8 @@ impl AddPlan {
             pull_child_trees: BTreeMap::new(),
             pull_changed_children: BTreeMap::new(),
             pull_index_children: BTreeMap::new(),
+            pull_current_modules: None,
+            pull_modules_evidence: None,
             identity: PreparedPlanIdentity::new(),
             workspace: workspace.to_owned(),
             input: input.clone(),
@@ -871,6 +875,9 @@ impl AddPlan {
             }
             self.pull_attribute_paths = attributes.into_iter().collect();
             source_paths.extend(self.pull_attribute_paths.iter().cloned());
+            // Current module declarations are worktree input, never covered by
+            // the dedicated metadata capability. Admit even an absent file.
+            source_paths.push(self.repository.workdir.join(".gitmodules"));
             let mut paths = inventory.paths();
             paths.extend(source_paths);
             if inventory.complete() {
@@ -1112,6 +1119,13 @@ impl AddPlan {
                 .map(|path| PullAttribute::capture(path, &mut budget))
                 .collect::<Result<_, _>>()?;
         }
+        self.pull_modules_evidence = Some(PullAttribute::capture(
+            &self.repository.workdir.join(".gitmodules"),
+            &mut snapshot::Budget {
+                entries: 1,
+                bytes: 1024 * 1024,
+            },
+        )?);
         if initial.requires_clean_worktree() && self.pull_graph_paths.is_some() {
             self.pull_sources = Some(PullSources::capture(
                 &self.repository.workdir,
@@ -1409,6 +1423,79 @@ impl AddPlan {
             .ok_or_else(|| GitToolError::Git("Missing post-fetch index evidence".into()))?
             .require_index(&index_evidence)?;
         self.pull_index_children = candidates.gitlinks;
+        let modules_evidence = self
+            .pull_modules_evidence
+            .as_ref()
+            .ok_or_else(|| GitToolError::Git("Missing current Pull module Read evidence".into()))?;
+        let mut current_modules = super::pull_children::Tree::parse(b"", width)?;
+        match &modules_evidence.evidence.entry {
+            snapshot::Entry::File(_, bytes) => {
+                current_modules.bind_module_declarations(bytes, true)?;
+            }
+            snapshot::Entry::Missing => {
+                // Git falls back from the missing worktree file to index, then
+                // HEAD. All object reads stay inside the admitted parent roots.
+                let mut blob = candidates.modules_blob;
+                if blob.is_none() {
+                    let head = self
+                        .pull_probe(vec![
+                            "rev-parse".into(),
+                            "--verify".into(),
+                            "--quiet".into(),
+                            "HEAD".into(),
+                        ])
+                        .await?;
+                    match head.status.code() {
+                        Some(0) if head.stderr.is_empty() => {
+                            let oid = super::pull_state::graph_oids(&head.stdout, width)?;
+                            if oid.len() != 1 {
+                                return Err(GitToolError::Git("Invalid current Pull HEAD".into()));
+                            }
+                            let listing = self
+                                .pull_probe(vec![
+                                    "ls-tree".into(),
+                                    "-z".into(),
+                                    "--full-tree".into(),
+                                    oid[0].clone(),
+                                    "--".into(),
+                                    ".gitmodules".into(),
+                                ])
+                                .await?;
+                            if !listing.status.success() || !listing.stderr.is_empty() {
+                                return Err(GitToolError::Git(
+                                    "Current Pull module tree lookup failed".into(),
+                                ));
+                            }
+                            blob = super::pull_children::Tree::parse(&listing.stdout, width)?
+                                .modules_blob;
+                        }
+                        Some(1) if head.stdout.is_empty() && head.stderr.is_empty() => {}
+                        _ => {
+                            return Err(GitToolError::Git(
+                                "Current Pull HEAD lookup failed".into(),
+                            ));
+                        }
+                    }
+                }
+                if let Some(blob) = blob {
+                    let output = self
+                        .pull_probe(vec!["cat-file".into(), "blob".into(), blob])
+                        .await?;
+                    if !output.status.success() || !output.stderr.is_empty() {
+                        return Err(GitToolError::Git(
+                            "Current Pull module blob read failed".into(),
+                        ));
+                    }
+                    current_modules.bind_module_declarations(&output.stdout, true)?;
+                }
+            }
+            _ => {
+                return Err(GitToolError::InvalidInput(
+                    "Current Pull module file is not regular".into(),
+                ));
+            }
+        }
+        self.pull_current_modules = Some(current_modules);
         let fetched = super::pull_state::fetched_tips(
             self.pull_evidence
                 .as_ref()
@@ -4727,6 +4814,12 @@ impl AddPlan {
         };
         for attribute in &self.pull_attributes {
             attribute.revalidate(&mut attribute_budget)?;
+        }
+        if let Some(modules) = &self.pull_modules_evidence {
+            modules.revalidate(&mut snapshot::Budget {
+                entries: 1,
+                bytes: 1024 * 1024,
+            })?;
         }
         if !self.pull_hook_evidence.is_empty()
             && super::config_state::ConfigState::capture_pull_hooks(&self.pull_hook_paths)?
@@ -12207,159 +12300,209 @@ pub(super) mod tests {
 
     #[tokio::test]
     async fn pull_postfetch_rebuilds_evidence_before_selecting_integration() {
-        let root = fixture();
-        let git = |args: &[&str]| {
-            let output = std::process::Command::new("git")
-                .current_dir(root.path())
-                .args(args)
-                .output()
-                .expect("Git");
-            assert!(
-                output.status.success(),
-                "{}",
-                String::from_utf8_lossy(&output.stderr)
-            );
-            output.stdout
-        };
-        git(&[
-            "-c",
-            "user.name=Fixture",
-            "-c",
-            "user.email=fixture@example.invalid",
-            "commit",
-            "--allow-empty",
-            "-m",
-            "initial",
-        ]);
-        git(&["config", "remote.origin.url", "git://example.invalid/repo"]);
-        std::fs::write(root.path().join("diff-order"), "missing/*\n").expect("order file");
-        git(&["config", "diff.orderFile", "diff-order"]);
-        // A dangling commit is already stored but is not reachable from any
-        // pre-fetch ref. Fetching it must include it in child-graph discovery
-        // while excluding its already-reachable parent.
-        let child_oid = git(&["rev-parse", "HEAD"]);
-        let child_oid = std::str::from_utf8(&child_oid).expect("child OID").trim();
-        git(&[
-            "update-index",
-            "--add",
-            "--cacheinfo",
-            &format!("160000,{child_oid},missing/child"),
-        ]);
-        std::fs::write(
-            root.path().join(".gitmodules"),
-            "[submodule \"child\"]\npath = missing/child\nurl = git://example.invalid/child\n",
-        )
-        .expect("module declaration");
-        git(&["add", ".gitmodules"]);
-        let tree_oid = git(&["write-tree"]);
-        let tree_oid = std::str::from_utf8(&tree_oid).expect("tree OID").trim();
-        let target = git(&[
-            "-c",
-            "user.name=Fixture",
-            "-c",
-            "user.email=fixture@example.invalid",
-            "commit-tree",
-            tree_oid,
-            "-p",
-            "HEAD",
-            "-m",
-            "new fetched history",
-        ]);
-        git(&["reset", "--mixed", "HEAD"]);
-        std::fs::remove_file(root.path().join(".gitmodules")).expect("remove fixture config");
-        git(&[
-            "update-index",
-            "--add",
-            "--cacheinfo",
-            &format!("160000,{child_oid},current/child"),
-        ]);
-        let target = std::str::from_utf8(&target).expect("object ID").trim();
-        let mut plan = Box::new(
-            AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
-                .expect("Pull"),
-        )
-        .discover()
-        .await
-        .expect("configuration");
-        for _ in 0..8 {
-            if plan.phase == Phase::PullFetch {
-                break;
+        for source in ["worktree", "index", "head", "absent"] {
+            let root = fixture();
+            let current = b"[submodule \"current\"]\npath = old\npath = current/child\nfetchRecurseSubmodules = true\nfetchRecurseSubmodules = on-demand\n";
+            let git = |args: &[&str]| {
+                let output = std::process::Command::new("git")
+                    .current_dir(root.path())
+                    .args(args)
+                    .output()
+                    .expect("Git");
+                assert!(
+                    output.status.success(),
+                    "{}",
+                    String::from_utf8_lossy(&output.stderr)
+                );
+                output.stdout
+            };
+            if source == "head" {
+                std::fs::write(root.path().join(".gitmodules"), current).expect("HEAD modules");
+                git(&["add", ".gitmodules"]);
             }
+            git(&[
+                "-c",
+                "user.name=Fixture",
+                "-c",
+                "user.email=fixture@example.invalid",
+                "commit",
+                "--allow-empty",
+                "-m",
+                "initial",
+            ]);
+            git(&["config", "remote.origin.url", "git://example.invalid/repo"]);
+            std::fs::write(root.path().join("diff-order"), "missing/*\n").expect("order file");
+            git(&["config", "diff.orderFile", "diff-order"]);
+            // A dangling commit is already stored but is not reachable from any
+            // pre-fetch ref. Fetching it must include it in child-graph discovery
+            // while excluding its already-reachable parent.
+            let child_oid = git(&["rev-parse", "HEAD"]);
+            let child_oid = std::str::from_utf8(&child_oid).expect("child OID").trim();
+            git(&[
+                "update-index",
+                "--add",
+                "--cacheinfo",
+                &format!("160000,{child_oid},missing/child"),
+            ]);
+            std::fs::write(
+                root.path().join(".gitmodules"),
+                "[submodule \"child\"]\npath = missing/child\nurl = git://example.invalid/child\n",
+            )
+            .expect("module declaration");
+            git(&["add", ".gitmodules"]);
+            let tree_oid = git(&["write-tree"]);
+            let tree_oid = std::str::from_utf8(&tree_oid).expect("tree OID").trim();
+            let target = git(&[
+                "-c",
+                "user.name=Fixture",
+                "-c",
+                "user.email=fixture@example.invalid",
+                "commit-tree",
+                tree_oid,
+                "-p",
+                "HEAD",
+                "-m",
+                "new fetched history",
+            ]);
+            git(&["reset", "--mixed", "HEAD"]);
+            std::fs::remove_file(root.path().join(".gitmodules")).expect("remove fixture config");
+            git(&[
+                "update-index",
+                "--add",
+                "--cacheinfo",
+                &format!("160000,{child_oid},current/child"),
+            ]);
+            match source {
+                "worktree" => std::fs::write(root.path().join(".gitmodules"), current)
+                    .expect("worktree modules"),
+                "index" => {
+                    std::fs::write(root.path().join(".gitmodules"), current)
+                        .expect("index modules");
+                    git(&["add", ".gitmodules"]);
+                    std::fs::remove_file(root.path().join(".gitmodules"))
+                        .expect("missing worktree modules");
+                }
+                "head" => {
+                    git(&["rm", "--cached", ".gitmodules"]);
+                }
+                _ => {}
+            }
+            let target = std::str::from_utf8(&target).expect("object ID").trim();
+            let mut plan = Box::new(
+                AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+                    .expect("Pull"),
+            )
+            .discover()
+            .await
+            .expect("configuration");
+            for _ in 0..8 {
+                if plan.phase == Phase::PullFetch {
+                    break;
+                }
+                let admission = proof(&plan)
+                    .consume_for_prepared(&plan.request(), &plan.identity)
+                    .expect("proof");
+                plan = plan
+                    .discover_pull_prefetch(&admission)
+                    .await
+                    .expect("prefetch");
+            }
+            assert!(plan.phase == Phase::PullFetch);
+            assert!(
+                plan.pull_attributes
+                    .iter()
+                    .any(|attribute| attribute.path == plan.repository.workdir.join("diff-order"))
+            );
+
+            // Exercise the post-fetch boundary with actual Git metadata mutation,
+            // independently of a network daemon or successful transport fixture.
+            git(&["fetch", "--no-recurse-submodules", ".", target]);
+            assert!(
+                plan.revalidate().is_err(),
+                "old FETCH_HEAD evidence must expire"
+            );
+            plan.facets
+                .retain(|facet| matches!(facet.nature, ToolNature::Read | ToolNature::Execute));
+            plan.identity = PreparedPlanIdentity::new();
+            plan.phase = Phase::PullPostFetch;
             let admission = proof(&plan)
                 .consume_for_prepared(&plan.request(), &plan.identity)
-                .expect("proof");
-            plan = plan
-                .discover_pull_prefetch(&admission)
+                .expect("fresh proof");
+            assert!(!admission.is_empty());
+            let next = plan
+                .discover_pull_postfetch(&admission)
                 .await
-                .expect("prefetch");
+                .expect("postfetch");
+            assert!(next.phase == Phase::PullIntegration);
+            assert_eq!(next.pull_new_commits, [target]);
+            assert!(next.pull_child_trees.contains_key(target));
+            assert_eq!(
+                next.pull_index_children
+                    .get("current/child")
+                    .map(String::as_str),
+                Some(child_oid)
+            );
+            assert!(!root.path().join("current").exists());
+            let child_tree = &next.pull_child_trees[target];
+            assert_eq!(
+                child_tree.gitlinks.get("missing/child").map(String::as_str),
+                Some(child_oid)
+            );
+            assert_eq!(child_tree.changed_gitlinks, child_tree.gitlinks);
+            let changed = &next.pull_changed_children["child"];
+            assert_eq!(changed.commit, target);
+            assert_eq!(changed.path, "missing/child");
+            assert!(changed.objects.contains(child_oid));
+            assert_eq!(
+                changed.effective_recursion,
+                Some(super::super::pull_children::Recursion::OnDemand)
+            );
+            assert!(child_tree.modules_blob.is_some());
+            assert_eq!(
+                child_tree
+                    .module_names
+                    .get("missing/child")
+                    .map(String::as_str),
+                Some("child")
+            );
+            assert!(!root.path().join("missing").exists());
+            let modules = next
+                .pull_current_modules
+                .as_ref()
+                .expect("current declarations");
+            if source == "absent" {
+                assert!(modules.module_names.is_empty());
+            } else {
+                assert_eq!(modules.module_names["current/child"], "current", "{source}");
+                assert_eq!(
+                    modules.module_recursion["current"],
+                    super::super::pull_children::Recursion::OnDemand
+                );
+            }
+            assert_eq!(
+                root.path().join(".gitmodules").exists(),
+                source == "worktree"
+            );
+            assert!(matches!(
+                next.pull_integration,
+                Some(super::super::pull_state::Integration::Command(_))
+            ));
+            next.revalidate().expect("fresh evidence");
+            std::fs::write(root.path().join(".gitmodules"), b"changed after admission")
+                .expect("tamper modules");
+            assert!(
+                next.revalidate().is_err(),
+                "{source} module evidence must expire"
+            );
+            if source == "worktree" {
+                std::fs::write(root.path().join(".gitmodules"), current).expect("restore modules");
+            } else {
+                std::fs::remove_file(root.path().join(".gitmodules")).expect("restore absence");
+            }
+            next.revalidate().expect("restored module evidence");
+            std::fs::write(root.path().join(".git/FETCH_HEAD"), "tampered").expect("tamper");
+            assert!(next.revalidate().is_err());
         }
-        assert!(plan.phase == Phase::PullFetch);
-        assert!(
-            plan.pull_attributes
-                .iter()
-                .any(|attribute| attribute.path == plan.repository.workdir.join("diff-order"))
-        );
-
-        // Exercise the post-fetch boundary with actual Git metadata mutation,
-        // independently of a network daemon or successful transport fixture.
-        git(&["fetch", "--no-recurse-submodules", ".", target]);
-        assert!(
-            plan.revalidate().is_err(),
-            "old FETCH_HEAD evidence must expire"
-        );
-        plan.facets
-            .retain(|facet| matches!(facet.nature, ToolNature::Read | ToolNature::Execute));
-        plan.identity = PreparedPlanIdentity::new();
-        plan.phase = Phase::PullPostFetch;
-        let admission = proof(&plan)
-            .consume_for_prepared(&plan.request(), &plan.identity)
-            .expect("fresh proof");
-        assert!(!admission.is_empty());
-        let next = plan
-            .discover_pull_postfetch(&admission)
-            .await
-            .expect("postfetch");
-        assert!(next.phase == Phase::PullIntegration);
-        assert_eq!(next.pull_new_commits, [target]);
-        assert!(next.pull_child_trees.contains_key(target));
-        assert_eq!(
-            next.pull_index_children
-                .get("current/child")
-                .map(String::as_str),
-            Some(child_oid)
-        );
-        assert!(!root.path().join("current").exists());
-        let child_tree = &next.pull_child_trees[target];
-        assert_eq!(
-            child_tree.gitlinks.get("missing/child").map(String::as_str),
-            Some(child_oid)
-        );
-        assert_eq!(child_tree.changed_gitlinks, child_tree.gitlinks);
-        let changed = &next.pull_changed_children["child"];
-        assert_eq!(changed.commit, target);
-        assert_eq!(changed.path, "missing/child");
-        assert!(changed.objects.contains(child_oid));
-        assert_eq!(
-            changed.effective_recursion,
-            Some(super::super::pull_children::Recursion::OnDemand)
-        );
-        assert!(child_tree.modules_blob.is_some());
-        assert_eq!(
-            child_tree
-                .module_names
-                .get("missing/child")
-                .map(String::as_str),
-            Some("child")
-        );
-        assert!(!root.path().join("missing").exists());
-        assert!(!root.path().join(".gitmodules").exists());
-        assert!(matches!(
-            next.pull_integration,
-            Some(super::super::pull_state::Integration::Command(_))
-        ));
-        next.revalidate().expect("fresh evidence");
-        std::fs::write(root.path().join(".git/FETCH_HEAD"), "tampered").expect("tamper");
-        assert!(next.revalidate().is_err());
     }
 
     #[tokio::test]
@@ -13078,6 +13221,52 @@ pub(super) mod tests {
             error
                 .to_string()
                 .contains("dedicated metadata Read admission")
+        );
+        assert!(!root.path().join(".git/FETCH_HEAD").exists());
+    }
+
+    #[tokio::test]
+    async fn pull_current_modules_require_exact_read_before_capture() {
+        let root = fixture();
+        std::fs::write(root.path().join(".gitmodules"), b"not config").expect("unadmitted source");
+        let mut plan = Box::new(
+            AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+                .expect("Pull"),
+        )
+        .discover()
+        .await
+        .expect("configuration");
+        for _ in 0..8 {
+            if plan.pull_graph_paths.is_some() {
+                break;
+            }
+            let admission = proof(&plan)
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .expect("proof");
+            plan = plan
+                .discover_pull_prefetch(&admission)
+                .await
+                .expect("inventory");
+        }
+        assert!(plan.pull_graph_paths.is_some());
+        assert!(plan.pull_modules_evidence.is_none());
+        let path = plan.repository.workdir.join(".gitmodules");
+        assert!(
+            plan.facets
+                .iter()
+                .any(|facet| facet.resource.as_deref() == path.to_str())
+        );
+        plan.facets
+            .retain(|facet| facet.resource.as_deref() != path.to_str());
+        let admission = proof(&plan)
+            .consume_for_prepared(&plan.request(), &plan.identity)
+            .expect("proof without module path");
+        let Err(error) = plan.discover_pull_prefetch(&admission).await else {
+            panic!("module source opened without exact Read");
+        };
+        assert!(
+            error.to_string().contains("exact Read admission"),
+            "{error}"
         );
         assert!(!root.path().join(".git/FETCH_HEAD").exists());
     }
