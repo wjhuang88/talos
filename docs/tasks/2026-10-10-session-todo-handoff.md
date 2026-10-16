@@ -1,3 +1,16 @@
+Pull metadata redirection and full-gate checkpoint (2026-10-16,
+`e7ef0081`): added direct regressions for a discovered ref directory
+replaced by a symlink and for a redirected metadata root before its first
+enumeration. Locked all-feature inventory selection passed 7/7; the staged
+diff and formatting checks passed. The standard `release_preflight.sh` rerun
+outside the sandbox completed successfully with the current source tree,
+including workspace tests and external runtime fixtures
+(`/private/tmp/i300-low-disk-preflight-approved.log`). Its sandboxed attempt
+failed only at process observation with `PermissionDenied` (745 tools tests
+passed, one environmental failure). Pull production fetch/integration is still
+disabled; independent review, Agent/MCP execution evidence and publication
+remain open. I300/T7 stays Active and the rest of the handoff queue is intact.
+
 Pull continuation capacity checkpoint (2026-10-16, `14ddb555`): removed
 remaining per-path approval continuations for internal absent tracking evidence
 and redundant graph namespace facets. The admitted closed metadata scope covers
