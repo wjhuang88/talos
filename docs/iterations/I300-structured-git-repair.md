@@ -1,3 +1,15 @@
+Pull activity evaluation checkpoint (2026-10-16, `5251f731`): admitted
+attribute snapshots now build a gix attribute search in the dedicated
+`PullChildAttributes` stage and resolve `submodule.active` attribute pathspecs
+to Enabled/Disabled. Missing `.gitattributes` files remain empty rule layers;
+non-regular entries and parser failures refuse safely. Tests cover `attr`,
+`-attr`, `!attr`, `attr=value`, parent/child/info precedence, exclusions and a
+native Git `check-attr` comparison. Locked all-feature Pull tests pass 76/76;
+all-target all-feature Clippy passes. Pull child identity/config/remote
+admission, index-backed child source semantics, recursive child fetch and
+integration execution remain open. Production Pull remains disabled; T7 stays
+Active.
+
 Attribute missing-file correction (2026-10-16): `f464b8df` keeps absent
 `.gitattributes` evidence as an empty rule layer instead of demanding an index
 fallback. Native `git check-attr` reads worktree attribute sources for ordinary
