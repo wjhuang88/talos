@@ -5,8 +5,8 @@ use std::collections::BTreeMap;
 
 use super::GitToolError;
 
-/// Historical invalid modes are retained: native Git treats them as demand
-/// policy rather than aborting historical blob discovery.
+/// Invalid modes are retained until candidate selection. Historical invalid
+/// modes use demand fallback; selected invalid current configuration must refuse.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Recursion {
     Off,
