@@ -3,8 +3,9 @@
 ## Purpose
 
 [I304](I304-absent-journal-pause.md) / [RUNTIME-011](../backlog/active/RUNTIME-011-absent-journal-pause.md)
-is Review / Claimed for the absent-journal pause no-op, distinct from I301 recovery reads.
-Claim #722 is effective at `23e659e2`; implementation review/full CI and post-repair Windows comparison remain pending.
+is Complete / Closed for the absent-journal pause no-op, distinct from I301 recovery reads.
+#726 merged as `c869a9af` after CI3203/review/CAS; CI3206 post-repair Windows comparison passed
+2220/2220 original-budget executions. I304 retains prior failures and #705 timeout residuals.
 The full selection inventory/non-overlap and preserved #705 failures are in I304.
 
 [I303](I303-embedded-skill-progressive-disclosure.md) / [SKILL-006](../backlog/active/SKILL-006-embedded-skill-progressive-disclosure.md)
