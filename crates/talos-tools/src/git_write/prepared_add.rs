@@ -11326,6 +11326,100 @@ pub(super) mod tests {
 
     #[cfg(unix)]
     #[tokio::test]
+    async fn pull_bundle_source_refuses_before_native_prefetch_side_effects() {
+        let source = fixture();
+        let native = fixture();
+        let prepared = fixture();
+        let run = |cwd: &Path, args: &[&str]| {
+            std::process::Command::new("git")
+                .current_dir(cwd)
+                .args([
+                    "-c",
+                    "user.name=Fixture",
+                    "-c",
+                    "user.email=fixture@example.invalid",
+                    "-c",
+                    "commit.gpgSign=false",
+                    "-c",
+                    "maintenance.auto=false",
+                ])
+                .args(args)
+                .output()
+                .expect("fixture Git")
+        };
+        let git = |cwd: &Path, args: &[&str]| {
+            let output = run(cwd, args);
+            assert!(output.status.success(), "{args:?}: {output:?}");
+            output.stdout
+        };
+        git(source.path(), &["add", "file"]);
+        git(source.path(), &["commit", "-m", "bundle-only object"]);
+        let oid = String::from_utf8(git(source.path(), &["rev-parse", "HEAD"])).expect("object ID");
+        let oid = oid.trim();
+        let bundle = source.path().join("outside.bundle");
+        let bundle_path = bundle.to_str().expect("bundle path");
+        git(source.path(), &["bundle", "create", bundle_path, "--all"]);
+        let bundle_bytes = std::fs::read(&bundle).expect("bundle");
+        for root in [&native, &prepared] {
+            git(root.path(), &["config", "fetch.bundleURI", bundle_path]);
+            assert!(!run(root.path(), &["cat-file", "-e", oid]).status.success());
+        }
+        // Native fetch imports this extra source even when the selected remote
+        // subsequently fails. Remote destination approval cannot cover it.
+        let missing = source.path().join("absent-remote");
+        assert!(
+            !run(
+                native.path(),
+                &[
+                    "fetch",
+                    "--update-head-ok",
+                    "--",
+                    missing.to_str().expect("remote")
+                ],
+            )
+            .status
+            .success()
+        );
+        assert!(
+            run(native.path(), &["cat-file", "-e", oid])
+                .status
+                .success()
+        );
+
+        let before = RepositoryState::capture(prepared.path()).expect("before");
+        let plan = Box::new(
+            AddPlan::prepare_pull(
+                prepared.path(),
+                &serde_json::json!({"remote": "origin"}),
+                ToolProvenance::Native,
+            )
+            .expect("prepare"),
+        );
+        let admission = proof(&plan);
+        let PreparedNormalStage::Complete(output) = plan.execute_stage(Box::new(admission)).await
+        else {
+            panic!("unadmitted bundle source continued to fetch planning");
+        };
+        assert!(output.result.is_error);
+        assert!(output.result.content.contains("bundle URI"), "{output:?}");
+        assert_eq!(
+            RepositoryState::capture(prepared.path()).expect("after"),
+            before
+        );
+        assert!(
+            !run(prepared.path(), &["cat-file", "-e", oid])
+                .status
+                .success()
+        );
+        assert!(!prepared.path().join(".git/FETCH_HEAD").exists());
+        assert_eq!(
+            std::fs::read(&bundle).expect("source retained"),
+            bundle_bytes
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
     async fn pull_fetch_refuses_executable_reference_transaction_hook() {
         use std::os::unix::fs::PermissionsExt;
         let root = fixture();
