@@ -1733,21 +1733,44 @@ impl AddPlan {
             let (rules, metadata) = std::panic::catch_unwind(|| {
                 let mut rules = gix::attrs::Search::default();
                 let mut metadata = gix::attrs::search::MetadataCollection::default();
-                rules.add_patterns_buffer(b"[attr]binary -diff -merge -text", "[builtin]".into(), None, &mut metadata, true);
+                rules.add_patterns_buffer(
+                    b"[attr]binary -diff -merge -text",
+                    "[builtin]".into(),
+                    None,
+                    &mut metadata,
+                    true,
+                );
                 for (path, local, macros) in sources {
-                    let evidence = self.pull_attributes.iter().find(|entry| entry.path == path)
-                        .ok_or_else(|| GitToolError::Git("Missing admitted Pull activity attributes".into()))?;
+                    let evidence = self
+                        .pull_attributes
+                        .iter()
+                        .find(|entry| entry.path == path)
+                        .ok_or_else(|| {
+                            GitToolError::Git("Missing admitted Pull activity attributes".into())
+                        })?;
                     match &evidence.evidence.entry {
-                        snapshot::Entry::File(_, bytes) => rules.add_patterns_buffer(bytes, path,
-                            local.then_some(self.repository.workdir.as_path()), &mut metadata, macros),
-                        snapshot::Entry::Missing if !local => {},
-                        snapshot::Entry::Missing => return Err(GitToolError::InvalidInput(
-                            "Pull activity needs index attribute fallback; fetched effects are retained".into())),
-                        _ => return Err(GitToolError::InvalidInput("Invalid Pull activity attribute evidence".into())),
+                        snapshot::Entry::File(_, bytes) => rules.add_patterns_buffer(
+                            bytes,
+                            path,
+                            local.then_some(self.repository.workdir.as_path()),
+                            &mut metadata,
+                            macros,
+                        ),
+                        // A missing worktree attribute file contributes no
+                        // rules. Git does not substitute the index for
+                        // `.gitattributes`; the Missing evidence is retained
+                        // so later creation invalidates this decision.
+                        snapshot::Entry::Missing => {}
+                        _ => {
+                            return Err(GitToolError::InvalidInput(
+                                "Invalid Pull activity attribute evidence".into(),
+                            ));
+                        }
                     }
                 }
                 Ok((rules, metadata))
-            }).map_err(|_| GitToolError::Git("Pull attribute parser panicked".into()))??;
+            })
+            .map_err(|_| GitToolError::Git("Pull attribute parser panicked".into()))??;
             let active = self
                 .pull_before
                 .as_ref()
