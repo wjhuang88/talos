@@ -43,6 +43,7 @@ pub(super) struct Tree {
 pub(super) struct Index {
     pub(super) gitlinks: BTreeMap<String, String>,
     pub(super) sparse: BTreeMap<String, String>,
+    pub(super) modules_blob: Option<String>,
 }
 
 impl Index {
@@ -57,10 +58,21 @@ impl Index {
                     ));
                 }
                 let mode = entry.mode.bits();
+                let raw = entry.path(index);
+                if raw == b".gitmodules" {
+                    if !matches!(mode, 0o100644 | 0o100755) {
+                        return Err(GitToolError::InvalidInput(
+                            "Pull index module declarations are not regular".into(),
+                        ));
+                    }
+                    listing.extend_from_slice(
+                        format!("{mode:o} blob {}\t.gitmodules\0", entry.id).as_bytes(),
+                    );
+                    continue;
+                }
                 if !matches!(mode, 0o040000 | 0o160000) {
                     continue;
                 }
-                let raw = entry.path(index);
                 let path = if mode == 0o040000 {
                     raw.strip_suffix(b"/").unwrap_or(raw)
                 } else {
@@ -77,11 +89,16 @@ impl Index {
                     sparse.insert(name.to_owned(), entry.id.to_string());
                 }
             }
-            let mut gitlinks = Tree::parse(&listing, width)?.gitlinks;
+            let tree = Tree::parse(&listing, width)?;
+            let mut gitlinks = tree.gitlinks;
             for path in sparse.keys() {
                 gitlinks.remove(path);
             }
-            Ok(Self { gitlinks, sparse })
+            Ok(Self {
+                gitlinks,
+                sparse,
+                modules_blob: tree.modules_blob,
+            })
         })
         .map_err(|_| GitToolError::Git("Pull index child decoder panicked".into()))?
     }
@@ -230,6 +247,15 @@ impl Tree {
     /// Resolve path-to-name declarations from an already admitted blob. Git
     /// ignores includes in historical .gitmodules; never resolve them here.
     pub(super) fn bind_modules(&mut self, bytes: &[u8]) -> Result<(), GitToolError> {
+        self.bind_module_declarations(bytes, false)
+    }
+
+    /// Parse admitted declarations; current files overwrite and reject invalid policy early.
+    pub(super) fn bind_module_declarations(
+        &mut self,
+        bytes: &[u8],
+        current: bool,
+    ) -> Result<(), GitToolError> {
         let invalid = || GitToolError::InvalidInput("Invalid Pull module declarations".into());
         if bytes.len() > 1024 * 1024 {
             return Err(invalid());
@@ -272,10 +298,10 @@ impl Tree {
                     match event {
                         Event::SectionValueName(key) => {
                             is_path = key.eq_ignore_ascii_case(b"path")
-                                && !by_name.contains_key(name)
-                                && first_path.is_none();
+                                && (current
+                                    || (!by_name.contains_key(name) && first_path.is_none()));
                             is_recursion = key.eq_ignore_ascii_case(b"fetchrecursesubmodules")
-                                && !recursion.contains_key(name);
+                                && (current || !recursion.contains_key(name));
                             explicit = false;
                             raw.clear();
                         }
@@ -294,10 +320,12 @@ impl Tree {
                                 }
                                 first_path = Some(normalized.into_owned());
                             } else {
-                                recursion.insert(
-                                    name.to_owned(),
-                                    Recursion::parse(explicit.then_some(normalized.as_ref())),
-                                );
+                                let mode =
+                                    Recursion::parse(explicit.then_some(normalized.as_ref()));
+                                if current && mode == Recursion::Invalid {
+                                    return Err(invalid());
+                                }
+                                recursion.insert(name.to_owned(), mode);
                             }
                             is_path = false;
                             is_recursion = false;
@@ -358,10 +386,15 @@ mod tests {
             push(&mut index, Mode::COMMIT, "nested/child");
             push(&mut index, Mode::DIR, "sparse/");
             push(&mut index, Mode::FILE, "ordinary");
+            push(&mut index, Mode::FILE, ".gitmodules");
             let candidates = Index::parse(&index, width).expect("candidates");
             assert_eq!(candidates.gitlinks.len(), 1);
             assert_eq!(candidates.gitlinks["nested/child"], oid.to_string());
             assert_eq!(candidates.sparse["sparse"], oid.to_string());
+            assert_eq!(candidates.modules_blob, Some(oid.to_string()));
+            let mut linked_modules = gix::index::State::new(kind);
+            push(&mut linked_modules, Mode::SYMLINK, ".gitmodules");
+            assert!(Index::parse(&linked_modules, width).is_err());
             index.entries_mut()[2].flags = Flags::STAGE_MASK;
             assert!(
                 Index::parse(&index, width).is_err(),
@@ -514,6 +547,44 @@ mod tests {
             tree.bind_changes(b"deleted\0ordinary\0")
                 .expect("non-links");
             assert!(tree.changed_gitlinks.is_empty());
+        }
+    }
+
+    #[test]
+    fn pull_current_modules_overwrite_and_refuse_invalid_values_atomically() {
+        let mut tree = Tree::parse(b"", 40).expect("tree");
+        tree.bind_module_declarations(
+            br#"[include]
+path = /must/not/be/read
+[submodule "child"]
+path = old
+path = intermediate
+fetchRecurseSubmodules = true
+[submodule "child"]
+path = final/child
+fetchRecurseSubmodules = on-demand
+[submodule "Child"]
+path = other
+fetchRecurseSubmodules
+fetchRecurseSubmodules =
+"#,
+            true,
+        )
+        .expect("current declarations");
+        assert_eq!(tree.module_names.len(), 2);
+        assert_eq!(tree.module_names["final/child"], "child");
+        assert_eq!(tree.module_names["other"], "Child");
+        assert_eq!(tree.module_recursion["child"], Recursion::OnDemand);
+        assert_eq!(tree.module_recursion["Child"], Recursion::Off);
+        let retained_names = tree.module_names.clone();
+        let retained_recursion = tree.module_recursion.clone();
+        for bytes in [
+            b"[submodule \"child\"]\npath = valid\npath\n".as_slice(),
+            b"[submodule \"child\"]\nfetchRecurseSubmodules = invalid\nfetchRecurseSubmodules = true\n",
+        ] {
+            assert!(tree.bind_module_declarations(bytes, true).is_err());
+            assert_eq!(tree.module_names, retained_names);
+            assert_eq!(tree.module_recursion, retained_recursion);
         }
     }
 
