@@ -1,3 +1,18 @@
+Historical recursion checkpoint (2026-10-16, `c1d47878`): admitted
+.gitmodules blobs now retain first-per-module fetchRecurseSubmodules policy
+independently of path declarations and repeated sections. Implicit true,
+explicit empty false, on-demand, case-sensitive names and invalid historical
+values are preserved; invalid historical values remain distinct rather than
+aborting discovery. Named changed-child aggregation retains the first-seen
+historical policy alongside commit/path and required objects. Source basis:
+Git 2.54 submodule-config.c parse_fetch_recurse/config callback and submodule.c
+get_fetch_recurse_config/fetch_task_create. Locked all-feature Pull tests pass
+63/63; all-target all-feature tools Clippy passes. Logs:
+/private/tmp/i300-historical-recursion-tests.log and
+/private/tmp/i300-historical-recursion-clippy.log. Current-config/global
+precedence, current-index candidates, child admissions/fetch, integration and
+final delivery gates remain open. Production Pull stays disabled; T7 Active.
+
 Historical declaration-order checkpoint (2026-10-16, `dadfa1de`): Pull
 module parsing now consumes ordered gix config events, preserving the first
 path declaration even when followed by an implicit duplicate. A first implicit
