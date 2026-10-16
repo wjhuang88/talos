@@ -215,6 +215,9 @@ impl PullEvidence {
         Ok(paths)
     }
 
+    /// Capture only after fresh metadata Read admission. For post-fetch capture,
+    /// retain the original location guard while accepting newly fetched content;
+    /// callers must separately retain and validate configuration/worktree evidence.
     pub(super) fn capture(
         repository: &super::repository_state::RepositoryState,
         tracking: Option<&str>,
@@ -226,6 +229,24 @@ impl PullEvidence {
             )
         };
         repository.revalidate_location()?;
+        // Fetch changes references and object storage, so its old content
+        // snapshot cannot serve as the post-fetch baseline. Validate retained
+        // roots/pointers BEFORE rediscovery, and again before accepting it.
+        let refreshed;
+        let repository = if fetched {
+            refreshed = super::repository_state::RepositoryState::capture(&repository.workdir)?;
+            repository.revalidate_location()?;
+            if refreshed.workdir != repository.workdir
+                || refreshed.git_dir != repository.git_dir
+                || refreshed.common_dir != repository.common_dir
+                || refreshed.index != repository.index
+            {
+                return Err(invalid());
+            }
+            &refreshed
+        } else {
+            repository
+        };
         let paths = Self::required_paths(repository, tracking, fetched)?;
         let index_modified = Self::index_modified(repository)?;
         let mut roots = Vec::new();
@@ -518,6 +539,97 @@ fn pull_evidence_refuses_reflog_escape_oversize_and_missing_leaf_creation() {
         .expect_err("redirect must fail before inspecting new root");
     assert!(
         error.to_string().contains("location pointer changed"),
+        "{error}"
+    );
+}
+
+#[cfg(test)]
+#[test]
+fn postfetch_evidence_rebaselines_changed_metadata_only_under_retained_location() {
+    let root = tempfile::tempdir().expect("fixture");
+    let source = root.path().join("source");
+    let local = root.path().join("local");
+    let git = |cwd: &std::path::Path, args: &[&str]| {
+        let output = std::process::Command::new("git")
+            .current_dir(cwd)
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_CONFIG_GLOBAL", root.path().join("absent-config"))
+            .args([
+                "-c",
+                "user.name=Fixture",
+                "-c",
+                "user.email=fixture@example.invalid",
+            ])
+            .args(args)
+            .output()
+            .expect("fixture Git");
+        assert!(output.status.success(), "{args:?}: {output:?}");
+        output.stdout
+    };
+    std::fs::create_dir(&source).expect("source");
+    git(&source, &["init", "-b", "main"]);
+    std::fs::write(source.join("file"), b"one\n").expect("source file");
+    git(&source, &["add", "file"]);
+    git(&source, &["commit", "-m", "one"]);
+    git(
+        root.path(),
+        &[
+            "clone",
+            source.to_str().expect("source"),
+            local.to_str().expect("local"),
+        ],
+    );
+    let original = super::repository_state::RepositoryState::capture(&local).expect("before");
+    let prefetch = PullEvidence::capture(&original, Some("refs/remotes/origin/main"), false)
+        .expect("prefetch evidence");
+    std::fs::write(source.join("file"), b"two\n").expect("source change");
+    git(&source, &["add", "file"]);
+    git(&source, &["commit", "-m", "two"]);
+    let expected = git(&source, &["rev-parse", "HEAD"]);
+    git(&local, &["fetch", "--no-recurse-submodules", "origin"]);
+    original
+        .revalidate_location()
+        .expect("old location retained");
+    assert_ne!(
+        original,
+        super::repository_state::RepositoryState::capture(&local).expect("changed graph")
+    );
+    assert!(
+        prefetch.revalidate().is_err(),
+        "old content evidence is stale"
+    );
+    let fetched = PullEvidence::capture(&original, Some("refs/remotes/origin/main"), true)
+        .expect("new content under old roots");
+    assert_eq!(
+        merge_candidates(fetched.fetch_head().expect("FETCH_HEAD"), 40).expect("candidate"),
+        [String::from_utf8(expected).expect("OID").trim().to_owned()]
+    );
+    fetched.revalidate().expect("stable post-fetch evidence");
+    let path = original.git_dir.join("FETCH_HEAD");
+    let saved = std::fs::read(&path).expect("fetched bytes");
+    std::fs::write(&path, b"replacement\n").expect("drift");
+    assert!(fetched.revalidate().is_err());
+    std::fs::write(&path, saved).expect("restore");
+    let redirected = root.path().join("unapproved");
+    std::fs::create_dir(&redirected).expect("external root");
+    std::fs::write(
+        original.git_dir.join("commondir"),
+        redirected.to_str().expect("path"),
+    )
+    .expect("redirect pointer");
+    let error = PullEvidence::capture(&original, None, true)
+        .expect_err("old admission must not read the new location");
+    assert!(
+        error.to_string().contains("location pointer changed"),
+        "{error}"
+    );
+    std::fs::remove_file(original.git_dir.join("commondir")).expect("restore pointer");
+    std::fs::rename(&original.git_dir, local.join("saved-gitdir")).expect("retain original");
+    std::fs::create_dir(&original.git_dir).expect("replace directory");
+    let error = PullEvidence::capture(&original, None, true)
+        .expect_err("replacement identity must fail before repository rediscovery");
+    assert!(
+        error.to_string().contains("root identity changed"),
         "{error}"
     );
 }
