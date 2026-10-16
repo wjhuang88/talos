@@ -5304,6 +5304,7 @@ fn pull_fetch_command(
             "gc.autoDetach=false",
             "--no-pager",
             "fetch",
+            "--no-recurse-submodules",
             "--update-head-ok",
             "--",
             remote,
@@ -6088,6 +6089,7 @@ pub(super) mod tests {
                 "gc.autoDetach=false",
                 "--no-pager",
                 "fetch",
+                "--no-recurse-submodules",
                 "--update-head-ok",
                 "--",
                 "upstream name"
@@ -6100,6 +6102,129 @@ pub(super) mod tests {
         );
         assert!(pull_fetch_command(&program, &workdir, "bad\nremote", &environment).is_err());
         assert!(pull_fetch_command(Path::new("git"), &workdir, "origin", &environment).is_err());
+    }
+
+    #[tokio::test]
+    async fn pull_parent_fetch_defers_recursive_child_effects() {
+        fn path(path: &Path) -> &str {
+            path.to_str().expect("fixture path")
+        }
+        let root = tempfile::tempdir().expect("fixture");
+        let child_remote = root.path().join("child.git");
+        let child = root.path().join("child");
+        let parent_remote = root.path().join("parent.git");
+        let parent = root.path().join("parent");
+        let native = root.path().join("native");
+        let prepared = root.path().join("prepared");
+        let git = |cwd: &Path, args: &[&str]| {
+            let output = std::process::Command::new("git")
+                .current_dir(cwd)
+                .env("GIT_CONFIG_NOSYSTEM", "1")
+                .env("GIT_CONFIG_GLOBAL", root.path().join("absent-config"))
+                .args([
+                    "-c",
+                    "protocol.file.allow=always",
+                    "-c",
+                    "user.name=Fixture",
+                    "-c",
+                    "user.email=fixture@example.invalid",
+                    "-c",
+                    "commit.gpgSign=false",
+                    "-c",
+                    "maintenance.auto=false",
+                ])
+                .args(args)
+                .output()
+                .expect("fixture Git");
+            assert!(output.status.success(), "{args:?}: {output:?}");
+            output.stdout
+        };
+        git(
+            root.path(),
+            &["init", "--bare", "-b", "main", path(&child_remote)],
+        );
+        git(root.path(), &["init", "-b", "main", path(&child)]);
+        std::fs::write(child.join("file"), b"one\n").expect("child source");
+        git(&child, &["add", "file"]);
+        git(&child, &["commit", "-m", "child one"]);
+        git(&child, &["remote", "add", "origin", path(&child_remote)]);
+        git(&child, &["push", "-u", "origin", "main"]);
+
+        git(
+            root.path(),
+            &["init", "--bare", "-b", "main", path(&parent_remote)],
+        );
+        git(root.path(), &["init", "-b", "main", path(&parent)]);
+        git(
+            &parent,
+            &["submodule", "add", path(&child_remote), "modules/child"],
+        );
+        git(&parent, &["commit", "-m", "parent one"]);
+        git(&parent, &["remote", "add", "origin", path(&parent_remote)]);
+        git(&parent, &["push", "-u", "origin", "main"]);
+        for checkout in [&native, &prepared] {
+            git(
+                root.path(),
+                &[
+                    "clone",
+                    "--recurse-submodules",
+                    path(&parent_remote),
+                    path(checkout),
+                ],
+            );
+        }
+
+        std::fs::write(child.join("file"), b"two\n").expect("new child source");
+        git(&child, &["add", "file"]);
+        git(&child, &["commit", "-m", "child two"]);
+        let new_oid = String::from_utf8(git(&child, &["rev-parse", "HEAD"])).expect("object ID");
+        let new_oid = new_oid.trim();
+        git(&child, &["push", "origin", "main"]);
+        let parent_child = parent.join("modules/child");
+        git(&parent_child, &["fetch", "origin"]);
+        git(&parent_child, &["checkout", new_oid]);
+        git(&parent, &["add", "modules/child"]);
+        git(&parent, &["commit", "-m", "parent two"]);
+        git(&parent, &["push", "origin", "main"]);
+
+        let has_child_object = |checkout: &Path| {
+            std::process::Command::new("git")
+                .current_dir(checkout.join("modules/child"))
+                .args(["cat-file", "-e", new_oid])
+                .output()
+                .expect("child object lookup")
+                .status
+                .success()
+        };
+        assert!(!has_child_object(&native) && !has_child_object(&prepared));
+        git(&native, &["fetch", "--update-head-ok", "origin"]);
+        assert!(
+            has_child_object(&native),
+            "native fetch recursively imports child objects"
+        );
+
+        let program = resolve_git(&execution_environment()).expect("absolute Git");
+        let mut environment = trace_suppressed_environment(execution_environment());
+        environment.insert("GIT_CONFIG_NOSYSTEM".into(), "1".into());
+        environment.insert(
+            "GIT_CONFIG_GLOBAL".into(),
+            root.path().join("absent-config").into_os_string(),
+        );
+        environment.insert("GIT_ALLOW_PROTOCOL".into(), "file".into());
+        let output = pull_fetch_command(&program, &prepared, "origin", &environment)
+            .expect("bound parent fetch")
+            .output()
+            .await
+            .expect("parent fetch");
+        assert!(output.status.success(), "{output:?}");
+        assert!(
+            !has_child_object(&prepared),
+            "child effects await separate admission"
+        );
+        assert_eq!(
+            git(&native, &["rev-parse", "refs/remotes/origin/main"]),
+            git(&prepared, &["rev-parse", "refs/remotes/origin/main"]),
+        );
     }
 
     #[tokio::test]
