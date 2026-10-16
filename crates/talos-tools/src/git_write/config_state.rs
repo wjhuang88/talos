@@ -1170,6 +1170,20 @@ impl ConfigState {
         repository: &RepositoryState,
         environment: &BTreeMap<OsString, OsString>,
     ) -> Result<Vec<PathBuf>, GitToolError> {
+        // Git fetch consumes this extra source before opening the selected
+        // remote. Its bundles can read local paths or contact other endpoints;
+        // approving the configured remote does not authorize either effect.
+        // Git itself uses an empty final value to disable bundle retrieval.
+        if self
+            .values
+            .get(b"fetch.bundleuri".as_slice())
+            .and_then(|values| values.last())
+            .is_some_and(|value| value.as_deref() != Some(b""))
+        {
+            return Err(unsupported(
+                "Pull bundle URI sources require separate read or network authorization",
+            ));
+        }
         let maintenance_enabled = self
             .values
             .get(b"maintenance.auto".as_slice())
@@ -2371,6 +2385,28 @@ mod tests {
         let config = capture("remote.origin.vcs\ncustom-vcs\0");
         assert!(config.prepare_pull_transport("origin").is_err());
         assert!(config.prepare_pull_transport("other").is_ok());
+
+        for records in [
+            "fetch.bundleURI\n/outside.bundle\0",
+            "fetch.bundleURI\nhttps://example.invalid/bundles\0",
+            "fetch.bundleURI\0",
+            "fetch.bundleURI\n\0fetch.bundleURI\n/outside.bundle\0",
+        ] {
+            assert!(
+                capture(records)
+                    .prepare_pull(&repository, &BTreeMap::new())
+                    .is_err(),
+                "{records}"
+            );
+        }
+        for records in [
+            "fetch.bundleURI\n\0",
+            "fetch.bundleURI\n/outside.bundle\0fetch.bundleURI\n\0",
+        ] {
+            capture(records)
+                .prepare_pull(&repository, &BTreeMap::new())
+                .expect("empty final bundle URI disables retrieval");
+        }
     }
 
     #[test]
