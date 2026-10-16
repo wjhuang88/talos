@@ -1,3 +1,17 @@
+Current-index child checkpoint (2026-10-16, `34650804`): post-fetch
+continuation now retains current index gitlinks separately from historical
+changed children. Sparse index directories expand through bounded admitted
+object probes; index evidence is checked before retaining candidates. Parsing
+is panic-guarded, validates SHA-1/SHA-256 IDs and paths, and rejects unresolved
+index stages and duplicate candidates without opening child paths. The real
+self-fetch fixture retains an index-only child whose worktree directory is
+absent. Locked all-feature Pull tests pass 65/65; all-target all-feature tools
+Clippy passes (logs: /private/tmp/i300-index-children-tests.log and
+/private/tmp/i300-index-children-clippy.log). Broader real sparse-expansion
+runtime evidence, current .gitmodules mapping/selection, child admissions and
+recursive fetch, integration, independent review and final delivery gates
+remain open. Production Pull stays disabled; T7/I300 remains Active.
+
 Child policy precedence checkpoint (2026-10-16, `55521958`, corrected by `f96af155`): retained
 pre-fetch configuration now resolves changed named candidates using explicit
 global mode first, last current per-module value second, historical declaration
