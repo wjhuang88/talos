@@ -164,6 +164,7 @@ enum Phase {
     PullPostFetch,
     PullChildAttributes,
     PullChildIdentity,
+    PullChildConfiguration,
     PullIntegration,
 }
 
@@ -1763,7 +1764,40 @@ impl AddPlan {
                 }
             }
             let location = super::repository_state::ChildLocation::capture(&path)?;
+            self.facets.push(path_facet(
+                ToolNature::Read,
+                &location.common_dir.join("config"),
+                "Pull selected child configuration",
+            )?);
             self.child_locations.push((path, location));
+        }
+        self.revalidate()?;
+        self.identity = PreparedPlanIdentity::new();
+        self.phase = Phase::PullChildConfiguration;
+        Ok(self)
+    }
+
+    async fn discover_pull_child_configuration(
+        mut self: Box<Self>,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<Box<Self>, GitToolError> {
+        for (workdir, location) in &self.child_locations {
+            let config_path = location.common_dir.join("config");
+            if !authorizations.iter().any(|token| {
+                token.authorizes_path(
+                    "git_pull",
+                    ToolNature::Read,
+                    &self.workspace,
+                    config_path.to_str().unwrap_or_default(),
+                )
+            }) {
+                return Err(GitToolError::InvalidInput(
+                    "Pull child configuration lacks exact Read admission".into(),
+                ));
+            }
+            let output = self.inspect_config_at(workdir).await?;
+            let config = super::config_state::ChildConfig::capture(&output, workdir)?;
+            self.child_configs.push((workdir.clone(), config));
         }
         self.revalidate()?;
         self.identity = PreparedPlanIdentity::new();
@@ -6016,6 +6050,9 @@ impl PreparedNormalToolInvocation for AddPlan {
             Phase::PullPreparation => self.discover_pull_prefetch(&authorizations).await,
             Phase::PullChildAttributes => self.discover_pull_child_attributes(&authorizations).await,
             Phase::PullChildIdentity => self.discover_pull_child_identity(&authorizations),
+            Phase::PullChildConfiguration => self
+                .discover_pull_child_configuration(&authorizations)
+                .await,
             Phase::PullPostFetch => self.discover_pull_postfetch(&authorizations).await.map_err(|error| GitToolError::Git(format!("Pull parent fetch completed; post-fetch discovery failed: {error}; fetched effects are retained; inspect repository before retrying"))),
             Phase::PullIntegration => {
                 if let Err(error) = self.revalidate() {
