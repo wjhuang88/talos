@@ -1,3 +1,12 @@
+Pull child identity checkpoint (2026-10-16): after admitted activity
+resolution, selected active children now enter a separate `PullChildIdentity`
+stage. It requests exact Read admission for each child worktree and `.git`
+marker, then binds `ChildLocation`; missing/stale identity or absent admission
+refuses before child effects. Locked Pull tests pass 76/76, cargo check passes,
+and diff check passes (`/private/tmp/i300-child-identity.log`). Configuration
+chain, child remote, object verification, recursive fetch and integration remain
+open; T7 stays Active.
+
 Correction (2026-10-16): the missing-attribute conclusions in the two checkpoints
 below are incorrect and superseded. A native Git regression now stages root and
 nested `.gitattributes`, removes both worktree files, and confirms ordinary
