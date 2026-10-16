@@ -14,8 +14,8 @@ after exact-head CI, independent security/API review and CAS.
 
 [I302](I302-windows-owned-handle-evidence.md) / [TEST-003](../backlog/active/TEST-003-windows-owned-handle-evidence.md)
 is Review/Claimed for bounded diagnostic candidate #716. #718 merged f4313237 / ADR-091
-effective. CI3197 failed cold73→76 while modes1–4 succeeded; direct API-return/cleanup
-controls need fresh protected review/native CI. Original cold40/+2 failure is retained.
+effective. CI3204 failed cold73→76 while modes1–6 succeeded. Exact DLL cache candidates and
+direct no-PSS mode7 need fresh protected review/native CI. Original cold40/+2 failure is retained.
 I293/I294/I300 remain Active; I277 retains Review, I249 Planned and I164 Paused.
 I301 bounded startup closeout is recorded below.
 I302 records the full inventory/non-overlap and workspace-recovery receipts; separate I302 commits

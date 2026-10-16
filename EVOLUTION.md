@@ -75,6 +75,7 @@ repeating known mistakes.
 | 63 | TLS fixtures | Callback observations are not physical connections; absent IP SNI is valid | I293 |
 | 64 | TLS fixtures | Native platform verification includes certificate policy, not just roots | I293 / #715 |
 | 65 | Resource tests | Process-wide counters need isolated workers and owned descendant cleanup | I293 / #716 |
+| 66 | Native borrowing | Attribute value buffers need independent stable storage through native list deletion | I302 / #716 |
 
 ## Lessons
 
@@ -1284,3 +1285,13 @@ cache disassembly into exact-runner attribution. Decode only validated symbol-st
 fields from the same capped hash prefix, then require full hash agreement on an official download.
 This does not establish loaded-module identity or binary trust. Preserve native failures, download
 integrity failures and disposable fixture results as distinct evidence.
+
+
+## 2026-10-16 - Preserve native attribute value storage across owner borrows
+
+- Trigger: Independent I302 control review rejected an inline handle-list field borrowed by a native attribute list.
+- Symptom: Later mutable owner borrows included that native-borrowed inline field, creating avoidable provenance/lifetime uncertainty.
+- Root cause: Owning the attribute-list allocation does not independently preserve the lifetime and borrow boundary of its input values.
+- Fix: Allocate the handle-list elements separately before acquiring resources, do not resize/mutate after native borrowing, and keep them alive through DeleteProcThreadAttributeList.
+- Prevention: Review both attribute allocation and input-value ownership, including subsequent Rust borrows and every error/unwind cleanup path.
+- Promoted to rule/check: ADR-091 direct-control clarification and protected native review; no production ownership expansion.

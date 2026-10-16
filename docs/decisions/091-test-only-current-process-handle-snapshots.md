@@ -102,3 +102,17 @@ only with explicitly reviewed test contract/cleanup; preserve all failed history
 - [Snapshot free](https://learn.microsoft.com/en-us/windows/win32/api/processsnapshot/nf-processsnapshot-pssfreesnapshot)
 
 These specify ABI/data lifetime; no native PSS observation or root-cause result is claimed yet.
+
+## I302 Direct Lifecycle Control Clarification — 2026-10-16
+
+Same-scope mode7 may compare count intervals in an independently owned exact-test worker using
+only the existing ADR-068 Win32 call set. It bypasses Talos launcher bookkeeping: direct first
+pipe cleanup and two direct suspended process lifecycles, four count samples and no PSS. Preserve
+same command/flags/stdio allowlist/environment, outer Job containment, success-only handle adoption,
+initialized-only attribute deletion, stable borrowed list storage through Delete, checked all-
+operation cleanup and panic containment. Never assign/resume this control child. A real missing-cwd
+CreateProcessW failure fixture follows measurement. No new API/native feature/memory/otherPID or
+object identity probe, production change, threshold/warmup/skip or root-cause acceptance is implied.
+The unchanged original cold40/+2 worker remains authoritative. Counts and checked closes do not
+prove process exit/reaping, cache ownership or absence of leaks. Fresh protected review/full native
+CI remain required; this clarification adds no native permission beyond the existing lifecycle.

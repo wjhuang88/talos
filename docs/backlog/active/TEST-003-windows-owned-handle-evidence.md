@@ -234,3 +234,30 @@ not full binary trust validation, calendar interpretation or loaded-module attes
 server candidates require full native SHA match. Protected scope review/local parser/bounds/
 short-read/cleanup/exit fixtures pass; governance/fingerprint/native gates pending. Review/Claimed,
 incomplete; no Completion Commit. I293/PROVIDER008/#705 unchanged, #643/#624 stay open.
+
+## CI3204 Exact-File Mechanisms And Direct Control — 2026-10-16
+
+CI3204 exact6d3d2970 FAILED Windows455/1, other five jobs pass; cold40/+2 still fails73->76.
+All3 DLL length/hashes now match direct Microsoft downloads. Exact-file static analysis identifies
+pipe-root caching and adjacent ETW/registry-root retained globals in the compatibility path;
+these are candidates for File/unknown+Key, NOT runtime object attribution or repair. PDB InfoAge
+mismatch limits symbol claims. Detailed RVAs/provenance/checks are preserved in I302 and #717
+comment6212258444; no downloaded PE execution/memory/otherPID/ObjectName/new observer API.
+
+Same-scope diagnostic mode7 bypasses Talos launcher bookkeeping in another outer-Job-owned exact
+worker: direct pipe cleanup and two direct suspended process lifecycles, four scalar counts,
+zero PSS/no delta assertion. Stable heap handle-list lifetime, initialized-only attributes,
+success-only returned-resource adoption, checked all-operation consume-before-release cleanup,
+no assign/resume, same flags/stdio allowlist/inputs and panic containment. A nonexistent-cwd real
+process-creation failure fixture runs AFTER measurement and must complete checked cleanup.
+No process-exit/reaping proof or native unwind-fixture coverage is claimed. Original mode0/all40/+2
+and modes1–6 remain; all eight outcomes are collected before asserting. Native execution/final
+protected review/exact-head full CI remain pending. No Completion Commit, merge or search activation.
+Main3bc38d78 I301/I304 closeouts are preserved in baseline refresh b7cf30db, not reopened.
+
+Final local candidate: pinned locked full preflight PASSED3726primary+1existing-child,0failed/
+ignored and both SDK modes, using only the prior exact local socket filter; original native
+failure retained. Corrected-source Windows coding --tests check/Clippy, actual production/test
+feature-graph separation, governance/claims/text/classifier/fmt/diff/scale pass. Independent Agent
+protected working-tree review approves diagnostic publication only, not native execution/repair/
+merge. Stable-head remote fingerprint review and new unfiltered native CI remain required.

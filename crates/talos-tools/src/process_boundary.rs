@@ -859,6 +859,9 @@ fn quote_windows_arg(value: &str) -> String {
 mod handle_snapshot;
 
 #[cfg(all(test, windows))]
+mod handle_lifecycle_control;
+
+#[cfg(all(test, windows))]
 mod windows_tests {
     use super::*;
     use std::collections::BTreeMap;
@@ -1359,7 +1362,7 @@ mod windows_tests {
             let mut controls = Vec::new();
             // Cold, observer, native cleanup fixtures and stage controls: owned processes. Retain
             // original failure, but attempt all workers before asserting any outcome.
-            for mode in [0u8, 1, 2, 3, 4, 5, 6] {
+            for mode in [0u8, 1, 2, 3, 4, 5, 6, 7] {
                 let directory = tempfile::Builder::new()
                     .prefix("talos-handle-count-")
                     .tempdir()
@@ -1443,7 +1446,7 @@ mod windows_tests {
                 controls.push(control); // retain Jobs through every worker/receipt check
             }
             eprintln!("handle worker outcomes={outcomes:?}");
-            assert_eq!(outcomes.len(), 7);
+            assert_eq!(outcomes.len(), 8);
             for (mode, result) in outcomes {
                 assert!(result.is_ok(), "handle worker mode={mode}: {result:?}");
             }
@@ -1490,6 +1493,7 @@ mod windows_tests {
             Some(value) if value == "4" => 4,
             Some(value) if value == "5" => 5,
             Some(value) if value == "6" => 6,
+            Some(value) if value == "7" => 7,
             Some(_) => panic!("invalid owned handle worker mode"),
         };
         if mode == 2 {
@@ -1505,6 +1509,38 @@ mod windows_tests {
             return;
         }
         let launcher = powershell("Start-Sleep -Seconds 30");
+        if mode == 7 {
+            let counts = handle_lifecycle_control::run(&launcher)
+                .expect("complete direct Win32 lifecycle control");
+            // Exercise this control's own partial setup cleanup after measurement.
+            // A nonexistent cwd reaches real CreateProcessW failure with live pipes,
+            // Job and initialized attributes. Its error is accepted only if cleanup
+            // completed without an error mask; no failing output handles are adopted.
+            let mut failure_launcher = launcher;
+            failure_launcher.cwd = directory.join("missing-direct-control-cwd");
+            assert!(!failure_launcher.cwd.exists());
+            assert_eq!(
+                handle_lifecycle_control::run(&failure_launcher)
+                    .err()
+                    .as_deref(),
+                Some("direct CreateProcessW failed"),
+                "must reach real process creation failure and finish checked cleanup"
+            );
+            // Serialization and receipt I/O follow every sampled lifecycle/cleanup.
+            let output = serde_json::to_vec(&serde_json::json!({
+                "child_pid":std::process::id(),"direct_cycles":2,"snapshots":0,
+                "native_failure_check":true,
+                "phases":handle_lifecycle_control::PHASES,"counts":counts,
+            }))
+            .expect("direct lifecycle JSON");
+            assert!(output.len() <= 1024);
+            eprintln!(
+                "DIRECT_WIN32_LIFECYCLE {}",
+                String::from_utf8_lossy(&output)
+            );
+            std::fs::write(receipt, output).expect("direct lifecycle receipt");
+            return;
+        }
         if matches!(mode, 5 | 6) {
             let mut observer = LaunchObservation::new(mode);
             let fault = if mode == 5 {
@@ -1696,7 +1732,7 @@ mod windows_tests {
     }
 
     fn validate_handle_receipt(path: &std::path::Path, mode: u8) -> Result<(), String> {
-        let cap = if mode == 0 {
+        let cap = if matches!(mode, 0 | 7) {
             1024
         } else {
             handle_snapshot::OUTPUT_CAP
@@ -1721,7 +1757,22 @@ mod windows_tests {
         if pid == 0 || pid == std::process::id() {
             return Err("receipt not another process".to_owned());
         }
-        if mode == 0 {
+        if mode == 7 {
+            if data["direct_cycles"].as_u64() != Some(2)
+                || data["snapshots"].as_u64() != Some(0)
+                || data["native_failure_check"] != true
+                || data["phases"] != serde_json::json!(handle_lifecycle_control::PHASES)
+                || data["counts"].as_array().is_none_or(|counts| {
+                    counts.len() != 4
+                        || counts
+                            .iter()
+                            .any(|n| n.as_u64().and_then(|n| u32::try_from(n).ok()).is_none())
+                })
+            {
+                return Err("invalid direct lifecycle receipt".to_owned());
+            }
+            // Count growth is evidence, never a replacement threshold or pass for mode0.
+        } else if mode == 0 {
             if data["attempts"].as_u64() != Some(40) {
                 return Err("wrong fault count".to_owned());
             }
@@ -1855,6 +1906,38 @@ mod windows_tests {
             Some(expected),
             "must reach the intended stage"
         );
+    }
+
+    #[test]
+    fn direct_lifecycle_receipt_preserves_growth_as_evidence() {
+        let directory = tempfile::tempdir().expect("fixture directory");
+        let path = directory.path().join("receipt.json");
+        let mut data = serde_json::json!({
+            "child_pid":std::process::id().wrapping_add(1).max(1),
+            "direct_cycles":2,"snapshots":0,"native_failure_check":true,
+            "phases":handle_lifecycle_control::PHASES,"counts":[73,74,76,1000],
+        });
+        let write = |data: &serde_json::Value| {
+            std::fs::write(&path, serde_json::to_vec(data).expect("fixture JSON")).expect("write");
+        };
+        write(&data);
+        assert!(validate_handle_receipt(&path, 7).is_ok());
+        assert!(validate_handle_receipt(&path, 0).is_err());
+        for (field, value) in [
+            ("direct_cycles", serde_json::json!(1)),
+            ("snapshots", serde_json::json!(4)),
+            ("native_failure_check", serde_json::json!(false)),
+            ("phases", serde_json::json!(vec!["direct_baseline"; 4])),
+            ("counts", serde_json::json!([73, 74, 76])),
+            ("counts", serde_json::json!([73, 74, 76, u64::MAX])),
+            ("counts", serde_json::json!([73, 74, 76, "unknown"])),
+        ] {
+            let original = data[field].clone();
+            data[field] = value;
+            write(&data);
+            assert!(validate_handle_receipt(&path, 7).is_err(), "{field}");
+            data[field] = original;
+        }
     }
 
     #[test]
