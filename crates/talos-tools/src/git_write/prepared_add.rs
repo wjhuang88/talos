@@ -225,6 +225,7 @@ pub(super) struct AddPlan {
     pull_new_commits: Vec<String>,
     pull_child_trees: BTreeMap<String, super::pull_children::Tree>,
     pull_changed_children: BTreeMap<String, super::pull_children::Changed>,
+    pull_index_children: BTreeMap<String, String>,
     identity: PreparedPlanIdentity,
     workspace: PathBuf,
     input: Value,
@@ -625,6 +626,7 @@ impl AddPlan {
             pull_new_commits: Vec::new(),
             pull_child_trees: BTreeMap::new(),
             pull_changed_children: BTreeMap::new(),
+            pull_index_children: BTreeMap::new(),
             identity: PreparedPlanIdentity::new(),
             workspace: workspace.to_owned(),
             input: input.clone(),
@@ -1374,6 +1376,39 @@ impl AddPlan {
                 ));
             }
         };
+        let (index, index_evidence) =
+            super::pull_state::decode_index(&self.repository.git_dir.join("index"), width)?;
+        let mut candidates = super::pull_children::Index::parse(&index, width)?;
+        for (prefix, oid) in &candidates.sparse {
+            let listing = self
+                .pull_probe(vec![
+                    "ls-tree".into(),
+                    "-r".into(),
+                    "-z".into(),
+                    "--full-tree".into(),
+                    oid.clone(),
+                ])
+                .await?;
+            if !listing.status.success() || !listing.stderr.is_empty() {
+                return Err(GitToolError::Git(
+                    "Pull index child expansion failed".into(),
+                ));
+            }
+            let tree = super::pull_children::Tree::parse(&listing.stdout, width)?;
+            for (path, oid) in tree.gitlinks {
+                let joined = format!("{prefix}/{path}");
+                if candidates.gitlinks.insert(joined, oid).is_some() {
+                    return Err(GitToolError::InvalidInput(
+                        "Duplicate Pull index child".into(),
+                    ));
+                }
+            }
+        }
+        self.pull_evidence
+            .as_ref()
+            .ok_or_else(|| GitToolError::Git("Missing post-fetch index evidence".into()))?
+            .require_index(&index_evidence)?;
+        self.pull_index_children = candidates.gitlinks;
         let fetched = super::pull_state::fetched_tips(
             self.pull_evidence
                 .as_ref()
@@ -12232,6 +12267,12 @@ pub(super) mod tests {
         ]);
         git(&["reset", "--mixed", "HEAD"]);
         std::fs::remove_file(root.path().join(".gitmodules")).expect("remove fixture config");
+        git(&[
+            "update-index",
+            "--add",
+            "--cacheinfo",
+            &format!("160000,{child_oid},current/child"),
+        ]);
         let target = std::str::from_utf8(&target).expect("object ID").trim();
         let mut plan = Box::new(
             AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
@@ -12281,6 +12322,13 @@ pub(super) mod tests {
         assert!(next.phase == Phase::PullIntegration);
         assert_eq!(next.pull_new_commits, [target]);
         assert!(next.pull_child_trees.contains_key(target));
+        assert_eq!(
+            next.pull_index_children
+                .get("current/child")
+                .map(String::as_str),
+            Some(child_oid)
+        );
+        assert!(!root.path().join("current").exists());
         let child_tree = &next.pull_child_trees[target];
         assert_eq!(
             child_tree.gitlinks.get("missing/child").map(String::as_str),
