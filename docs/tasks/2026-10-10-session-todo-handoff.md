@@ -3160,3 +3160,12 @@ added pre-push/reference hook paths plus signing/recursive/custom-transport help
 checks. Latest tools library tests pass 176/176; all-target Clippy passes. Push
 transport remains disabled pending complete effects implementation and review;
 Pull migration and all later serial deliverables remain open.
+Pull child configuration continuation repair checkpoint (2026-10-16, `88246a89`):
+the Pull child configuration stage now records an explicit discovery state and
+the complete Git-reported source frontier. The continuation verifies exact Read
+admission for every source before recapturing configuration and clears stale
+captures, preventing duplicate configs or a second read before authorization.
+Locked Pull tests pass 76/76, `cargo check --locked -p talos-tools --all-features`
+passes, and all-target all-feature Clippy with `-D warnings` passes. Child
+remote semantics, object admission, recursive fetch, integration, and delivery
+gates remain open; Production Pull remains disabled.
