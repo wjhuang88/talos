@@ -143,6 +143,37 @@ pub(super) fn collect_named_changes(
 }
 
 impl Tree {
+    /// Select declared current-index candidates without opening child paths.
+    /// Unmapped paths remain in the caller's index inventory for separately
+    /// admitted legacy discovery. Selection does not mark module names seen:
+    /// native Git does that only after an initialized repository yields a task.
+    pub(super) fn select_current(
+        &self,
+        index: &BTreeMap<String, String>,
+        changed: &BTreeMap<String, Changed>,
+        policy: impl Fn(&str, Option<Recursion>) -> Result<Recursion, GitToolError>,
+    ) -> Result<BTreeMap<String, Recursion>, GitToolError> {
+        let mut selected = BTreeMap::new();
+        for path in index.keys() {
+            let Some(name) = self.module_names.get(path) else {
+                continue;
+            };
+            let mode = policy(name, self.module_recursion.get(name).copied())?;
+            match mode {
+                Recursion::On => {}
+                Recursion::OnDemand if changed.contains_key(name) => {}
+                Recursion::Invalid => {
+                    return Err(GitToolError::InvalidInput(
+                        "Invalid current Pull child recursion policy".into(),
+                    ));
+                }
+                _ => continue,
+            }
+            selected.insert(path.clone(), mode);
+        }
+        Ok(selected)
+    }
+
     /// Parse an admitted `ls-tree -r -z --full-tree` listing without filesystem
     /// discovery, config includes, path expansion, or child repository access.
     pub(super) fn parse(bytes: &[u8], width: usize) -> Result<Self, GitToolError> {
@@ -367,6 +398,55 @@ impl Tree {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pull_current_selection_uses_names_and_preserves_legacy_inventory() {
+        let mut modules = Tree::parse(b"", 40).expect("empty tree");
+        modules.bind_module_declarations(
+            b"[submodule \"renamed\"]\npath = current\nfetchRecurseSubmodules = on-demand\n[submodule \"always\"]\npath = unchanged\nfetchRecurseSubmodules = true\n[submodule \"off\"]\npath = disabled\nfetchRecurseSubmodules = false\n", true,
+        ).expect("modules");
+        let index = ["current", "unchanged", "disabled", "legacy"]
+            .into_iter()
+            .map(|path| (path.to_owned(), "a".repeat(40)))
+            .collect();
+        let mut historical = Tree::parse(b"", 40).expect("history");
+        historical
+            .changed_gitlinks
+            .insert("old".into(), "b".repeat(40));
+        historical
+            .module_names
+            .insert("old".into(), "renamed".into());
+        let changed = collect_named_changes(
+            &["commit".into()],
+            &BTreeMap::from([("commit".into(), historical)]),
+        )
+        .expect("changes");
+        let selected = modules
+            .select_current(&index, &changed, |_, mode| {
+                Ok(mode.unwrap_or(Recursion::OnDemand))
+            })
+            .expect("selection");
+        assert_eq!(
+            selected,
+            BTreeMap::from([
+                ("current".into(), Recursion::OnDemand),
+                ("unchanged".into(), Recursion::On)
+            ])
+        );
+        assert!(index.contains_key("legacy"));
+        let selected = modules
+            .select_current(&index, &BTreeMap::new(), |_, mode| {
+                Ok(mode.unwrap_or(Recursion::OnDemand))
+            })
+            .expect("unchanged");
+        assert_eq!(selected.len(), 1);
+        assert!(selected.contains_key("unchanged"));
+        assert!(
+            modules
+                .select_current(&index, &changed, |_, _| Ok(Recursion::Invalid))
+                .is_err()
+        );
+    }
 
     #[test]
     fn pull_index_children_preserve_sparse_trees_and_reject_ambiguous_paths() {

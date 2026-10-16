@@ -226,6 +226,7 @@ pub(super) struct AddPlan {
     pull_child_trees: BTreeMap<String, super::pull_children::Tree>,
     pull_changed_children: BTreeMap<String, super::pull_children::Changed>,
     pull_index_children: BTreeMap<String, String>,
+    pull_current_fetch_children: BTreeMap<String, super::pull_children::Recursion>,
     pull_current_modules: Option<super::pull_children::Tree>,
     pull_modules_evidence: Option<PullAttribute>,
     identity: PreparedPlanIdentity,
@@ -629,6 +630,7 @@ impl AddPlan {
             pull_child_trees: BTreeMap::new(),
             pull_changed_children: BTreeMap::new(),
             pull_index_children: BTreeMap::new(),
+            pull_current_fetch_children: BTreeMap::new(),
             pull_current_modules: None,
             pull_modules_evidence: None,
             identity: PreparedPlanIdentity::new(),
@@ -1587,6 +1589,15 @@ impl AddPlan {
             .pull_before
             .as_ref()
             .ok_or_else(|| GitToolError::Git("Missing Pull pre-fetch recursion policy".into()))?;
+        self.pull_current_fetch_children = self
+            .pull_current_modules
+            .as_ref()
+            .ok_or_else(|| GitToolError::Git("Missing current Pull module declarations".into()))?
+            .select_current(
+                &self.pull_index_children,
+                &self.pull_changed_children,
+                |name, recursion| before.child_recursion(name, recursion),
+            )?;
         for (name, child) in &mut self.pull_changed_children {
             // Selection still needs current-index/active-policy evidence. Keep
             // invalid current policy dormant until this candidate is selected.
