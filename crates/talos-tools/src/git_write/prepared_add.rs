@@ -5162,8 +5162,11 @@ impl AddPlan {
             }
         }
         for (path, expected) in &self.child_locations {
-            let marker = path.join(".git");
-            let metadata_path = child_metadata_path(path, &marker)?;
+            let metadata_path = if matches!(self.operation, Operation::Pull(_)) {
+                child_metadata_path(path, &path.join(".git"))?
+            } else {
+                path.clone()
+            };
             if &super::repository_state::ChildLocation::capture(&metadata_path)? != expected {
                 return Err(GitToolError::InvalidInput(
                     "Submodule location changed after discovery".into(),
@@ -12081,6 +12084,32 @@ pub(super) mod tests {
         state
             .try_admit_prepared_invocation(pending, &request, &context, &plan.identity)
             .expect("admission")
+    }
+
+    #[test]
+    fn pull_child_metadata_path_resolves_external_gitdir_marker() {
+        let root = tempfile::tempdir().expect("fixture");
+        let worktree = root.path().join("child");
+        let gitdir = root.path().join("metadata");
+        let common = root.path().join("common");
+        std::fs::create_dir(&worktree).expect("worktree");
+        std::fs::create_dir(&gitdir).expect("gitdir");
+        std::fs::create_dir(&common).expect("common");
+        std::fs::write(worktree.join(".git"), "gitdir: ../metadata\n").expect("marker");
+        std::fs::write(gitdir.join("commondir"), b"../common\n").expect("commondir");
+        let marker = worktree.join(".git");
+        let resolved = child_metadata_path(&worktree, &marker).expect("metadata path");
+        assert_eq!(resolved, worktree.join("../metadata"));
+        let location = super::super::repository_state::ChildLocation::capture(&resolved)
+            .expect("child location");
+        assert_eq!(
+            location.git_dir,
+            gitdir.canonicalize().expect("canonical gitdir")
+        );
+        assert_eq!(
+            location.common_dir,
+            common.canonicalize().expect("canonical common")
+        );
     }
 
     #[tokio::test]
