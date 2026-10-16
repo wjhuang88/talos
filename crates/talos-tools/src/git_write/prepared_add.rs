@@ -1965,7 +1965,15 @@ impl AddPlan {
                 }
             }
             config.prepare_pull_transport("origin")?;
-            if let Some(url) = config.remote_url("origin")? {
+            for url in config.fetch_destinations("origin")? {
+                if let Some(path) = super::remote_state::local_destination(&url, workdir)? {
+                    self.facets.push(path_facet(
+                        ToolNature::Read,
+                        &path,
+                        "Pull child local fetch source; contents and fetch deferred",
+                    )?);
+                    continue;
+                }
                 self.facets.push(
                     ToolPermissionFacet::with_resource(
                         ToolNature::Network,

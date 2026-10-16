@@ -73,6 +73,7 @@ impl ReceiverEffects {
 #[derive(PartialEq, Eq)]
 pub(super) struct ChildConfig {
     values: Values,
+    ordered_output: Vec<u8>,
     origins: BTreeSet<PathBuf>,
     pub files: Vec<(PathBuf, snapshot::Entry)>,
     identities: Vec<snapshot::PathIdentity>,
@@ -212,24 +213,13 @@ impl ChildConfig {
         Ok(())
     }
 
-    /// Return the last configured URL for a named child remote without
-    /// contacting it or resolving helpers.
-    pub(super) fn remote_url(&self, remote: &str) -> Result<Option<String>, GitToolError> {
-        let key = format!("remote.{remote}.url");
-        let Some(value) = self
-            .values
-            .get(key.as_bytes())
-            .and_then(|values| values.last())
-            .and_then(|value| value.as_deref())
-        else {
-            return Ok(None);
-        };
-        let value =
-            std::str::from_utf8(value).map_err(|_| unsupported("Child remote URL is not UTF-8"))?;
-        if value.is_empty() || value.contains(['\0', '\n', '\r']) {
-            return Err(unsupported("Child remote URL is invalid"));
-        }
-        Ok(Some(value.to_owned()))
+    /// Resolve fetch destinations using Git's ordered URL and rewrite rules.
+    pub(super) fn fetch_destinations(&self, remote: &str) -> Result<Vec<String>, GitToolError> {
+        super::remote_state::destinations(
+            &super::remote_state::records(&self.ordered_output)?,
+            remote,
+            false,
+        )
     }
 
     pub(super) fn receiver_effects(
@@ -432,6 +422,7 @@ impl ChildConfig {
             .collect::<Result<Vec<_>, GitToolError>>()?;
         Ok(Self {
             values,
+            ordered_output: output.to_vec(),
             origins,
             files,
             identities,
@@ -440,7 +431,7 @@ impl ChildConfig {
 
     pub(super) fn verify_host(&self, output: &[u8]) -> Result<(), GitToolError> {
         let (values, origins) = parse_origins(output)?;
-        if values != self.values || origins != self.origins {
+        if values != self.values || origins != self.origins || output != self.ordered_output {
             return Err(unsupported(
                 "Submodule configuration changed during discovery",
             ));
@@ -2573,6 +2564,36 @@ mod tests {
                 .contains("changed during discovery")
         );
         config.revalidate().expect("original evidence retained");
+    }
+
+    #[test]
+    fn child_fetch_destination_preserves_first_url_and_rewrite_order() {
+        let root = tempfile::tempdir().expect("fixture");
+        std::fs::write(root.path().join("config"), "").expect("source");
+        let output = |records: &[&str]| {
+            records
+                .iter()
+                .map(|record| format!("file:{}\0{record}\0", root.path().join("config").display()))
+                .collect::<String>()
+        };
+        let first = output(&[
+            "remote.origin.url\nalias:repo",
+            "remote.origin.url\ngit://ignored.invalid/repo",
+            "url.git://first.invalid/.insteadof\nalias:",
+            "url.git://second.invalid/.insteadof\nalias:",
+        ]);
+        let config = ChildConfig::capture(first.as_bytes(), root.path()).expect("config");
+        assert_eq!(
+            config.fetch_destinations("origin").expect("fetch"),
+            ["git://first.invalid/repo"]
+        );
+        let reordered = output(&[
+            "remote.origin.url\nalias:repo",
+            "remote.origin.url\ngit://ignored.invalid/repo",
+            "url.git://second.invalid/.insteadof\nalias:",
+            "url.git://first.invalid/.insteadof\nalias:",
+        ]);
+        assert!(config.verify_host(reordered.as_bytes()).is_err());
     }
 
     #[cfg(unix)]
