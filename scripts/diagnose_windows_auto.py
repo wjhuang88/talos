@@ -43,6 +43,7 @@ def filetime_text(ticks: int) -> str:
 
 
 def first_child_window(text: str) -> tuple[int, int, int]:
+    text = text.replace("\r\n", "\n")
     lifetime = re.findall(r"^WINDOWS_AUTO_DIAG lifetime_read_ok=1 created_100ns=(\d+) exited_100ns=(\d+) identity=(\d+) pid=(\d+) thread=ThreadId\(\d+\)$", text, re.M)
     if len(lifetime) != 1:
         raise ValueError("ambiguous lifetime")
@@ -167,14 +168,16 @@ def lifecycle_self_test() -> None:
               "WINDOWS_AUTO_DIAG child_pid=3400 identity=608\n"
               f"WINDOWS_AUTO_DIAG lifetime_read_ok=1 created_100ns={created} exited_100ns={exited} identity=608 pid=8892 thread=ThreadId(135)\n")
     assert first_child_window(source) == (3400, created, exited)
+    assert first_child_window(source.replace("\n", "\r\n")) == (3400, created, exited)
     for bad in (source + source, source.replace("child_pid=3400", "child_pid=0"),
                 source.replace("identity=608\nWINDOWS_AUTO_DIAG child", "identity=608\ninterleaved\nWINDOWS_AUTO_DIAG child")):
-        try:
-            first_child_window(bad)
-        except ValueError:
-            pass
-        else:
-            raise AssertionError("ambiguous child must be rejected")
+        for candidate in (bad, bad.replace("\n", "\r\n")):
+            try:
+                first_child_window(candidate)
+            except ValueError:
+                pass
+            else:
+                raise AssertionError("ambiguous child must be rejected")
     stamp = filetime_text(created + 1)
     assert stamp == "2026-10-16T09:14:51.9094392Z"
     xml = (f'<Events><Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System>'
@@ -209,7 +212,7 @@ def lifecycle_self_test() -> None:
 
     with tempfile.TemporaryDirectory() as directory:
         output = Path(directory)
-        (output / "instrumented-suite-first-1.log").write_text(source)
+        (output / "instrumented-suite-first-1.log").write_bytes(source.replace("\n", "\r\n").encode("utf-8"))
         for timeout, reap_failure in ((False, False), (True, False), (True, True)):
             utility = Utility(timeout, reap_failure)
             with patch.dict(os.environ, {"SystemRoot": directory}), patch.object(subprocess, "Popen", return_value=utility) as launch:

@@ -2,7 +2,7 @@
 
 Date: 2026-10-11. Baseline: `444a8137f054b33802f26bffdb55fb0f83a7a861`.
 
-Current stage (2026-10-16): post-test first-child engine-event metadata; native execution pending.
+Current stage (2026-10-16): repair diagnostic identity parsing for Windows CRLF; fresh native execution pending.
 Earlier matrices, pending statements and tool availability below are preserved staged history;
 the latest checkpoint defines the current fixed 120-process / 2220-test experiment.
 
@@ -865,3 +865,55 @@ that gate is now set only after matrix returns, and successful restoration prece
 Three disposable main-flow fixtures verify completed60with an original failure retains exit1
 and collects once, build-abort and matrix-watchdog-abort collect zero times, and all six raw
 snapshots restore in every path. These are mocked flow checks, not new native passing tests.
+
+
+## CI3212 Harness Failure And CRLF Parsing Repair — 2026-10-16
+
+CI3212/run38886936675, exact505a51bb9f379813ac1f82c18317c8929264d75f, attempt1, completed
+FAILED. The six ordinary jobs succeeded. BOTH diagnostic jobs failed in the added lifecycle
+self-test at line223, checking receipt.status equals records for the normal mock query. Their
+original test matrices did not start; no baseline/instrumented diagnostic artifact exists.
+The separate i170walkthrough artifact is not a diagnostic matrix. This is a diagnostic harness
+failure, not a new original Auto/evaluator timeout, and contributes no new120/2220execution count.
+CI3211's2219pass/1fail and all preceding failed evidence remain unchanged and authoritative.
+
+Determined failure chain: Path.write_text(source) uses platform newline translation, producing
+CRLF on Windows. The collector reads raw bytes and decodes UTF8 without text-mode universal newline
+conversion. first_child_window's intact-line regular expressions required LF, so a CR before the
+end anchor made the lifetime record unmatched. The collector correctly returned unavailable,
+but the self-test correctly expected records and failed. Primary Python3.12 newline contract:
+https://docs.python.org/3.12/library/functions.html#open
+On Linux, executing the EXACT previous lifecycle_self_test with Path.write_text forced to Windows
+newline translation reproduces its same assertion at223. The proposed version passes the SAME
+simulation. This determines the diagnostic fixture/parser failure, not the underlying intermittent
+Windows timeout. It is not native query availability or event-schema evidence.
+
+Small correction: normalize only CRLF pairs to LF inside first_child_window before the existing
+strict identity/adjacent-record matches. No trimming, arbitrary whitespace acceptance, joining
+interleaved lines, substitute PID, weakened assertion or error suppression. Existing LF logs
+keep the same tuple; CRLF versions produce that identical tuple. Duplicate receipts, invalidPID
+and interleaved adjacency are explicitly rejected in BOTH encodings. The mock first-suite file
+now writes deterministic UTF8 CRLF bytes even on Linux, making this Windows path part of every
+self-test rather than hiding it behind the host platform's default newline. Collector query,
+record/status/privacy/caps/reaping logic and all original Rust overlays/workflow/sources,
+dependencies/lockfile/toolchain/deadlines/assertions/first-call order remain unchanged.
+
+The earlier transient worktree had reverted to the pre-collector snapshot and the CI3211 local
+ZIPs were absent on resumption. Retrieved both exact505a51bb remote blobs again and verified Git
+blob identities(script41b1d085b543fa80ad1bec4e364257d36f285f39 and ownerc3ca7a30c304a2ef84a04b769166f0aa51dcea85).
+Reconstructed tree2ae6889283dfd11653afd188e857be1107777ba6 exactly before applying this delta;
+prior native/evidence statements above remain historical records, not fresh local revalidation.
+
+Local correction checks: exact old self-test FAIL223 under Windows newline simulation, fixed
+same simulation PASS; diagnostic self-test, LF/CRLF strict-identity regressions, classifier14,
+text boundary23crates and whitespace PASS. Original assertions remain exercised. No rerun of
+unchanged505a51bb to replace CI3212, no Windows query success or timeout-root closure claimed.
+Fresh independent review/governance and a new native run remain required. #705 staysOPEN/unmerged;
+I301/I304Complete/Closed, old10s15s/evaluator5s/Pluginunknown and other-task owners unchanged.
+
+Both governance validators now PASS0warnings with actual pinned1.99/locked metadata
+(SQLite17/delivery12 fixture cases). Six generated Rust overlays byte-compare identical to
+exact505a51bb's reconstructed tree; workflow/production/deps/lock/toolchain have no delta.
+The independent causal review repeats oldFAIL/newPASS and confirms the parsing fix preserves
+strict identities. Final exact-local and exact-remote publication reviews follow separately.
+CI3212 failure/diagnostic classification is also recorded in comment6217759937.
