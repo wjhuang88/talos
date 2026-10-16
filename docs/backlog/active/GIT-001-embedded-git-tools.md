@@ -1,5 +1,16 @@
 # GIT-001: Built-in Git Tools — Native Git Support
 
+Tracking recheck (2026-10-16): the live crates.io sparse index at
+`https://index.crates.io/3/g/gix` still ends at non-yanked `gix 0.89.0`
+(MSRV 1.88), while the Talos lockfile remains at 0.87.1. This is a release
+availability check, not a new API or parity review. The 0.89.0 source audit
+below remains the capability evidence: fetch, merge primitives and some
+worktree operations are available, but it did not establish complete
+checkout/switch, push, or Pull merge/rebase orchestration. Keep the existing
+host-Git bridges and their separate Read/Write/Execute and network admission
+until each replacement passes operation-specific parity, security, unavailable-
+host, and runtime tests. No Git-removal date can be inferred from this recheck.
+
 ## Outcome
 
 Talos provides a comprehensive set of built-in Git tools powered by the `gix` crate (pure Rust
