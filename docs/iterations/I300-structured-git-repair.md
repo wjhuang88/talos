@@ -1,3 +1,18 @@
+Changed gitlink checkpoint (2026-10-16, `7ba1fbdd`): post-fetch discovery
+now runs bounded recursive combined diffs for each newly reachable commit and
+retains only new-side gitlinks at changed paths. Real two-parent merge fixtures
+exclude links inherited from either parent and include a novel merge result;
+the real self-fetch fixture covers a nested gitlink path. NUL framing, duplicate
+and traversal failures preserve retained state. Configured diff.orderFile now
+requires exact Read admission and retained path/content evidence even without
+pre-fetch rebase cleanliness checks. Initial regressions exposed a missing -r
+and a macOS canonical-path assertion; both were corrected before final validation.
+Locked all-feature Pull tests pass 60/60 and all-target all-feature tools Clippy
+passes. Child policy/name aggregation, initialized child identity/config/remote
+admission, nested fetch, integration, runtime evidence, independent review and
+full current-head preflight remain open. Production fetch remains disabled;
+I300/T7 remains Active. This is a local implementation stage, not publication.
+
 Historical module checkpoint (2026-10-16, `a1580b8d`): post-fetch tree
 discovery now reads each .gitmodules blob by its validated object ID through
 the owned runner, then parses it with gix without includes and with a panic
