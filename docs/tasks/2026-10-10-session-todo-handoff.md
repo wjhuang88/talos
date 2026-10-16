@@ -1,3 +1,16 @@
+Network continuation checkpoint (2026-10-16, `05668643`): a real loopback Git
+daemon now exercises the implemented parent fetch through execute_stage. All
+three fresh-read outcomes are covered: approval reaches integration selection;
+absent proof and replayed fetch proof refuse. The continuation has no Write or
+Network facets; fetched metadata is retained and no index is created. The
+fixture explicitly configures upstream tracking so FETCH_HEAD contains a merge
+candidate (its initial missing-upstream run correctly refused selection).
+Locked all-feature Pull tests pass 56/56 and all-target all-feature tools Clippy
+passes with incremental compilation disabled. These are tools-layer unit
+fixtures, not real Agent/MCP evidence; production activation remains disabled.
+Recursive child planning/execution, integration writes, cancellation/budget and
+runtime matrices, independent review, full preflight and publication remain open.
+
 Activation correction (2026-10-16, `240f322f`): ADR-089 explicitly requires
 recursive execution, runtime evidence and independent review before production
 fetch activation. The earlier parent-fetch stage enabled that path prematurely;
