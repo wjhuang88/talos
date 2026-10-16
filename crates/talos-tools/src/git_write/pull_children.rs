@@ -13,6 +13,40 @@ pub(super) struct Tree {
     pub(super) module_names: BTreeMap<String, String>,
 }
 
+/// A declared module's changed objects, in parent revision-walk order.
+/// Unnamed gitlinks remain in Tree until separately admitted populated-path
+/// discovery can resolve Git's legacy name fallback.
+#[derive(Debug, PartialEq, Eq)]
+pub(super) struct Changed {
+    pub(super) commit: String,
+    pub(super) path: String,
+    pub(super) objects: std::collections::BTreeSet<String>,
+}
+
+pub(super) fn collect_named_changes(
+    commits: &[String],
+    trees: &BTreeMap<String, Tree>,
+) -> Result<BTreeMap<String, Changed>, GitToolError> {
+    let mut result: BTreeMap<String, Changed> = BTreeMap::new();
+    for commit in commits {
+        let tree = trees.get(commit).ok_or_else(|| {
+            GitToolError::InvalidInput("Missing Pull child tree during aggregation".into())
+        })?;
+        for (path, object) in &tree.changed_gitlinks {
+            let Some(name) = tree.module_names.get(path) else {
+                continue;
+            };
+            let changed = result.entry(name.clone()).or_insert_with(|| Changed {
+                commit: commit.clone(),
+                path: path.clone(),
+                objects: std::collections::BTreeSet::new(),
+            });
+            changed.objects.insert(object.clone());
+        }
+    }
+    Ok(result)
+}
+
 impl Tree {
     /// Parse an admitted `ls-tree -r -z --full-tree` listing without filesystem
     /// discovery, config includes, path expansion, or child repository access.
@@ -180,6 +214,30 @@ impl Tree {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pull_named_changes_keep_first_revision_path_and_all_objects() {
+        let mut trees = BTreeMap::new();
+        for (commit, path, object) in [("z", "renamed", "b"), ("a", "old", "a")] {
+            let mut tree = Tree::parse(b"", 40).expect("tree");
+            tree.changed_gitlinks.insert(path.into(), object.repeat(40));
+            tree.changed_gitlinks
+                .insert("undeclared".into(), "c".repeat(40));
+            tree.module_names.insert(path.into(), "Child".into());
+            // Module names are case sensitive.
+            tree.changed_gitlinks.insert("lower".into(), "d".repeat(40));
+            tree.module_names.insert("lower".into(), "child".into());
+            trees.insert(commit.into(), tree);
+        }
+        let commits = vec!["z".into(), "a".into()];
+        let changed = collect_named_changes(&commits, &trees).expect("changes");
+        assert_eq!(changed.len(), 2);
+        assert_eq!(changed["Child"].commit, "z");
+        assert_eq!(changed["Child"].path, "renamed");
+        assert_eq!(changed["Child"].objects.len(), 2);
+        assert_eq!(changed["child"].objects.len(), 1);
+        assert!(collect_named_changes(&["missing".into()], &trees).is_err());
+    }
 
     #[test]
     fn pull_combined_changes_exclude_links_inherited_from_a_parent() {

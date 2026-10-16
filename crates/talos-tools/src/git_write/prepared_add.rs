@@ -224,6 +224,7 @@ pub(super) struct AddPlan {
     pull_ref_tips: Option<Vec<String>>,
     pull_new_commits: Vec<String>,
     pull_child_trees: BTreeMap<String, super::pull_children::Tree>,
+    pull_changed_children: BTreeMap<String, super::pull_children::Changed>,
     identity: PreparedPlanIdentity,
     workspace: PathBuf,
     input: Value,
@@ -623,6 +624,7 @@ impl AddPlan {
             pull_ref_tips: None,
             pull_new_commits: Vec::new(),
             pull_child_trees: BTreeMap::new(),
+            pull_changed_children: BTreeMap::new(),
             identity: PreparedPlanIdentity::new(),
             workspace: workspace.to_owned(),
             input: input.clone(),
@@ -1455,6 +1457,10 @@ impl AddPlan {
             tree.bind_changes(&changes.stdout)?;
             self.pull_child_trees.insert(commit.clone(), tree);
         }
+        self.pull_changed_children = super::pull_children::collect_named_changes(
+            &self.pull_new_commits,
+            &self.pull_child_trees,
+        )?;
         self.pull_integration = Some(
             self.pull_before
                 .as_ref()
@@ -12268,6 +12274,10 @@ pub(super) mod tests {
             Some(child_oid)
         );
         assert_eq!(child_tree.changed_gitlinks, child_tree.gitlinks);
+        let changed = &next.pull_changed_children["child"];
+        assert_eq!(changed.commit, target);
+        assert_eq!(changed.path, "missing/child");
+        assert!(changed.objects.contains(child_oid));
         assert!(child_tree.modules_blob.is_some());
         assert_eq!(
             child_tree
