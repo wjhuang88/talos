@@ -198,6 +198,20 @@ fn startup_values(entry: &snapshot::Entry) -> Result<StartupValues, GitToolError
 }
 
 impl ChildConfig {
+    pub(super) fn prepare_pull_transport(&self, remote: &str) -> Result<(), GitToolError> {
+        for key in [
+            format!("remote.{remote}.uploadpack"),
+            format!("remote.{remote}.vcs"),
+        ] {
+            if self.values.contains_key(key.as_bytes()) {
+                return Err(unsupported(
+                    "Configured Pull child transport helper requires separate execution authorization",
+                ));
+            }
+        }
+        Ok(())
+    }
+
     /// Return the last configured URL for a named child remote without
     /// contacting it or resolving helpers.
     pub(super) fn remote_url(&self, remote: &str) -> Result<Option<String>, GitToolError> {

@@ -1797,6 +1797,7 @@ impl AddPlan {
             }
             let output = self.inspect_config_at(workdir).await?;
             let config = super::config_state::ChildConfig::capture(&output, workdir)?;
+            config.prepare_pull_transport("origin")?;
             if let Some(url) = config.remote_url("origin")? {
                 self.facets.push(
                     ToolPermissionFacet::with_resource(
