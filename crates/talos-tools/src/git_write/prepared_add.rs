@@ -234,6 +234,7 @@ pub(super) struct AddPlan {
         Option<super::receiver_state::Metadata>,
     )>,
     pull_index_children: BTreeMap<String, String>,
+    pull_child_fetch_targets: BTreeMap<PathBuf, (String, Vec<String>)>,
     pull_current_fetch_children: BTreeMap<String, super::pull_children::Recursion>,
     pull_current_modules: Option<super::pull_children::Tree>,
     pull_modules_evidence: Option<PullAttribute>,
@@ -642,6 +643,7 @@ impl AddPlan {
             pull_changed_children: BTreeMap::new(),
             pull_child_layouts: Vec::new(),
             pull_index_children: BTreeMap::new(),
+            pull_child_fetch_targets: BTreeMap::new(),
             pull_current_fetch_children: BTreeMap::new(),
             pull_current_modules: None,
             pull_modules_evidence: None,
@@ -1964,9 +1966,19 @@ impl AddPlan {
                     )?);
                 }
             }
-            config.prepare_pull_transport("origin")?;
-            for url in config.fetch_destinations("origin")? {
-                if let Some(path) = super::remote_state::local_destination(&url, workdir)? {
+            let metadata = self
+                .pull_child_layouts
+                .iter()
+                .find(|(root, _)| &root.spelling == workdir)
+                .and_then(|(_, metadata)| metadata.as_ref())
+                .ok_or_else(|| {
+                    GitToolError::InvalidInput("Pull child HEAD evidence missing".into())
+                })?;
+            let remote = config.fetch_remote(metadata.branch()?)?;
+            config.prepare_pull_transport(&remote)?;
+            let destinations = config.fetch_destinations(&remote)?;
+            for url in &destinations {
+                if let Some(path) = super::remote_state::local_destination(url, workdir)? {
                     self.facets.push(path_facet(
                         ToolNature::Read,
                         &path,
@@ -1977,7 +1989,7 @@ impl AddPlan {
                 self.facets.push(
                     ToolPermissionFacet::with_resource(
                         ToolNature::Network,
-                        url,
+                        url.clone(),
                         ToolResourceKind::Remote,
                     )
                     .with_description(
@@ -1985,6 +1997,8 @@ impl AddPlan {
                     ),
                 );
             }
+            self.pull_child_fetch_targets
+                .insert(workdir.clone(), (remote, destinations));
             self.child_configs.push((workdir.clone(), config));
         }
         if !self.pull_config_sources_discovered {

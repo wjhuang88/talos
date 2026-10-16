@@ -199,6 +199,11 @@ fn startup_values(entry: &snapshot::Entry) -> Result<StartupValues, GitToolError
 }
 
 impl ChildConfig {
+    /// The first recursive fetch uses ordinary fetch default-remote semantics.
+    pub(super) fn fetch_remote(&self, branch: Option<&str>) -> Result<String, GitToolError> {
+        super::pull_state::fetch_remote(&self.ordered_output, branch, None)
+    }
+
     pub(super) fn prepare_pull_transport(&self, remote: &str) -> Result<(), GitToolError> {
         for key in [
             format!("remote.{remote}.uploadpack"),
@@ -2267,6 +2272,34 @@ mod tests {
             .expect("capture");
         config.verify_host(first.as_bytes()).expect("same ordering");
         assert!(config.verify_host(reordered.as_bytes()).is_err());
+    }
+
+    #[test]
+    fn child_fetch_remote_binds_branch_and_single_remote_defaults() {
+        let root = tempfile::tempdir().expect("fixture");
+        let path = root.path().join("config");
+        std::fs::write(&path, "").expect("source");
+        let output = [
+            "remote.backup.url\ngit://backup.invalid/repo",
+            "remote.upstream.url\ngit://upstream.invalid/repo",
+            "branch.Topic.remote\nupstream",
+        ]
+        .iter()
+        .map(|record| format!("file:{}\0{record}\0", path.display()))
+        .collect::<String>();
+        let config = ChildConfig::capture(output.as_bytes(), root.path()).expect("config");
+        assert_eq!(
+            config.fetch_remote(Some("Topic")).expect("branch"),
+            "upstream"
+        );
+        assert_eq!(config.fetch_remote(Some("topic")).expect("case"), "origin");
+        assert_eq!(config.fetch_remote(None).expect("detached"), "origin");
+        let output = format!(
+            "file:{}\0remote.backup.url\ngit://backup.invalid/repo\0",
+            path.display()
+        );
+        let config = ChildConfig::capture(output.as_bytes(), root.path()).expect("config");
+        assert_eq!(config.fetch_remote(None).expect("single"), "backup");
     }
 
     #[test]
