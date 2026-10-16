@@ -1,3 +1,16 @@
+Named child aggregation checkpoint (2026-10-16, `ad62ef9e`): post-fetch
+discovery now aggregates declared changed modules by case-sensitive name,
+retaining the first revision-walk commit/path and the deduplicated required
+child object IDs across historical path changes. Missing tree evidence refuses.
+The real self-fetch fixture verifies the retained module requirement; the pure
+regression covers rename history, first-seen order and distinct name casing.
+Undeclared gitlinks remain retained in tree evidence pending separately admitted
+populated-path discovery; they are not silently declared ineligible. Locked
+all-feature Pull tests pass 61/61; all-target all-feature tools Clippy passes.
+Child recursion policy, current-index candidates and legacy name fallback,
+identity/config/remote admissions, nested fetch, integration and final delivery
+gates remain open. Production fetch remains disabled; I300/T7 stays Active.
+
 Changed gitlink checkpoint (2026-10-16, `7ba1fbdd`): post-fetch discovery
 now runs bounded recursive combined diffs for each newly reachable commit and
 retains only new-side gitlinks at changed paths. Real two-parent merge fixtures
