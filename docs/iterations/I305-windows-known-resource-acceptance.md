@@ -1,6 +1,6 @@
 # Iteration I305: Windows Known-Resource Acceptance
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-10-16
 > Planned objective: replace an unqualified process-total gate with tested known-resource cleanup acceptance.
 > Baseline rule: preserve this scope; a different acceptance target uses another iteration.
@@ -10,13 +10,13 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | TEST-004 known successful-return Windows resource cleanup acceptance, native call-site coverage and real negative controls; no production launcher/search behavior or I302 PSS attribution. |
 | Claimed At | 2026-10-16 |
 | Source Issue | #729 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #730 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer explicitly accepted #717 proposal6217718821 on2026-10-16 at22:39 Asia/Shanghai and continued GitHub delivery. No distinct maintainer reviewer available; independent protected Agent security/technical review, exact-head CI, validators and CAS remain mandatory. |
 | Implementation PR | #716 after effective claim merge and baseline refresh; separate I305 commits |
@@ -79,3 +79,19 @@ code, unsafe, feature/dependency or production change. No Completion Commit exis
 Draft validators/protected contract review/exact-head applicable CI/CAS pending. Implementation and
 native positive/negative evidence pending. Keep new owner Active/Review only after effective claim,
 and Complete only with existing implementation evidence. #717/#643/#624 remain open.
+
+## Final Atomic Proposal — #730
+
+This Active/Claimed record and ADR-091 amendment are proposed together in governance-only #730.
+They become effective only upon reviewed exact-head CI/validator/CAS main merge. No implementation
+branch/code/test/native/production/dependency change exists in this candidate. The maintainer's
+22:39 acceptance authorizes this bounded change; no second confirmation is required. Independent
+protected Agent contract review is mandatory and is not distinct natural-person approval.
+
+### Local Governance Checkpoint
+
+Pinned1.99 actual locked dependency metadata governance passed SQLite17/delivery12 with0warnings;
+claims0warnings/text23/classifier14/diff passed. Independent protected nine-file working-tree
+contract review APPROVES governance proposal, not effectiveness/implementation/native execution.
+Authorization is the maintainer's22:39 session acceptance of proposal6217718821, not the older
+proposal comment's content. Fresh exact-remote review, applicable CI and final CAS remain.

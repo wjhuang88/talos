@@ -28,6 +28,7 @@ PR #682 merged as `a3a4753d6e42123e33ead1d7e6f769a96f85f37e`, with final accepta
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
+| Windows known-resource acceptance | Active / Claimed (proposed) | [TEST-004](backlog/active/TEST-004-windows-known-resource-acceptance.md) / [I305](iterations/I305-windows-known-resource-acceptance.md) / #729 | #730 atomic claim/ADR091 amendment; effective only after protected review/CI/CAS/main merge. I302 residual stays open; no production change or automatic #716 merge. |
 | Absent-journal pause without initialization | Complete / Closed | [RUNTIME-011](backlog/active/RUNTIME-011-absent-journal-pause.md) / [I304](iterations/I304-absent-journal-pause.md) | #726 implementation `aa1c477f` merged `c869a9af`; CI3203/review/CAS and CI3206 post-repair2220/2220 passed. I304 retains local failures; #705 retains broader timeout residuals. |
 | Embedded Skill progressive disclosure | Complete / Closed | [SKILL-006](backlog/active/SKILL-006-embedded-skill-progressive-disclosure.md) / [I303](iterations/I303-embedded-skill-progressive-disclosure.md) / #719 | #721 merged as `6d72975e`; exact-head CI, independent security/API review and CAS passed. |
 | Windows self-only handle evidence | Active / Claimed (proposed) | [TEST-003](backlog/active/TEST-003-windows-owned-handle-evidence.md) / [I302](iterations/I302-windows-owned-handle-evidence.md) / #717 | #718 proposes atomic ADR-091/claim; ineffective until protected review/CI/CAS and main merge. No PSS code yet. |

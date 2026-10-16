@@ -1,6 +1,6 @@
 # TEST-004: Known Windows Native Resource Cleanup Acceptance
 
-**Status**: Ready / Unclaimed; atomic governance preparation
+**Status**: In Progress / Claimed; atomic proposal #730, ineffective until main merge
 **Type**: Technical Story / bounded test correction
 **Parent Epic**: None; related TEST-003/#717 and SEARCH-001-C/#643
 **Source Issue**: #729
@@ -10,13 +10,13 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | TEST-004 known successful-return Windows resource cleanup acceptance, native call-site coverage and real negative controls; no production launcher/search behavior or I302 PSS attribution. |
 | Claimed At | 2026-10-16 |
 | Source Issue | #729 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #730 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer explicitly accepted #717 proposal6217718821 on2026-10-16 at22:39 Asia/Shanghai and continued GitHub delivery. No distinct maintainer reviewer available; independent protected Agent security/technical review, exact-head CI, validators and CAS remain mandatory. |
 | Implementation PR | #716 after effective claim merge and baseline refresh; separate I305 commits |
@@ -74,3 +74,11 @@ is the Windows fault/negative fixture and bounded receipts; infrastructure-only 
 feature claim. Update this owner/I305/ADR091, Board/index/matrix and Issue. Revert test-only acceptance
 instrumentation if native proof fails; original historical failure remains available. No completion
 commit exists. Governance-only draft, not implementation or effective activation.
+
+## Final Atomic Proposal — #730
+
+This Active/Claimed record and ADR-091 amendment are proposed together in governance-only #730.
+They become effective only upon reviewed exact-head CI/validator/CAS main merge. No implementation
+branch/code/test/native/production/dependency change exists in this candidate. The maintainer's
+22:39 acceptance authorizes this bounded change; no second confirmation is required. Independent
+protected Agent contract review is mandatory and is not distinct natural-person approval.

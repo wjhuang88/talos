@@ -2,6 +2,11 @@
 
 ## Purpose
 
+[I305](I305-windows-known-resource-acceptance.md) / [TEST-004](../backlog/active/TEST-004-windows-known-resource-acceptance.md)
+is an Active/Claimed atomic proposal #730 for maintainer-accepted known-resource cleanup acceptance.
+ADR-091 amendment/claim are ineffective until exact-head protected review/CI/CAS and main merge.
+I302 retains unexplained native-resource residuals; no implementation or original-defect closure.
+
 [I304](I304-absent-journal-pause.md) / [RUNTIME-011](../backlog/active/RUNTIME-011-absent-journal-pause.md)
 is Complete / Closed for the absent-journal pause no-op, distinct from I301 recovery reads.
 #726 merged as `c869a9af` after CI3203/review/CAS; CI3206 post-repair Windows comparison passed
