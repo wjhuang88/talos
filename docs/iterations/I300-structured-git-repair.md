@@ -1,3 +1,24 @@
+Child selection policy checkpoint (2026-10-16, `e9321876`, `03da666e`):
+current-index declared candidates now retain On/OnDemand eligibility by module
+name, preserving unmapped paths for separately admitted legacy discovery. This
+selection does not mark a module seen before an initialized child yields a task.
+Historical candidates retain activity precedence: last per-name active boolean,
+then submodule.active pathspecs, then valued URL presence. Ordinary pathspecs use
+panic-guarded gix plumbing without filesystem discovery; glob, exclusion,
+icase, literal, directory and absolute-root cases pass. Eight matching cases also
+match isolated native Git 2.54 submodule-init outcomes (no network access).
+Attribute pathspecs stay
+explicitly unresolved, and invalid activity stays dormant until scheduling;
+neither is silently treated as inactive. Locked all-feature Pull tests pass
+70/70 and all-target all-feature tools Clippy passes (logs:
+/private/tmp/i300-child-activity-tests.log and
+/private/tmp/i300-child-activity-clippy.log). These are local policy tests, not
+native recursive-fetch equivalence or delivery evidence. Remaining: admitted
+attribute evaluation, legacy populated-path discovery, initialized/absorbed child
+identity/config/remote admission, required-object checks and retries, nested
+fetch, integration execution and original delivery gates. Production Pull stays
+disabled; I300/T7 remains Active; later handoff tasks remain unactivated.
+
 Current module source checkpoint (2026-10-16, `4d751699`): Pull now admits
 worktree .gitmodules as an exact Read path before capturing regular-file or
 absence evidence. Revalidation binds that evidence across parent fetch and
