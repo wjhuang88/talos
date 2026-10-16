@@ -6269,6 +6269,14 @@ pub(super) mod tests {
         let parent = root.path().join("parent");
         let native = root.path().join("native");
         let prepared = root.path().join("prepared");
+        let child_policy_cases = [
+            ("global-off-child-on", "false", "true", false),
+            ("global-on-child-off", "true", "false", true),
+            ("global-demand-child-on", "on-demand", "true", true),
+            ("global-on-child-demand", "true", "on-demand", true),
+            ("global-default-child-off", "", "false", false),
+            ("global-default-child-on", "", "true", true),
+        ];
         let policy_cases = [
             (
                 "off-last",
@@ -6388,6 +6396,30 @@ pub(super) mod tests {
             }
         }
 
+        for (name, global, local, _) in child_policy_cases {
+            let checkout = root.path().join(name);
+            git(
+                root.path(),
+                &[
+                    "clone",
+                    "--recurse-submodules",
+                    path(&parent_remote),
+                    path(&checkout),
+                ],
+            );
+            if !global.is_empty() {
+                git(&checkout, &["config", "fetch.recurseSubmodules", global]);
+            }
+            git(
+                &checkout,
+                &[
+                    "config",
+                    "submodule.modules/child.fetchRecurseSubmodules",
+                    local,
+                ],
+            );
+        }
+
         std::fs::write(child.join("file"), b"two\n").expect("new child source");
         git(&child, &["add", "file"]);
         git(&child, &["commit", "-m", "child two"]);
@@ -6438,6 +6470,13 @@ pub(super) mod tests {
             );
             git(&checkout, &["fetch", "--update-head-ok", "origin"]);
             assert_eq!(has_child_object(&checkout), *fetches_child, "{name}");
+        }
+
+        for (name, _, _, fetches_child) in child_policy_cases {
+            let checkout = root.path().join(name);
+            assert!(!has_child_object(&checkout));
+            git(&checkout, &["fetch", "--update-head-ok", "origin"]);
+            assert_eq!(has_child_object(&checkout), fetches_child, "{name}");
         }
 
         let program = resolve_git(&execution_environment()).expect("absolute Git");
