@@ -1,6 +1,8 @@
 # RUNTIME-011: Absent-Journal Pause Without Initialization
 
-> Document status: Review
+> Document status: Complete
+
+Completion Commit: aa1c477f1a457dc44ad039cc72bf9ed19842bf83
 
 **Type**: Technical / Runtime State Story
 **Parent Epic**: None
@@ -10,7 +12,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex |
 | Work Slice | Absent-journal pause no-op under the existing pending-store guard; storage and real Actor/Runtime shutdown regressions and documentation only. Existing-journal durability, admission authority and shutdown policy remain unchanged. |
@@ -19,9 +21,9 @@
 | Governance Claim PR | #722 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer authorized continuing the intermittent-timeout investigation and grounded repair using GitHub CI. No distinct maintainer reviewer is available; independent Agent storage/custody/API review, exact-head CI, both validators and merge-time CAS are mandatory. |
-| Implementation PR | Not started |
-| Last Updated | 2026-10-15 |
-| Handoff / Release Condition | No implementation branch or committed implementation before finalized claim reaches main; stop if the optimization requires new custody semantics or an ADR change. |
+| Implementation PR | #726 (merged as c869a9afc2871d82c7fe0a18d1bfddf903831b59) |
+| Last Updated | 2026-10-16 |
+| Handoff / Release Condition | Bounded absence/pause acceptance complete at #726; #705 retains independent timeout investigation. No release or broader latency guarantee. |
 
 ## Identity / Goal / Value
 
@@ -115,3 +117,52 @@ historical. Delivery is Review / Claimed; the execution and validation record is
 Guard-before-absence, storage regressions and actual Actor/Runtime shutdown tests implement this
 slice. Independent exact-head custody/API review, full native CI and post-repair Windows comparison
 with preserved CI3182 remain gates. No Completion Commit or timeout-closure claim exists.
+
+
+## Bounded Acceptance Closeout — 2026-10-16
+
+Current delivery is Complete / Closed. Earlier proposal/pending/Review paragraphs are preserved
+history and are superseded only for this bounded pause slice by this closeout.
+
+Implementation #726 exact aa1c477f1a457dc44ad039cc72bf9ed19842bf83 merged as
+c869a9afc2871d82c7fe0a18d1bfddf903831b59 after CI3203/run38755790909 all six jobs SUCCESS,
+attempt1, independent exact-head storage/custody/API review6195119208 and merge CAS6205402481.
+The merge tree1a239eee60205d7a421472b4c66b5b6e8b21d4de equals the reviewed implementation tree.
+Windows and macOS executed unchanged full suites; macOS full release preflight passed. The
+original local2195pass/1fail Unix-socket EPERM and earlier Plugin admission failure remain
+retained in I304; remote success does not explain the Plugin failure or waive local failure.
+
+Acceptance evidence maps to the published requirements:
+- Verified absence under the existing guard returns0 with no parent/database/schema creation;
+  real later admission/reopen remains durable. Existing Accepted/Paused/Running data, counts,
+  receipts/payloads/order and unchanged WAL/FULL/immediate transaction behavior are covered.
+- Independent-store admission before/after pause, Runtime closing/start-fence tests, conservative
+  ParentDir/link/error/schema behavior and real PermissionDenied keep their original authority.
+- Actual Actor absence is checked after shutdown/task join; Runtime empty shutdown preserves
+  receipts, post-close RuntimeClosing and no runtime storage. Nonempty and failed reconciliation
+  assertions remain unchanged. Session241tests, both SDK executable modes and native CI passed.
+- Post-repair #705 exact ff84ec7064edb54ace27ba7c2700f028e5dfaef6 integrates actual #726 main
+  with only three temporary diagnostic files; its six production Rust sources match this merge.
+  CI3206/run38832452061 all eight jobs SUCCESS attempt1, with both independent fresh-first
+  Windows phases60processes/1110pass0fail0ignored each (2220total). All original deadlines and
+  assertions remain, no warmup/ignored case/retry-to-green. Both65-file ZIPs are independently
+  hashed; all12original/restored raw byte receipts match. Evidence comment6209342583 records
+  IDs, SHA256, source/manifest validation and comparison limits; I304 records the full checkpoint.
+
+All60matched original-Auto pause paths classified absence without connection/commit stages.
+Pause median0.2475ms/max0.351ms, caller median0.33075ms/max0.527ms and shutdown
+median1.07815ms/max1.726ms support the structural optimization against retained CI3182's
+successful pause1.5210834s/caller1.5214184s/shutdown1.5225249s. Different production baselines,
+runner image/VM and probe overhead prevent a controlled causal speedup or universal guarantee.
+
+README.md, README.zh-CN.md and RUNTIME-SDK-CONTRACT.md were updated in #726. No new API,
+persistent-state semantics, custody, permission, dependency or release change is part of this
+closeout. #590/I290/I291 stay terminal; I301 stays Review under its own acceptance. Historical
+CI3182 evaluator composite5s failure, old10s/15s failures, native active-child latency,
+existing-journal costs and prior Plugin uncertainty remain #705 residuals. This completion
+neither closes the intermittent-timeout investigation nor authorizes merging temporary #705.
+
+
+Independent completed-evidence/local closeout review: #705 comment6209379440. Final closeout-head
+review/CI, both governance validators and merge CAS remain required before this owner update
+reaches main; the existing bounded claim authorizes this owner/derived-view synchronization.
