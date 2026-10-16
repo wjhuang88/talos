@@ -3725,7 +3725,16 @@ configuration identity/origin tests pass 3/3. `8a312b3e` also restores the disti
 Commit/Checkout gitdir interpretation during shared child revalidation.
 Broader validation: `cargo test --locked -p talos-tools --all-features --lib`
 passes 779/779. This is crate-library evidence, not workspace or delivery closure.
-External Pull gitdir/commondir admission waves remain incomplete: resolving a
-marker is not evidence of an executable, independently admitted identity flow.
-Child remote semantics, object admission, recursive fetch, integration, and
+`98dff9b9` supersedes the helper-only external-gitdir prototype: separate marker,
+gitdir/fixed-pointer, and common-root waves retain shared Root/Metadata evidence.
+The prepared-plan test consumes fresh permission-engine proofs at each wave,
+leaves targets absent until their own wave, and rejects subsequent marker and
+commondir redirection. The duplicate marker parser was removed; Pull/Checkout
+share exact child Read validation. Tools library tests pass 779/779.
+`2edba07e` reuses ordered fetch destination resolution for child URLs and binds
+configuration declaration order. Local sources request Read facets rather than
+Network facets. Configuration tests pass 25/25; all-target Clippy passes; final
+`cargo test --locked -p talos-tools --all-features --lib` passes 780/780.
+Child branch/default remote selection, refspecs and transport/source effects,
+object admission, recursive fetch, integration, runner stage capacity, and
 delivery gates remain open; Production Pull remains disabled.

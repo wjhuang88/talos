@@ -1,10 +1,11 @@
-Pull child remote discovery checkpoint (2026-10-16): admitted child
-configuration now exposes only the last `remote.<name>.url` value through a
-bounded parser. The Pull configuration stage adds a Network facet for the
-selected child `origin` URL without contacting it; invalid/non-UTF-8/empty
-values refuse. Pull tests pass 76/76 and cargo check passes
-(`/private/tmp/i300-child-remote-discovery.log`). Remote helper validation,
-child object admission, recursive fetch and integration remain open.
+Pull child remote discovery checkpoint (2026-10-16, `2edba07e`): child
+configuration retains declaration order and reuses the shared fetch destination
+resolver (first URL, insteadOf longest-prefix/tie semantics). Local destinations
+request Read path facets; network destinations request Network facets. No source
+is opened or contacted by this inventory. Configuration tests pass 25/25 and
+all-target all-feature Clippy passes. Selecting the child's default remote is
+still hardcoded to origin; branch remote/refspec binding, source/transport
+effects, object admission, recursive fetch and integration remain open.
 
 Pull child configuration checkpoint (2026-10-16): `PullChildIdentity` now
 transitions active children into `PullChildConfiguration`. Each child requests
@@ -3176,8 +3177,13 @@ Pull child gitdir binding correction checkpoint (2026-10-16, `afc61b1c`):
 Pull child identity admission now resolves the `.git` marker before capturing
 `ChildLocation`, so external gitdirs and linked common directories are bound to
 the actual metadata roots. This only establishes helper-level resolution:
-external gitdir/commondir authorization waves are not yet executable and remain
-required work. The stage also requires the dedicated configuration-
+the helper-only implementation is superseded by `98dff9b9`: marker, gitdir/fixed
+pointer, and common-root discovery now use separate fresh admissions, retaining
+Root/Metadata evidence and refusing marker/commondir redirection. The new test
+advances real prepared plans with permission-engine path proofs, including
+targets absent until their own wave. All 779 tools library tests pass. This does
+not prove end-to-end runner stage capacity or recursive fetch delivery.
+The stage also requires the dedicated configuration-
 chain capability before invoking Git with includes. Locked Pull tests pass
 76/76, cargo check and all-target all-feature Clippy with `-D warnings` pass.
 Dedicated external-gitdir/include fixtures, object admission, recursive fetch,
