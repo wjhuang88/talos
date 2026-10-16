@@ -59,6 +59,9 @@ mod pull_state;
 #[path = "git_write/pull_inventory.rs"]
 mod pull_inventory;
 
+#[path = "git_write/pull_children.rs"]
+mod pull_children;
+
 // ─── Host git helpers ───
 
 #[cfg(test)]
