@@ -1,3 +1,15 @@
+Recursive Pull policy checkpoint (2026-10-16, `e41d7ec1`): retained prefetch
+evidence now distinguishes default, off, on and on-demand modes and respects
+the declaration order of `submodule.recurse` and `fetch.recurseSubmodules`.
+The PullFetch permission description states the retained mode and that the
+parent command defers child effects. Real Git 2.54 fixtures confirm native
+child-object imports for the four ordered on/off/on-demand cases, including
+the test-fixture correction needed to preserve configuration declaration
+order. Locked all-feature Pull tests pass 52/52; tools all-target all-feature
+Clippy, formatting and diff checks pass. This does not select children, execute
+fetch, or complete recursive Pull. Fresh post-fetch discovery, per-child plans,
+integration and full current-head validation remain open. I300/T7 stays Active.
+
 Pull recursive-child checkpoint (2026-10-16, `18beb0bc`): maintainer accepted
 staged equivalent recursion. The fixed parent fetch now includes
 `--no-recurse-submodules`; a native Git 2.54 fixture proves native parent fetch
