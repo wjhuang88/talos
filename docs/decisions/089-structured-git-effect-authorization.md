@@ -463,6 +463,33 @@ Acceptance alone does not enable fetch or claim Pull delivery. The implementatio
 must replace the layer-by-layer production inventory with admitted bounded
 evidence under this dedicated scope rather than retain two contradictory modes.
 
+### Recursive child fetch extension (accepted 2026-10-16)
+
+Native Git 2.54 source inspection and an isolated fixture confirmed that the
+default `on-demand` parent fetch starts child-repository Git processes and may
+import child objects before the parent fetch command returns. A parent remote
+approval and parent metadata roots do not authorize those effects. The
+maintainer accepted staged equivalent execution: every structured parent fetch
+must pass `--no-recurse-submodules`; after it completes, a fresh parent metadata
+Read stage discovers fetched ref/tree changes and `.gitmodules`, then each
+eligible initialized child repository receives its own identity-bound metadata
+Read/Write and remote Network plan before its child fetch. Child fetches also
+disable Git-internal recursion; newly found descendants repeat this cycle.
+
+This preserves recursive-fetch intent and separately authorizes each child,
+but changes native process ordering, parallelism and failure output. Uninitialized
+submodules are not initialized by this feature. Child config/include reads,
+helpers, credentials, hooks, external object stores and arbitrary child paths
+remain separately authorized or unsupported. The existing 8-stage lifecycle
+and 128-command/64-MiB cumulative output bounds remain fixed; if the discovered
+tree cannot be fully planned within them, the operation stops with any already
+completed parent/child fetch effects reported and never retries automatically.
+
+Acceptance authorizes implementation, not execution. Child discovery, exact
+identity binding, per-child approval, nested-fetch iteration, partial-effect
+reporting, budget exhaustion, cancellation, Agent/MCP evidence and independent
+review remain prerequisites before enabling Pull fetch.
+
 ## Receiver Metadata Effects (accepted contract, 2026-10-13)
 
 The maintainer accepted a dedicated git_push-only receiver metadata Read/Write
