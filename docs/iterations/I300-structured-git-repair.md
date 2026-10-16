@@ -1,3 +1,16 @@
+Historical declaration-order checkpoint (2026-10-16, `dadfa1de`): Pull
+module parsing now consumes ordered gix config events, preserving the first
+path declaration even when followed by an implicit duplicate. A first implicit
+path still refuses atomically. Name-only declarations are retained for later
+legacy-name collision checks. Parsing remains bounded, panic-guarded and does
+not follow includes or open child paths. Cargo.lock uses gix-config 0.60.0;
+older session notes referring to 0.58.0 are not current dependency evidence.
+Locked all-feature Pull tests pass 62/62 and all-target all-feature tools
+Clippy passes (logs: /private/tmp/i300-module-order-tests.log and
+/private/tmp/i300-module-order-clippy.log). Child recursion policy, child
+admission/fetch, integration, independent review and full current-head delivery
+gates remain open; production Pull stays disabled and T7 remains Active.
+
 Named child aggregation checkpoint (2026-10-16, `ad62ef9e`): post-fetch
 discovery now aggregates declared changed modules by case-sensitive name,
 retaining the first revision-walk commit/path and the deduplicated required
