@@ -123,8 +123,37 @@ pub(super) struct Changed {
 pub(super) enum Activity {
     Enabled,
     Disabled,
-    Pathspec,
+    Pathspec {
+        /// Worktree-relative ancestor rules requiring exact Read admission.
+        /// Fixed system/global/info rules and index fallbacks are additional
+        /// inputs, not covered by this lexical inventory.
+        attributes: Vec<String>,
+    },
     Invalid,
+}
+
+impl Activity {
+    /// Inventory ancestor rule names without inspecting the child directory.
+    pub(super) fn pathspec(path: &str) -> Result<Self, GitToolError> {
+        let components: Vec<_> = path.split('/').collect();
+        if path.contains(['\\', '\0'])
+            || components.iter().any(|part| {
+                part.is_empty() || matches!(*part, "." | "..") || part.eq_ignore_ascii_case(".git")
+            })
+        {
+            return Err(GitToolError::InvalidInput(
+                "Invalid Pull attribute candidate path".into(),
+            ));
+        }
+        let mut attributes = vec![".gitattributes".to_owned()];
+        let mut prefix = String::new();
+        for component in &components[..components.len() - 1] {
+            prefix.push_str(component);
+            prefix.push('/');
+            attributes.push(format!("{prefix}.gitattributes"));
+        }
+        Ok(Self::Pathspec { attributes })
+    }
 }
 
 pub(super) fn collect_named_changes(
@@ -747,6 +776,31 @@ fetchRecurseSubmodules = true
             assert_eq!(tree.module_names.len(), 1, "failed binding is atomic");
         }
         assert!(tree.bind_modules(&vec![b'x'; 1024 * 1024 + 1]).is_err());
+    }
+
+    #[test]
+    fn pull_activity_attributes_stop_before_child_repository() {
+        assert_eq!(
+            Activity::pathspec("missing/nested/child").expect("lexical inventory"),
+            Activity::Pathspec {
+                attributes: vec![
+                    ".gitattributes".into(),
+                    "missing/.gitattributes".into(),
+                    "missing/nested/.gitattributes".into(),
+                ],
+            }
+        );
+        assert_eq!(
+            Activity::pathspec("child").expect("root child"),
+            Activity::Pathspec {
+                attributes: vec![".gitattributes".into()],
+            }
+        );
+        for path in [
+            "", "/child", "a//b", "a/../b", "a/./b", "a/.GIT/b", "a\\b", "a\0b",
+        ] {
+            assert!(Activity::pathspec(path).is_err(), "{path:?}");
+        }
     }
 
     #[test]

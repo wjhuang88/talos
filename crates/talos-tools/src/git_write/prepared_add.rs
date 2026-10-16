@@ -1604,7 +1604,7 @@ impl AddPlan {
                 match before.child_active(name, &child.path, &self.repository.workdir) {
                     Ok(Some(true)) => Activity::Enabled,
                     Ok(Some(false)) => Activity::Disabled,
-                    Ok(None) => Activity::Pathspec,
+                    Ok(None) => Activity::pathspec(&child.path)?,
                     Err(_) => Activity::Invalid,
                 },
             );
