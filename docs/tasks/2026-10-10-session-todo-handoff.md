@@ -1,3 +1,26 @@
+Activation correction (2026-10-16, `240f322f`): ADR-089 explicitly requires
+recursive execution, runtime evidence and independent review before production
+fetch activation. The earlier parent-fetch stage enabled that path prematurely;
+production now refuses before spawning fetch while unit fixtures retain the
+real execution path. Locked all-feature tools check passes. This gate must only
+be removed with the outstanding activation evidence, not merely passing unit
+tests. No production Pull delivery or remote publication is claimed.
+
+Post-fetch selection checkpoint (2026-10-16, `fb69814e`): the fresh admitted
+Read stage now rebuilds the bounded metadata inventory and FETCH_HEAD evidence
+under the retained location guard, then selects merge/rebase, unborn or moved
+HEAD reconciliation using production read-only probes. It creates a new plan
+identity but does not yet grant integration Write or execute that selection.
+A real local-fetch fixture proves obsolete evidence fails, admitted recapture
+succeeds, and later FETCH_HEAD tampering invalidates the new evidence. Locked
+all-feature Pull tests pass 55/55. All-target all-feature tools Clippy passes
+with CARGO_INCREMENTAL=0 after the first attempt failed writing its cache with
+ENOSPC; previously authorized incremental cache cleanup enabled the retry.
+The first fixture attempt lacked an initial commit and was corrected before
+the passing run. Successful network-fetch continuation coverage, recursive
+child discovery/approval, integration effects/execution, independent review,
+full current-source preflight and publication remain open. I300/T7 stays Active.
+
 Parent fetch execution checkpoint (2026-10-16, `747d0a84`): PullFetch now invokes
 the owned command runner after retained evidence, metadata Write, transport and
 hook checks. Nonzero exits report possible partial effects; successful fetch
