@@ -11838,6 +11838,174 @@ pub(super) mod tests {
     }
 
     #[tokio::test]
+    async fn pull_network_fetch_continuation_requires_fresh_admission() {
+        let remote = fixture();
+        let git = |root: &Path, args: &[&str]| {
+            let output = std::process::Command::new("git")
+                .current_dir(root)
+                .args(args)
+                .output()
+                .expect("Git");
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            String::from_utf8(output.stdout)
+                .expect("UTF8")
+                .trim()
+                .to_owned()
+        };
+        git(
+            remote.path(),
+            &[
+                "-c",
+                "user.name=Fixture",
+                "-c",
+                "user.email=fixture@example.invalid",
+                "commit",
+                "--allow-empty",
+                "-m",
+                "initial",
+            ],
+        );
+        let expected = git(remote.path(), &["rev-parse", "HEAD"]);
+        let remote_branch = git(remote.path(), &["symbolic-ref", "HEAD"]);
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("port");
+        let port = listener.local_addr().expect("address").port();
+        drop(listener);
+        let mut daemon = tokio::process::Command::new("git")
+            .args([
+                "daemon",
+                "--reuseaddr",
+                "--listen=127.0.0.1",
+                "--export-all",
+            ])
+            .arg(format!("--port={port}"))
+            .arg(format!(
+                "--base-path={}",
+                remote.path().parent().expect("parent").display()
+            ))
+            .arg(remote.path())
+            .kill_on_drop(true)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .expect("daemon");
+        tokio::time::timeout(std::time::Duration::from_secs(5), async {
+            loop {
+                if std::net::TcpStream::connect(("127.0.0.1", port)).is_ok() {
+                    break;
+                }
+                assert!(daemon.try_wait().expect("daemon state").is_none());
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .expect("ready");
+        let destination = format!(
+            "git://127.0.0.1:{port}/{}",
+            remote.path().file_name().expect("name").to_string_lossy()
+        );
+        for mode in ["allow", "deny", "replay"] {
+            let local = fixture();
+            git(local.path(), &["remote", "add", "origin", &destination]);
+            let branch = git(local.path(), &["symbolic-ref", "--short", "HEAD"]);
+            git(
+                local.path(),
+                &["config", &format!("branch.{branch}.remote"), "origin"],
+            );
+            git(
+                local.path(),
+                &["config", &format!("branch.{branch}.merge"), &remote_branch],
+            );
+            let mut plan = Box::new(
+                AddPlan::prepare_pull(local.path(), &serde_json::json!({}), ToolProvenance::Native)
+                    .expect("plan"),
+            )
+            .discover()
+            .await
+            .expect("configuration");
+            for _ in 0..8 {
+                if plan.phase == Phase::PullFetch {
+                    break;
+                }
+                let tokens = proof(&plan)
+                    .consume_for_prepared(&plan.request(), &plan.identity)
+                    .expect("proof");
+                plan = plan
+                    .discover_pull_prefetch(&tokens)
+                    .await
+                    .expect("prefetch");
+            }
+            assert!(plan.phase == Phase::PullFetch);
+            let stale = proof(&plan);
+            let admission = proof(&plan);
+            let PreparedNormalStage::Continue(next) = plan.execute_stage(Box::new(admission)).await
+            else {
+                panic!("fetch failed");
+            };
+            assert!(
+                next.permission_profile()
+                    .iter()
+                    .all(|facet| !matches!(facet.nature, ToolNature::Write | ToolNature::Network))
+            );
+            let fetched = std::fs::read(local.path().join(".git/FETCH_HEAD")).expect("fetched");
+            assert!(String::from_utf8_lossy(&fetched).contains(&expected));
+            let result = if mode == "deny" {
+                next.execute_stage(Box::new(())).await
+            } else if mode == "replay" {
+                next.execute_stage(Box::new(stale)).await
+            } else {
+                let state = PermissionSessionState::new(PermissionEngine::with_workspace_root(
+                    local.path().to_owned(),
+                ));
+                let context = PermissionContext::new(
+                    PermissionMode::Interactive,
+                    InteractionCapability::Available,
+                );
+                let input = serde_json::json!({});
+                let request = PermissionRequest::new(
+                    "git_pull",
+                    ToolProvenance::Native,
+                    next.permission_profile(),
+                    &input,
+                );
+                let proposal = state
+                    .propose(&request, &context, GrantScope::Once)
+                    .expect("proposal");
+                let pending = state
+                    .approve_once(proposal, &request, &context)
+                    .expect("approve");
+                let admission = state
+                    .try_admit_prepared_invocation(
+                        pending,
+                        &request,
+                        &context,
+                        next.plan_identity().expect("identity"),
+                    )
+                    .expect("admit");
+                next.execute_stage(Box::new(admission)).await
+            };
+            match result {
+                PreparedNormalStage::Continue(_) => assert_eq!(mode, "allow"),
+                PreparedNormalStage::Complete(output) => {
+                    assert_ne!(mode, "allow", "{}", output.result.content);
+                    assert!(output.result.is_error);
+                    assert!(output.result.content.contains("proof"));
+                }
+            }
+            assert_eq!(
+                std::fs::read(local.path().join(".git/FETCH_HEAD")).expect("retained"),
+                fetched
+            );
+            assert!(!local.path().join(".git/index").exists());
+        }
+        daemon.kill().await.expect("stop daemon");
+        daemon.wait().await.expect("reap daemon");
+    }
+
+    #[tokio::test]
     async fn pull_postfetch_rebuilds_evidence_before_selecting_integration() {
         let root = fixture();
         let git = |args: &[&str]| {
