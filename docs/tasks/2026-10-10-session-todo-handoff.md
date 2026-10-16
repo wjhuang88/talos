@@ -1,3 +1,21 @@
+Child policy precedence checkpoint (2026-10-16, `55521958`, corrected by `f96af155`): retained
+pre-fetch configuration now resolves changed named candidates using explicit
+global mode first, last current per-module value second, historical declaration
+third, then on-demand default. Module names remain case sensitive. Explicit
+global modes bypass invalid per-module values; invalid current values remain
+dormant pending candidate selection, whereas historical invalid values follow
+native demand fallback. Selected invalid current values must refuse.
+Post-fetch discovery retains each candidate's effective policy without opening
+child paths. The real self-fetch fixture verifies the retained default; policy
+regression covers overrides, duplicate values, casing, implicit/empty values
+and invalid-value handling. Locked all-feature Pull tests pass 64/64 and
+all-target all-feature tools Clippy passes (logs:
+/private/tmp/i300-child-precedence-tests.log and
+/private/tmp/i300-child-precedence-clippy.log). Current-index/active-policy
+candidates, child identity/config/remote admissions, nested fetch, integration,
+independent review and full delivery gates remain open. Production Pull remains
+disabled; T7/I300 remains Active.
+
 Historical recursion checkpoint (2026-10-16, `c1d47878`): admitted
 .gitmodules blobs now retain first-per-module fetchRecurseSubmodules policy
 independently of path declarations and repeated sections. Implicit true,
