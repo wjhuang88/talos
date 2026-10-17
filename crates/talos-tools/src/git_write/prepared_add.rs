@@ -2129,21 +2129,8 @@ impl AddPlan {
                 })?;
             inventory.bind_alternates(&location.git_dir, &location.common_dir)?;
             inventory.bind_references(&location.git_dir, &location.common_dir)?;
-            if inventory.discover_worktree_targets(&location.common_dir)? {
-                pending = true;
-                for path in inventory.paths() {
-                    if !self.facets.iter().any(|facet| {
-                        facet.nature == ToolNature::Read
-                            && facet.resource_kind == Some(ToolResourceKind::Path)
-                            && facet.resource.as_deref() == path.to_str()
-                    }) {
-                        self.facets.push(path_facet(
-                            ToolNature::Read,
-                            &path,
-                            "Pull linked worktree pointer target; descendant reads deferred",
-                        )?);
-                    }
-                }
+            let discovered = if inventory.discover_worktree_targets(&location.common_dir)? {
+                true
             } else {
                 inventory.bind_worktree_targets(|path| {
                     authorizations
@@ -2157,7 +2144,21 @@ impl AddPlan {
                             )
                         })
                         .map(|token| token.normalized_path().to_owned())
-                })?;
+                })?
+            };
+            pending |= discovered;
+            for path in inventory.paths() {
+                if !self.facets.iter().any(|facet| {
+                    facet.nature == ToolNature::Read
+                        && facet.resource_kind == Some(ToolResourceKind::Path)
+                        && facet.resource.as_deref() == path.to_str()
+                }) {
+                    self.facets.push(path_facet(
+                        ToolNature::Read,
+                        &path,
+                        "Pull linked worktree target or reference frontier; descendant reads deferred",
+                    )?);
+                }
             }
         }
         if pending {

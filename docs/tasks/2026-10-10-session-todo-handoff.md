@@ -1,3 +1,15 @@
+Linked-worktree reference closure checkpoint (2026-10-17): after separately
+admitted `commondir` targets are bound, external `refs` and `packed-refs` become
+fresh exact-path frontiers. Their descendants and contents use the existing
+4096-entry/4 MiB shared budgets. The main `common/config.worktree` and the
+registration's fallback `packed-refs` now retain content evidence as well.
+Regression coverage checks denial without external admission and in-place
+reference/config changes. Locked Pull tests pass 90/90 and all-target/all-feature
+Clippy passes with warnings denied. Independent review identified and confirmed
+the fallback packed-refs fix, then found no new blocker. Missing-relative target resolution, object probes, child transport,
+integration, runner stage capacity and final delivery remain open; production
+Pull stays disabled and T7 remains Active.
+
 Linked-worktree target admission checkpoint (2026-10-17): retained pointer
 bytes now produce raw target Read facets, and configuration discovery returns
 for fresh admission before target identity capture. Binding first checks all
