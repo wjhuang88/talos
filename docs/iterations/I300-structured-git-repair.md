@@ -3748,8 +3748,13 @@ new descendant frontier requires fresh exact Read admission; retained inventorie
 are revalidated before later preparation. A prepared-plan regression consumes
 permission-engine proof and rejects reuse of the previous frontier's tokens.
 Tools library tests pass 782/782 outside the sandbox; all-target Clippy passes.
-This establishes directory admission only: object bytes, alternates, replacement
-resolution and actual child probes are not yet authorized or implemented.
+This establishes directory admission only. `dd66155d` additionally captures
+admitted `objects/info/alternates` and `http-alternates`, refusing nonempty
+external-store redirects. Empty-file bytes and absent-leaf directory listings
+are retained and revalidated, including in-place edits and newly created leaves.
+Tools library tests pass 784/784 outside the sandbox; all-target Clippy passes.
+Object bytes, replacement resolution and actual child probes remain incomplete;
+these checks do not establish recursive execution or final stage-budget reachability.
 Missing-object retry remote selection, refspecs and transport/source effects,
 object admission, recursive fetch, integration, runner stage capacity, and
 delivery gates remain open; Production Pull remains disabled.
