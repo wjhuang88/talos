@@ -3588,3 +3588,19 @@ Module-name follow-up: independent re-review found the policy correction closes
 its blocker. Path/name matching now compares joined paths to avoid Windows
 separator differences. Locked Pull tests pass 103/103 after that adjustment;
 Clippy and both governance validators pass for this increment.
+
+Rebased validation checkpoint (2026-10-18): all 128 local implementation commits
+were rebased onto origin/main 891f6c49; current stage commits are 24cff179
+(child fetch/shared graph refresh) and 208ad52e (module-name scheduling).
+Only EVOLUTION.md conflicted; both branches' lessons were retained. The first
+post-rebase standard preflight passed workspace check and Clippy, but test
+compilation terminated with ENOSPC, not a test assertion failure. Under the
+existing maintainer authorization, rebuildable target/debug artifacts (17 GiB)
+were removed. Standard preflight is now running again with CARGO_INCREMENTAL=0,
+CARGO_PROFILE_DEV_DEBUG=0, CARGO_PROFILE_TEST_DEBUG=0 and CARGO_BUILD_JOBS=2;
+log: /tmp/talos-i300-rebased-preflight-compact.log. No full-suite success is
+claimed. Native Git 2.54 repo_submodule_init confirms an unpopulated module may
+fall back to the parent's modules/name gitdir without a worktree; the current
+Root-based child admission does not yet implement this behavior. That fallback
+requires separately admitted metadata identity rather than a fabricated
+worktree binding. All original T7 activation and handoff closure gates remain.
