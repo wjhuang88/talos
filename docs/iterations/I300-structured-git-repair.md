@@ -3800,6 +3800,18 @@ semantics, child transport/retries, recursive fetch, parent integration,
 eight-stage runner reachability and final delivery gates remain open.
 Production Pull remains disabled; I300/T7 and the handoff stay incomplete.
 
+Linked-worktree target admission update (2026-10-17): raw targets parsed from
+retained pointer bytes receive new exact Read facets and a fresh plan identity
+before resolution. Binding checks all grants first, verifies canonical versus
+approved normalized mappings, and retains target identities. Absolute gitdir
+backlinks do not trigger target access; relative spellings retain `..` until
+admitted resolution. Pull-focused tests pass 88/88, including old-frontier
+denial, wrong-mapping rejection, target replacement and pruned absolute backlink
+coverage. All-target/all-feature Clippy passes; independent review found no new
+blocker. Missing relative/forgiving
+targets, external common reference descendants and remaining native-probe reads
+remain activation blockers; production Pull and T7 remain incomplete.
+
 Linked-worktree pointer evidence update (2026-10-17): admitted registration
 `gitdir` and `commondir` file contents now share the reference evidence budget,
 with pointer bytes kept separate from symbolic-ref validation. The 13/13
