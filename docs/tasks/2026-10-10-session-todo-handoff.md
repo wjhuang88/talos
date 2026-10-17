@@ -3330,3 +3330,21 @@ this increment. The reviewer confirmed fresh exact-path admission precedes root
 capture, and distinguished path deduplication here from native initialized-task
 name suppression, which remains open. The review did not cover actual recursive
 execution or stage-budget reachability.
+
+
+Child metadata scope checkpoint (2026-10-17): initialized child graph discovery
+now uses the accepted dedicated metadata Read capability and separately approved,
+identity-bound child gitdir/common roots to batch bounded directory traversal in
+one continuation, rather than consuming an approval stage per directory depth.
+External paths and raw linked-worktree pointer targets retain separate exact-path
+admission. A real prepared-plan regression covers 24 directory levels, missing
+capability/root refusal and reference-content mutation. Child default-remote
+selection now strips config origin fields using the same ordered-record extraction
+as parent Pull policy; configuration origin evidence remains retained.
+Locked all-feature Pull library tests pass 90/90; all-target/all-feature Clippy
+with `-D warnings` passes (`/tmp/talos-t7-child-scope-{tests,clippy}.log`).
+Independent reviewer `review_prepared` found no new authorization blocker.
+This establishes discovery batching, not full runner reachability: child object
+semantics, transport/retries, recursive fetch, parent integration, eight-stage
+end-to-end validation and final delivery gates remain open. Production Pull is
+still disabled; I300/T7 remains Active and incomplete.
