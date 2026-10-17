@@ -3188,3 +3188,52 @@ chain capability before invoking Git with includes. Locked Pull tests pass
 76/76, cargo check and all-target all-feature Clippy with `-D warnings` pass.
 Dedicated external-gitdir/include fixtures, object admission, recursive fetch,
 integration and delivery gates remain open; Production Pull remains disabled.
+
+Pull child identity continuation checkpoint (2026-10-17): after independent
+Read admission, configured startup worktree directories now retain identity
+and reject same-path replacement on Unix during subsequent plan revalidation. The
+post-fetch path without attribute rules now shares the existing selected-child
+identity transition rather than skipping directly to integration; it adds no
+attribute-only approval stage. A real post-fetch fixture exercises explicit
+activity across worktree/index/HEAD/absent module declarations, verifies fresh
+child-directory/marker Read facets, and rejects the old admission tokens.
+Locked all-feature tools library tests pass 787/787 outside the sandbox
+(`/tmp/talos-t7-routing-tests-unsandboxed.log`); all-target/all-feature Clippy
+passes (`/tmp/talos-t7-routing-clippy.log`). The sandboxed suite passed 786 and
+failed the existing process-observation test with EPERM, then was rerun outside
+the sandbox. A final focused routing run passes 1/1. Object probing/replacement
+semantics, child transport/retries, recursive fetch, parent integration,
+eight-stage runner reachability and final delivery gates remain open.
+Production Pull remains disabled; I300/T7 and the handoff stay incomplete.
+
+Independent review residual (2026-10-17): shared `snapshot::PathIdentity`
+retains ancestor device/inode identity on Unix, but only canonical paths on
+Windows. Same-path Windows directory replacement therefore remains undetected;
+the new replacement regression is not verified on Windows and must not be
+treated as cross-platform evidence. Direct Windows-only `same-file` use is
+pending maintainer acceptance under ADR-089's dependency restriction. No new
+dependency has been introduced. This stage remains uncommitted pending that
+decision and the resulting implementation/review; the Unix checks above do not
+close the Windows residual or authorize Production Pull.
+
+Current-index child routing checkpoint (2026-10-17, `c0eae3f3`): identity discovery now
+uses one shared candidate list, with already-selected current-index paths first
+and active historical paths afterward, deduplicated by path. This restores
+current `On` candidates even when no new gitlink changes exist; their selection
+does not depend on historical activity. Git v2.54.0 `submodule.c`
+`fetch_task_create` / `get_fetch_task_from_index` establish this requirement.
+A regression initializes a real child repository, verifies exact child/marker
+Read facets and rejection of previous-stage tokens, and confirms that metadata
+resolution still waits for another admission. Locked all-feature tools library
+tests pass 788/788 outside the sandbox
+(`/tmp/talos-t7-current-child-tests-unsandboxed.log`); sandbox execution passed
+787 with the known process-observation EPERM. All-target/all-feature Clippy,
+formatting and whitespace checks pass. This fixes routing only: initialized-task
+name suppression, uninitialized/legacy children, object reachability, child
+transport/retries, integration and runner reachability remain incomplete, as does
+the Windows identity decision above. Production Pull remains disabled.
+Independent reviewer `review_prepared` found no new authorization blocker in
+this increment. The reviewer confirmed fresh exact-path admission precedes root
+capture, and distinguished path deduplication here from native initialized-task
+name suppression, which remains open. The review did not cover actual recursive
+execution or stage-budget reachability.
