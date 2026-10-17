@@ -64,6 +64,46 @@ fn invalid() -> GitToolError {
     )
 }
 
+// Native reftable readers join manifest entries directly to the backend path.
+// Keep every entry a single filename on both Unix and Windows.
+fn validate_table_names(bytes: &[u8]) -> Result<(), GitToolError> {
+    for name in bytes.split(|byte| *byte == b'\n') {
+        let stem = name.split(|byte| *byte == b'.').next().unwrap_or_default();
+        let device = [
+            b"CON".as_slice(),
+            b"PRN",
+            b"AUX",
+            b"NUL",
+            b"CONIN$",
+            b"CONOUT$",
+        ]
+        .iter()
+        .any(|reserved| stem.eq_ignore_ascii_case(reserved))
+            || (stem.len() == 4
+                && (stem[..3].eq_ignore_ascii_case(b"COM")
+                    || stem[..3].eq_ignore_ascii_case(b"LPT"))
+                && matches!(stem[3], b'1'..=b'9'));
+        if name
+            .last()
+            .is_some_and(|byte| matches!(byte, b'.' | b' ' | b'\r'))
+            || device
+            || name == b"."
+            || name == b".."
+            || name.iter().any(|byte| {
+                !byte.is_ascii()
+                    || byte.is_ascii_control()
+                    || matches!(
+                        byte,
+                        b' ' | b'/' | b'\\' | b':' | b'<' | b'>' | b'"' | b'|' | b'?' | b'*'
+                    )
+            })
+        {
+            return Err(invalid());
+        }
+    }
+    Ok(())
+}
+
 impl Inventory {
     pub(super) fn new(git_dir: &Path, common_dir: &Path) -> Self {
         let mut pending = Vec::new();
@@ -71,6 +111,7 @@ impl Inventory {
             for name in [
                 "HEAD",
                 "refs",
+                "reftable",
                 "logs",
                 "objects",
                 "info",
@@ -203,6 +244,7 @@ impl Inventory {
                 .chain(self.worktree_reference_roots.iter().map(PathBuf::as_path))
                 .any(|root| {
                     path.starts_with(root.join("refs"))
+                        || path.starts_with(root.join("reftable"))
                         || path == &root.join("packed-refs")
                         || path == &root.join("HEAD")
                 })
@@ -217,7 +259,7 @@ impl Inventory {
                             && components.next().is_some_and(|name| {
                                 matches!(
                                     name.as_os_str().to_str(),
-                                    Some("HEAD" | "refs" | "packed-refs")
+                                    Some("HEAD" | "refs" | "packed-refs" | "reftable")
                                 )
                             })
                     });
@@ -246,6 +288,14 @@ impl Inventory {
                     .map_err(|_| invalid())?;
                 if reference && let super::snapshot::Entry::File(_, bytes) = &entry.entry {
                     super::receiver_state::validate_symbolic_target(bytes)?;
+                    if path.file_name().is_some_and(|name| name == "tables.list")
+                        && path
+                            .parent()
+                            .and_then(Path::file_name)
+                            .is_some_and(|name| name == "reftable")
+                    {
+                        validate_table_names(bytes)?;
+                    }
                 }
                 evidence.push((path.clone(), entry));
             }
@@ -348,7 +398,7 @@ impl Inventory {
         for raw in &self.worktree_common_targets {
             let root = &mappings[raw];
             self.worktree_reference_roots.insert(root.clone());
-            for name in ["refs", "packed-refs"] {
+            for name in ["refs", "packed-refs", "reftable"] {
                 let path = root.join(name);
                 if !self.visited.contains_key(&path) && !self.pending.contains(&path) {
                     if self.visited.len() + self.pending.len() + self.worktree_targets.len() >= 4096
@@ -480,6 +530,92 @@ fn identity(path: &Path) -> Result<Option<PathIdentity>, GitToolError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reftable_manifests_cannot_escape_admitted_backends() {
+        for location in ["reftable", "worktrees/linked/reftable"] {
+            for contents in [
+                "../outside\n",
+                "sub/file\n",
+                "sub\\file\n",
+                "C:outside\n",
+                ".\n",
+                "..\n",
+                "bad\0name\n",
+                "NUL.ref\n",
+                "con\n",
+                "COM1.ref\n",
+                "lpt9.ref\n",
+                "COM¹.ref\n",
+                "name.\n",
+                "name \n",
+                "wild*.ref\n",
+            ] {
+                let temp = tempfile::tempdir().expect("repo");
+                let root = temp.path().canonicalize().expect("root");
+                let table = root.join(location);
+                std::fs::create_dir_all(&table).expect("backend");
+                std::fs::write(table.join("tables.list"), contents).expect("list");
+                let mut inventory = Inventory::new(&root, &root);
+                while !inventory.complete() {
+                    inventory.advance(|_| true).expect("frontier");
+                }
+                assert!(
+                    inventory.bind_references(&root, &root).is_err(),
+                    "{location}: {contents:?}"
+                );
+            }
+        }
+        validate_table_names(b"one.ref\ntwo.ref\n").expect("ordinary tables");
+    }
+
+    #[test]
+    fn reftable_files_require_frontier_admission_and_bind_content() {
+        let temp = tempfile::tempdir().expect("repo");
+        let root = temp.path().canonicalize().expect("root");
+        let table = root.join("reftable");
+        std::fs::create_dir(&table).expect("backend");
+        std::fs::write(table.join("tables.list"), "one.ref\n").expect("list");
+        std::fs::write(table.join("one.ref"), b"table contents").expect("table");
+        let mut inventory = Inventory::new(&root, &root);
+        let admitted = inventory.paths();
+        inventory
+            .advance(|path| admitted.contains(&path.to_owned()))
+            .expect("roots");
+        assert!(
+            inventory
+                .advance(|path| admitted.contains(&path.to_owned()))
+                .is_err()
+        );
+        while !inventory.complete() {
+            inventory.advance(|_| true).expect("frontier");
+        }
+        inventory
+            .bind_references(&root, &root)
+            .expect("content evidence");
+        inventory.revalidate().expect("unchanged");
+        std::fs::write(table.join("one.ref"), b"changed content").expect("in-place edit");
+        assert!(inventory.revalidate().is_err());
+    }
+
+    #[test]
+    fn linked_reftable_list_is_reference_content() {
+        let temp = tempfile::tempdir().expect("repo");
+        let root = temp.path().canonicalize().expect("root");
+        let table = root.join("worktrees/linked/reftable");
+        std::fs::create_dir_all(&table).expect("backend");
+        let list = table.join("tables.list");
+        std::fs::write(&list, "one.ref\n").expect("list");
+        let mut inventory = Inventory::new(&root, &root);
+        while !inventory.complete() {
+            inventory.advance(|_| true).expect("frontier");
+        }
+        inventory
+            .bind_references(&root, &root)
+            .expect("content evidence");
+        std::fs::write(&list, "two.ref\n").expect("in-place list edit");
+        assert!(inventory.revalidate().is_err());
+    }
 
     #[test]
     fn main_worktree_config_is_bound_outside_the_current_config_chain() {
@@ -692,6 +828,7 @@ mod tests {
         let external_packed_refs = external.join("packed-refs");
         assert!(inventory.pending.contains(&external_refs));
         assert!(inventory.pending.contains(&external_packed_refs));
+        assert!(inventory.pending.contains(&external.join("reftable")));
 
         // The external descendants cannot be inspected using the old frontier.
         assert!(
@@ -721,6 +858,8 @@ mod tests {
         for leaf in [
             "HEAD",
             "refs/heads/private",
+            "reftable/tables.list",
+            "reftable/one.ref",
             "packed-refs",
             "gitdir",
             "commondir",
