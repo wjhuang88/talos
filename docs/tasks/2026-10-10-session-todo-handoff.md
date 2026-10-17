@@ -3385,3 +3385,22 @@ Independent reviewer `review_prepared` found no new blocker. Object/replacement
 semantics, child transport/retries, recursive fetch, parent integration, runner
 stage-budget success and final delivery gates remain incomplete. T7 stays Active
 and production Pull stays disabled.
+
+
+Reftable read-evidence checkpoint (2026-10-17): child inventory now includes
+`reftable/` in each admitted gitdir/common root and binds table manifests and
+files under the existing shared reference-content budget. Linked-worktree
+private backends receive the same treatment; external common backends become
+fresh exact-path frontiers before any inspection. Regressions reject stale
+frontier admission and in-place table/list changes. Locked all-feature Pull
+tests pass 96/96 (`/tmp/talos-t7-reftable-tests.log`). Manifest entries
+are conservatively limited to ASCII single filenames, rejecting path separators,
+Windows device names, special/control characters and trailing dot/space aliases.
+This closes the native reader's unchecked manifest path join; nonstandard names
+are refused rather than followed outside the admitted backend. No native child object
+probe or fetch is enabled. Independent design review also identified in-place
+object/acceleration-file mutations as an activation prerequisite: directory
+identity alone cannot bind those bytes, so retained object decisions require
+content evidence or a justified fresh-probe strategy. Object type/replacement
+semantics, recursive transport/retries, parent integration and final delivery
+remain open; Production Pull stays disabled and T7 remains Active.
