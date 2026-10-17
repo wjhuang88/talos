@@ -4053,3 +4053,19 @@ library tests and warnings-denied all-target Clippy pass. ADR-082 documents the
 additive contract and caller-owned input authorization/size budget. This is the
 input prerequisite for Git batch object probing, not an enabled probe or Pull
 execution; the remaining T7 and handoff scope is unchanged.
+
+Child batch object-type checkpoint (2026-10-17): after child configuration,
+startup and graph/linked-target admission converge, selected historical gitlink
+OIDs are checked using supervised finite stdin and Git cat-file batch protocol.
+Only explicit missing records mean absent; failed execution, malformed responses
+and non-commit objects refuse. Tags are not peeled and native replacement lookup
+is preserved. Presence results are discarded immediately and cannot skip a later
+fetch across approval; reachability and actual fetching remain unimplemented.
+Input is capped at 256 KiB and output reserves the existing shared command budget.
+All 100 locked Pull tests and all-target/all-feature warnings-denied Clippy pass;
+independent incremental review found no blocker. Tests include actual discovery-
+stage missing/noncommit cases and real Git replacement-to-tree/tag checks. Old plans correctly reject
+changed replacement metadata, so those fixtures prepare new evidence first.
+Non-Unix supervised input currently refuses explicitly; Windows support remains
+required. Production Pull remains disabled and all original closure gates and
+later handoff tasks remain open.
