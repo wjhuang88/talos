@@ -2316,10 +2316,78 @@ impl AddPlan {
             })?;
             // Only reject invalid types here. Presence must be re-probed at the
             // fetch consumer; never retain it across the next approval.
-            self.pull_child_commit_objects(workdir, &location.git_dir, worktree, &objects)
+            self.pull_child_has_commits(workdir, &location.git_dir, worktree, &objects)
                 .await?;
         }
         Ok(())
+    }
+
+    async fn pull_child_has_commits(
+        &self,
+        workdir: &Path,
+        gitdir: &Path,
+        worktree: &Path,
+        objects: &[String],
+    ) -> Result<bool, GitToolError> {
+        if objects.is_empty() {
+            return Ok(true);
+        }
+        if !self
+            .pull_child_commit_objects(workdir, gitdir, worktree, objects)
+            .await?
+        {
+            return Ok(false);
+        }
+        // Match native submodule_has_commits: mere object existence is not
+        // enough; every requested commit must be reachable from an existing ref.
+        // This and cat-file are transient observations, not an atomic snapshot.
+        self.revalidate()?;
+        let mut command = self.pull_child_command(workdir, gitdir, worktree);
+        command.args(["rev-list", "-n", "1", "--stdin", "--not", "--all"]);
+        let input = format!("{}\n", objects.join("\n")).into_bytes();
+        let output = self
+            .run_command_output_with_input(
+                command,
+                std::time::Duration::from_secs(10),
+                16 * 1024,
+                Some(input),
+            )
+            .await?;
+        if !output.status.success() {
+            return Ok(false);
+        }
+        if output.stdout.is_empty() {
+            return Ok(true);
+        }
+        let oid = output
+            .stdout
+            .strip_suffix(b"\n")
+            .ok_or_else(|| GitToolError::Git("Invalid Pull child reachability response".into()))?;
+        if !matches!(oid.len(), 40 | 64) || !oid.iter().all(u8::is_ascii_hexdigit) {
+            return Err(GitToolError::Git(
+                "Invalid Pull child reachability response".into(),
+            ));
+        }
+        Ok(false)
+    }
+
+    fn pull_child_command(
+        &self,
+        workdir: &Path,
+        gitdir: &Path,
+        worktree: &Path,
+    ) -> tokio::process::Command {
+        let mut command = tokio::process::Command::new(&self.program);
+        command
+            .current_dir(workdir)
+            .arg("--no-pager")
+            .arg("--git-dir")
+            .arg(gitdir)
+            .arg("--work-tree")
+            .arg(worktree)
+            .env_clear()
+            .envs(&self.environment);
+        command
     }
 
     async fn pull_child_commit_objects(
@@ -2348,17 +2416,8 @@ impl AddPlan {
             }
         }
         self.revalidate()?;
-        let mut command = tokio::process::Command::new(&self.program);
-        command
-            .current_dir(workdir)
-            .arg("--no-pager")
-            .arg("--git-dir")
-            .arg(gitdir)
-            .arg("--work-tree")
-            .arg(worktree)
-            .args(["cat-file", "--batch-check=%(objectname) %(objecttype)"])
-            .env_clear()
-            .envs(&self.environment);
+        let mut command = self.pull_child_command(workdir, gitdir, worktree);
+        command.args(["cat-file", "--batch-check=%(objectname) %(objecttype)"]);
         let output = self
             .run_command_output_with_input(
                 command,
@@ -16471,11 +16530,44 @@ pub(super) mod tests {
         ]);
         let commit = git(&["rev-parse", "HEAD"]);
         let tree = git(&["rev-parse", "HEAD^{tree}"]);
+        let orphan = git(&[
+            "-c",
+            "user.name=test",
+            "-c",
+            "user.email=test@example.com",
+            "commit-tree",
+            &tree,
+            "-m",
+            "unreferenced",
+        ]);
         let mut plan =
             AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
                 .expect("plan");
         let path = root.path().canonicalize().expect("root");
         let gitdir = path.join(".git");
+        assert!(
+            plan.pull_child_has_commits(&path, &gitdir, &path, std::slice::from_ref(&commit))
+                .await
+                .expect("reachable")
+        );
+        assert!(
+            !plan
+                .pull_child_has_commits(&path, &gitdir, &path, std::slice::from_ref(&orphan))
+                .await
+                .expect("unreachable")
+        );
+        assert!(
+            !plan
+                .pull_child_has_commits(&path, &gitdir, &path, &[commit.clone(), orphan.clone()])
+                .await
+                .expect("mixed")
+        );
+        assert!(
+            !plan
+                .pull_child_has_commits(&path, &gitdir, &path, &["a".repeat(40)])
+                .await
+                .expect("missing")
+        );
         assert!(
             plan.pull_child_commit_objects(&path, &gitdir, &path, std::slice::from_ref(&commit))
                 .await
@@ -16493,6 +16585,16 @@ pub(super) mod tests {
                 .expect_err("tree")
                 .to_string()
                 .contains("not a commit")
+        );
+        // --all includes detached HEADs of other registered worktrees; no
+        // branch ref is needed to make this previously orphaned commit reachable.
+        git(&["worktree", "add", "--detach", "linked", &orphan]);
+        plan = AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+            .expect("linked worktree plan");
+        assert!(
+            plan.pull_child_has_commits(&path, &gitdir, &path, std::slice::from_ref(&orphan))
+                .await
+                .expect("linked detached HEAD is reachable")
         );
         git(&["replace", "-f", &commit, &tree]);
         plan = AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
