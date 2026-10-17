@@ -62,7 +62,7 @@ def first_child_window(text: str) -> tuple[int, int, int]:
 
 
 def lifecycle_query(child: int, created: int, exited: int) -> str:
-    return ("*[System[Provider[@Name='PowerShell'] and (EventID=400 or EventID=403) "
+    return ("*[System[Provider[@Name='PowerShell'] and (EventID=400 or EventID=403 or EventID=600) "
             f"and Execution[@ProcessID={child}] and TimeCreated[@SystemTime>='{filetime_text(created)}' "
             f"and @SystemTime<='{filetime_text(exited)}']]]")
 
@@ -90,7 +90,7 @@ def lifecycle_metadata(raw: bytes, child: int, created: int, exited: int) -> lis
         # Canonical UTC 100ns text only, so lexical bounds are exact.
         if not re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{7}Z", stamp):
             raise ValueError("event timestamp")
-        if (event_id not in (400, 403) or pid != child
+        if (event_id not in (400, 403, 600) or pid != child
                 or system.find("e:Provider", ns).attrib.get("Name") != "PowerShell"
                 or system.findtext("e:Channel", namespaces=ns) != "Windows PowerShell"
                 or not filetime_text(created) <= stamp <= filetime_text(exited)):
@@ -187,6 +187,9 @@ def lifecycle_self_test() -> None:
     raw = xml.encode("utf-16")
     expected = [{"event_id": 400, "child_pid": 3400, "time_utc": stamp}]
     assert lifecycle_metadata(raw, 3400, created, exited) == expected
+    assert lifecycle_metadata(xml.replace("<EventID>400", "<EventID>600").encode("utf-16"),
+                              3400, created, exited) == [{**expected[0], "event_id": 600}]
+    assert "(EventID=400 or EventID=403 or EventID=600)" in lifecycle_query(3400, created, exited)
     for bad in (raw + b"x" * 131073, xml.replace('ProcessID="3400"', 'ProcessID="3401"').encode("utf-16"),
                 xml.replace("<EventID>400", "<EventID>800").encode("utf-16"),
                 xml.replace(stamp, filetime_text(exited + 1)).encode("utf-16"),

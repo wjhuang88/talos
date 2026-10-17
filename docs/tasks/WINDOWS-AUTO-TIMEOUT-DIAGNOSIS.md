@@ -2,7 +2,7 @@
 
 Date: 2026-10-11. Baseline: `444a8137f054b33802f26bffdb55fb0f83a7a861`.
 
-Current stage (2026-10-16): repair diagnostic identity parsing for Windows CRLF; fresh native execution pending.
+Current stage (2026-10-16): add bounded event600 provider-lifecycle observations before engine availability; native execution pending.
 Earlier matrices, pending statements and tool availability below are preserved staged history;
 the latest checkpoint defines the current fixed 120-process / 2220-test experiment.
 
@@ -917,3 +917,75 @@ exact505a51bb's reconstructed tree; workflow/production/deps/lock/toolchain have
 The independent causal review repeats oldFAIL/newPASS and confirms the parsing fix preserves
 strict identities. Final exact-local and exact-remote publication reviews follow separately.
 CI3212 failure/diagnostic classification is also recorded in comment6217759937.
+
+
+## CI3214 Final Evidence And Provider-Lifecycle Observation — 2026-10-16
+
+CI3214/run38916833365 exact0d5cc0bc712a651c056cf88bb875e1903f8a095f attempt1 is finally FAILED:
+seven jobs SUCCESS, Windows workspace117026425095 FAILED in original partial-setup process-total
+handle assertion before147/after154 (talos-tools440pass/1fail). This is separate from BOTH successful
+diagnostic jobs: baseline60processes/1110pass0fail and instrumented60/1110pass0fail, total120/2220.
+Native CRLF self-tests pass. Do not promote passing diagnostics to whole-run success or claim a
+proven product handle leak from a process-total delta. No rerun/threshold/assertion replacement.
+
+Verified GitHub artifact digests,CRC and extracted bytes: baseline12052878529 SHA256
+2357d397e47dd213aaa71a2c3da35aa5a42bbc22eb4e2fd74459779598a280cc (65files);instrumented12053096821
+SHA25675ecf5d3dd88ecdc3924d1f1250baca3d0dac98e5cd1f99451325f025bf0206b (66files),expireOct30.
+Workspacefailure12053327443 SHA2563b7abe80641ce65a7191789b30f916fe23783ac4363eb34c1ac2eb14acb0d3a8
+(2files),expireOct19. Both manifests match exacthead,Windowsimage20261007.264.1/X64/4CPU;
+sixnormalizedsources and all12rawWindows restoration receipts match actualmain3bc38d78.
+Independent Agent evidence review APPROVE verifies these facts, counts, identities and arithmetic;
+shared account is not distinct human approval. Checkpoints6218154137 and6218160205 preserve the
+raw facts and review; earlier in-progress statements are historical, not the final state.
+
+The first-owned-child collector returns records for child1476,parent8564,handle612,waiter119:
+created134366352538045017; event400134366352558003561;event403134366352564470349;
+exit134366352564665476. Lifetime2662.0459ms splits into creation-to4001995.8544ms,
+400-to403646.6788ms and403-to-exit19.5127ms. Native observation12.3181ms afterexit,
+waitreturn12.6398ms afterexit, then pipejoin0.3731ms. First positive stdout is
+134366352564177663; ToolResult2.7650226s. The timestamp-only receipt passes fixed provider/
+channel/PID/lifetime checks. Review verifies that receipt and collector source, not discarded
+raw XML or a retrospective query on the departed runner. These are engine-event observations,
+not exact script-entry/exclusive initialization cost or a cause of CI3211's13.736s child/failed
+baseline, older10s15s, evaluator5s or Plugin uncertainty. Event logging timing/clock limitations
+and successful-sample versus historical-failure distinctions remain.
+
+Main has since advanced to c81782b6d922ec1b8bfa62e9c4a2914d746680bb through governance-only#730.
+It makes the independent I305/TEST004 claim and ADR091 amendment effective, without implementing
+any native/test change. Incoming nine documents are integrated byte-for-byte. The current +2
+assertion is therefore still present and preserved. Its implementation belongs to that separate
+owner/#716/#729; #705 does not take it over, change acceptance or mark it Complete. I301/I304
+remain terminal. This refresh adds no production-source/workflow/dependency/lock/toolchain delta.
+
+Next testable hypothesis: the observed creation-to-event400 wait may precede the earliest
+PowerShell internal provider-lifecycle event, or may occur among those lifecycle observations.
+Extend the SAME fixed post-test query and scalar-only parser allowlist with event600. No new
+channel/provider/PID/window/query process or access is added; /c:17,accepted16events,128KiB,
+30/5/5s bounds,45s remaining-margin check, completed-matrix and successful-restoration gates
+remain unchanged. Original cold-first commands/120processes/2220executions/guard deadlines and
+all assertions, baseline without collection and six Rust overlays remain unchanged.
+
+Primary event600 reference (official example of Provider Started events before engine400):
+https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/show-command?view=powershell-7.5
+Only eventID/PID/UTC is retained; internal provider names, Started/Stopped payload, EventData,
+commands, XML and rendered errors are NOT saved. Therefore a600record is a provider-lifecycle
+observation, not asserted to be a particular provider or transition. Do not automatically label
+all600s as startup, select a unique provider, or infer an exclusive cost. If multiple600records
+precede an unambiguous400, compare the earliest/latest such observations to creation and400
+while retaining all timestamps; none of those intervals is exact code-execution time. If600s
+are missing, timestamps are ambiguous/inconsistent, the16record cap overflows or native query
+fails, evidence remains unknown; do not increase caps or fetch partial replacements to force it.
+Prior CI3214's raw event XML is not retained and cannot be retroactively expanded to600s.
+
+This is a substantive bounded metadata experiment, not an unchanged-head retry for a green run.
+No enabling logs, prewarm, skip, relaxed threshold, retry-to-green, native call/unsafe/rights,
+PSS/otherPID observation or product repair. Previous CI3163/3182/3211 runtime failures,
+CI3212 harness failure, CI3214 workspace failure and CI3206/3214 passing diagnostic samples are
+all retained. #705 staysOPEN/unmerged. Fresh local/independent review and native evidence follow.
+
+Local preparation: unchanged diagnostic self-test plus exact scalar600acceptance and fixed-query
+ID-set assertions PASS; all unknown-ID/PID/time/DTD/count/byte/privacy/CRLF/cleanup regressions
+remain. All six generated Rust overlays compare byte-identical to previous0d5cc0bc equivalents;
+all production sources/lock/toolchain compare identical to currentmainc81782b6; workflow unchanged.
+Classifier14/text23/diff and both governors PASS0warnings with actual pinned1.99 locked metadata
+(SQLite17/delivery12 fixtures). This is not a new native600record or full-preflight outcome.
