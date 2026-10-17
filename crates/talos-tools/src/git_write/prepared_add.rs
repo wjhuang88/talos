@@ -818,6 +818,8 @@ impl AddPlan {
             while !inventory.complete() {
                 inventory.advance(metadata_path)?;
             }
+            inventory.bind_alternates(&self.repository.git_dir, &self.repository.common_dir)?;
+            inventory.bind_references(&self.repository.git_dir, &self.repository.common_dir)?;
             let objects_ready = {
                 [&self.repository.git_dir, &self.repository.common_dir]
                     .iter()
@@ -1388,6 +1390,8 @@ impl AddPlan {
                     || path.starts_with(&self.repository.common_dir)
             })?;
         }
+        inventory.bind_alternates(&self.repository.git_dir, &self.repository.common_dir)?;
+        inventory.bind_references(&self.repository.git_dir, &self.repository.common_dir)?;
         let evidence =
             super::pull_state::PullEvidence::capture(&self.repository, tracking.as_deref(), true)?;
         self.repository.revalidate_location()?;
@@ -14588,6 +14592,16 @@ pub(super) mod tests {
         }
         assert!(history.record_profile(&PreparedPlanIdentity::new(), &plan.facets));
         assert!(!root.path().join(".git/FETCH_HEAD").exists());
+        let reference = plan.repository.common_dir.join("refs/heads/Topic");
+        let original_reference = std::fs::read(&reference).expect("reference");
+        std::fs::write(&reference, format!("{}\n", "1".repeat(40)))
+            .expect("change reference in place");
+        assert!(
+            plan.revalidate().is_err(),
+            "reference contents must remain bound"
+        );
+        std::fs::write(&reference, original_reference).expect("restore reference");
+        plan.revalidate().expect("restored reference evidence");
         std::fs::write(&absent_tracking_log, b"new evidence").expect("create reflog");
         assert!(
             plan.revalidate().is_err(),
