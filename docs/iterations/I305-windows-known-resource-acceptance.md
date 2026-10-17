@@ -1,6 +1,6 @@
 # Iteration I305: Windows Known-Resource Acceptance
 
-> Document status: Review
+> Document status: Complete
 > Published plan date: 2026-10-16
 > Planned objective: replace an unqualified process-total gate with tested known-resource cleanup acceptance.
 > Baseline rule: preserve this scope; a different acceptance target uses another iteration.
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | TEST-004 known successful-return Windows resource cleanup acceptance, native call-site coverage and real negative controls; no production launcher/search behavior or I302 PSS attribution. |
@@ -19,9 +19,9 @@
 | Governance Claim PR | #730 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer explicitly accepted #717 proposal6217718821 on2026-10-16 at22:39 Asia/Shanghai and continued GitHub delivery. No distinct maintainer reviewer available; independent protected Agent security/technical review, exact-head CI, validators and CAS remain mandatory. |
-| Implementation PR | #716 after effective claim merge and baseline refresh; separate I305 commits |
-| Last Updated | 2026-10-16 |
-| Handoff / Release Condition | No implementation before finalized claim and ADR-091 amendment reach main; no automatic Complete or #716 merge. |
+| Implementation PR | #716 merged as `b5b8241e2d8fa72d6e469bd96ccbdf54ff851c69`; separate I305 commits |
+| Last Updated | 2026-10-17 |
+| Handoff / Release Condition | Bounded implementation merged; explicit evidence-based closeout only. TEST003/#717 and SEARCH-C/#643/#624 remain open. |
 
 ## Published Baseline
 
@@ -173,3 +173,38 @@ cache/toolchain; minimal pinned compiler/std/formatter restored with official SH
 These focused receipts are not a new full-workspace preflight or native Windows pass. Previous
 fullpreflight receipts remain historical; fresh exact-head full unfiltered CI/review required.
 Review/Claimed remains, no Complete or automatic716merge. Preserve CI3219 failure, no retry-to-green.
+
+## Bounded Completion — 2026-10-17
+
+Completion Commit: b5b8241e2d8fa72d6e469bd96ccbdf54ff851c69
+
+#716 merged this already-existing implementation after exact head198cb751/tree29ac46f2,
+CI3221/run39005702425 all6jobs SUCCESS, independent protected full-stage merge-readiness review
+and final CAS6233550377. Main tree matches the reviewed candidate; no status-only commit is cited.
+This closeout deliberately closes ONLY TEST004/I305, after implementation, rather than inferring
+Complete from a green diagnostic. Original acceptance/exclusions and every failed run remain.
+
+Acceptance: all40 exact faults and per-role/acquisition generations, actual returned resources /
+checked native statuses, initialized Delete invocation,16 checked termination/signalled bounded
+waits, real omission/duplicate sensitivity with checked in-frame recovery, inventory/mutation and
+CRLF checks pass. Windows tools463/0/0ignored/0filtered, full downstream governance/claims/audit/
+smoke; Unix unfiltered release_preflight, original socket fixture and both SDK modes also pass.
+All40/4negative and required232resource/208close/24Delete/16termination+exit values are enforced
+by the passing exact-source assertions. Successful raw numeric/mode8 receipts are harness-captured,
+not independently visible log evidence. The proof is limited to enumerated successful-return
+resources in these injected paths; void Delete proves invocation, not allocator reclamation.
+
+TEST003/I302/#717 remains Review/Claimed and OPEN for unexplained/untracked/native-private lifetime,
+failed-output/failed-init production gaps and broader success-path limits. Prior+3 and CI3219 failure
+are retained. SEARCH001C/I293/#643 and Epic#624 remain incomplete/open; no default activation,
+provider admission, release, #705 takeover or global leak/cache conclusion. I301/I303/I304 stayclosed.
+Runtime docs are the bounded inventory/receipts; infrastructure-only, no new user feature.
+
+Retrospective: native-call return/exit checks and real omitted-operation sensitivity give a narrower
+verifiable contract than process totals. Sharing pre-recovery and final predicates prevents vacuous
+negative controls. Canonicalized line-ending fixtures avoid checkout-specific false failures without
+relaxing fingerprint enforcement. Further native attribution requires separately qualified evidence
+under #717, never silently broadening this completion.
+
+Governance-only closeout checks/protected review/applicable CI/CAS must pass before these proposed
+Complete/Closed records become target-main truth. Issue#729 closes afterward; no other Issue closes.

@@ -10,7 +10,7 @@
 | Source Issue | #643 |
 | Depends on | Accepted ADR-085; SEARCH-001-B / #642 complete in #656; NET-001 boundary coordination |
 | Claim State | Claimed |
-| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 merged TLS/CONNECT subset; #716 bounded form transport Review / CI3175..3177 failed; checked existing cleanup diagnostic pending, richer self-snapshot proposal Unclaimed (default activation Pending) |
+| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 merged TLS/CONNECT subset; #716 merged bounded form/diagnostic stage at `b5b8241e`; CI3221 all6jobs pass; full C/EP and default activation Pending |
 | Completion | Pending |
 
 ## Collaboration Claim
@@ -1071,3 +1071,14 @@ Windows cross-check/Clippy, graphs and governance pass; these are not native obs
 The earlier457/1 Linux EOF failure remains unresolved evidence; a later pass does not prove a
 fixture repair or scheduling cause. Production transport and all original deadlines/assertions
 are unchanged. Fresh stable-head protected review and unfiltered full CI remain required.
+
+## Merged Bounded Form Stage — 2026-10-17
+
+#716 merged as b5b8241e2d8fa72d6e469bd96ccbdf54ff851c69 after exact198cb751/tree29ac46f2,
+all6CI3221 jobs, protected full-stage review and CAS6233550377. This adds only dormant private
+bounded form transport and its tested TLS/redirect/authority constraints; no default WebSearch or
+provider admission. Full C/EP/protocol parity, prepared-binding, D/privacy/root/rollback and actual
+activation gates remain Pending; this owner stays Active/Claimed, #643/#624OPEN.
+TEST004/I305 closes only its known-resource test criterion with existing merged evidence. #717
+retains unexplained native resources and prior failures. Passing captured assertions are not raw
+numeric receipts or cache/global-leak proof; #705 and completed I301/I303/I304 remain separate.

@@ -628,3 +628,13 @@ resource acceptance, inventory and real negatives. Existing I302 stays Review/Cl
 with unexplained process-wide/native resource lifetime and future untracked acquisitions as OPEN
 #717 residual. No original global-leak closure or natural-person/native acceptance is inferred.
 #716 may carry separate I305 commits after baseline refresh; no automatic merge, #643/#624 open.
+
+## Merged Diagnostics And Retained Residual — 2026-10-17
+
+#716 merged b5b8241e2d8fa72d6e469bd96ccbdf54ff851c69 after CI3221 all6jobs SUCCESS and
+protected full-stage review/CAS6233550377. Native resource outer/all40/four-negative assertions,
+audit/inventory/CRLF and full workspace pass (tools463/0); successful raw receipts remain captured.
+TEST004/I305 alone receives bounded Complete/Closed closeout. This owner stays Review/Claimed:
+unknown/untracked/native-private lifetime, failed-output/init production gaps and broader lifecycle
+limits remain OPEN#717. Original+3, CI3219 and all prior failures remain; no global-leak or legitimate
+cache conclusion. Search#643/#624 remainOPEN and #705 retains independent diagnosis.
