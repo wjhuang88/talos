@@ -76,12 +76,16 @@ pub(super) struct Budget {
 }
 
 /// Path resolution evidence, without reading file contents. This reduces
-/// substitution windows but is not a race-free filesystem handle.
+/// substitution windows but does not confine subsequent path-based operations.
+/// Windows retains live handles to keep volume/file-index comparisons valid;
+/// same-file's 64-bit index comparison does not fully identify ReFS files.
 #[derive(Debug, PartialEq, Eq)]
 pub(super) struct PathIdentity {
     resolved: PathBuf,
     #[cfg(unix)]
     ancestors: Vec<(u64, u64)>,
+    #[cfg(windows)]
+    ancestors: Vec<same_file::Handle>,
 }
 
 impl PathIdentity {
@@ -98,9 +102,17 @@ impl PathIdentity {
                 })
                 .collect::<std::io::Result<Vec<_>>>()?
         };
+        #[cfg(windows)]
+        let ancestors = std::panic::catch_unwind(|| {
+            resolved
+                .ancestors()
+                .map(same_file::Handle::from_path)
+                .collect::<std::io::Result<Vec<_>>>()
+        })
+        .map_err(|_| std::io::Error::other("Windows Git path identity inspection panicked"))??;
         Ok(Self {
             resolved,
-            #[cfg(unix)]
+            #[cfg(any(unix, windows))]
             ancestors,
         })
     }
@@ -278,6 +290,30 @@ impl Entry {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(any(unix, windows))]
+    #[test]
+    fn path_identity_retains_leaf_and_ancestor_identity() {
+        let root = tempfile::tempdir().expect("fixture");
+        let parent = root.path().join("parent");
+        std::fs::create_dir(&parent).expect("parent");
+        let leaf = parent.join("leaf");
+        std::fs::write(&leaf, b"unchanged").expect("leaf");
+        let identity = PathIdentity::capture(&leaf).expect("identity");
+        assert_eq!(identity, PathIdentity::capture(&leaf).expect("unchanged"));
+        let saved = root.path().join("saved");
+        std::fs::rename(&parent, &saved).expect("move parent");
+        std::fs::create_dir(&parent).expect("replace parent");
+        std::fs::rename(saved.join("leaf"), &leaf).expect("retain original leaf");
+        assert_ne!(identity, PathIdentity::capture(&leaf).expect("new parent"));
+        std::fs::rename(&leaf, saved.join("leaf")).expect("return leaf");
+        std::fs::remove_dir(&parent).expect("remove replacement");
+        std::fs::rename(&saved, &parent).expect("restore parent");
+        assert_eq!(identity, PathIdentity::capture(&leaf).expect("restored"));
+        std::fs::rename(&leaf, parent.join("original-leaf")).expect("move leaf");
+        std::fs::write(&leaf, b"unchanged").expect("identical replacement bytes");
+        assert_ne!(identity, PathIdentity::capture(&leaf).expect("new leaf"));
+    }
 
     #[cfg(unix)]
     #[test]

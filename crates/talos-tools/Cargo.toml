@@ -34,7 +34,7 @@ shell = [
     "tokio/fs",
     "dep:windows-sys",
 ]
-git = ["dep:libc", "dep:windows-sys", "tokio/rt", "dep:gix", "dep:similar", "dep:talos-permission", "dep:talos-sandbox", "tokio/fs", "tokio/io-util", "tokio/macros", "tokio/process", "tokio/time"]
+git = ["dep:libc", "dep:windows-sys", "dep:same-file", "tokio/rt", "dep:gix", "dep:similar", "dep:talos-permission", "dep:talos-sandbox", "tokio/fs", "tokio/io-util", "tokio/macros", "tokio/process", "tokio/time"]
 network = [
     "dep:image",
     "tokio/macros",
@@ -96,6 +96,7 @@ cap-std = { version = "4.0.3", default-features = false, optional = true }
 libc = { version = "0.2", optional = true }
 
 [target.'cfg(windows)'.dependencies]
+same-file = { version = "=1.0.6", optional = true }
 windows-sys = { version = "0.61.2", optional = true, features = [
     "Win32_Foundation",
     "Win32_Security",

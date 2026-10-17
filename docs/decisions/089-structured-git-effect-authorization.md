@@ -92,12 +92,39 @@ Literal paths deliberately remove implicit option/pathspec interpretation from
 `git_add`; document migration to explicit paths/directories. More complete facets
 may request approval where prior profiles understated effects. No automatic grant,
 force push, hook bypass, credential probe, network test or release is authorized.
-No new dependencies, native exception or unsafe code is authorized by this proposal.
+No new dependencies, native exception or unsafe code is authorized by this proposal,
+except the narrowly accepted Windows identity dependency amendment below.
 
 If public Rust APIs must change, record exact inventory and migration before
 implementation; source-breaking changes are next pre-1.0 minor only. This contract
 does not permit dropping ordinary Git functionality simply to make tests pass.
 Unsupported configurations must have an explicit explanation and tracked residual.
+
+## Accepted Windows Path Identity Dependency (2026-10-17)
+
+The maintainer accepted a Windows-only, Git-feature-only direct dependency on
+`same-file = 1.0.6`, already present transitively in Cargo.lock. Stable Rust 1.99
+does not expose the required Windows file identity through stable metadata APIs.
+`snapshot::PathIdentity` retains safe owned handles for the canonical leaf and
+ancestors and compares volume/file-index identities while both handles remain
+open. Calls into this dependency are panic-guarded; I/O errors fail preparation
+or revalidation. No Talos-authored unsafe or new general file-read authority is
+introduced. No host utility is used for this identity check.
+
+The dependency uses winapi-util's read-open directory-capable handles, rather
+than metadata-only access: restrictive ancestor ACLs, sharing conflicts or
+resource exhaustion can conservatively reject the plan. It does not read file
+contents or enumerate directories. Handles are released when evidence drops;
+there is no separate aggregate plan handle budget yet. This exception is pinned
+to the accepted version and does not authorize arbitrary dependency upgrades.
+
+Limitations remain explicit: same-file 1.0.6 compares 64-bit file indices and
+does not fully support ReFS 128-bit identities; this is not proof of confinement
+or all-filesystem Windows replacement protection. `RegularEvidence`'s separate
+Windows leaf identity remains unchanged. Native Windows runtime validation,
+including rename and sharing behavior with retained handles, remains a delivery
+gate. Replace this bridge when stable Rust offers an adequate safe identity API,
+or when a separately reviewed solution supplies full filesystem identity support.
 
 ## Accepted API Amendment (2026-10-11)
 
