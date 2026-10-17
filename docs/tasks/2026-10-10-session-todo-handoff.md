@@ -1,3 +1,17 @@
+Linked-worktree target admission checkpoint (2026-10-17): retained pointer
+bytes now produce raw target Read facets, and configuration discovery returns
+for fresh admission before target identity capture. Binding first checks all
+target grants and compares actual canonical resolution with each approved
+normalized path. Target identities remain in revalidation. Absolute gitdir
+backlinks remain text-only, matching Git 2.54; only relative backlinks trigger
+target resolution. New regressions cover old-frontier denial, wrong mappings,
+same-path replacement, and absolute backlinks to pruned checkouts. Pull-focused
+tests pass 88/88; all-target/all-feature Clippy passes and independent review
+found no new blocker. External common
+reference descendants, missing relative targets/forgiving resolution, and
+remaining native-probe reads still require implementation before activation.
+Production Pull remains disabled; this is not T7 or handoff completion.
+
 Linked-worktree pointer evidence checkpoint (2026-10-17): the admitted
 registration files `common/worktrees/<id>/gitdir` and `commondir` now retain
 bounded contents in the existing shared 4096-entry/4 MiB reference evidence

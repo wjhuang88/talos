@@ -14,6 +14,7 @@ pub(super) struct Inventory {
     directories: BTreeMap<PathBuf, Vec<PathBuf>>,
     alternates: Vec<(PathBuf, super::snapshot::RegularEvidence)>,
     references: Vec<(PathBuf, super::snapshot::RegularEvidence)>,
+    worktree_targets: BTreeMap<PathBuf, Option<PathIdentity>>,
 }
 
 fn invalid() -> GitToolError {
@@ -47,6 +48,7 @@ impl Inventory {
             directories: BTreeMap::new(),
             alternates: Vec::new(),
             references: Vec::new(),
+            worktree_targets: BTreeMap::new(),
         }
     }
 
@@ -55,6 +57,7 @@ impl Inventory {
             .keys()
             .cloned()
             .chain(self.pending.iter().cloned())
+            .chain(self.worktree_targets.keys().cloned())
             .collect()
     }
 
@@ -74,6 +77,13 @@ impl Inventory {
     }
 
     pub(super) fn revalidate(&self) -> Result<(), GitToolError> {
+        for (path, expected) in &self.worktree_targets {
+            if let Some(expected) = expected
+                && PathIdentity::capture(path).ok().as_ref() != Some(expected)
+            {
+                return Err(invalid());
+            }
+        }
         for (path, expected) in &self.visited {
             if &identity(path)? != expected {
                 return Err(invalid());
@@ -173,6 +183,89 @@ impl Inventory {
         }
         self.revalidate()?;
         self.references = evidence;
+        self.revalidate()
+    }
+
+    /// Parse only retained pointer bytes. Target filesystem access waits for
+    /// the next exact-path admission; these targets are not recursive grants.
+    pub(super) fn discover_worktree_targets(
+        &mut self,
+        common: &Path,
+    ) -> Result<bool, GitToolError> {
+        self.revalidate()?;
+        let mut added = false;
+        for (path, evidence) in &self.references {
+            let Some(relative) = path.strip_prefix(common.join("worktrees")).ok() else {
+                continue;
+            };
+            let mut components = relative.components();
+            let _id = components.next();
+            let Some(leaf) = components.next() else {
+                continue;
+            };
+            if components.next().is_some() {
+                continue;
+            }
+            let gitdir = leaf.as_os_str() == "gitdir";
+            if !gitdir && leaf.as_os_str() != "commondir" {
+                continue;
+            }
+            let super::snapshot::Entry::File(_, bytes) = &evidence.entry else {
+                return Err(invalid());
+            };
+            let text = std::str::from_utf8(bytes).map_err(|_| invalid())?;
+            let text = if gitdir {
+                text.trim_end_matches(|c: char| c.is_ascii_whitespace())
+                    .strip_suffix("/.git")
+                    .unwrap_or_else(|| text.trim_end_matches(|c: char| c.is_ascii_whitespace()))
+            } else {
+                text.trim_end_matches(['\r', '\n'])
+            };
+            if text.is_empty() || text.contains(['\0', '\r', '\n']) {
+                return Err(invalid());
+            }
+            super::remote_state::validate_local_path_syntax(Path::new(text))?;
+            // get_linked_worktree() only resolves a relative backlink. An
+            // absolute backlink is retained as text, even for a pruned checkout.
+            if gitdir && Path::new(text).is_absolute() {
+                continue;
+            }
+            let target = path.parent().ok_or_else(invalid)?.join(text);
+            if !self.worktree_targets.contains_key(&target) {
+                if self.visited.len() + self.worktree_targets.len() >= 4096 {
+                    return Err(invalid());
+                }
+                self.worktree_targets.insert(target, None);
+                added = true;
+            }
+        }
+        self.revalidate()?;
+        Ok(added)
+    }
+
+    pub(super) fn bind_worktree_targets(
+        &mut self,
+        admitted: impl Fn(&Path) -> Option<PathBuf>,
+    ) -> Result<(), GitToolError> {
+        // Check all admissions before touching any newly discovered target.
+        let mappings = self
+            .worktree_targets
+            .keys()
+            .map(|path| {
+                admitted(path)
+                    .map(|normalized| (path.clone(), normalized))
+                    .ok_or_else(invalid)
+            })
+            .collect::<Result<BTreeMap<_, _>, _>>()?;
+        self.revalidate()?;
+        for (path, identity) in &mut self.worktree_targets {
+            if path.canonicalize().map_err(|_| invalid())? != mappings[path] {
+                return Err(invalid());
+            }
+            if identity.is_none() {
+                *identity = Some(PathIdentity::capture(path).map_err(|_| invalid())?);
+            }
+        }
         self.revalidate()
     }
 
@@ -292,6 +385,97 @@ fn identity(path: &Path) -> Result<Option<PathIdentity>, GitToolError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn linked_pointer_targets_wait_for_fresh_admission() {
+        let temp = tempfile::tempdir().expect("fixture");
+        let root = temp.path().canonicalize().expect("root");
+        let registration = root.join("worktrees/linked");
+        std::fs::create_dir_all(&registration).expect("registration");
+        let target = root.join("separately-admitted");
+        std::fs::write(
+            registration.join("gitdir"),
+            "../../separately-admitted/.git \t\n",
+        )
+        .expect("pointer");
+        std::fs::write(registration.join("commondir"), "../..\r\n").expect("common");
+        let mut inventory = Inventory::new(&root, &root);
+        while !inventory.complete() {
+            inventory.advance(|_| true).expect("frontier");
+        }
+        inventory
+            .bind_references(&root, &root)
+            .expect("pointer evidence");
+        let previous = inventory.paths();
+        // Target does not exist: discovery must not resolve it.
+        assert!(
+            inventory
+                .discover_worktree_targets(&root)
+                .expect("raw targets")
+        );
+        let raw_target = registration.join("../../separately-admitted");
+        assert!(inventory.worktree_targets.contains_key(&raw_target));
+        assert!(
+            inventory
+                .worktree_targets
+                .contains_key(&registration.join("../.."))
+        );
+        assert!(
+            inventory
+                .bind_worktree_targets(|path| previous
+                    .contains(&path.to_owned())
+                    .then(|| path.to_owned()))
+                .is_err()
+        );
+        assert!(inventory.worktree_targets.values().all(Option::is_none));
+        std::fs::create_dir(&target).expect("target created independently");
+        assert!(
+            inventory
+                .bind_worktree_targets(|_| Some(root.clone()))
+                .is_err()
+        );
+        inventory
+            .bind_worktree_targets(|path| path.canonicalize().ok())
+            .expect("fresh admission");
+        assert!(
+            !inventory
+                .discover_worktree_targets(&root)
+                .expect("stable targets")
+        );
+        inventory.revalidate().expect("unchanged targets");
+        std::fs::rename(&target, root.join("saved-target")).expect("move target");
+        std::fs::create_dir(&target).expect("replacement target");
+        #[cfg(any(unix, windows))]
+        assert!(inventory.revalidate().is_err());
+    }
+
+    #[test]
+    fn absolute_worktree_backlink_does_not_resolve_pruned_checkout() {
+        let temp = tempfile::tempdir().expect("fixture");
+        let root = temp.path().canonicalize().expect("root");
+        let registration = root.join("worktrees/pruned");
+        std::fs::create_dir_all(&registration).expect("registration");
+        let missing = root.join("missing/.git");
+        std::fs::write(
+            registration.join("gitdir"),
+            format!("{}\n", missing.display()),
+        )
+        .expect("pointer");
+        let mut inventory = Inventory::new(&root, &root);
+        while !inventory.complete() {
+            inventory.advance(|_| true).expect("frontier");
+        }
+        inventory.bind_references(&root, &root).expect("evidence");
+        assert!(
+            !inventory
+                .discover_worktree_targets(&root)
+                .expect("absolute text only")
+        );
+        assert!(inventory.worktree_targets.is_empty());
+        inventory
+            .bind_worktree_targets(|_| None)
+            .expect("no target access");
+    }
 
     #[test]
     fn linked_worktree_references_require_admission_and_retain_contents() {
