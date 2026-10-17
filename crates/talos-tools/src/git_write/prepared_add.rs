@@ -1885,6 +1885,19 @@ impl AddPlan {
             )?);
             self.facets.push(path_facet(
                 ToolNature::Read,
+                &location.git_dir,
+                "Pull selected child private Git metadata for object admission",
+            )?);
+            self.facets.push(
+                ToolPermissionFacet::with_resource(
+                    ToolNature::Read,
+                    "git:pull-repository-metadata",
+                    ToolResourceKind::Remote,
+                )
+                .with_description("bounded graph discovery in this Pull's individually bound child metadata roots"),
+            );
+            self.facets.push(path_facet(
+                ToolNature::Read,
                 &location.git_dir.join("config.worktree"),
                 "Pull child fixed startup worktree configuration",
             )?);
@@ -2063,13 +2076,6 @@ impl AddPlan {
                 .insert(workdir.clone(), (remote, destinations));
             let inventory =
                 super::pull_inventory::Inventory::new(&location.git_dir, &location.common_dir);
-            for path in inventory.paths() {
-                self.facets.push(path_facet(
-                    ToolNature::Read,
-                    &path,
-                    "Pull child object and reference inventory; object reads deferred",
-                )?);
-            }
             self.pull_child_inventories
                 .insert(workdir.clone(), inventory);
             self.child_configs.push((workdir.clone(), config));
@@ -2080,6 +2086,21 @@ impl AddPlan {
             return Ok(self);
         }
         self.revalidate()?;
+        if !self.facets.iter().any(|facet| {
+            facet.nature == ToolNature::Read
+                && facet.resource_kind == Some(ToolResourceKind::Remote)
+                && facet.resource.as_deref() == Some("git:pull-repository-metadata")
+        }) {
+            return Err(GitToolError::InvalidInput(
+                "Pull child graph discovery lacks dedicated metadata Read admission".into(),
+            ));
+        }
+        // The closed capability applies only to these retained child roots,
+        // with their own exact grants, never to arbitrary paths or other tools.
+        for (_, location) in &self.child_locations {
+            self.child_read(&location.git_dir, authorizations)?;
+            self.child_read(&location.common_dir, authorizations)?;
+        }
         let workdirs: Vec<_> = self
             .child_locations
             .iter()
@@ -2090,19 +2111,37 @@ impl AddPlan {
         }
         self.revalidate()?;
         let mut pending = false;
-        for inventory in self.pull_child_inventories.values_mut() {
-            inventory.advance(|path| {
-                authorizations.iter().any(|token| {
-                    token.authorizes_path(
-                        "git_pull",
-                        ToolNature::Read,
-                        &self.workspace,
-                        path.to_str().unwrap_or_default(),
-                    )
-                })
-            })?;
+        for (workdir, inventory) in &mut self.pull_child_inventories {
+            let location = self
+                .child_locations
+                .iter()
+                .find(|(path, _)| path == workdir)
+                .map(|(_, location)| location)
+                .ok_or_else(|| {
+                    GitToolError::InvalidInput("Pull child metadata roots missing".into())
+                })?;
+            let metadata_path = |path: &Path| {
+                path.starts_with(&location.git_dir) || path.starts_with(&location.common_dir)
+            };
+            let admitted = |path: &Path| {
+                metadata_path(path)
+                    || authorizations.iter().any(|token| {
+                        token.authorizes_path(
+                            "git_pull",
+                            ToolNature::Read,
+                            &self.workspace,
+                            path.to_str().unwrap_or_default(),
+                        )
+                    })
+            };
+            // Directory depth within approved metadata roots consumes no new
+            // runner stage. External reference frontiers still wait for exact
+            // grants, including each newly discovered descendant.
+            while !inventory.complete() && inventory.paths().iter().all(|path| admitted(path)) {
+                inventory.advance(admitted)?;
+            }
             pending |= !inventory.complete();
-            for path in inventory.paths() {
+            for path in inventory.exact_paths(&location.git_dir, &location.common_dir) {
                 if !self.facets.iter().any(|facet| {
                     facet.nature == ToolNature::Read
                         && facet.resource_kind == Some(ToolResourceKind::Path)
@@ -2147,7 +2186,7 @@ impl AddPlan {
                 })?
             };
             pending |= discovered;
-            for path in inventory.paths() {
+            for path in inventory.exact_paths(&location.git_dir, &location.common_dir) {
                 if !self.facets.iter().any(|facet| {
                     facet.nature == ToolNature::Read
                         && facet.resource_kind == Some(ToolResourceKind::Path)
@@ -12453,49 +12492,88 @@ pub(super) mod tests {
     }
 
     #[tokio::test]
-    async fn pull_child_inventory_waits_for_fresh_frontier_admission() {
-        let root = fixture();
-        let external = tempfile::tempdir().expect("external");
-        let metadata = external.path().canonicalize().expect("canonical");
-        std::fs::create_dir(metadata.join("objects")).expect("objects");
-        std::fs::create_dir(metadata.join("objects/aa")).expect("fanout");
-        let mut plan = Box::new(
-            AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
-                .expect("prepare"),
-        );
-        plan.phase = Phase::PullChildConfiguration;
-        plan.pull_config_sources_discovered = true;
-        plan.facets.push(ToolPermissionFacet::with_resource(
-            ToolNature::Read,
-            "git:configuration-chain",
-            ToolResourceKind::Remote,
-        ));
-        let inventory = super::super::pull_inventory::Inventory::new(&metadata, &metadata);
-        for path in inventory.paths() {
-            plan.facets
-                .push(path_facet(ToolNature::Read, &path, "inventory").expect("facet"));
-        }
-        plan.pull_child_inventories
-            .insert(metadata.clone(), inventory);
-        let tokens = proof(&plan)
-            .consume_for_prepared(&plan.request(), &plan.identity)
-            .expect("proof");
-        let plan = plan
-            .discover_pull_child_configuration(&tokens)
+    async fn pull_child_metadata_scope_batches_depth_and_requires_own_root() {
+        for mode in ["allow", "missing-capability", "missing-root"] {
+            let root = fixture();
+            assert!(
+                std::process::Command::new("git")
+                    .current_dir(root.path())
+                    .args(["init", "child"])
+                    .output()
+                    .expect("child init")
+                    .status
+                    .success()
+            );
+            let child = root.path().join("child").canonicalize().expect("child");
+            let gitdir = child.join(".git");
+            let deep = gitdir
+                .join("refs/heads")
+                .join("nested/".repeat(24))
+                .join("tip");
+            std::fs::create_dir_all(deep.parent().expect("parent")).expect("deep refs");
+            std::fs::write(&deep, format!("{}\n", "a".repeat(40))).expect("ref");
+            let mut plan = Box::new(
+                AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+                    .expect("prepare"),
+            )
+            .discover()
             .await
-            .expect("names");
-        assert!(matches!(plan.phase, Phase::PullChildConfiguration));
-        assert!(!plan.pull_child_inventories[&metadata].complete());
-        assert!(
-            plan.facets
-                .iter()
-                .any(|facet| facet.resource.as_deref() == metadata.join("objects/aa").to_str())
-        );
-        assert!(
-            plan.discover_pull_child_configuration(&tokens)
+            .expect("parent config");
+            plan.pull_current_fetch_children
+                .insert("child".into(), super::super::pull_children::Recursion::On);
+            plan.select_pull_child_identity().expect("select");
+            while plan.phase == Phase::PullChildIdentity {
+                let tokens = proof(&plan)
+                    .consume_for_prepared(&plan.request(), &plan.identity)
+                    .expect("identity proof");
+                plan = plan
+                    .discover_pull_child_identity(&tokens)
+                    .expect("child identity");
+            }
+            assert!(plan.phase == Phase::PullChildConfiguration);
+            let tokens = proof(&plan)
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .expect("config proof");
+            plan = plan
+                .discover_pull_child_configuration(&tokens)
                 .await
-                .is_err()
-        );
+                .expect("config discovery");
+            assert!(plan.pull_config_sources_discovered);
+            assert!(!plan.pull_child_inventories[&child].complete());
+            assert!(
+                !plan
+                    .facets
+                    .iter()
+                    .any(|facet| facet.resource.as_deref() == deep.to_str())
+            );
+            if mode == "missing-capability" {
+                plan.facets.retain(|facet| {
+                    facet.resource.as_deref() != Some("git:pull-repository-metadata")
+                });
+            }
+            let mut tokens = proof(&plan)
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .expect("graph proof");
+            if mode == "missing-root" {
+                tokens.retain(|token| token.normalized_path() != gitdir);
+            }
+            let next = plan.discover_pull_child_configuration(&tokens).await;
+            if mode != "allow" {
+                assert!(next.is_err(), "{mode} must refuse graph discovery");
+                continue;
+            }
+            let plan = next.expect("single admitted graph stage");
+            assert!(plan.phase == Phase::PullIntegration);
+            assert!(plan.pull_child_inventories[&child].complete());
+            assert!(
+                !plan
+                    .facets
+                    .iter()
+                    .any(|facet| facet.resource.as_deref() == deep.to_str())
+            );
+            std::fs::write(&deep, format!("{}\n", "b".repeat(40))).expect("edit ref");
+            assert!(plan.revalidate().is_err());
+        }
     }
 
     #[test]

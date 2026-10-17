@@ -70,6 +70,18 @@ impl Inventory {
         self.pending.is_empty()
     }
 
+    /// Paths not covered by the bound metadata roots, plus raw pointer targets
+    /// whose approved normalization must be checked separately before binding.
+    pub(super) fn exact_paths(&self, gitdir: &Path, common: &Path) -> Vec<PathBuf> {
+        self.paths()
+            .into_iter()
+            .filter(|path| {
+                self.worktree_targets.contains_key(path)
+                    || (!path.starts_with(gitdir) && !path.starts_with(common))
+            })
+            .collect()
+    }
+
     pub(super) fn subtree_complete(&self, root: &Path) -> bool {
         let absent = root.parent().is_some_and(|parent| {
             self.directories
