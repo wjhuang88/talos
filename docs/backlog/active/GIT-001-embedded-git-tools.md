@@ -1,6 +1,6 @@
 # GIT-001: Built-in Git Tools — Native Git Support
 
-Tracking recheck (2026-10-16): the live crates.io sparse index at
+Tracking recheck (2026-10-17): the live crates.io sparse index at
 `https://index.crates.io/3/g/gix` still ends at non-yanked `gix 0.89.0`
 (MSRV 1.88), while the Talos lockfile remains at 0.87.1. This is a release
 availability check, not a new API or parity review. The 0.89.0 source audit
@@ -320,9 +320,9 @@ Operations using host `git` fallback:
 - `git_pull` — gix fetch works, but no worktree update after fetch
 - `git_stash_list` — gix stash is placeholder (not delivered in I026)
 
-Operations using native `gix`:
-- `git_add` — via `gix::index` manipulation
-- `git_commit` — via `gix::Repository::commit()`
+Native write migration targets (not the current implementation):
+- `git_add` — investigate `gix::index` manipulation
+- `git_commit` — investigate `gix::Repository::commit()` and required hook/signing parity
 
 I026 implementation note: `git_add` and `git_commit` are delivered through the same structured
 host-git adapter as the other write operations while native gix write orchestration remains under
