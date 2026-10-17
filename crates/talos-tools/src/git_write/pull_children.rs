@@ -5,6 +5,36 @@ use std::collections::BTreeMap;
 
 use super::GitToolError;
 
+/// Validate exact batch-check responses without peeling tags or interpreting a
+/// failed Git invocation as a missing object. Presence is only a transient result.
+pub(super) fn commit_batch_output(objects: &[String], output: &[u8]) -> Result<bool, GitToolError> {
+    let invalid = || GitToolError::Git("Invalid Pull child object response".into());
+    let text = std::str::from_utf8(output).map_err(|_| invalid())?;
+    let mut lines = text.split_terminator('\n');
+    let mut complete = true;
+    for object in objects {
+        let line = lines.next().ok_or_else(invalid)?;
+        let (oid, kind) = line.split_once(' ').ok_or_else(invalid)?;
+        if oid != object {
+            return Err(invalid());
+        }
+        match kind {
+            "commit" => {}
+            "missing" => complete = false,
+            "blob" | "tree" | "tag" => {
+                return Err(GitToolError::InvalidInput(
+                    "Pull child gitlink object is not a commit".into(),
+                ));
+            }
+            _ => return Err(invalid()),
+        }
+    }
+    if lines.next().is_some() || (!output.is_empty() && !output.ends_with(b"\n")) {
+        return Err(invalid());
+    }
+    Ok(complete)
+}
+
 /// Invalid modes are retained until candidate selection. Historical invalid
 /// modes use demand fallback; selected invalid current configuration must refuse.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -439,6 +469,27 @@ impl Tree {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pull_commit_batch_distinguishes_missing_and_rejects_noncommits_and_bad_protocol() {
+        let objects = vec!["a".repeat(40), "b".repeat(40)];
+        let output = format!("{} commit\n{} missing\n", objects[0], objects[1]);
+        assert!(!commit_batch_output(&objects, output.as_bytes()).expect("missing"));
+        for kind in ["blob", "tree", "tag", "unknown"] {
+            assert!(
+                commit_batch_output(&objects[..1], format!("{} {kind}\n", objects[0]).as_bytes())
+                    .is_err()
+            );
+        }
+        for output in [
+            String::new(),
+            format!("{} commit", objects[0]),
+            format!("{} commit\n", objects[1]),
+            format!("{} commit\nextra\n", objects[0]),
+        ] {
+            assert!(commit_batch_output(&objects[..1], output.as_bytes()).is_err());
+        }
+    }
 
     #[test]
     fn pull_current_selection_uses_names_and_preserves_legacy_inventory() {

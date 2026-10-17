@@ -336,6 +336,17 @@ impl AddPlan {
         deadline: std::time::Duration,
         limit: u64,
     ) -> Result<std::process::Output, GitToolError> {
+        self.run_command_output_with_input(command, deadline, limit, None)
+            .await
+    }
+
+    async fn run_command_output_with_input(
+        &self,
+        command: tokio::process::Command,
+        deadline: std::time::Duration,
+        limit: u64,
+        input: Option<Vec<u8>>,
+    ) -> Result<std::process::Output, GitToolError> {
         self.command_budget
             .lock()
             .map_err(|_| GitToolError::Git("Git command budget unavailable".into()))?
@@ -344,12 +355,29 @@ impl AddPlan {
         {
             let mut command = command;
             crate::process_boundary::apply_process_hardening(&mut command);
-            self.execution.execute(command.into_std(), deadline,
-                usize::try_from(limit).unwrap_or(usize::MAX)).await
+            let limit = usize::try_from(limit).unwrap_or(usize::MAX);
+            let result = match input {
+                Some(input) => {
+                    self.execution
+                        .execute_with_input(command.into_std(), deadline, limit, input)
+                        .await
+                }
+                None => {
+                    self.execution
+                        .execute(command.into_std(), deadline, limit)
+                        .await
+                }
+            };
+            result
                 .map_err(|error| GitToolError::Git(format!("host Git execution failed: {error}; effects may be partial; inspect repository before retrying")))
         }
         #[cfg(not(unix))]
         {
+            if input.is_some() {
+                return Err(GitToolError::InvalidInput(
+                    "Supervised Git input unavailable on this platform".into(),
+                ));
+            }
             super::run_host_command_output(command, deadline, limit).await
         }
     }
@@ -2268,8 +2296,83 @@ impl AddPlan {
         if pending {
             return Ok(self);
         }
+        self.validate_pull_child_object_types().await?;
         self.phase = Phase::PullIntegration;
         Ok(self)
+    }
+
+    async fn validate_pull_child_object_types(&self) -> Result<(), GitToolError> {
+        for (workdir, location) in &self.child_locations {
+            let objects: Vec<_> = self
+                .pull_changed_children
+                .values()
+                .filter(|child| self.repository.workdir.join(&child.path) == *workdir)
+                .flat_map(|child| child.objects.iter().cloned())
+                .collect::<std::collections::BTreeSet<_>>()
+                .into_iter()
+                .collect();
+            let (worktree, _) = self.pull_child_worktrees.get(workdir).ok_or_else(|| {
+                GitToolError::InvalidInput("Pull child effective worktree missing".into())
+            })?;
+            // Only reject invalid types here. Presence must be re-probed at the
+            // fetch consumer; never retain it across the next approval.
+            self.pull_child_commit_objects(workdir, &location.git_dir, worktree, &objects)
+                .await?;
+        }
+        Ok(())
+    }
+
+    async fn pull_child_commit_objects(
+        &self,
+        workdir: &Path,
+        gitdir: &Path,
+        worktree: &Path,
+        objects: &[String],
+    ) -> Result<bool, GitToolError> {
+        if objects.is_empty() {
+            return Ok(true);
+        }
+        let mut input = Vec::new();
+        for oid in objects {
+            if !matches!(oid.len(), 40 | 64) || !oid.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+                return Err(GitToolError::InvalidInput(
+                    "Invalid Pull child object ID".into(),
+                ));
+            }
+            input.extend_from_slice(oid.as_bytes());
+            input.push(b'\n');
+            if input.len() > 256 * 1024 {
+                return Err(GitToolError::InvalidInput(
+                    "Pull child object input limit exceeded".into(),
+                ));
+            }
+        }
+        self.revalidate()?;
+        let mut command = tokio::process::Command::new(&self.program);
+        command
+            .current_dir(workdir)
+            .arg("--no-pager")
+            .arg("--git-dir")
+            .arg(gitdir)
+            .arg("--work-tree")
+            .arg(worktree)
+            .args(["cat-file", "--batch-check=%(objectname) %(objecttype)"])
+            .env_clear()
+            .envs(&self.environment);
+        let output = self
+            .run_command_output_with_input(
+                command,
+                std::time::Duration::from_secs(10),
+                1024 * 1024,
+                Some(input),
+            )
+            .await?;
+        if !output.status.success() {
+            return Err(GitToolError::Git(
+                "Pull child object inspection failed".into(),
+            ));
+        }
+        super::pull_children::commit_batch_output(objects, &output.stdout)
     }
 
     fn bind_pull_child_worktree(
@@ -12561,7 +12664,11 @@ pub(super) mod tests {
 
     #[tokio::test]
     async fn pull_child_metadata_scope_batches_depth_and_requires_own_root() {
-        for mode in ["allow", "missing-capability", "missing-root"] {
+        let mut modes = vec!["allow", "missing-capability", "missing-root"];
+        if cfg!(unix) {
+            modes.extend(["missing-object", "noncommit"]);
+        }
+        for mode in modes {
             let root = fixture();
             assert!(
                 std::process::Command::new("git")
@@ -12589,6 +12696,33 @@ pub(super) mod tests {
             .expect("parent config");
             plan.pull_current_fetch_children
                 .insert("child".into(), super::super::pull_children::Recursion::On);
+            if matches!(mode, "missing-object" | "noncommit") {
+                let object = if mode == "noncommit" {
+                    let output = std::process::Command::new("git")
+                        .current_dir(&child)
+                        .args(["hash-object", "-w", "../file"])
+                        .output()
+                        .expect("blob");
+                    assert!(output.status.success());
+                    String::from_utf8(output.stdout)
+                        .expect("oid")
+                        .trim()
+                        .to_owned()
+                } else {
+                    "b".repeat(40)
+                };
+                plan.pull_changed_children.insert(
+                    "child".into(),
+                    super::super::pull_children::Changed {
+                        commit: "c".repeat(40),
+                        path: "child".into(),
+                        objects: [object].into_iter().collect(),
+                        historical_recursion: None,
+                        effective_recursion: Some(super::super::pull_children::Recursion::OnDemand),
+                        activity: Some(super::super::pull_children::Activity::Enabled),
+                    },
+                );
+            }
             plan.select_pull_child_identity().expect("select");
             while plan.phase == Phase::PullChildIdentity {
                 let tokens = proof(&plan)
@@ -12626,7 +12760,16 @@ pub(super) mod tests {
                 tokens.retain(|token| token.normalized_path() != gitdir);
             }
             let next = plan.discover_pull_child_configuration(&tokens).await;
-            if mode != "allow" {
+            if mode == "noncommit" {
+                assert!(
+                    next.err()
+                        .expect("noncommit")
+                        .to_string()
+                        .contains("not a commit")
+                );
+                continue;
+            }
+            if !matches!(mode, "allow" | "missing-object") {
                 assert!(next.is_err(), "{mode} must refuse graph discovery");
                 continue;
             }
@@ -16298,6 +16441,96 @@ pub(super) mod tests {
                 PreparedNormalStage::Continue(next) => operation = next,
             }
         }
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn pull_child_batch_uses_owned_input_and_distinguishes_execution_failure() {
+        let root = fixture();
+        let git = |args: &[&str]| {
+            let output = std::process::Command::new("git")
+                .current_dir(root.path())
+                .args(args)
+                .output()
+                .expect("git");
+            assert!(output.status.success(), "{:?}", output.stderr);
+            String::from_utf8(output.stdout)
+                .expect("UTF8")
+                .trim()
+                .to_owned()
+        };
+        git(&[
+            "-c",
+            "user.name=test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "--allow-empty",
+            "-m",
+            "initial",
+        ]);
+        let commit = git(&["rev-parse", "HEAD"]);
+        let tree = git(&["rev-parse", "HEAD^{tree}"]);
+        let mut plan =
+            AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+                .expect("plan");
+        let path = root.path().canonicalize().expect("root");
+        let gitdir = path.join(".git");
+        assert!(
+            plan.pull_child_commit_objects(&path, &gitdir, &path, std::slice::from_ref(&commit))
+                .await
+                .expect("commit")
+        );
+        assert!(
+            !plan
+                .pull_child_commit_objects(&path, &gitdir, &path, &["a".repeat(40)])
+                .await
+                .expect("missing")
+        );
+        assert!(
+            plan.pull_child_commit_objects(&path, &gitdir, &path, std::slice::from_ref(&tree))
+                .await
+                .expect_err("tree")
+                .to_string()
+                .contains("not a commit")
+        );
+        git(&["replace", "-f", &commit, &tree]);
+        plan = AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+            .expect("replacement plan");
+        let error = plan
+            .pull_child_commit_objects(&path, &gitdir, &path, std::slice::from_ref(&commit))
+            .await
+            .expect_err("replacement type");
+        assert!(error.to_string().contains("not a commit"), "{error}");
+        git(&["replace", "-d", &commit]);
+        git(&[
+            "-c",
+            "user.name=test",
+            "-c",
+            "user.email=test@example.com",
+            "tag",
+            "-a",
+            "tagged",
+            "-m",
+            "tag",
+        ]);
+        let tag = git(&["rev-parse", "tagged"]);
+        plan = AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+            .expect("tag plan");
+        assert!(
+            plan.pull_child_commit_objects(&path, &gitdir, &path, &[tag])
+                .await
+                .expect_err("annotated tag must not peel")
+                .to_string()
+                .contains("not a commit")
+        );
+        // A setup failure must not be converted to an object-missing result.
+        plan.program = std::path::PathBuf::from("/usr/bin/false");
+        assert!(
+            plan.pull_child_commit_objects(&path, &gitdir, &path, &[commit])
+                .await
+                .is_err()
+        );
     }
 
     fn fixture() -> tempfile::TempDir {
