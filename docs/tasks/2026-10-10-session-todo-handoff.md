@@ -3515,3 +3515,14 @@ Pull tests and all-target/all-feature Clippy pass; independent review found no
 blocker. This prepares fetch selection but does not yet change fetch behavior.
 Child fetch/retries, parent integration, Windows input, complete runner evidence
 and all original T7/handoff closure gates remain open.
+
+Child fetch external-effect checkpoint (2026-10-17): parent and child transport
+preparation now share the existing fetch bundle/proxy/external-maintenance
+checks. Final empty bundle URI and disabled automatic maintenance retain their
+existing semantics; invalid maintenance booleans refuse. Configuration tests
+pass 27/27, Pull-focused tests pass 100/100, and all-target/all-feature Clippy
+passes with warnings denied. Independent incremental security review found no
+blocker. The initial new fixture lacked its configuration source file and was
+corrected before these runs. This closes a child preparation gap only; hooks,
+credentials, transport planning and actual child fetch remain open, as do all
+original T7 and handoff delivery requirements. Production Pull stays disabled.

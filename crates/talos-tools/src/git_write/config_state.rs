@@ -227,6 +227,7 @@ impl ChildConfig {
     }
 
     pub(super) fn prepare_pull_transport(&self, remote: &str) -> Result<(), GitToolError> {
+        validate_fetch_external_effects(&self.values)?;
         for key in [
             format!("remote.{remote}.uploadpack"),
             format!("remote.{remote}.vcs"),
@@ -1204,41 +1205,7 @@ impl ConfigState {
         repository: &RepositoryState,
         environment: &BTreeMap<OsString, OsString>,
     ) -> Result<Vec<PathBuf>, GitToolError> {
-        // Git fetch consumes this extra source before opening the selected
-        // remote. Its bundles can read local paths or contact other endpoints;
-        // approving the configured remote does not authorize either effect.
-        // Git itself uses an empty final value to disable bundle retrieval.
-        if self
-            .values
-            .get(b"fetch.bundleuri".as_slice())
-            .and_then(|values| values.last())
-            .is_some_and(|value| value.as_deref() != Some(b""))
-        {
-            return Err(unsupported(
-                "Pull bundle URI sources require separate read or network authorization",
-            ));
-        }
-        let maintenance_enabled = self
-            .values
-            .get(b"maintenance.auto".as_slice())
-            .and_then(|values| values.last())
-            .map(|value| git_boolean(value.as_deref()))
-            .transpose()?
-            .unwrap_or(true);
-        if self.values.contains_key(b"core.gitproxy".as_slice())
-            || maintenance_enabled
-                && (self.values.contains_key(b"gc.recentobjectshook".as_slice())
-                    || self
-                        .values
-                        .get(b"gc.repackfilterto".as_slice())
-                        .and_then(|values| values.last())
-                        .and_then(|value| value.as_deref())
-                        .is_some_and(|value| !value.is_empty()))
-        {
-            return Err(unsupported(
-                "Configured Git fetch helper or external maintenance effects require separate authorization",
-            ));
-        }
+        validate_fetch_external_effects(&self.values)?;
         let directory = configured_path(&self.values, b"core.hookspath", environment)?
             .unwrap_or_else(|| repository.git_dir.join("hooks"));
         let directory = if directory.is_absolute() {
@@ -1257,6 +1224,7 @@ impl ConfigState {
 
     /// Validate the selected fetch remote after policy discovery, before any fetch mutation.
     pub(super) fn prepare_pull_transport(&self, remote: &str) -> Result<(), GitToolError> {
+        validate_fetch_external_effects(&self.values)?;
         for key in [
             format!("remote.{remote}.uploadpack"),
             format!("remote.{remote}.vcs"),
@@ -1621,6 +1589,42 @@ impl ConfigState {
         }
         Ok(())
     }
+}
+
+fn validate_fetch_external_effects(values: &Values) -> Result<(), GitToolError> {
+    // Git fetch consumes this extra source before opening the selected
+    // remote. Its bundles can read local paths or contact other endpoints;
+    // approving the configured remote does not authorize either effect.
+    // Git itself uses an empty final value to disable bundle retrieval.
+    if values
+        .get(b"fetch.bundleuri".as_slice())
+        .and_then(|values| values.last())
+        .is_some_and(|value| value.as_deref() != Some(b""))
+    {
+        return Err(unsupported(
+            "Pull bundle URI sources require separate read or network authorization",
+        ));
+    }
+    let maintenance_enabled = values
+        .get(b"maintenance.auto".as_slice())
+        .and_then(|values| values.last())
+        .map(|value| git_boolean(value.as_deref()))
+        .transpose()?
+        .unwrap_or(true);
+    if values.contains_key(b"core.gitproxy".as_slice())
+        || maintenance_enabled
+            && (values.contains_key(b"gc.recentobjectshook".as_slice())
+                || values
+                    .get(b"gc.repackfilterto".as_slice())
+                    .and_then(|values| values.last())
+                    .and_then(|value| value.as_deref())
+                    .is_some_and(|value| !value.is_empty()))
+    {
+        return Err(unsupported(
+            "Configured Git fetch helper or external maintenance effects require separate authorization",
+        ));
+    }
+    Ok(())
 }
 
 fn refuse_promisor_objects(values: &Values) -> Result<(), GitToolError> {
@@ -2582,6 +2586,47 @@ mod tests {
                 .err()
                 .expect("refusal");
             assert!(error.to_string().contains("promisor remote"), "{error}");
+        }
+    }
+
+    #[test]
+    fn child_fetch_refuses_external_effects_and_honors_disabling_values() {
+        let root = tempfile::tempdir().expect("fixture");
+        std::fs::write(root.path().join("config"), "").expect("source");
+        let capture = |records: &[(&str, &str)]| {
+            let mut output = String::new();
+            for (key, value) in records {
+                output.push_str(&format!(
+                    "file:{}\0{key}\n{value}\0",
+                    root.path().join("config").display()
+                ));
+            }
+            ChildConfig::capture(output.as_bytes(), root.path()).expect("capture")
+        };
+        for records in [
+            vec![("fetch.bundleuri", "https://example.com/bundle")],
+            vec![("core.gitproxy", "proxy-program")],
+            vec![("gc.recentobjectshook", "hook-program")],
+            vec![("gc.repackfilterto", "/external/objects")],
+            vec![("maintenance.auto", "invalid")],
+        ] {
+            assert!(capture(&records).prepare_pull_transport("origin").is_err());
+        }
+        for records in [
+            vec![
+                ("fetch.bundleuri", "https://example.com/bundle"),
+                ("fetch.bundleuri", ""),
+            ],
+            vec![("gc.repackfilterto", "")],
+            vec![
+                ("maintenance.auto", "false"),
+                ("gc.recentobjectshook", "hook-program"),
+                ("gc.repackfilterto", "/external/objects"),
+            ],
+        ] {
+            capture(&records)
+                .prepare_pull_transport("origin")
+                .expect("disabled effect");
         }
     }
 
