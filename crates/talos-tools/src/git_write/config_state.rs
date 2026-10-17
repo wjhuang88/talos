@@ -198,10 +198,32 @@ fn startup_values(entry: &snapshot::Entry) -> Result<StartupValues, GitToolError
     .unwrap_or_else(|_| Err(unsupported("Child startup configuration parser failed")))
 }
 
+/// Strip origin fields while retaining ordered, possibly valueless records.
+fn ordered_records(output: &[u8]) -> Result<Vec<u8>, GitToolError> {
+    if output.is_empty() {
+        return Ok(Vec::new());
+    }
+    let fields: Vec<_> = output
+        .strip_suffix(&[0])
+        .ok_or_else(|| unsupported("Incomplete Pull configuration"))?
+        .split(|byte| *byte == 0)
+        .collect();
+    let (pairs, tail) = fields.as_chunks::<2>();
+    if !tail.is_empty() {
+        return Err(unsupported("Incomplete Pull configuration"));
+    }
+    let mut records = Vec::new();
+    for [_, record] in pairs {
+        records.extend_from_slice(record);
+        records.push(0);
+    }
+    Ok(records)
+}
+
 impl ChildConfig {
     /// The first recursive fetch uses ordinary fetch default-remote semantics.
     pub(super) fn fetch_remote(&self, branch: Option<&str>) -> Result<String, GitToolError> {
-        super::pull_state::fetch_remote(&self.ordered_output, branch, None)
+        super::pull_state::fetch_remote(&ordered_records(&self.ordered_output)?, branch, None)
     }
 
     pub(super) fn prepare_pull_transport(&self, remote: &str) -> Result<(), GitToolError> {
@@ -812,25 +834,7 @@ impl ConfigState {
     }
     /// Preserve declaration order and valueless records for Pull policy parsing.
     pub(super) fn pull_records(&self) -> Result<Vec<u8>, GitToolError> {
-        if self.ordered_output.is_empty() {
-            return Ok(Vec::new());
-        }
-        let fields: Vec<_> = self
-            .ordered_output
-            .strip_suffix(&[0])
-            .ok_or_else(|| unsupported("Incomplete Pull configuration"))?
-            .split(|byte| *byte == 0)
-            .collect();
-        let (pairs, tail) = fields.as_chunks::<2>();
-        if !tail.is_empty() {
-            return Err(unsupported("Incomplete Pull configuration"));
-        }
-        let mut records = Vec::new();
-        for [_, record] in pairs {
-            records.extend_from_slice(record);
-            records.push(0);
-        }
-        Ok(records)
+        ordered_records(&self.ordered_output)
     }
 
     pub(super) fn pull_remote_records(&self) -> Result<Vec<(String, String)>, GitToolError> {
@@ -2276,8 +2280,11 @@ mod tests {
 
     #[test]
     fn child_fetch_remote_binds_branch_and_single_remote_defaults() {
-        let root = tempfile::tempdir().expect("fixture");
-        let path = root.path().join("config");
+        let root = tempfile::Builder::new()
+            .prefix("talos-config-")
+            .tempdir()
+            .expect("fixture");
+        let path = root.path().join("config-without-dot");
         std::fs::write(&path, "").expect("source");
         let output = [
             "remote.backup.url\ngit://backup.invalid/repo",
