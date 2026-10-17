@@ -3542,3 +3542,34 @@ independent follow-up review found no remaining blocker for this increment.
 Child fetch execution/transport credentials, recursive retries, parent integration,
 Windows input and all original runtime/publication/closure gates remain open.
 T7 remains Active and production Pull remains disabled.
+
+Child fetch execution work-in-progress checkpoint (2026-10-17): the uncommitted
+stage now executes at most one child fetch before rebuilding every child graph
+inventory observing the changed metadata roots. Per-child completion replaces
+an all-children flag, and pending children regain their own Network/Write facets.
+Parent-graph overlap currently refuses before mutation and still requires a
+coordinated refresh implementation. Stage errors disclose possible retained
+partial fetch effects. The attributes-only fixture correctly selects integration
+when no children exist. Pull-focused tests passed 102/102 before strengthening
+the skip fixture; the strengthened real-daemon test subsequently passed with a
+nonempty reachable commit set freshly probed after write approval. This is not
+completion evidence: shared linked-child regression, independent security
+re-review, full tools validation, parent overlap handling and the existing
+transport/recursive/integration/runtime gates remain outstanding. Production
+Pull remains disabled. Resume from the uncommitted prepared_add.rs changes;
+validation logs are /tmp/talos-child-fetch-refresh.log and
+/tmp/talos-child-fetch-nonempty.log.
+
+Child fetch shared-graph follow-up (2026-10-17): real Git daemon coverage now
+runs two linked worktrees sharing a common store, refreshes graph evidence after
+the first fetch, and successfully fetches the second. A separate branch mutates
+a reference between fetches and verifies refusal. Independent incremental review
+confirmed the two prior graph-evidence blockers are resolved; its remaining
+post-fetch configuration error-context finding is fixed for resumed discovery.
+Full locked all-feature tools library tests passed 809/809 (outside the sandbox
+for process-supervision observation). Final focused tests/Clippy are being
+rerun after the error-context correction. The parent overlap refusal and all
+original activation/closure residuals remain, without any completion claim.
+Final error-context correction validation: locked Pull tests 102/102 and
+all-target/all-feature warnings-denied Clippy passed. This stage remains a
+production-disabled implementation increment, not T7 completion.
