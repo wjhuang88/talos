@@ -3573,3 +3573,18 @@ original activation/closure residuals remain, without any completion claim.
 Final error-context correction validation: locked Pull tests 102/102 and
 all-target/all-feature warnings-denied Clippy passed. This stage remains a
 production-disabled implementation increment, not T7 completion.
+
+Child module-name scheduling checkpoint (2026-10-17, in progress): selected
+initialized current children now suppress same-name historical paths after
+successful identity capture; names remain case sensitive. Commit probes and
+historical unconditional recursion policy follow the selected module name
+across path changes. Independent review caught an initially path-only policy
+comparison; the correction and real-daemon renamed-path/On/reachable-object
+regression pass with all 103 locked Pull tests. Missing/uninitialized/legacy
+repository fallback and final security follow-up remain open. Origin/main was
+fetched and advanced 21 commits to 891f6c49; rebase must follow this local stage's
+validation and commit. Production Pull remains disabled and T7 remains Active.
+Module-name follow-up: independent re-review found the policy correction closes
+its blocker. Path/name matching now compares joined paths to avoid Windows
+separator differences. Locked Pull tests pass 103/103 after that adjustment;
+Clippy and both governance validators pass for this increment.
