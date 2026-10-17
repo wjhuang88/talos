@@ -49,11 +49,10 @@ impl ChildLocation {
         let common_dir = match &pointer {
             snapshot::Entry::Missing => canonical_git.clone(),
             snapshot::Entry::File(_, bytes) => {
-                let bytes = bytes.strip_suffix(b"\n").unwrap_or(bytes);
-                let bytes = bytes.strip_suffix(b"\r").unwrap_or(bytes);
                 let text = std::str::from_utf8(bytes).map_err(|_| {
                     GitToolError::InvalidInput("Submodule commondir is not UTF-8".into())
                 })?;
+                let text = text.trim_end_matches(['\r', '\n']);
                 if text.is_empty() || bytes.contains(&0) {
                     return Err(GitToolError::InvalidInput(
                         "Invalid submodule commondir path".into(),
@@ -445,6 +444,24 @@ mod tests {
             before,
             ChildLocation::capture(&git_dir).expect("retargeted location")
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn child_location_trims_all_pointer_line_endings_but_preserves_spaces() {
+        let root = tempfile::tempdir().expect("fixture");
+        let git_dir = root.path().join("gitdir");
+        let shared = root.path().join("shared ");
+        std::fs::create_dir(&git_dir).expect("gitdir");
+        std::fs::create_dir(&shared).expect("shared");
+        std::fs::write(git_dir.join("commondir"), "../shared \r\n\n\r\n").expect("pointer");
+        let location = ChildLocation::capture(&git_dir).expect("location");
+        assert_eq!(
+            location.common_dir,
+            shared.canonicalize().expect("shared path")
+        );
+        std::fs::write(git_dir.join("commondir"), "\r\n\n").expect("empty pointer");
+        assert!(ChildLocation::capture(&git_dir).is_err());
     }
 
     #[cfg(unix)]

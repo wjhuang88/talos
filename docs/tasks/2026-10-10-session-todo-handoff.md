@@ -3463,3 +3463,13 @@ mirrors the fetch transition; it is not full execute_stage integration success.
 All 98 locked Pull tests and library Clippy pass; independent review found no
 new blocker. Production activation, ordinary recursive success within eight
 stages, child probes/fetch/retries, integration and final delivery remain open.
+
+Child commondir parsing checkpoint (2026-10-17): ChildLocation now removes all
+trailing CR/LF, matching receiver metadata parsing and Git's nonempty-pointer
+rule while preserving path spaces. New regression covers repeated mixed line
+endings, a directory with a trailing space, and the retained empty-pointer
+refusal (the latter remains deliberately stricter than Git). All three locked
+child-location tests pass; independent review found no blocker. Original pointer
+bytes remain bound. Object probing still requires a supervised input path or an
+equivalent library implementation; child fetch/integration and all original T7
+closure gates remain open. This is a compatibility fix, not Pull activation.
