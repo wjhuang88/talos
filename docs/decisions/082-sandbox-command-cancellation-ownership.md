@@ -24,7 +24,14 @@ unchanged. No new dependency, host `kill` utility, release or unrelated backgrou
 migration is included.
 
 - Create an isolated session/process group before running the sandbox wrapper;
-  stdin is null and stdout/stderr are independently drained.
+  stdin is null by default and stdout/stderr are independently drained.
+  An authorized caller may explicitly supply finite owned input through
+  `OwnedCommandOperation::execute_with_input`. Delivery runs concurrently with
+  output collection under the same cancellation, deadline and cleanup owner;
+  the input pipe closes after delivery. Incomplete delivery is an execution
+  error, including early child exit. The caller remains responsible for input
+  authorization and size budgeting; this API grants neither permission nor an
+  additional memory budget.
 - A supervisor owns the child, process-group identity and cleanup state. Caller
   cancellation signals that supervisor; it does not discard the sole child owner.
 - Observe leader exit without reaping (`waitid` with `WEXITED | WNOHANG | WNOWAIT`).

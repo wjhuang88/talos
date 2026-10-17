@@ -7,7 +7,7 @@ use std::process::{Child, Command, Output, Stdio};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use tokio::io::{AsyncRead, AsyncReadExt};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
 use tokio::sync::{Notify, oneshot};
 
 use crate::SandboxError;
@@ -294,16 +294,31 @@ pub(crate) async fn execute(
 }
 
 pub(crate) async fn execute_with_limit(
-    mut command: Command,
+    command: Command,
     cleanup: Arc<Cleanup>,
     deadline: Duration,
     resources: impl Send + 'static,
     output_limit: usize,
 ) -> Result<Output, SandboxError> {
+    execute_with_input(command, cleanup, deadline, resources, output_limit, None).await
+}
+
+pub(crate) async fn execute_with_input(
+    mut command: Command,
+    cleanup: Arc<Cleanup>,
+    deadline: Duration,
+    resources: impl Send + 'static,
+    output_limit: usize,
+    input: Option<Vec<u8>>,
+) -> Result<Output, SandboxError> {
     let started = tokio::time::Instant::now();
     let mut receipt = cleanup.register()?;
     command
-        .stdin(Stdio::null())
+        .stdin(if input.is_some() {
+            Stdio::piped()
+        } else {
+            Stdio::null()
+        })
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     // SAFETY: the post-fork hook invokes only the async-signal-safe setsid and
@@ -355,11 +370,12 @@ pub(crate) async fn execute_with_limit(
     let cancel = CancelOnDrop(Some(cancel_tx));
     let task = tokio::spawn(async move {
         let _resources = resources;
-        let result = supervise_limited(
+        let result = supervise_limited_with_input(
             owner,
             cancel_rx,
             deadline.saturating_sub(started.elapsed()),
             output_limit,
+            input,
         )
         .await;
         receipt.finish(result.1);
@@ -381,12 +397,32 @@ async fn supervise(
     supervise_limited(owner, cancel, deadline, usize::MAX).await
 }
 
+#[cfg(test)]
 async fn supervise_limited(
-    mut owner: OwnedChild,
+    owner: OwnedChild,
     cancel: oneshot::Receiver<()>,
     deadline: Duration,
     output_limit: usize,
 ) -> (Result<Output, SandboxError>, Option<String>) {
+    supervise_limited_with_input(owner, cancel, deadline, output_limit, None).await
+}
+
+async fn supervise_limited_with_input(
+    mut owner: OwnedChild,
+    cancel: oneshot::Receiver<()>,
+    deadline: Duration,
+    output_limit: usize,
+    input: Option<Vec<u8>>,
+) -> (Result<Output, SandboxError>, Option<String>) {
+    let stdin = owner.child.stdin.take();
+    let input = async move {
+        if let Some(input) = input {
+            let stdin = stdin.ok_or_else(|| io::Error::other("missing stdin"))?;
+            let mut stdin = tokio::process::ChildStdin::from_std(stdin)?;
+            stdin.write_all(&input).await?;
+        }
+        Ok::<(), io::Error>(())
+    };
     let stdout = owner
         .child
         .stdout
@@ -417,7 +453,15 @@ async fn supervise_limited(
             return (Err(failed(detail)), cleanup);
         }
     };
-    supervise_io_limited(owner, cancel, deadline, stdout, stderr, output_limit).await
+    supervise_io_limited(
+        owner,
+        cancel,
+        deadline,
+        (stdout, stderr),
+        output_limit,
+        input,
+    )
+    .await
 }
 
 #[cfg(test)]
@@ -428,17 +472,27 @@ async fn supervise_io(
     stdout: impl AsyncRead + Unpin,
     stderr: impl AsyncRead + Unpin,
 ) -> (Result<Output, SandboxError>, Option<String>) {
-    supervise_io_limited(owner, cancel, deadline, stdout, stderr, usize::MAX).await
+    supervise_io_limited(
+        owner,
+        cancel,
+        deadline,
+        (stdout, stderr),
+        usize::MAX,
+        async { Ok(()) },
+    )
+    .await
 }
 
 async fn supervise_io_limited(
     mut owner: OwnedChild,
     mut cancel: oneshot::Receiver<()>,
     deadline: Duration,
-    mut stdout: impl AsyncRead + Unpin,
-    mut stderr: impl AsyncRead + Unpin,
+    (mut stdout, mut stderr): (impl AsyncRead + Unpin, impl AsyncRead + Unpin),
     output_limit: usize,
+    input: impl std::future::Future<Output = io::Result<()>>,
 ) -> (Result<Output, SandboxError>, Option<String>) {
+    tokio::pin!(input);
+    let mut input_done = false;
     let mut out = Vec::new();
     let mut err = Vec::new();
     let mut out_eof = false;
@@ -449,11 +503,15 @@ async fn supervise_io_limited(
     tokio::pin!(deadline);
     let reason = loop {
         match owner.observe() {
-            Ok(true) if out_eof && err_eof => break None,
+            Ok(true) if out_eof && err_eof && input_done => break None,
             Ok(_) => {}
             Err(error) => break Some(format!("sandbox exit observation failed: {error}")),
         }
         tokio::select! {
+            written = &mut input, if !input_done => match written {
+                Ok(()) => input_done = true,
+                Err(error) => break Some(format!("sandbox stdin write failed: {error}")),
+            },
             _ = &mut cancel => break Some("sandbox execution cancelled".into()),
             _ = &mut deadline => break Some("sandbox execution timed out".into()),
             read = stdout.read(&mut out_buf), if !out_eof => match read {
@@ -578,6 +636,75 @@ async fn finish_cleanup_limited(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn finite_input_drains_output_and_closes_the_pipe() {
+        let directory = tempfile::tempdir().expect("workspace");
+        let cleanup = Arc::new(Cleanup::default());
+        // Exceeds pipe capacity in both directions: serial delivery would hang.
+        let input = vec![b'x'; 256 * 1024];
+        let output = execute_with_input(
+            shell("cat", directory.path()),
+            cleanup.clone(),
+            Duration::from_secs(3),
+            (),
+            input.len(),
+            Some(input.clone()),
+        )
+        .await
+        .expect("duplex delivery and EOF");
+        assert!(output.status.success());
+        assert_eq!(output.stdout, input);
+        cleanup.wait(Duration::from_secs(1)).await.expect("cleanup");
+    }
+
+    #[tokio::test]
+    async fn blocked_input_obeys_deadline_and_cancellation() {
+        let directory = tempfile::tempdir().expect("workspace");
+        for cancel in [false, true] {
+            let cleanup = Arc::new(Cleanup::default());
+            let task = tokio::spawn(execute_with_input(
+                shell("sleep 30", directory.path()),
+                cleanup.clone(),
+                Duration::from_millis(100),
+                (),
+                1024,
+                Some(vec![0; 1024 * 1024]),
+            ));
+            if cancel {
+                tokio::time::sleep(Duration::from_millis(30)).await;
+                task.abort();
+                let _ = task.await;
+            } else {
+                assert!(
+                    task.await
+                        .expect("task")
+                        .expect_err("timeout")
+                        .to_string()
+                        .contains("timed out")
+                );
+            }
+            cleanup.wait(Duration::from_secs(3)).await.expect("cleanup");
+        }
+    }
+
+    #[tokio::test]
+    async fn early_exit_cannot_report_undelivered_input_as_success() {
+        let directory = tempfile::tempdir().expect("workspace");
+        let cleanup = Arc::new(Cleanup::default());
+        let error = execute_with_input(
+            shell("exit 0", directory.path()),
+            cleanup.clone(),
+            Duration::from_secs(2),
+            (),
+            1024,
+            Some(vec![0; 1024 * 1024]),
+        )
+        .await
+        .expect_err("undelivered input");
+        assert!(error.to_string().contains("stdin write failed"));
+        cleanup.wait(Duration::from_secs(1)).await.expect("cleanup");
+    }
 
     #[tokio::test]
     async fn bounded_output_accepts_exact_limit_and_cleans_overflow() {
