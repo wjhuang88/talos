@@ -235,6 +235,7 @@ pub(super) struct AddPlan {
     )>,
     pull_index_children: BTreeMap<String, String>,
     pull_child_fetch_targets: BTreeMap<PathBuf, (String, Vec<String>)>,
+    pull_child_inventories: BTreeMap<PathBuf, super::pull_inventory::Inventory>,
     pull_current_fetch_children: BTreeMap<String, super::pull_children::Recursion>,
     pull_current_modules: Option<super::pull_children::Tree>,
     pull_modules_evidence: Option<PullAttribute>,
@@ -644,6 +645,7 @@ impl AddPlan {
             pull_child_layouts: Vec::new(),
             pull_index_children: BTreeMap::new(),
             pull_child_fetch_targets: BTreeMap::new(),
+            pull_child_inventories: BTreeMap::new(),
             pull_current_fetch_children: BTreeMap::new(),
             pull_current_modules: None,
             pull_modules_evidence: None,
@@ -1999,6 +2001,17 @@ impl AddPlan {
             }
             self.pull_child_fetch_targets
                 .insert(workdir.clone(), (remote, destinations));
+            let inventory =
+                super::pull_inventory::Inventory::new(&location.git_dir, &location.common_dir);
+            for path in inventory.paths() {
+                self.facets.push(path_facet(
+                    ToolNature::Read,
+                    &path,
+                    "Pull child object and reference inventory; object reads deferred",
+                )?);
+            }
+            self.pull_child_inventories
+                .insert(workdir.clone(), inventory);
             self.child_configs.push((workdir.clone(), config));
         }
         if !self.pull_config_sources_discovered {
@@ -2007,7 +2020,37 @@ impl AddPlan {
             return Ok(self);
         }
         self.revalidate()?;
+        let mut pending = false;
+        for inventory in self.pull_child_inventories.values_mut() {
+            inventory.advance(|path| {
+                authorizations.iter().any(|token| {
+                    token.authorizes_path(
+                        "git_pull",
+                        ToolNature::Read,
+                        &self.workspace,
+                        path.to_str().unwrap_or_default(),
+                    )
+                })
+            })?;
+            pending |= !inventory.complete();
+            for path in inventory.paths() {
+                if !self.facets.iter().any(|facet| {
+                    facet.nature == ToolNature::Read
+                        && facet.resource_kind == Some(ToolResourceKind::Path)
+                        && facet.resource.as_deref() == path.to_str()
+                }) {
+                    self.facets.push(path_facet(
+                        ToolNature::Read,
+                        &path,
+                        "Pull child object and reference inventory frontier",
+                    )?);
+                }
+            }
+        }
         self.identity = PreparedPlanIdentity::new();
+        if pending {
+            return Ok(self);
+        }
         self.phase = Phase::PullIntegration;
         Ok(self)
     }
@@ -5251,6 +5294,9 @@ impl AddPlan {
             if let Some(metadata) = metadata {
                 metadata.revalidate(&metadata.canonical)?;
             }
+        }
+        for inventory in self.pull_child_inventories.values() {
+            inventory.revalidate()?;
         }
         for metadata in &self.checkout_child_metadata {
             metadata.revalidate(&metadata.canonical)?;
@@ -12155,6 +12201,52 @@ pub(super) mod tests {
         state
             .try_admit_prepared_invocation(pending, &request, &context, &plan.identity)
             .expect("admission")
+    }
+
+    #[tokio::test]
+    async fn pull_child_inventory_waits_for_fresh_frontier_admission() {
+        let root = fixture();
+        let external = tempfile::tempdir().expect("external");
+        let metadata = external.path().canonicalize().expect("canonical");
+        std::fs::create_dir(metadata.join("objects")).expect("objects");
+        std::fs::create_dir(metadata.join("objects/aa")).expect("fanout");
+        let mut plan = Box::new(
+            AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+                .expect("prepare"),
+        );
+        plan.phase = Phase::PullChildConfiguration;
+        plan.pull_config_sources_discovered = true;
+        plan.facets.push(ToolPermissionFacet::with_resource(
+            ToolNature::Read,
+            "git:configuration-chain",
+            ToolResourceKind::Remote,
+        ));
+        let inventory = super::super::pull_inventory::Inventory::new(&metadata, &metadata);
+        for path in inventory.paths() {
+            plan.facets
+                .push(path_facet(ToolNature::Read, &path, "inventory").expect("facet"));
+        }
+        plan.pull_child_inventories
+            .insert(metadata.clone(), inventory);
+        let tokens = proof(&plan)
+            .consume_for_prepared(&plan.request(), &plan.identity)
+            .expect("proof");
+        let plan = plan
+            .discover_pull_child_configuration(&tokens)
+            .await
+            .expect("names");
+        assert!(matches!(plan.phase, Phase::PullChildConfiguration));
+        assert!(!plan.pull_child_inventories[&metadata].complete());
+        assert!(
+            plan.facets
+                .iter()
+                .any(|facet| facet.resource.as_deref() == metadata.join("objects/aa").to_str())
+        );
+        assert!(
+            plan.discover_pull_child_configuration(&tokens)
+                .await
+                .is_err()
+        );
     }
 
     #[test]
