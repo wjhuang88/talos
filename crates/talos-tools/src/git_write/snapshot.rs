@@ -22,6 +22,8 @@ pub(super) struct RegularEvidence {
 
 #[derive(Debug, PartialEq, Eq)]
 struct LeafIdentity {
+    #[cfg(windows)]
+    handle: same_file::Handle,
     #[cfg(unix)]
     device: u64,
     #[cfg(unix)]
@@ -44,7 +46,15 @@ impl LeafIdentity {
                 inode: metadata.ino(),
             }))
         }
-        #[cfg(not(unix))]
+        #[cfg(windows)]
+        {
+            let _ = metadata;
+            let handle = std::panic::catch_unwind(|| same_file::Handle::from_path(path)).map_err(
+                |_| std::io::Error::other("Windows Git leaf identity inspection panicked"),
+            )??;
+            Ok(Some(Self { handle }))
+        }
+        #[cfg(not(any(unix, windows)))]
         {
             let _ = metadata;
             Ok(Some(Self {}))
@@ -315,7 +325,7 @@ mod tests {
         assert_ne!(identity, PathIdentity::capture(&leaf).expect("new leaf"));
     }
 
-    #[cfg(unix)]
+    #[cfg(any(unix, windows))]
     #[test]
     fn regular_evidence_rejects_identical_byte_inode_replacement() {
         let root = tempfile::tempdir().expect("fixture");

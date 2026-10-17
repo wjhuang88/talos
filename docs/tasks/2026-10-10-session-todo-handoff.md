@@ -3348,3 +3348,23 @@ This establishes discovery batching, not full runner reachability: child object
 semantics, transport/retries, recursive fetch, parent integration, eight-stage
 end-to-end validation and final delivery gates remain open. Production Pull is
 still disabled; I300/T7 remains Active and incomplete.
+
+
+Windows regular-file evidence checkpoint (2026-10-17): `RegularEvidence` now
+retains a Windows leaf handle using the already accepted Windows/Git-only
+same-file dependency, closing the separate identity placeholder that treated
+identical-byte replacement as unchanged. Dependency errors and panics reject
+evidence capture. The existing identical-byte replacement regression now applies
+to Windows and is explicitly selected by Windows CI. Its locked macOS execution
+passes; all-target/all-feature Clippy passes. Independent reviewer
+`review_prepared` found no new blocker, including retained-handle lifetime and
+shared-delete behavior. Native Windows execution remains required; ReFS identity
+and aggregate handle budgets remain residuals. All-feature Windows cross-check
+cannot run on this host because x86_64-w64-mingw32-gcc is unavailable, so it is
+not runtime evidence. Production Pull remains disabled.
+The preceding child-scope stage also passes all 795 all-feature tools library
+tests outside the sandbox (`/tmp/talos-t7-child-scope-all-tests-unsandboxed.log`);
+sandbox execution passed 794 and hit the known process-observation EPERM.
+Git-feature Windows GNU library cross-check passes
+(`/tmp/talos-t7-windows-leaf-git-check.log`), with the existing unused
+`run_host_command` warning; this is compilation evidence only.

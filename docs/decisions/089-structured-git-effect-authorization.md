@@ -121,7 +121,10 @@ to the accepted version and does not authorize arbitrary dependency upgrades.
 Limitations remain explicit: same-file 1.0.6 compares 64-bit file indices and
 does not fully support ReFS 128-bit identities; this is not proof of confinement
 or all-filesystem Windows replacement protection. `RegularEvidence`'s separate
-Windows leaf identity remains unchanged. Native Windows runtime validation,
+Windows leaf identity now also retains a panic-guarded owned handle while
+regular-file evidence lives; identical-byte file replacement therefore changes
+the compared identity. The existing replacement regression is selected explicitly
+in Windows CI. Native Windows runtime validation,
 including rename and sharing behavior with retained handles, remains a delivery
 gate. Replace this bridge when stable Rust offers an adequate safe identity API,
 or when a separately reviewed solution supplies full filesystem identity support.
