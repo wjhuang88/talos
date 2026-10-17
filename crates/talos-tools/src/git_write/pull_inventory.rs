@@ -13,6 +13,7 @@ pub(super) struct Inventory {
     visited: BTreeMap<PathBuf, Option<PathIdentity>>,
     directories: BTreeMap<PathBuf, Vec<PathBuf>>,
     alternates: Vec<(PathBuf, super::snapshot::RegularEvidence)>,
+    references: Vec<(PathBuf, super::snapshot::RegularEvidence)>,
 }
 
 fn invalid() -> GitToolError {
@@ -44,6 +45,7 @@ impl Inventory {
             visited: BTreeMap::new(),
             directories: BTreeMap::new(),
             alternates: Vec::new(),
+            references: Vec::new(),
         }
     }
 
@@ -93,7 +95,54 @@ impl Inventory {
                 return Err(invalid());
             }
         }
+        let mut budget = super::snapshot::Budget {
+            entries: 4096,
+            bytes: 4 * 1024 * 1024,
+        };
+        for (path, expected) in &self.references {
+            if &super::snapshot::RegularEvidence::capture(path, &mut budget)
+                .map_err(|_| invalid())?
+                != expected
+            {
+                return Err(invalid());
+            }
+        }
         Ok(())
+    }
+
+    /// Bind reference contents, including symbolic replacement-ref declarations,
+    /// without recursively opening descendants absent from the admitted inventory.
+    pub(super) fn bind_references(
+        &mut self,
+        gitdir: &Path,
+        common: &Path,
+    ) -> Result<(), GitToolError> {
+        if !self.complete() {
+            return Err(invalid());
+        }
+        self.revalidate()?;
+        let mut budget = super::snapshot::Budget {
+            entries: 4096,
+            bytes: 4 * 1024 * 1024,
+        };
+        let mut evidence = Vec::new();
+        for (path, identity) in &self.visited {
+            let reference = [gitdir, common].iter().any(|root| {
+                path.starts_with(root.join("refs"))
+                    || path == &root.join("packed-refs")
+                    || path == &root.join("HEAD")
+            });
+            if reference && identity.is_some() && !self.directories.contains_key(path) {
+                evidence.push((
+                    path.clone(),
+                    super::snapshot::RegularEvidence::capture(path, &mut budget)
+                        .map_err(|_| invalid())?,
+                ));
+            }
+        }
+        self.revalidate()?;
+        self.references = evidence;
+        self.revalidate()
     }
 
     /// Bind object-store redirects only after the complete frontier was admitted.
@@ -332,6 +381,31 @@ mod tests {
             b"http://unadmitted.invalid\n",
         )
         .expect("new redirect");
+        assert!(inventory.revalidate().is_err());
+    }
+
+    #[test]
+    fn child_reference_contents_bind_in_place_symbolic_target_changes() {
+        let temp = tempfile::tempdir().expect("fixture");
+        let root = temp.path().canonicalize().expect("root");
+        std::fs::create_dir_all(root.join("refs/replace")).expect("refs");
+        std::fs::create_dir_all(root.join("refs/heads")).expect("heads");
+        let target = root.join("refs/heads/target");
+        std::fs::write(&target, format!("{}\n", "a".repeat(40))).expect("target");
+        std::fs::write(
+            root.join("refs/replace/object"),
+            b"ref: refs/heads/target\n",
+        )
+        .expect("symbolic replacement");
+        let mut inventory = Inventory::new(&root, &root);
+        assert!(inventory.bind_references(&root, &root).is_err());
+        while !inventory.complete() {
+            inventory.advance(|_| true).expect("admitted frontier");
+        }
+        inventory
+            .bind_references(&root, &root)
+            .expect("reference bytes");
+        std::fs::write(&target, format!("{}\n", "b".repeat(40))).expect("in-place change");
         assert!(inventory.revalidate().is_err());
     }
 

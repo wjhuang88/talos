@@ -2052,12 +2052,14 @@ impl AddPlan {
             return Ok(self);
         }
         for (workdir, location) in &self.child_locations {
-            self.pull_child_inventories
+            let inventory = self
+                .pull_child_inventories
                 .get_mut(workdir)
                 .ok_or_else(|| {
                     GitToolError::InvalidInput("Pull child object inventory missing".into())
-                })?
-                .bind_alternates(&location.git_dir, &location.common_dir)?;
+                })?;
+            inventory.bind_alternates(&location.git_dir, &location.common_dir)?;
+            inventory.bind_references(&location.git_dir, &location.common_dir)?;
         }
         self.phase = Phase::PullIntegration;
         Ok(self)
