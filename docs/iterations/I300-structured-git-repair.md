@@ -4017,3 +4017,17 @@ linked-worktree target discovery/admission and external reference-root closure
 remain prerequisites before native child probes or production activation.
 Fetch found origin/main unchanged (118 ahead, zero behind before this commit).
 T7 remains Active; no handoff completion or full-workspace validation is claimed.
+
+Parent linked-worktree admission checkpoint (2026-10-17): prefetch and
+postfetch now share bounded parent-inventory convergence. Raw linked targets
+require exact grants and normalized identity matching; external reference roots
+and descendants remain fresh frontiers. Successful fetch discards the old graph
+inventory once; postfetch continuations retain the new evidence across approval.
+The real local-fetch fixture rejects pointer edits between postfetch approvals
+and retains FETCH_HEAD. Its deep external-ref case accounts for preparation and
+fetch in PreparedStageHistory, stops when the shared budget refuses continuation,
+and verifies untouched fetched bytes and an unvisited leaf. This fixture manually
+mirrors the fetch transition; it is not full execute_stage integration success.
+All 98 locked Pull tests and library Clippy pass; independent review found no
+new blocker. Production activation, ordinary recursive success within eight
+stages, child probes/fetch/retries, integration and final delivery remain open.
