@@ -709,6 +709,63 @@ impl AddPlan {
             .await
     }
 
+    fn advance_pull_parent_inventory(
+        &mut self,
+        inventory: &mut super::pull_inventory::Inventory,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<bool, GitToolError> {
+        let gitdir = &self.repository.git_dir;
+        let common = &self.repository.common_dir;
+        let exact = |path: &Path| {
+            authorizations.iter().find(|token| {
+                token.authorizes_path(
+                    "git_pull",
+                    ToolNature::Read,
+                    &self.workspace,
+                    path.to_str().unwrap_or_default(),
+                )
+            })
+        };
+        let admitted = |path: &Path| {
+            path.starts_with(gitdir) || path.starts_with(common) || exact(path).is_some()
+        };
+        let mut pending = inventory
+            .exact_paths(gitdir, common)
+            .iter()
+            .any(|path| exact(path).is_none());
+        if !pending {
+            while !inventory.complete() && inventory.paths().iter().all(|path| admitted(path)) {
+                inventory.advance(admitted)?;
+            }
+            pending = !inventory.complete();
+            if !pending {
+                inventory.bind_alternates(gitdir, common)?;
+                inventory.bind_references(gitdir, common)?;
+                pending = if inventory.discover_worktree_targets(common)? {
+                    true
+                } else {
+                    inventory.bind_worktree_targets(|path| {
+                        exact(path).map(|token| token.normalized_path().to_owned())
+                    })?
+                };
+            }
+        }
+        for path in inventory.exact_paths(gitdir, common) {
+            if !self.facets.iter().any(|facet| {
+                facet.nature == ToolNature::Read
+                    && facet.resource_kind == Some(ToolResourceKind::Path)
+                    && facet.resource.as_deref() == path.to_str()
+            }) {
+                self.facets.push(path_facet(
+                    ToolNature::Read,
+                    &path,
+                    "Pull parent linked-worktree target or reference frontier; reads deferred",
+                )?);
+            }
+        }
+        Ok(!pending)
+    }
+
     async fn discover_pull_prefetch(
         mut self: Box<Self>,
         authorizations: &[talos_core::tool::ToolExecutionAuthorization],
@@ -744,6 +801,15 @@ impl AddPlan {
         ];
         let metadata_path = |path: &Path| metadata_roots.iter().any(|root| path.starts_with(root));
         if self.pull_graph_paths.is_none() {
+            let mut inventory = self
+                .pull_inventory
+                .take()
+                .ok_or_else(|| GitToolError::Git("Missing Pull graph inventory".into()))?;
+            if !self.advance_pull_parent_inventory(&mut inventory, authorizations)? {
+                self.pull_inventory = Some(inventory);
+                self.identity = PreparedPlanIdentity::new();
+                return Ok(self);
+            }
             let index_path = self.repository.git_dir.join("index");
             if !authorizations.iter().any(|token| {
                 token.authorizes_path(
@@ -809,17 +875,6 @@ impl AddPlan {
                 &config.pull_records()?,
                 branch,
             )?;
-            let mut inventory = self
-                .pull_inventory
-                .take()
-                .ok_or_else(|| GitToolError::Git("Missing Pull graph inventory".into()))?;
-            // Descendant names are covered by the separately admitted closed
-            // metadata scope, rather than consuming one runner stage per depth.
-            while !inventory.complete() {
-                inventory.advance(metadata_path)?;
-            }
-            inventory.bind_alternates(&self.repository.git_dir, &self.repository.common_dir)?;
-            inventory.bind_references(&self.repository.git_dir, &self.repository.common_dir)?;
             let objects_ready = {
                 [&self.repository.git_dir, &self.repository.common_dir]
                     .iter()
@@ -1360,6 +1415,17 @@ impl AddPlan {
                 "Post-fetch discovery lacks dedicated metadata Read admission".into(),
             ));
         }
+        let mut inventory = self.pull_inventory.take().unwrap_or_else(|| {
+            super::pull_inventory::Inventory::new(
+                &self.repository.git_dir,
+                &self.repository.common_dir,
+            )
+        });
+        if !self.advance_pull_parent_inventory(&mut inventory, authorizations)? {
+            self.pull_inventory = Some(inventory);
+            self.identity = PreparedPlanIdentity::new();
+            return Ok(self);
+        }
         let config = self
             .config
             .as_ref()
@@ -1379,19 +1445,6 @@ impl AddPlan {
             .map(|branch| super::pull_state::tracking_reference(&records, branch, remote))
             .transpose()?
             .flatten();
-        let mut inventory = super::pull_inventory::Inventory::new(
-            &self.repository.git_dir,
-            &self.repository.common_dir,
-        );
-        while !inventory.complete() {
-            self.repository.revalidate_location()?;
-            inventory.advance(|path| {
-                path.starts_with(&self.repository.git_dir)
-                    || path.starts_with(&self.repository.common_dir)
-            })?;
-        }
-        inventory.bind_alternates(&self.repository.git_dir, &self.repository.common_dir)?;
-        inventory.bind_references(&self.repository.git_dir, &self.repository.common_dir)?;
         let evidence =
             super::pull_state::PullEvidence::capture(&self.repository, tracking.as_deref(), true)?;
         self.repository.revalidate_location()?;
@@ -6642,6 +6695,9 @@ impl PreparedNormalToolInvocation for AddPlan {
                     )));
                 }
                 let mut plan = self;
+                // Fetch mutates the graph. Retain the new inventory across any
+                // post-fetch target admissions, never reuse pre-fetch evidence.
+                plan.pull_inventory = None;
                 plan.facets
                     .retain(|facet| matches!(facet.nature, ToolNature::Read | ToolNature::Execute));
                 plan.identity = PreparedPlanIdentity::new();
@@ -13526,7 +13582,14 @@ pub(super) mod tests {
 
     #[tokio::test]
     async fn pull_postfetch_rebuilds_evidence_before_selecting_integration() {
-        for source in ["worktree", "index", "head", "absent"] {
+        for source in [
+            "worktree",
+            "index",
+            "head",
+            "absent",
+            "linked-tamper",
+            "linked-budget",
+        ] {
             let root = fixture();
             let current = b"[submodule \"current\"]\npath = old\npath = current/child\nfetchRecurseSubmodules = true\nfetchRecurseSubmodules = on-demand\n";
             let git = |args: &[&str]| {
@@ -13618,14 +13681,18 @@ pub(super) mod tests {
             let mut plan = Box::new(
                 AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
                     .expect("Pull"),
-            )
-            .discover()
-            .await
-            .expect("configuration");
+            );
+            let mut history = talos_core::tool::PreparedStageHistory::default();
+            let mut recorded_stages = 0;
+            assert!(history.record_profile(&plan.identity, &plan.facets));
+            recorded_stages += 1;
+            plan = plan.discover().await.expect("configuration");
             for _ in 0..8 {
                 if plan.phase == Phase::PullFetch {
                     break;
                 }
+                assert!(history.record_profile(&plan.identity, &plan.facets));
+                recorded_stages += 1;
                 let admission = proof(&plan)
                     .consume_for_prepared(&plan.request(), &plan.identity)
                     .expect("proof");
@@ -13635,6 +13702,8 @@ pub(super) mod tests {
                     .expect("prefetch");
             }
             assert!(plan.phase == Phase::PullFetch);
+            assert!(history.record_profile(&plan.identity, &plan.facets));
+            recorded_stages += 1;
             assert!(
                 plan.pull_attributes
                     .iter()
@@ -13650,8 +13719,55 @@ pub(super) mod tests {
             );
             plan.facets
                 .retain(|facet| matches!(facet.nature, ToolNature::Read | ToolNature::Execute));
+            plan.pull_inventory = None;
             plan.identity = PreparedPlanIdentity::new();
             plan.phase = Phase::PullPostFetch;
+            let external = tempfile::tempdir().expect("postfetch external common");
+            let pointer = root.path().join(".git/worktrees/linked/commondir");
+            if source.starts_with("linked-") {
+                std::fs::create_dir_all(pointer.parent().expect("registration"))
+                    .expect("registration");
+                std::fs::write(
+                    &pointer,
+                    format!(
+                        "{}\n",
+                        external.path().canonicalize().expect("external").display()
+                    ),
+                )
+                .expect("external common pointer");
+            }
+            if source == "linked-budget" {
+                let deep = external.path().join("refs/heads/a/b/c/d/e/f/g/h/i/j/topic");
+                std::fs::create_dir_all(deep.parent().expect("parents")).expect("deep refs");
+                std::fs::write(&deep, format!("{target}\n")).expect("external ref");
+                let fetched =
+                    std::fs::read(root.path().join(".git/FETCH_HEAD")).expect("fetch effects");
+                while history.record_profile(&plan.identity, &plan.facets) {
+                    recorded_stages += 1;
+                    let tokens = proof(&plan)
+                        .consume_for_prepared(&plan.request(), &plan.identity)
+                        .expect("postfetch frontier admission");
+                    plan = plan
+                        .discover_pull_postfetch(&tokens)
+                        .await
+                        .expect("frontier");
+                    assert!(plan.phase == Phase::PullPostFetch);
+                }
+                assert_eq!(recorded_stages, 8);
+                assert!(
+                    !plan
+                        .pull_inventory
+                        .as_ref()
+                        .expect("retained frontier")
+                        .paths()
+                        .contains(&deep)
+                );
+                assert_eq!(
+                    std::fs::read(root.path().join(".git/FETCH_HEAD")).expect("retained fetch"),
+                    fetched
+                );
+                continue;
+            }
             let admission = proof(&plan)
                 .consume_for_prepared(&plan.request(), &plan.identity)
                 .expect("fresh proof");
@@ -13660,6 +13776,17 @@ pub(super) mod tests {
                 .discover_pull_postfetch(&admission)
                 .await
                 .expect("postfetch");
+            if source == "linked-tamper" {
+                assert!(next.phase == Phase::PullPostFetch);
+                assert!(next.pull_inventory.is_some());
+                let tokens = proof(&next)
+                    .consume_for_prepared(&next.request(), &next.identity)
+                    .expect("target admission");
+                std::fs::write(&pointer, "../..\n").expect("change retained pointer");
+                assert!(next.discover_pull_postfetch(&tokens).await.is_err());
+                assert!(root.path().join(".git/FETCH_HEAD").exists());
+                continue;
+            }
             assert!(
                 next.phase == Phase::PullChildIdentity,
                 "source={source}, activity={:?}",
@@ -14514,6 +14641,65 @@ pub(super) mod tests {
             "{error}"
         );
         assert!(!root.path().join(".git/FETCH_HEAD").exists());
+    }
+
+    #[tokio::test]
+    async fn pull_parent_linked_targets_require_fresh_exact_admission() {
+        let root = fixture();
+        let mut plan = Box::new(
+            AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+                .expect("Pull"),
+        )
+        .discover()
+        .await
+        .expect("configuration");
+        let common = plan.repository.common_dir.clone();
+        let registration = common.join("worktrees/linked");
+        std::fs::create_dir_all(&registration).expect("registration");
+        std::fs::write(registration.join("gitdir"), "/absent-checkout/.git\n")
+            .expect("absolute backlink remains text");
+        let external = tempfile::tempdir().expect("external common");
+        let external = external.path().canonicalize().expect("canonical external");
+        std::fs::create_dir_all(external.join("refs/heads")).expect("external refs");
+        let reference = external.join("refs/heads/topic");
+        std::fs::write(&reference, format!("{}\n", "1".repeat(40))).expect("reference");
+        std::fs::write(
+            registration.join("commondir"),
+            format!("{}\n", external.display()),
+        )
+        .expect("common pointer");
+        let mut inventory = super::super::pull_inventory::Inventory::new(&common, &common);
+        let old = proof(&plan)
+            .consume_for_prepared(&plan.request(), &plan.identity)
+            .expect("original grants");
+        assert!(
+            !plan
+                .advance_pull_parent_inventory(&mut inventory, &old)
+                .expect("targets")
+        );
+        assert!(inventory.exact_paths(&common, &common).contains(&external));
+        assert!(!inventory.paths().contains(&reference));
+        assert!(
+            !plan
+                .advance_pull_parent_inventory(&mut inventory, &old)
+                .expect("old grants")
+        );
+        for _ in 0..8 {
+            let tokens = proof(&plan)
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .expect("fresh frontier grants");
+            if plan
+                .advance_pull_parent_inventory(&mut inventory, &tokens)
+                .expect("advance")
+            {
+                break;
+            }
+        }
+        assert!(inventory.complete());
+        assert!(inventory.paths().contains(&reference));
+        inventory.revalidate().expect("bound contents");
+        std::fs::write(&reference, format!("{}\n", "2".repeat(40))).expect("change contents");
+        assert!(inventory.revalidate().is_err());
     }
 
     #[tokio::test]
