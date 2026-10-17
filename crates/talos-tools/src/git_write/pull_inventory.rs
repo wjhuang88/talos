@@ -14,9 +14,48 @@ pub(super) struct Inventory {
     directories: BTreeMap<PathBuf, Vec<PathBuf>>,
     alternates: Vec<(PathBuf, super::snapshot::RegularEvidence)>,
     references: Vec<(PathBuf, super::snapshot::RegularEvidence)>,
-    worktree_targets: BTreeMap<PathBuf, Option<PathIdentity>>,
+    worktree_targets: BTreeMap<PathBuf, Option<WorktreeTarget>>,
     worktree_common_targets: BTreeSet<PathBuf>,
     worktree_reference_roots: BTreeSet<PathBuf>,
+}
+
+/// Resolution evidence for an existing target or a missing checkout suffix.
+/// Common directories still require an existing target before refs discovery.
+#[derive(Debug, PartialEq, Eq)]
+struct WorktreeTarget {
+    resolved: PathBuf,
+    ancestor: PathIdentity,
+}
+
+impl WorktreeTarget {
+    fn capture(path: &Path, allow_missing: bool) -> Result<Self, GitToolError> {
+        let mut ancestor = path;
+        let mut suffix = Vec::new();
+        let mut resolved = loop {
+            match ancestor.canonicalize() {
+                Ok(resolved) => break resolved,
+                Err(error) if allow_missing && error.kind() == std::io::ErrorKind::NotFound => {
+                    // A dangling link is not an absent checkout component.
+                    // Never reinterpret its unresolved target as a lexical suffix.
+                    match std::fs::symlink_metadata(ancestor) {
+                        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                        _ => return Err(invalid()),
+                    }
+                    suffix.push(ancestor.file_name().ok_or_else(invalid)?.to_owned());
+                    ancestor = ancestor.parent().ok_or_else(invalid)?;
+                }
+                Err(_) => return Err(invalid()),
+            }
+        };
+        let identity = PathIdentity::capture(ancestor).map_err(|_| invalid())?;
+        for name in suffix.into_iter().rev() {
+            resolved.push(name);
+        }
+        Ok(Self {
+            resolved,
+            ancestor: identity,
+        })
+    }
 }
 
 fn invalid() -> GitToolError {
@@ -96,7 +135,10 @@ impl Inventory {
     pub(super) fn revalidate(&self) -> Result<(), GitToolError> {
         for (path, expected) in &self.worktree_targets {
             if let Some(expected) = expected
-                && PathIdentity::capture(path).ok().as_ref() != Some(expected)
+                && WorktreeTarget::capture(path, !self.worktree_common_targets.contains(path))
+                    .ok()
+                    .as_ref()
+                    != Some(expected)
             {
                 return Err(invalid());
             }
@@ -289,11 +331,13 @@ impl Inventory {
             .collect::<Result<BTreeMap<_, _>, _>>()?;
         self.revalidate()?;
         for (path, identity) in &mut self.worktree_targets {
-            if path.canonicalize().map_err(|_| invalid())? != mappings[path] {
+            let current =
+                WorktreeTarget::capture(path, !self.worktree_common_targets.contains(path))?;
+            if current.resolved != mappings[path] {
                 return Err(invalid());
             }
             if identity.is_none() {
-                *identity = Some(PathIdentity::capture(path).map_err(|_| invalid())?);
+                *identity = Some(current);
             }
         }
         self.revalidate()?;
@@ -518,6 +562,61 @@ mod tests {
         std::fs::rename(&target, root.join("saved-target")).expect("move target");
         std::fs::create_dir(&target).expect("replacement target");
         #[cfg(any(unix, windows))]
+        assert!(inventory.revalidate().is_err());
+    }
+
+    #[test]
+    fn missing_worktree_target_requires_checkout_mode_and_retains_parent_identity() {
+        let temp = tempfile::tempdir().expect("repo");
+        let root = temp.path().canonicalize().expect("root");
+        let parent = root.join("checkout-parent");
+        std::fs::create_dir(&parent).expect("parent");
+        let path = parent.join("missing");
+        assert!(WorktreeTarget::capture(&path, false).is_err());
+        let evidence = WorktreeTarget::capture(&path, true).expect("missing checkout");
+        assert_eq!(evidence.resolved, path);
+        std::fs::rename(&parent, root.join("saved-parent")).expect("move parent");
+        std::fs::create_dir(&parent).expect("replace parent");
+        #[cfg(any(unix, windows))]
+        assert_ne!(
+            evidence,
+            WorktreeTarget::capture(&path, true).expect("replacement")
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn missing_worktree_target_rejects_dangling_symlink_suffix() {
+        let temp = tempfile::tempdir().expect("repo");
+        let root = temp.path().canonicalize().expect("root");
+        let link = root.join("dangling");
+        std::os::unix::fs::symlink(root.join("missing"), &link).expect("link");
+        assert!(WorktreeTarget::capture(&link.join("checkout"), true).is_err());
+    }
+
+    #[test]
+    fn relative_missing_worktree_backlink_binds_absence_and_ancestor() {
+        let temp = tempfile::tempdir().expect("repo");
+        let root = temp.path().canonicalize().expect("root");
+        let registration = root.join("worktrees/linked");
+        std::fs::create_dir_all(&registration).expect("registration");
+        std::fs::write(registration.join("gitdir"), "../../missing/deep/.git\n").expect("backlink");
+        let mut inventory = Inventory::new(&root, &root);
+        while !inventory.complete() {
+            inventory.advance(|_| true).expect("inventory");
+        }
+        inventory.bind_references(&root, &root).expect("references");
+        assert!(
+            inventory
+                .discover_worktree_targets(&root)
+                .expect("discover")
+        );
+        assert!(inventory.bind_worktree_targets(|_| None).is_err());
+        inventory
+            .bind_worktree_targets(|_| Some(root.join("missing/deep")))
+            .expect("admitted missing checkout");
+        inventory.revalidate().expect("stable absence");
+        std::fs::create_dir(root.join("missing")).expect("create ancestor");
         assert!(inventory.revalidate().is_err());
     }
 
