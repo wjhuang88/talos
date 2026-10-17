@@ -3414,3 +3414,16 @@ review found no blocker in this correction. Object observations must be freshly
 re-probed at their final consumer after every approval or object-store mutation;
 no cross-stage existence/reachability cache may drive fetch decisions. Layout,
 configuration, reference and redirect evidence remains mandatory. T7 stays Active.
+
+Cross-stage validation checkpoint (2026-10-17, implementation `68b5adf4`):
+locked all-feature Pull tests pass 97/97 and Clippy passes with warnings denied.
+The complete locked all-feature talos-tools library suite passes 802/802 outside
+the sandbox, including process-observation tests
+(`/tmp/talos-t7-tools-all-current.log`). Both governance validators pass with
+zero warnings. Incremental cache cleanup used the previously accepted scope;
+subsequent builds disable incremental caching. This is tools-library evidence,
+not full-workspace preflight, native Windows runtime or publication evidence.
+GIX tracking was rechecked against the live sparse index: latest non-yanked
+0.89.0 (published 2026-10-08, MSRV 1.88), Talos locked at 0.87.1. No newer release
+or host-Git removal date is established. Remaining T7 execution/integration
+and all subsequent handoff deliverables remain open.
