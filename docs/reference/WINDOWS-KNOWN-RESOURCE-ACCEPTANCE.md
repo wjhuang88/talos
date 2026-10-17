@@ -72,3 +72,13 @@ CI3219 on6bd0ddfb: the real outer resource fixture and audit/inventory assertion
 only the synthetic CRLF checkout fixture (462/1 Windows). Successful harness output did not expose
 raw numeric/mode8 receipts. Canonicalizing synthetic input corrects double-CRLF construction;
 actual fingerprint/native sources/acceptance stay unchanged. Fresh full CI remains required.
+
+
+## Bounded Acceptance Closure — 2026-10-17
+
+Implementation #716 merged as b5b8241e2d8fa72d6e469bd96ccbdf54ff851c69; exact198cb751/tree29ac46f2
+passed all6CI3221 jobs, native tools463/0 and downstream gates, protected review/CAS6233550377.
+TEST004/I305 closes only this enumerated-resource assertion contract. Successful raw counters/JSON
+remain captured; source-enforced acceptance is the evidence. TEST003/#717 remains OPEN for the
+unexplained/private/untracked lifetime and failed-output/init/success-path limits above. No Search
+activation or global leak/cache proof follows. Earlier pending/failure checkpoints are historical.
