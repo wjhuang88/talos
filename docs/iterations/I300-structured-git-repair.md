@@ -3800,6 +3800,23 @@ semantics, child transport/retries, recursive fetch, parent integration,
 eight-stage runner reachability and final delivery gates remain open.
 Production Pull remains disabled; I300/T7 and the handoff stay incomplete.
 
+Linked-worktree graph inventory update (2026-10-17): child graph discovery now
+admits `worktrees` through the existing bounded exact-path frontier; registered
+worktree HEAD/refs contents are retained in the shared reference evidence budget.
+Inventory regressions pass 13/13, including descendant admission denial and
+in-place linked HEAD/private-ref changes. A real Git 2.54 detached-worktree
+fixture confirms those HEADs participate in `rev-list --all` unless explicitly
+restricted with `--single-worktree`. Object probing, recursive execution and
+production activation remain incomplete.
+The full Pull-focused suite passes 86/86; all-target/all-feature Clippy and
+project/collaboration governance validators pass. Fetch found no new main
+commits requiring rebase at this checkpoint.
+Independent review found no new blocker for the inert frontier increment.
+Before native child probing, linked registration `gitdir`/`commondir` still
+require bounded content evidence and resolved-target restriction/admission:
+Git's worktree/ref backend reads those pointers, so HEAD/refs evidence alone
+is insufficient. This remains an explicit activation blocker.
+
 Windows path identity implementation update (2026-10-17): maintainer accepted
 Windows/Git-only same-file 1.0.6 (ADR-089 amendment). PathIdentity now retains
 panic-guarded safe handles for canonical leaf and ancestors; configured child
