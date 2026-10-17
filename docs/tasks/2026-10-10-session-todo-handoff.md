@@ -3473,3 +3473,15 @@ child-location tests pass; independent review found no blocker. Original pointer
 bytes remain bound. Object probing still requires a supervised input path or an
 equivalent library implementation; child fetch/integration and all original T7
 closure gates remain open. This is a compatibility fix, not Pull activation.
+
+Supervised input checkpoint (2026-10-17): OwnedCommandOperation now offers
+explicit finite owned stdin delivery alongside the existing null-stdin API.
+Input writes share the output loop, timeout, cancellation and process-group
+cleanup; successful collection requires completed delivery. Independent review
+identified an early-exit race, fixed by requiring input_done before success.
+Regressions cover duplex pipe-capacity overflow, EOF, blocked-input timeout,
+caller cancellation and early exit with undelivered bytes. All 48 locked sandbox
+library tests and warnings-denied all-target Clippy pass. ADR-082 documents the
+additive contract and caller-owned input authorization/size budget. This is the
+input prerequisite for Git batch object probing, not an enabled probe or Pull
+execution; the remaining T7 and handoff scope is unchanged.

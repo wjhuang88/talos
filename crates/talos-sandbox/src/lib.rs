@@ -114,6 +114,27 @@ pub struct OwnedCommandOperation {
 
 #[cfg(unix)]
 impl OwnedCommandOperation {
+    /// Executes an authorized command with finite, caller-owned standard input.
+    /// Input delivery shares output collection's deadline and cancellation scope;
+    /// the pipe closes after delivery. Input is not an authorization grant.
+    pub async fn execute_with_input(
+        &self,
+        command: std::process::Command,
+        deadline: std::time::Duration,
+        output_limit: usize,
+        input: Vec<u8>,
+    ) -> Result<std::process::Output, SandboxError> {
+        supervisor::execute_with_input(
+            command,
+            self.cleanup.clone(),
+            deadline,
+            (),
+            output_limit,
+            Some(input),
+        )
+        .await
+    }
+
     /// Returns invocation-local cleanup evidence before any command starts.
     pub fn cleanup_receipt(&self) -> SandboxCleanupReceipt {
         SandboxCleanupReceipt {
