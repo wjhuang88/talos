@@ -154,3 +154,22 @@ Current Review/Claimed state is candidate truth, not Complete or merge authority
 and other failed receipts remain; #717/#643/#624 stay open. Native receipts expose the all40
 232resource/208close/24Delete/16termination+exit proof and4real-negative detection/recovery only
 if every actual check passes. No native success or process-wide leak absence is claimed here.
+
+### CI3219 And CRLF Fixture Correction — 2026-10-17
+
+Exact head6bd0ddfb/treec1cd718b CI3219/run38922821235 FAILED Windows462passed/1failed,
+0ignored/filtered; other5jobs succeeded. ONLY checkout_crlf_preserves_reviewed_native_inventory
+failed. Actual native resource outer test (all40 plus4negative assertions), both audit-unit tests,
+real inventory and mutations passed. Successful output is harness-captured: no raw numeric resource
+receipt/mode8JSON appears in this job log; success is evidence from passing reviewed assertions.
+Original +3 attribution remains outside the known-resource proof; #717/#643/#624 stay OPEN.
+
+Fixture bug: replacing LF with CRLF on already-CRLF input creates CR-CR-LF. Canonicalize input toLF
+first, then validate both LF/CRLF synthetic variants. Fingerprint normalization, EXPECTED and all4
+native source files remain unchanged. Pinned1.99 standalone std-only inventory suite reproduces
+oldCRLF 2pass/1expectedfailure; final corrected LF and CRLF checkouts each pass3/0, including real
+inventory/mutation guards. Formatting/diff pass. Workspace maintenance removed old local build
+cache/toolchain; minimal pinned compiler/std/formatter restored with official SHA256 verification.
+These focused receipts are not a new full-workspace preflight or native Windows pass. Previous
+fullpreflight receipts remain historical; fresh exact-head full unfiltered CI/review required.
+Review/Claimed remains, no Complete or automatic716merge. Preserve CI3219 failure, no retry-to-green.

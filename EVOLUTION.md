@@ -1304,3 +1304,11 @@ integrity failures and disposable fixture results as distinct evidence.
 - Fix: call the same per-role release/termination predicates before recovery and in final acceptance; require the precise missing release or native live timeout, then checked in-frame recovery.
 - Prevention: consume termination/release attempt state before native invocation, reject duplicate requests before another call, and test failed results/wait timeout/no retry separately from real native negative fixtures.
 - Promoted to check: TEST-004 source inventory mutations and independent protected native review. Whole-file fingerprints detect source change, not semantic ownership proof; keep unknown resources residual.
+
+
+## 2026-10-17 — Canonicalize fixture inputs before synthesizing checkout line endings
+
+CI3219 exposed a test that converted already-CRLF source into CR-CR-LF. Normalize fixture input
+toLF first, derive both LF/CRLF variants, and run against both incoming checkout forms. Preserve
+actual source hashes and validators. Successful harness assertions do not imply raw receipts were
+visible; distinguish passed assertions from independently emitted evidence.

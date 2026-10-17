@@ -76,6 +76,11 @@ fn inventory_rejects_uncovered_calls_and_removed_or_moved_observation() {
 
 #[test]
 fn checkout_crlf_preserves_reviewed_native_inventory() {
-    let crlf = SOURCES.map(|source| source.replace("\n", "\r\n"));
-    assert!(validate(std::array::from_fn(|index| crlf[index].as_str())));
+    let lf = SOURCES.map(|source| source.replace("\r\n", "\n"));
+    let crlf = lf.each_ref().map(|source| source.replace("\n", "\r\n"));
+    for checkout in [&lf, &crlf] {
+        assert!(validate(std::array::from_fn(
+            |index| checkout[index].as_str()
+        )));
+    }
 }

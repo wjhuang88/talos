@@ -66,3 +66,9 @@ OS leak absence, original global repair or automatic #716 merge.
 Native positive/negative evidence and exact-head protected review/full CI are pending until their
 actual receipts exist. Local cross-target compilation is not Windows execution. Original CI3213
 and all earlier failures remain in I302/#717.
+
+
+CI3219 on6bd0ddfb: the real outer resource fixture and audit/inventory assertions passed; run failed
+only the synthetic CRLF checkout fixture (462/1 Windows). Successful harness output did not expose
+raw numeric/mode8 receipts. Canonicalizing synthetic input corrects double-CRLF construction;
+actual fingerprint/native sources/acceptance stay unchanged. Fresh full CI remains required.
