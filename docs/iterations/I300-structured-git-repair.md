@@ -3753,6 +3753,15 @@ admitted `objects/info/alternates` and `http-alternates`, refusing nonempty
 external-store redirects. Empty-file bytes and absent-leaf directory listings
 are retained and revalidated, including in-place edits and newly created leaves.
 Tools library tests pass 784/784 outside the sandbox; all-target Clippy passes.
+`5d31624d` binds admitted child HEAD, packed-refs and loose reference contents
+under a shared 4096-entry/4-MiB budget. Revalidation detects in-place changes,
+including a symbolic replacement declaration's target inside the refs tree;
+capture never recursively opens paths absent from the admitted inventory.
+Tools library tests pass 785/785 outside the sandbox; all-target Clippy passes.
+`5e630e6f` reuses receiver symbolic-target validation to reject pseudo refs and
+cross-worktree aliases outside retained refs namespaces; no separate parser was
+introduced. Tools library tests pass 786/786 outside the sandbox; all-target
+Clippy passes. This does not resolve symbolic chains or authorize other targets.
 Object bytes, replacement resolution and actual child probes remain incomplete;
 these checks do not establish recursive execution or final stage-budget reachability.
 Missing-object retry remote selection, refspecs and transport/source effects,
