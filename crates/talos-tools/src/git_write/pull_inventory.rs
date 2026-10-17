@@ -24,37 +24,54 @@ pub(super) struct Inventory {
 #[derive(Debug, PartialEq, Eq)]
 struct WorktreeTarget {
     resolved: PathBuf,
-    ancestor: PathIdentity,
+    ancestors: Vec<PathIdentity>,
 }
 
 impl WorktreeTarget {
     fn capture(path: &Path, allow_missing: bool) -> Result<Self, GitToolError> {
-        let mut ancestor = path;
-        let mut suffix = Vec::new();
-        let mut resolved = loop {
-            match ancestor.canonicalize() {
-                Ok(resolved) => break resolved,
-                Err(error) if allow_missing && error.kind() == std::io::ErrorKind::NotFound => {
-                    // A dangling link is not an absent checkout component.
-                    // Never reinterpret its unresolved target as a lexical suffix.
-                    match std::fs::symlink_metadata(ancestor) {
-                        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-                        _ => return Err(invalid()),
+        let mut spelling = path.to_owned();
+        let mut ancestors = Vec::new();
+        'resolve: loop {
+            let mut ancestor = spelling.as_path();
+            let mut suffix = Vec::new();
+            let mut resolved = loop {
+                match ancestor.canonicalize() {
+                    Ok(resolved) => break resolved,
+                    Err(error) if allow_missing && error.kind() == std::io::ErrorKind::NotFound => {
+                        // A dangling link is not an absent checkout component.
+                        match std::fs::symlink_metadata(ancestor) {
+                            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                            _ => return Err(invalid()),
+                        }
+                        match ancestor.components().next_back().ok_or_else(invalid)? {
+                            std::path::Component::Normal(name) => suffix.push(name.to_owned()),
+                            std::path::Component::ParentDir => suffix.push("..".into()),
+                            _ => return Err(invalid()),
+                        }
+                        ancestor = ancestor.parent().ok_or_else(invalid)?;
                     }
-                    suffix.push(ancestor.file_name().ok_or_else(invalid)?.to_owned());
-                    ancestor = ancestor.parent().ok_or_else(invalid)?;
+                    Err(_) => return Err(invalid()),
                 }
-                Err(_) => return Err(invalid()),
+            };
+            ancestors.push(PathIdentity::capture(ancestor).map_err(|_| invalid())?);
+            let mut remaining = suffix.into_iter().rev();
+            while let Some(name) = remaining.next() {
+                if name == ".." {
+                    // A cancelled missing component may expose an existing
+                    // symlink. Re-resolve before interpreting any later `..`.
+                    // Each pass removes a ParentDir; use a loop, not recursion.
+                    resolved.pop();
+                    resolved.extend(remaining);
+                    spelling = resolved;
+                    continue 'resolve;
+                }
+                resolved.push(name);
             }
-        };
-        let identity = PathIdentity::capture(ancestor).map_err(|_| invalid())?;
-        for name in suffix.into_iter().rev() {
-            resolved.push(name);
+            return Ok(Self {
+                resolved,
+                ancestors,
+            });
         }
-        Ok(Self {
-            resolved,
-            ancestor: identity,
-        })
     }
 }
 
@@ -343,7 +360,12 @@ impl Inventory {
             if text.is_empty() || text.contains(['\0', '\r', '\n']) {
                 return Err(invalid());
             }
-            super::remote_state::validate_local_path_syntax(Path::new(text))?;
+            // Checkout backlinks use Git's forgiving relative resolver below,
+            // including interleaved missing components and ParentDir. Shared
+            // metadata pointers retain the stricter receiver path syntax.
+            if !gitdir {
+                super::remote_state::validate_local_path_syntax(Path::new(text))?;
+            }
             // get_linked_worktree() only resolves a relative backlink. An
             // absolute backlink is retained as text, even for a pruned checkout.
             if gitdir && Path::new(text).is_absolute() {
@@ -720,6 +742,63 @@ mod tests {
         );
     }
 
+    #[test]
+    fn missing_worktree_suffix_resolves_parent_components() {
+        let temp = tempfile::tempdir().expect("repo");
+        let root = temp.path().canonicalize().expect("root");
+        let path = root.join("missing/deep/../../checkout");
+        assert!(WorktreeTarget::capture(&path, false).is_err());
+        let evidence = WorktreeTarget::capture(&path, true).expect("forgiving target");
+        assert_eq!(evidence.resolved, root.join("checkout"));
+        std::fs::write(root.join("missing"), b"not a directory").expect("replace absence");
+        assert!(WorktreeTarget::capture(&path, true).is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn missing_worktree_suffix_keeps_existing_symlink_parent_semantics() {
+        let temp = tempfile::tempdir().expect("repo");
+        let root = temp.path().canonicalize().expect("root");
+        std::fs::create_dir_all(root.join("actual/nested")).expect("actual");
+        std::os::unix::fs::symlink(root.join("actual/nested"), root.join("link"))
+            .expect("existing link");
+        let path = root.join("link/../missing/../checkout");
+        let evidence = WorktreeTarget::capture(&path, true).expect("forgiving target");
+        assert_eq!(evidence.resolved, root.join("actual/checkout"));
+        let interleaved = root.join("missing/../link/../checkout");
+        assert_eq!(
+            WorktreeTarget::capture(&interleaved, true)
+                .expect("interleaved symlink and parent")
+                .resolved,
+            root.join("actual/checkout")
+        );
+        std::fs::create_dir_all(root.join("elsewhere/nested")).expect("redirect target");
+        std::os::unix::fs::symlink(root.join("elsewhere/nested"), root.join("actual/missing"))
+            .expect("redirect absent component");
+        assert_ne!(
+            evidence,
+            WorktreeTarget::capture(&path, true).expect("redirected target")
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn cancelling_missing_suffix_resolves_later_existing_symlink() {
+        let temp = tempfile::tempdir().expect("repo");
+        let root = temp.path().canonicalize().expect("root");
+        std::fs::create_dir(root.join("actual")).expect("target");
+        std::os::unix::fs::symlink(root.join("actual"), root.join("link")).expect("link");
+        let path = root.join("missing/../link/checkout");
+        let evidence = WorktreeTarget::capture(&path, true).expect("forgiving target");
+        assert_eq!(evidence.resolved, root.join("actual/checkout"));
+        std::fs::rename(root.join("actual"), root.join("saved")).expect("move target");
+        std::fs::create_dir(root.join("actual")).expect("replace target");
+        assert_ne!(
+            evidence,
+            WorktreeTarget::capture(&path, true).expect("replacement target")
+        );
+    }
+
     #[cfg(unix)]
     #[test]
     fn missing_worktree_target_rejects_dangling_symlink_suffix() {
@@ -753,6 +832,54 @@ mod tests {
             .expect("admitted missing checkout");
         inventory.revalidate().expect("stable absence");
         std::fs::create_dir(root.join("missing")).expect("create ancestor");
+        assert!(inventory.revalidate().is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn relative_backlink_resolves_interleaved_missing_and_symlink_after_admission() {
+        let temp = tempfile::tempdir().expect("repo");
+        let root = temp.path().canonicalize().expect("root");
+        let registration = root.join("worktrees/linked");
+        std::fs::create_dir_all(&registration).expect("registration");
+        std::fs::create_dir_all(root.join("actual/nested")).expect("target");
+        std::os::unix::fs::symlink(root.join("actual/nested"), root.join("link"))
+            .expect("existing link");
+        std::fs::write(
+            registration.join("gitdir"),
+            "../../missing/../link/../checkout/.git\n",
+        )
+        .expect("backlink");
+        let mut inventory = Inventory::new(&root, &root);
+        while !inventory.complete() {
+            inventory.advance(|_| true).expect("inventory");
+        }
+        inventory.bind_references(&root, &root).expect("references");
+        assert!(
+            inventory
+                .discover_worktree_targets(&root)
+                .expect("discover")
+        );
+        assert!(inventory.bind_worktree_targets(|_| None).is_err());
+        // The current general permission normalizer is lexical before resolving
+        // symlinks. It must not authorize Git's different interpretation.
+        assert!(
+            inventory
+                .bind_worktree_targets(|path| {
+                    talos_core::tool::normalize_authorized_path(
+                        &root,
+                        path.to_str().expect("UTF-8 fixture"),
+                    )
+                    .ok()
+                })
+                .is_err()
+        );
+        inventory
+            .bind_worktree_targets(|_| Some(root.join("actual/checkout")))
+            .expect("exact resolved admission");
+        inventory.revalidate().expect("stable target");
+        std::fs::rename(root.join("actual"), root.join("saved")).expect("move target");
+        std::fs::create_dir(root.join("actual")).expect("replace target");
         assert!(inventory.revalidate().is_err());
     }
 
