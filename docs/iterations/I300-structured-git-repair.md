@@ -3767,3 +3767,18 @@ these checks do not establish recursive execution or final stage-budget reachabi
 Missing-object retry remote selection, refspecs and transport/source effects,
 object admission, recursive fetch, integration, runner stage capacity, and
 delivery gates remain open; Production Pull remains disabled.
+
+Pull child bootstrap checkpoint (2026-10-17): child configuration discovery now
+uses the shared explicit `--git-dir`/`--work-tree` bootstrap probe instead of
+ordinary repository setup, so configuration-provided `core.worktree` does not get
+resolved during discovery. After exact Read admission for the fixed common and
+worktree config files, bounded startup evidence retains raw local layout targets
+and emits them as separate Read facets; revalidation detects edits. A regression
+with a nonexistent configured worktree verifies the target remains unopened.
+`cargo test --locked -p talos-tools --all-features --lib` passes 787/787 outside
+the sandbox; all-target Clippy passes. Sandbox execution still has the known
+process-observation `EPERM` in the existing eight-stage Push test. This checkpoint
+covers startup discovery only: admitted target identity retention for execution,
+objects/replacement semantics, child transport and retry behavior, recursive
+fetch, parent integration and stage-budget reachability remain open. Production
+Pull remains disabled; T7 and the original handoff remain incomplete.

@@ -236,6 +236,7 @@ pub(super) struct AddPlan {
     pull_index_children: BTreeMap<String, String>,
     pull_child_fetch_targets: BTreeMap<PathBuf, (String, Vec<String>)>,
     pull_child_inventories: BTreeMap<PathBuf, super::pull_inventory::Inventory>,
+    pull_child_startup: BTreeMap<PathBuf, super::config_state::ChildStartupLayout>,
     pull_current_fetch_children: BTreeMap<String, super::pull_children::Recursion>,
     pull_current_modules: Option<super::pull_children::Tree>,
     pull_modules_evidence: Option<PullAttribute>,
@@ -646,6 +647,7 @@ impl AddPlan {
             pull_index_children: BTreeMap::new(),
             pull_child_fetch_targets: BTreeMap::new(),
             pull_child_inventories: BTreeMap::new(),
+            pull_child_startup: BTreeMap::new(),
             pull_current_fetch_children: BTreeMap::new(),
             pull_current_modules: None,
             pull_modules_evidence: None,
@@ -1866,6 +1868,11 @@ impl AddPlan {
                 &location.common_dir,
                 "Pull selected child Git metadata for object admission",
             )?);
+            self.facets.push(path_facet(
+                ToolNature::Read,
+                &location.git_dir.join("config.worktree"),
+                "Pull child fixed startup worktree configuration",
+            )?);
             self.child_locations
                 .push((layout.spelling.clone(), location));
         }
@@ -1934,7 +1941,45 @@ impl AddPlan {
                     "Pull child configuration lacks exact Read admission".into(),
                 ));
             }
-            let output = self.inspect_config_at(workdir).await?;
+            self.child_read(&location.git_dir.join("config.worktree"), authorizations)?;
+            if !self.pull_config_sources_discovered {
+                let metadata = self
+                    .pull_child_layouts
+                    .iter()
+                    .find(|(root, _)| &root.spelling == workdir)
+                    .and_then(|(_, metadata)| metadata.as_ref())
+                    .ok_or_else(|| {
+                        GitToolError::InvalidInput(
+                            "Pull child startup metadata evidence missing".into(),
+                        )
+                    })?;
+                let startup = super::config_state::ChildStartupLayout::capture(
+                    &location.git_dir,
+                    &location.common_dir,
+                    metadata.has_common(),
+                )?;
+                for target in &startup.targets {
+                    self.facets.push(path_facet(
+                        ToolNature::Read,
+                        target,
+                        "Pull child raw startup worktree; resolution deferred",
+                    )?);
+                }
+                self.pull_child_startup.insert(workdir.clone(), startup);
+            } else {
+                let startup = self.pull_child_startup.get(workdir).ok_or_else(|| {
+                    GitToolError::InvalidInput("Pull child startup evidence missing".into())
+                })?;
+                startup.revalidate()?;
+                for target in &startup.targets {
+                    self.child_read(target, authorizations)?;
+                }
+            }
+            // Discovery alone overrides setup; retain configured layout values
+            // for independent admission before any ordinary child command.
+            let output = self
+                .inspect_child_bootstrap_config(&location.git_dir, workdir)
+                .await?;
             if self.pull_config_sources_discovered {
                 let expected = self
                     .child_configs
@@ -3013,13 +3058,13 @@ impl AddPlan {
             // still resolves core.worktree. This is a discovery-only override;
             // the configured value remains in the inventory for fresh admission.
             let output = self
-                .inspect_checkout_child_config(&metadata.canonical, &layout.canonical)
+                .inspect_child_bootstrap_config(&metadata.canonical, &layout.canonical)
                 .await?;
             let config =
                 super::config_state::ChildConfig::capture_receiver(&output, &metadata.canonical)?;
             config.verify_host(
                 &self
-                    .inspect_checkout_child_config(&metadata.canonical, &layout.canonical)
+                    .inspect_child_bootstrap_config(&metadata.canonical, &layout.canonical)
                     .await?,
             )?;
             self.facets.push(path_facet(
@@ -3855,7 +3900,7 @@ impl AddPlan {
             })
     }
 
-    async fn inspect_checkout_child_config(
+    async fn inspect_child_bootstrap_config(
         &self,
         gitdir: &Path,
         worktree: &Path,
@@ -5307,6 +5352,9 @@ impl AddPlan {
         }
         for inventory in self.pull_child_inventories.values() {
             inventory.revalidate()?;
+        }
+        for startup in self.pull_child_startup.values() {
+            startup.revalidate()?;
         }
         for metadata in &self.checkout_child_metadata {
             metadata.revalidate(&metadata.canonical)?;
@@ -10629,7 +10677,7 @@ pub(super) mod tests {
         )
         .expect("plan");
         let output = plan
-            .inspect_checkout_child_config(&child.join(".git"), &child)
+            .inspect_child_bootstrap_config(&child.join(".git"), &child)
             .await
             .expect("bound probe");
         assert!(
@@ -12211,6 +12259,78 @@ pub(super) mod tests {
         state
             .try_admit_prepared_invocation(pending, &request, &context, &plan.identity)
             .expect("admission")
+    }
+
+    #[tokio::test]
+    async fn pull_child_bootstrap_defers_worktree_and_retains_startup_evidence() {
+        let root = fixture();
+        let child = root.path().join("child");
+        assert!(
+            std::process::Command::new("git")
+                .current_dir(root.path())
+                .args(["init", "child"])
+                .output()
+                .expect("init")
+                .status
+                .success()
+        );
+        let child = child.canonicalize().expect("child");
+        let gitdir = child.join(".git");
+        let missing = root.path().join("unadmitted-worktree");
+        let config_path = gitdir.join("config");
+        let original = std::fs::read_to_string(&config_path).expect("config");
+        std::fs::write(
+            &config_path,
+            format!("{original}\n[core]\nworktree = {}\n", missing.display()),
+        )
+        .expect("startup target");
+        let layout = super::super::receiver_state::Root::capture(&child, &child).expect("root");
+        let metadata =
+            super::super::receiver_state::Metadata::capture(&gitdir, &gitdir).expect("metadata");
+        let location =
+            super::super::repository_state::ChildLocation::capture(&gitdir).expect("location");
+        let mut plan = Box::new(
+            AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+                .expect("prepare"),
+        );
+        plan.environment
+            .insert("GIT_CONFIG_NOSYSTEM".into(), "1".into());
+        plan.environment.insert(
+            "GIT_CONFIG_GLOBAL".into(),
+            root.path().join("absent-config").into_os_string(),
+        );
+        plan.phase = Phase::PullChildConfiguration;
+        plan.pull_child_layouts.push((layout, Some(metadata)));
+        plan.child_locations.push((child.clone(), location));
+        plan.facets.push(ToolPermissionFacet::with_resource(
+            ToolNature::Read,
+            "git:configuration-chain",
+            ToolResourceKind::Remote,
+        ));
+        for path in [&gitdir, &config_path, &gitdir.join("config.worktree")] {
+            plan.facets
+                .push(path_facet(ToolNature::Read, path, "startup").expect("facet"));
+        }
+        let tokens = proof(&plan)
+            .consume_for_prepared(&plan.request(), &plan.identity)
+            .expect("proof");
+        let plan = plan
+            .discover_pull_child_configuration(&tokens)
+            .await
+            .expect("discovery");
+        assert!(!missing.exists());
+        assert!(plan.pull_child_startup[&child].targets.contains(&missing));
+        assert!(plan.child_read(&missing, &tokens).is_err());
+        assert!(
+            plan.facets
+                .iter()
+                .any(|facet| facet.resource.as_deref() == missing.to_str())
+        );
+        plan.pull_child_startup[&child]
+            .revalidate()
+            .expect("retained startup");
+        std::fs::write(&config_path, original).expect("change startup");
+        assert!(plan.pull_child_startup[&child].revalidate().is_err());
     }
 
     #[tokio::test]
