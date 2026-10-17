@@ -3404,3 +3404,13 @@ identity alone cannot bind those bytes, so retained object decisions require
 content evidence or a justified fresh-probe strategy. Object type/replacement
 semantics, recursive transport/retries, parent integration and final delivery
 remain open; Production Pull stays disabled and T7 remains Active.
+
+Historical recursion-policy checkpoint (2026-10-17): active historical children
+with effective `fetchRecurseSubmodules=false` no longer enter identity discovery
+or add child path Read facets. Current-index selections remain independent, so
+a current `On` task is not suppressed by a historical `Off` policy. Focused
+regression covers Off, On, OnDemand and current-index precedence. Independent
+review found no blocker in this correction. Object observations must be freshly
+re-probed at their final consumer after every approval or object-store mutation;
+no cross-stage existence/reachability cache may drive fetch decisions. Layout,
+configuration, reference and redirect evidence remains mandatory. T7 stays Active.

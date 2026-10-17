@@ -1741,7 +1741,8 @@ impl AddPlan {
             if matches!(
                 child.activity,
                 Some(super::pull_children::Activity::Enabled)
-            ) {
+            ) && child.effective_recursion != Some(super::pull_children::Recursion::Off)
+            {
                 let path = self.repository.workdir.join(&child.path);
                 if !paths.contains(&path) {
                     paths.push(path);
@@ -13362,6 +13363,47 @@ pub(super) mod tests {
         }
         daemon.kill().await.expect("stop daemon");
         daemon.wait().await.expect("reap daemon");
+    }
+
+    #[test]
+    fn pull_historical_recursion_off_does_not_admit_child_paths() {
+        use super::super::pull_children::{Activity, Changed, Recursion};
+        let root = fixture();
+        let mut plan =
+            AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+                .expect("Pull");
+        let child = plan.repository.workdir.join("historical");
+        plan.pull_changed_children.insert(
+            "module".into(),
+            Changed {
+                commit: "0".repeat(40),
+                path: "historical".into(),
+                objects: Default::default(),
+                historical_recursion: Some(Recursion::On),
+                effective_recursion: Some(Recursion::Off),
+                activity: Some(Activity::Enabled),
+            },
+        );
+        plan.select_pull_child_identity().expect("selection");
+        assert!(plan.phase == Phase::PullIntegration);
+        assert!(!plan.facets.iter().any(|facet| {
+            facet.resource.as_deref() == child.to_str()
+                || facet.resource.as_deref() == child.join(".git").to_str()
+        }));
+        for mode in [Recursion::On, Recursion::OnDemand] {
+            plan.pull_changed_children
+                .get_mut("module")
+                .expect("child")
+                .effective_recursion = Some(mode);
+            assert_eq!(plan.selected_pull_child_paths(), vec![child.clone()]);
+        }
+        plan.pull_changed_children
+            .get_mut("module")
+            .expect("child")
+            .effective_recursion = Some(Recursion::Off);
+        plan.pull_current_fetch_children
+            .insert("historical".into(), Recursion::On);
+        assert_eq!(plan.selected_pull_child_paths(), vec![child]);
     }
 
     #[tokio::test]
