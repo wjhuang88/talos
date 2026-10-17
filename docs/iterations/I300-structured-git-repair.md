@@ -3936,3 +3936,20 @@ sandbox execution passed 794 and hit the known process-observation EPERM.
 Git-feature Windows GNU library cross-check passes
 (`/tmp/talos-t7-windows-leaf-git-check.log`), with the existing unused
 `run_host_command` warning; this is compilation evidence only.
+
+
+Missing linked-checkout checkpoint (2026-10-17): after independent exact target
+admission, relative backlinks may resolve through ordinary missing suffixes.
+Evidence retains the resolved path and nearest existing ancestor identity;
+creation of missing components or replacement of that ancestor invalidates the
+plan. Commondir targets still must exist. Git 2.54 abspath.c confirms the native
+forgiving resolver permits multiple missing components. Dangling symlinks and
+missing paths containing unresolved parent components remain conservative
+refusals, not full native equivalence, and require follow-up before claiming
+ordinary-path coverage complete. No native object probe is activated here.
+Locked all-feature Pull tests pass 93/93; all-target/all-feature Clippy passes
+with warnings denied (`/tmp/talos-t7-missing-worktree-{pull-tests,clippy}.log`).
+Independent reviewer `review_prepared` found no new blocker. Object/replacement
+semantics, child transport/retries, recursive fetch, parent integration, runner
+stage-budget success and final delivery gates remain incomplete. T7 stays Active
+and production Pull stays disabled.
