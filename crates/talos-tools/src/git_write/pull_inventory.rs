@@ -133,11 +133,12 @@ impl Inventory {
                     || path == &root.join("HEAD")
             });
             if reference && identity.is_some() && !self.directories.contains_key(path) {
-                evidence.push((
-                    path.clone(),
-                    super::snapshot::RegularEvidence::capture(path, &mut budget)
-                        .map_err(|_| invalid())?,
-                ));
+                let entry = super::snapshot::RegularEvidence::capture(path, &mut budget)
+                    .map_err(|_| invalid())?;
+                if let super::snapshot::Entry::File(_, bytes) = &entry.entry {
+                    super::receiver_state::validate_symbolic_target(bytes)?;
+                }
+                evidence.push((path.clone(), entry));
             }
         }
         self.revalidate()?;
@@ -308,6 +309,20 @@ mod tests {
         assert!(inventory.subtree_complete(&root.join("refs/missing")));
         std::fs::create_dir(root.join("refs/missing")).expect("new subtree");
         assert!(inventory.revalidate().is_err());
+    }
+
+    #[test]
+    fn child_symbolic_reference_cannot_escape_retained_namespace() {
+        let temp = tempfile::tempdir().expect("fixture");
+        let root = temp.path().canonicalize().expect("root");
+        std::fs::create_dir_all(root.join("refs/replace")).expect("refs");
+        std::fs::write(root.join("refs/replace/object"), b"ref: FETCH_HEAD\n")
+            .expect("pseudo target");
+        let mut inventory = Inventory::new(&root, &root);
+        while !inventory.complete() {
+            inventory.advance(|_| true).expect("admitted frontier");
+        }
+        assert!(inventory.bind_references(&root, &root).is_err());
     }
 
     #[test]
