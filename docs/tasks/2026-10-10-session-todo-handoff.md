@@ -1,3 +1,21 @@
+Linked-worktree graph inventory checkpoint (2026-10-17): child graph discovery
+now includes `worktrees` under the existing exact-path frontier and 4096-entry
+limit. Registered worktree HEAD and refs contents join the shared 4 MiB reference
+evidence budget. Regression coverage requires fresh descendant admission and
+rejects in-place HEAD/private-ref changes; inventory tests pass 13/13. A real
+Git 2.54 fixture confirms `rev-list --all` includes another worktree's detached
+HEAD while `--single-worktree --all` excludes it. This closes a prerequisite
+read-inventory gap only; no child object probe or production Pull is enabled.
+The full Pull-focused suite passes 86/86; all-target/all-feature Clippy and both
+governance validators pass. Fetch succeeded with no new origin/main commits
+requiring rebase (HEAD is 106 commits ahead before this stage's commit).
+Independent review found no new blocker in this inert frontier increment, but
+identified an explicit native-probe activation blocker: linked registration
+`gitdir` and `commondir` contents must be bound and their resolved targets
+restricted/admitted before invoking Git's worktree/ref backend. HEAD/refs
+evidence alone does not authorize those pointer resolutions. Do not activate
+native child probing on the strength of this checkpoint.
+
 Windows path identity implementation checkpoint (2026-10-17): maintainer accepted
 the Windows/Git-only same-file 1.0.6 direct dependency; ADR-089 records its exact
 scope and limitations. PathIdentity now retains live handles for leaf/ancestor

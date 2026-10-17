@@ -34,6 +34,7 @@ impl Inventory {
                 "info",
                 "shallow",
                 "packed-refs",
+                "worktrees",
             ] {
                 pending.push(root.join(name));
             }
@@ -132,7 +133,18 @@ impl Inventory {
                 path.starts_with(root.join("refs"))
                     || path == &root.join("packed-refs")
                     || path == &root.join("HEAD")
-            });
+            }) || path
+                .strip_prefix(common.join("worktrees"))
+                .ok()
+                .is_some_and(|relative| {
+                    // Linked worktree refs are per-worktree roots for --all.
+                    // The first component is the registered worktree identifier.
+                    let mut components = relative.components();
+                    components.next().is_some()
+                        && components.next().is_some_and(|name| {
+                            name.as_os_str() == "HEAD" || name.as_os_str() == "refs"
+                        })
+                });
             let boundary = [gitdir, common]
                 .iter()
                 .any(|root| path == &root.join("shallow") || path == &root.join("info/grafts"));
@@ -267,6 +279,40 @@ fn identity(path: &Path) -> Result<Option<PathIdentity>, GitToolError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn linked_worktree_references_require_admission_and_retain_contents() {
+        for leaf in ["HEAD", "refs/heads/private"] {
+            let temp = tempfile::tempdir().expect("fixture");
+            let root = temp.path().canonicalize().expect("root");
+            let path = root.join("worktrees/linked").join(leaf);
+            std::fs::create_dir_all(path.parent().expect("parent")).expect("directories");
+            std::fs::write(&path, format!("{}\n", "a".repeat(40))).expect("reference");
+            let mut inventory = Inventory::new(&root, &root);
+            let initial = inventory.paths();
+            assert!(initial.contains(&root.join("worktrees")));
+            inventory
+                .advance(|path| initial.contains(&path.to_owned()))
+                .expect("root admission");
+            assert!(
+                inventory
+                    .advance(|path| initial.contains(&path.to_owned()))
+                    .is_err()
+            );
+            assert!(inventory.bind_references(&root, &root).is_err());
+            while !inventory.complete() {
+                inventory
+                    .advance(|_| true)
+                    .expect("fresh frontier admission");
+            }
+            inventory
+                .bind_references(&root, &root)
+                .expect("bind references");
+            assert!(inventory.references.iter().any(|(bound, _)| bound == &path));
+            std::fs::write(&path, format!("{}\n", "b".repeat(40))).expect("in-place change");
+            assert!(inventory.revalidate().is_err());
+        }
+    }
 
     #[test]
     fn graph_boundaries_bind_in_place_changes_and_absence() {
