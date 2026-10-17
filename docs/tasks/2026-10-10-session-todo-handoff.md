@@ -1,3 +1,26 @@
+Windows path identity implementation checkpoint (2026-10-17): maintainer accepted
+the Windows/Git-only same-file 1.0.6 direct dependency; ADR-089 records its exact
+scope and limitations. PathIdentity now retains live handles for leaf/ancestor
+volume+file-index comparisons with panic-guarded capture. The configured child
+worktree binding is implemented, and replacement regressions are explicitly
+selected in Windows CI. Locked all-feature tools tests pass 790/790 outside the
+sandbox (`/tmp/talos-t7-identity-all-tests.log`). Windows GNU library cross-check
+passes (`/tmp/talos-t7-windows-identity-check.log`), with an existing unused
+run_host_command warning; this is compile evidence, not Windows runtime proof.
+Independent incremental review found no new blocker. ReFS 128-bit identities,
+RegularEvidence's distinct Windows leaf protection, aggregate retained handle
+resources, native Windows runtime/sharing behavior and original T7 delivery
+gates remain residuals. The earlier pending-dependency decision is superseded;
+no all-filesystem guarantee or production Pull activation is claimed.
+
+Final stage validation: governance and collaboration validators both pass with
+zero warnings. The configured-worktree fixture now writes its path through
+`git config` so Windows backslashes are quoted correctly; its focused locked
+test passes after that adjustment. Windows GNU test cross-check could not finish
+because this host lacks `x86_64-w64-mingw32-gcc`
+(`/tmp/talos-t7-windows-identity-tests-check.log`); native Windows CI remains
+required, and library cross-compilation alone does not validate test execution.
+
 Pull graph boundary evidence checkpoint (2026-10-17): the admitted child
 inventory now retains shallow and info/grafts contents alongside reference
 evidence, sharing the existing per-inventory 4096-entry/4 MiB budget. Missing

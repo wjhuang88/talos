@@ -248,12 +248,14 @@ jobs:
           cargo test -p talos-desktop --features desktop-ui --locked
           exit $LASTEXITCODE
 
-      - name: Structured Git executable guard tests
+      - name: Structured Git executable and path identity guard tests
         shell: pwsh
         run: |
           $tests = @(
             'git::git_write::prepared_add::tests::windows_program_guard_allows_real_git_startup',
-            'git::git_write::prepared_add::tests::program_evidence_retains_windows_replacement_guard'
+            'git::git_write::prepared_add::tests::program_evidence_retains_windows_replacement_guard',
+            'git::git_write::snapshot::tests::path_identity_retains_leaf_and_ancestor_identity',
+            'git::git_write::prepared_add::tests::pull_child_bootstrap_defers_worktree_and_retains_startup_evidence'
           )
           $listed = @(cargo test -p talos-tools --features git --locked --lib -- --list)
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

@@ -3800,6 +3800,25 @@ semantics, child transport/retries, recursive fetch, parent integration,
 eight-stage runner reachability and final delivery gates remain open.
 Production Pull remains disabled; I300/T7 and the handoff stay incomplete.
 
+Windows path identity implementation update (2026-10-17): maintainer accepted
+Windows/Git-only same-file 1.0.6 (ADR-089 amendment). PathIdentity now retains
+panic-guarded safe handles for canonical leaf and ancestors; configured child
+worktree binding checks fresh Read admission and retains identity. Locked tools
+tests pass 790/790 on macOS; Windows GNU library cross-check passes with the
+existing run_host_command dead-code warning. CI explicitly selects ancestor/
+leaf replacement and configured-worktree regressions. Incremental independent
+review found no new blocker. Native Windows runtime evidence remains pending;
+ReFS 128-bit identity, RegularEvidence's separate Windows leaf identity and
+aggregate handle resource bounds remain tracked residuals. This supersedes the
+pending dependency decision below, without closing T7 or enabling Pull.
+
+Final stage validation: project governance and collaboration checks pass with
+zero warnings. After changing the configured-worktree fixture to use `git config`
+for portable path quoting, its focused locked regression passes. Windows GNU
+test cross-check is environment-blocked by missing `x86_64-w64-mingw32-gcc`
+(`/tmp/talos-t7-windows-identity-tests-check.log`); native Windows test execution
+remains a delivery gate, separate from the successful library cross-check.
+
 Independent review residual (2026-10-17): shared `snapshot::PathIdentity`
 retains ancestor device/inode identity on Unix, but only canonical paths on
 Windows. Same-path Windows directory replacement therefore remains undetected;

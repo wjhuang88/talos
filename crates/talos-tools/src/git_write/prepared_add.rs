@@ -237,6 +237,7 @@ pub(super) struct AddPlan {
     pull_child_fetch_targets: BTreeMap<PathBuf, (String, Vec<String>)>,
     pull_child_inventories: BTreeMap<PathBuf, super::pull_inventory::Inventory>,
     pull_child_startup: BTreeMap<PathBuf, super::config_state::ChildStartupLayout>,
+    pull_child_worktrees: BTreeMap<PathBuf, (PathBuf, snapshot::PathIdentity)>,
     pull_current_fetch_children: BTreeMap<String, super::pull_children::Recursion>,
     pull_current_modules: Option<super::pull_children::Tree>,
     pull_modules_evidence: Option<PullAttribute>,
@@ -648,6 +649,7 @@ impl AddPlan {
             pull_child_fetch_targets: BTreeMap::new(),
             pull_child_inventories: BTreeMap::new(),
             pull_child_startup: BTreeMap::new(),
+            pull_child_worktrees: BTreeMap::new(),
             pull_current_fetch_children: BTreeMap::new(),
             pull_current_modules: None,
             pull_modules_evidence: None,
@@ -2078,6 +2080,15 @@ impl AddPlan {
             return Ok(self);
         }
         self.revalidate()?;
+        let workdirs: Vec<_> = self
+            .child_locations
+            .iter()
+            .map(|(path, _)| path.clone())
+            .collect();
+        for workdir in workdirs {
+            self.bind_pull_child_worktree(&workdir, authorizations)?;
+        }
+        self.revalidate()?;
         let mut pending = false;
         for inventory in self.pull_child_inventories.values_mut() {
             inventory.advance(|path| {
@@ -2121,6 +2132,35 @@ impl AddPlan {
         }
         self.phase = Phase::PullIntegration;
         Ok(self)
+    }
+
+    fn bind_pull_child_worktree(
+        &mut self,
+        workdir: &Path,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<(), GitToolError> {
+        let startup = self.pull_child_startup.get(workdir).ok_or_else(|| {
+            GitToolError::InvalidInput("Pull child startup evidence missing".into())
+        })?;
+        startup.revalidate()?;
+        let target = startup
+            .targets
+            .iter()
+            .next()
+            .cloned()
+            .unwrap_or_else(|| workdir.to_owned());
+        let admitted = self.child_read(&target, authorizations)?;
+        let identity = snapshot::PathIdentity::capture(&target).map_err(|_| {
+            GitToolError::InvalidInput("Pull child startup worktree identity unavailable".into())
+        })?;
+        if target.canonicalize().ok().as_deref() != Some(admitted) || !target.is_dir() {
+            return Err(GitToolError::InvalidInput(
+                "Pull child startup worktree changed after admission".into(),
+            ));
+        }
+        self.pull_child_worktrees
+            .insert(workdir.to_owned(), (target, identity));
+        Ok(())
     }
 
     async fn resolve_pull_child_activity(&mut self) -> Result<(), GitToolError> {
@@ -5368,6 +5408,13 @@ impl AddPlan {
         }
         for startup in self.pull_child_startup.values() {
             startup.revalidate()?;
+        }
+        for (target, identity) in self.pull_child_worktrees.values() {
+            if snapshot::PathIdentity::capture(target).ok().as_ref() != Some(identity) {
+                return Err(GitToolError::InvalidInput(
+                    "Pull child configured worktree changed after admission".into(),
+                ));
+            }
         }
         for metadata in &self.checkout_child_metadata {
             metadata.revalidate(&metadata.canonical)?;
@@ -12292,11 +12339,16 @@ pub(super) mod tests {
         let missing = root.path().join("unadmitted-worktree");
         let config_path = gitdir.join("config");
         let original = std::fs::read_to_string(&config_path).expect("config");
-        std::fs::write(
-            &config_path,
-            format!("{original}\n[core]\nworktree = {}\n", missing.display()),
-        )
-        .expect("startup target");
+        assert!(
+            std::process::Command::new("git")
+                .current_dir(&child)
+                .args(["config", "core.worktree"])
+                .arg(&missing)
+                .output()
+                .expect("startup target")
+                .status
+                .success()
+        );
         let layout = super::super::receiver_state::Root::capture(&child, &child).expect("root");
         let metadata =
             super::super::receiver_state::Metadata::capture(&gitdir, &gitdir).expect("metadata");
@@ -12327,7 +12379,7 @@ pub(super) mod tests {
         let tokens = proof(&plan)
             .consume_for_prepared(&plan.request(), &plan.identity)
             .expect("proof");
-        let plan = plan
+        let mut plan = plan
             .discover_pull_child_configuration(&tokens)
             .await
             .expect("discovery");
@@ -12339,9 +12391,29 @@ pub(super) mod tests {
                 .iter()
                 .any(|facet| facet.resource.as_deref() == missing.to_str())
         );
-        plan.pull_child_startup[&child]
-            .revalidate()
-            .expect("retained startup");
+        assert!(plan.bind_pull_child_worktree(&child, &tokens).is_err());
+        std::fs::create_dir(&missing).expect("create independently admitted target");
+        let next_tokens = proof(&plan)
+            .consume_for_prepared(&plan.request(), &plan.identity)
+            .expect("worktree proof");
+        plan.bind_pull_child_worktree(&child, &next_tokens)
+            .expect("bind admitted target");
+        assert_eq!(plan.pull_child_worktrees[&child].0, missing);
+        plan.environment = trace_suppressed_environment(execution_environment());
+        plan.revalidate().expect("retained target identity");
+        #[cfg(any(unix, windows))]
+        {
+            let previous_target = root.path().join("previous-worktree");
+            std::fs::rename(&missing, &previous_target).expect("move admitted directory");
+            std::fs::create_dir(&missing).expect("replace target");
+            assert!(
+                plan.revalidate().is_err(),
+                "same spelling must not replace identity"
+            );
+            std::fs::remove_dir(&missing).expect("remove empty replacement");
+            std::fs::rename(&previous_target, &missing).expect("restore identity");
+            plan.revalidate().expect("restored target");
+        }
         std::fs::write(&config_path, original).expect("change startup");
         assert!(plan.pull_child_startup[&child].revalidate().is_err());
     }
