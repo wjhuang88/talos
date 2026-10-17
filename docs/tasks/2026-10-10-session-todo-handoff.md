@@ -3427,3 +3427,13 @@ GIX tracking was rechecked against the live sparse index: latest non-yanked
 0.89.0 (published 2026-10-08, MSRV 1.88), Talos locked at 0.87.1. No newer release
 or host-Git removal date is established. Remaining T7 execution/integration
 and all subsequent handoff deliverables remain open.
+
+Child common-root stage convergence checkpoint (2026-10-17): metadata discovery
+continues under the current proof when every resolved child common root already
+has exact Read admission. Ordinary gitdir==common layouts therefore use two
+identity continuations rather than three; no configuration values are read at
+this point. External common targets still return for fresh admission and their
+canonical mappings are checked before ChildLocation capture. The real current-
+child regression asserts this stage reduction; the external target regression
+and all 97 locked all-feature Pull tests pass. This does not establish complete
+runner success within eight stages or enable production Pull.

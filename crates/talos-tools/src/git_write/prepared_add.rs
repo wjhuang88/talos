@@ -1852,8 +1852,15 @@ impl AddPlan {
                 )?);
                 *slot = Some(metadata);
             }
-            self.identity = PreparedPlanIdentity::new();
-            return Ok(self);
+            if self.pull_child_layouts.iter().any(|(_, metadata)| {
+                metadata.as_ref().is_none_or(|metadata| {
+                    self.child_read(&metadata.common_path, authorizations)
+                        .is_err()
+                })
+            }) {
+                self.identity = PreparedPlanIdentity::new();
+                return Ok(self);
+            }
         }
         for (layout, metadata) in &self.pull_child_layouts {
             let metadata = metadata.as_ref().ok_or_else(|| {
@@ -13450,6 +13457,18 @@ pub(super) mod tests {
         assert!(
             plan.child_locations.is_empty(),
             "metadata requires another admission"
+        );
+        let tokens = proof(&plan)
+            .consume_for_prepared(&plan.request(), &plan.identity)
+            .expect("metadata tokens");
+        let plan = plan
+            .discover_pull_child_identity(&tokens)
+            .expect("already admitted common directory");
+        assert!(plan.phase == Phase::PullChildConfiguration);
+        assert_eq!(plan.child_locations.len(), 1);
+        assert!(
+            !plan.pull_config_sources_discovered,
+            "config still waits for admission"
         );
     }
 
