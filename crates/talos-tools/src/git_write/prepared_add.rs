@@ -165,6 +165,7 @@ enum Phase {
     PullChildAttributes,
     PullChildIdentity,
     PullChildConfiguration,
+    PullChildFetch,
     PullIntegration,
 }
 
@@ -236,6 +237,7 @@ pub(super) struct AddPlan {
     pull_index_children: BTreeMap<String, String>,
     pull_child_fetch_targets: BTreeMap<PathBuf, (String, Vec<String>)>,
     pull_child_hook_evidence: Vec<(PathBuf, snapshot::RegularEvidence)>,
+    pull_children_fetched: std::collections::BTreeSet<PathBuf>,
     pull_child_inventories: BTreeMap<PathBuf, super::pull_inventory::Inventory>,
     pull_child_startup: BTreeMap<PathBuf, super::config_state::ChildStartupLayout>,
     pull_child_worktrees: BTreeMap<PathBuf, (PathBuf, snapshot::PathIdentity)>,
@@ -677,6 +679,7 @@ impl AddPlan {
             pull_index_children: BTreeMap::new(),
             pull_child_fetch_targets: BTreeMap::new(),
             pull_child_hook_evidence: Vec::new(),
+            pull_children_fetched: std::collections::BTreeSet::new(),
             pull_child_inventories: BTreeMap::new(),
             pull_child_startup: BTreeMap::new(),
             pull_child_worktrees: BTreeMap::new(),
@@ -1373,16 +1376,9 @@ impl AddPlan {
         self.pull_evidence = Some(evidence);
         self.pull_remote = Some(remote);
         self.pull_destinations = destinations.clone();
-        self.pull_transport_supported = destinations.iter().all(|destination| {
-            std::panic::catch_unwind(|| gix::url::parse(destination)).is_ok_and(|parsed| {
-                parsed.is_ok_and(|url| {
-                    url.scheme == gix::url::Scheme::Git
-                        && url.host.is_some()
-                        && url.user.is_none()
-                        && url.password.is_none()
-                })
-            })
-        });
+        self.pull_transport_supported = destinations
+            .iter()
+            .all(|destination| pull_network_transport_supported(destination));
         for destination in destinations {
             self.facets.push(
                 ToolPermissionFacet::with_resource(
@@ -2356,8 +2352,207 @@ impl AddPlan {
             return Ok(self);
         }
         self.validate_pull_child_object_types().await?;
-        self.phase = Phase::PullIntegration;
+        if self
+            .child_locations
+            .iter()
+            .all(|(path, _)| self.pull_children_fetched.contains(path))
+        {
+            self.phase = Phase::PullIntegration;
+        } else {
+            for (path, location) in &self.child_locations {
+                if self.pull_children_fetched.contains(path) {
+                    continue;
+                }
+                let (_, destinations) =
+                    self.pull_child_fetch_targets.get(path).ok_or_else(|| {
+                        GitToolError::InvalidInput("Pull child fetch destination missing".into())
+                    })?;
+                for destination in destinations {
+                    self.facets.push(
+                        ToolPermissionFacet::with_resource(
+                            ToolNature::Network,
+                            destination.clone(),
+                            ToolResourceKind::Remote,
+                        )
+                        .with_description("Pull pending child fetch destination"),
+                    );
+                }
+                for root in [&location.git_dir, &location.common_dir] {
+                    self.facets.push(path_facet(
+                        ToolNature::Write,
+                        root,
+                        "Pull child fetch writes under this identity-bound metadata root",
+                    )?);
+                }
+            }
+            self.facets.push(
+                ToolPermissionFacet::with_resource(
+                    ToolNature::Write,
+                    "git:pull-repository-metadata",
+                    ToolResourceKind::Remote,
+                )
+                .with_description(
+                    "Child fetch only; native recursion disabled; integration needs fresh approval",
+                ),
+            );
+            self.phase = Phase::PullChildFetch;
+        }
         Ok(self)
+    }
+
+    async fn execute_pull_child_fetch(
+        mut self: Box<Self>,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<Box<Self>, GitToolError> {
+        self.revalidate()?;
+        if !self.facets.iter().any(|facet| {
+            facet.nature == ToolNature::Write
+                && facet.resource_kind == Some(ToolResourceKind::Remote)
+                && facet.resource.as_deref() == Some("git:pull-repository-metadata")
+        }) {
+            return Err(GitToolError::InvalidInput(
+                "Pull child metadata Write capability missing".into(),
+            ));
+        }
+        // Check every selected root and transport before starting the first child.
+        for (workdir, location) in &self.child_locations {
+            if self.pull_children_fetched.contains(workdir) {
+                continue;
+            }
+            // Parent graph evidence cannot be silently rebased by a child fetch.
+            if self.pull_inventory.as_ref().is_some_and(|inventory| {
+                inventory.paths().iter().any(|path| {
+                    [&location.git_dir, &location.common_dir]
+                        .iter()
+                        .any(|root| path.starts_with(root) || root.starts_with(path))
+                })
+            }) {
+                return Err(GitToolError::InvalidInput(
+                    "Pull child fetch overlaps retained parent graph; coordinated refresh required"
+                        .into(),
+                ));
+            }
+            for root in [&location.git_dir, &location.common_dir] {
+                if !authorizations.iter().any(|token| {
+                    token.authorizes_path(
+                        "git_pull",
+                        ToolNature::Write,
+                        &self.workspace,
+                        root.to_str().unwrap_or_default(),
+                    )
+                }) {
+                    return Err(GitToolError::InvalidInput(
+                        "Pull child metadata root lacks Write admission".into(),
+                    ));
+                }
+            }
+            let (_, destinations) =
+                self.pull_child_fetch_targets.get(workdir).ok_or_else(|| {
+                    GitToolError::InvalidInput("Pull child fetch destination missing".into())
+                })?;
+            if destinations.is_empty()
+                || !destinations
+                    .iter()
+                    .all(|destination| pull_network_transport_supported(destination))
+            {
+                return Err(GitToolError::InvalidInput("Pull child transport requires separately validated path, helper, credential, or network effects".into()));
+            }
+        }
+        if !cfg!(test) {
+            return Err(GitToolError::InvalidInput("Pull child execution awaits recursive retry, integration and independent activation gates; no child fetch started".into()));
+        }
+        for (workdir, location) in &self.child_locations {
+            if self.pull_children_fetched.contains(workdir) {
+                continue;
+            }
+            self.revalidate()?;
+            let (worktree, _) = self.pull_child_worktrees.get(workdir).ok_or_else(|| {
+                GitToolError::InvalidInput("Pull child effective worktree missing".into())
+            })?;
+            let objects = self
+                .pull_changed_children
+                .values()
+                .filter(|child| self.repository.workdir.join(&child.path) == *workdir)
+                .flat_map(|child| child.objects.iter().cloned())
+                .collect::<std::collections::BTreeSet<_>>()
+                .into_iter()
+                .collect::<Vec<_>>();
+            let unconditional = self.pull_current_fetch_children.iter().any(|(path, mode)| {
+                self.repository.workdir.join(path) == *workdir
+                    && *mode == super::pull_children::Recursion::On
+            }) || self.pull_changed_children.values().any(|child| {
+                self.repository.workdir.join(&child.path) == *workdir
+                    && child.effective_recursion == Some(super::pull_children::Recursion::On)
+            });
+            // Never use discovery's presence result across the write approval.
+            if !unconditional
+                && self
+                    .pull_child_has_commits(workdir, &location.git_dir, worktree, &objects)
+                    .await?
+            {
+                self.pull_children_fetched.insert(workdir.clone());
+                continue;
+            }
+            self.revalidate()?;
+            let (remote, _) = self.pull_child_fetch_targets.get(workdir).ok_or_else(|| {
+                GitToolError::InvalidInput("Pull child fetch remote missing".into())
+            })?;
+            let mut command =
+                self.pull_child_command(&location.git_dir, &location.git_dir, worktree);
+            command.args([
+                "-c",
+                "maintenance.autoDetach=false",
+                "-c",
+                "gc.autoDetach=false",
+                "fetch",
+                "--no-recurse-submodules",
+                "--",
+                remote,
+            ]);
+            let output = self
+                .run_command_output(command, std::time::Duration::from_secs(120), 1024 * 1024)
+                .await?;
+            if !output.status.success() {
+                return Err(GitToolError::Git("Pull child fetch failed; previously fetched metadata is retained; inspect repository before retrying".into()));
+            }
+            // Refresh every inventory that observes the mutated roots, including
+            // linked siblings sharing a common object/ref store. No further child
+            // may run until this evidence has converged under Read admission.
+            let roots = [&location.git_dir, &location.common_dir];
+            let affected: Vec<_> = self
+                .pull_child_inventories
+                .iter()
+                .filter(|(_, inventory)| {
+                    inventory.paths().iter().any(|path| {
+                        roots
+                            .iter()
+                            .any(|root| path.starts_with(root) || root.starts_with(path))
+                    })
+                })
+                .map(|(path, _)| path.clone())
+                .collect();
+            self.pull_children_fetched.insert(workdir.clone());
+            for path in affected {
+                let location = self
+                    .child_locations
+                    .iter()
+                    .find(|(key, _)| key == &path)
+                    .map(|(_, location)| location)
+                    .ok_or_else(|| {
+                        GitToolError::InvalidInput("Pull affected child location missing".into())
+                    })?;
+                self.pull_child_inventories.insert(
+                    path,
+                    super::pull_inventory::Inventory::new(&location.git_dir, &location.common_dir),
+                );
+            }
+            break;
+        }
+        self.facets
+            .retain(|facet| !matches!(facet.nature, ToolNature::Write | ToolNature::Network));
+        self.identity = PreparedPlanIdentity::new();
+        self.phase = Phase::PullChildConfiguration;
+        self.discover_pull_child_configuration(authorizations).await
     }
 
     async fn validate_pull_child_object_types(&self) -> Result<(), GitToolError> {
@@ -6723,6 +6918,17 @@ fn receiver_command(program: &Path) -> Result<String, GitToolError> {
     ))
 }
 
+fn pull_network_transport_supported(destination: &str) -> bool {
+    std::panic::catch_unwind(|| gix::url::parse(destination)).is_ok_and(|parsed| {
+        parsed.is_ok_and(|url| {
+            url.scheme == gix::url::Scheme::Git
+                && url.host.is_some()
+                && url.user.is_none()
+                && url.password.is_none()
+        })
+    })
+}
+
 fn pull_fetch_command(
     program: &Path,
     workdir: &Path,
@@ -6810,9 +7016,23 @@ impl PreparedNormalToolInvocation for AddPlan {
             Phase::PullPreparation => self.discover_pull_prefetch(&authorizations).await,
             Phase::PullChildAttributes => self.discover_pull_child_attributes(&authorizations).await,
             Phase::PullChildIdentity => self.discover_pull_child_identity(&authorizations),
-            Phase::PullChildConfiguration => self
-                .discover_pull_child_configuration(&authorizations)
-                .await,
+            Phase::PullChildConfiguration => {
+                let child_effects = !self.pull_children_fetched.is_empty();
+                self.discover_pull_child_configuration(&authorizations)
+                    .await
+                    .map_err(|error| {
+                        if child_effects {
+                            GitToolError::Git(format!(
+                                "Pull child post-fetch discovery failed: {error}; this operation may have partial fetch effects retained; inspect repositories before retrying",
+                            ))
+                        } else {
+                            error
+                        }
+                    })
+            }
+            Phase::PullChildFetch => self.execute_pull_child_fetch(&authorizations).await.map_err(|error| GitToolError::Git(format!(
+                "Pull child fetch stage failed: {error}; this operation may have partial fetch effects retained; inspect repositories before retrying",
+            ))),
             Phase::PullPostFetch => self.discover_pull_postfetch(&authorizations).await.map_err(|error| GitToolError::Git(format!("Pull parent fetch completed; post-fetch discovery failed: {error}; fetched effects are retained; inspect repository before retrying"))),
             Phase::PullIntegration => {
                 if let Err(error) = self.revalidate() {
@@ -12795,6 +13015,262 @@ pub(super) mod tests {
     }
 
     #[tokio::test]
+    async fn pull_child_fetch_has_own_write_stage_and_rebuilds_graph() {
+        let remote = fixture();
+        let git = |cwd: &Path, args: &[&str]| {
+            let output = std::process::Command::new("git")
+                .current_dir(cwd)
+                .args(args)
+                .output()
+                .expect("Git");
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            String::from_utf8(output.stdout)
+                .expect("UTF8")
+                .trim()
+                .to_owned()
+        };
+        git(
+            remote.path(),
+            &[
+                "-c",
+                "user.name=Fixture",
+                "-c",
+                "user.email=fixture@example.com",
+                "commit",
+                "--allow-empty",
+                "-m",
+                "source",
+            ],
+        );
+        let expected = git(remote.path(), &["rev-parse", "HEAD"]);
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("port");
+        let port = listener.local_addr().expect("address").port();
+        drop(listener);
+        let mut daemon = tokio::process::Command::new("git")
+            .args([
+                "daemon",
+                "--reuseaddr",
+                "--listen=127.0.0.1",
+                "--export-all",
+            ])
+            .arg(format!("--port={port}"))
+            .arg(format!("--base-path={}", remote.path().display()))
+            .arg(remote.path())
+            .kill_on_drop(true)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .expect("daemon");
+        tokio::time::timeout(std::time::Duration::from_secs(5), async {
+            loop {
+                if std::net::TcpStream::connect(("127.0.0.1", port)).is_ok() {
+                    break;
+                }
+                assert!(daemon.try_wait().expect("state").is_none());
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .expect("ready");
+        for mode in ["allow", "missing-write", "skip", "linked", "linked-tamper"] {
+            let root = fixture();
+            git(root.path(), &["init", "child"]);
+            let child = root.path().join("child").canonicalize().expect("child");
+            git(
+                &child,
+                &[
+                    "remote",
+                    "add",
+                    "origin",
+                    &format!("git://127.0.0.1:{port}/"),
+                ],
+            );
+            if mode == "skip" {
+                git(
+                    &child,
+                    &[
+                        "fetch",
+                        remote.path().to_str().expect("remote"),
+                        "HEAD:refs/heads/present",
+                    ],
+                );
+                std::fs::remove_file(child.join(".git/FETCH_HEAD"))
+                    .expect("clear fixture fetch marker");
+            }
+            if mode.starts_with("linked") {
+                git(
+                    &child,
+                    &[
+                        "-c",
+                        "user.name=Fixture",
+                        "-c",
+                        "user.email=fixture@example.com",
+                        "commit",
+                        "--allow-empty",
+                        "-m",
+                        "child",
+                    ],
+                );
+                git(&child, &["worktree", "add", "--detach", "../sibling"]);
+            }
+            let mut plan = Box::new(
+                AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+                    .expect("plan"),
+            )
+            .discover()
+            .await
+            .expect("config");
+            plan.pull_current_fetch_children
+                .insert("child".into(), super::super::pull_children::Recursion::On);
+            if mode == "skip" {
+                plan.pull_changed_children.insert(
+                    "child".into(),
+                    super::super::pull_children::Changed {
+                        commit: expected.clone(),
+                        path: "child".into(),
+                        objects: [expected.clone()].into_iter().collect(),
+                        historical_recursion: None,
+                        effective_recursion: Some(super::super::pull_children::Recursion::OnDemand),
+                        activity: Some(super::super::pull_children::Activity::Enabled),
+                    },
+                );
+            }
+            if mode.starts_with("linked") {
+                plan.pull_current_fetch_children
+                    .insert("sibling".into(), super::super::pull_children::Recursion::On);
+            }
+            plan.select_pull_child_identity().expect("select");
+            for _ in 0..8 {
+                if plan.phase != Phase::PullChildIdentity {
+                    break;
+                }
+                let tokens = proof(&plan)
+                    .consume_for_prepared(&plan.request(), &plan.identity)
+                    .expect("identity proof");
+                plan = plan
+                    .discover_pull_child_identity(&tokens)
+                    .expect("identity");
+            }
+            for _ in 0..8 {
+                if plan.phase != Phase::PullChildConfiguration {
+                    break;
+                }
+                let tokens = proof(&plan)
+                    .consume_for_prepared(&plan.request(), &plan.identity)
+                    .expect("config proof");
+                plan = plan
+                    .discover_pull_child_configuration(&tokens)
+                    .await
+                    .expect("child config");
+            }
+            assert!(plan.phase == Phase::PullChildFetch);
+            assert!(!child.join(".git/FETCH_HEAD").exists());
+            if mode == "skip" {
+                plan.pull_current_fetch_children.insert(
+                    "child".into(),
+                    super::super::pull_children::Recursion::OnDemand,
+                );
+            }
+            let mut tokens = proof(&plan)
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .expect("fetch proof");
+            if mode == "missing-write" {
+                tokens.retain(|token| {
+                    !token.authorizes_path(
+                        "git_pull",
+                        ToolNature::Write,
+                        &plan.workspace,
+                        child.join(".git").to_str().expect("path"),
+                    )
+                });
+                assert!(
+                    plan.execute_pull_child_fetch(&tokens)
+                        .await
+                        .err()
+                        .expect("refusal")
+                        .to_string()
+                        .contains("Write admission")
+                );
+                assert!(!child.join(".git/FETCH_HEAD").exists());
+                continue;
+            }
+            let mut plan = plan.execute_pull_child_fetch(&tokens).await.expect("fetch");
+            if mode.starts_with("linked") {
+                for _ in 0..8 {
+                    if plan.phase != Phase::PullChildConfiguration {
+                        break;
+                    }
+                    let tokens = proof(&plan)
+                        .consume_for_prepared(&plan.request(), &plan.identity)
+                        .expect("shared graph proof");
+                    plan = plan
+                        .discover_pull_child_configuration(&tokens)
+                        .await
+                        .expect("shared graph refresh");
+                }
+                assert!(plan.phase == Phase::PullChildFetch);
+                assert_eq!(plan.pull_children_fetched.len(), 1);
+                plan.revalidate()
+                    .expect("shared graph refreshed before sibling fetch");
+                if mode == "linked-tamper" {
+                    git(&child, &["update-ref", "refs/heads/tampered", &expected]);
+                    assert!(
+                        plan.revalidate().is_err(),
+                        "first child's graph stays bound between fetches"
+                    );
+                    continue;
+                }
+                let tokens = proof(&plan)
+                    .consume_for_prepared(&plan.request(), &plan.identity)
+                    .expect("sibling fetch proof");
+                plan = plan
+                    .execute_pull_child_fetch(&tokens)
+                    .await
+                    .expect("sibling fetch");
+                assert_eq!(plan.pull_children_fetched.len(), 2);
+            }
+            assert!(matches!(
+                plan.phase,
+                Phase::PullChildConfiguration | Phase::PullIntegration
+            ));
+            assert!(
+                !plan
+                    .facets
+                    .iter()
+                    .any(|facet| matches!(facet.nature, ToolNature::Write | ToolNature::Network))
+            );
+            if mode == "allow" || mode.starts_with("linked") {
+                assert!(
+                    std::fs::read_to_string(child.join(".git/FETCH_HEAD"))
+                        .expect("fetch head")
+                        .contains(&expected)
+                );
+            } else {
+                assert!(!child.join(".git/FETCH_HEAD").exists());
+            }
+            for _ in 0..8 {
+                if plan.phase != Phase::PullChildConfiguration {
+                    break;
+                }
+                let tokens = proof(&plan)
+                    .consume_for_prepared(&plan.request(), &plan.identity)
+                    .expect("postfetch proof");
+                plan = plan
+                    .discover_pull_child_configuration(&tokens)
+                    .await
+                    .expect("fresh graph");
+            }
+            assert!(plan.phase == Phase::PullIntegration);
+        }
+        daemon.kill().await.expect("stop");
+        daemon.wait().await.expect("reap");
+    }
+
+    #[tokio::test]
     async fn pull_child_metadata_scope_batches_depth_and_requires_own_root() {
         let mut modes = vec![
             "allow",
@@ -12996,7 +13472,7 @@ pub(super) mod tests {
                 continue;
             }
             let plan = next.expect("single admitted graph stage");
-            assert!(plan.phase == Phase::PullIntegration);
+            assert!(plan.phase == Phase::PullChildFetch);
             assert!(
                 plan.pull_child_hook_evidence
                     .iter()
