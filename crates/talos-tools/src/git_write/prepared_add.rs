@@ -1682,6 +1682,8 @@ impl AddPlan {
                 }
             }
             self.phase = Phase::PullChildAttributes;
+        } else {
+            self.select_pull_child_identity()?;
         }
         Ok(self)
     }
@@ -1720,36 +1722,54 @@ impl AddPlan {
         self.pull_attributes = evidence;
         self.revalidate()?;
         self.resolve_pull_child_activity().await?;
+        self.select_pull_child_identity()?;
+        Ok(self)
+    }
+
+    fn selected_pull_child_paths(&self) -> Vec<PathBuf> {
+        // Git schedules selected current-index entries before historical changes.
+        // Current `On` candidates do not require a changed gitlink or historical
+        // activity; policy selection already happened in select_current().
+        let mut paths: Vec<_> = self
+            .pull_current_fetch_children
+            .keys()
+            .map(|path| self.repository.workdir.join(path))
+            .collect();
         for child in self.pull_changed_children.values() {
             if matches!(
                 child.activity,
                 Some(super::pull_children::Activity::Enabled)
             ) {
                 let path = self.repository.workdir.join(&child.path);
-                self.facets.push(path_facet(
-                    ToolNature::Read,
-                    &path,
-                    "Pull selected child identity",
-                )?);
-                self.facets.push(path_facet(
-                    ToolNature::Read,
-                    &path.join(".git"),
-                    "Pull selected child Git marker",
-                )?);
+                if !paths.contains(&path) {
+                    paths.push(path);
+                }
             }
         }
+        paths
+    }
+
+    fn select_pull_child_identity(&mut self) -> Result<(), GitToolError> {
+        let paths = self.selected_pull_child_paths();
+        for path in &paths {
+            self.facets.push(path_facet(
+                ToolNature::Read,
+                path,
+                "Pull selected child identity",
+            )?);
+            self.facets.push(path_facet(
+                ToolNature::Read,
+                &path.join(".git"),
+                "Pull selected child Git marker",
+            )?);
+        }
         self.identity = PreparedPlanIdentity::new();
-        self.phase = if self.pull_changed_children.values().any(|child| {
-            matches!(
-                child.activity,
-                Some(super::pull_children::Activity::Enabled)
-            )
-        }) {
+        self.phase = if !paths.is_empty() {
             Phase::PullChildIdentity
         } else {
             Phase::PullIntegration
         };
-        Ok(self)
+        Ok(())
     }
 
     fn discover_pull_child_identity(
@@ -1760,14 +1780,7 @@ impl AddPlan {
         if !self.pull_child_layouts.is_empty() {
             return self.discover_pull_child_metadata(authorizations);
         }
-        for child in self.pull_changed_children.values() {
-            if !matches!(
-                child.activity,
-                Some(super::pull_children::Activity::Enabled)
-            ) {
-                continue;
-            }
-            let path = self.repository.workdir.join(&child.path);
+        for path in self.selected_pull_child_paths() {
             let marker = path.join(".git");
             for candidate in [&path, &marker] {
                 self.child_read(candidate, authorizations)?;
@@ -13168,6 +13181,53 @@ pub(super) mod tests {
     }
 
     #[tokio::test]
+    async fn pull_current_child_without_changes_requires_fresh_identity_admission() {
+        let root = fixture();
+        let output = std::process::Command::new("git")
+            .current_dir(root.path())
+            .args(["init", "child"])
+            .output()
+            .expect("initialize child");
+        assert!(output.status.success(), "{output:?}");
+        let mut plan = Box::new(
+            AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+                .expect("Pull"),
+        )
+        .discover()
+        .await
+        .expect("configuration");
+        let child = plan.repository.workdir.join("child");
+        let stale = proof(&plan)
+            .consume_for_prepared(&plan.request(), &plan.identity)
+            .expect("old tokens");
+        assert!(plan.pull_changed_children.is_empty());
+        plan.pull_current_fetch_children
+            .insert("child".into(), super::super::pull_children::Recursion::On);
+        plan.select_pull_child_identity()
+            .expect("select current child");
+        assert!(plan.phase == Phase::PullChildIdentity);
+        for path in [&child, &child.join(".git")] {
+            assert!(plan.facets.iter().any(|facet| {
+                facet.nature == ToolNature::Read && facet.resource.as_deref() == path.to_str()
+            }));
+            assert!(plan.child_read(path, &stale).is_err());
+        }
+        let tokens = proof(&plan)
+            .consume_for_prepared(&plan.request(), &plan.identity)
+            .expect("fresh child tokens");
+        assert!(plan.child_locations.is_empty());
+        let plan = plan
+            .discover_pull_child_identity(&tokens)
+            .expect("admitted current child");
+        assert_eq!(plan.pull_child_layouts.len(), 1);
+        assert_eq!(plan.pull_child_layouts[0].0.spelling, child);
+        assert!(
+            plan.child_locations.is_empty(),
+            "metadata requires another admission"
+        );
+    }
+
+    #[tokio::test]
     async fn pull_child_attributes_require_fresh_exact_admission() {
         for denied in [true, false] {
             let root = fixture();
@@ -13305,6 +13365,7 @@ pub(super) mod tests {
                 _ => {}
             }
             let target = std::str::from_utf8(&target).expect("object ID").trim();
+            git(&["config", "submodule.child.active", "true"]);
             let mut plan = Box::new(
                 AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
                     .expect("Pull"),
@@ -13350,7 +13411,25 @@ pub(super) mod tests {
                 .discover_pull_postfetch(&admission)
                 .await
                 .expect("postfetch");
-            assert!(next.phase == Phase::PullIntegration);
+            assert!(
+                next.phase == Phase::PullChildIdentity,
+                "source={source}, activity={:?}",
+                next.pull_changed_children
+                    .values()
+                    .map(|child| &child.activity)
+                    .collect::<Vec<_>>()
+            );
+            assert!(next.pull_activity_globals.is_empty());
+            for path in [
+                next.repository.workdir.join("missing/child"),
+                next.repository.workdir.join("missing/child/.git"),
+            ] {
+                assert!(next.facets.iter().any(|facet| {
+                    facet.nature == ToolNature::Read && facet.resource.as_deref() == path.to_str()
+                }));
+                assert!(next.child_read(&path, &admission).is_err());
+            }
+            assert!(next.child_locations.is_empty());
             assert_eq!(next.pull_new_commits, [target]);
             assert!(next.pull_child_trees.contains_key(target));
             assert_eq!(
