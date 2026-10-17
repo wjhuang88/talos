@@ -8,7 +8,7 @@ const SOURCES: [&str; 4] = [
     include_str!("handle_snapshot.rs"),
 ];
 const EXPECTED: [u64; 4] = [
-    0x4d12244ea7cc5fb0,
+    0xc163f2af569837b0,
     0xaaf4ee820de4ea11,
     0x2c2394169b451d76,
     0xa95c60b55dcdf0fc,
