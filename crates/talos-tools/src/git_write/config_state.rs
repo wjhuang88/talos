@@ -221,6 +221,15 @@ fn ordered_records(output: &[u8]) -> Result<Vec<u8>, GitToolError> {
 }
 
 impl ChildConfig {
+    pub(super) fn pull_hook_paths(
+        &self,
+        common: &std::path::Path,
+        worktree: &std::path::Path,
+        environment: &BTreeMap<OsString, OsString>,
+    ) -> Result<Vec<PathBuf>, GitToolError> {
+        fetch_hook_paths(&self.values, common, worktree, environment)
+    }
+
     /// The first recursive fetch uses ordinary fetch default-remote semantics.
     pub(super) fn fetch_remote(&self, branch: Option<&str>) -> Result<String, GitToolError> {
         super::pull_state::fetch_remote(&ordered_records(&self.ordered_output)?, branch, None)
@@ -1206,17 +1215,12 @@ impl ConfigState {
         environment: &BTreeMap<OsString, OsString>,
     ) -> Result<Vec<PathBuf>, GitToolError> {
         validate_fetch_external_effects(&self.values)?;
-        let directory = configured_path(&self.values, b"core.hookspath", environment)?
-            .unwrap_or_else(|| repository.git_dir.join("hooks"));
-        let directory = if directory.is_absolute() {
-            directory
-        } else {
-            repository.workdir.join(directory)
-        };
-        let paths = ["reference-transaction", "pre-auto-gc"]
-            .into_iter()
-            .map(|name| directory.join(name))
-            .collect::<Vec<_>>();
+        let paths = fetch_hook_paths(
+            &self.values,
+            &repository.common_dir,
+            &repository.workdir,
+            environment,
+        )?;
         self.auxiliary.extend(paths.iter().cloned());
         self.hooks.extend(paths.iter().cloned());
         Ok(paths)
@@ -1589,6 +1593,25 @@ impl ConfigState {
         }
         Ok(())
     }
+}
+
+fn fetch_hook_paths(
+    values: &Values,
+    common: &std::path::Path,
+    worktree: &std::path::Path,
+    environment: &BTreeMap<OsString, OsString>,
+) -> Result<Vec<PathBuf>, GitToolError> {
+    let directory = configured_path(values, b"core.hookspath", environment)?
+        .unwrap_or_else(|| common.join("hooks"));
+    let directory = if directory.is_absolute() {
+        directory
+    } else {
+        worktree.join(directory)
+    };
+    Ok(["reference-transaction", "pre-auto-gc"]
+        .into_iter()
+        .map(|name| directory.join(name))
+        .collect())
 }
 
 fn validate_fetch_external_effects(values: &Values) -> Result<(), GitToolError> {
@@ -2587,6 +2610,45 @@ mod tests {
                 .expect("refusal");
             assert!(error.to_string().contains("promisor remote"), "{error}");
         }
+    }
+
+    #[test]
+    fn child_pull_hook_paths_preserve_common_default_and_effective_worktree_override() {
+        let root = tempfile::tempdir().expect("fixture");
+        let source = root.path().join("config");
+        std::fs::write(&source, "").expect("source");
+        let common = root.path().join("common");
+        let worktree = root.path().join("effective-worktree");
+        let environment = BTreeMap::new();
+        let config = ChildConfig::capture(b"", root.path()).expect("empty config");
+        assert_eq!(
+            config
+                .pull_hook_paths(&common, &worktree, &environment)
+                .expect("defaults"),
+            [
+                common.join("hooks/reference-transaction"),
+                common.join("hooks/pre-auto-gc")
+            ]
+        );
+        let output = format!(
+            "file:{}\0core.hookspath\nrelative-hooks\0",
+            source.display()
+        );
+        let config = ChildConfig::capture(output.as_bytes(), root.path()).expect("override");
+        assert_eq!(
+            config
+                .pull_hook_paths(&common, &worktree, &environment)
+                .expect("relative"),
+            [
+                worktree.join("relative-hooks/reference-transaction"),
+                worktree.join("relative-hooks/pre-auto-gc")
+            ]
+        );
+        assert!(!common.exists());
+        assert!(
+            !worktree.exists(),
+            "path planning must not open hooks or their roots"
+        );
     }
 
     #[test]

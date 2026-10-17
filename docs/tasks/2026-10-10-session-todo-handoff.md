@@ -3526,3 +3526,19 @@ blocker. The initial new fixture lacked its configuration source file and was
 corrected before these runs. This closes a child preparation gap only; hooks,
 credentials, transport planning and actual child fetch remain open, as do all
 original T7 and handoff delivery requirements. Production Pull stays disabled.
+
+Child fetch hook checkpoint (2026-10-17): configuration discovery now publishes
+exact child fetch hook Read paths before inspecting contents. After effective
+worktree/root binding and path admission, all children share one deduplicated
+4 MiB hook content budget; retained evidence is rechecked on continuation.
+Executable hooks refuse instead of being silently disabled. Independent review
+found the inherited linked-worktree default-path bug: default hooks belong to
+common_dir/hooks, not private gitdir/hooks. Both parent and child now use that
+default; explicit relative hooksPath remains relative to the effective worktree.
+Real linked-child coverage refuses an executable common hook, and regressions
+cover missing exact hook authorization, later content changes, and path-only
+planning without reading targets. The Pull-focused suite passes 101/101 and
+independent follow-up review found no remaining blocker for this increment.
+Child fetch execution/transport credentials, recursive retries, parent integration,
+Windows input and all original runtime/publication/closure gates remain open.
+T7 remains Active and production Pull remains disabled.
