@@ -2,10 +2,10 @@
 
 ## Status
 
-Accepted contract proposal in #718; ineffective until target-main merge. Maintainer accepted
-the scope packet on2026-10-14 at14:50 Asia/Shanghai. This contract becomes effective only with
-finalized TEST-003/I302 atomic claim merge, independent protected
-native/security review, exact-head CI and CAS. It does not authorize implementation beforehand.
+Accepted and effective via #718 merge f4313237c4212e59f57202e22df2ed9b10f78681 after
+maintainer acceptance2026-10-14 at14:50 Asia/Shanghai, independent protected contract review
+6163000640, applicable exact-head CI3180 and CAS6163082933. This diagnostic contract does
+not establish native execution, original defect repair, TEST-003 completion or #716 merge readiness.
 
 ## Context
 
@@ -102,6 +102,20 @@ only with explicitly reviewed test contract/cleanup; preserve all failed history
 - [Snapshot free](https://learn.microsoft.com/en-us/windows/win32/api/processsnapshot/nf-processsnapshot-pssfreesnapshot)
 
 These specify ABI/data lifetime; no native PSS observation or root-cause result is claimed yet.
+
+## I302 Direct Lifecycle Control Clarification — 2026-10-16
+
+Same-scope mode7 may compare count intervals in an independently owned exact-test worker using
+only the existing ADR-068 Win32 call set. It bypasses Talos launcher bookkeeping: direct first
+pipe cleanup and two direct suspended process lifecycles, four count samples and no PSS. Preserve
+same command/flags/stdio allowlist/environment, outer Job containment, success-only handle adoption,
+initialized-only attribute deletion, stable borrowed list storage through Delete, checked all-
+operation cleanup and panic containment. Never assign/resume this control child. A real missing-cwd
+CreateProcessW failure fixture follows measurement. No new API/native feature/memory/otherPID or
+object identity probe, production change, threshold/warmup/skip or root-cause acceptance is implied.
+The unchanged original cold40/+2 worker remains authoritative. Counts and checked closes do not
+prove process exit/reaping, cache ownership or absence of leaks. Fresh protected review/full native
+CI remain required; this clarification adds no native permission beyond the existing lifecycle.
 
 ## Maintainer-Accepted TEST-004 Amendment — 2026-10-16
 

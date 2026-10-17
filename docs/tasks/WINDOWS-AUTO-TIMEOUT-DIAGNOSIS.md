@@ -1065,3 +1065,76 @@ projectgovernance attempt is BLOCKED/FAILED1error because cargo is absent when i
 consumer validator invokes metadata; delivery12fixtures pass. Prior tree's pinned metadata
 success is retained historical evidence, not relabeled as this candidate's fresh success.
 No merge until required exacthead CI/governance/security gates pass.
+
+## CI3222 Final Evidence And Intact-Identity Receipt — 2026-10-17
+
+CI3222/run39027455520 exact94e8531273e751eb2e119970d3a7673baeaa296b attempt1 SUCCESS:
+all8jobs, baseline60processes/1110passed/0failed/0ignored and instrumented60/1110/0/0,
+combined120processes/2220passed/0failed/0ignored. Artifact SHA256/CRC/extracted bytes verified:
+
+- baseline12099770323 (65files):143df807db4c6ff7992091fd3221784c1f53ef6291f5491e0cc319d35c256563;
+- instrumented12099192017 (67files):e293e7be9811dcba0e552dafb7a70b3a87d536206e6604e5fa8d320f5a4050c5.
+
+Both expire2026-10-31. Exacthead/image20261007.264.1/4CPU manifests match; all6normalized
+production source hashes and12rawWindows CRLF restoration receipts independently verified.
+Both event receipts are unavailable/events[] WITHOUT a selected child tuple. First-suite
+creation-return header is fragmented by parallel libtest stdout; first_child_window independently
+reproduces ambiguous-child rejection. Separate intact PID/lifetime lines MUST NOT be joined
+retroactively. Failure occurs before event query, so console-channel availability and the
+previous CI3220 creation-to-firstlogged600 interval remain untested by this run. No zero-event,
+zero-duration, provider-state or historical-cause conclusion is justified. Independent Agent
+read-only review APPROVE bounded completed evidence; receipt #705 comment6233549123. Shared
+account/Agent review is not distinct human approval.
+
+Next hypothesis: reducing cross-stream formatting fragments can allow a fresh intact identity
+record to reach the existing postmortem collector. The diagnostic overlay now emits one
+self-contained child_created receipt containing time/childPID/handle/parentPID/thread at the
+existing creation-return position, using a preformatted String with leading/trailing newline
+fences and one stderr-lock write_all. The successful postexit lifetime receipt uses the same
+writer. Lock lives only for that write; no new native API, policy, file, dependency or production
+behavior. One write_all is NOT an atomicity guarantee against stdout/OS writes; damaged records
+remain unavailable. No old log is repaired and no guessed tuple is queried.
+
+Parser requires exactly one complete new identity receipt in the source, one intact successful
+lifetime record, matching handle/parentPID, valid childPID, and receipt time within creation/exit.
+Duplicate records (including conflicting owner), fragments, wrongPID/handle, invalid time and
+old adjacent or fragmented schema are rejected. CRLF normalization remains the sole normalization.
+Newline-fenced records surrounded by unrelated test output pass. Existing classic and console
+query identities, allowlists, count/byte/time/owned-cleanup bounds and completion/restoration
+ordering stay unchanged. No retries, prewarm, ignored tests, threshold relaxation or changed
+Auto15s/cleanup10s/tool120s/evaluator5s/assertions. Rust1.99.0/dependencies/lock unchanged.
+
+Only the diagnostic boundary overlay changes (two receipt emissions and one small writer);
+other5generated Rust overlays are byteidentical to94e8531. Actual production sources and workflow
+are unchanged; same3diagnosticfiles versus main. Currentmainc817 and #716head198cb751 unchanged;
+I305 implementation remains separate owner, I301/I304 stay Complete/Closed. All prior failures,
+CI3222's unavailable-event outcome, evaluator/old10s/15s/Plugin uncertainty stay retained.
+No merge, release or overall timeout-root closure authorization. Exactcandidate independent
+technical/security review and native CI remain required. Local Cargo is still absent; no fresh
+pinnedRust/fullpreflight success claimed. Prior freshgovernance blocked at SQLite metadata remains
+an explicit local environment limitation, never relabeled as passing by the green CI result.
+
+Before publication, concurrent #716 merged main forward to
+b5b8241e2d8fa72d6e469bd96ccbdf54ff851c69. Synchronize that already-reviewed main wholesale,
+preserving its separately owned Search transport, I302/PSS/I305 tests, native source inventory,
+governance and dependency-feature state. This is baseline synchronization, not #705 authorship
+or takeover; #705 does not modify those implementations, acceptance predicates or new native
+sites. Historical CI3222 used oldc817 and is not relabeled as testing newmain. Old handle-count
+failures/assertions remain historical evidence even though the separate I305 owner has changed
+main's acceptance. No claim that all old main assertions still exist after that other PR.
+
+Threeway workflow merge preserves incoming installed-module evidence collection and keeps
+only the existing #705 job additions versus newmain. All27incoming changed files except the
+necessarily combined workflow must byte-match newmain. Both previous and current diagnostic
+probes apply to new production sources successfully; only the same boundary receipt writer and
+two emissions differ between those overlays; the other5overlays are identical. Fresh matrices
+compile/run Desktop tests; talos-tools cfg(test) native-inventory tests are not bypassed/edited
+there and remain covered on ORIGINAL restored/uninstrumented sources by the separate Windows
+workspace job. No fingerprint baseline is refreshed for a temporary probe. Native exacthead CI
+must confirm this compatibility; local selftest/classifier14/text23/claims0warnings and diffcheck
+pass do not constitute a new Windows execution. Local pinnedRust remains unavailable.
+An unfiltered instrumented talos-tools --lib run would intentionally fail the native source
+inventory because the temporary boundary differs; the optional exact controlled-fixture mode
+filters tests and proves no inventory acceptance. Do not bypass/update that guard. Existing
+fresh-phase Desktop matrices and separate uninstrumented full-workspace job remain the required
+path. Independent incoming-compatibility review confirms these cfg(test)/anchor limits.

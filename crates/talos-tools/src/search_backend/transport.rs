@@ -140,6 +140,63 @@ pub(super) struct SearchTransport {
     fixture_roots: Vec<reqwest::Certificate>,
 }
 
+#[derive(Clone, Copy)]
+enum BodyFormat {
+    Json,
+    Form,
+}
+
+impl BodyFormat {
+    fn content_type(self) -> &'static str {
+        match self {
+            Self::Json => "application/json",
+            Self::Form => "application/x-www-form-urlencoded",
+        }
+    }
+}
+
+fn encode_form(fields: &[(String, String)]) -> Result<Vec<u8>, TransportError> {
+    // Check exact serializer expansion before allocating the encoded body. Every pair
+    // costs '=' plus separators; even empty fields therefore have a bounded count.
+    if fields.len() > 8192 {
+        return Err(TransportError::InvalidRequest);
+    }
+    let mut length: usize = 0;
+    for (index, (name, value)) in fields.iter().enumerate() {
+        length = length
+            .checked_add(if index == 0 { 1 } else { 2 })
+            .filter(|n| *n <= 16_384)
+            .ok_or(TransportError::InvalidRequest)?;
+        for field in [name, value] {
+            if field.len() > 16_384 {
+                return Err(TransportError::InvalidRequest);
+            }
+            for byte in field.bytes() {
+                let size = if byte.is_ascii_alphanumeric()
+                    || matches!(byte, b'-' | b'_' | b'.' | b'*' | b' ')
+                {
+                    1
+                } else {
+                    3
+                };
+                length = length
+                    .checked_add(size)
+                    .filter(|n| *n <= 16_384)
+                    .ok_or(TransportError::InvalidRequest)?;
+            }
+        }
+    }
+    // This URL is solely an in-memory serializer container, never a destination.
+    let mut encoded =
+        Url::parse("https://form.invalid/").map_err(|_| TransportError::InvalidRequest)?;
+    encoded.query_pairs_mut().extend_pairs(
+        fields
+            .iter()
+            .map(|(name, value)| (name.as_str(), value.as_str())),
+    );
+    Ok(encoded.query().unwrap_or_default().as_bytes().to_vec())
+}
+
 impl SearchTransport {
     pub(super) fn new(
         manifest: ToolNetworkManifest,
@@ -214,6 +271,28 @@ impl SearchTransport {
         method: Method,
         body: Option<Vec<u8>>,
     ) -> Result<TransportResponse, TransportError> {
+        self.execute_formatted(url, method, body, BodyFormat::Json)
+            .await
+    }
+
+    pub(super) async fn execute_form(
+        &self,
+        url: Url,
+        fields: Vec<(String, String)>,
+    ) -> Result<TransportResponse, TransportError> {
+        self.budget.check_live()?;
+        let body = encode_form(&fields)?;
+        self.execute_formatted(url, Method::POST, Some(body), BodyFormat::Form)
+            .await
+    }
+
+    async fn execute_formatted(
+        &self,
+        url: Url,
+        method: Method,
+        body: Option<Vec<u8>>,
+        format: BodyFormat,
+    ) -> Result<TransportResponse, TransportError> {
         self.budget.check_live()?;
         if !matches!(method, Method::GET | Method::HEAD | Method::POST)
             || body.as_ref().is_some_and(|b| b.len() > 16_384)
@@ -221,9 +300,12 @@ impl SearchTransport {
         {
             return Err(TransportError::InvalidRequest);
         }
-        let result = timeout_at(self.budget.deadline, self.execute_inner(url, method, body))
-            .await
-            .map_err(|_| TransportError::Deadline)?;
+        let result = timeout_at(
+            self.budget.deadline,
+            self.execute_inner(url, method, body, format),
+        )
+        .await
+        .map_err(|_| TransportError::Deadline)?;
         self.budget.check_live()?;
         result
     }
@@ -233,6 +315,7 @@ impl SearchTransport {
         mut url: Url,
         method: Method,
         body: Option<Vec<u8>>,
+        format: BodyFormat,
     ) -> Result<TransportResponse, TransportError> {
         let mut redirects = 0;
         loop {
@@ -299,7 +382,7 @@ impl SearchTransport {
                 .header(reqwest::header::ACCEPT_ENCODING, "identity");
             if let Some(body) = body.as_ref() {
                 request = request
-                    .header(reqwest::header::CONTENT_TYPE, "application/json")
+                    .header(reqwest::header::CONTENT_TYPE, format.content_type())
                     .body(body.clone());
             }
             let request = request

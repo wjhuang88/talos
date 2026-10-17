@@ -291,6 +291,75 @@ jobs:
         timeout-minutes: 20
         shell: pwsh
         run: |
+          # I302: installed-file identities, not loaded-process/module observations.
+          # Keep the original tests running even if identity collection is incomplete.
+          $moduleEvidenceComplete = $true
+          foreach ($moduleName in @('kernelbase.dll', 'kernel32.dll', 'ntdll.dll')) {
+            $stream = $null
+            $hash = $null
+            $record = @{ file = $moduleName; phase = 'before_workspace_tests'; status = 'incomplete' }
+            try {
+              $modulePath = [IO.Path]::Combine([Environment]::SystemDirectory, $moduleName)
+              if (([IO.File]::GetAttributes($modulePath) -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+                throw 'unsupported file'
+              }
+              $stream = [IO.File]::Open($modulePath, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+              $limit = 32MB
+              if ($stream.Length -le 0 -or $stream.Length -ge $limit) { throw 'size limit' }
+              $expectedLength = $stream.Length
+              $hash = [Security.Cryptography.SHA256]::Create()
+              $buffer = [byte[]]::new(16384)
+              $header = [byte[]]::new(4096)
+              $headerCount = 0
+              $total = 0L
+              while ($total -lt $limit) {
+                $count = $stream.Read($buffer, 0, [int][Math]::Min($buffer.Length, $limit - $total))
+                if ($count -eq 0) { break }
+                $copyCount = [int][Math]::Min($count, $header.Length - $headerCount)
+                if ($copyCount -gt 0) {
+                  [Array]::Copy($buffer, 0, $header, $headerCount, $copyCount)
+                  $headerCount += $copyCount
+                }
+                $null = $hash.TransformBlock($buffer, 0, $count, $buffer, 0)
+                $total += $count
+              }
+              if ($total -ge $limit -or $total -ne $expectedLength -or $stream.Length -ne $expectedLength) {
+                throw 'incomplete identity'
+              }
+              $null = $hash.TransformFinalBlock([byte[]]::new(0), 0, 0)
+              # Decode only the symbol-store lookup fields from the hashed prefix.
+              if ($headerCount -lt 64 -or [BitConverter]::ToUInt16($header, 0) -ne 0x5a4d) {
+                throw 'unsupported DOS header'
+              }
+              $pe = [BitConverter]::ToInt32($header, 60)
+              if ($pe -lt 64 -or $pe -gt $headerCount - 88) { throw 'PE header outside prefix' }
+              if ([BitConverter]::ToUInt32($header, $pe) -ne 0x4550 -or
+                  [BitConverter]::ToUInt16($header, $pe + 4) -ne 0x8664) { throw 'unsupported PE header' }
+              $optionalSize = [BitConverter]::ToUInt16($header, $pe + 20)
+              if ($optionalSize -lt 112 -or $optionalSize -gt $headerCount - $pe - 24 -or
+                  [BitConverter]::ToUInt16($header, $pe + 24) -ne 0x20b) { throw 'unsupported optional header' }
+              $imageSize = [BitConverter]::ToUInt32($header, $pe + 80)
+              if ($imageSize -eq 0 -or $imageSize -gt 0x80000000L) { throw 'unsupported image size' }
+              $record = @{
+                file = $moduleName; phase = 'before_workspace_tests'; status = 'ok'; bytes = $total
+                sha256 = [BitConverter]::ToString($hash.Hash).Replace('-', '').ToLowerInvariant()
+                pe_timestamp = [BitConverter]::ToUInt32($header, $pe + 8); image_size = $imageSize
+              }
+            } catch {
+              # Do not disclose paths, exception bodies, bytes or environment contents.
+              $moduleEvidenceComplete = $false
+            } finally {
+              foreach ($resource in @($hash, $stream)) {
+                try {
+                  if ($null -ne $resource) { $resource.Dispose() }
+                } catch {
+                  $moduleEvidenceComplete = $false
+                  $record = @{ file = $moduleName; phase = 'before_workspace_tests'; status = 'incomplete' }
+                }
+              }
+            }
+            Write-Host ('I302_INSTALLED_MODULE ' + ($record | ConvertTo-Json -Compress))
+          }
           cargo test --workspace --locked --no-fail-fast 2>&1 | Tee-Object -FilePath windows-workspace-tests.log
           $testExit = $LASTEXITCODE
           if ($testExit -ne 0) {
@@ -298,6 +367,10 @@ jobs:
             Select-String -Path windows-workspace-tests.log -Pattern "FAILED|failures:|test result: FAILED|error: test failed|panicked at" -Context 3,8 |
               Tee-Object -FilePath windows-workspace-failures.log
             exit $testExit
+          }
+          if (-not $moduleEvidenceComplete) {
+            Write-Host 'I302 installed-module identity incomplete; workspace tests were still attempted.'
+            exit 1
           }
 
       - name: Upload Windows workspace failure logs

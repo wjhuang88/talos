@@ -50,15 +50,17 @@ def first_child_window(text: str) -> tuple[int, int, int]:
     created, exited, handle, parent = map(int, lifetime[0])
     if not 0 < parent <= 0xFFFFFFFF or not 0 < handle <= 0xFFFFFFFFFFFFFFFF:
         raise ValueError("invalid owner identity")
-    # An intact adjacent receipt is required; never repair interleaved identities.
-    children = re.findall(rf"^WINDOWS_AUTO_DIAG time=SystemTime \{{ intervals: \d+ \}} pid={parent} thread=ThreadId\(\d+\) stage=create_process_return identity={handle}\nWINDOWS_AUTO_DIAG child_pid=(\d+) identity={handle}$", text, re.M)
-    if len(children) != 1 or not 0 < int(children[0]) <= 0xFFFFFFFF:
+    # Require one complete self-contained owned-identity receipt. Never repair old fragments.
+    children = re.findall(r"^WINDOWS_AUTO_DIAG child_created time=SystemTime \{ intervals: (\d+) \} child_pid=(\d+) identity=(\d+) pid=(\d+) thread=ThreadId\(\d+\)$", text, re.M)
+    if (len(children) != 1 or not 0 < int(children[0][1]) <= 0xFFFFFFFF
+            or tuple(map(int, children[0][2:])) != (handle, parent)
+            or not created <= int(children[0][0]) <= exited):
         raise ValueError("ambiguous child")
     if not 0 < exited - created <= 90 * 10_000_000:
         raise ValueError("unsupported lifetime")
     filetime_text(created)
     filetime_text(exited)
-    return int(children[0]), created, exited
+    return int(children[0][1]), created, exited
 
 
 def lifecycle_query(child: int, created: int, exited: int, *, console: bool = False) -> str:
@@ -167,13 +169,18 @@ def lifecycle_self_test() -> None:
     from unittest.mock import patch
 
     created, exited = 134366156919094391, 134366157056455513
-    source = ("WINDOWS_AUTO_DIAG time=SystemTime { intervals: 134366156919112821 } pid=8892 thread=ThreadId(69) stage=create_process_return identity=608\n"
-              "WINDOWS_AUTO_DIAG child_pid=3400 identity=608\n"
+    source = ("WINDOWS_AUTO_DIAG child_created time=SystemTime { intervals: 134366156919112821 } child_pid=3400 identity=608 pid=8892 thread=ThreadId(69)\n"
               f"WINDOWS_AUTO_DIAG lifetime_read_ok=1 created_100ns={created} exited_100ns={exited} identity=608 pid=8892 thread=ThreadId(135)\n")
     assert first_child_window(source) == (3400, created, exited)
     assert first_child_window(source.replace("\n", "\r\n")) == (3400, created, exited)
+    assert first_child_window("test other ... ok" + "\n" + source + "\ntest other ... ok\n") == (3400, created, exited)
     for bad in (source + source, source.replace("child_pid=3400", "child_pid=0"),
-                source.replace("identity=608\nWINDOWS_AUTO_DIAG child", "identity=608\ninterleaved\nWINDOWS_AUTO_DIAG child")):
+                source.replace("child_pid=3400 identity=608", "child_pid=3400\ninterleaved\nidentity=608"),
+                source.replace("pid=8892 thread=ThreadId(69)", "pid=8893 thread=ThreadId(69)"),
+                source.replace("134366156919112821", "134366156919094390"),
+                source.replace("134366156919112821", str(exited + 1)),
+                source.replace("identity=608 pid=8892 thread=ThreadId(69)", "identity=609 pid=8892 thread=ThreadId(69)"),
+                source + source.split("\n", 1)[0].replace("pid=8892", "pid=8893") + "\n"):
         for candidate in (bad, bad.replace("\n", "\r\n")):
             try:
                 first_child_window(candidate)
@@ -181,6 +188,15 @@ def lifecycle_self_test() -> None:
                 pass
             else:
                 raise AssertionError("ambiguous child must be rejected")
+    legacy = ("WINDOWS_AUTO_DIAG time=SystemTime { intervals: 134366156919112821 } pid=8892 thread=ThreadId(69) stage=create_process_return identity=608\n"
+              "WINDOWS_AUTO_DIAG child_pid=3400 identity=608\n" + source.split("\n", 1)[1])
+    for candidate in (legacy, legacy.replace(" } pid=8892", "test other ... ok } pid=\n8892")):
+        try:
+            first_child_window(candidate)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("legacy or fragmented identity must not be reconstructed")
     stamp = filetime_text(created + 1)
     assert stamp == "2026-10-16T09:14:51.9094392Z"
     xml = (f'<Events><Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System>'
@@ -395,6 +411,15 @@ fn windows_auto_probe(stage: &str, identity: usize) {
 }
 
 '''
+    helper += '''#[cfg(windows)]
+fn windows_auto_identity_receipt(receipt: String) {
+    use std::io::Write as _;
+    // One preformatted buffer reduces cross-stream formatting fragments. Still reject any damaged receipt.
+    let framed = format!("\\n{receipt}\\n");
+    let _ = std::io::stderr().lock().write_all(framed.as_bytes());
+}
+
+'''
     boundary = replace_once(boundary, "/// Windows Job Object launcher implementing ADR-068's assigned-before-resume boundary.", helper + "/// Windows Job Object launcher implementing ADR-068's assigned-before-resume boundary.")
     for old, new in [
         ("        let launched = create_windows_job(&self.program, &self.args, &self.cwd, &self.env)?;", "        windows_auto_probe(\"launch_enter\", 0);\n        let launched = create_windows_job(&self.program, &self.args, &self.cwd, &self.env)?;\n        windows_auto_probe(\"launch_return\", launched.process as usize);"),
@@ -417,7 +442,7 @@ fn windows_auto_probe(stage: &str, identity: usize) {
                     eprintln!("WINDOWS_AUTO_DIAG times_read_ok={} kernel_100ns={} user_100ns={} identity={}", times_read_ok, ticks(kernel), ticks(user), process as usize);
                     // Exit FILETIME is undefined until exit; only use a successful read after a signaled wait.
                     if observed == windows_sys::Win32::Foundation::WAIT_OBJECT_0 && times_read_ok != 0 {
-                        eprintln!("WINDOWS_AUTO_DIAG lifetime_read_ok=1 created_100ns={} exited_100ns={} identity={} pid={} thread={:?}", ticks(created), ticks(exited), process as usize, std::process::id(), std::thread::current().id());
+                        windows_auto_identity_receipt(format!("WINDOWS_AUTO_DIAG lifetime_read_ok=1 created_100ns={} exited_100ns={} identity={} pid={} thread={:?}", ticks(created), ticks(exited), process as usize, std::process::id(), std::thread::current().id()));
                     }
                     let mut io = windows_sys::Win32::System::Threading::IO_COUNTERS {
                         ReadOperationCount: 0, WriteOperationCount: 0, OtherOperationCount: 0,
@@ -436,7 +461,7 @@ fn windows_auto_probe(stage: &str, identity: usize) {
         ("        if count == 0 {\n            return Ok(());\n        }", "        windows_auto_probe(match stream { BackgroundOutputStream::Stdout => \"stdout_read_return\", BackgroundOutputStream::Stderr => \"stderr_read_return\" }, process);\n        eprintln!(\"WINDOWS_AUTO_DIAG bytes={} identity={} stream={:?}\", count, process, stream);\n        if count == 0 {\n            return Ok(());\n        }"),
         ("    sender: tokio::sync::mpsc::Sender<BackgroundProcessEvent>,\n) -> Result<(), String> {", "    sender: tokio::sync::mpsc::Sender<BackgroundProcessEvent>,\n    process: usize,\n) -> Result<(), String> {"),
         ("        if CreateProcessW(", "        windows_auto_probe(\"create_process_enter\", 0);\n        if CreateProcessW("),
-        ("        process = info.hProcess;", "        windows_auto_probe(\"create_process_return\", info.hProcess as usize);\n        eprintln!(\"WINDOWS_AUTO_DIAG child_pid={} identity={}\", info.dwProcessId, info.hProcess as usize);\n        process = info.hProcess;"),
+        ("        process = info.hProcess;", "        windows_auto_probe(\"create_process_return\", info.hProcess as usize);\n        windows_auto_identity_receipt(format!(\"WINDOWS_AUTO_DIAG child_created time={:?} child_pid={} identity={} pid={} thread={:?}\", std::time::SystemTime::now(), info.dwProcessId, info.hProcess as usize, std::process::id(), std::thread::current().id()));\n        process = info.hProcess;"),
         ("        CloseHandle(thread);\n        thread =", "        windows_auto_probe(\"assigned_and_resumed\", process as usize);\n        CloseHandle(thread);\n        thread ="),
     ]:
         boundary = replace_once(boundary, old, new)
@@ -791,6 +816,9 @@ def main() -> int:
         assert patched[BOUNDARY].count("GetProcessTimes(process,") == 1
         assert patched[BOUNDARY].count("if observed == windows_sys::Win32::Foundation::WAIT_OBJECT_0 && times_read_ok != 0 {") == 1
         assert patched[BOUNDARY].count("lifetime_read_ok=1 created_100ns={}") == 1
+        assert patched[BOUNDARY].count("WINDOWS_AUTO_DIAG child_created time={:?}") == 1
+        assert patched[BOUNDARY].count("std::io::stderr().lock().write_all(framed.as_bytes())") == 1
+        assert patched[BOUNDARY].count("windows_auto_identity_receipt(format!(") == 2
         assert patched[BOUNDARY].count("GetProcessIoCounters(process, &mut io)") == 1
         assert "let io_error = if io_read_ok == 0 { windows_sys::Win32::Foundation::GetLastError() } else { 0 };" in patched[BOUNDARY]
         assert all(field + ": 0" in patched[BOUNDARY] for field in (
