@@ -3604,3 +3604,60 @@ fall back to the parent's modules/name gitdir without a worktree; the current
 Root-based child admission does not yet implement this behavior. That fallback
 requires separately admitted metadata identity rather than a fabricated
 worktree binding. All original T7 activation and handoff closure gates remain.
+
+Relative backlink resolver work-in-progress (2026-10-18): the uncommitted
+pull_inventory.rs change supports ParentDir in a missing checkout suffix.
+After each missing-component cancellation it immediately resolves the remaining
+path again, preserving existing symlink semantics and retaining every ancestor
+identity. An iterative loop avoids path-controlled recursion. Independent
+review caught an earlier interleaved symlink/ParentDir error; the latest
+correction was re-reviewed without a remaining blocker. A native Git worktree
+list fixture confirms the relative missing/../link/../checkout backlink maps to
+actual/checkout when link points to actual/nested; absolute backlinks retain
+their separate existing behavior. Added tests cover simple cancellation,
+existing and newly exposed symlinks, exact admission and directory replacement.
+The first focused Cargo command omitted the Git feature and ran zero tests;
+it is not validation evidence. All-feature focused tests (session 73693) and
+the complete inventory module tests (session 17590) are queued behind standard
+preflight (session 93128). Logs respectively:
+/tmp/talos-i300-forgiving-target-all-features.log,
+/tmp/talos-i300-forgiving-inventory.log,
+/tmp/talos-i300-rebased-preflight-compact.log. Do not commit the resolver as
+validated until these tests and affected Clippy checks have actually passed.
+
+Resolver validation follow-up (2026-10-18): all-feature focused tests passed
+5/5, but the complete inventory suite exposed the inherited receiver syntax
+guard rejecting the new relative checkout backlink before resolution. The
+correction exempts only checkout gitdir backlinks from that receiver-specific
+guard; commondir retains the strict rule and every checkout target still needs
+exact normalized-path admission. The complete inventory suite now passes 27/27,
+including the interleaved backlink admission/replacement regression; formatting
+passes. Latest log: /tmp/talos-i300-forgiving-inventory-final.log. Affected
+all-feature/all-target Clippy and final security follow-up remain in progress;
+standard workspace preflight is still running. This supersedes the earlier
+queued-test state without claiming T7 completion.
+
+Real authorization follow-up (2026-10-18): affected all-target/all-feature
+Clippy passed. Inspection of talos-core normalize_authorized_path confirms it
+normalizes ParentDir lexically before filesystem canonicalization; interleaved
+symlink backlinks may therefore disagree with Git resolution. The resolver
+continues to refuse such mismatched authorization, and a regression now uses
+the real normalizer to assert that refusal. This is a remaining compatibility
+gap, not a completed ordinary runtime path. The full workspace preflight ended
+with three tools failures: the earlier pre-correction backlink test binary and
+two native_inventory baseline checks. The four protected source files were
+compared with origin/main 891f6c49; only process_boundary.rs differs, by shell
+feature cfg gates. Independent protected-source review is requested before any
+fingerprint update. Latest focused log:
+/tmp/talos-i300-forgiving-real-normalizer.log. Full preflight must be rerun
+after corrections; no full-suite success is claimed.
+
+Protected-source review follow-up (2026-10-18): independent reviewer
+/root/review_prepared confirmed only shell feature gates changed in
+process_boundary.rs relative to 891f6c49; native operation bodies, arguments,
+resource transfers and cleanup are unchanged. Refreshed that file's fingerprint
+only. All three native_inventory tests pass with --locked and --all-features.
+This does not establish Windows runtime evidence. Corrected standard preflight
+is running as session 76149; log:
+/tmp/talos-i300-rebased-preflight-corrected.log. The real-normalizer compatibility
+gap remains open; production Pull remains disabled.
