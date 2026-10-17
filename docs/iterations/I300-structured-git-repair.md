@@ -3800,6 +3800,16 @@ semantics, child transport/retries, recursive fetch, parent integration,
 eight-stage runner reachability and final delivery gates remain open.
 Production Pull remains disabled; I300/T7 and the handoff stay incomplete.
 
+Linked-worktree reference closure update (2026-10-17): independently admitted
+common targets now publish exact `refs`/`packed-refs` frontiers before descendant
+access. External reference bytes share the existing 4096-entry/4 MiB evidence
+budget. Main `common/config.worktree` and registered worktree fallback
+`packed-refs` contents are also bound. Locked Pull tests pass 90/90; all-target,
+all-feature Clippy passes with warnings denied. Independent final review found
+no new blocker after the fallback packed-refs correction;
+missing-relative target compatibility and the remaining object, transport,
+integration, runner and delivery requirements remain open. Pull stays disabled.
+
 Linked-worktree target admission update (2026-10-17): raw targets parsed from
 retained pointer bytes receive new exact Read facets and a fresh plan identity
 before resolution. Binding checks all grants first, verifies canonical versus

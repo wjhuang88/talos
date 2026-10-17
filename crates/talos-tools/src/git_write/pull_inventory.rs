@@ -2,7 +2,7 @@
 //! every frontier before inspection, either by exact paths or the dedicated
 //! identity-bound metadata scope. Neither mode permits traversing links.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use super::{GitToolError, snapshot::PathIdentity};
@@ -15,6 +15,8 @@ pub(super) struct Inventory {
     alternates: Vec<(PathBuf, super::snapshot::RegularEvidence)>,
     references: Vec<(PathBuf, super::snapshot::RegularEvidence)>,
     worktree_targets: BTreeMap<PathBuf, Option<PathIdentity>>,
+    worktree_common_targets: BTreeSet<PathBuf>,
+    worktree_reference_roots: BTreeSet<PathBuf>,
 }
 
 fn invalid() -> GitToolError {
@@ -36,6 +38,7 @@ impl Inventory {
                 "shallow",
                 "packed-refs",
                 "worktrees",
+                "config.worktree",
             ] {
                 pending.push(root.join(name));
             }
@@ -49,6 +52,8 @@ impl Inventory {
             alternates: Vec::new(),
             references: Vec::new(),
             worktree_targets: BTreeMap::new(),
+            worktree_common_targets: BTreeSet::new(),
+            worktree_reference_roots: BTreeSet::new(),
         }
     }
 
@@ -121,7 +126,7 @@ impl Inventory {
         Ok(())
     }
 
-    /// Bind references, linked-worktree pointers and shallow/graft boundaries,
+    /// Bind references, linked-worktree pointers/config and shallow/graft boundaries,
     /// including symbolic replacement refs, under one shared evidence budget,
     /// without recursively opening descendants absent from the admitted inventory.
     pub(super) fn bind_references(
@@ -139,25 +144,35 @@ impl Inventory {
         };
         let mut evidence = Vec::new();
         for (path, identity) in &self.visited {
-            let reference = [gitdir, common].iter().any(|root| {
-                path.starts_with(root.join("refs"))
-                    || path == &root.join("packed-refs")
-                    || path == &root.join("HEAD")
-            }) || path
-                .strip_prefix(common.join("worktrees"))
-                .ok()
-                .is_some_and(|relative| {
-                    // Linked worktree refs are per-worktree roots for --all.
-                    // The first component is the registered worktree identifier.
-                    let mut components = relative.components();
-                    components.next().is_some()
-                        && components.next().is_some_and(|name| {
-                            name.as_os_str() == "HEAD" || name.as_os_str() == "refs"
-                        })
-                });
+            let reference = [gitdir, common]
+                .into_iter()
+                .chain(self.worktree_reference_roots.iter().map(PathBuf::as_path))
+                .any(|root| {
+                    path.starts_with(root.join("refs"))
+                        || path == &root.join("packed-refs")
+                        || path == &root.join("HEAD")
+                })
+                || path
+                    .strip_prefix(common.join("worktrees"))
+                    .ok()
+                    .is_some_and(|relative| {
+                        // Linked worktree refs are per-worktree roots for --all.
+                        // The first component is the registered worktree identifier.
+                        let mut components = relative.components();
+                        components.next().is_some()
+                            && components.next().is_some_and(|name| {
+                                matches!(
+                                    name.as_os_str().to_str(),
+                                    Some("HEAD" | "refs" | "packed-refs")
+                                )
+                            })
+                    });
             let boundary = [gitdir, common]
                 .iter()
                 .any(|root| path == &root.join("shallow") || path == &root.join("info/grafts"));
+            // get_worktrees() checks the main worktree's core.bare separately
+            // even when its config.worktree is absent from the current chain.
+            let worktree_config = path == &common.join("config.worktree");
             let pointer = path
                 .strip_prefix(common.join("worktrees"))
                 .ok()
@@ -169,7 +184,7 @@ impl Inventory {
                         })
                         && components.next().is_none()
                 });
-            if (reference || boundary || pointer)
+            if (reference || boundary || pointer || worktree_config)
                 && identity.is_some()
                 && !self.directories.contains_key(path)
             {
@@ -231,6 +246,9 @@ impl Inventory {
                 continue;
             }
             let target = path.parent().ok_or_else(invalid)?.join(text);
+            if !gitdir {
+                self.worktree_common_targets.insert(target.clone());
+            }
             if !self.worktree_targets.contains_key(&target) {
                 if self.visited.len() + self.worktree_targets.len() >= 4096 {
                     return Err(invalid());
@@ -246,7 +264,7 @@ impl Inventory {
     pub(super) fn bind_worktree_targets(
         &mut self,
         admitted: impl Fn(&Path) -> Option<PathBuf>,
-    ) -> Result<(), GitToolError> {
+    ) -> Result<bool, GitToolError> {
         // Check all admissions before touching any newly discovered target.
         let mappings = self
             .worktree_targets
@@ -266,7 +284,28 @@ impl Inventory {
                 *identity = Some(PathIdentity::capture(path).map_err(|_| invalid())?);
             }
         }
-        self.revalidate()
+        self.revalidate()?;
+        // Resolving a common directory does not grant access to its reference
+        // store. Publish only names here; the next advance requires fresh grants
+        // before inspecting their type, contents, or descendants.
+        let mut added = false;
+        for raw in &self.worktree_common_targets {
+            let root = &mappings[raw];
+            self.worktree_reference_roots.insert(root.clone());
+            for name in ["refs", "packed-refs"] {
+                let path = root.join(name);
+                if !self.visited.contains_key(&path) && !self.pending.contains(&path) {
+                    if self.visited.len() + self.pending.len() + self.worktree_targets.len() >= 4096
+                    {
+                        return Err(invalid());
+                    }
+                    self.pending.push(path);
+                    added = true;
+                }
+            }
+        }
+        self.pending.sort();
+        Ok(added)
     }
 
     /// Bind object-store redirects only after the complete frontier was admitted.
@@ -387,6 +426,27 @@ mod tests {
     use super::*;
 
     #[test]
+    fn main_worktree_config_is_bound_outside_the_current_config_chain() {
+        let temp = tempfile::tempdir().expect("repo");
+        let common = temp.path().canonicalize().expect("common");
+        let gitdir = common.join("worktrees/current");
+        std::fs::create_dir_all(&gitdir).expect("linked gitdir");
+        let config = common.join("config.worktree");
+        std::fs::write(&config, "[core]\n bare = true\n").expect("main config");
+        let mut inventory = Inventory::new(&gitdir, &common);
+        assert!(inventory.advance(|path| path != config).is_err());
+        while !inventory.complete() {
+            inventory.advance(|_| true).expect("admitted frontier");
+        }
+        inventory
+            .bind_references(&gitdir, &common)
+            .expect("evidence");
+        assert!(inventory.references.iter().any(|(path, _)| path == &config));
+        std::fs::write(&config, "[core]\n bare = false\n").expect("edit main config");
+        assert!(inventory.revalidate().is_err());
+    }
+
+    #[test]
     fn linked_pointer_targets_wait_for_fresh_admission() {
         let temp = tempfile::tempdir().expect("fixture");
         let root = temp.path().canonicalize().expect("root");
@@ -478,8 +538,82 @@ mod tests {
     }
 
     #[test]
+    fn linked_worktree_common_refs_get_a_separate_frontier() {
+        let repo = tempfile::tempdir().expect("repo");
+        let repo = repo.path().canonicalize().expect("canonical repo");
+        let external = tempfile::tempdir().expect("external common dir");
+        let external = external.path().canonicalize().expect("canonical external");
+        std::fs::create_dir_all(repo.join("checkout")).expect("checkout");
+        std::fs::create_dir_all(repo.join("worktrees/linked")).expect("registration");
+        std::fs::create_dir_all(external.join("refs/heads")).expect("external refs");
+        std::fs::write(
+            repo.join("worktrees/linked/gitdir"),
+            "../../checkout/.git\n",
+        )
+        .expect("backlink");
+        std::fs::write(
+            repo.join("worktrees/linked/commondir"),
+            format!("{}\n", external.display()),
+        )
+        .expect("common pointer");
+        let private_ref = external.join("refs/heads/external-only");
+        std::fs::write(&private_ref, "0123456789012345678901234567890123456789\n")
+            .expect("external ref");
+
+        let mut inventory = Inventory::new(&repo, &repo);
+        while !inventory.complete() {
+            inventory.advance(|_| true).expect("repo frontier");
+        }
+        inventory
+            .bind_references(&repo, &repo)
+            .expect("repo evidence");
+        assert!(
+            inventory
+                .discover_worktree_targets(&repo)
+                .expect("raw targets")
+        );
+        assert!(
+            inventory
+                .bind_worktree_targets(|path| path.canonicalize().ok())
+                .expect("target binding and fresh frontier")
+        );
+        let external_refs = external.join("refs");
+        let external_packed_refs = external.join("packed-refs");
+        assert!(inventory.pending.contains(&external_refs));
+        assert!(inventory.pending.contains(&external_packed_refs));
+
+        // The external descendants cannot be inspected using the old frontier.
+        assert!(
+            inventory
+                .advance(|path| !path.starts_with(&external))
+                .is_err()
+        );
+        assert!(inventory.advance(|_| true).is_ok());
+        while !inventory.complete() {
+            inventory.advance(|_| true).expect("external ref frontier");
+        }
+        inventory
+            .bind_references(&repo, &repo)
+            .expect("external evidence");
+        assert!(inventory.references.iter().any(|(path, evidence)| {
+            path == &private_ref
+                && matches!(&evidence.entry, super::super::snapshot::Entry::File(_, bytes)
+                    if bytes == b"0123456789012345678901234567890123456789\n")
+        }));
+        std::fs::write(&private_ref, "fedcba9876543210fedcba9876543210fedcba98\n")
+            .expect("replace ref contents");
+        assert!(inventory.revalidate().is_err());
+    }
+
+    #[test]
     fn linked_worktree_references_require_admission_and_retain_contents() {
-        for leaf in ["HEAD", "refs/heads/private", "gitdir", "commondir"] {
+        for leaf in [
+            "HEAD",
+            "refs/heads/private",
+            "packed-refs",
+            "gitdir",
+            "commondir",
+        ] {
             let temp = tempfile::tempdir().expect("fixture");
             let root = temp.path().canonicalize().expect("root");
             let path = root.join("worktrees/linked").join(leaf);
