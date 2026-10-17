@@ -12,6 +12,7 @@ pub(super) struct Inventory {
     pending: Vec<PathBuf>,
     visited: BTreeMap<PathBuf, Option<PathIdentity>>,
     directories: BTreeMap<PathBuf, Vec<PathBuf>>,
+    alternates: Vec<(PathBuf, super::snapshot::RegularEvidence)>,
 }
 
 fn invalid() -> GitToolError {
@@ -42,6 +43,7 @@ impl Inventory {
             pending,
             visited: BTreeMap::new(),
             directories: BTreeMap::new(),
+            alternates: Vec::new(),
         }
     }
 
@@ -79,7 +81,64 @@ impl Inventory {
                 return Err(invalid());
             }
         }
+        let mut budget = super::snapshot::Budget {
+            entries: 4,
+            bytes: 256 * 1024,
+        };
+        for (path, expected) in &self.alternates {
+            if &super::snapshot::RegularEvidence::capture(path, &mut budget)
+                .map_err(|_| invalid())?
+                != expected
+            {
+                return Err(invalid());
+            }
+        }
         Ok(())
+    }
+
+    /// Bind object-store redirects only after the complete frontier was admitted.
+    /// Missing leaves are proved by the retained parent directory listing, so
+    /// an absent, unadmitted descendant is never opened or stat'ed here.
+    pub(super) fn bind_alternates(
+        &mut self,
+        gitdir: &Path,
+        common: &Path,
+    ) -> Result<(), GitToolError> {
+        if !self.complete() {
+            return Err(invalid());
+        }
+        self.revalidate()?;
+        let mut paths = Vec::new();
+        for root in [gitdir, common] {
+            if !self.subtree_complete(&root.join("objects")) {
+                return Err(invalid());
+            }
+            for name in ["alternates", "http-alternates"] {
+                let path = root.join("objects/info").join(name);
+                if self.visited.get(&path).is_some_and(Option::is_some) && !paths.contains(&path) {
+                    paths.push(path);
+                }
+            }
+        }
+        let mut budget = super::snapshot::Budget {
+            entries: 4,
+            bytes: 256 * 1024,
+        };
+        let mut evidence = Vec::new();
+        for path in paths {
+            let entry = super::snapshot::RegularEvidence::capture(&path, &mut budget)
+                .map_err(|_| invalid())?;
+            if !matches!(&entry.entry, super::snapshot::Entry::File(_, bytes) if bytes.is_empty()) {
+                return Err(GitToolError::InvalidInput(
+                    "Pull child alternate object stores require separate discovery and admission"
+                        .into(),
+                ));
+            }
+            evidence.push((path, entry));
+        }
+        self.revalidate()?;
+        self.alternates = evidence;
+        self.revalidate()
     }
 
     pub(super) fn advance(&mut self, admitted: impl Fn(&Path) -> bool) -> Result<(), GitToolError> {
@@ -228,6 +287,51 @@ mod tests {
         assert!(inventory.subtree_complete(&root.join("objects")));
         assert!(inventory.complete());
         std::fs::write(root.join("shallow"), b"new").expect("new leaf");
+        assert!(inventory.revalidate().is_err());
+    }
+
+    #[test]
+    fn child_alternates_wait_for_inventory_and_bind_in_place_changes() {
+        let temp = tempfile::tempdir().expect("fixture");
+        let root = temp.path().canonicalize().expect("root");
+        std::fs::create_dir_all(root.join("objects/info")).expect("objects");
+        let path = root.join("objects/info/alternates");
+        std::fs::write(&path, b"").expect("empty");
+        let mut inventory = Inventory::new(&root, &root);
+        assert!(inventory.bind_alternates(&root, &root).is_err());
+        while !inventory.complete() {
+            inventory.advance(|_| true).expect("admitted frontier");
+        }
+        inventory
+            .bind_alternates(&root, &root)
+            .expect("empty alternates");
+        std::fs::write(&path, b"/unadmitted/object/store\n").expect("redirect");
+        assert!(inventory.revalidate().is_err());
+        let mut changed = Inventory::new(&root, &root);
+        while !changed.complete() {
+            changed.advance(|_| true).expect("admitted frontier");
+        }
+        assert!(changed.bind_alternates(&root, &root).is_err());
+    }
+
+    #[test]
+    fn child_absent_alternates_are_bound_by_directory_listing() {
+        let temp = tempfile::tempdir().expect("fixture");
+        let root = temp.path().canonicalize().expect("root");
+        std::fs::create_dir_all(root.join("objects/info")).expect("objects");
+        let mut inventory = Inventory::new(&root, &root);
+        while !inventory.complete() {
+            inventory.advance(|_| true).expect("admitted frontier");
+        }
+        inventory
+            .bind_alternates(&root, &root)
+            .expect("absent alternates");
+        assert!(inventory.alternates.is_empty());
+        std::fs::write(
+            root.join("objects/info/http-alternates"),
+            b"http://unadmitted.invalid\n",
+        )
+        .expect("new redirect");
         assert!(inventory.revalidate().is_err());
     }
 
