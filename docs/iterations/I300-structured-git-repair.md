@@ -4069,3 +4069,17 @@ changed replacement metadata, so those fixtures prepare new evidence first.
 Non-Unix supervised input currently refuses explicitly; Windows support remains
 required. Production Pull remains disabled and all original closure gates and
 later handoff tasks remain open.
+
+Child reachability checkpoint (2026-10-17): the child probe now follows native
+submodule_has_commits with exact commit-type/presence checking followed by
+rev-list -n 1 --stdin --not --all. Missing or unreachable commits return false;
+nonzero traversal status follows native false semantics while owned execution
+failures remain errors. Two probes are not an atomic graph snapshot and the
+result is discarded in discovery; the future fetch consumer must freshly probe.
+A shared child command builder keeps cwd/gitdir/worktree/environment consistent.
+Real Git coverage includes reachable, orphaned, mixed and missing OIDs plus an
+orphan made reachable solely by a linked worktree's detached HEAD. All 100 locked
+Pull tests and all-target/all-feature Clippy pass; independent review found no
+blocker. This prepares fetch selection but does not yet change fetch behavior.
+Child fetch/retries, parent integration, Windows input, complete runner evidence
+and all original T7/handoff closure gates remain open.
