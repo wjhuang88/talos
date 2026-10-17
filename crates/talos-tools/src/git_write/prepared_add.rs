@@ -1835,6 +1835,41 @@ impl AddPlan {
         paths
     }
 
+    fn pull_child_name(&self, workdir: &Path) -> Option<&str> {
+        if let Some(path) = self
+            .pull_current_fetch_children
+            .keys()
+            .find(|path| self.repository.workdir.join(path) == workdir)
+        {
+            return self
+                .pull_current_modules
+                .as_ref()?
+                .module_names
+                .get(path)
+                .map(String::as_str);
+        }
+        self.pull_changed_children
+            .iter()
+            .find(|(_, child)| self.repository.workdir.join(&child.path) == workdir)
+            .map(|(name, _)| name.as_str())
+    }
+
+    fn pull_child_objects(&self, workdir: &Path) -> Vec<String> {
+        let name = self.pull_child_name(workdir);
+        self.pull_changed_children
+            .iter()
+            .filter(|(key, child)| {
+                name.map_or_else(
+                    || self.repository.workdir.join(&child.path) == workdir,
+                    |name| key.as_str() == name,
+                )
+            })
+            .flat_map(|(_, child)| child.objects.iter().cloned())
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
+            .collect()
+    }
+
     fn select_pull_child_identity(&mut self) -> Result<(), GitToolError> {
         let paths = self.selected_pull_child_paths();
         for path in &paths {
@@ -1866,7 +1901,12 @@ impl AddPlan {
         if !self.pull_child_layouts.is_empty() {
             return self.discover_pull_child_metadata(authorizations);
         }
+        let mut seen = std::collections::BTreeSet::new();
         for path in self.selected_pull_child_paths() {
+            let name = self.pull_child_name(&path).map(str::to_owned);
+            if name.as_ref().is_some_and(|name| seen.contains(name)) {
+                continue;
+            }
             let marker = path.join(".git");
             for candidate in [&path, &marker] {
                 self.child_read(candidate, authorizations)?;
@@ -1890,6 +1930,9 @@ impl AddPlan {
                 )?);
             }
             self.pull_child_layouts.push((layout, None));
+            if let Some(name) = name {
+                seen.insert(name);
+            }
         }
         self.identity = PreparedPlanIdentity::new();
         Ok(self)
@@ -2469,20 +2512,15 @@ impl AddPlan {
             let (worktree, _) = self.pull_child_worktrees.get(workdir).ok_or_else(|| {
                 GitToolError::InvalidInput("Pull child effective worktree missing".into())
             })?;
-            let objects = self
-                .pull_changed_children
-                .values()
-                .filter(|child| self.repository.workdir.join(&child.path) == *workdir)
-                .flat_map(|child| child.objects.iter().cloned())
-                .collect::<std::collections::BTreeSet<_>>()
-                .into_iter()
-                .collect::<Vec<_>>();
+            let objects = self.pull_child_objects(workdir);
             let unconditional = self.pull_current_fetch_children.iter().any(|(path, mode)| {
                 self.repository.workdir.join(path) == *workdir
                     && *mode == super::pull_children::Recursion::On
-            }) || self.pull_changed_children.values().any(|child| {
-                self.repository.workdir.join(&child.path) == *workdir
-                    && child.effective_recursion == Some(super::pull_children::Recursion::On)
+            }) || self.pull_changed_children.iter().any(|(name, child)| {
+                self.pull_child_name(workdir).map_or_else(
+                    || self.repository.workdir.join(&child.path) == *workdir,
+                    |selected| selected == name,
+                ) && child.effective_recursion == Some(super::pull_children::Recursion::On)
             });
             // Never use discovery's presence result across the write approval.
             if !unconditional
@@ -2557,14 +2595,7 @@ impl AddPlan {
 
     async fn validate_pull_child_object_types(&self) -> Result<(), GitToolError> {
         for (workdir, location) in &self.child_locations {
-            let objects: Vec<_> = self
-                .pull_changed_children
-                .values()
-                .filter(|child| self.repository.workdir.join(&child.path) == *workdir)
-                .flat_map(|child| child.objects.iter().cloned())
-                .collect::<std::collections::BTreeSet<_>>()
-                .into_iter()
-                .collect();
+            let objects = self.pull_child_objects(workdir);
             let (worktree, _) = self.pull_child_worktrees.get(workdir).ok_or_else(|| {
                 GitToolError::InvalidInput("Pull child effective worktree missing".into())
             })?;
@@ -13015,6 +13046,71 @@ pub(super) mod tests {
     }
 
     #[tokio::test]
+    async fn pull_initialized_current_child_suppresses_same_historical_name() {
+        for historical_name in ["renamed", "Renamed"] {
+            let root = fixture();
+            assert!(
+                std::process::Command::new("git")
+                    .current_dir(root.path())
+                    .args(["init", "current"])
+                    .status()
+                    .expect("child init")
+                    .success()
+            );
+            let mut plan = Box::new(
+                AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+                    .expect("plan"),
+            )
+            .discover()
+            .await
+            .expect("config");
+            let mut modules = super::super::pull_children::Tree::parse(b"", 40).expect("modules");
+            modules
+                .module_names
+                .insert("current".into(), "renamed".into());
+            plan.pull_current_modules = Some(modules);
+            plan.pull_current_fetch_children.insert(
+                "current".into(),
+                super::super::pull_children::Recursion::OnDemand,
+            );
+            let oid = "a".repeat(40);
+            plan.pull_changed_children.insert(
+                historical_name.into(),
+                super::super::pull_children::Changed {
+                    commit: "b".repeat(40),
+                    path: "historical/missing".into(),
+                    objects: [oid.clone()].into_iter().collect(),
+                    historical_recursion: None,
+                    effective_recursion: Some(super::super::pull_children::Recursion::OnDemand),
+                    activity: Some(super::super::pull_children::Activity::Enabled),
+                },
+            );
+            let current = plan.repository.workdir.join("current");
+            assert_eq!(
+                plan.pull_child_objects(&current),
+                if historical_name == "renamed" {
+                    vec![oid]
+                } else {
+                    vec![]
+                }
+            );
+            plan.select_pull_child_identity().expect("select");
+            let tokens = proof(&plan)
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .expect("proof");
+            let result = plan.discover_pull_child_identity(&tokens);
+            if historical_name == "renamed" {
+                let plan =
+                    result.expect("same name is suppressed before opening historical missing path");
+                assert_eq!(plan.pull_child_layouts.len(), 1);
+                assert_eq!(plan.pull_child_layouts[0].0.spelling, current);
+            } else {
+                assert!(result.is_err(), "module names remain case sensitive");
+            }
+        }
+    }
+
+    #[tokio::test]
     async fn pull_child_fetch_has_own_write_stage_and_rebuilds_graph() {
         let remote = fixture();
         let git = |cwd: &Path, args: &[&str]| {
@@ -13076,7 +13172,14 @@ pub(super) mod tests {
         })
         .await
         .expect("ready");
-        for mode in ["allow", "missing-write", "skip", "linked", "linked-tamper"] {
+        for mode in [
+            "allow",
+            "missing-write",
+            "skip",
+            "linked",
+            "linked-tamper",
+            "renamed-on",
+        ] {
             let root = fixture();
             git(root.path(), &["init", "child"]);
             let child = root.path().join("child").canonicalize().expect("child");
@@ -13089,7 +13192,7 @@ pub(super) mod tests {
                     &format!("git://127.0.0.1:{port}/"),
                 ],
             );
-            if mode == "skip" {
+            if mode == "skip" || mode == "renamed-on" {
                 git(
                     &child,
                     &[
@@ -13126,7 +13229,7 @@ pub(super) mod tests {
             .expect("config");
             plan.pull_current_fetch_children
                 .insert("child".into(), super::super::pull_children::Recursion::On);
-            if mode == "skip" {
+            if mode == "skip" || mode == "renamed-on" {
                 plan.pull_changed_children.insert(
                     "child".into(),
                     super::super::pull_children::Changed {
@@ -13142,6 +13245,18 @@ pub(super) mod tests {
             if mode.starts_with("linked") {
                 plan.pull_current_fetch_children
                     .insert("sibling".into(), super::super::pull_children::Recursion::On);
+            }
+            if mode == "renamed-on" {
+                let mut modules =
+                    super::super::pull_children::Tree::parse(b"", 40).expect("modules");
+                modules.module_names.insert("child".into(), "child".into());
+                plan.pull_current_modules = Some(modules);
+                let changed = plan
+                    .pull_changed_children
+                    .get_mut("child")
+                    .expect("historical");
+                changed.path = "old/missing".into();
+                changed.effective_recursion = Some(super::super::pull_children::Recursion::On);
             }
             plan.select_pull_child_identity().expect("select");
             for _ in 0..8 {
@@ -13169,7 +13284,7 @@ pub(super) mod tests {
             }
             assert!(plan.phase == Phase::PullChildFetch);
             assert!(!child.join(".git/FETCH_HEAD").exists());
-            if mode == "skip" {
+            if mode == "skip" || mode == "renamed-on" {
                 plan.pull_current_fetch_children.insert(
                     "child".into(),
                     super::super::pull_children::Recursion::OnDemand,
@@ -13243,7 +13358,7 @@ pub(super) mod tests {
                     .iter()
                     .any(|facet| matches!(facet.nature, ToolNature::Write | ToolNature::Network))
             );
-            if mode == "allow" || mode.starts_with("linked") {
+            if mode == "allow" || mode.starts_with("linked") || mode == "renamed-on" {
                 assert!(
                     std::fs::read_to_string(child.join(".git/FETCH_HEAD"))
                         .expect("fetch head")
