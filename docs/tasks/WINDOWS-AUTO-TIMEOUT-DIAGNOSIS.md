@@ -989,3 +989,79 @@ remain. All six generated Rust overlays compare byte-identical to previous0d5cc0
 all production sources/lock/toolchain compare identical to currentmainc81782b6; workflow unchanged.
 Classifier14/text23/diff and both governors PASS0warnings with actual pinned1.99 locked metadata
 (SQLite17/delivery12 fixtures). This is not a new native600record or full-preflight outcome.
+
+## CI3220 Final Evidence And Console-Startup Hypothesis — 2026-10-17
+
+CI3220/run39005526212 exact0e5c89c5f05862994de09ec5f2dda2119a44a6ef attempt1 completed
+SUCCESS: all8jobs, baseline60processes/1110passed and instrumented60processes/1110passed,
+combined120processes/2220passed/0failed/0ignored. Both ZIP CRCs and digests were verified:
+
+- baseline artifact12090564330 SHA256 f851c91e0c336d9b02fcc1777c18153aa9bfecda9f46bc0e3d3ee3fbfd9f203e;
+- instrumented artifact12091197189 SHA256 545b1654116a4909700337aa30e360194f1343f26131186e4eb891d900a79be9.
+
+Both expire2026-10-31. Manifests identify exacthead/image20261007.264.1/4CPUs; all6normalized
+source hashes and12raw Windows CRLF restoration receipts match reviewed production sources.
+First sample parent9612/child3900/handle460/waiter143 has one intact lifetime and8accepted
+scalar records (six600,400,403): creation134366881763898916, exit134366881825159083.
+
+| Recorded interval | ms |
+|---|---:|
+| Creation to exit | 6126.0167 |
+| Creation to earliest logged600 | 4681.1891 |
+| Earliest to latest logged600 | 38.0995 |
+| Latest600 to400 | 171.8343 |
+| 400 to403 | 1201.9257 |
+| 403 to exit | 32.9681 |
+
+76.4148929% of this successful lifetime precedes earliest logged600. FinalCPU0.609375s;
+CPU/IO samples advance. Exit to native observation11.961ms, exit to waitreturn12.3896ms,
+subsequent pipejoin0.2701ms; originalToolResult6.7965185s. This is not firstactual provider
+work, provider/state identity, exclusive.NET cost or evidence of Defender/disk/scheduler cause.
+Wallclock/event recording limits remain. RawXML is discarded intentionally and cannot be
+reparsed. Independent Agent read-only evidence review APPROVE verified head, hashes/CRCs,
+counts, identities/restoration and arithmetic; shared account is not distinct human approval.
+Evidence/review receipt: #705 comment6233133393. Earlier failures and unknowns remain intact:
+CI3163(2205/15),CI3182(2219/1),CI3211(2219/1),CI3212 prematrix CRLF harness failure,
+CI3214 original workspace handle147to154 failure (its diagnostic2220/0), evaluator composite5s,
+old10s/15s and Plugin uncertainty. No overall timeout closure; I301/I304 remain Complete/Closed.
+Main c81782b6d922ec1b8bfa62e9c4a2914d746680bb and separate #716 owner/head198cb751 checked;
+I305 implementation remains separately owned. #705 stays OPEN/UNMERGED.
+
+Next bounded hypothesis: existing console-start observations may subdivide creation to
+firstlogged600. The Windows5.1 reference enum assigns40961/40962 to
+PerformanceTrackConsoleStartupStart/Stop:
+https://learn.microsoft.com/en-us/dotnet/api/system.management.automation.tracing.powershelltraceevent?view=powershellsdk-1.1.0
+The current upstream manifest independently places these IDs on its Operational channel;
+that Core manifest is not proof of the installed Windows5.1 channel configuration:
+https://github.com/PowerShell/PowerShell/blob/master/src/PowerShell.Core.Instrumentation/PowerShell.Core.Instrumentation.man
+
+Candidate adds one sequential postmatrix/postrestoration read-only wevtutil query of the fixed
+Microsoft-Windows-PowerShell/Operational channel, fixed Microsoft-Windows-PowerShell provider,
+IDs40961/40962, and the SAME first owned childPID and creation/exit bounds. Availability and
+actual image contract remain a native hypothesis; no logging/policy is enabled or changed.
+Each query independently requires45s left in the existing35min script budget and retains
+30s query/5s reap/5s readerjoin,131072byte/16accepted event caps (query17 detects overflow),
+8MiB source cap and exact owned utility cleanup. No sharedbudget extension. Insufficient
+margin skips the second query as unavailable. Unconfirmed reap remains an explicit failure.
+Only eventID/PID/UTC and selected child lifetime survive in first-child-console-events.json;
+no command/event body/XML/provider state is saved. The existing classic receipt stays separate.
+Missing/incompatible/ambiguous/overflow records remain unknown; even valid markers do not
+identify the whole historical failure or exclusive internal initialization cost. Baseline has
+no collector. All original attempts and six source restorations precede BOTH collectors.
+No Rustoverlay/nativeAPI/production/workflow/toolchain/dependency/lock/timeout/assertion change;
+no prewarm, ignore, threshold relaxation or retry-to-green. Same3diagnosticfiles versusmain.
+
+Local validation: collector selftest covers both IDs, exact provider/channel separation,
+wrongPID/outoflifetime rejection, privacy sentinel, console argv/receipt, exhaustedbudget
+without Popen; inherited caps/timeout/reap/threadfailure fixtures remain. All six generated
+Rust overlays must remain byteidentical to prior0e5 candidate. Local Rust toolchain is absent;
+no fresh pinnedRust/fullpreflight claim; remote exacthead checks remain required before any
+acceptance. This is diagnostic publication only, never merge/rootclosure authorization.
+
+Continuation checks: selftest PASS including sequential classic-success/console-budget-skip;
+classifier14PASS; textboundary23crates/0errors; collaborationclaims0warnings; diff whitespacePASS;
+all6generated Rust overlays compared byteforbyte IDENTICAL to exact0e5 predecessor. Fresh
+projectgovernance attempt is BLOCKED/FAILED1error because cargo is absent when its SQLite
+consumer validator invokes metadata; delivery12fixtures pass. Prior tree's pinned metadata
+success is retained historical evidence, not relabeled as this candidate's fresh success.
+No merge until required exacthead CI/governance/security gates pass.

@@ -61,13 +61,15 @@ def first_child_window(text: str) -> tuple[int, int, int]:
     return int(children[0]), created, exited
 
 
-def lifecycle_query(child: int, created: int, exited: int) -> str:
-    return ("*[System[Provider[@Name='PowerShell'] and (EventID=400 or EventID=403 or EventID=600) "
+def lifecycle_query(child: int, created: int, exited: int, *, console: bool = False) -> str:
+    provider = "Microsoft-Windows-PowerShell" if console else "PowerShell"
+    ids = "EventID=40961 or EventID=40962" if console else "EventID=400 or EventID=403 or EventID=600"
+    return (f"*[System[Provider[@Name='{provider}'] and ({ids}) "
             f"and Execution[@ProcessID={child}] and TimeCreated[@SystemTime>='{filetime_text(created)}' "
             f"and @SystemTime<='{filetime_text(exited)}']]]")
 
 
-def lifecycle_metadata(raw: bytes, child: int, created: int, exited: int) -> list[dict]:
+def lifecycle_metadata(raw: bytes, child: int, created: int, exited: int, *, console: bool = False) -> list[dict]:
     # Query output is transient only; never persist XML, EventData, rendered messages or errors.
     if len(raw) > 131_072:
         raise ValueError("event byte cap")
@@ -90,16 +92,16 @@ def lifecycle_metadata(raw: bytes, child: int, created: int, exited: int) -> lis
         # Canonical UTC 100ns text only, so lexical bounds are exact.
         if not re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{7}Z", stamp):
             raise ValueError("event timestamp")
-        if (event_id not in (400, 403, 600) or pid != child
-                or system.find("e:Provider", ns).attrib.get("Name") != "PowerShell"
-                or system.findtext("e:Channel", namespaces=ns) != "Windows PowerShell"
+        if (event_id not in ((40961, 40962) if console else (400, 403, 600)) or pid != child
+                or system.find("e:Provider", ns).attrib.get("Name") != ("Microsoft-Windows-PowerShell" if console else "PowerShell")
+                or system.findtext("e:Channel", namespaces=ns) != ("Microsoft-Windows-PowerShell/Operational" if console else "Windows PowerShell")
                 or not filetime_text(created) <= stamp <= filetime_text(exited)):
             raise ValueError("event identity or lifetime")
         result.append({"event_id": event_id, "child_pid": pid, "time_utc": stamp})
     return result
 
 
-def collect_first_child_events(output: Path) -> None:
+def collect_first_child_events(output: Path, *, console: bool = False) -> None:
     receipt = {"status": "unavailable", "events": []}
     cleanup_failed = False
     try:
@@ -114,7 +116,8 @@ def collect_first_child_events(output: Path) -> None:
         child, created, exited = first_child_window(data.decode("utf-8"))
         receipt.update(child_pid=child, created_100ns=created, exited_100ns=exited)
         command = [str(Path(os.environ["SystemRoot"]) / "System32" / "wevtutil.exe"),
-                   "qe", "Windows PowerShell", "/q:" + lifecycle_query(child, created, exited),
+                   "qe", "Microsoft-Windows-PowerShell/Operational" if console else "Windows PowerShell",
+                   "/q:" + lifecycle_query(child, created, exited, console=console),
                    "/c:17", "/f:xml", "/e:Events", "/uni:true"]
         # No Popen context: its __exit__ would add an unbounded wait/pipe close.
         utility = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
@@ -149,12 +152,12 @@ def collect_first_child_events(output: Path) -> None:
         reader.join(timeout=5)
         if code != 0 or reader.is_alive() or len(captured) != 1:
             raise ValueError("query unavailable")
-        receipt["events"] = lifecycle_metadata(captured[0], child, created, exited)
+        receipt["events"] = lifecycle_metadata(captured[0], child, created, exited, console=console)
         receipt["status"] = "records" if receipt["events"] else "no_matching_records"
     except (OSError, ValueError, OverflowError, KeyError, TypeError, AttributeError, ET.ParseError):
         # Missing logs, unsupported schema and identities are unknown, never zero-duration evidence.
         pass
-    (output / "first-child-engine-events.json").write_text(json.dumps(receipt, indent=2), encoding="utf-8")
+    (output / ("first-child-console-events.json" if console else "first-child-engine-events.json")).write_text(json.dumps(receipt, indent=2), encoding="utf-8")
     if cleanup_failed:
         raise RuntimeError("owned event collector cleanup unconfirmed")
 
@@ -202,6 +205,28 @@ def lifecycle_self_test() -> None:
         else:
             raise AssertionError("unqualified events must be rejected")
 
+    # Separate fixed channel/provider/ID allowlists; cross-channel events are rejected.
+    console_xml = xml.replace('Name="PowerShell"', 'Name="Microsoft-Windows-PowerShell"').replace(
+        "<EventID>400", "<EventID>40961").replace(
+        "<Channel>Windows PowerShell", "<Channel>Microsoft-Windows-PowerShell/Operational")
+    console_raw = console_xml.encode("utf-16")
+    for event_id in (40961, 40962):
+        candidate = console_xml.replace("40961", str(event_id)).encode("utf-16")
+        assert lifecycle_metadata(candidate, 3400, created, exited, console=True) == [
+            {**expected[0], "event_id": event_id}]
+    for candidate, console in ((console_raw, False), (raw, True),
+                               (console_xml.replace('ProcessID="3400"', 'ProcessID="3401"').encode("utf-16"), True),
+                               (console_xml.replace(stamp, filetime_text(exited + 1)).encode("utf-16"), True)):
+        try:
+            lifecycle_metadata(candidate, 3400, created, exited, console=console)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("cross-channel or unqualified console event")
+    query = lifecycle_query(3400, created, exited, console=True)
+    assert "Provider[@Name='Microsoft-Windows-PowerShell']" in query
+    assert "(EventID=40961 or EventID=40962)" in query and "Execution[@ProcessID=3400]" in query
+
     class Utility:
         def __init__(self, timeout: bool, reap_failure: bool):
             self.stdout = io.BytesIO(raw)
@@ -232,6 +257,28 @@ def lifecycle_self_test() -> None:
             argv = launch.call_args.args[0]
             assert argv[1:3] == ["qe", "Windows PowerShell"] and "/c:17" in argv
             assert argv[3] == "/q:" + lifecycle_query(3400, created, exited)
+        utility = Utility(False, False)
+        utility.stdout = io.BytesIO(console_raw)
+        with patch.dict(os.environ, {"SystemRoot": directory}), patch.object(subprocess, "Popen", return_value=utility) as launch:
+            collect_first_child_events(output, console=True)
+        receipt = json.loads((output / "first-child-console-events.json").read_text())
+        assert receipt["status"] == "records" and receipt["events"][0]["event_id"] == 40961
+        assert "DO_NOT_PERSIST" not in json.dumps(receipt)
+        assert launch.call_args.args[0][1:4] == ["qe", "Microsoft-Windows-PowerShell/Operational", "/q:" + query]
+        with patch.dict(globals(), {"END_BY": 0}):
+            with patch.object(subprocess, "Popen") as launch:
+                collect_first_child_events(output, console=True)
+            launch.assert_not_called()
+        assert json.loads((output / "first-child-console-events.json").read_text())["status"] == "unavailable"
+        # A completed classic query may leave too little existing budget for console.
+        utility = Utility(False, False)
+        with patch.dict(globals(), {"END_BY": 100}), patch.object(time, "monotonic", side_effect=(0, 60)):
+            with patch.dict(os.environ, {"SystemRoot": directory}), patch.object(subprocess, "Popen", return_value=utility) as launch:
+                collect_first_child_events(output)
+                collect_first_child_events(output, console=True)
+            assert launch.call_count == 1
+        assert json.loads((output / "first-child-engine-events.json").read_text())["status"] == "records"
+        assert json.loads((output / "first-child-console-events.json").read_text())["status"] == "unavailable"
         utility = Utility(False, False)
         with patch.dict(os.environ, {"SystemRoot": directory}), patch.object(subprocess, "Popen", return_value=utility), patch.object(threading.Thread, "start", side_effect=RuntimeError("fixture")):
             collect_first_child_events(output)
@@ -836,6 +883,7 @@ def main() -> int:
         print("WINDOWS_AUTO_DIAG temporary Rust probes restored; raw readback verified", flush=True)
         if args.fresh_phase == "instrumented" and fresh_matrix_completed:
             collect_first_child_events(output)
+            collect_first_child_events(output, console=True)
     return int(any(result["exit_code"] != 0 for result in results))
 
 
