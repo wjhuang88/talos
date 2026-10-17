@@ -18,8 +18,9 @@ effective URL port. IP literals skip DNS but receive the same address check.
 Clients disable implicit redirect, HTTP retry, Referer, ambient proxies and all optional decoders,
 request identity encoding, use HTTP/1 and no cross-hop pooling. Original hostname remains the
 Host/TLS identity; default Rustls certificate validation is retained. No caller headers, cookies,
-Authorization or Host override are supported. POST has a fixed application/json body format.
-This deliberately does not yet implement the upstream form protocol.
+Authorization or Host override are supported. Existing POST execute retains fixed application/json;
+private execute_form adds bounded application/x-www-form-urlencoded with ordered owned fields.
+Neither activates an upstream route or establishes complete compatibility protocol parity.
 
 GET/HEAD may follow only predeclared301/302/303/307/308 targets. Every hop gets its own checks and
 pinned dial set, under the same budget. POST retains body/method only on same-origin307/308;
@@ -146,3 +147,26 @@ Windows passed. The25-year synthetic leaf violated Apple's825-day TLS leaf limit
 365-day positive/host-only leaves remove that known incompatibility while retaining platform
 verification, all negatives and production trust. Closed Request errors did not prove the sole
 cause. Fresh corrected-head macOS acceptance remains required; see I293 and fixture provenance.
+
+## Bounded Form POST Prerequisite — 2026-10-14
+
+#715 TLS/CONNECT merged after corrected-head native macOS/Windows acceptance; see I293.
+The next dormant form path uses only fixed internal Json/Form content types and the existing
+URL serializer. Preflight checks UTF-8 byte expansion, '='/'&' separators and checked arithmetic
+before allocation; encoded size <=16384 implies at most8192 fields, even for empty pairs.
+Per-field raw length is also checked before scanning. This bounds encoding work/output, not
+caller-owned input allocation or whole-process memory. The serializer's synthetic form.invalid
+URL is an in-memory container only; it receives no permission, DNS or connection activity.
+
+Spaces become '+', literal '+'/'~'/controls/non-ASCII bytes are escaped; order, duplicate keys
+and empty keys/values are retained. Existing target URL/query is never rewritten. The encoded
+body is owned, and POST307/308 keeps its bytes/type only within the same origin. Shared deadline
+fences run before encoding, after it and at the existing send path; oversize uses no DNS or
+attempt reservation. Actual request authority/redirect/TLS/CONNECT/address controls are reused.
+No caller content-type/header override, extra retry, probe, ambient proxy or default activation.
+
+Eight added fixtures and prior39 form a47-case focused checkpoint. Golden output and bounded
+generated decoder round-trips cover serialization without introducing proptest/dependency or
+claiming proptest execution; real socket/TLS fixtures cover body/type, exact/overflow bounds,
+redirect isolation, denial/deadline and proxy visibility. This is not copied upstream parser code,
+provider admission, prepared-object fingerprint integration or full protocol parity.

@@ -74,6 +74,8 @@ repeating known mistakes.
 | 62 | Async / Transport | timeout_at alone is not a deadline fence for immediately Ready inner futures | I293 |
 | 63 | TLS fixtures | Callback observations are not physical connections; absent IP SNI is valid | I293 |
 | 64 | TLS fixtures | Native platform verification includes certificate policy, not just roots | I293 / #715 |
+| 65 | Resource tests | Process-wide counters need isolated workers and owned descendant cleanup | I293 / #716 |
+| 66 | Native borrowing | Attribute value buffers need independent stable storage through native list deletion | I302 / #716 |
 
 ## Lessons
 
@@ -1232,3 +1234,81 @@ repeating known mistakes.
 - Prevention: Check fixed-date certificate metadata/signatures/key linkage offline; record
   renewal deadline and require actual native macOS/Windows CI before claiming portability.
 - Promoted to rule/check: tests/fixtures/search-tls/generate.py --check; direct_tls_preserves_original_sni_host_and_pinned_dial_address.
+
+## 2026-10-14 - Process-wide Resource Counters Need Isolated Workers
+
+- Trigger: #716 CI3175 Windows handle-count fixture failed with before151/after162.
+- Symptom: The sampled process also ran concurrent socket/TLS/process tests.
+- Root cause: Confirmed measurement scope includes sibling activity; the observed +11 alone
+  establishes neither a real leak nor interference as its sole cause.
+- Fix: Run the exact fixture in an owned single-test worker, preserving40 faults and +2
+  threshold. Existing outer Job ownership also covers descendants before inner assignment.
+- Prevention: Require the intended fault at each attempt and a completed count receipt;
+  continuously drain bounded diagnostics and prove native CI rather than retrying old heads.
+- Promoted to rule/check: windows_partial_setup_failures_release_every_parent_handle.
+
+The isolated worker then failed CI3176 with73→76. Isolation removes sibling-test activity from
+that worker but does not establish the cause of remaining resource growth. Record fixed-size
+per-attempt samples after all original assertions, then emit diagnostics outside the interval;
+preserve the independent final sample/threshold and both failures. Warmup or threshold widening
+without a proven cause would conceal evidence rather than repair the fixture.
+
+CI3177 localizes growth to first Pipe(+1) and first Assignment(+2), followed by stable samples.
+This is boundary evidence, not handle identity/lifetime proof. Check existing cleanup return values
+after all release attempts; adding new native observation needs its own reviewed contract/claim.
+
+CI3190 self-only type metadata still does not identify resource lifetimes. Source inspection
+also shows injected Assignment short-circuits before AssignProcessToJobObject: a fault label
+names an error boundary, not proof that its namesake API executed. Read actual control flow
+before attribution; use existing-operation stage controls and retain cold failure/uncertainty.
+
+When observing a launcher with live raw resources, contain the entire checkpoint (counts,
+capture, numeric copy and storage), then report observer failure only after original cleanup.
+Returned handle values retained after cleanup are historical numbers, not proof of live owners.
+
+## 2026-10-15 — Separate API Return Evidence From Cleanup And Module Identity
+
+- CI3198 direct checkpoints put unexplained growth before failure cleanup; known returned
+  handles disappeared from bounded snapshots. Do not translate disappearance into object lifetime
+  or all-resource release proof, or diagnostic success into the original failed regression's fix.
+- Version-qualified official DLL disassembly can establish an initialization mechanism without
+  proving the CI runner uses those bytes. Hash fixed installed files before matching offline
+  samples; on-disk identity still does not attest a later process's loaded module.
+- Preserve PDB GUID/age mismatch instead of treating symbol-server retrieval as strict matching.
+  Keep unknown handle types unknown and original cold/+2 failures visible. Diagnostic metadata
+  collection must be bounded and cannot suppress the original full test command.
+
+## 2026-10-16 — Exact Binary Lookup Beyond Auxiliary Index Coverage
+
+CI3202's installed-file hashes were absent from auxiliary indexes. Do not turn nearby-version
+cache disassembly into exact-runner attribution. Decode only validated symbol-store identity
+fields from the same capped hash prefix, then require full hash agreement on an official download.
+This does not establish loaded-module identity or binary trust. Preserve native failures, download
+integrity failures and disposable fixture results as distinct evidence.
+
+
+## 2026-10-16 - Preserve native attribute value storage across owner borrows
+
+- Trigger: Independent I302 control review rejected an inline handle-list field borrowed by a native attribute list.
+- Symptom: Later mutable owner borrows included that native-borrowed inline field, creating avoidable provenance/lifetime uncertainty.
+- Root cause: Owning the attribute-list allocation does not independently preserve the lifetime and borrow boundary of its input values.
+- Fix: Allocate the handle-list elements separately before acquiring resources, do not resize/mutate after native borrowing, and keep them alive through DeleteProcThreadAttributeList.
+- Prevention: Review both attribute allocation and input-value ownership, including subsequent Rust borrows and every error/unwind cleanup path.
+- Promoted to rule/check: ADR-091 direct-control clarification and protected native review; no production ownership expansion.
+
+
+## 2026-10-16 — Negative controls must reject through the actual acceptance predicate
+
+- Trigger: TEST-004 protected review rejected omission detectors derived only from injection flags.
+- Root cause: recovering before final validation could let a negative pass even when the real gate no longer rejected missing operations.
+- Fix: call the same per-role release/termination predicates before recovery and in final acceptance; require the precise missing release or native live timeout, then checked in-frame recovery.
+- Prevention: consume termination/release attempt state before native invocation, reject duplicate requests before another call, and test failed results/wait timeout/no retry separately from real native negative fixtures.
+- Promoted to check: TEST-004 source inventory mutations and independent protected native review. Whole-file fingerprints detect source change, not semantic ownership proof; keep unknown resources residual.
+
+
+## 2026-10-17 — Canonicalize fixture inputs before synthesizing checkout line endings
+
+CI3219 exposed a test that converted already-CRLF source into CR-CR-LF. Normalize fixture input
+toLF first, derive both LF/CRLF variants, and run against both incoming checkout forms. Preserve
+actual source hashes and validators. Successful harness assertions do not imply raw receipts were
+visible; distinguish passed assertions from independently emitted evidence.

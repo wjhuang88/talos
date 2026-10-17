@@ -10,7 +10,7 @@
 | Source Issue | #643 |
 | Depends on | Accepted ADR-085; SEARCH-001-B / #642 complete in #656; NET-001 boundary coordination |
 | Claim State | Claimed |
-| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 TLS/CONNECT subset Review (macOS fixture correction pending, default activation Pending) |
+| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 merged TLS/CONNECT subset; #716 bounded form transport Review / CI3175..3177 failed; checked existing cleanup diagnostic pending, richer self-snapshot proposal Unclaimed (default activation Pending) |
 | Completion | Pending |
 
 ## Collaboration Claim
@@ -849,3 +849,225 @@ remote/local tree equality, obtain fresh independent protected exact-head review
 unfiltered CI jobs, then repeat main/head/tree/claim/non-overlap/Issue CAS. Preserve failedCI3172
 and do not use old-head approval as new-head evidence. C/EP Pending, D independently incomplete,
 E/F gated, #643/#624 open; broader proxy/ambient/protocol/D/official-root gates remain.
+
+## TLS/CONNECT Merge And Bounded Form Transport — 2026-10-14
+
+#715 merged `d66e380ad144329dbea49634122505a5a3075e95` after corrected exact-head protected
+Agent review6158318325, full six-job CI3173/run38491794838 and CAS6158600236. Complete logs
+show all13 TLS fixtures passing on macOS and Windows; macOS unfiltered preflight includes the
+original Unix-socket case and both SDK modes. FailureCI3172 remains historical; the corrected
+head recovered on these runners without verification bypass or skips, not a lifetime-only causal
+experiment or proof of universal portability. Partial receipts: #6436158606822/#6246158607177/
+#7156158607444. C/EP Pending, D independently incomplete, E/F gated; #643/#624 stay open.
+
+Next stage on feature/I293-search-form-protocol starts from that merge under the unchanged
+effective #712 claim. Private execute_form owns ordered fields, predicts exact UTF-8 form byte
+expansion using checked arithmetic before encoded allocation, then uses the existing URL
+serializer.16KiB encoded cap implies <=8192 fields (2N-1 minimum); individual raw fields also
+receive an early16KiB rejection. JSON execute signature/behavior stays intact, and internal fixed
+Json/Form selection never exposes caller headers. POST307/308 retains encoded bytes/type only
+same-origin; other POST/cross-origin redirects fail. Existing DNS/pinning/proxy/TLS/authority/
+shared request/deadline/body budgets remain the only send path. No new dependency/lock/API,
+parser copy, actual upstream route or default WebSearch activation.
+
+Eight new fixtures cover golden Unicode/reserved/control/duplicate/empty/order encoding,
+bounded generated round-trip properties, real wire16KiB exact body/type, expansion/field-count
+overflow before DNS/reservation, same-origin redirect semantics, scoped cross-origin refusal,
+denied method/expired entry fence, and actual CONNECT verified-TLS form/CONNECT isolation.
+The crate has no direct proptest dev dependency: bounded generated properties reuse the
+standard decoder without adding a Git/test dependency; do not claim proptest execution.
+The Rust-native existing URL serializer replaces the need for a host encoder/manual escape
+implementation. Initial compile-only fixture Value/string accessor error was corrected locally;
+corrected focused47/47 and network all-target Clippy pass. No failing runtime or remote candidate
+is claimed for that compile error. Independent design preview found no blocker; full local
+checkpoint and protected implementation review/CI/CAS remain before publication/merge.
+
+This is a transport prerequisite, not full upstream form/request/parser/probe/retry/source parity.
+Form input ownership here does not prove real prepared invocation/request fingerprint binding or
+official root/router integration; those remain full C/EP gates. Broader proxy/ambient migration,
+bounded D terms/privacy/MIT and official-root/rollback acceptance remain activation gates.
+
+Final local form checkpoint: independent protected implementation preview found no blocker.
+Its bounded-property limitation was addressed with actual wire UTF-8 escape-heavy exact16KiB
+and one-byte-overflow negatives, alongside the existing ASCII boundary; no new dependency.
+Fresh final focused47/47, network all-target Clippy and full workspace tests pass. Workspace
+3705 primary passes/119 summaries +ambient child1 (raw3706/120), zero failures/ignores; exactly
+the previously authorized unchanged Unix-socket primary filter. The child's457 exact-only
+sibling filters are not waived tests: parent tools run458 including all eight additions.
+Locked workspace check/Clippy, both SDK modes, fmt/diff, governance(SQL17/delivery12), claims,
+text boundary23, classifier14 and site/installers pass. No full unfiltered local preflight claim.
+Fresh exact-head protected review/full CI/CAS remain the remote gates. Resume on
+feature/I293-search-form-protocol from #715 merge; verify local/remote tree equality before
+publication and keep full C/EP, #643/#624 and D/E-F activation dispositions unchanged.
+
+## Form Candidate CI And Isolated Handle Fixture — 2026-10-14
+
+#716 original head925e46a89a8dce7e8177b9e1f681657974f2f9e2/tree2085eb5e9069c9cf574fd59f89abb8ac6b74e777
+received protected independent Agent review6158827975. CI3175/run38495718642 passed five
+jobs but failed Windows workspace: tools448pass/1fail, pre-existing
+windows_partial_setup_failures_release_every_parent_handle before151/after162 (+11).
+Its GetProcessHandleCount observes the entire concurrent harness. That measurement scope
+permits interference from other tests; this is not proof that interference solely caused +11
+or that no actual leak exists. Failed CI remains evidence, not a retry-to-green candidate.
+
+Bounded maintenance under the existing collaboration SOP exception repairs only that Windows
+test in the same PR. Production process source is byte-identical; no unsafe/native binding,
+process rights/policy, dependency/lock, production deadline, skip or waiver changes. The outer
+test uses existing WindowsBackgroundLauncher assignment-before-resume/kill-on-close Job
+ownership to launch the same binary with exact test selection and one test thread. Descendants
+created before inner assignment remain under the outer Job; no breakaway is introduced.
+The sole control Arc stays owned through terminal handling and receipt validation; last drop
+provides panic cleanup. The worker initializes its Tokio runtime before the baseline, then
+executes the original synchronous five faults times eight attempts and original +2 threshold.
+Exact injected-error checks prevent an earlier launch failure from masquerading as a later fault.
+
+Success requires a real successful Exited event and a <=1024-byte JSON receipt in an owned
+canonical temporary directory, reporting all40 attempts, u32 before/after and a nonzero worker
+PID distinct from the parent. Exact invocation/receipt checks reject zero-test success or EOF.
+Captured diagnostics retain <=16KiB while continuing to drain. Event waiting is bounded60s;
+failure requests force termination and drains terminal events for up to10s before assertion.
+These bounds do not claim a hard limit on every OS/native cleanup tail. Actual nested-Job
+compatibility and resource assertions must pass native Windows CI; unsupported-host failure
+is not skipped. #705 retains its separate workflow/diagnosis/script scope.
+
+Restored pinned1.99.0 local locked check/Clippy and workspace tests pass:3705 primary/119
+summaries +ambient child1 (raw3706/120), zero failures/ignores; only the previously authorized
+unchanged Unix-socket primary filter. Child457 exact-only sibling filters are not waivers;
+parent tools458 execute them. External SDK fixture passed. Windows-only correction is not
+compiled/executed by this Linux checkpoint; fresh final validation, independent protected
+implementation/exact-head review and all six unfiltered native CI jobs remain before CAS.
+I293/C remain Active/Claimed/incomplete; #643/#624 open, D separate and E/F gated.
+
+Final correction checkpoint: independent protected implementation preview found no blocker;
+not stable-head approval or native execution. Fresh fmt/diff/workspace Clippy, both SDK modes,
+governance(SQL17/delivery12), claims0warnings, text boundary23/classifier14 and site/installers
+pass. Initial shell scoping omitted cargo from later chained commands; validation was rerun
+under a shared explicit toolchain environment. A mistaken extra SDK --offline invocation was
+rejected by argparse after the standard validator had passed both actual SDK modes; no offline
+SDK claim is made. Remote main is stilld66e380a, #643/#624 open and only #705/#716 open PRs;
+#705 changes workflow/diagnostic docs/script, not this committed Rust test fixture.
+Publish the coherent checkpoint to the existing #716 branch, verify tree equality, obtain fresh
+exact-head protected independent Agent review and complete unfiltered CI, then repeat CAS.
+
+## Isolated Worker Failure And Bounded Trace — 2026-10-14
+
+Fresh #716 protected review6159740360 approved heada30279c1c53f52c8b2448d85e5940539557ba552/
+tree6ae44a0b2ab5096d646585bd20e193c78892cf07, conditional on native CI/CAS. CI3176/
+run38502637067 FAILED Windows workspace, five other jobs passed. The isolated worker reached
+the original final resource assertion: before73/after76 (+3),0pass/1fail/448 exact-only sibling
+filters. Parent tools448pass/1fail,0ignored/0filtered. Outer cleanup=Ok(())/terminal=true;
+no timeout or output overflow. These observations prove the worker/Job launched and the exact
+fault checks reached the final sample, not that all supervision tasks joined or that no leak
+exists. Isolation alone did not resolve the failure. Mac full unfiltered release preflight,
+original Unix-socket case and both SDK modes passed; form/TLS fixtures passed on both hosts.
+Windows downstream governance/audit/smoke steps were skipped by failure, not passed evidence.
+
+Source review finds attempted cleanup of thread/process/job/pipes and attribute list, but its
+unchecked native cleanup results do not prove actual closure. Neither a true handle leak nor
+cold initialization is yet established. Do not warm up the launch path to hide a first-use delta,
+widen +2, ignore/skip the case, retry the failed head to green or activate/merge the candidate.
+
+The next stable candidate is explicitly diagnostic, not a completed correction: a fixed stack
+[u32;41] records the original baseline and the count after each of the original40 fault attempts.
+It reuses the existing read-only count helper and adds no unsafe/binding/handle/rights/dependency
+or production-code changes. No diagnostic I/O or dynamic trace allocation occurs in the sampled
+interval. A bounded trace prints after the independent original final sample and before its
+unchanged assertion, so failures reveal growth by fault/attempt. Index0 is baseline; indices1..8
+Pipe,9..16 Job,17..24 AttributeList,25..32 Assignment,33..40 Resume. Retain both counts[40] and
+the separate original after value. Original exact errors,40 attempts,+2,outer ownership,
+deadlines/drain and success-only receipt remain. Totals can locate growth boundaries but cannot
+identify handle types or establish a unique cause. Native CI is required; even a green diagnostic
+run alone is not root-cause closure or merge authorization. No new scope/claim/lifecycle change;
+bounded fixture maintenance stays within #716 and does not take over #705 diagnosis.
+
+Local diagnostic checkpoint: independent protected implementation preview found no blocker for
+diagnostic publication only. Restored pinned1.99.0 fmt/diff, governance(SQL17/delivery12),
+claims0warnings, text boundary23 and classifier14 pass. Source-prefix comparison proves production
+process bytes unchanged; only10 Rust lines in the Windows test module are added. No new local
+workspace compile/runtime pass is claimed for this Windows-only trace, and no new local test
+filter was used. Original Linux and CI3176 Mac results remain historical receipts for unchanged
+non-Windows code; fresh full native CI is mandatory. Main remainsd66e380a, open PRs #705/#716
+are separate; I293 claim/lifecycle and all activation gates remain unchanged. Publish the stable
+diagnostic tree, verify remote identity, obtain fresh independent protected exact-head review,
+then interpret the trace before proposing any correction or merge.
+
+## First-Use Boundaries And Checked Existing Cleanup — 2026-10-14
+
+CI3177/run38520756375 failed Windows while all five other jobs passed. The diagnostic worker
+recorded73 baseline,74 after first Pipe,74 through all eight Pipe/Job/AttributeList attempts,
+76 after first Assignment,76 through remaining Assignment/Resume, independent after76. All40
+exact injected-error checks reached the unchanged +2 assertion; parent448pass/1fail, worker
+0pass/1fail/448 exact-only sibling filters, no ignored tests. This run exhibits two first-use
+growth boundaries and no repeated accumulation; it establishes neither a legitimate lifetime
+nor a one-time leak's absence. Preserve3175/3176/3177 as actual failed evidence.
+
+Within the same bounded fixture maintenance, capture BOOL results from the existing close and
+TerminateProcess calls and aggregate a test-only failure mask. Bits0 thread close,1 termination,
+2 process close,3 Job close,4..7 stdout-read/write and stderr-read/write close. Only assert after
+all cleanup operations have been attempted, so a failed check cannot skip a later release.
+The original calls/conditions/order and production failure result remain; no new native call,
+binding/unsafe block/handle/rights/manifest/lock is introduced. Source bytes in this production
+function do change to capture existing return values; previous byte-identity claims apply only
+to earlier heads. No production return checking or behavioral fix is claimed. The new checks
+can establish known calls' success, not process-wide resource closure or the +3 cause.
+
+Independent local protected preview found no blocker for these stronger checks. A proposed
+[current-process type snapshot packet](../proposals/WINDOWS-HANDLE-COUNT-SELF-SNAPSHOT.md) records
+the next concrete observation contract. It is Proposed/Unclaimed and requires maintainer scope
+acceptance followed by separate effective ADR/claim before adding a native feature or unsafe
+helper. Current I293 scope/claim and security decisions remain unchanged; no PSS code is added.
+No warmup, threshold increase, skip or merge authorization follows from either diagnostic.
+
+Final local checkpoint: independent seven-file protected preview found no publication blocker.
+Pinned1.99.0 fmt/diff, governance(SQL17/delivery12), claims0warnings, text boundary23 and
+classifier14 pass. Comparison of the touched function's native call-site inventory/order and
+unsafe block count is unchanged; this is source evidence, not compiled-binary equivalence or
+native cleanup execution. No new local workspace/native pass is claimed. Fresh stable-head
+protected diagnostic review and native full CI remain necessary. Proposal is not scope approval;
+Cargo feature unification must be verified before any test-only feature-isolation claim.
+
+2026-10-15 adjacent diagnostic: #718 / ADR-091 / TEST-003 / I302 claim is effective via
+f4313237. Current main9b7ba281 and original7165c49a8bd are combined before reconstructed
+I302 diagnostic publication. Unpublished d1d818e2 was lost in workspace maintenance; its local
+receipts are historical, not current evidence. Cold40/+2 and CI3175-3178 failures remain;
+3178 known cleanup BOOLs succeeded without resolving73->76. Three owned workers qualify
+bounded types/observer/cleanup evidence, not a production fix or716 merge. Fresh review/full
+native CI pending;643/624 open, D/activation/rollback gates unchanged,705/721 independent.
+
+CI3190/run38679585476 on a39ee959 failed Windows cold73->76 (453passed/1failed), with five
+other jobs successful. I302 observer/native fixtures succeeded but did not repair the original
+failure. Exact protected publication review6184162949 does not authorize merge. I302 now owns
+two additional bounded stage controls using existing launcher operations; see its owner journal
+for metadata/uncertainty and fresh validation requirements. Latest main23e659e2 is included,
+preserving I303 Complete and I304's independent claim. I293/C remains Active/Claimed/incomplete;
+#643/#624 open and activation/full-chain gates unchanged.
+
+CI3197/run38685760669 on770d856e FAILED Windows454passed/1failed, five other jobs passed.
+I302 modes1–4 succeeded, narrowing but not resolving the original cold73->76 failure. Direct
+CreatePipe/CreateProcessW return/cleanup observation belongs to I302 and adds no Search or
+production launcher behavior. I293 remains Active/Claimed/incomplete and #643/#624 stay open.
+
+C-fixture residual from the next local preflight: untouched Linux deadline/EOF test failed
+with457tools passes/1failure. It requires EOF without first proving request/accept arrival and
+cannot distinguish read errors from no EOF. This is a source-level ambiguity, not proven cause;
+retain the failure and original2s/150ms bounds. I302 journal records exact receipt and separate
+validation. No retry-to-green/full-preflight pass or transfer to #705 is claimed.
+
+Bounded Linux fixture telemetry now records up to4 read ErrorKinds and, only at failed EOF
+assertion, accept count, up to4 request(length,header-complete) shapes and EOF count. No request
+content/path is logged; no error becomes EOF and all150ms/2s/10s bounds remain. The next full
+preflight tests materially new diagnostic source; retain the old failure and make no repair or
+scheduler-rootcause claim from a later pass. Independent protected review remains required.
+
+The failure snapshot is non-atomic: committed request shapes exclude any still-in-flight buffer,
+so an empty list is not proof that no bytes arrived; accepted==0 is absence of an accept receipt,
+not proof that no TCP connection reached the listen backlog. EOF counts read events, not unique
+connections. Error total and saved kinds are sampled separately; errors_unrepresented may
+reflect in-flight recording as well as the four-kind cap. Preserve these interpretation limits.
+
+Fresh pinned locked full preflight on the new combined diagnostic source passed3717primary+
+1existingchild/0failed/ignored and both SDK modes (only prior exact local socket filter).
+Windows cross-check/Clippy, graphs and governance pass; these are not native observations.
+The earlier457/1 Linux EOF failure remains unresolved evidence; a later pass does not prove a
+fixture repair or scheduling cause. Production transport and all original deadlines/assertions
+are unchanged. Fresh stable-head protected review and unfiltered full CI remain required.

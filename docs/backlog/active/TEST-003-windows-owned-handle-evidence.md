@@ -1,6 +1,6 @@
 # TEST-003: Test-Only Current-Process Handle Evidence
 
-**Status**: In Progress / Claimed; proposed atomic selection, ineffective until #718 merges
+**Status**: Review / Claimed; #716 diagnostic candidate, native evidence/acceptance pending
 **Type**: Spike / Technical Story
 **Parent Epic**: None; related SEARCH-001-C/#643 and #716 CI blocker
 **Source Issue**: #717
@@ -19,8 +19,8 @@
 | Governance Claim PR | #718 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer accepted bounded self-snapshot scope 2026-10-14 at14:50 Asia/Shanghai and authorized continued GitHub delivery; no distinct maintainer reviewer available. Independent protected Agent native/security review, exact-head CI, validators and CAS are mandatory; no natural-person approval claim. |
-| Implementation PR | Not started; later #716 follow-up after effective claim refresh |
-| Last Updated | 2026-10-14 |
+| Implementation PR | #716; separate I302 diagnostic work after effective #718 main refresh |
+| Last Updated | 2026-10-16 |
 | Handoff / Release Condition | No implementation before finalized atomic claim and ADR merge into main; no automatic original-defect closure or #716 merge. |
 
 ## Identity / Goal / Value
@@ -101,6 +101,167 @@ refresh; sharing a PR transfers no ownership between the two slices.
 Finalized #718 proposes Active/Claimed I302 and accepted ADR-091 atomically; all remain ineffective
 until merge. Independent complete contract preview found no blocker. No PSS code is in this PR.
 
+## Effective Claim And Recovery — 2026-10-15
+
+#718 merged f4313237c4212e59f57202e22df2ed9b10f78681 after protected contract review
+6163000640, applicable CI3180 and CAS6163082933; proposal statements above are historical.
+Current main9b7ba281 retains this claim. Recovered implementation starts from that main and
+merges original7165c49a8bd as a separate baseline commit. #721/I303 and #705 remain independent.
+
+Workspace maintenance removed the unpublished d1d818e2/treeeed12027 source, toolchain and logs.
+Old local validation/review receipts are historical, not evidence for reconstructed code. This
+candidate is reimplemented/reviewed/validated anew; see I302 execution journal. Three owned
+workers retain cold40/+2, four observer snapshots and four native cleanup-fixture captures.
+Diagnostic publication is not original-defect repair, Complete state or716 merge authority.
+No Completion Commit or native observation is claimed. #643/#624 remain open.
+
+## Native Evidence And Stage Controls — 2026-10-15
+
+CI3190/run38679585476 on exact published head a39ee9590428630a28ea8deb1781608e76ac9abb
+failed the unchanged cold worker73->76: Windows453passed/1failed/0ignored/0filtered; five other
+jobs passed. The observer and native cleanup fixtures both succeeded. Four observer phases had
+counts73/73/74/76, with unchanged before/after observation counts. Added/retyped metadata:
+first_pipe File\u0000 value168; final_40 unknown value328 and Key\u0000 value332. These raw
+type strings include a trailing NUL. Values are process-local, may be reused, and do not identify
+objects or prove a leak/legitimate cache. Successful controls do not eliminate every observer effect.
+The known cleanup BOOLs passed; parent cleanup/terminal success does not establish all lifetimes.
+Exact protected remote review6184162949 approved diagnostic publication only, not repair/merge.
+
+Source confirms the injected Assignment branch short-circuits before AssignProcessToJobObject.
+That API therefore cannot explain the +2 through its execution on this fault path. Two further
+independent owned workers use existing launcher operations/rejections without a new hook/native
+call/unsafe/rights: mode3 observes baseline, first Pipe cleanup, attribute preparation followed by
+the exact existing quote rejection, then suspended-process failure cleanup; mode4 observes
+baseline, existing program resolution, existing environment construction, then suspended-process
+failure cleanup. The environment builder itself reads/copies the worker environment; immediately
+discard its result, with no extra observational copy/inspection/log/persistence of its contents.
+Each worker retains four snapshots and all existing caps/Jobs/deadlines. All five outcomes are
+collected before asserting; original cold40/+2 remains uninstrumented and unchanged.
+
+Main23e659e2403739b74bc018ec46305346e8e2c7ad (including bdea322f) is included in separate
+baseline refreshes. I304/RUNTIME-011 retains its independent effective #722 claim.
+I303/SKILL-006 remains Complete/Closed with its own evidence, while I302 stays Review/Claimed.
+New controls require fresh local validation, exact-head protected review and unfiltered native
+CI. They narrow a phase interval, not root cause or resource identity. No Completion Commit.
+
+Fresh pinned locked local preflight passed3717primary+1existing-child tests/0failed/ignored,
+workspace check/Clippy and both SDK modes, with only the previously authorized local socket
+filter. Final-source Windows test-target cross-check/Clippy, feature graphs, governance/claims,
+text/classifier/fmt/diff/scale pass; no new native execution claimed. Full receipts are in I302.
+Stable exact-head protected review and unfiltered native CI precede evidence acceptance.
+
+## CI3197 And Direct Call-Boundary Investigation — 2026-10-15
+
+Exact head770d856e01b5f99155f2e202cd29382aab44f9bb/treeabef7bb2 had protected remote
+publication review6184988997 (all20 remote blobs matched). Full CI3197/run38685760669 FAILED:
+Windows454passed/1failed/0ignored/0filtered; five other jobs passed. Original cold73->76 remains.
+Modes1/2/3/4 succeeded. Mode3 counts73/74/74/76 at baseline/Pipe cleanup/attribute rejection/
+suspended-process cleanup; mode4 counts73/73/73/76 at baseline/path/env/suspended-process cleanup.
+The two preparation controls showed no additional count growth. This narrows the interval, not
+a particular API, identity, legitimate cache or leak. Raw File/Key names retain trailing NUL;
+other data stays unknown. Full native count/type receipts are in #717 comment6187417883.
+
+The maintainer requested deeper root-cause investigation on2026-10-15. Independent protected
+design/implementation previews found no blocker for two further same-scope owned workers:
+mode5 captures before first CreatePipe/after its successful return/before cleanup/after cleanup;
+mode6 captures before CreateProcessW/after successful return/before cleanup/after cleanup.
+Each records counts before/after each snapshot plus seven numeric API-return slots (stdout pipe
+read/write, stderr pipe read/write, Job, process, thread). After cleanup these remain historical
+returned values, NOT live ownership or object IDs. Never dereference/duplicate/close an observed
+value. Compare direct returned resources with bounded type differences; handle reuse and observer
+effects prevent automatic root-cause inference.
+
+The explicit concrete observer is test-only and None on existing workers. Entire checkpoint
+count/capture/numeric-copy/storage is panic-contained; observer errors do not escape the live raw
+owner interval or short-circuit original cleanup. Fixed four-slot storage, unchanged native helper,
+ABI/features/rights/faults/production behavior. Explicit receipt assertions/output follow cleanup;
+a caught panic may still invoke the ordinary panic hook. Keep the original cleanup-mask assertion.
+Four captures/worker and all output/entry caps remain. Seven workers increase total parent wait
+budget; only the individual worker60s wait/10s failure-drain bounds are unchanged. Cold40/+2 and
+all prior failed runs remain. New exact-head protected review/native CI are required; no fix claim.
+
+New local full preflight FAILED on an untouched Linux deadline/EOF fixture (tools457pass/1fail);
+workspace check/Clippy and fixed-source Windows cross-check/Clippy passed. First Windows fixture
+JSON syntax error was corrected; failed receipts remain in I302. SDK/unreached targets are
+independently checked, not a replacement full-pass receipt. No new filter or retry-to-green.
+The Linux fixture does not establish connection arrival before requiring EOF, so its current
+failure is ambiguous rather than proof of this Windows-only change's effect. Original full CI
+and merge gates remain. See I302 for the separate CreatePipe failed-output ownership contract
+gap: real, outside this production claim, and not the success-then-injected-fault +3 cause.
+
+On the materially new combined diagnostic source, fresh pinned locked full preflight passed
+3717primary+1existingchild/0failed/ignored and both SDK modes, with the same sole authorized
+local filter; fixed-source Windows coding cross-check/Clippy and graphs/gates pass. This does
+NOT erase the old Linux failure or prove repair/scheduling cause. Exact receipts/independent
+continuations and limits are in I302. Fresh stable-head protected review/native CI are pending.
+
+## CI3198 Interpretation And Installed-File Follow-up — 2026-10-15
+
+Exact d90676f7/tree9d14 protected remote review6188161308 approved diagnostics only. CI3198
+run38707880538 FAILED (Windows455pass/1fail, other five jobs succeed), original cold73->76;
+modes1–6 succeeded. Direct Pipe counts73/76/76/74 show returned308/312 disappear after cleanup,
+extra File304 present at successful return. Process counts79/83/83/76 show all seven returned
+values disappear after cleanup, while unknown328/Key332 were already present at API return.
+This locates instrumented growth, not object identity/lifetime or cold cache/leak causation.
+Independent raw-log/source interpretation verified; full receipts6194344099 remain on #717.
+
+Read-only Microsoft DLL disassembly identifies a cached pipe-root handle mechanism in a
+version-qualified public sample; I302 records exact URL/hash/RVAs and PDB age mismatch. It is a
+candidate for +1 only, not exact CI module/handle attribution or the unexplained process+2.
+A separately reviewed evidence-only workflow prelude hashes three fixed installed System32
+DLLs using capped read-only streams (actual32MiB limit,16KiB chunks). Emit only three bounded
+basename/status/length/hash records; no content/path/exception/environment output or persistence.
+No new native ABI/PSS/unsafe/dependency/download/PE execution/process enumeration, test changes,
+threshold/warmup/skip/waiver. Identity failure cannot skip original full tests and remains a failed
+evidence result. On-disk identity at collection time is not loaded-module identity. Owner remains
+Review/Claimed/incomplete; fresh workflow review/native CI required, no original defect repair,
+Completion Commit or716 merge. #643/#624 remain open; #705 workflow ownership is preserved.
+
+## CI3202 And Direct Symbol Lookup — 2026-10-16
+
+CI3202 on ee8d23a1/treebfd248a1 FAILED Windows455/1, other five jobs pass, original cold73->76;
+modes1–6 and all fixed-file identity receipts succeed. Exact hashes/call values in I302 and
+#717 comment6204372217. None matches auxiliary indexes, so nearby-version cache analysis cannot
+qualify runner resources; unknown336/Key340 remain unattributed. No repair/completion/merge.
+
+Follow-up retains first4096 actual bytes from the same capped hash stream, validates signed
+PE offsets/actual and declared optional-header bounds/MZ/PE/AMD64/PE32+, and outputs only two
+unsigned lookup fields: TimeDateStamp and SizeOfImage. No extra reads/PE execution/native ABI/
+process observation/raw header/path/content persistence or output; same three files/32MiB cap,
+independent cleanup catches/original cargo command and exit priority. Under2KiB fixed receipts.
+This explicit fixed-field decoder extends only the prior stage's no-parser description; it is
+not full binary trust validation, calendar interpretation or loaded-module attestation. Official
+server candidates require full native SHA match. Protected scope review/local parser/bounds/
+short-read/cleanup/exit fixtures pass; governance/fingerprint/native gates pending. Review/Claimed,
+incomplete; no Completion Commit. I293/PROVIDER008/#705 unchanged, #643/#624 stay open.
+
+## CI3204 Exact-File Mechanisms And Direct Control — 2026-10-16
+
+CI3204 exact6d3d2970 FAILED Windows455/1, other five jobs pass; cold40/+2 still fails73->76.
+All3 DLL length/hashes now match direct Microsoft downloads. Exact-file static analysis identifies
+pipe-root caching and adjacent ETW/registry-root retained globals in the compatibility path;
+these are candidates for File/unknown+Key, NOT runtime object attribution or repair. PDB InfoAge
+mismatch limits symbol claims. Detailed RVAs/provenance/checks are preserved in I302 and #717
+comment6212258444; no downloaded PE execution/memory/otherPID/ObjectName/new observer API.
+
+Same-scope diagnostic mode7 bypasses Talos launcher bookkeeping in another outer-Job-owned exact
+worker: direct pipe cleanup and two direct suspended process lifecycles, four scalar counts,
+zero PSS/no delta assertion. Stable heap handle-list lifetime, initialized-only attributes,
+success-only returned-resource adoption, checked all-operation consume-before-release cleanup,
+no assign/resume, same flags/stdio allowlist/inputs and panic containment. A nonexistent-cwd real
+process-creation failure fixture runs AFTER measurement and must complete checked cleanup.
+No process-exit/reaping proof or native unwind-fixture coverage is claimed. Original mode0/all40/+2
+and modes1–6 remain; all eight outcomes are collected before asserting. Native execution/final
+protected review/exact-head full CI remain pending. No Completion Commit, merge or search activation.
+Main3bc38d78 I301/I304 closeouts are preserved in baseline refresh b7cf30db, not reopened.
+
+Final local candidate: pinned locked full preflight PASSED3726primary+1existing-child,0failed/
+ignored and both SDK modes, using only the prior exact local socket filter; original native
+failure retained. Corrected-source Windows coding --tests check/Clippy, actual production/test
+feature-graph separation, governance/claims/text/classifier/fmt/diff/scale pass. Independent Agent
+protected working-tree review approves diagnostic publication only, not native execution/repair/
+merge. Stable-head remote fingerprint review and new unfiltered native CI remain required.
+
 
 ## Retained Residual And TEST-004 Selection — 2026-10-16
 
@@ -111,3 +272,12 @@ Maintainer accepted narrower known-resource acceptance at22:39 Asia/Shanghai. Ne
 and I305/#730 own the proposed criterion/instrumentation/real-negative correction, only after their
 claim/amendedADR reaches main. This owner retains PSS diagnostics and unexplained/untracked
 process-wide/native resources as an OPEN residual; no completion/status takeover or #716 merge.
+
+
+## Effective TEST-004 Boundary — 2026-10-16
+
+#730 merged c81782b6 establishes TEST004/I305 and the accepted ADR091 amendment. The #716
+candidate may replace the global+2 oracle with actual enumerated-resource acceptance only under
+that independent owner. New instrumentation/all40/real negative native evidence remains pending;
+raw counts/direct controls/history stay. TEST003 remains Review/Claimed with unexplained/untracked
+native-resource residual OPEN; no Completion Commit or cache/global-leak-absence conclusion.

@@ -96,3 +96,56 @@ See the transport contract and I293 for authority timing, trusted-proxy limits a
 The25-year synthetic positive leaf violates Apple's825-day lifetime requirement; a coherent
 365-day leaf bundle correction retains production trust/verification and all negative cases.
 Fresh exact-head review/full CI required, no merge/skip/sole-cause inference. I293 records gates.
+
+#715 corrected head merged `d66e380a` with protected review6158318325, all six CI3173 jobs and
+CAS6158600236; all13 TLS cases pass on macOS/Windows, old failedCI retained. Next I293 bounded
+form transport prerequisite is Review:47 focused fixtures, no default activation/dependency/API
+or upstream parser copy. Full local/remote gates and broader proxy/ambient/protocol/D/official-
+root acceptance remain Pending; #643/#624 open. I293 records the authoritative stage evidence.
+
+#716 original protected review6158827975 is retained; CI3175 failed Windows process-wide
+handle counting (+11) while five jobs passed. A bounded test-only isolated-worker correction
+preserves all40 faults and +2 threshold, using existing outer Job ownership. Fresh protected
+review/native CI/CAS remain; no production process change, skip or retry-to-green claim.
+
+CI3176 failed the isolated worker as well:73→76, original +2 assertion intact; five other jobs
+passed. Root cause remains unknown. #716 prepares a bounded test-only41-sample trace, preserving
+all40 attempts/threshold/cleanup. This is diagnostic evidence, not a fixed or merge-ready stage.
+
+CI3177 trace failed cold73→76: first Pipe+1/first Assignment+2, later samples stable. Known cleanup
+BOOL checks are prepared without new native calls; richer self-only metadata requires separately
+accepted diagnostic scope/ADR/claim. No warmup or original-threshold change; #716 stays unmerged.
+
+2026-10-15: #718 merged f4313237 establishes the separate accepted TEST-003/I302/ADR-091
+self-only diagnostic scope. Recovered #716 candidate incorporates current main9b7ba281 and
+keeps I293 search commits separate from I302 observer work. Native execution/review/acceptance
+pending; original40/+2 and all failed history retained. Diagnostic collection does not fix the
+original defect or authorize716 merge, default Search activation or full C/Epic closure.
+
+CI3190 on published a39ee959 failed unchanged cold73->76; Windows453passed/1failed, five other
+jobs passed. Successful I302 observer/native fixtures are diagnostic evidence only. New bounded
+stage controls and typed-evidence interpretation remain in TEST-003/I302, with fresh protected
+review/native CI required. Main23e659e2 is included without taking over I303/I304 work. I293/C
+stays Active/Claimed/incomplete, #643/#624 open; production/default activation gates unchanged.
+
+CI3197 on770d856e failed unchanged cold73->76; five other jobs passed, I302 modes1–4
+succeeded. Preparation-only controls did not increase counts; direct API-return/cleanup
+investigation stays in TEST-003/I302. C acceptance, #716 merge and #643/#624 closure remain
+blocked by the unresolved original failure and existing activation gates; no Search change.
+
+Local validation residual: the new full preflight also failed unchanged Linux fixture
+`enclosing_deadline_covers_dns_and_response_wait_and_drops_socket` at its2s EOF receipt
+(tools457pass/1fail). It lacks proof that the150ms request reached an accepted connection;
+other read terminal states also lack receipts. Actual cause remains unknown. Preserve this
+C-fixture residual and the failed run; no deadline/filter change or full-local-pass claim.
+
+Follow-up is bounded failure telemetry only: retain up to4 read ErrorKinds and report accepted
+count, up to4 request(length,headers-complete) shapes and EOF count when that assertion fails.
+No content/paths/arguments are output, no error is counted as EOF, and150ms/2s/fixture10s limits
+are unchanged. Revalidate the new diagnostic source; retain the prior failure even if it passes.
+This is not a production fix or proven cause. Separate I293 commit; I302 owns Windows observers.
+
+New diagnostic-source local full preflight passed3717primary+1existingchild and both SDK modes,
+with only the prior authorized local filter; old457/1 failure remains. No repair/rootcause or
+native pass is inferred. Fixed-source Windows cross-check/Clippy/graphs/gates pass; fresh exact
+protected review/full unfiltered CI remain. I293 remains Active/Claimed/incomplete, #643/#624 open.

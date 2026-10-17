@@ -960,7 +960,7 @@ approval callback; the legacy argument-only SDK default denies this new scope. T
 [network carrier migration](docs/reference/SEARCH-001-C-NETWORK-CARRIER-MIGRATION.md) documents
 the additive API, exact endpoint binding and wrapper obligations. The staged
 [controlled direct transport](docs/reference/SEARCH-001-C-CONTROLLED-TRANSPORT.md) has local
-HTTP/TLS/SNI and limited CONNECT evidence; broader proxy, ambient configuration and protocol
+HTTP/TLS/SNI, limited CONNECT and bounded form POST evidence; broader proxy, ambient configuration and protocol
 gates remain before default search activation.
 This SEARCH-001-C infrastructure stage does not activate a new default search transport or release.
 

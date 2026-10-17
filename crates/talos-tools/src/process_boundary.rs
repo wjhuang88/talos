@@ -452,8 +452,10 @@ enum WindowsLaunchFault {
 #[cfg(windows)]
 #[cfg(test)]
 #[derive(Default)]
-struct WindowsLaunchTestHooks {
+struct WindowsLaunchTestHooks<'a> {
     fault: Option<WindowsLaunchFault>,
+    observer: Option<&'a mut windows_tests::LaunchObservation>,
+    audit: Option<&'a mut resource_acceptance::ResourceAudit>,
 }
 
 #[cfg(windows)]
@@ -490,7 +492,7 @@ fn create_windows_job_with_hooks(
     args: &[String],
     cwd: &std::path::Path,
     extra_env: &std::collections::BTreeMap<String, String>,
-    #[cfg(test)] hooks: WindowsLaunchTestHooks,
+    #[cfg(test)] mut hooks: WindowsLaunchTestHooks<'_>,
 ) -> Result<WindowsLaunchHandles, String> {
     use std::mem::{size_of, zeroed};
     use std::os::windows::io::FromRawHandle;
@@ -536,9 +538,56 @@ fn create_windows_job_with_hooks(
     let mut attrs: windows_sys::Win32::System::Threading::LPPROC_THREAD_ATTRIBUTE_LIST =
         std::ptr::null_mut();
     let mut attr_storage = Vec::<usize>::new();
+    #[cfg(test)]
+    let mut attrs_initialized = false;
+    // Keep native-borrowed list storage alive through audited Delete, including negatives.
+    #[cfg(test)]
+    let mut audit_handle_list = [std::ptr::null_mut(); 2];
+    #[cfg(test)]
+    macro_rules! acquired {
+        ($role:ident, $value:expr) => {
+            if let Some(audit) = hooks.audit.as_deref_mut() {
+                audit.acquired(resource_acceptance::Role::$role, $value as usize);
+            }
+        };
+    }
+    // Test-only fixed observers cannot propagate errors/panics past live raw owners.
+    #[cfg(test)]
+    macro_rules! observe {
+        ($phase:literal) => {
+            if let Some(observer) = hooks.observer.as_deref_mut() {
+                observer.record(
+                    $phase,
+                    [
+                        out_read, out_write, err_read, err_write, job, process, thread,
+                    ],
+                );
+            }
+        };
+    }
+    #[cfg(test)]
+    macro_rules! checked_close {
+        ($role:ident, $handle:expr) => {
+            if let Some(audit) = hooks.audit.as_deref_mut() {
+                audit.close(resource_acceptance::Role::$role, $handle as usize, || {
+                    CloseHandle($handle)
+                })
+            } else {
+                CloseHandle($handle)
+            }
+        };
+    }
     let result = (|| unsafe {
+        #[cfg(test)]
+        observe!("before_pipe");
         if CreatePipe(&mut out_read, &mut out_write, &security, 0) == 0 {
             return Err(last_windows_error("CreatePipe"));
+        }
+        #[cfg(test)]
+        {
+            acquired!(OutRead, out_read);
+            acquired!(OutWrite, out_write);
+            observe!("pipe_created");
         }
         #[cfg(test)]
         if hooks.fault == Some(WindowsLaunchFault::Pipe) {
@@ -546,6 +595,11 @@ fn create_windows_job_with_hooks(
         }
         if CreatePipe(&mut err_read, &mut err_write, &security, 0) == 0 {
             return Err(last_windows_error("CreatePipe"));
+        }
+        #[cfg(test)]
+        {
+            acquired!(ErrRead, err_read);
+            acquired!(ErrWrite, err_write);
         }
         if SetHandleInformation(out_read, HANDLE_FLAG_INHERIT, 0) == 0
             || SetHandleInformation(err_read, HANDLE_FLAG_INHERIT, 0) == 0
@@ -556,6 +610,8 @@ fn create_windows_job_with_hooks(
         if job.is_null() || job == INVALID_HANDLE_VALUE {
             return Err(last_windows_error("CreateJobObjectW"));
         }
+        #[cfg(test)]
+        acquired!(Job, job);
         #[cfg(test)]
         if hooks.fault == Some(WindowsLaunchFault::Job) {
             return Err("injected Job Object setup failure".to_owned());
@@ -581,10 +637,21 @@ fn create_windows_job_with_hooks(
             return Err(last_windows_error("InitializeProcThreadAttributeList"));
         }
         #[cfg(test)]
+        {
+            attrs_initialized = true;
+            acquired!(Attributes, attrs);
+        }
+        #[cfg(test)]
         if hooks.fault == Some(WindowsLaunchFault::AttributeList) {
             return Err("injected attribute-list setup failure".to_owned());
         }
+        #[cfg(not(test))]
         let handles = [out_write, err_write];
+        #[cfg(test)]
+        let handles = {
+            audit_handle_list.copy_from_slice(&[out_write, err_write]);
+            &audit_handle_list
+        };
         if UpdateProcThreadAttribute(
             attrs,
             0,
@@ -617,6 +684,8 @@ fn create_windows_job_with_hooks(
         startup.StartupInfo.hStdOutput = out_write;
         startup.StartupInfo.hStdError = err_write;
         let mut info: PROCESS_INFORMATION = zeroed();
+        #[cfg(test)]
+        observe!("before_process");
         if CreateProcessW(
             program_w.as_mut_ptr(),
             command_w.as_mut_ptr(),
@@ -634,6 +703,12 @@ fn create_windows_job_with_hooks(
         }
         process = info.hProcess;
         thread = info.hThread;
+        #[cfg(test)]
+        {
+            acquired!(Process, process);
+            acquired!(Thread, thread);
+            observe!("process_created");
+        }
         #[cfg(test)]
         let assignment_failed = hooks.fault == Some(WindowsLaunchFault::Assignment)
             || AssignProcessToJobObject(job, process) == 0;
@@ -681,26 +756,104 @@ fn create_windows_job_with_hooks(
         })
     })();
     if result.is_err() {
+        #[cfg(test)]
+        observe!("before_cleanup");
+        #[cfg(test)]
+        let mut cleanup_failures = 0u16;
         unsafe {
             if !thread.is_null() {
-                CloseHandle(thread);
+                #[cfg(test)]
+                let _closed = checked_close!(Thread, thread);
+                #[cfg(not(test))]
+                let _closed = CloseHandle(thread);
+                #[cfg(test)]
+                if _closed == 0 {
+                    cleanup_failures |= 1;
+                }
             }
             if !process.is_null() {
-                windows_sys::Win32::System::Threading::TerminateProcess(process, 1);
-                CloseHandle(process);
+                #[cfg(test)]
+                let _terminated = if let Some(audit) = hooks.audit.as_deref_mut() {
+                    audit.terminate(
+                        process as usize,
+                        || windows_sys::Win32::System::Threading::TerminateProcess(process, 1),
+                        |millis| {
+                            windows_sys::Win32::System::Threading::WaitForSingleObject(
+                                process, millis,
+                            )
+                        },
+                    )
+                } else {
+                    windows_sys::Win32::System::Threading::TerminateProcess(process, 1)
+                };
+                #[cfg(not(test))]
+                let _terminated =
+                    windows_sys::Win32::System::Threading::TerminateProcess(process, 1);
+                #[cfg(test)]
+                let _closed = checked_close!(Process, process);
+                #[cfg(not(test))]
+                let _closed = CloseHandle(process);
+                #[cfg(test)]
+                {
+                    if _terminated == 0 {
+                        cleanup_failures |= 1 << 1;
+                    }
+                    if _closed == 0 {
+                        cleanup_failures |= 1 << 2;
+                    }
+                }
             }
             if !attrs.is_null() {
+                #[cfg(test)]
+                if let Some(audit) = hooks.audit.as_deref_mut() {
+                    audit.delete(attrs as usize, attrs_initialized, || {
+                        DeleteProcThreadAttributeList(attrs)
+                    });
+                } else {
+                    DeleteProcThreadAttributeList(attrs);
+                }
+                #[cfg(not(test))]
                 DeleteProcThreadAttributeList(attrs);
             }
             if !job.is_null() {
-                CloseHandle(job);
+                #[cfg(test)]
+                let _closed = checked_close!(Job, job);
+                #[cfg(not(test))]
+                let _closed = CloseHandle(job);
+                #[cfg(test)]
+                if _closed == 0 {
+                    cleanup_failures |= 1 << 3;
+                }
             }
+            #[cfg(test)]
+            let mut pipe_bit = 1u16 << 4;
             for handle in [out_read, out_write, err_read, err_write] {
                 if !handle.is_null() {
-                    CloseHandle(handle);
+                    #[cfg(test)]
+                    let _closed = if let Some(audit) = hooks.audit.as_deref_mut() {
+                        audit.close_pipe(handle as usize, || CloseHandle(handle))
+                    } else {
+                        CloseHandle(handle)
+                    };
+                    #[cfg(not(test))]
+                    let _closed = CloseHandle(handle);
+                    #[cfg(test)]
+                    if _closed == 0 {
+                        cleanup_failures |= pipe_bit;
+                    }
+                }
+                #[cfg(test)]
+                {
+                    pipe_bit <<= 1;
                 }
             }
         }
+        // Report only after every cleanup operation has been attempted. Test failures
+        // must not short-circuit release of a later handle or termination of the child.
+        #[cfg(test)]
+        observe!("after_cleanup");
+        #[cfg(test)]
+        assert_eq!(cleanup_failures, 0, "Windows launch cleanup failure mask");
     }
     result
 }
@@ -794,6 +947,18 @@ fn quote_windows_arg(value: &str) -> String {
     quoted
 }
 
+#[cfg(test)]
+mod native_inventory;
+
+#[cfg(all(test, windows))]
+mod resource_acceptance;
+
+#[cfg(all(test, windows))]
+mod handle_snapshot;
+
+#[cfg(all(test, windows))]
+mod handle_lifecycle_control;
+
 #[cfg(all(test, windows))]
 mod windows_tests {
     use super::*;
@@ -801,6 +966,118 @@ mod windows_tests {
     use std::path::PathBuf;
     use std::time::Duration;
     use talos_core::background_job::{BackgroundJobLauncher, BackgroundProcessEvent};
+
+    const RETURNED_ORDER: [&str; 7] = [
+        "stdout_read",
+        "stdout_write",
+        "stderr_read",
+        "stderr_write",
+        "job",
+        "process",
+        "thread",
+    ];
+
+    #[derive(serde::Serialize)]
+    struct CallSample {
+        phase: &'static str,
+        before_snapshot: u32,
+        after_snapshot: u32,
+        // Values returned to this launcher, NOT still-live ownership or object IDs.
+        returned: [usize; 7],
+        #[serde(skip)]
+        handles: handle_snapshot::Handles,
+    }
+
+    pub(super) struct LaunchObservation {
+        phases: [&'static str; 4],
+        samples: [Option<CallSample>; 4],
+        next: usize,
+        error: Option<String>,
+    }
+
+    impl LaunchObservation {
+        fn new(mode: u8) -> Self {
+            Self {
+                phases: if mode == 5 {
+                    [
+                        "before_pipe",
+                        "pipe_created",
+                        "before_cleanup",
+                        "after_cleanup",
+                    ]
+                } else {
+                    [
+                        "before_process",
+                        "process_created",
+                        "before_cleanup",
+                        "after_cleanup",
+                    ]
+                },
+                samples: std::array::from_fn(|_| None),
+                next: 0,
+                error: None,
+            }
+        }
+
+        pub(super) fn record(
+            &mut self,
+            phase: &'static str,
+            returned: [windows_sys::Win32::Foundation::HANDLE; 7],
+        ) {
+            if self.error.is_some() || !self.phases.contains(&phase) {
+                return;
+            }
+            // Cover count, capture, numeric copy AND storage. Never unwind past the
+            // launcher's live raw resources or return early from its cleanup.
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                if self.next >= 4 || self.phases[self.next] != phase {
+                    return Err("call checkpoint order/cap".to_owned());
+                }
+                let before_snapshot = current_process_handle_count();
+                let handles = handle_snapshot::capture()?;
+                let after_snapshot = current_process_handle_count();
+                self.samples[self.next] = Some(CallSample {
+                    phase,
+                    before_snapshot,
+                    after_snapshot,
+                    returned: returned.map(|handle| handle as usize),
+                    handles,
+                });
+                self.next += 1;
+                Ok(())
+            }))
+            .unwrap_or_else(|_| Err("call observer panicked; evidence incomplete".to_owned()));
+            if let Err(error) = result {
+                self.error = Some(error);
+            }
+        }
+
+        fn finish(self) -> Result<Vec<u8>, String> {
+            if let Some(error) = self.error {
+                return Err(error);
+            }
+            let samples = self
+                .samples
+                .into_iter()
+                .collect::<Option<Vec<_>>>()
+                .ok_or("missing call checkpoint; evidence incomplete")?;
+            let calls = serde_json::to_value(&samples).map_err(|_| "call receipt encoding")?;
+            let phases = samples
+                .into_iter()
+                .map(|sample| (sample.phase, sample.handles))
+                .collect::<Vec<_>>();
+            let mut receipt: serde_json::Value =
+                serde_json::from_slice(&handle_snapshot::differences(&phases)?)
+                    .map_err(|_| "call differences JSON")?;
+            receipt["calls"] = calls;
+            receipt["returned_order"] = serde_json::json!(RETURNED_ORDER);
+            let output = serde_json::to_vec(&receipt).map_err(|_| "call receipt encoding")?;
+            if output.len() > handle_snapshot::OUTPUT_CAP - 4096 {
+                return Err("call receipt byte cap".to_owned());
+            }
+            Ok(output)
+        }
+    }
 
     fn powershell(script: &str) -> WindowsBackgroundLauncher {
         WindowsBackgroundLauncher::new(
@@ -1009,7 +1286,7 @@ mod windows_tests {
             .terminate()
             .await
             .expect("Job Object termination succeeds");
-        let _ = tokio::time::timeout(Duration::from_secs(10), async {
+        tokio::time::timeout(Duration::from_secs(10), async {
             while let Some(event) = events.recv().await {
                 if matches!(event, BackgroundProcessEvent::Exited(_)) {
                     break;
@@ -1095,6 +1372,7 @@ mod windows_tests {
             &launcher.env,
             WindowsLaunchTestHooks {
                 fault: Some(WindowsLaunchFault::UnsupportedHost),
+                ..Default::default()
             },
         ) {
             Ok(_) => panic!("unsupported Job host must fail closed"),
@@ -1140,6 +1418,7 @@ mod windows_tests {
             &launcher.env,
             WindowsLaunchTestHooks {
                 fault: Some(WindowsLaunchFault::Assignment),
+                ..Default::default()
             },
         ) {
             Ok(_) => panic!("injected assignment failure must fail closed"),
@@ -1160,6 +1439,7 @@ mod windows_tests {
             &launcher.env,
             WindowsLaunchTestHooks {
                 fault: Some(WindowsLaunchFault::Resume),
+                ..Default::default()
             },
         ) {
             Ok(_) => panic!("injected resume failure must fail closed"),
@@ -1168,10 +1448,321 @@ mod windows_tests {
         assert!(error.contains("ResumeThread"));
     }
 
-    #[test]
-    fn windows_partial_setup_failures_release_every_parent_handle() {
+    #[tokio::test]
+    async fn windows_partial_setup_failures_release_every_parent_handle() {
+        const TEST: &str = "process_boundary::windows_tests::windows_partial_setup_failures_release_every_parent_handle";
+        const CHILD_RECEIPT: &str = "TALOS_WINDOWS_HANDLE_COUNT_RECEIPT";
+        const MODE: &str = "TALOS_WINDOWS_HANDLE_SNAPSHOT_MODE";
+        let Some(receipt) = std::env::var_os(CHILD_RECEIPT) else {
+            // GetProcessHandleCount covers the whole process. Other concurrently running
+            // tests must not change this fixture's baseline or final sample.
+            let mut outcomes = Vec::new();
+            let mut controls = Vec::new();
+            // Cold, observer, native cleanup fixtures and stage controls: owned processes. Retain
+            // historical failures; attempt all workers before asserting any outcome.
+            for mode in [0u8, 1, 2, 3, 4, 5, 6, 7, 8] {
+                let directory = tempfile::Builder::new()
+                    .prefix("talos-handle-count-")
+                    .tempdir()
+                    .expect("owned receipt directory");
+                let receipt = directory.path().join("receipt.json");
+                let mut environment = BTreeMap::new();
+                environment.insert(
+                    CHILD_RECEIPT.to_owned(),
+                    receipt.to_str().expect("receipt path").to_owned(),
+                );
+                // Explicit zero prevents an inherited observer marker warming the cold child.
+                environment.insert(MODE.to_owned(), mode.to_string());
+                // The intentional caught-panic fixture must not inherit an unbounded
+                // backtrace setting; no process-global environment mutation is used.
+                environment.insert("RUST_BACKTRACE".to_owned(), "0".to_owned());
+                // The outer Job also owns descendants created before the inner fault
+                // reaches assignment. Its last control drop kills the whole tree.
+                let launcher = WindowsBackgroundLauncher::new(
+                    std::env::current_exe()
+                        .expect("test executable")
+                        .into_os_string()
+                        .into_string()
+                        .expect("test executable path"),
+                    ["--exact", TEST, "--test-threads=1", "--nocapture"]
+                        .map(str::to_owned)
+                        .to_vec(),
+                    std::env::current_dir().expect("test working directory"),
+                    environment,
+                );
+                let launched = match Box::new(launcher).launch().await {
+                    Ok(launched) => launched,
+                    Err(error) => {
+                        outcomes.push((mode, Err(format!("launch failed: {error}"))));
+                        continue;
+                    }
+                };
+                let control = launched.control;
+                let mut events = launched.events;
+                let mut output = Vec::new();
+                let mut overflow = false;
+                let result = tokio::time::timeout(Duration::from_secs(60), async {
+                    while let Some(event) = events.recv().await {
+                        match event {
+                            BackgroundProcessEvent::Output(chunk) => {
+                                let remaining = 16_384 - output.len();
+                                overflow |= chunk.bytes.len() > remaining;
+                                // Retention is bounded; keep draining after the cap.
+                                output.extend_from_slice(
+                                    &chunk.bytes[..chunk.bytes.len().min(remaining)],
+                                );
+                            }
+                            BackgroundProcessEvent::Exited(exit) => return Ok(exit.success),
+                            BackgroundProcessEvent::SupervisionFailed(error) => return Err(error),
+                        }
+                    }
+                    Err("handle child ended without Exited".to_owned())
+                })
+                .await;
+                if !matches!(&result, Ok(Ok(true))) || overflow {
+                    let cleanup = control.force_terminate().await;
+                    let terminal = matches!(&result, Ok(Ok(_)))
+                        || tokio::time::timeout(Duration::from_secs(10), async {
+                            while let Some(event) = events.recv().await {
+                                if matches!(event, BackgroundProcessEvent::Exited(_)) {
+                                    return true;
+                                }
+                            }
+                            false
+                        })
+                        .await
+                        .unwrap_or(false);
+                    eprintln!("handle fixture cleanup={cleanup:?} terminal={terminal}");
+                }
+                eprintln!("{}", String::from_utf8_lossy(&output));
+                let validation = if matches!(result, Ok(Ok(true))) && !overflow {
+                    validate_handle_receipt(&receipt, mode)
+                } else {
+                    Err(format!("exit={result:?}; overflow={overflow}"))
+                };
+                outcomes.push((mode, validation));
+                controls.push(control); // retain Jobs through every worker/receipt check
+            }
+            eprintln!("handle worker outcomes={outcomes:?}");
+            assert_eq!(outcomes.len(), 9);
+            for (mode, result) in outcomes {
+                assert!(result.is_ok(), "handle worker mode={mode}: {result:?}");
+            }
+            drop(controls);
+            return;
+        };
+        assert_eq!(
+            std::env::args().skip(1).collect::<Vec<_>>(),
+            ["--exact", TEST, "--test-threads=1", "--nocapture"],
+            "child marker requires the exact isolated invocation"
+        );
+        let receipt = PathBuf::from(receipt);
+        assert_eq!(
+            receipt.file_name(),
+            Some(std::ffi::OsStr::new("receipt.json"))
+        );
+        let directory = receipt
+            .parent()
+            .expect("receipt directory")
+            .canonicalize()
+            .expect("owned directory");
+        assert!(
+            directory
+                .file_name()
+                .expect("directory name")
+                .to_string_lossy()
+                .starts_with("talos-handle-count-")
+        );
+        assert_eq!(
+            directory.parent(),
+            Some(
+                std::env::temp_dir()
+                    .canonicalize()
+                    .expect("temp root")
+                    .as_path()
+            )
+        );
+        let mode = match std::env::var_os(MODE) {
+            None => 0,
+            Some(value) if value == "0" => 0,
+            Some(value) if value == "1" => 1,
+            Some(value) if value == "2" => 2,
+            Some(value) if value == "3" => 3,
+            Some(value) if value == "4" => 4,
+            Some(value) if value == "5" => 5,
+            Some(value) if value == "6" => 6,
+            Some(value) if value == "7" => 7,
+            Some(value) if value == "8" => 8,
+            Some(_) => panic!("invalid owned handle worker mode"),
+        };
+        if mode == 2 {
+            handle_snapshot::native_fixtures(); // exactly four captures in its own Job
+            std::fs::write(
+                receipt,
+                serde_json::to_vec(&serde_json::json!({
+                    "child_pid":std::process::id(),"snapshots":4,"native_checks":true
+                }))
+                .expect("native fixture JSON"),
+            )
+            .expect("native fixture receipt");
+            return;
+        }
         let launcher = powershell("Start-Sleep -Seconds 30");
+        if mode == 7 {
+            let counts = handle_lifecycle_control::run(&launcher)
+                .expect("complete direct Win32 lifecycle control");
+            // Exercise this control's own partial setup cleanup after measurement.
+            // A nonexistent cwd reaches real CreateProcessW failure with live pipes,
+            // Job and initialized attributes. Its error is accepted only if cleanup
+            // completed without an error mask; no failing output handles are adopted.
+            let mut failure_launcher = launcher;
+            failure_launcher.cwd = directory.join("missing-direct-control-cwd");
+            assert!(!failure_launcher.cwd.exists());
+            assert_eq!(
+                handle_lifecycle_control::run(&failure_launcher)
+                    .err()
+                    .as_deref(),
+                Some("direct CreateProcessW failed"),
+                "must reach real process creation failure and finish checked cleanup"
+            );
+            // Serialization and receipt I/O follow every sampled lifecycle/cleanup.
+            let output = serde_json::to_vec(&serde_json::json!({
+                "child_pid":std::process::id(),"direct_cycles":2,"snapshots":0,
+                "native_failure_check":true,
+                "phases":handle_lifecycle_control::PHASES,"counts":counts,
+            }))
+            .expect("direct lifecycle JSON");
+            assert!(output.len() <= 1024);
+            eprintln!(
+                "DIRECT_WIN32_LIFECYCLE {}",
+                String::from_utf8_lossy(&output)
+            );
+            std::fs::write(receipt, output).expect("direct lifecycle receipt");
+            return;
+        }
+        if matches!(mode, 5 | 6) {
+            let mut observer = LaunchObservation::new(mode);
+            let fault = if mode == 5 {
+                WindowsLaunchFault::Pipe
+            } else {
+                WindowsLaunchFault::Assignment
+            };
+            let result = create_windows_job_with_hooks(
+                &launcher.program,
+                &launcher.args,
+                &launcher.cwd,
+                &launcher.env,
+                WindowsLaunchTestHooks {
+                    fault: Some(fault),
+                    observer: Some(&mut observer),
+                    ..Default::default()
+                },
+            );
+            assert_eq!(
+                result.err().as_deref(),
+                Some(if mode == 5 {
+                    "injected pipe setup failure"
+                } else {
+                    "injected AssignProcessToJobObject failure"
+                })
+            );
+            // Explicit receipt assertions/output follow original cleanup. A caught
+            // observer panic may already have invoked the ordinary panic hook.
+            let output = observer
+                .finish()
+                .expect("complete bounded call-boundary receipt");
+            eprintln!(
+                "PSS_CALL_BOUNDARY mode={mode} {}",
+                String::from_utf8_lossy(&output)
+            );
+            std::fs::write(receipt, output).expect("call-boundary receipt");
+            return;
+        }
+        if matches!(mode, 3 | 4) {
+            let mut phases = Vec::new();
+            let mut observations = Vec::new();
+            record_handle_stage("control_baseline", &mut phases, &mut observations);
+            if mode == 3 {
+                assert_handle_stage_failure(
+                    &launcher,
+                    &launcher.program,
+                    Some(WindowsLaunchFault::Pipe),
+                    "injected pipe setup failure",
+                );
+                record_handle_stage("first_pipe_cleanup", &mut phases, &mut observations);
+                // Existing input rejection is AFTER UpdateProcThreadAttribute and BEFORE
+                // resolve/environment/CreateProcessW. No new hook/native/unsafe is needed.
+                assert_handle_stage_failure(
+                    &launcher,
+                    "invalid\"program",
+                    None,
+                    "Windows program path contains an unsupported quote or NUL",
+                );
+                record_handle_stage(
+                    "attributes_prepared_then_rejected",
+                    &mut phases,
+                    &mut observations,
+                );
+            } else {
+                let resolved =
+                    resolve_windows_program(&launcher.program).expect("known fixture program");
+                drop(resolved);
+                record_handle_stage("program_resolved", &mut phases, &mut observations);
+                // Exercise the existing launcher environment builder (which reads/copies
+                // the worker's environment), then immediately discard its output. No extra
+                // observational copy, inspection, log or persistence of those contents.
+                drop(windows_environment(&launcher.env));
+                record_handle_stage("environment_built", &mut phases, &mut observations);
+            }
+            assert_handle_stage_failure(
+                &launcher,
+                &launcher.program,
+                Some(WindowsLaunchFault::Assignment),
+                "injected AssignProcessToJobObject failure",
+            );
+            record_handle_stage("suspended_process_cleanup", &mut phases, &mut observations);
+            let output =
+                handle_snapshot::differences(&phases).expect("bounded complete stage differences");
+            eprintln!("PSS_STAGE_COUNTS mode={mode} observations={observations:?}");
+            eprintln!(
+                "PSS_STAGE_TYPES mode={mode} {}",
+                String::from_utf8_lossy(&output)
+            );
+            std::fs::write(receipt, output).expect("stage-control receipt");
+            return;
+        }
+        if mode == 8 {
+            let summary = resource_acceptance::negative_controls(&launcher);
+            let output = serde_json::to_vec(&serde_json::json!({
+                "child_pid":std::process::id(), "negative_controls":summary,
+            }))
+            .expect("negative receipt encoding");
+            eprintln!(
+                "WINDOWS_RESOURCE_NEGATIVES {}",
+                String::from_utf8_lossy(&output)
+            );
+            std::fs::write(receipt, output).expect("negative receipt write");
+            return;
+        }
+        let mut phases = Vec::new();
+        let mut observer_counts = Vec::new();
+        if mode == 1 {
+            for phase in ["baseline", "observer_control"] {
+                let before = current_process_handle_count();
+                phases.push((
+                    phase,
+                    handle_snapshot::capture().expect("checked self snapshot"),
+                ));
+                observer_counts.push((phase, before, current_process_handle_count()));
+            }
+        }
         let before = current_process_handle_count();
+        // Fixed storage and read-only counts keep diagnostics out of the sampled work.
+        // Index 0 is the baseline; each group of eight follows the fault order below.
+        let mut counts = [0u32; 41];
+        counts[0] = before;
+        let mut attempts = 0;
+        let mut known = resource_acceptance::Summary::default();
         for fault in [
             WindowsLaunchFault::Pipe,
             WindowsLaunchFault::Job,
@@ -1180,21 +1771,394 @@ mod windows_tests {
             WindowsLaunchFault::Resume,
         ] {
             for _ in 0..8 {
+                let mut audit = resource_acceptance::ResourceAudit::new(fault, attempts + 1, None);
                 let result = create_windows_job_with_hooks(
                     &launcher.program,
                     &launcher.args,
                     &launcher.cwd,
                     &launcher.env,
-                    WindowsLaunchTestHooks { fault: Some(fault) },
+                    WindowsLaunchTestHooks {
+                        fault: Some(fault),
+                        audit: Some(&mut audit),
+                        ..Default::default()
+                    },
                 );
                 assert!(result.is_err(), "{fault:?} must fail closed");
+                let expected = match fault {
+                    WindowsLaunchFault::Pipe => "injected pipe setup failure",
+                    WindowsLaunchFault::Job => "injected Job Object setup failure",
+                    WindowsLaunchFault::AttributeList => "injected attribute-list setup failure",
+                    WindowsLaunchFault::Assignment => "injected AssignProcessToJobObject failure",
+                    WindowsLaunchFault::Resume => "injected ResumeThread failure",
+                    WindowsLaunchFault::UnsupportedHost => panic!("not a partial-setup fault"),
+                };
+                assert_eq!(
+                    result.err().expect("injected failure"),
+                    expected,
+                    "must reach the requested fault, not fail earlier"
+                );
+                known.add(audit.finish().expect("actual known-resource cleanup"));
+                attempts += 1;
+                counts[attempts] = current_process_handle_count();
+                if mode == 1 && attempts == 1 {
+                    let before = current_process_handle_count();
+                    phases.push((
+                        "first_pipe",
+                        handle_snapshot::capture().expect("checked self snapshot"),
+                    ));
+                    observer_counts.push(("first_pipe", before, current_process_handle_count()));
+                }
             }
         }
         let after = current_process_handle_count();
-        assert!(
-            after <= before.saturating_add(2),
-            "partial launch failures leaked handles: before={before}, after={after}"
+        // Preserve the independent final sample and emit evidence before a failure.
+        // This is a diagnostic trace, not a warmup, threshold change or success receipt.
+        eprintln!(
+            "WINDOWS_HANDLE_COUNT_TRACE fault_order=Pipe,Job,AttributeList,Assignment,Resume attempts_per_fault=8 counts={counts:?} before={before} after={after}"
         );
+        if mode == 1 {
+            phases.push((
+                "final_40",
+                handle_snapshot::capture().expect("checked self snapshot"),
+            ));
+            observer_counts.push(("final_40", after, current_process_handle_count()));
+            assert_eq!(attempts, 40);
+            let output =
+                handle_snapshot::differences(&phases).expect("bounded complete differences");
+            eprintln!("PSS_OBSERVER_COUNTS {observer_counts:?}");
+            eprintln!("PSS_HANDLE_TYPES {}", String::from_utf8_lossy(&output));
+            std::fs::write(receipt, output).expect("snapshot receipt");
+            return; // observer metadata cannot substitute for the cold worker resource proof
+        }
+        // Effective TEST-004/ADR091: raw totals remain diagnostics, not ownership proof.
+        known.require_all40();
+        // Receipt I/O and diagnostics are deliberately outside the sampled interval.
+        assert_eq!(attempts, 40);
+        std::fs::write(
+            receipt,
+            serde_json::to_vec(&serde_json::json!({
+                "child_pid": std::process::id(), "attempts": attempts,
+                "before": before, "after": after, "known_resources": known,
+            }))
+            .expect("receipt encoding"),
+        )
+        .expect("receipt write");
+        eprintln!("WINDOWS_HANDLE_COUNT_RECEIPT attempts={attempts} before={before} after={after}");
+        eprintln!(
+            "WINDOWS_KNOWN_RESOURCE_RECEIPT {}",
+            serde_json::to_string(&known).expect("known-resource receipt")
+        );
+    }
+
+    fn validate_handle_receipt(path: &std::path::Path, mode: u8) -> Result<(), String> {
+        let cap = if matches!(mode, 0 | 7 | 8) {
+            1024
+        } else {
+            handle_snapshot::OUTPUT_CAP
+        };
+        if std::fs::metadata(path)
+            .map_err(|_| "missing receipt")?
+            .len()
+            > cap as u64
+        {
+            return Err("receipt byte cap".to_owned());
+        }
+        let bytes = std::fs::read(path).map_err(|_| "receipt read failed")?;
+        if bytes.len() > cap {
+            return Err("receipt byte cap".to_owned());
+        }
+        let data: serde_json::Value =
+            serde_json::from_slice(&bytes).map_err(|_| "invalid receipt JSON")?;
+        let pid = data["child_pid"]
+            .as_u64()
+            .and_then(|pid| u32::try_from(pid).ok())
+            .ok_or("invalid child PID")?;
+        if pid == 0 || pid == std::process::id() {
+            return Err("receipt not another process".to_owned());
+        }
+        if mode == 8 {
+            if data["negative_controls"] != resource_acceptance::negative_receipt() {
+                return Err("negative resource controls incomplete".to_owned());
+            }
+        } else if mode == 7 {
+            if data["direct_cycles"].as_u64() != Some(2)
+                || data["snapshots"].as_u64() != Some(0)
+                || data["native_failure_check"] != true
+                || data["phases"] != serde_json::json!(handle_lifecycle_control::PHASES)
+                || data["counts"].as_array().is_none_or(|counts| {
+                    counts.len() != 4
+                        || counts
+                            .iter()
+                            .any(|n| n.as_u64().and_then(|n| u32::try_from(n).ok()).is_none())
+                })
+            {
+                return Err("invalid direct lifecycle receipt".to_owned());
+            }
+            // Count growth is diagnostic; mode0 independently proves known-resource cleanup.
+        } else if mode == 0 {
+            if data["attempts"].as_u64() != Some(40) {
+                return Err("wrong fault count".to_owned());
+            }
+            let before = data["before"]
+                .as_u64()
+                .and_then(|v| u32::try_from(v).ok())
+                .ok_or("invalid baseline")?;
+            let after = data["after"]
+                .as_u64()
+                .and_then(|v| u32::try_from(v).ok())
+                .ok_or("invalid final count")?;
+            let _diagnostic_counts = (before, after);
+            if data["known_resources"] != resource_acceptance::all40_receipt() {
+                return Err("known resource proof incomplete".to_owned());
+            }
+        } else {
+            if data["snapshots"].as_u64() != Some(4) {
+                return Err("wrong snapshot count".to_owned());
+            }
+            if mode != 2
+                && data["changes"]
+                    .as_array()
+                    .is_none_or(|changes| changes.len() > 32)
+            {
+                return Err("missing/oversized type differences".to_owned());
+            }
+            if mode != 2 {
+                let expected = match mode {
+                    1 => ["baseline", "observer_control", "first_pipe", "final_40"],
+                    3 => [
+                        "control_baseline",
+                        "first_pipe_cleanup",
+                        "attributes_prepared_then_rejected",
+                        "suspended_process_cleanup",
+                    ],
+                    4 => [
+                        "control_baseline",
+                        "program_resolved",
+                        "environment_built",
+                        "suspended_process_cleanup",
+                    ],
+                    5 => [
+                        "before_pipe",
+                        "pipe_created",
+                        "before_cleanup",
+                        "after_cleanup",
+                    ],
+                    6 => [
+                        "before_process",
+                        "process_created",
+                        "before_cleanup",
+                        "after_cleanup",
+                    ],
+                    _ => return Err("invalid observer mode".to_owned()),
+                };
+                let phases = data["phase_sizes"]
+                    .as_array()
+                    .ok_or("missing observer phases")?;
+                if phases.len() != expected.len()
+                    || phases.iter().zip(expected).any(|(entry, phase)| {
+                        entry[0].as_str() != Some(phase)
+                            || entry[1].as_u64().is_none_or(|size| size > 1024)
+                    })
+                {
+                    return Err("observer phase order/entry cap invalid".to_owned());
+                }
+                if matches!(mode, 5 | 6) {
+                    if data["returned_order"] != serde_json::json!(RETURNED_ORDER) {
+                        return Err("invalid returned-handle role order".to_owned());
+                    }
+                    let calls = data["calls"].as_array().ok_or("missing call checkpoints")?;
+                    if calls.len() != 4
+                        || calls.iter().zip(expected).any(|(entry, phase)| {
+                            entry["phase"].as_str() != Some(phase)
+                                || ["before_snapshot", "after_snapshot"]
+                                    .into_iter()
+                                    .any(|key| {
+                                        entry[key]
+                                            .as_u64()
+                                            .and_then(|n| u32::try_from(n).ok())
+                                            .is_none()
+                                    })
+                                || entry["returned"].as_array().is_none_or(|values| {
+                                    values.len() != 7 || values.iter().any(|v| v.as_u64().is_none())
+                                })
+                        })
+                    {
+                        return Err("invalid call checkpoint receipt".to_owned());
+                    }
+                }
+            }
+            if mode == 2 && data["native_checks"] != true {
+                return Err("native fixtures missing".to_owned());
+            }
+        }
+        Ok(())
+    }
+
+    fn record_handle_stage(
+        phase: &'static str,
+        phases: &mut Vec<(&'static str, handle_snapshot::Handles)>,
+        observations: &mut Vec<(&'static str, u32, u32)>,
+    ) {
+        let before = current_process_handle_count();
+        phases.push((
+            phase,
+            handle_snapshot::capture().expect("checked self stage snapshot"),
+        ));
+        observations.push((phase, before, current_process_handle_count()));
+    }
+
+    fn assert_handle_stage_failure(
+        launcher: &WindowsBackgroundLauncher,
+        program: &str,
+        fault: Option<WindowsLaunchFault>,
+        expected: &str,
+    ) {
+        let result = create_windows_job_with_hooks(
+            program,
+            &launcher.args,
+            &launcher.cwd,
+            &launcher.env,
+            WindowsLaunchTestHooks {
+                fault,
+                ..Default::default()
+            },
+        );
+        assert_eq!(
+            result.err().as_deref(),
+            Some(expected),
+            "must reach the intended stage"
+        );
+    }
+
+    #[test]
+    fn direct_lifecycle_receipt_preserves_growth_as_evidence() {
+        let directory = tempfile::tempdir().expect("fixture directory");
+        let path = directory.path().join("receipt.json");
+        let mut data = serde_json::json!({
+            "child_pid":std::process::id().wrapping_add(1).max(1),
+            "direct_cycles":2,"snapshots":0,"native_failure_check":true,
+            "phases":handle_lifecycle_control::PHASES,"counts":[73,74,76,1000],
+        });
+        let write = |data: &serde_json::Value| {
+            std::fs::write(&path, serde_json::to_vec(data).expect("fixture JSON")).expect("write");
+        };
+        write(&data);
+        assert!(validate_handle_receipt(&path, 7).is_ok());
+        assert!(validate_handle_receipt(&path, 0).is_err());
+        for (field, value) in [
+            ("direct_cycles", serde_json::json!(1)),
+            ("snapshots", serde_json::json!(4)),
+            ("native_failure_check", serde_json::json!(false)),
+            ("phases", serde_json::json!(vec!["direct_baseline"; 4])),
+            ("counts", serde_json::json!([73, 74, 76])),
+            ("counts", serde_json::json!([73, 74, 76, u64::MAX])),
+            ("counts", serde_json::json!([73, 74, 76, "unknown"])),
+        ] {
+            let original = data[field].clone();
+            data[field] = value;
+            write(&data);
+            assert!(validate_handle_receipt(&path, 7).is_err(), "{field}");
+            data[field] = original;
+        }
+    }
+
+    #[test]
+    fn call_receipt_requires_complete_matching_checkpoints() {
+        let directory = tempfile::tempdir().expect("fixture directory");
+        let path = directory.path().join("receipt.json");
+        let phases = [
+            "before_pipe",
+            "pipe_created",
+            "before_cleanup",
+            "after_cleanup",
+        ];
+        let mut data = serde_json::json!({"child_pid":std::process::id().wrapping_add(1).max(1),
+            "snapshots":4,"changes":[],"returned_order":RETURNED_ORDER,
+            "phase_sizes":phases.map(|phase| (phase,73)),
+            "calls":phases.map(|phase| serde_json::json!({"phase":phase,
+                "before_snapshot":73,"after_snapshot":73,"returned":vec![0u64;7]}))});
+        std::fs::write(&path, serde_json::to_vec(&data).expect("fixture JSON")).expect("write");
+        assert!(validate_handle_receipt(&path, 5).is_ok());
+        assert!(validate_handle_receipt(&path, 6).is_err());
+        data["calls"][2]["returned"] = serde_json::json!(vec![0u64; 6]);
+        std::fs::write(&path, serde_json::to_vec(&data).expect("fixture JSON")).expect("write");
+        assert!(validate_handle_receipt(&path, 5).is_err());
+        let mut observer = LaunchObservation::new(5);
+        // Wrong first phase rejects before any native capture; failure stays contained.
+        observer.record("pipe_created", [std::ptr::null_mut(); 7]);
+        assert_eq!(
+            observer.finish().err().as_deref(),
+            Some("call checkpoint order/cap")
+        );
+        assert!(LaunchObservation::new(6).finish().is_err());
+    }
+
+    #[test]
+    fn handle_stage_receipt_requires_exact_phase_order() {
+        let directory = tempfile::tempdir().expect("fixture directory");
+        let path = directory.path().join("receipt.json");
+        let pid = std::process::id().wrapping_add(1).max(1);
+        let mut data = serde_json::json!({"child_pid":pid,"snapshots":4,"changes":[],
+            "phase_sizes":[["control_baseline",73],["first_pipe_cleanup",74],
+                ["attributes_prepared_then_rejected",74],["suspended_process_cleanup",76]]});
+        std::fs::write(&path, serde_json::to_vec(&data).expect("fixture JSON"))
+            .expect("fixture write");
+        assert!(validate_handle_receipt(&path, 3).is_ok());
+        assert!(
+            validate_handle_receipt(&path, 4).is_err(),
+            "another worker's phases are not valid evidence"
+        );
+        data["phase_sizes"][2][0] = serde_json::json!("control_baseline");
+        std::fs::write(&path, serde_json::to_vec(&data).expect("fixture JSON"))
+            .expect("fixture write");
+        assert!(validate_handle_receipt(&path, 3).is_err());
+    }
+
+    #[test]
+    fn known_resource_receipts_require_actual_complete_summary_and_negatives() {
+        let directory = tempfile::tempdir().expect("receipt directory");
+        let path = directory.path().join("receipt.json");
+        let mut data = serde_json::json!({"child_pid":1,"attempts":40,"before":73,"after":76,
+            "known_resources":resource_acceptance::all40_receipt()});
+        std::fs::write(&path, data.to_string()).expect("receipt");
+        assert!(validate_handle_receipt(&path, 0).is_ok());
+        for field in [
+            "attempts",
+            "resources",
+            "closes",
+            "deletes",
+            "terminations",
+            "exits",
+            "generation_sum",
+        ] {
+            let original = data["known_resources"][field].take();
+            std::fs::write(&path, data.to_string()).expect("incomplete receipt");
+            assert!(validate_handle_receipt(&path, 0).is_err(), "{field}");
+            data["known_resources"][field] = original;
+        }
+        data = serde_json::json!({"child_pid":1,"negative_controls":resource_acceptance::negative_receipt()});
+        std::fs::write(&path, data.to_string()).expect("negative receipt");
+        assert!(validate_handle_receipt(&path, 8).is_ok());
+        data["negative_controls"]["recovered"] = 3.into();
+        std::fs::write(&path, data.to_string()).expect("incomplete recovery");
+        assert!(validate_handle_receipt(&path, 8).is_err());
+    }
+
+    #[test]
+    fn handle_receipt_failures_are_results_not_early_panics() {
+        let directory = tempfile::tempdir().expect("fixture directory");
+        let path = directory.path().join("receipt.json");
+        assert!(validate_handle_receipt(&path, 0).is_err());
+        std::fs::write(&path, b"bad JSON").expect("fixture write");
+        assert!(validate_handle_receipt(&path, 0).is_err());
+        std::fs::write(&path, vec![b'x'; 1025]).expect("fixture write");
+        assert!(validate_handle_receipt(&path, 0).is_err());
+        std::fs::write(
+            &path,
+            br#"{"child_pid":1,"attempts":40,"before":73,"after":76}"#,
+        )
+        .expect("fixture write");
+        assert!(validate_handle_receipt(&path, 0).is_err());
     }
 
     fn windows_process_exists(pid: u32) -> bool {

@@ -9,12 +9,245 @@ use std::{
 };
 use talos_core::tool::{ToolNetworkAuthorizationError, ToolNetworkScope};
 
+fn form_fields(fields: &[(&str, &str)]) -> Vec<(String, String)> {
+    fields
+        .iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect()
+}
+
+#[test]
+fn form_encoding_preserves_unicode_reserved_bytes_duplicates_empty_fields_and_order() {
+    let fields = form_fields(&[("q", "中 +&=~\r\n"), ("q", "*._-"), ("", ""), ("a", "")]);
+    assert_eq!(
+        encode_form(&fields).expect("form"),
+        b"q=%E4%B8%AD+%2B%26%3D%7E%0D%0A&q=*._-&=&a="
+    );
+    assert!(encode_form(&[]).expect("empty form").is_empty());
+    assert_eq!(
+        encode_form(&vec![(String::new(), String::new()); 8192])
+            .expect("maximum empty fields")
+            .len(),
+        16_383
+    );
+}
+
+#[test]
+fn bounded_generated_form_fields_round_trip_through_standard_url_decoding() {
+    // Bounded generated property coverage without adding a new test dependency.
+    let samples: Vec<String> = (0..=255)
+        .filter_map(char::from_u32)
+        .map(|c| format!("{c}中🙂 +~&=\0"))
+        .collect();
+    for value in samples {
+        let fields = vec![(value.clone(), value), (String::new(), String::new())];
+        let bytes = encode_form(&fields).expect("bounded generated input");
+        assert!(bytes.len() <= 16_384);
+        let mut encoded = Url::parse("https://decode.invalid/").expect("container");
+        encoded.set_query(Some(std::str::from_utf8(&bytes).expect("ASCII")));
+        assert_eq!(
+            encoded.query_pairs().into_owned().collect::<Vec<_>>(),
+            fields
+        );
+    }
+}
+
+#[tokio::test]
+async fn real_form_post_has_fixed_type_and_exact_encoded_body_at_the_limit() {
+    for (value, encoded_value) in [
+        ("a".repeat(16_382), "a".repeat(16_382)),
+        (
+            format!("{}aa", "中".repeat(1820)),
+            format!("{}aa", "%E4%B8%AD".repeat(1820)),
+        ),
+    ] {
+        let server = Server::new(vec![ok("form")]);
+        let url = server.url("/search?fixed=1");
+        let t = transport(
+            manifest(&[(&url, Method::POST)], loopback(), 0),
+            dns(server.port),
+            Duration::from_secs(3),
+            1,
+            1024,
+        );
+        let fields = form_fields(&[("q", &value)]);
+        assert_eq!(
+            t.execute_form(url, fields).await.expect("form POST").body,
+            b"form"
+        );
+        let request = server.request(0);
+        assert!(request.starts_with("POST /search?fixed=1 HTTP/1.1\r\n"));
+        assert!(
+            request
+                .to_ascii_lowercase()
+                .contains("content-type: application/x-www-form-urlencoded\r\n")
+        );
+        assert_eq!(
+            request.split_once("\r\n\r\n").expect("body").1,
+            format!("q={encoded_value}")
+        );
+        assert_eq!(encoded_value.len() + 2, 16_384);
+        assert_eq!(server.count(), 1);
+    }
+}
+
+#[tokio::test]
+async fn form_overflow_expansion_and_field_count_are_rejected_without_dns_or_budget_use() {
+    let server = Server::new(vec![]);
+    let url = server.url("/search");
+    let resolver = dns(server.port);
+    let t = transport(
+        manifest(&[(&url, Method::POST)], loopback(), 0),
+        resolver.clone(),
+        Duration::from_secs(3),
+        1,
+        1024,
+    );
+    for fields in [
+        form_fields(&[("q", &"a".repeat(16_383))]),
+        form_fields(&[("q", &"中".repeat(1821))]),
+        form_fields(&[("q", &format!("{}aaa", "中".repeat(1820)))]),
+        vec![(String::new(), String::new()); 8193],
+    ] {
+        assert_eq!(
+            t.execute_form(url.clone(), fields)
+                .await
+                .expect_err("oversized form"),
+            TransportError::InvalidRequest
+        );
+    }
+    assert_eq!(resolver.calls.load(Ordering::Relaxed), 0);
+    assert_eq!(t.budget.attempts.load(Ordering::Relaxed), 0);
+    assert_eq!(server.count(), 0);
+}
+
+#[tokio::test]
+async fn form_same_origin_redirect_retains_body_and_type_but_other_post_redirects_fail() {
+    for status in [301, 302, 303, 307, 308] {
+        let server = Server::new(vec![
+            format!(
+                "HTTP/1.1 {status} Redirect\r\nLocation: /target\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+            ),
+            ok("form"),
+        ]);
+        let url = server.url("/search");
+        let next = server.url("/target");
+        let t = transport(
+            manifest(
+                &[(&url, Method::POST), (&next, Method::POST)],
+                loopback(),
+                1,
+            ),
+            dns(server.port),
+            Duration::from_secs(3),
+            2,
+            1024,
+        );
+        let result = t.execute_form(url, form_fields(&[("q", "toy +&")])).await;
+        if matches!(status, 307 | 308) {
+            assert_eq!(result.expect("preserved POST").body, b"form");
+            for i in [0, 1] {
+                let request = server.request(i);
+                assert!(
+                    request
+                        .to_ascii_lowercase()
+                        .contains("content-type: application/x-www-form-urlencoded\r\n")
+                );
+                assert!(request.ends_with("q=toy+%2B%26"));
+            }
+            assert_eq!(server.count(), 2);
+        } else {
+            assert_eq!(
+                result.expect_err("method-changing redirect"),
+                TransportError::Redirect
+            );
+            assert_eq!(server.count(), 1);
+        }
+    }
+}
+
+#[tokio::test]
+async fn form_cross_origin_redirect_never_forwards_body_even_when_target_is_scoped() {
+    let target = Server::new(vec![ok("unexpected")]);
+    let next = target.url("/target");
+    let source = Server::new(vec![redirect(307, &next)]);
+    let url = source.url("/search");
+    let t = transport(
+        manifest(
+            &[(&url, Method::POST), (&next, Method::POST)],
+            loopback(),
+            1,
+        ),
+        dns(source.port),
+        Duration::from_secs(3),
+        2,
+        1024,
+    );
+    assert_eq!(
+        t.execute_form(url, form_fields(&[("q", "toy-secret")]))
+            .await
+            .expect_err("origin changed"),
+        TransportError::Redirect
+    );
+    assert!(source.request(0).ends_with("q=toy-secret"));
+    assert_eq!(target.count(), 0);
+}
+
+#[tokio::test]
+async fn denied_form_scope_and_expired_budget_do_not_resolve_or_start() {
+    let server = Server::new(vec![]);
+    let url = server.url("/search");
+    let resolver = dns(server.port);
+    let t = transport(
+        manifest(&[(&url, Method::GET)], loopback(), 0),
+        resolver.clone(),
+        Duration::from_secs(3),
+        1,
+        1024,
+    );
+    assert_eq!(
+        t.execute_form(url.clone(), form_fields(&[("q", "toy")]))
+            .await
+            .expect_err("POST not scoped"),
+        TransportError::Unauthorized
+    );
+    assert_eq!(t.budget.attempts.load(Ordering::Relaxed), 0);
+    let t = transport(
+        manifest(&[(&url, Method::POST)], loopback(), 0),
+        resolver.clone(),
+        Duration::from_secs(3),
+        1,
+        1024,
+    );
+    // A constructed expired budget exercises the entry fence without wall-clock sleeps.
+    let t = SearchTransport {
+        budget: Arc::new(TransportBudget {
+            deadline: Instant::now(),
+            attempts: AtomicUsize::new(0),
+            bytes: AtomicUsize::new(0),
+            max_requests: 1,
+            max_bytes: 1024,
+        }),
+        ..t
+    };
+    assert_eq!(
+        t.execute_form(url, form_fields(&[("q", "toy")]))
+            .await
+            .expect_err("expired form"),
+        TransportError::Deadline
+    );
+    assert_eq!(resolver.calls.load(Ordering::Relaxed), 0);
+    assert_eq!(server.count(), 0);
+}
+
 /// Owned local socket fixture: no upstream service, region or real credential.
 struct Server {
     port: u16,
     stop: Arc<AtomicBool>,
     accepted: Arc<AtomicUsize>,
     closed: Arc<AtomicUsize>,
+    read_errors: Arc<Mutex<Vec<std::io::ErrorKind>>>,
+    read_error_count: Arc<AtomicUsize>,
     requests: Arc<Mutex<Vec<Vec<u8>>>>,
     worker: Mutex<Option<thread::JoinHandle<()>>>,
 }
@@ -27,12 +260,16 @@ impl Server {
         let stop = Arc::new(AtomicBool::new(false));
         let accepted = Arc::new(AtomicUsize::new(0));
         let closed = Arc::new(AtomicUsize::new(0));
+        let read_errors = Arc::new(Mutex::new(Vec::with_capacity(4)));
+        let read_error_count = Arc::new(AtomicUsize::new(0));
         let requests = Arc::new(Mutex::new(Vec::new()));
-        let (s, a, c, r) = (
+        let (s, a, c, r, errors, error_count) = (
             stop.clone(),
             accepted.clone(),
             closed.clone(),
             requests.clone(),
+            read_errors.clone(),
+            read_error_count.clone(),
         );
         let worker = thread::spawn(move || {
             let mut responses: VecDeque<_> = responses.into();
@@ -70,7 +307,14 @@ impl Server {
                         {
                             continue;
                         }
-                        Err(_) => break,
+                        Err(error) => {
+                            error_count.fetch_add(1, Ordering::Relaxed);
+                            let mut errors = errors.lock().expect("read error receipt");
+                            if errors.len() < 4 {
+                                errors.push(error.kind());
+                            }
+                            break;
+                        }
                     }
                     assert!(bytes.len() <= 32_768, "fixture request bound");
                     if let Some(end) = bytes.windows(4).position(|s| s == b"\r\n\r\n") {
@@ -105,7 +349,14 @@ impl Server {
                                     e.kind(),
                                     std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
                                 ) => {}
-                            Err(_) => break,
+                            Err(error) => {
+                                error_count.fetch_add(1, Ordering::Relaxed);
+                                let mut errors = errors.lock().expect("read error receipt");
+                                if errors.len() < 4 {
+                                    errors.push(error.kind());
+                                }
+                                break;
+                            }
                         }
                     }
                 }
@@ -121,6 +372,8 @@ impl Server {
             stop,
             accepted,
             closed,
+            read_errors,
+            read_error_count,
             requests,
             worker: Mutex::new(Some(worker)),
         }
@@ -719,7 +972,19 @@ async fn enclosing_deadline_covers_dns_and_response_wait_and_drops_socket() {
         }
     })
     .await
-    .expect("owned connection closes");
+    .unwrap_or_else(|error| {
+        let (shapes, shapes_truncated) = {
+            let requests = server.requests.lock().expect("request receipt");
+            let shapes = requests.iter().take(4)
+                .map(|bytes| (bytes.len(), bytes.windows(4).any(|s| s == b"\r\n\r\n")))
+                .collect::<Vec<_>>();
+            (shapes, requests.len() > 4)
+        };
+        let errors = server.read_errors.lock().expect("read error receipt").clone();
+        let errors_unrepresented = server.read_error_count.load(Ordering::Relaxed) > errors.len();
+        panic!("owned connection closes: {error}; accepted={} committed_request_shapes={shapes:?} shapes_truncated={shapes_truncated} eof_reads={} read_errors={errors:?} errors_unrepresented={errors_unrepresented}",
+            server.accepted.load(Ordering::Relaxed), server.closed.load(Ordering::Relaxed));
+    });
 }
 
 #[tokio::test]
