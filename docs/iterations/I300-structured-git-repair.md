@@ -3800,6 +3800,15 @@ semantics, child transport/retries, recursive fetch, parent integration,
 eight-stage runner reachability and final delivery gates remain open.
 Production Pull remains disabled; I300/T7 and the handoff stay incomplete.
 
+Linked-worktree pointer evidence update (2026-10-17): admitted registration
+`gitdir` and `commondir` file contents now share the reference evidence budget,
+with pointer bytes kept separate from symbolic-ref validation. The 13/13
+inventory regressions cover fresh frontier admission and in-place pointer
+modifications; Pull-focused tests pass 86/86 and all-target/all-feature Clippy
+passes. Independent review found no new blocker in the bounded evidence change.
+Resolved-target authorization remains an explicit native-probe activation
+blocker; production Pull and the broader T7 objective remain incomplete.
+
 Linked-worktree graph inventory update (2026-10-17): child graph discovery now
 admits `worktrees` through the existing bounded exact-path frontier; registered
 worktree HEAD/refs contents are retained in the shared reference evidence budget.
