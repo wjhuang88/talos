@@ -111,8 +111,8 @@ impl Inventory {
         Ok(())
     }
 
-    /// Bind references and shallow/graft graph boundaries, including symbolic
-    /// replacement-ref declarations, under one shared evidence budget,
+    /// Bind references, linked-worktree pointers and shallow/graft boundaries,
+    /// including symbolic replacement refs, under one shared evidence budget,
     /// without recursively opening descendants absent from the admitted inventory.
     pub(super) fn bind_references(
         &mut self,
@@ -148,7 +148,20 @@ impl Inventory {
             let boundary = [gitdir, common]
                 .iter()
                 .any(|root| path == &root.join("shallow") || path == &root.join("info/grafts"));
-            if (reference || boundary) && identity.is_some() && !self.directories.contains_key(path)
+            let pointer = path
+                .strip_prefix(common.join("worktrees"))
+                .ok()
+                .is_some_and(|relative| {
+                    let mut components = relative.components();
+                    components.next().is_some()
+                        && components.next().is_some_and(|name| {
+                            name.as_os_str() == "gitdir" || name.as_os_str() == "commondir"
+                        })
+                        && components.next().is_none()
+                });
+            if (reference || boundary || pointer)
+                && identity.is_some()
+                && !self.directories.contains_key(path)
             {
                 let entry = super::snapshot::RegularEvidence::capture(path, &mut budget)
                     .map_err(|_| invalid())?;
@@ -282,7 +295,7 @@ mod tests {
 
     #[test]
     fn linked_worktree_references_require_admission_and_retain_contents() {
-        for leaf in ["HEAD", "refs/heads/private"] {
+        for leaf in ["HEAD", "refs/heads/private", "gitdir", "commondir"] {
             let temp = tempfile::tempdir().expect("fixture");
             let root = temp.path().canonicalize().expect("root");
             let path = root.join("worktrees/linked").join(leaf);

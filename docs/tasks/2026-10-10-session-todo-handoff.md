@@ -1,3 +1,14 @@
+Linked-worktree pointer evidence checkpoint (2026-10-17): the admitted
+registration files `common/worktrees/<id>/gitdir` and `commondir` now retain
+bounded contents in the existing shared 4096-entry/4 MiB reference evidence
+budget. These are pointer bytes, not symbolic refs. In-place edits invalidate
+the plan. Inventory tests pass 13/13 and all Pull-focused tests pass 86/86;
+all-target/all-feature Clippy passes. Independent incremental review found no
+new blocker. Git 2.54 worktree.c/setup.c confirm distinct trimming/resolution
+rules; target resolution/read admission remains open and native child probing
+must not be activated until that authorization is implemented. No production
+Pull activation or T7 completion is claimed.
+
 Linked-worktree graph inventory checkpoint (2026-10-17): child graph discovery
 now includes `worktrees` under the existing exact-path frontier and 4096-entry
 limit. Registered worktree HEAD and refs contents join the shared 4 MiB reference
