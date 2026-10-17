@@ -1,3 +1,18 @@
+Pull graph boundary evidence checkpoint (2026-10-17): the admitted child
+inventory now retains shallow and info/grafts contents alongside reference
+evidence, sharing the existing per-inventory 4096-entry/4 MiB budget. Missing
+paths remain bound by absence or parent listings without opening unadmitted
+descendants. A regression covers present/absent variants of both paths and
+in-place modifications. Locked inventory tests pass 12/12; the configured
+worktree identity regression and all-target/all-feature Clippy also pass.
+Independent incremental authorization review found no new blocker. These checks
+include the still-uncommitted configured-worktree identity change; its Unix-only
+replacement assertion is now explicitly platform-scoped. The Windows identity
+decision, object probing, recursive execution, integration, complete runner
+budget evidence and final delivery gates remain open. Production Pull remains
+disabled; T7 and all subsequent tasks remain incomplete. Fetch confirmed no
+new origin/main commits requiring rebase at this checkpoint.
+
 Pull child remote discovery checkpoint (2026-10-16, `2edba07e`): child
 configuration retains declaration order and reuses the shared fetch destination
 resolver (first URL, insteadOf longest-prefix/tie semantics). Local destinations

@@ -110,7 +110,8 @@ impl Inventory {
         Ok(())
     }
 
-    /// Bind reference contents, including symbolic replacement-ref declarations,
+    /// Bind references and shallow/graft graph boundaries, including symbolic
+    /// replacement-ref declarations, under one shared evidence budget,
     /// without recursively opening descendants absent from the admitted inventory.
     pub(super) fn bind_references(
         &mut self,
@@ -132,10 +133,14 @@ impl Inventory {
                     || path == &root.join("packed-refs")
                     || path == &root.join("HEAD")
             });
-            if reference && identity.is_some() && !self.directories.contains_key(path) {
+            let boundary = [gitdir, common]
+                .iter()
+                .any(|root| path == &root.join("shallow") || path == &root.join("info/grafts"));
+            if (reference || boundary) && identity.is_some() && !self.directories.contains_key(path)
+            {
                 let entry = super::snapshot::RegularEvidence::capture(path, &mut budget)
                     .map_err(|_| invalid())?;
-                if let super::snapshot::Entry::File(_, bytes) = &entry.entry {
+                if reference && let super::snapshot::Entry::File(_, bytes) = &entry.entry {
                     super::receiver_state::validate_symbolic_target(bytes)?;
                 }
                 evidence.push((path.clone(), entry));
@@ -262,6 +267,32 @@ fn identity(path: &Path) -> Result<Option<PathIdentity>, GitToolError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn graph_boundaries_bind_in_place_changes_and_absence() {
+        for name in ["shallow", "info/grafts"] {
+            for exists in [false, true] {
+                let temp = tempfile::tempdir().expect("fixture");
+                let root = temp.path().canonicalize().expect("root");
+                std::fs::create_dir(root.join("info")).expect("info");
+                let path = root.join(name);
+                if exists {
+                    std::fs::write(&path, format!("{}\n", "a".repeat(40)))
+                        .expect("initial graph boundary");
+                }
+                let mut inventory = Inventory::new(&root, &root);
+                assert!(inventory.bind_references(&root, &root).is_err());
+                while !inventory.complete() {
+                    inventory.advance(|_| true).expect("admitted frontier");
+                }
+                inventory.bind_references(&root, &root).expect("bind graph");
+                inventory.revalidate().expect("unchanged graph");
+                std::fs::write(&path, format!("{}\n", "b".repeat(40)))
+                    .expect("change graph boundary");
+                assert!(inventory.revalidate().is_err(), "{name}, exists={exists}");
+            }
+        }
+    }
 
     #[test]
     fn replacement_symbolic_target_waits_for_full_reference_frontier() {
