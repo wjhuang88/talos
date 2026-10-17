@@ -3735,7 +3735,7 @@ share exact child Read validation. Tools library tests pass 779/779.
 configuration declaration order. Local sources request Read facets rather than
 Network facets. Configuration tests pass 25/25; all-target Clippy passes; final
 `cargo test --locked -p talos-tools --all-features --lib` passes 780/780.
-`0cd8ae36` binds the first recursive child fetch to the admitted HEAD branch,
+`6f68807f` (rebased from `0cd8ae36`) binds the first recursive child fetch to the admitted HEAD branch,
 ordinary fetch default-remote rules, and retained ordered destinations. It reuses
 the parent remote resolver; non-branch symbolic HEAD chains refuse pending
 separate resolution admission. Git v2.54.0 `submodule.c` and `remote.c` confirm
@@ -3743,6 +3743,13 @@ that this first-fetch path differs from missing-object retry remote selection.
 Tools library tests pass 781/781 outside the sandbox; the sandboxed run passed
 780 with the existing process-observation EPERM in the eight-stage Push test.
 All-target Clippy passes. This is preparation evidence, not recursive execution.
+`bb8e854c` reuses bounded graph inventory for child objects/references. Each
+new descendant frontier requires fresh exact Read admission; retained inventories
+are revalidated before later preparation. A prepared-plan regression consumes
+permission-engine proof and rejects reuse of the previous frontier's tokens.
+Tools library tests pass 782/782 outside the sandbox; all-target Clippy passes.
+This establishes directory admission only: object bytes, alternates, replacement
+resolution and actual child probes are not yet authorized or implemented.
 Missing-object retry remote selection, refspecs and transport/source effects,
 object admission, recursive fetch, integration, runner stage capacity, and
 delivery gates remain open; Production Pull remains disabled.
