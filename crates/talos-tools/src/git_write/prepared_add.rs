@@ -235,6 +235,7 @@ pub(super) struct AddPlan {
     )>,
     pull_index_children: BTreeMap<String, String>,
     pull_child_fetch_targets: BTreeMap<PathBuf, (String, Vec<String>)>,
+    pull_child_hook_evidence: Vec<(PathBuf, snapshot::RegularEvidence)>,
     pull_child_inventories: BTreeMap<PathBuf, super::pull_inventory::Inventory>,
     pull_child_startup: BTreeMap<PathBuf, super::config_state::ChildStartupLayout>,
     pull_child_worktrees: BTreeMap<PathBuf, (PathBuf, snapshot::PathIdentity)>,
@@ -675,6 +676,7 @@ impl AddPlan {
             pull_child_layouts: Vec::new(),
             pull_index_children: BTreeMap::new(),
             pull_child_fetch_targets: BTreeMap::new(),
+            pull_child_hook_evidence: Vec::new(),
             pull_child_inventories: BTreeMap::new(),
             pull_child_startup: BTreeMap::new(),
             pull_child_worktrees: BTreeMap::new(),
@@ -2144,6 +2146,26 @@ impl AddPlan {
                 })?;
             let remote = config.fetch_remote(metadata.branch()?)?;
             config.prepare_pull_transport(&remote)?;
+            let hook_worktree = self
+                .pull_child_startup
+                .get(workdir)
+                .ok_or_else(|| {
+                    GitToolError::InvalidInput("Pull child startup evidence missing".into())
+                })?
+                .targets
+                .iter()
+                .next()
+                .map(PathBuf::as_path)
+                .unwrap_or(workdir);
+            for path in
+                config.pull_hook_paths(&location.common_dir, hook_worktree, &self.environment)?
+            {
+                self.facets.push(path_facet(
+                    ToolNature::Read,
+                    &path,
+                    "Pull child fetch hook; contents deferred until exact Read admission",
+                )?);
+            }
             let destinations = config.fetch_destinations(&remote)?;
             for url in &destinations {
                 if let Some(path) = super::remote_state::local_destination(url, workdir)? {
@@ -2204,6 +2226,43 @@ impl AddPlan {
         }
         self.revalidate()?;
         let mut pending = false;
+        let mut hook_paths = std::collections::BTreeSet::new();
+        for (workdir, config) in &self.child_configs {
+            let (_, location) = self
+                .child_locations
+                .iter()
+                .find(|(path, _)| path == workdir)
+                .ok_or_else(|| {
+                    GitToolError::InvalidInput("Pull child metadata roots missing".into())
+                })?;
+            let (worktree, _) = self.pull_child_worktrees.get(workdir).ok_or_else(|| {
+                GitToolError::InvalidInput("Pull child effective worktree missing".into())
+            })?;
+            hook_paths.extend(config.pull_hook_paths(
+                &location.common_dir,
+                worktree,
+                &self.environment,
+            )?);
+        }
+        for path in &hook_paths {
+            pending |= self.child_read(path, authorizations).is_err();
+            if !self.facets.iter().any(|facet| {
+                facet.nature == ToolNature::Read
+                    && facet.resource_kind == Some(ToolResourceKind::Path)
+                    && facet.resource.as_deref() == path.to_str()
+            }) {
+                self.facets.push(path_facet(
+                    ToolNature::Read,
+                    path,
+                    "Pull child fetch hook; contents deferred until exact Read admission",
+                )?);
+            }
+        }
+        if !pending {
+            self.pull_child_hook_evidence = super::config_state::ConfigState::capture_pull_hooks(
+                &hook_paths.into_iter().collect::<Vec<_>>(),
+            )?;
+        }
         for (workdir, inventory) in &mut self.pull_child_inventories {
             let location = self
                 .child_locations
@@ -5836,6 +5895,20 @@ impl AddPlan {
             return Err(GitToolError::InvalidInput(
                 "Pull fetch hook evidence changed after discovery".into(),
             ));
+        }
+        if !self.pull_child_hook_evidence.is_empty() {
+            let paths = self
+                .pull_child_hook_evidence
+                .iter()
+                .map(|(path, _)| path.clone())
+                .collect::<Vec<_>>();
+            if super::config_state::ConfigState::capture_pull_hooks(&paths)?
+                != self.pull_child_hook_evidence
+            {
+                return Err(GitToolError::InvalidInput(
+                    "Pull child fetch hook evidence changed after discovery".into(),
+                ));
+            }
         }
         if let Some(inventory) = &self.pull_inventory {
             inventory.revalidate()?;
@@ -12723,23 +12796,95 @@ pub(super) mod tests {
 
     #[tokio::test]
     async fn pull_child_metadata_scope_batches_depth_and_requires_own_root() {
-        let mut modes = vec!["allow", "missing-capability", "missing-root"];
+        let mut modes = vec![
+            "allow",
+            "missing-capability",
+            "missing-root",
+            "missing-hook",
+        ];
         if cfg!(unix) {
-            modes.extend(["missing-object", "noncommit"]);
+            modes.extend([
+                "missing-object",
+                "noncommit",
+                "executable-hook",
+                "hook-change",
+                "linked-hook",
+            ]);
         }
         for mode in modes {
             let root = fixture();
             assert!(
                 std::process::Command::new("git")
                     .current_dir(root.path())
-                    .args(["init", "child"])
+                    .args([
+                        "init",
+                        if mode == "linked-hook" {
+                            "seed"
+                        } else {
+                            "child"
+                        }
+                    ])
                     .output()
                     .expect("child init")
                     .status
                     .success()
             );
+            if mode == "linked-hook" {
+                let seed = root.path().join("seed");
+                assert!(
+                    std::process::Command::new("git")
+                        .current_dir(&seed)
+                        .args([
+                            "-c",
+                            "user.name=Fixture",
+                            "-c",
+                            "user.email=fixture@example.com",
+                            "commit",
+                            "--allow-empty",
+                            "-m",
+                            "seed"
+                        ])
+                        .output()
+                        .expect("seed commit")
+                        .status
+                        .success()
+                );
+                assert!(
+                    std::process::Command::new("git")
+                        .current_dir(&seed)
+                        .args(["worktree", "add", "--detach", "../child"])
+                        .output()
+                        .expect("linked child")
+                        .status
+                        .success()
+                );
+            }
             let child = root.path().join("child").canonicalize().expect("child");
-            let gitdir = child.join(".git");
+            let gitdir = if mode == "linked-hook" {
+                root.path().join("seed/.git/worktrees/child")
+            } else {
+                child.join(".git")
+            };
+            let common = if mode == "linked-hook" {
+                root.path().join("seed/.git")
+            } else {
+                gitdir.clone()
+            };
+            let hook = common.join("hooks/reference-transaction");
+            #[cfg(unix)]
+            if matches!(mode, "executable-hook" | "hook-change" | "linked-hook") {
+                use std::os::unix::fs::PermissionsExt;
+                std::fs::write(&hook, "#!/bin/sh\nexit 0\n").expect("hook");
+                std::fs::set_permissions(
+                    &hook,
+                    std::fs::Permissions::from_mode(if mode != "hook-change" {
+                        0o755
+                    } else {
+                        0o644
+                    }),
+                )
+                .expect("hook permissions");
+            }
             let deep = gitdir
                 .join("refs/heads")
                 .join("nested/".repeat(24))
@@ -12818,7 +12963,19 @@ pub(super) mod tests {
             if mode == "missing-root" {
                 tokens.retain(|token| token.normalized_path() != gitdir);
             }
+            if mode == "missing-hook" {
+                tokens.retain(|token| token.normalized_path() != hook);
+            }
             let next = plan.discover_pull_child_configuration(&tokens).await;
+            if matches!(mode, "executable-hook" | "linked-hook") {
+                assert!(
+                    next.err()
+                        .expect("hook refusal")
+                        .to_string()
+                        .contains("Executable Git fetch hooks")
+                );
+                continue;
+            }
             if mode == "noncommit" {
                 assert!(
                     next.err()
@@ -12828,12 +12985,23 @@ pub(super) mod tests {
                 );
                 continue;
             }
-            if !matches!(mode, "allow" | "missing-object") {
+            if mode == "missing-hook" {
+                let plan = next.expect("deferred hook admission");
+                assert!(plan.phase == Phase::PullChildConfiguration);
+                assert!(plan.pull_child_hook_evidence.is_empty());
+                continue;
+            }
+            if !matches!(mode, "allow" | "missing-object" | "hook-change") {
                 assert!(next.is_err(), "{mode} must refuse graph discovery");
                 continue;
             }
             let plan = next.expect("single admitted graph stage");
             assert!(plan.phase == Phase::PullIntegration);
+            assert!(
+                plan.pull_child_hook_evidence
+                    .iter()
+                    .any(|(path, _)| path == &hook)
+            );
             assert!(plan.pull_child_inventories[&child].complete());
             assert!(
                 !plan
@@ -12841,7 +13009,11 @@ pub(super) mod tests {
                     .iter()
                     .any(|facet| facet.resource.as_deref() == deep.to_str())
             );
-            std::fs::write(&deep, format!("{}\n", "b".repeat(40))).expect("edit ref");
+            if mode == "hook-change" {
+                std::fs::write(&hook, "changed\n").expect("edit hook");
+            } else {
+                std::fs::write(&deep, format!("{}\n", "b".repeat(40))).expect("edit ref");
+            }
             assert!(plan.revalidate().is_err());
         }
     }
