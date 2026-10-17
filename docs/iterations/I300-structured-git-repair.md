@@ -4005,3 +4005,15 @@ canonical mappings are checked before ChildLocation capture. The real current-
 child regression asserts this stage reduction; the external target regression
 and all 97 locked all-feature Pull tests pass. This does not establish complete
 runner success within eight stages or enable production Pull.
+
+Parent graph content evidence checkpoint (2026-10-17): both prefetch and
+postfetch now bind alternates and reference contents on the completed parent
+inventory before subsequent object/graph inspection. This reuses the child
+inventory's bounded evidence instead of introducing another snapshot layer.
+The real tracking-plan regression rejects an in-place branch ref edit, then
+accepts restored bytes. All 97 locked all-feature Pull tests and warnings-denied
+library Clippy pass; independent incremental review found no blocker. Parent
+linked-worktree target discovery/admission and external reference-root closure
+remain prerequisites before native child probes or production activation.
+Fetch found origin/main unchanged (118 ahead, zero behind before this commit).
+T7 remains Active; no handoff completion or full-workspace validation is claimed.
