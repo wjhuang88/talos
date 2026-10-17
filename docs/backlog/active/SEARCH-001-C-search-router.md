@@ -160,3 +160,10 @@ activation gates remain Pending; this owner stays Active/Claimed, #643/#624OPEN.
 TEST004/I305 closes only its known-resource test criterion with existing merged evidence. #717
 retains unexplained native resources and prior failures. Passing captured assertions are not raw
 numeric receipts or cache/global-leak proof; #705 and completed I301/I303/I304 remain separate.
+
+2026-10-17 next dormant prerequisite: I293 owns immutable, invocation-bound transport payload
+preparation and consuming execution. Its production transport entry consumes the prepared URL/body
+instead of accepting replacement raw parameters; test-only raw adapters retain the fixture suite. This proves ownership
+and per-invocation object matching, not construction before approval or official Agent binding.
+See the controlled-transport reference and I293 validation journal. Full C/EP/parity/D/root/rollback
+and default activation remain Pending; #643/#624 stay open, #717/#705 retain separate residuals.

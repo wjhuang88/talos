@@ -1,4 +1,5 @@
 use super::*;
+mod prepared;
 mod tls;
 use std::{
     collections::VecDeque,
@@ -595,6 +596,11 @@ async fn actual_permission_once_authority_can_execute_and_clear_blocks_next_star
     let server = Server::new(vec![ok("authorized")]);
     let url = server.url("/search");
     let m = manifest(&[(&url, Method::GET)], loopback(), 0);
+    let first_payload = PreparedTransportRequest::json_bytes(&m, url.clone(), Method::GET, None)
+        .expect("prepare before approval");
+    let second_payload = PreparedTransportRequest::json_bytes(&m, url.clone(), Method::GET, None)
+        .expect("prepare before revocation");
+    let resolver = dns(server.port);
     let state = Arc::new(PermissionSessionState::new(PermissionEngine::new()));
     let facets = [ToolPermissionFacet::with_resource(
         ToolNature::Network,
@@ -621,23 +627,25 @@ async fn actual_permission_once_authority_can_execute_and_clear_blocks_next_star
         m,
         authority,
         Arc::new(TransportBudget::new(Duration::from_secs(2), 2, 1024).expect("budget")),
-        dns(server.port),
+        resolver.clone(),
     )
     .expect("transport");
     assert_eq!(
-        t.execute(url.clone(), Method::GET, None)
+        t.execute_prepared(first_payload)
             .await
             .expect("response")
             .status,
         200
     );
+    let before = resolver.calls.load(Ordering::Relaxed);
     state.clear().expect("clear");
     assert_eq!(
-        t.execute(url, Method::GET, None)
+        t.execute_prepared(second_payload)
             .await
             .expect_err("revoked"),
         TransportError::Unauthorized
     );
+    assert_eq!(resolver.calls.load(Ordering::Relaxed), before);
     assert_eq!(server.count(), 1);
 }
 

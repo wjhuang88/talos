@@ -18,8 +18,10 @@ effective URL port. IP literals skip DNS but receive the same address check.
 Clients disable implicit redirect, HTTP retry, Referer, ambient proxies and all optional decoders,
 request identity encoding, use HTTP/1 and no cross-hop pooling. Original hostname remains the
 Host/TLS identity; default Rustls certificate validation is retained. No caller headers, cookies,
-Authorization or Host override are supported. Existing POST execute retains fixed application/json;
-private execute_form adds bounded application/x-www-form-urlencoded with ordered owned fields.
+Authorization or Host override are supported. Prepared JSON-byte requests retain fixed
+application/json; prepared forms use bounded
+application/x-www-form-urlencoded with ordered owned fields. Raw execute/execute_form adapters
+exist only under cfg(test); production adapter code must consume a prepared request.
 Neither activates an upstream route or establishes complete compatibility protocol parity.
 
 GET/HEAD may follow only predeclared301/302/303/307/308 targets. Every hop gets its own checks and
@@ -170,3 +172,30 @@ generated decoder round-trips cover serialization without introducing proptest/d
 claiming proptest execution; real socket/TLS fixtures cover body/type, exact/overflow bounds,
 redirect isolation, denial/deadline and proxy visibility. This is not copied upstream parser code,
 provider admission, prepared-object fingerprint integration or full protocol parity.
+
+## Owned Request Payload — 2026-10-17
+
+Pure private preparation owns the actual parsed URL, HTTP method, encoded body and fixed type,
+validates the existing URL/body/method bounds and exact manifest endpoint membership, and records
+its invocation ID. json_bytes labels already-encoded bytes application/json without parsing or
+validating JSON; form completes bounded encoding during preparation. Neither constructor accepts
+caller headers or performs live-authority checks, DNS, sends or execution-budget reservations.
+Debug and all errors remain content-free. There is no payload hash or query digest in Session scope.
+
+The production transport entry accepts only an owned PreparedTransportRequest. Consumption checks
+invocation ID before authority, DNS and budget reservations, then reuses all existing execution
+fences. The object exposes no mutation or Clone API. Source URL/body/form mutations after preparing
+owned copies cannot change sent bytes. Different invocation IDs sharing the same Session scope
+cannot exchange objects, while query-independent Session reuse remains the ADR-090 contract.
+
+This is an ownership prerequisite, not an approval seal: one manifest can prepare multiple objects,
+and consuming an object is not a global exactly-once guarantee. Future official prepared tool
+invocations must hold this same object across approval; this stage does not enforce when it was
+constructed, integrate Agent input/fingerprint binding, or complete provider protocol parity.
+No default activation, upstream protocol copying or D admission follows.
+
+Five added prepared fixtures plus the prior47 exercise this entry. The real Once-permission
+fixture now prepares before admission and retains a second object across clear/revocation;
+execution still rejects it before another DNS request. Existing HTTP/TLS/CONNECT/redirect and
+budget tests pass through test-only raw adapters into the consuming entry. Local results and
+exact candidate gates are recorded in I293; these tests do not establish official root integration.

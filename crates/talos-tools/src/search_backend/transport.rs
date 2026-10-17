@@ -197,6 +197,94 @@ fn encode_form(fields: &[(String, String)]) -> Result<Vec<u8>, TransportError> {
     Ok(encoded.query().unwrap_or_default().as_bytes().to_vec())
 }
 
+/// Immutable payload for one invocation. Preparation is local and grants no authority.
+/// Not Clone: execution consumes this object, but the manifest is not globally single-use.
+pub(super) struct PreparedTransportRequest {
+    invocation_id: uuid::Uuid,
+    url: Url,
+    method: Method,
+    body: Option<Vec<u8>>,
+    format: BodyFormat,
+}
+
+impl std::fmt::Debug for PreparedTransportRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("PreparedTransportRequest(<redacted>)")
+    }
+}
+
+fn request_endpoint(url: &Url, method: &Method) -> Result<ToolNetworkEndpoint, TransportError> {
+    if !url.username().is_empty()
+        || url.password().is_some()
+        || url.fragment().is_some()
+        || url.as_str().len() > 8192
+        || url.query().is_some_and(|q| q.len() > 4096)
+    {
+        return Err(TransportError::InvalidRequest);
+    }
+    ToolNetworkEndpoint::new(
+        url.scheme(),
+        url.host_str().ok_or(TransportError::InvalidRequest)?,
+        url.port_or_known_default()
+            .ok_or(TransportError::InvalidRequest)?,
+        method.as_str(),
+        url.path(),
+    )
+    .map_err(|_| TransportError::InvalidRequest)
+}
+
+impl PreparedTransportRequest {
+    /// Own already-encoded bytes with the fixed JSON content type; does not parse JSON.
+    pub(super) fn json_bytes(
+        manifest: &ToolNetworkManifest,
+        url: Url,
+        method: Method,
+        body: Option<Vec<u8>>,
+    ) -> Result<Self, TransportError> {
+        Self::new(manifest, url, method, body, BodyFormat::Json)
+    }
+
+    pub(super) fn form(
+        manifest: &ToolNetworkManifest,
+        url: Url,
+        fields: Vec<(String, String)>,
+    ) -> Result<Self, TransportError> {
+        Self::new(
+            manifest,
+            url,
+            Method::POST,
+            Some(encode_form(&fields)?),
+            BodyFormat::Form,
+        )
+    }
+
+    fn new(
+        manifest: &ToolNetworkManifest,
+        url: Url,
+        method: Method,
+        body: Option<Vec<u8>>,
+        format: BodyFormat,
+    ) -> Result<Self, TransportError> {
+        if !matches!(method, Method::GET | Method::HEAD | Method::POST)
+            || body.as_ref().is_some_and(|b| b.len() > 16_384)
+            || (method != Method::POST && body.is_some())
+        {
+            return Err(TransportError::InvalidRequest);
+        }
+        let endpoint = request_endpoint(&url, &method)?;
+        if !manifest.scope().endpoints().contains(&endpoint) {
+            return Err(TransportError::Unauthorized);
+        }
+        Ok(Self {
+            invocation_id: manifest.invocation_id(),
+            url,
+            method,
+            body,
+            format,
+        })
+    }
+}
+
 impl SearchTransport {
     pub(super) fn new(
         manifest: ToolNetworkManifest,
@@ -233,23 +321,7 @@ impl SearchTransport {
 
     fn check(&self, url: &Url, method: &Method) -> Result<ToolNetworkEndpoint, TransportError> {
         self.budget.check_live()?;
-        if !url.username().is_empty()
-            || url.password().is_some()
-            || url.fragment().is_some()
-            || url.as_str().len() > 8192
-            || url.query().is_some_and(|q| q.len() > 4096)
-        {
-            return Err(TransportError::InvalidRequest);
-        }
-        let endpoint = ToolNetworkEndpoint::new(
-            url.scheme(),
-            url.host_str().ok_or(TransportError::InvalidRequest)?,
-            url.port_or_known_default()
-                .ok_or(TransportError::InvalidRequest)?,
-            method.as_str(),
-            url.path(),
-        )
-        .map_err(|_| TransportError::InvalidRequest)?;
+        let endpoint = request_endpoint(url, method)?;
         if !self.manifest.scope().endpoints().contains(&endpoint) {
             return Err(TransportError::Unauthorized);
         }
@@ -265,49 +337,48 @@ impl SearchTransport {
         Ok(endpoint)
     }
 
-    pub(super) async fn execute(
+    /// The future prepared tool invocation must hold this same object across approval.
+    /// Invocation identity checks do not prove that a caller constructed it before approval.
+    pub(super) async fn execute_prepared(
         &self,
-        url: Url,
-        method: Method,
-        body: Option<Vec<u8>>,
+        request: PreparedTransportRequest,
     ) -> Result<TransportResponse, TransportError> {
-        self.execute_formatted(url, method, body, BodyFormat::Json)
-            .await
-    }
-
-    pub(super) async fn execute_form(
-        &self,
-        url: Url,
-        fields: Vec<(String, String)>,
-    ) -> Result<TransportResponse, TransportError> {
-        self.budget.check_live()?;
-        let body = encode_form(&fields)?;
-        self.execute_formatted(url, Method::POST, Some(body), BodyFormat::Form)
-            .await
-    }
-
-    async fn execute_formatted(
-        &self,
-        url: Url,
-        method: Method,
-        body: Option<Vec<u8>>,
-        format: BodyFormat,
-    ) -> Result<TransportResponse, TransportError> {
-        self.budget.check_live()?;
-        if !matches!(method, Method::GET | Method::HEAD | Method::POST)
-            || body.as_ref().is_some_and(|b| b.len() > 16_384)
-            || (method != Method::POST && body.is_some())
-        {
-            return Err(TransportError::InvalidRequest);
+        if request.invocation_id != self.manifest.invocation_id() {
+            return Err(TransportError::Unauthorized);
         }
+        self.budget.check_live()?;
         let result = timeout_at(
             self.budget.deadline,
-            self.execute_inner(url, method, body, format),
+            self.execute_inner(request.url, request.method, request.body, request.format),
         )
         .await
         .map_err(|_| TransportError::Deadline)?;
         self.budget.check_live()?;
         result
+    }
+
+    // Legacy raw fixture adapters cannot be called from production adapter code.
+    #[cfg(test)]
+    async fn execute(
+        &self,
+        url: Url,
+        method: Method,
+        body: Option<Vec<u8>>,
+    ) -> Result<TransportResponse, TransportError> {
+        self.budget.check_live()?;
+        let request = PreparedTransportRequest::json_bytes(&self.manifest, url, method, body)?;
+        self.execute_prepared(request).await
+    }
+
+    #[cfg(test)]
+    async fn execute_form(
+        &self,
+        url: Url,
+        fields: Vec<(String, String)>,
+    ) -> Result<TransportResponse, TransportError> {
+        self.budget.check_live()?;
+        let request = PreparedTransportRequest::form(&self.manifest, url, fields)?;
+        self.execute_prepared(request).await
     }
 
     async fn execute_inner(
