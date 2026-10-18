@@ -555,6 +555,10 @@ fn postfetch_evidence_rebaselines_changed_metadata_only_under_retained_location(
             .env("GIT_CONFIG_GLOBAL", root.path().join("absent-config"))
             .args([
                 "-c",
+                "maintenance.autoDetach=false",
+                "-c",
+                "gc.autoDetach=false",
+                "-c",
                 "user.name=Fixture",
                 "-c",
                 "user.email=fixture@example.invalid",

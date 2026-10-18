@@ -3990,3 +3990,20 @@ passed as recorded above. Real Windows CI and exact-head final review remain
 required. Production Pull and non-Unix preparation remain disabled. Resume with
 PR #735 check results and invocation-wide Pull budget/resolution authorization;
 preserve the full original handoff queue.
+
+CI follow-up (2026-10-18): PR #735 run 39114660162 failed Windows Clippy on
+three unused legacy host test helpers and Linux preflight on the post-fetch
+metadata evidence fixture. Local fixes restrict the helpers/imports to tests
+and apply the accepted foreground maintenance settings to that fixture, retaining
+all stale-content/location assertions. Background maintenance is a suspected,
+not proven unique, cause of the Linux failure. Targeted independent review found
+no new blocker. Host-boundary tests pass 8/8; post-fetch fixture passes 1/1;
+Windows Git-only library cross-check passes (7 unrelated feature-only dead-code
+warnings remain). Full-feature Windows cross-Clippy cannot run locally because
+x86_64-w64-mingw32-gcc is absent; real Windows CI remains mandatory.
+Local preflight session 65235, /tmp/talos-i300-ci-correction-preflight.log, is
+still running; its source snapshot predates the fixture-only adjustment, whose
+focused test passed separately. Do not label this a final-head full pass.
+Pull retained-byte discovery was separately committed as 4c9fec62 after 28/28
+inventory tests, Git library Clippy, both governance validators, and independent
+review. Shared budgets/raw-target authorization and the full queue remain open.
