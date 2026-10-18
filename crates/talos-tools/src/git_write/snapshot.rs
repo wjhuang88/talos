@@ -314,10 +314,7 @@ impl Entry {
                 return Err(invalid());
             }
         }
-        let mut bytes = Vec::new();
-        file.take((budget.bytes as u64).saturating_add(1))
-            .read_to_end(&mut bytes)?;
-        budget.bytes = budget.bytes.checked_sub(bytes.len()).ok_or_else(invalid)?;
+        let bytes = read_regular_body(file, &mut budget.bytes)?;
         let after = std::fs::symlink_metadata(path)?;
         if !after.is_file() {
             return Err(invalid());
@@ -665,3 +662,24 @@ mod tests {
         );
     }
 }
+
+// Charge bytes even when a growing file or a partial I/O failure rejects capture.
+fn read_regular_body(reader: impl Read, remaining: &mut usize) -> std::io::Result<Vec<u8>> {
+    let available = *remaining;
+    let mut bytes = Vec::new();
+    let result = reader
+        .take((available as u64).saturating_add(1))
+        .read_to_end(&mut bytes);
+    *remaining = available.saturating_sub(bytes.len());
+    result?;
+    if bytes.len() > available {
+        return Err(std::io::Error::other(
+            "Git regular evidence exceeds its limit",
+        ));
+    }
+    Ok(bytes)
+}
+
+#[cfg(test)]
+#[path = "snapshot_budget_tests.rs"]
+mod budget_tests;

@@ -4537,3 +4537,36 @@ and identical-byte inode replacement; log
 `/tmp/talos-i300-pull-evidence-stream.log`. This reduces PullEvidence duplicate
 bodies/handles only: RepositoryState still recaptures and whole-invocation quota
 accounting remains incomplete. T7 stays Active and production Pull stays closed.
+
+Shared metadata allowance checkpoint (2026-10-18): both production PullEvidence
+captures now use the AddPlan reference ledger shared with graph inventories and
+path resolution, replacing their independent 16 MiB body allowance. The default
+capture wrapper is test-only; production must supply the ledger. Pre/post-fetch
+captures cumulatively consume the same 4 MiB allowance; a post-fetch exhaustion
+still returns through the existing retained-effects error path. This intentionally
+rejects operations whose combined metadata exceeds the bound, even when each
+individual capture would previously fit.
+
+Independent review also identified and verified a fix for failed-read charging:
+regular snapshot reads now debit observed bytes before propagating partial I/O
+errors, and a growing-file overrun exhausts the allowance rather than preserving
+it. Separate tests cover partial read failure, overrun, and a 3 MiB metadata
+capture followed by revalidation/drop/replacement without refund. Snapshot tests
+pass 12/12; before the shared-helper correction, Pull state passed 26/26 and
+prepared Pull tests passed 41/41. Logs: `/tmp/talos-i300-failed-budget.log`,
+`/tmp/talos-i300-pull-metadata-quota.log`,
+`/tmp/talos-i300-pull-metadata-prepared.log`. Full final-candidate validation
+remains required. Directory/path/identity serialization, retained/transient
+handles, independent RepositoryState capture and index decoding remain quota
+residuals; this is not whole-invocation accounting or T7 completion.
+
+Final focused checkpoint: all Pull graph/resolution/state tests pass 81/81
+(`/tmp/talos-i300-metadata-quota-all-pull.log`); the revised failure Reader handles
+short buffers and its final test passes 1/1. Windows Git-only library cross-check
+passes with the seven existing feature-only warnings. Both governance validators
+pass. Native candidate f29e4ed0 Windows job 117697889352 now passes the production
+preparation gate, child-bootstrap and selected Add acceptance cases, then fails
+`real_commit_preserves_index_semantics_and_all_excludes_untracked`: maintenance
+executable differs from bound Git. The remaining later operation cases were not
+run. Log `/tmp/talos-i300-windows-117697889352.log`. Investigate executable binding;
+do not weaken the guard or claim Windows operation acceptance.

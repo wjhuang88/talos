@@ -216,10 +216,20 @@ impl PullEvidence {
     /// Capture only after fresh metadata Read admission. For post-fetch capture,
     /// retain the original location guard while accepting newly fetched content;
     /// callers must separately retain and validate configuration/worktree evidence.
+    #[cfg(test)]
     pub(super) fn capture(
         repository: &super::repository_state::RepositoryState,
         tracking: Option<&str>,
         fetched: bool,
+    ) -> Result<Self, GitToolError> {
+        Self::capture_with_budget(repository, tracking, fetched, &Default::default())
+    }
+
+    pub(super) fn capture_with_budget(
+        repository: &super::repository_state::RepositoryState,
+        tracking: Option<&str>,
+        fetched: bool,
+        budget: &super::pull_inventory::ReferenceBudget,
     ) -> Result<Self, GitToolError> {
         let invalid = || {
             GitToolError::InvalidInput(
@@ -254,10 +264,6 @@ impl PullEvidence {
         roots.push(
             super::snapshot::PathIdentity::capture(&repository.workdir).map_err(|_| invalid())?,
         );
-        let mut budget = super::snapshot::Budget {
-            entries: paths.len(),
-            bytes: 16 * 1024 * 1024,
-        };
         let mut entries = Vec::new();
         for path in paths {
             let root = if path.starts_with(&repository.git_dir) {
@@ -278,8 +284,7 @@ impl PullEvidence {
                 return Err(invalid());
             }
             let identity = super::snapshot::PathIdentity::capture(parent).map_err(|_| invalid())?;
-            let evidence = super::snapshot::RegularEvidence::capture(&path, &mut budget)
-                .map_err(|_| invalid())?;
+            let evidence = budget.capture(&path).map_err(|_| invalid())?;
             if super::snapshot::PathIdentity::capture(parent).map_err(|_| invalid())? != identity {
                 return Err(invalid());
             }

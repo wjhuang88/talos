@@ -36,7 +36,10 @@ impl ReferenceBudget {
         result
     }
 
-    fn capture(&self, path: &Path) -> Result<super::snapshot::RegularEvidence, GitToolError> {
+    pub(super) fn capture(
+        &self,
+        path: &Path,
+    ) -> Result<super::snapshot::RegularEvidence, GitToolError> {
         self.capture_limited(path, usize::MAX)
     }
 
