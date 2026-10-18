@@ -4314,3 +4314,33 @@ Windows CI 39122382667 compiled the previously failing test target and ran
 foreground tests, but path_identity_retains_leaf_and_ancestor_identity failed
 when renaming a parent directory with retained handles (Access denied). This
 must be resolved and revalidated on Windows; no platform completion is claimed.
+
+Windows metadata-handle correction (2026-10-18, `f4c3ba0d`): dependency inspection
+shows same-file's path constructor requests content-read access. PathIdentity
+now opens metadata-only handles with explicit read/write/delete sharing, then
+retains the same-file identity. All original ancestor/leaf replacement assertions
+remain. Independent security review found no blocker; local snapshot tests pass
+9/9, formatting passes, and Windows GNU Git-only library check passes with seven
+existing feature-only dead-code warnings. These checks do not prove the Windows
+runtime failure is resolved. Full standard preflight is running in session 48484,
+log `/tmp/talos-i300-metadata-handle-preflight.log`; fresh native Windows CI is
+still required. Production Pull remains disabled and the full handoff stays open.
+
+Shared alternate evidence checkpoint (2026-10-18, `d830597a`): the four fixed
+alternate-file candidates now consume the same invocation file allowance as
+references. Rebinding revalidates and reuses retained evidence instead of opening
+another copy or resetting a separate pool. Nonempty alternate files still refuse;
+the 256 KiB capture ceiling remains. Independent review found no blocker;
+inventory tests pass 33/33 and all-feature library Clippy passes with warnings
+denied. Full preflight session 48484 failed because sandbox execution of the CLI
+fixture returned PermissionDenied; approved external session 96720 now runs the
+standard gate against the shared-alternate source. Log:
+`/tmp/talos-i300-shared-alternates-preflight-unsandboxed.log`. This is not proof
+of full path/directory/temporary-resource accounting or native Windows success.
+
+Stage synchronization (2026-10-18): fresh fetch succeeds; `d830597a` has no
+origin/main-only commits (ahead 170 / behind 0), so no rebase is necessary.
+Both governance validators pass with zero warnings. Remote run 39122382667 is
+terminal: Linux standard workspace gate passed; Windows identity runtime failed
+as recorded above. That run predates the metadata-handle correction and does not
+validate it. Await external preflight session 96720 before publishing this batch.
