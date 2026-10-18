@@ -4230,3 +4230,10 @@ sandbox run failed process observation with EPERM; this successful run supersede
 that local validation failure, not the outstanding remote Windows CI. The fixture
 race cause remains tentative. PR #735 still requires fresh exact-head CI and
 review; production Pull and non-Unix preparation remain disabled, and T7 Active.
+
+Test separation checkpoint (2026-10-18): moved the 28 Pull inventory unit tests
+to `pull_inventory_tests.rs`, preserving their module path and production source.
+The extracted body was checked against the original before rustfmt; formatting
+only joins two expressions after deindentation. All 28 inventory tests pass with
+locked all-feature tools testing. This reduces the production inventory file
+from 1314 to 553 lines; it is organization, not new Pull capability or completion.
