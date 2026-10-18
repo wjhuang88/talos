@@ -318,6 +318,58 @@ denied frontier preserving all repository state, approval-between-stage drift,
 budgets, final effects, real prepared Agent/Runtime/MCP execution, and independent
 security review. Full support remains outstanding until those gates pass.
 
+### Proposed Pull worktree resolution metadata capability (2026-10-18)
+
+Status: Proposed; not accepted or enabled. Exact Path Read normalizes `..`
+lexically before resolving links. Git's relative linked-worktree backlinks
+resolve components in filesystem order, so the approved normalized path may
+not identify the actual resolution target. A later target grant cannot
+retroactively authorize metadata reads performed while discovering it.
+
+Propose Read(Remote `git:pull-worktree-resolution`) for structured Pull only.
+Its immutable inputs are relative `gitdir` backlinks and `commondir` pointers
+retained from separately admitted linked-worktree registration files. Inputs include
+both absolute and relative commondir values under the existing strict syntax;
+relative values use the registration file's parent. Only checkout backlinks
+permit a missing suffix. It covers
+only component metadata, symbolic-link text, and read-only identity handles
+needed to resolve those inputs and retain/revalidate their ancestor identities.
+External inspection is restricted to their actual component chains, link
+referents, cancelled ancestors and retained identity dependencies; no arbitrary
+external path scanning is allowed. Windows handles must use the minimum rights
+needed for identity, without reading content; otherwise resolution refuses.
+Resolution may reach outside the repository; this must be explicit in the
+approval description. Absolute checkout backlinks remain text-only. No file
+contents, directory enumeration, process execution, network access or writes
+are granted. Generic tools cannot consume this capability.
+
+Implement component-wise resolution with at most 64 link hops per source,
+sharing the existing 4096-entry/4-MiB inventory budgets for components, link
+text and retained identity evidence; counts persist across continuations.
+The 4096 entries are shared across the invocation, with every retained Windows
+handle counted separately. Temporary handles are released promptly and count
+toward that same peak bound. The byte bound measures user-space serialized
+path/link/identity evidence, not kernel memory. Revalidation may revisit retained
+records without charging them again, but cannot add records or reset link-hop
+counts; new discovery must consume the remaining cumulative budget.
+Unbounded `canonicalize` is not an implementation of this budget. Windows
+read-only identity handles use the already accepted safe dependency and must
+count against the same retained-entry bound. Unsupported link kinds refuse.
+Retain raw spellings, traversal order, cancelled ancestors, missing entries and
+link evidence. Drift invalidates the plan; it must not silently rebaseline.
+
+After metadata discovery, publish each resolved target as a fresh exact Path
+Read facet. Require both the scoped discovery authorization and all target
+authorizations before binding or consuming target references. Reference file
+contents and descendants retain their existing separate admissions. Discovery
+cannot authorize a Git probe or mutation; normal final effect authorization
+and the eight-stage limit remain. Identity revalidation is not atomic TOCTOU
+confinement. Denial, redirection, budget exhaustion and real permission-pipeline
+tests plus independent security review are required before enabling this path.
+
+This is separate from the unaccepted Checkout configuration-link proposal.
+Maintainer acceptance is required before implementation enables the capability.
+
 ### Foreground maintenance accepted (2026-10-12)
 
 The maintainer accepted explicit `maintenance.autoDetach=false` and
