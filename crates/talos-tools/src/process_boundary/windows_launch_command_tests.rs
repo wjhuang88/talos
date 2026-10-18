@@ -1,5 +1,50 @@
 use super::*;
 
+#[tokio::test]
+async fn job_cleanup_confirms_live_process_exit_before_returning() {
+    let launched = create_windows_job(
+        "powershell.exe",
+        &[
+            "-NoLogo".into(),
+            "-NoProfile".into(),
+            "-NonInteractive".into(),
+            "-Command".into(),
+            "Start-Sleep -Seconds 60".into(),
+        ],
+        &std::env::current_dir().expect("current directory"),
+        &std::collections::BTreeMap::new(),
+    )
+    .expect("launch owned process");
+    // SAFETY: native launch transfers its sole process-handle ownership here.
+    // File is used only as a CloseHandle owner, never for process I/O.
+    use std::os::windows::io::FromRawHandle;
+    let _process = unsafe { std::fs::File::from_raw_handle(launched.process as _) };
+    let control = WindowsJobControl { job: launched.job };
+    assert!(control.active_processes().expect("live Job query") > 0);
+    control.terminate().await.expect("confirmed process exit");
+    assert_eq!(control.active_processes().expect("empty Job query"), 0);
+}
+
+#[tokio::test]
+async fn job_cleanup_confirms_empty_job_and_rejects_invalid_handle() {
+    use windows_sys::Win32::System::JobObjects::CreateJobObjectW;
+    // SAFETY: default security attributes and no name; ownership transfers below.
+    let job = unsafe { CreateJobObjectW(std::ptr::null(), std::ptr::null()) };
+    assert!(!job.is_null(), "{}", last_windows_error("CreateJobObjectW"));
+    let control = WindowsJobControl { job };
+    assert_eq!(control.active_processes().expect("query empty Job"), 0);
+    control
+        .terminate()
+        .await
+        .expect("confirmed empty Job cleanup");
+
+    let invalid = WindowsJobControl {
+        job: std::ptr::null_mut(),
+    };
+    assert!(invalid.active_processes().is_err());
+    assert!(invalid.terminate().await.is_err());
+}
+
 #[test]
 fn finite_input_pipe_delivers_bytes_then_eof_and_inherits_only_reader() {
     use std::io::{Read, Write};
