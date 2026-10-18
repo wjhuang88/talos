@@ -1,5 +1,14 @@
 # I300 Git Authorization Migration Inventory
 
+Current candidate boundary (2026-10-18; unpublished): Unix prepared Add, Commit,
+nonrecursive Checkout and limited Push have executable paths. Production Pull
+remains disabled. Non-Unix preparation and command execution refuse pending
+the accepted ADR-068 foreground Job extension. Direct calls without prepared
+authorization remain refused. Earlier checkpoints below are historical and do
+not override this boundary. Job command/environment encoding, finite stdin and explicit no-input EOF
+primitives are prepared; foreground delivery, ownership/cleanup receipts and real
+Windows evidence remain open. T7 is Active, not delivered or complete.
+
 Checkout new gitlink update (2026-10-15; unpublished): existing ordinary
 empty directories, and on Unix bounded nonempty directories without Git metadata
 names or protected HFS/NTFS aliases, can become uninitialized gitlinks. A separate

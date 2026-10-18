@@ -499,11 +499,14 @@ Skill 主体和引用内容不会被直接打印到滚动历史、诊断信息�
 工具先申请专用的 Git 配置链发现授权，再单独审批生成的暂存计划；配置值仅供内部使用。
 发现阶段要求主机 Git 支持 `git var GIT_ATTR_SYSTEM` 和 `GIT_ATTR_GLOBAL`。
 不支持的过滤器、钩子、fsmonitor、对象 alternates 和 split index 会被拒绝，
-兜底执行需另行授权。此次迁移目前覆盖 `git_add`，生命周期和其他 Git 写工具仍有待完成的门禁。
+兜底执行需另行授权。尚未发布的 Unix 候选已实现经过计划审批的 Add、Commit、
+非递归 Checkout 和受限 Push。生产 Pull 仍禁用；非 Unix 结构化 Git 暂时拒绝执行，
+等待 Windows Job 监督接入。T7 尚未完成。
 详见 [I300 迁移清单](docs/reference/I300-GIT-AUTHORIZATION-MIGRATION.md)。
 候选版的非递归 checkout 替换非空子模块目录时，先发现目录条目，再逐项申请删除权限，
-其中包括未跟踪文件。有效配置源、符号链接和特殊条目仍受保护；执行失败可能留下部分 Git 效果。
-正在迁移的 `git_commit` 目前拒绝变更操作，包括直接调用。其计划中的已授权执行
+其中包括未跟踪文件和 Unix FIFO/socket 条目。有效配置源仍受保护；符号链接和不支持的特殊条目
+会被拒绝。执行失败可能留下部分 Git 效果。
+未经过计划审批的直接变更调用会被拒绝。已授权执行
 会显式固定 `maintenance.autoDetach=false`、`gc.autoDetach=false`，让自动维护在前台
 共享调用生命周期；不会禁用维护工作。
 

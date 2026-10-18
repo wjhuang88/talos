@@ -1,3 +1,13 @@
+Current Windows supervision checkpoint (2026-10-18): maintainer accepted
+ADR-068 foreground extension to reuse the existing Job implementation for
+structured Git. Independent review found direct-child-only cleanup on non-Unix
+could leave Commit/Push descendants writing after cancellation. Preparation now
+refuses on non-Unix before discovery, and the runner independently refuses its
+old fallback. This is containment only; Job integration, lossless environment,
+stdin/output bounds, terminal cleanup receipts, Windows runtime evidence and
+fresh independent review remain required. T7 stays Active; production Pull stays
+disabled. No stage merge is claimed. Details and resume steps are in the handoff.
+
 Pull child remote discovery checkpoint (2026-10-16): admitted child
 configuration now exposes only the last `remote.<name>.url` value through a
 bounded parser. The Pull configuration stage adds a Network facet for the
@@ -4083,3 +4093,93 @@ Pull tests and all-target/all-feature Clippy pass; independent review found no
 blocker. This prepares fetch selection but does not yet change fetch behavior.
 Child fetch/retries, parent integration, Windows input, complete runner evidence
 and all original T7/handoff closure gates remain open.
+
+Windows Job command-line preparation checkpoint (2026-10-18): the existing native
+launcher now uses a shared UTF-16 argument encoder with no lossy conversion,
+rejecting embedded NUL and command lines above 32,767 UTF-16 units including the
+terminator. Separate platform-independent tests pass 3/3 with all features,
+including unpaired UTF-16 units, quoting and expansion limits. A default-feature
+run selected zero tests and is not counted as evidence. Frozen OsString command
+and environment extraction, stdin and foreground ownership/cleanup integration
+remain open; Windows structured Git remains refused. The original 49cc215f full
+release preflight completed successfully, but does not certify these later edits.
+
+Windows Job environment checkpoint (2026-10-18): the existing background launcher
+now snapshots vars_os rather than panicking on non-Unicode environment values.
+A shared explicit-snapshot encoder uses std Command's Windows key ordering and
+case-equivalent override handling without spawning; UTF-16 values are preserved,
+invalid names/NUL rejected, and empty/nonempty blocks terminate with double NUL.
+Tests are separate: six combined environment/command-line tests pass on macOS;
+all-feature/all-target locked Clippy passes. The Windows-specific key-override
+test is not executed on macOS. Full-feature Windows cross-check failed before
+Talos compilation because x86_64-w64-mingw32-gcc is missing; this is not Windows
+validation evidence. Git-only cross-check is tracked separately. Foreground Git
+still requires exact frozen-environment transfer, stdin and Job ownership/receipt
+integration; this helper does not claim end-to-end non-Unicode launch support.
+
+Environment review correction: independent review identified that std Windows
+key ordering may panic before validation for an empty key. Snapshot now validates
+all UTF-16 key/value pairs before Command insertion and catches ordering panics
+as errors. Windows snapshot regression assertions include invalid keys. Git-only
+Windows cross-check passes with three unused fallback warnings; it is compile
+evidence only. Full-feature cross-check still needs the missing MinGW compiler.
+
+Windows native launch input checkpoint (2026-10-18): the existing background
+entrypoint now prepares lossless OsStr/OsString argument buffers and an explicit
+environment block before any native handles are allocated. The same native
+create/assign/resume/cleanup implementation consumes only those buffers and
+never re-reads PATH or parent environment. Background executable resolution
+and inherited-environment selection remain in its compatibility wrapper; original
+argv[0] spelling is retained. A separate Windows-only input regression is added
+but has not run on Windows. Git-only Windows cross-compilation passes; foreground
+Git ownership, finite stdin and receipts are still incomplete and remain refused.
+
+Finite Windows stdin primitive checkpoint (2026-10-18): the shared native Job
+launcher accepts an optional RAII pipe prepared before raw launch allocation.
+Only the child read endpoint joins the inherited-handle allowlist; the parent
+writer is explicitly non-inheritable. Failure drops both endpoints; successful
+launch closes the local child endpoint and transfers the writer to the caller.
+Background launch continues to request no input. A separate Windows-only test
+checks inheritance flags, binary bytes and EOF, but is not executed on macOS.
+Git-only Windows cross-compilation passes. Foreground input delivery/deadlines,
+cancellation and terminal Job receipts remain unimplemented; no activation or
+Windows runtime verification is claimed. The no-input foreground NUL handle and
+full setup-fault/resource matrix also remain required before activation.
+
+Stdin review correction: the inherited-handle buffer now lives outside the
+launch closure in both production and tests, through failure-path attribute-list
+deletion. Independent review identified premature Vec drop in the initial
+production-only branch; that divergent branch was removed. Windows Git-only
+cross-check passes after correction. Real Windows lifecycle evidence remains open.
+
+Windows Job cleanup confirmation checkpoint (2026-10-18): the shared control now
+queries JobObjectBasicAccountingInformation after termination and returns success
+only when ActiveProcesses is zero. Query errors and a five-second deadline return
+unconfirmed cleanup errors. Independent security review found no blocker in the
+limited delta; background signal/force plus grace can now take up to fourteen
+seconds and foreground ownership must account for that bound. Separate empty,
+invalid-handle and live-process tests were added but have not run on Windows.
+Git-only Windows library cross-check and macOS all-feature/all-target locked Clippy
+pass. Descendants with closed stdio, cancellation/reconfirmation, query-failure and
+timeout runtime evidence remain open; this does not complete foreground integration.
+
+Windows no-input checkpoint (2026-10-18): the shared native launch command owns
+a read-only NUL handle for no-input calls, sets its inheritance flag, and includes
+it in the existing explicit handle allowlist. Finite stdin remains a separate
+mutually exclusive pipe. This also changes background stdin from an invalid handle
+to immediate EOF; programs can observe that difference. Independent review found
+no blocker in this limited delta. Windows Git library cross-check and macOS locked
+all-feature/all-target Clippy pass. Separate local-handle and real-child EOF tests
+are added but not executed on Windows. Existing eight-resource fault accounting
+does not cover this RAII NUL handle; return-time release evidence and native fault
+matrix remain required. Foreground lifecycle integration remains incomplete.
+
+Windows stdin ownership simplification checkpoint (2026-10-18): commit 1d7fe170
+replaces two independent optional handles with one Pipe/Null enum, so neither
+missing nor simultaneous stdin modes are representable. Native startup and the
+allowlist use the same child handle; successful launch consumes the enum to close
+the local read side and transfer only a finite writer. Independent review found
+no blocker; early-error local stdin closure precedes outer native cleanup, while
+the attribute-list backing buffer still outlives deletion. Git-only Windows
+cross-check, all-feature/all-target locked Clippy, project governance and claim
+validators pass. Native failure/release evidence and foreground integration remain.
