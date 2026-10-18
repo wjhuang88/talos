@@ -3764,3 +3764,13 @@ the selected task state, so they do not prove native changed-list calculation or
 full runner delivery. Metadata-only fallback, execution layout, resolution
 authority and original T7 closure gates remain open. The reusable test-model
 lesson is recorded in EVOLUTION.md.
+
+Test module separation (2026-10-18): moved the complete prepared Git test module
+to `git_write/prepared_add_tests.rs` without changing its module path or fixture
+visibility. `prepared_add.rs` is now 7,258 lines rather than 17,742; production
+logic is unchanged by this move. All 137 prepared-plan tests pass outside the
+sandbox, and all-target/all-feature Clippy passes. The sandbox run passed 136
+and failed only the existing process-observation EPERM case; the full outside
+rerun closes that environment failure. Independent review compared the extracted
+module and confirmed scope/content preservation. Production orchestration remains
+large and T7 remains Active; this is test separation, not feature completion.
