@@ -11,8 +11,8 @@ use super::GitToolError;
 /// Invocation-owned cumulative allowance, never reset by a continuation.
 #[derive(Debug)]
 pub(super) struct Budget {
-    entries: usize,
-    bytes: usize,
+    pub(super) entries: usize,
+    pub(super) bytes: usize,
 }
 
 impl Default for Budget {
@@ -125,7 +125,7 @@ fn inspect(path: &Path) -> Result<State, GitToolError> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 struct Record {
     path: PathBuf,
     state: State,
@@ -133,7 +133,7 @@ struct Record {
 
 /// Retains traversal order, including links, missing suffixes and ancestors
 /// later cancelled by `..`. Revalidation never discovers or replaces records.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub(super) struct Resolution {
     resolved: PathBuf,
     records: Vec<Record>,

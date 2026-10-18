@@ -2129,6 +2129,51 @@ async fn pull_graph_read_requires_closed_capability_after_configuration() {
 }
 
 #[tokio::test]
+async fn pull_unapproved_resolution_does_not_inspect_missing_external_target() {
+    let root = fixture();
+    let mut plan = Box::new(
+        AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+            .expect("Pull"),
+    )
+    .discover()
+    .await
+    .expect("configuration");
+    let common = plan.repository.common_dir.clone();
+    let registration = common.join("worktrees/linked");
+    std::fs::create_dir_all(&registration).expect("registration");
+    let missing = root.path().join("missing-external-common");
+    std::fs::write(
+        registration.join("commondir"),
+        format!("{}\n", missing.display()),
+    )
+    .expect("pointer");
+    let mut inventory = super::super::pull_inventory::Inventory::new(&common, &common);
+    while !inventory.complete() {
+        inventory.advance(|_| true).expect("approved metadata");
+    }
+    inventory.bind_references(&common, &common).expect("source evidence");
+    for _ in 0..2 {
+        assert!(AddPlan::advance_pull_worktree_targets(
+            &mut inventory,
+            &common,
+            &mut plan.facets,
+            &plan.workspace,
+            &[],
+            false,
+        ).expect("unapproved capability must defer without inspecting missing target"));
+        assert!(inventory.exact_paths(&common, &common).is_empty());
+    }
+    assert!(AddPlan::advance_pull_worktree_targets(
+        &mut inventory,
+        &common,
+        &mut plan.facets,
+        &plan.workspace,
+        &[],
+        true,
+    ).is_err(), "approved resolution detects the missing common directory");
+}
+
+#[tokio::test]
 async fn pull_parent_linked_targets_require_fresh_exact_admission() {
     let root = fixture();
     let mut plan = Box::new(
@@ -2162,13 +2207,26 @@ async fn pull_parent_linked_targets_require_fresh_exact_admission() {
             .advance_pull_parent_inventory(&mut inventory, &old)
             .expect("targets")
     );
-    assert!(inventory.exact_paths(&common, &common).contains(&external));
+    assert!(AddPlan::pull_resolution_admitted(&plan.facets));
+    assert!(inventory.exact_paths(&common, &common).is_empty());
     assert!(!inventory.paths().contains(&reference));
+    // Only the newly approved dedicated capability permits chain inspection.
+    let resolution = proof(&plan)
+        .consume_for_prepared(&plan.request(), &plan.identity)
+        .expect("resolution capability");
     assert!(
         !plan
-            .advance_pull_parent_inventory(&mut inventory, &old)
-            .expect("old grants")
+            .advance_pull_parent_inventory(&mut inventory, &resolution)
+            .expect("resolved target plan")
     );
+    assert!(inventory.exact_paths(&common, &common).contains(&external));
+    // Capability approval does not grant the newly resolved target's contents.
+    assert!(
+        !plan
+            .advance_pull_parent_inventory(&mut inventory, &resolution)
+            .expect("target still lacks exact admission")
+    );
+    assert!(!inventory.paths().contains(&reference));
     for _ in 0..8 {
         let tokens = proof(&plan)
             .consume_for_prepared(&plan.request(), &plan.identity)
