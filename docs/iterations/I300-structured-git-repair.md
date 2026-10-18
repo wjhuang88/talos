@@ -4398,3 +4398,14 @@ cumulative queue charging, not completed temporary-peak or directory/identity
 accounting. The previous stable stage was pushed through `32dda28a` to #735;
 CI 39127288380 is still running, including native Windows identity validation.
 No full preflight or remote exact-head evidence is claimed for `055f65e9` yet.
+
+Native Windows result (2026-10-18, CI 39127288380): the Windows job is
+terminal failure. The original path identity ancestor/leaf replacement test now
+passes, as do real Git startup, executable replacement guard, regular-evidence
+replacement and focused foreground supervision tests. The next test,
+`pull_child_bootstrap_defers_worktree_and_retains_startup_evidence`, fails at
+`prepare_pull`: production preparation still deliberately rejects non-Unix
+platforms while foreground Job integration acceptance is incomplete. Thus the
+identity repair has native evidence, but Windows preparation remains a delivery
+blocker; neither skipping this test nor opening preparation without full review
+is closure. Job log: `/tmp/talos-i300-windows-39127288380.log`, job 117675006764.
