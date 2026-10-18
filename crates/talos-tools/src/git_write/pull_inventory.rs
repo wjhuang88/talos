@@ -309,14 +309,17 @@ impl Inventory {
                 .into_iter()
                 .chain(self.worktree_reference_roots.iter().map(PathBuf::as_path))
                 .any(|root| {
-                    path.starts_with(root.join("refs"))
-                        || path.starts_with(root.join("reftable"))
-                        || path == &root.join("packed-refs")
-                        || path == &root.join("HEAD")
+                    path.strip_prefix(root).is_ok_and(|relative| {
+                        relative.starts_with("refs")
+                            || relative.starts_with("reftable")
+                            || relative == Path::new("packed-refs")
+                            || relative == Path::new("HEAD")
+                    })
                 })
                 || path
-                    .strip_prefix(common.join("worktrees"))
+                    .strip_prefix(common)
                     .ok()
+                    .and_then(|relative| relative.strip_prefix("worktrees").ok())
                     .is_some_and(|relative| {
                         // Linked worktree refs are per-worktree roots for --all.
                         // The first component is the registered worktree identifier.
@@ -329,15 +332,18 @@ impl Inventory {
                                 )
                             })
                     });
-            let boundary = [gitdir, common]
-                .iter()
-                .any(|root| path == &root.join("shallow") || path == &root.join("info/grafts"));
+            let boundary = [gitdir, common].iter().any(|root| {
+                path.strip_prefix(root).is_ok_and(|relative| {
+                    relative == Path::new("shallow") || relative == Path::new("info/grafts")
+                })
+            });
             // get_worktrees() checks the main worktree's core.bare separately
             // even when its config.worktree is absent from the current chain.
-            let worktree_config = path == &common.join("config.worktree");
+            let worktree_config = path.strip_prefix(common) == Ok(Path::new("config.worktree"));
             let pointer = path
-                .strip_prefix(common.join("worktrees"))
+                .strip_prefix(common)
                 .ok()
+                .and_then(|relative| relative.strip_prefix("worktrees").ok())
                 .is_some_and(|relative| {
                     let mut components = relative.components();
                     components.next().is_some()
@@ -362,6 +368,7 @@ impl Inventory {
                         validate_table_names(bytes)?;
                     }
                 }
+                self.reference_budget.retain_path(path)?;
                 evidence.push((path.clone(), entry));
             }
         }
@@ -381,7 +388,11 @@ impl Inventory {
     ) -> Result<bool, GitToolError> {
         let mut added = false;
         for (path, evidence) in &self.references {
-            let Some(relative) = path.strip_prefix(common.join("worktrees")).ok() else {
+            let Some(relative) = path
+                .strip_prefix(common)
+                .ok()
+                .and_then(|relative| relative.strip_prefix("worktrees").ok())
+            else {
                 continue;
             };
             let mut components = relative.components();

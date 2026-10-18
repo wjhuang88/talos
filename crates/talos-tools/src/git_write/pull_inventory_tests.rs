@@ -43,7 +43,7 @@ fn resolution_and_reference_capture_share_cumulative_allowance() {
 fn alternates_share_reference_allowance_and_rebinding_does_not_recharge() {
     let temp = tempfile::tempdir().expect("fixture");
     let base = temp.path().canonicalize().expect("base");
-    let budget = ReferenceBudget(Arc::new(Mutex::new((2, 1024 * 1024))));
+    let budget = ReferenceBudget(Arc::new(Mutex::new((3, 1024 * 1024))));
     for name in ["parent", "child"] {
         let root = base.join(name);
         std::fs::create_dir_all(root.join("objects/info")).expect("objects");
@@ -66,7 +66,13 @@ fn alternates_share_reference_allowance_and_rebinding_does_not_recharge() {
             inventory
                 .bind_alternates(&root, &root)
                 .expect("retained entry");
-            assert_eq!(*budget.0.lock().expect("budget"), (0, 1024 * 1024 - 5));
+            assert_eq!(
+                *budget.0.lock().expect("budget"),
+                (
+                    0,
+                    1024 * 1024 - 5 - root.join("HEAD").as_os_str().as_encoded_bytes().len()
+                )
+            );
         } else {
             assert!(inventory.bind_alternates(&root, &root).is_err());
         }
@@ -93,7 +99,12 @@ fn rejected_nonempty_alternate_consumes_shared_allowance() {
 fn reference_allowance_is_shared_across_inventories_and_not_reset_by_rebinding() {
     let temp = tempfile::tempdir().expect("fixture");
     let base = temp.path().canonicalize().expect("base");
-    let budget = ReferenceBudget(Arc::new(Mutex::new((10, 9))));
+    let path_bytes = base
+        .join("parent/HEAD")
+        .as_os_str()
+        .as_encoded_bytes()
+        .len();
+    let budget = ReferenceBudget(Arc::new(Mutex::new((10, path_bytes + 9))));
     let mut inventories = Vec::new();
     for name in ["parent", "child"] {
         let root = base.join(name);
@@ -111,10 +122,10 @@ fn reference_allowance_is_shared_across_inventories_and_not_reset_by_rebinding()
     parent
         .bind_references(root, root)
         .expect("retained evidence");
-    assert_eq!(*budget.0.lock().expect("budget"), (9, 4));
+    assert_eq!(*budget.0.lock().expect("budget"), (8, 4));
     let (root, child) = &mut inventories[1];
     assert!(child.bind_references(root, root).is_err());
-    assert_eq!(*budget.0.lock().expect("failed capture budget"), (8, 4));
+    assert_eq!(*budget.0.lock().expect("failed capture budget"), (7, 4));
     // Dropping an inventory does not refund cumulative discovery work.
     drop(inventories);
     let root = base.join("parent");
