@@ -412,14 +412,20 @@ mod tests {
         std::fs::write(&leaf, b"unchanged").expect("leaf");
         let identity = PathIdentity::capture(&leaf).expect("identity");
         assert_eq!(identity, PathIdentity::capture(&leaf).expect("unchanged"));
+        // Windows may refuse renaming a directory with an open descendant,
+        // even when every identity handle shares DELETE. Move the same leaf
+        // out first; retain all handles while replacing its empty parent.
+        let staged_leaf = root.path().join("staged-leaf");
+        std::fs::rename(&leaf, &staged_leaf).expect("stage original leaf");
         let saved = root.path().join("saved");
         std::fs::rename(&parent, &saved).expect("move parent");
         std::fs::create_dir(&parent).expect("replace parent");
-        std::fs::rename(saved.join("leaf"), &leaf).expect("retain original leaf");
+        std::fs::rename(&staged_leaf, &leaf).expect("retain original leaf");
         assert_ne!(identity, PathIdentity::capture(&leaf).expect("new parent"));
-        std::fs::rename(&leaf, saved.join("leaf")).expect("return leaf");
+        std::fs::rename(&leaf, &staged_leaf).expect("stage leaf for restoration");
         std::fs::remove_dir(&parent).expect("remove replacement");
         std::fs::rename(&saved, &parent).expect("restore parent");
+        std::fs::rename(&staged_leaf, &leaf).expect("restore original leaf");
         assert_eq!(identity, PathIdentity::capture(&leaf).expect("restored"));
         std::fs::rename(&leaf, parent.join("original-leaf")).expect("move leaf");
         std::fs::write(&leaf, b"unchanged").expect("identical replacement bytes");
