@@ -4,11 +4,39 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 
 use super::{GitToolError, snapshot::PathIdentity};
 
+/// Cumulative file-evidence allowance shared by every inventory in one Pull.
+/// Path traversal and transient handle accounting are separate remaining work.
+#[derive(Clone, Debug)]
+pub(super) struct ReferenceBudget(Arc<Mutex<(usize, usize)>>);
+
+impl Default for ReferenceBudget {
+    fn default() -> Self {
+        Self(Arc::new(Mutex::new((4096, 4 * 1024 * 1024))))
+    }
+}
+
+impl ReferenceBudget {
+    fn capture(&self, path: &Path) -> Result<super::snapshot::RegularEvidence, GitToolError> {
+        let mut remaining = self.0.lock().map_err(|_| invalid())?;
+        let mut allowance = super::snapshot::Budget {
+            entries: remaining.0,
+            bytes: remaining.1,
+        };
+        let result = super::snapshot::RegularEvidence::capture(path, &mut allowance);
+        // Failed captures also consume any work already charged. A continuation
+        // or replacement inventory must never restore the invocation allowance.
+        *remaining = (allowance.entries, allowance.bytes);
+        result.map_err(|_| invalid())
+    }
+}
+
 #[derive(Debug)]
 pub(super) struct Inventory {
+    reference_budget: ReferenceBudget,
     pending: Vec<PathBuf>,
     visited: BTreeMap<PathBuf, Option<PathIdentity>>,
     directories: BTreeMap<PathBuf, Vec<PathBuf>>,
@@ -122,7 +150,16 @@ fn validate_table_names(bytes: &[u8]) -> Result<(), GitToolError> {
 }
 
 impl Inventory {
+    #[cfg(test)]
     pub(super) fn new(git_dir: &Path, common_dir: &Path) -> Self {
+        Self::with_reference_budget(git_dir, common_dir, ReferenceBudget::default())
+    }
+
+    pub(super) fn with_reference_budget(
+        git_dir: &Path,
+        common_dir: &Path,
+        reference_budget: ReferenceBudget,
+    ) -> Self {
         let mut pending = Vec::new();
         for root in [git_dir, common_dir] {
             for name in [
@@ -143,6 +180,7 @@ impl Inventory {
         pending.sort();
         pending.dedup();
         Self {
+            reference_budget,
             pending,
             visited: BTreeMap::new(),
             directories: BTreeMap::new(),
@@ -227,19 +265,9 @@ impl Inventory {
             return Err(invalid());
         }
         self.revalidate()?;
-        let mut budget = super::snapshot::Budget {
-            entries: 4096,
-            bytes: 4 * 1024 * 1024,
-        };
         // Existing evidence has just been revalidated in place. Keep its
         // identity handles and bytes rather than capturing a second full copy.
-        // It still consumes the same allowance when admitting new references.
-        for (_, retained) in &self.references {
-            budget.entries = budget.entries.checked_sub(1).ok_or_else(invalid)?;
-            if let super::snapshot::Entry::File(_, bytes) = &retained.entry {
-                budget.bytes = budget.bytes.checked_sub(bytes.len()).ok_or_else(invalid)?;
-            }
-        }
+        // Their initial capture already consumed the invocation allowance.
         let mut evidence = Vec::new();
         for (path, identity) in &self.visited {
             if self
@@ -294,8 +322,7 @@ impl Inventory {
                 && identity.is_some()
                 && !self.directories.contains_key(path)
             {
-                let entry = super::snapshot::RegularEvidence::capture(path, &mut budget)
-                    .map_err(|_| invalid())?;
+                let entry = self.reference_budget.capture(path)?;
                 if reference && let super::snapshot::Entry::File(_, bytes) = &entry.entry {
                     super::receiver_state::validate_symbolic_target(bytes)?;
                     if path.file_name().is_some_and(|name| name == "tables.list")

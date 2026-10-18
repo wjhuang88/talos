@@ -4298,3 +4298,19 @@ warnings denied and formatting pass. Logs:
 accounting: shared parent/child/continuation quotas, temporary resource peaks,
 resolution authorization and full Pull delivery remain open. Production Pull
 stays disabled and T7 remains Active.
+
+Pull cumulative reference allowance checkpoint (2026-10-18): AddPlan now owns
+one shared reference-file allowance cloned into all four production parent/child
+inventory construction sites. New file captures consume cumulative entries and
+bytes across inventories, replacements and continuations; repeated retained-file
+revalidation does not recharge, and dropping an inventory does not refund.
+Independent review found no blocker. Inventory tests pass 31/31, Pull-prefixed
+tests 118/118, all-feature library check/Clippy and formatting pass. Logs:
+`/tmp/talos-i300-reference-quota-{check,tests,pull-tests,clippy}.log`.
+This only closes reference-file allowance resets: directory/path/link evidence,
+alternates and Windows temporary/retained-handle peaks still require the unified
+invocation quota. Production Pull remains disabled; T7 stays Active.
+Windows CI 39122382667 compiled the previously failing test target and ran
+foreground tests, but path_identity_retains_leaf_and_ancestor_identity failed
+when renaming a parent directory with retained handles (Access denied). This
+must be resolved and revalidated on Windows; no platform completion is claimed.
