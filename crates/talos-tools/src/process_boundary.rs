@@ -1,5 +1,8 @@
 //! Shared non-interactive process boundary for command tools.
 
+#[cfg(any(windows, test))]
+mod windows_command_line;
+
 #[cfg(feature = "shell")]
 use std::process::Stdio;
 
@@ -671,12 +674,11 @@ fn create_windows_job_with_hooks(
         }
         let resolved_program = resolve_windows_program(program)?;
         let mut program_w = wide(resolved_program.as_os_str());
-        let mut command = quote_windows_arg(program);
-        for arg in args {
-            command.push(' ');
-            command.push_str(&quote_windows_arg(arg));
-        }
-        let mut command_w = wide(std::ffi::OsStr::new(&command));
+        let arguments = std::iter::once(program)
+            .chain(args.iter().map(String::as_str))
+            .map(|argument| argument.encode_utf16().collect())
+            .collect::<Vec<_>>();
+        let mut command_w = windows_command_line::encode(&arguments)?;
         let cwd_w = wide(cwd.as_os_str());
         let mut environment = windows_environment(extra_env);
         let mut startup: STARTUPINFOEXW = zeroed();
@@ -921,34 +923,6 @@ fn resolve_windows_program(program: &str) -> Result<std::path::PathBuf, String> 
     ))
 }
 
-#[cfg(windows)]
-fn quote_windows_arg(value: &str) -> String {
-    if !value.is_empty() && !value.contains([' ', '\t', '"']) {
-        return value.to_owned();
-    }
-    let mut quoted = String::with_capacity(value.len() + 2);
-    quoted.push('"');
-    let mut backslashes = 0usize;
-    for character in value.chars() {
-        match character {
-            '\\' => backslashes += 1,
-            '"' => {
-                quoted.extend(std::iter::repeat_n('\\', backslashes * 2 + 1));
-                quoted.push('"');
-                backslashes = 0;
-            }
-            _ => {
-                quoted.extend(std::iter::repeat_n('\\', backslashes));
-                quoted.push(character);
-                backslashes = 0;
-            }
-        }
-    }
-    quoted.extend(std::iter::repeat_n('\\', backslashes * 2));
-    quoted.push('"');
-    quoted
-}
-
 #[cfg(test)]
 mod native_inventory;
 
@@ -1097,18 +1071,6 @@ mod windows_tests {
             std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
             BTreeMap::new(),
         )
-    }
-
-    #[test]
-    fn windows_argument_quoting_preserves_backslashes_and_quotes() {
-        assert_eq!(quote_windows_arg("plain"), "plain");
-        assert_eq!(quote_windows_arg(""), "\"\"");
-        assert_eq!(quote_windows_arg("two words"), "\"two words\"");
-        let quoted = quote_windows_arg("a\"b");
-        assert!(quoted.starts_with('"') && quoted.ends_with('"'));
-        assert!(quoted.contains("\\\""));
-        let trailing = quote_windows_arg(r#"C:\path with space\"#);
-        assert!(trailing.starts_with('"') && trailing.ends_with('"'));
     }
 
     #[test]
