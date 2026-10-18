@@ -3,7 +3,6 @@
 //! This module performs no directory enumeration or file-content reads.
 
 use std::collections::VecDeque;
-use std::ffi::OsString;
 use std::path::{Component, Path, PathBuf};
 
 use super::GitToolError;
@@ -25,6 +24,18 @@ impl Default for Budget {
 }
 
 impl Budget {
+    // Queue text is explicit scratch evidence. Reserve before allocating its
+    // owned components; consumed discovery allowance is never refunded.
+    fn charge_components(&mut self, path: &Path) -> Result<(), GitToolError> {
+        let bytes = path
+            .components()
+            .try_fold(0usize, |total, component| {
+                total.checked_add(component.as_os_str().as_encoded_bytes().len())
+            })
+            .ok_or_else(invalid)?;
+        self.charge(0, bytes)
+    }
+
     fn charge(&mut self, entries: usize, bytes: usize) -> Result<(), GitToolError> {
         let remaining_entries = self.entries.checked_sub(entries).ok_or_else(invalid)?;
         let remaining_bytes = self.bytes.checked_sub(bytes).ok_or_else(invalid)?;
@@ -152,6 +163,7 @@ impl Resolution {
         if !path.is_absolute() {
             return Err(invalid());
         }
+        budget.charge_components(path)?;
         let mut pending: VecDeque<_> = path
             .components()
             .map(|component| (component.as_os_str().to_owned(), allow_missing))
@@ -184,7 +196,6 @@ impl Resolution {
                             if hops > 64 {
                                 return Err(invalid());
                             }
-                            let target = target.clone();
                             result.resolved.pop();
                             if target.is_absolute() {
                                 result.resolved.clear();
@@ -200,16 +211,13 @@ impl Resolution {
                             {
                                 return Err(invalid());
                             }
-                            let components: Vec<OsString> = target
-                                .components()
-                                .map(|c| c.as_os_str().to_owned())
-                                .collect();
-                            if components.is_empty() {
+                            if target.components().next().is_none() {
                                 return Err(invalid());
                             }
+                            budget.charge_components(target)?;
                             // A dangling link is not a missing checkout suffix.
-                            for component in components.into_iter().rev() {
-                                pending.push_front((component, false));
+                            for component in target.components().rev() {
+                                pending.push_front((component.as_os_str().to_owned(), false));
                             }
                         }
                         _ => {}
