@@ -1,6 +1,39 @@
 use super::*;
 
 #[test]
+fn worktree_binding_refuses_before_retaining_unbudgeted_reference_roots() {
+    let temp = tempfile::tempdir().expect("fixture");
+    let root = temp.path().canonicalize().expect("root");
+    let mut inventory = Inventory::new(&root, &root);
+    let resolution = ReferenceBudget::default()
+        .resolve(&root, false)
+        .expect("target");
+    inventory
+        .worktree_targets
+        .insert(root.clone(), Some(resolution));
+    inventory.worktree_common_targets.insert(root.clone());
+    let budget = ReferenceBudget(Arc::new(Mutex::new((1, 1024 * 1024))));
+    inventory.reference_budget = budget.clone();
+    let calls = std::cell::Cell::new(0);
+    let admitted = |path: &Path| {
+        calls.set(calls.get() + 1);
+        Some(path.to_owned())
+    };
+    assert!(inventory.bind_worktree_targets(admitted).is_err());
+    assert_eq!(calls.get(), 1);
+    assert!(inventory.worktree_reference_roots.is_empty());
+    let exhausted = *budget.0.lock().expect("allowance");
+    assert_eq!(exhausted.0, 0);
+    assert!(inventory.bind_worktree_targets(admitted).is_err());
+    assert_eq!(
+        calls.get(),
+        1,
+        "retry must refuse before cloning a grant path"
+    );
+    assert_eq!(*budget.0.lock().expect("allowance"), exhausted);
+}
+
+#[test]
 fn borrowed_queries_preserve_allowance_but_owned_capture_cannot_retry_exhaustion() {
     let temp = tempfile::tempdir().expect("fixture");
     let root = temp.path().canonicalize().expect("root");
