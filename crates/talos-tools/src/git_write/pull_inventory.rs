@@ -207,9 +207,7 @@ impl Inventory {
             }
         }
         for (path, expected) in &self.directories {
-            if &children(path)? != expected {
-                return Err(invalid());
-            }
+            revalidate_children(path, expected)?;
         }
         let mut budget = super::snapshot::Budget {
             entries: 4,
@@ -517,6 +515,30 @@ impl Inventory {
         self.pending = next;
         self.revalidate()
     }
+}
+
+// Compare against the retained sorted set without constructing a second full
+// path inventory. New entries fail immediately, rather than being retained as
+// a replacement discovery baseline during revalidation.
+fn revalidate_children(path: &Path, expected: &[PathBuf]) -> Result<(), GitToolError> {
+    if expected.len() > 4096 {
+        return Err(invalid());
+    }
+    let mut seen = vec![false; expected.len()];
+    let mut count = 0usize;
+    for child in std::fs::read_dir(path).map_err(|_| invalid())? {
+        let child = child.map_err(|_| invalid())?.path();
+        let index = expected.binary_search(&child).map_err(|_| invalid())?;
+        if seen[index] {
+            return Err(invalid());
+        }
+        seen[index] = true;
+        count += 1;
+    }
+    if count != expected.len() {
+        return Err(invalid());
+    }
+    Ok(())
 }
 
 fn children(path: &Path) -> Result<Vec<PathBuf>, GitToolError> {
