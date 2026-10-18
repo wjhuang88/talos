@@ -4386,3 +4386,15 @@ Remaining: directory/path/identity/temporary peak quota unification, recursive
 Pull and final integration execution, real wrapper acceptance and native Windows
 validation. This stage does not prove full ADR-089 resource accounting. Production
 Pull and non-Unix preparation remain disabled; T7 and the full handoff remain open.
+
+Resolution queue checkpoint (2026-10-18, `055f65e9`): reserve initial and
+link-expanded component text before allocating owned queue components; remove
+the duplicate link target and intermediate component vector. Resolver tests pass
+7/7, including refusal before metadata discovery and refusal at link expansion
+when only queue text exceeds the remaining allowance. Evidence:
+`/tmp/talos-i300-resolution-queue-final-tests.log`. All-feature library Clippy
+passes (`/tmp/talos-i300-resolution-queue-clippy.log`). This is conservative
+cumulative queue charging, not completed temporary-peak or directory/identity
+accounting. The previous stable stage was pushed through `32dda28a` to #735;
+CI 39127288380 is still running, including native Windows identity validation.
+No full preflight or remote exact-head evidence is claimed for `055f65e9` yet.
