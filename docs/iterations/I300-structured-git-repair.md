@@ -4237,3 +4237,14 @@ The extracted body was checked against the original before rustfmt; formatting
 only joins two expressions after deindentation. All 28 inventory tests pass with
 locked all-feature tools testing. This reduces the production inventory file
 from 1314 to 553 lines; it is organization, not new Pull capability or completion.
+
+Pull directory revalidation checkpoint (2026-10-18): retained sorted names are
+checked incrementally with a bounded seen bitmap instead of recapturing a full
+second path vector. Missing names, unknown names and duplicates refuse; entry
+identity checks remain separate. A regression covers deletion, equal-count
+replacement and restoration without changing the retained baseline. Locked
+inventory tests pass 29/29, all-feature tools library Clippy with warnings denied
+and workspace format checking pass. Independent security delta review found no
+new blocker or read-scope expansion. This removes duplicate path retention only:
+bitmap, directory handles and temporary platform path allocations still require
+invocation-wide accounting. Production Pull remains disabled; T7 remains Active.

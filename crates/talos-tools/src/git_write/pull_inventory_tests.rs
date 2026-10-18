@@ -1,6 +1,26 @@
 use super::*;
 
 #[test]
+fn directory_revalidation_compares_the_retained_set_without_rebaselining() {
+    let temp = tempfile::tempdir().expect("fixture");
+    let root = temp.path().canonicalize().expect("root");
+    for name in ["a", "b", "c"] {
+        std::fs::write(root.join(name), b"contents").expect("entry");
+    }
+    let retained = children(&root).expect("capture names");
+    revalidate_children(&root, &retained).expect("same set");
+    std::fs::remove_file(root.join("b")).expect("remove entry");
+    assert!(revalidate_children(&root, &retained).is_err());
+    std::fs::write(root.join("replacement"), b"contents").expect("same count, new name");
+    assert!(revalidate_children(&root, &retained).is_err());
+    std::fs::remove_file(root.join("replacement")).expect("remove replacement");
+    std::fs::write(root.join("b"), b"contents").expect("restore name");
+    revalidate_children(&root, &retained).expect("original set");
+    // This checks names only; entry identities are validated independently.
+    assert_eq!(retained, children(&root).expect("unchanged baseline"));
+}
+
+#[test]
 fn reftable_manifests_cannot_escape_admitted_backends() {
     for location in ["reftable", "worktrees/linked/reftable"] {
         for contents in [
