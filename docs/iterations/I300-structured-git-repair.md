@@ -4616,3 +4616,34 @@ Temporary paths()/exact_paths() copies, worktree-frontier copies, identity
 serialization and retained/transient handles remain quota residuals, as do
 RepositoryState/index/config capture. Full stage validation remains required;
 production Pull and Windows preparation stay closed and T7 stays Active.
+
+Validation follow-up (2026-10-18): directory-stage preflight exited 101 at
+`prepared_local_push_runs_all_eight_admitted_stages`, with macOS process
+observation returning PermissionDenied / Operation not permitted (875 tools
+tests passed). This is not a passing full preflight. The standard command was
+restarted with explicit sandbox escalation; log
+`/tmp/talos-i300-directory-preflight-unsandboxed.log`, exited 0 including both
+external Runtime SDK variants. This validates directory-stage fb7bb553.
+
+Native Windows run 39136878491, job 117703093508, confirms the maintenance
+refusal persists at 7fde190a. Test diagnostics show the bound entry at
+`C:\Program Files\Git\bin\git.exe` and canonical child at
+`C:\Program Files\Git\ucrt64\libexec\git-core\git.exe`. CRLF normalization did
+not resolve the different-program layout. Log:
+`/tmp/talos-i300-windows-117703093508.log`. Independent review confirms fresh
+child Read/Execute admission permits identity capture but does not prove its
+configuration semantics match the original entry. The proposed next repair is
+bounded re-preparation from the separately admitted internal Git, discarding
+old program-specific evidence and rediscovering location/configuration/exec-path.
+This proposal is not implemented or validated; the existing guard stays intact.
+
+The same remote run's main validation job 117703093505 also failed independently:
+`loose_reference_changes_invalidate_snapshot_without_new_objects` observed a
+transient `objects/maintenance.lock` in only one object-layout snapshot. Its
+fixture Git helper now sets both accepted foreground-maintenance options, so
+setup commits complete their maintenance before comparing repository snapshots.
+The object-layout assertion and production capture are unchanged. Log:
+`/tmp/talos-i300-main-117703093505.log`. Focused repository-state validation
+passes 14/14 (`/tmp/talos-i300-repository-maintenance.log`). Both governance
+validators pass with zero warnings. Fresh full-stage validation and native
+Windows acceptance remain outstanding.
