@@ -4409,3 +4409,18 @@ platforms while foreground Job integration acceptance is incomplete. Thus the
 identity repair has native evidence, but Windows preparation remains a delivery
 blocker; neither skipping this test nor opening preparation without full review
 is closure. Job log: `/tmp/talos-i300-windows-39127288380.log`, job 117675006764.
+
+Windows lifecycle acceptance extension (2026-10-18): add required native CI cases
+for an infinite output writer exceeding the allowance and a leader exiting while
+its acknowledged descendant loops with separately redirected stdio. Both require
+a successful cleanup receipt; the descendant observer fails and explicitly stops
+any survivor. Independent review of the first fixture identified a missing child
+acknowledgement; the revised script retains a ready marker and live-child check
+before leader exit. Formatting and Git-only Windows library cross-check pass
+(`/tmp/talos-i300-windows-foreground-lib-check.log`, seven existing feature-only
+warnings). Cross-checking test targets is blocked by absent
+`x86_64-w64-mingw32-gcc`; neither new test has native runtime evidence yet.
+Review found no static spawn bypass, but opening the common preparation gate
+also requires native Add/Commit/Checkout/Push authorization/execution coverage,
+concurrent-operation isolation, large-input/two-output-stream and failure cleanup
+acceptance. Keep the gate closed pending those results.

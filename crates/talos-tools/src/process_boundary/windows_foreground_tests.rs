@@ -101,6 +101,96 @@ async fn foreground_timeout_confirms_job_and_io_cleanup() {
 }
 
 #[tokio::test]
+async fn foreground_output_limit_terminates_writer_and_confirms_cleanup() {
+    let owner = OwnedCommandExecutor::default();
+    let result = owner
+        .operation()
+        .execute(
+            powershell(
+                "$bytes = New-Object byte[] 8192; $out = [Console]::OpenStandardOutput(); while ($true) { $out.Write($bytes, 0, $bytes.Length); $out.Flush() }",
+            ),
+            Duration::from_secs(20),
+            1024,
+        )
+        .await;
+    owner.seal();
+    owner
+        .wait(Duration::from_secs(10))
+        .await
+        .expect("confirmed output-limit cleanup");
+    assert!(
+        result
+            .expect_err("output must exceed allowance")
+            .contains("output limit"),
+    );
+}
+
+#[tokio::test]
+async fn foreground_leader_exit_reaps_descendant_with_redirected_stdio() {
+    let directory = tempfile::tempdir().expect("descendant fixture");
+    let quote = |path: &std::path::Path| path.to_string_lossy().replace('\'', "''");
+    let pid = directory.path().join("child.pid");
+    let ready = directory.path().join("child.ready");
+    let child_script = directory.path().join("child.ps1");
+    let stdout = directory.path().join("child.stdout");
+    let stderr = directory.path().join("child.stderr");
+    std::fs::write(
+        &child_script,
+        format!(
+            "$ErrorActionPreference = 'Stop'; [System.IO.File]::WriteAllText('{}', [string]$PID); [System.IO.File]::WriteAllText('{}', 'ready'); while ($true) {{ Start-Sleep -Seconds 60 }}",
+            quote(&pid),
+            quote(&ready),
+        ),
+    )
+    .expect("child script");
+    // The descendant owns different stdio files, so EOF from the leader is
+    // insufficient evidence of cleanup. Its acknowledged loop cannot exit naturally.
+    let script = format!(
+        "$ErrorActionPreference = 'Stop'; $child = Start-Process -FilePath (Join-Path $PSHOME 'powershell.exe') -ArgumentList '-NoLogo','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File','\"{}\"' -RedirectStandardOutput '{}' -RedirectStandardError '{}' -PassThru; $until = [DateTime]::UtcNow.AddSeconds(10); while (!(Test-Path -LiteralPath '{}')) {{ if ($child.HasExited -or [DateTime]::UtcNow -gt $until) {{ throw 'child failed to acknowledge' }}; Start-Sleep -Milliseconds 10 }}; if ($child.HasExited) {{ throw 'child exited before leader' }}; [System.IO.File]::WriteAllText('{}', [string]$child.Id)",
+        quote(&child_script),
+        quote(&stdout),
+        quote(&stderr),
+        quote(&ready),
+        quote(&pid),
+    );
+    let owner = OwnedCommandExecutor::default();
+    let result = owner
+        .operation()
+        .execute(powershell(&script), Duration::from_secs(20), 4096)
+        .await;
+    owner.seal();
+    let cleanup = owner.wait(Duration::from_secs(10)).await;
+    // Observe and stop survivors before asserting execution or cleanup results.
+    // The child publishes its own PID before entering its persistent loop.
+    let acknowledgement = std::fs::read_to_string(ready);
+    let pid: u32 = std::fs::read_to_string(pid)
+        .expect("descendant was started")
+        .parse()
+        .expect("numeric descendant id");
+    let observer = OwnedCommandExecutor::default();
+    let observed = observer
+        .operation()
+        .execute(
+            powershell(&format!(
+                "if (Get-Process -Id {pid} -ErrorAction SilentlyContinue) {{ $process = Get-CimInstance Win32_Process -Filter 'ProcessId = {pid}'; if ($process.CommandLine -and $process.CommandLine.Contains('{}')) {{ Stop-Process -Id {pid} -Force -ErrorAction Stop }}; exit 1 }} else {{ exit 0 }}",
+                quote(&child_script),
+            )),
+            Duration::from_secs(20),
+            4096,
+        )
+        .await;
+    observer.seal();
+    observer
+        .wait(Duration::from_secs(10))
+        .await
+        .expect("observer cleanup");
+    assert!(observed.expect("observe descendant").status.success());
+    cleanup.expect("confirmed descendant cleanup");
+    assert!(result.expect("leader execution").status.success());
+    assert_eq!(acknowledgement.expect("child acknowledgement"), "ready");
+}
+
+#[tokio::test]
 async fn dropped_foreground_wait_keeps_cleanup_owned() {
     let owner = OwnedCommandExecutor::default();
     let operation = owner.operation();
