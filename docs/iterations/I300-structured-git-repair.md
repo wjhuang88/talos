@@ -4515,3 +4515,25 @@ external rerun passes 139/139, log
 test still requires native CI; a host run cannot validate its body. Remaining
 Pull functionality, unified quota, Windows operation acceptance and publication
 remain owned here; T7 remains Active.
+
+Candidate f29e4ed0 standard preflight exited 0 (session 82228), log
+`/tmp/talos-i300-windows-gate-preflight.log`; both external Runtime SDK variants
+passed. The candidate is pushed and native CI 39135084930 is running. Fresh
+origin/main fetch has behind 0; no rebase is needed. Previous CI 39129652021
+finished with the main workspace job passing and Windows preparation fixture
+failing as described above.
+
+Pull evidence streaming checkpoint (2026-10-18): revalidation now compares the
+retained metadata bodies with the existing fixed 8192-byte scratch buffer instead
+of recapturing a second PullEvidence. It reselects and validates the closest
+existing parent before opening each leaf, brackets each comparison with retained
+parent identity checks, retains both index timestamp checks and compares the
+complete RepositoryState at the end. Immutable tracking/fetched fields used only
+for reconstruction are removed. Initial post-fetch capture semantics are intact.
+Independent static review found no lost predicate or authorization bypass.
+Pull-state tests pass 25/25, including an independent test file covering newly
+created intermediate directories, a changed second body chunk, restored contents
+and identical-byte inode replacement; log
+`/tmp/talos-i300-pull-evidence-stream.log`. This reduces PullEvidence duplicate
+bodies/handles only: RepositoryState still recaptures and whole-invocation quota
+accounting remains incomplete. T7 stays Active and production Pull stays closed.

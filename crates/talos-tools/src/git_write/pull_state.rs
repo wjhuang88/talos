@@ -115,8 +115,6 @@ fn pure_index_decodes_both_hash_formats_without_worktree_files() {
 pub(super) struct PullEvidence {
     repository: super::repository_state::RepositoryState,
     roots: Vec<super::snapshot::PathIdentity>,
-    tracking: Option<String>,
-    fetched: bool,
     index_modified: Option<std::time::SystemTime>,
     entries: Vec<(
         std::path::PathBuf,
@@ -310,37 +308,67 @@ impl PullEvidence {
         Ok(Self {
             repository: current,
             roots,
-            tracking: tracking.map(str::to_owned),
-            fetched,
             index_modified,
             entries,
         })
     }
 
     pub(super) fn revalidate(&self) -> Result<(), GitToolError> {
-        // Refuse changed roots/pointers before rediscovery can read new roots.
-        for (root, identity) in [
-            &self.repository.git_dir,
-            &self.repository.common_dir,
-            &self.repository.workdir,
-        ]
-        .into_iter()
-        .zip(&self.roots)
-        {
-            if &super::snapshot::PathIdentity::capture(root).map_err(|_| {
-                GitToolError::InvalidInput("Pull repository root unavailable".into())
-            })? != identity
+        let invalid = || {
+            GitToolError::InvalidInput(
+                "Pull reference/reflog evidence changed after inspection".into(),
+            )
+        };
+        let check_roots = || -> Result<(), GitToolError> {
+            for (root, identity) in [
+                &self.repository.git_dir,
+                &self.repository.common_dir,
+                &self.repository.workdir,
+            ]
+            .into_iter()
+            .zip(&self.roots)
             {
-                return Err(GitToolError::InvalidInput(
-                    "Pull repository root changed".into(),
-                ));
+                identity.revalidate(root).map_err(|_| invalid())?;
             }
+            Ok(())
+        };
+        // Refuse changed roots/pointers before any metadata content is read.
+        check_roots()?;
+        self.repository.revalidate_location()?;
+        if Self::index_modified(&self.repository)? != self.index_modified {
+            return Err(invalid());
+        }
+        for (path, identity, evidence) in &self.entries {
+            let root = if path.starts_with(&self.repository.git_dir) {
+                &self.repository.git_dir
+            } else {
+                &self.repository.common_dir
+            };
+            // A newly created intermediate directory changes the retained
+            // closest parent even when the leaf remains absent.
+            let parent = path
+                .parent()
+                .ok_or_else(invalid)?
+                .ancestors()
+                .find(|parent| parent.exists())
+                .ok_or_else(invalid)?;
+            let resolved = parent.canonicalize().map_err(|_| invalid())?;
+            if resolved != parent || !resolved.starts_with(root) {
+                return Err(invalid());
+            }
+            identity.revalidate(parent).map_err(|_| invalid())?;
+            evidence.revalidate(path).map_err(|_| invalid())?;
+            identity.revalidate(parent).map_err(|_| invalid())?;
         }
         self.repository.revalidate_location()?;
-        if Self::capture(&self.repository, self.tracking.as_deref(), self.fetched)? != *self {
-            return Err(GitToolError::InvalidInput(
-                "Pull reference/reflog evidence changed after inspection".into(),
-            ));
+        if super::repository_state::RepositoryState::capture(&self.repository.workdir)?
+            != self.repository
+        {
+            return Err(invalid());
+        }
+        check_roots()?;
+        if Self::index_modified(&self.repository)? != self.index_modified {
+            return Err(invalid());
         }
         Ok(())
     }
@@ -2855,3 +2883,7 @@ async fn real_pull_unborn_preserves_local_index_and_worktree() {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "pull_evidence_tests.rs"]
+mod evidence_tests;
