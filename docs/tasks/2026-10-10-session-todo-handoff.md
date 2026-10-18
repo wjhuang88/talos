@@ -3954,3 +3954,30 @@ Clippy pass. Windows runtime tests have not run. Native input fault/release proo
 foreground operation/receipt wiring and the complete Pull implementation remain
 open. Both governance validators pass with zero warnings. Fresh origin/main fetch
 shows no upstream-only commits; no rebase needed. No T7 stage has been merged.
+
+Windows foreground execution checkpoint (2026-10-18): the shared
+native Job launcher now backs the foreground executor, with retained IO workers,
+finite stdin flush, cancellation, output/deadline bounds and sticky unconfirmed
+cleanup on launch/worker failure. Native launch unwinds follow the same raw-owner
+cleanup path; attribute-list pointers enter cleanup only after initialization.
+Independent review found the latter failure-path defect during this integration.
+Separate Windows-only tests cover IO panic versus ordinary IO failure and operation
+receipt isolation; these tests have not been compiled or executed on Windows.
+Evidence correction: earlier Git-only Windows checks excluded `process_boundary`
+through its module cfg and therefore did not validate native Job code. The current
+module cfg includes Git on Windows; its locked library cross-check passes (with
+unused background/fallback warnings). macOS all-feature/all-target locked Clippy
+passes for the foreground integration. Production non-Unix preparation remains
+closed; real Windows runtime validation, final review and current-head full gates
+remain outstanding. T7 and the overall handoff remain Active, not delivered.
+Foreground runtime regression checkpoint: six explicit test names are now required
+by Windows CI, including binary finite stdin/EOF, timeout cleanup, cancellation by
+dropping the caller, and lifecycle/worker-failure checks. Latest fetch confirms
+zero upstream-only main commits (local branch ahead 155 before this stage).
+
+Stage validation: standard `./scripts/release_preflight.sh` exited 0 for this
+source candidate, including locked workspace check/Clippy/tests and external SDK
+fixture (`/tmp/talos-i300-foreground-preflight.log`). The earlier sandbox EPERM
+push regression passed outside the sandbox; the refreshed protected native-source
+inventory tests pass 3/3 after independent review. No Windows runtime or merge
+completion is inferred from these macOS results.

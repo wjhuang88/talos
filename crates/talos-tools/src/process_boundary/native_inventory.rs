@@ -1,17 +1,19 @@
 //! Fail-closed source inventory: any change to these native boundary files needs
 //! a refreshed baseline AND independent protected source review. This is a change
 //! detector, not semantic proof of resource ownership or alias absence.
-const SOURCES: [&str; 4] = [
+const SOURCES: [&str; 5] = [
     include_str!("../process_boundary.rs"),
     include_str!("resource_acceptance.rs"),
     include_str!("handle_lifecycle_control.rs"),
     include_str!("handle_snapshot.rs"),
+    include_str!("windows_foreground.rs"),
 ];
-const EXPECTED: [u64; 4] = [
-    0xc163f2af569837b0,
+const EXPECTED: [u64; 5] = [
+    0xfdd464d0974c62fb,
     0xaaf4ee820de4ea11,
     0x2c2394169b451d76,
     0xa95c60b55dcdf0fc,
+    0x644841c7dba4298d,
 ];
 fn fingerprint(source: &str) -> u64 {
     source
@@ -21,7 +23,7 @@ fn fingerprint(source: &str) -> u64 {
             (hash ^ u64::from(byte)).wrapping_mul(0x100000001b3)
         })
 }
-fn validate(sources: [&str; 4]) -> bool {
+fn validate(sources: [&str; 5]) -> bool {
     sources
         .into_iter()
         .zip(EXPECTED)

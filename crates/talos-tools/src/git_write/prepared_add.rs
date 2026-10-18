@@ -172,8 +172,8 @@ enum Phase {
 pub(super) struct AddPlan {
     phase: Phase,
     command_budget: std::sync::Mutex<CommandBudget>,
-    #[cfg(unix)]
-    execution: talos_sandbox::OwnedCommandOperation,
+    #[cfg(any(unix, windows))]
+    execution: super::OwnedCommandOperation,
     operation: Operation,
     commit_state: Option<super::repository_state::CommitState>,
     push_destinations: Vec<String>,
@@ -302,11 +302,8 @@ impl CommandBudget {
 }
 
 impl AddPlan {
-    #[cfg(unix)]
-    pub(super) fn bind_operation(
-        mut self,
-        execution: talos_sandbox::OwnedCommandOperation,
-    ) -> Self {
+    #[cfg(any(unix, windows))]
+    pub(super) fn bind_operation(mut self, execution: super::OwnedCommandOperation) -> Self {
         self.execution = execution;
         self
     }
@@ -374,7 +371,24 @@ impl AddPlan {
             result
                 .map_err(|error| GitToolError::Git(format!("host Git execution failed: {error}; effects may be partial; inspect repository before retrying")))
         }
-        #[cfg(not(unix))]
+        #[cfg(windows)]
+        {
+            let limit = usize::try_from(limit).unwrap_or(usize::MAX);
+            let result = match input {
+                Some(input) => {
+                    self.execution
+                        .execute_with_input(command.into_std(), deadline, limit, input)
+                        .await
+                }
+                None => {
+                    self.execution
+                        .execute(command.into_std(), deadline, limit)
+                        .await
+                }
+            };
+            result.map_err(|error| GitToolError::Git(format!("host Git execution failed: {error}; effects may be partial; inspect repository before retrying")))
+        }
+        #[cfg(not(any(unix, windows)))]
         {
             let _ = (command, deadline, limit, input);
             Err(GitToolError::InvalidInput(
@@ -622,8 +636,8 @@ impl AddPlan {
         Ok(Self {
             phase: Phase::SenderConfiguration,
             command_budget: std::sync::Mutex::new(CommandBudget::default()),
-            #[cfg(unix)]
-            execution: talos_sandbox::OwnedCommandExecutor::default().operation(),
+            #[cfg(any(unix, windows))]
+            execution: super::OwnedCommandExecutor::default().operation(),
             operation,
             commit_state,
             push_destinations: Vec::new(),
@@ -7068,7 +7082,7 @@ fn pull_fetch_command(
 
 #[async_trait]
 impl PreparedNormalToolInvocation for AddPlan {
-    #[cfg(unix)]
+    #[cfg(any(unix, windows))]
     fn cleanup_receipt(&self) -> Option<std::sync::Arc<dyn talos_core::tool::ToolCleanupReceipt>> {
         Some(std::sync::Arc::new(self.execution.cleanup_receipt()))
     }
