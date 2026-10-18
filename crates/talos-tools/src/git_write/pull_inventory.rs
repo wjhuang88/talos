@@ -322,13 +322,13 @@ impl Inventory {
         self.revalidate()
     }
 
-    /// Parse only retained pointer bytes. Target filesystem access waits for
-    /// the next exact-path admission; these targets are not recursive grants.
+    /// Parse only retained pointer bytes, without filesystem revalidation.
+    /// Callers separately revalidate the admitted source evidence before use;
+    /// target resolution and content reads require their respective admissions.
     pub(super) fn discover_worktree_targets(
         &mut self,
         common: &Path,
     ) -> Result<bool, GitToolError> {
-        self.revalidate()?;
         let mut added = false;
         for (path, evidence) in &self.references {
             let Some(relative) = path.strip_prefix(common.join("worktrees")).ok() else {
@@ -383,7 +383,6 @@ impl Inventory {
                 added = true;
             }
         }
-        self.revalidate()?;
         Ok(added)
     }
 
@@ -658,6 +657,43 @@ mod tests {
         assert!(inventory.references.iter().any(|(path, _)| path == &config));
         std::fs::write(&config, "[core]\n bare = false\n").expect("edit main config");
         assert!(inventory.revalidate().is_err());
+    }
+
+    #[test]
+    fn pointer_discovery_uses_retained_bytes_and_defers_source_revalidation() {
+        let temp = tempfile::tempdir().expect("fixture");
+        let root = temp.path().canonicalize().expect("root");
+        let registration = root.join("worktrees/linked");
+        std::fs::create_dir_all(&registration).expect("registration");
+        let pointer = registration.join("gitdir");
+        std::fs::write(&pointer, "../../original/.git\n").expect("pointer");
+        let mut inventory = Inventory::new(&root, &root);
+        while !inventory.complete() {
+            inventory.advance(|_| true).expect("frontier");
+        }
+        inventory.bind_references(&root, &root).expect("evidence");
+        // Remove the source entirely: discovery must neither reopen it nor
+        // silently replace the previously admitted bytes with a fresh read.
+        std::fs::remove_file(&pointer).expect("remove source");
+        assert!(
+            inventory
+                .discover_worktree_targets(&root)
+                .expect("pure parse")
+        );
+        assert!(
+            inventory
+                .worktree_targets
+                .contains_key(&registration.join("../../original"))
+        );
+        // Parsing does not make stale evidence executable. The independent
+        // source check and binding both reject the changed registration.
+        assert!(inventory.revalidate().is_err());
+        assert!(
+            inventory
+                .bind_worktree_targets(|path| Some(path.to_owned()))
+                .is_err()
+        );
+        assert!(inventory.worktree_targets.values().all(Option::is_none));
     }
 
     #[test]

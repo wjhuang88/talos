@@ -4209,3 +4209,13 @@ workspace check, Clippy, tests and the external SDK fixture; log:
 `windows_foreground.rs`, with updated baselines after independent protected-source
 review. Its three mutation/baseline tests pass. No Windows runtime, exact-head CI
 or merged delivery is claimed.
+
+Pull retained-byte discovery checkpoint (2026-10-18): pointer candidate parsing
+no longer performs implicit filesystem revalidation. Both production callers
+first bind/revalidate admitted references; binding still independently rejects
+changed registration evidence. A regression removes the retained pointer source,
+proves discovery still parses only the retained bytes, and proves subsequent
+source validation/binding refuse. Inventory tests pass 28/28. Independent targeted
+review found no new bypass in this delta; raw-target Path normalization and the
+invocation-wide accounting/resolution capability remain open and production Pull
+remains disabled. This is not final T7 security approval or completion.
