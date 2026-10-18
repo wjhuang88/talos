@@ -199,6 +199,34 @@ pub(super) struct PathIdentity {
 }
 
 impl PathIdentity {
+    /// Revalidate retained ancestors one at a time rather than constructing a
+    /// second identity vector (and a second set of Windows handles).
+    pub(super) fn revalidate(&self, path: &Path) -> std::io::Result<()> {
+        let changed = || std::io::Error::other("Git path identity changed");
+        if path.canonicalize()? != self.resolved {
+            return Err(changed());
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::MetadataExt;
+            for (path, expected) in self.resolved.ancestors().zip(&self.ancestors) {
+                let metadata = std::fs::metadata(path)?;
+                if (metadata.dev(), metadata.ino()) != *expected {
+                    return Err(changed());
+                }
+            }
+        }
+        #[cfg(windows)]
+        {
+            for (path, expected) in self.resolved.ancestors().zip(&self.ancestors) {
+                if &windows_path_handle(path)? != expected {
+                    return Err(changed());
+                }
+            }
+        }
+        Ok(())
+    }
+
     pub(super) fn capture(path: &Path) -> std::io::Result<Self> {
         let resolved = path.canonicalize()?;
         #[cfg(unix)]
@@ -213,33 +241,34 @@ impl PathIdentity {
                 .collect::<std::io::Result<Vec<_>>>()?
         };
         #[cfg(windows)]
-        let ancestors = std::panic::catch_unwind(|| {
-            use std::os::windows::fs::OpenOptionsExt;
-            use windows_sys::Win32::Storage::FileSystem::{
-                FILE_FLAG_BACKUP_SEMANTICS, FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE,
-            };
-            resolved
-                .ancestors()
-                .map(|path| {
-                    // Content-read handles on descendants can prevent ancestor
-                    // renames on Windows. Retain identity with metadata-only
-                    // access and allow replacement while the handle stays live.
-                    let file = std::fs::OpenOptions::new()
-                        .access_mode(0)
-                        .share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE)
-                        .custom_flags(FILE_FLAG_BACKUP_SEMANTICS)
-                        .open(path)?;
-                    same_file::Handle::from_file(file)
-                })
-                .collect::<std::io::Result<Vec<_>>>()
-        })
-        .map_err(|_| std::io::Error::other("Windows Git path identity inspection panicked"))??;
+        let ancestors = resolved
+            .ancestors()
+            .map(windows_path_handle)
+            .collect::<std::io::Result<Vec<_>>>()?;
         Ok(Self {
             resolved,
             #[cfg(any(unix, windows))]
             ancestors,
         })
     }
+}
+
+#[cfg(windows)]
+fn windows_path_handle(path: &Path) -> std::io::Result<same_file::Handle> {
+    std::panic::catch_unwind(|| {
+        use std::os::windows::fs::OpenOptionsExt;
+        use windows_sys::Win32::Storage::FileSystem::{
+            FILE_FLAG_BACKUP_SEMANTICS, FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE,
+        };
+        // Metadata-only access permits ancestor renames while retaining identity.
+        let file = std::fs::OpenOptions::new()
+            .access_mode(0)
+            .share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE)
+            .custom_flags(FILE_FLAG_BACKUP_SEMANTICS)
+            .open(path)?;
+        same_file::Handle::from_file(file)
+    })
+    .map_err(|_| std::io::Error::other("Windows Git path identity inspection panicked"))?
 }
 
 impl Entry {
@@ -412,6 +441,7 @@ mod tests {
         std::fs::write(&leaf, b"unchanged").expect("leaf");
         let identity = PathIdentity::capture(&leaf).expect("identity");
         assert_eq!(identity, PathIdentity::capture(&leaf).expect("unchanged"));
+        identity.revalidate(&leaf).expect("retained identity");
         // Windows may refuse renaming a directory with an open descendant,
         // even when every identity handle shares DELETE. Move the same leaf
         // out first; retain all handles while replacing its empty parent.
@@ -422,14 +452,17 @@ mod tests {
         std::fs::create_dir(&parent).expect("replace parent");
         std::fs::rename(&staged_leaf, &leaf).expect("retain original leaf");
         assert_ne!(identity, PathIdentity::capture(&leaf).expect("new parent"));
+        assert!(identity.revalidate(&leaf).is_err());
         std::fs::rename(&leaf, &staged_leaf).expect("stage leaf for restoration");
         std::fs::remove_dir(&parent).expect("remove replacement");
         std::fs::rename(&saved, &parent).expect("restore parent");
         std::fs::rename(&staged_leaf, &leaf).expect("restore original leaf");
         assert_eq!(identity, PathIdentity::capture(&leaf).expect("restored"));
+        identity.revalidate(&leaf).expect("restored identity");
         std::fs::rename(&leaf, parent.join("original-leaf")).expect("move leaf");
         std::fs::write(&leaf, b"unchanged").expect("identical replacement bytes");
         assert_ne!(identity, PathIdentity::capture(&leaf).expect("new leaf"));
+        assert!(identity.revalidate(&leaf).is_err());
     }
 
     #[cfg(any(unix, windows))]
