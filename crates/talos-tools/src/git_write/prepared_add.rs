@@ -1523,13 +1523,14 @@ impl AddPlan {
                 "Post-fetch discovery lacks dedicated metadata Read admission".into(),
             ));
         }
-        let mut inventory = self.pull_inventory.take().unwrap_or_else(|| {
-            super::pull_inventory::Inventory::with_reference_budget(
+        let mut inventory = match self.pull_inventory.take() {
+            Some(inventory) => inventory,
+            None => super::pull_inventory::Inventory::with_reference_budget(
                 &self.repository.git_dir,
                 &self.repository.common_dir,
                 self.pull_reference_budget.clone(),
-            )
-        });
+            )?,
+        };
         if !self.advance_pull_parent_inventory(&mut inventory, authorizations)? {
             self.pull_inventory = Some(inventory);
             self.identity = PreparedPlanIdentity::new();
@@ -2360,7 +2361,7 @@ impl AddPlan {
                 &location.git_dir,
                 &location.common_dir,
                 self.pull_reference_budget.clone(),
-            );
+            )?;
             self.pull_child_inventories
                 .insert(workdir.clone(), inventory);
             self.child_configs.push((workdir.clone(), config));
@@ -2695,7 +2696,7 @@ impl AddPlan {
                         &location.git_dir,
                         &location.common_dir,
                         self.pull_reference_budget.clone(),
-                    ),
+                    )?,
                 );
             }
             break;
@@ -3120,7 +3121,7 @@ impl AddPlan {
                 &self.repository.git_dir,
                 &self.repository.common_dir,
                 self.pull_reference_budget.clone(),
-            );
+            )?;
             for path in
                 super::pull_state::PullEvidence::required_paths(&self.repository, None, false)?
             {

@@ -4592,3 +4592,27 @@ debug info disabled and two build jobs. Log:
 24449b2c and the maintenance path/diagnostic source changes, including workspace
 tests and both external Runtime SDK fixture variants. This is local validation;
 fresh remote evidence is still required for this stage and no merge is claimed.
+
+Directory discovery allowance checkpoint (2026-10-18): Inventory construction
+is now fallible and charges initial frontier spellings before joining/retaining
+them. Discovery charges visited keys, directory keys, directory-entry names
+before joining, and next-frontier clones through the same cumulative
+ReferenceBudget as regular metadata bodies and pointer resolution. All four
+production construction sites propagate failure and retain the invocation's
+shared ledger. Deduplicated initial spellings still consume discovery allowance;
+failed advances preserve pending and never refund observed work. This tightens
+the accepted 4096-entry/4-MiB refusal behavior across parent and child inventories.
+
+Independent review found no new authorization bypass or lost frontier. Pull
+library tests pass 131/131 (`/tmp/talos-i300-directory-all-pull.log`); the final
+four separate directory-budget tests also pass after adding a directory/body
+joint-ledger assertion (`/tmp/talos-i300-directory-final.log`). They cover shared
+construction exhaustion, byte exhaustion, failed advance/retry/drop/rebuild and
+revalidation without rediscovery. Existing tiny-body-budget tests isolate their
+body ledger after discovery only in test code. Windows Git-only library
+cross-check passes with the seven existing feature-only warnings
+(`/tmp/talos-i300-directory-windows.log`); it is not native runtime evidence.
+Temporary paths()/exact_paths() copies, worktree-frontier copies, identity
+serialization and retained/transient handles remain quota residuals, as do
+RepositoryState/index/config capture. Full stage validation remains required;
+production Pull and Windows preparation stay closed and T7 stays Active.

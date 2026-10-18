@@ -8,8 +8,8 @@ use std::sync::{Arc, Mutex};
 
 use super::{GitToolError, snapshot::PathIdentity};
 
-/// Cumulative file and pointer-resolution allowance for all Pull inventories.
-/// Directory evidence and full transient-resource accounting remain separate.
+/// Cumulative file, directory-name and pointer-resolution allowance for Pull.
+/// Full transient-resource and identity-handle accounting remain separate.
 #[derive(Clone, Debug)]
 pub(super) struct ReferenceBudget(Arc<Mutex<(usize, usize)>>);
 
@@ -20,6 +20,28 @@ impl Default for ReferenceBudget {
 }
 
 impl ReferenceBudget {
+    fn retain_path(&self, path: &Path) -> Result<(), GitToolError> {
+        self.retain_path_bytes(path.as_os_str().as_encoded_bytes().len())
+    }
+
+    fn retain_child_name(&self, parent: &Path, name: &std::ffi::OsStr) -> Result<(), GitToolError> {
+        let bytes = parent
+            .as_os_str()
+            .as_encoded_bytes()
+            .len()
+            .checked_add(1)
+            .and_then(|bytes| bytes.checked_add(name.as_encoded_bytes().len()))
+            .ok_or_else(invalid)?;
+        self.retain_path_bytes(bytes)
+    }
+
+    fn retain_path_bytes(&self, bytes: usize) -> Result<(), GitToolError> {
+        let mut remaining = self.0.lock().map_err(|_| invalid())?;
+        remaining.0 = remaining.0.checked_sub(1).ok_or_else(invalid)?;
+        remaining.1 = remaining.1.checked_sub(bytes).ok_or_else(invalid)?;
+        Ok(())
+    }
+
     fn resolve(
         &self,
         path: &Path,
@@ -136,13 +158,14 @@ impl Inventory {
     #[cfg(test)]
     pub(super) fn new(git_dir: &Path, common_dir: &Path) -> Self {
         Self::with_reference_budget(git_dir, common_dir, ReferenceBudget::default())
+            .expect("fixture inventory allowance")
     }
 
     pub(super) fn with_reference_budget(
         git_dir: &Path,
         common_dir: &Path,
         reference_budget: ReferenceBudget,
-    ) -> Self {
+    ) -> Result<Self, GitToolError> {
         let mut pending = Vec::new();
         for root in [git_dir, common_dir] {
             for name in [
@@ -157,12 +180,15 @@ impl Inventory {
                 "worktrees",
                 "config.worktree",
             ] {
+                // Charge before retaining the joined spelling. Duplicate roots
+                // still consume discovery work even though the frontier dedups.
+                reference_budget.retain_child_name(root, std::ffi::OsStr::new(name))?;
                 pending.push(root.join(name));
             }
         }
         pending.sort();
         pending.dedup();
-        Self {
+        Ok(Self {
             reference_budget,
             pending,
             visited: BTreeMap::new(),
@@ -172,7 +198,7 @@ impl Inventory {
             worktree_targets: BTreeMap::new(),
             worktree_common_targets: BTreeSet::new(),
             worktree_reference_roots: BTreeSet::new(),
-        }
+        })
     }
 
     pub(super) fn paths(&self) -> Vec<PathBuf> {
@@ -510,21 +536,24 @@ impl Inventory {
         self.revalidate()?;
         let mut next = Vec::new();
         for path in &self.pending {
+            self.reference_budget.retain_path(path)?;
             let before = identity(path)?;
             if before.is_some()
                 && std::fs::symlink_metadata(path)
                     .map_err(|_| invalid())?
                     .is_dir()
             {
-                let entries = children(path)?;
+                let entries = children(path, &self.reference_budget)?;
                 for child in &entries {
                     if self.visited.len() + self.pending.len() + next.len() >= 4096 {
                         return Err(invalid());
                     }
                     // Only directory-entry names are consumed here. Child
                     // identity and type wait for the next exact-path admission.
+                    self.reference_budget.retain_path(child)?;
                     next.push(child.clone());
                 }
+                self.reference_budget.retain_path(path)?;
                 self.directories.insert(path.clone(), entries);
             }
             revalidate_identity(path, before.as_ref())?;
@@ -561,13 +590,16 @@ fn revalidate_children(path: &Path, expected: &[PathBuf]) -> Result<(), GitToolE
     Ok(())
 }
 
-fn children(path: &Path) -> Result<Vec<PathBuf>, GitToolError> {
+fn children(path: &Path, budget: &ReferenceBudget) -> Result<Vec<PathBuf>, GitToolError> {
     let mut entries = Vec::new();
     for child in std::fs::read_dir(path).map_err(|_| invalid())? {
         if entries.len() >= 4096 {
             return Err(invalid());
         }
-        entries.push(child.map_err(|_| invalid())?.path());
+        let child = child.map_err(|_| invalid())?;
+        let name = child.file_name();
+        budget.retain_child_name(path, &name)?;
+        entries.push(path.join(name));
     }
     entries.sort();
     Ok(entries)
@@ -607,3 +639,7 @@ fn revalidate_identity(path: &Path, expected: Option<&PathIdentity>) -> Result<(
 #[cfg(test)]
 #[path = "pull_inventory_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "pull_directory_budget_tests.rs"]
+mod directory_budget_tests;
