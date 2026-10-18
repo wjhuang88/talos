@@ -11,7 +11,7 @@ const SOURCES: [&str; 5] = [
 const EXPECTED: [u64; 5] = [
     0xfdd464d0974c62fb,
     0xaaf4ee820de4ea11,
-    0x2c2394169b451d76,
+    0x77b368f79911fbee,
     0xa95c60b55dcdf0fc,
     0x644841c7dba4298d,
 ];

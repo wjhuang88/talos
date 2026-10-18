@@ -4032,3 +4032,17 @@ The owner I300 records the result. Publish the reviewed local correction batch
 to PR #735 and obtain fresh remote CI; Windows runtime verification, shared Pull
 budget/resolution admission, full Pull execution and the original remaining queue
 are still open. No T7 completion or merge is claimed.
+
+
+Windows CI test-control correction (2026-10-18): run 39117998283 on
+`e20e89d8` passed Windows workspace Check/Clippy but failed test compilation:
+the direct lifecycle control still imported removed `quote_windows_arg` and
+used fallible `windows_environment` as a buffer. The control now reuses the
+pure UTF16 encoder and propagates environment errors before its resource
+baseline. Independent protected-source review found no new blocker; direct
+Win32 ownership/acquisition/cleanup remains independent of the production
+launcher. The reviewed source fingerprint was refreshed. Locked all-feature
+encoder tests pass 3/3; standalone edition-2024 native inventory tests pass
+3/3; formatting and diff checks pass. These macOS checks do not compile or run
+the Windows control. Fresh Windows test-target/runtime CI and current-head full
+preflight remain required. Production Pull remains disabled; T7 is not complete.
