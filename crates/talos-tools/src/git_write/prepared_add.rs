@@ -2216,20 +2216,13 @@ impl AddPlan {
                 })?;
             let remote = config.fetch_remote(metadata.branch()?)?;
             config.prepare_pull_transport(&remote)?;
-            let hook_worktree = self
-                .pull_child_startup
-                .get(workdir)
-                .ok_or_else(|| {
-                    GitToolError::InvalidInput("Pull child startup evidence missing".into())
-                })?
-                .targets
-                .iter()
-                .next()
-                .map(PathBuf::as_path)
-                .unwrap_or(workdir);
-            for path in
-                config.pull_hook_paths(&location.common_dir, hook_worktree, &self.environment)?
-            {
+            // Fetch does not chdir to the worktree. Relative hooks and remote
+            // paths are interpreted from its execution directory, the gitdir.
+            for path in config.pull_hook_paths(
+                &location.common_dir,
+                &location.git_dir,
+                &self.environment,
+            )? {
                 self.facets.push(path_facet(
                     ToolNature::Read,
                     &path,
@@ -2238,7 +2231,8 @@ impl AddPlan {
             }
             let destinations = config.fetch_destinations(&remote)?;
             for url in &destinations {
-                if let Some(path) = super::remote_state::local_destination(url, workdir)? {
+                if let Some(path) = super::remote_state::local_destination(url, &location.git_dir)?
+                {
                     self.facets.push(path_facet(
                         ToolNature::Read,
                         &path,
@@ -2305,12 +2299,9 @@ impl AddPlan {
                 .ok_or_else(|| {
                     GitToolError::InvalidInput("Pull child metadata roots missing".into())
                 })?;
-            let (worktree, _) = self.pull_child_worktrees.get(workdir).ok_or_else(|| {
-                GitToolError::InvalidInput("Pull child effective worktree missing".into())
-            })?;
             hook_paths.extend(config.pull_hook_paths(
                 &location.common_dir,
-                worktree,
+                &location.git_dir,
                 &self.environment,
             )?);
         }

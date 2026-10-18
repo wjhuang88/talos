@@ -3783,3 +3783,16 @@ with --locked; all-feature/all-target Clippy passes with warnings denied.
 This is portable candidate filtering only, not native Windows runtime evidence
 or metadata-only fallback execution. Filesystem prefix/alias validation,
 execution layout, resolution authority and original T7 delivery gates remain.
+
+Child fetch execution-base correction (2026-10-18): real Git 2.54 probes show
+relative core.hooksPath and remote paths resolve under cwd=gitdir, including
+configured/stale worktrees and explicit worktree overrides. Both hook admission
+waves and local-source candidates now use the retained gitdir, not the logical
+checkout or configured worktree. A Unix native regression checks actual hook cwd
+and relative remote success in five layouts; the prepared fetch matrix checks
+executable relative-hook refusal without fetch and exact relative-local facets.
+Focused child tests pass 5/5; locked Pull tests pass 110/110; all-feature/all-target
+Clippy passes. Stale core.worktree did not fail in these fetch probes, so native
+source commentary is not evidence that this case must fail. This correction does
+not implement missing-checkout fallback, enable local transports, remove startup
+admission, or activate production Pull. Full T7 and handoff closure remain open.

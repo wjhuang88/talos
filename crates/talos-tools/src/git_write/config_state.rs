@@ -224,10 +224,10 @@ impl ChildConfig {
     pub(super) fn pull_hook_paths(
         &self,
         common: &std::path::Path,
-        worktree: &std::path::Path,
+        execution_dir: &std::path::Path,
         environment: &BTreeMap<OsString, OsString>,
     ) -> Result<Vec<PathBuf>, GitToolError> {
-        fetch_hook_paths(&self.values, common, worktree, environment)
+        fetch_hook_paths(&self.values, common, execution_dir, environment)
     }
 
     /// The first recursive fetch uses ordinary fetch default-remote semantics.
