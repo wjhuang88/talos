@@ -357,6 +357,8 @@ impl Drop for WindowsJobControl {
 impl BackgroundJobLauncher for WindowsBackgroundLauncher {
     async fn launch(self: Box<Self>) -> Result<LaunchedBackgroundJob, String> {
         let launched = create_windows_job(&self.program, &self.args, &self.cwd, &self.env)?;
+        // Background calls request no finite input.
+        drop(launched.stdin);
         let control = Arc::new(WindowsJobControl { job: launched.job });
         let (tx, rx) = tokio::sync::mpsc::channel(BACKGROUND_PROCESS_EVENT_CAPACITY);
         let stdout = launched.stdout;
@@ -443,6 +445,7 @@ struct WindowsLaunchHandles {
     process: windows_sys::Win32::Foundation::HANDLE,
     stdout: tokio::fs::File,
     stderr: tokio::fs::File,
+    stdin: Option<tokio::fs::File>,
 }
 
 #[cfg(windows)]
@@ -513,6 +516,7 @@ fn create_windows_job_with_hooks(
         &args,
         cwd,
         windows_environment(extra_env)?,
+        false,
     )?;
     create_windows_job_native(
         command,
@@ -529,6 +533,7 @@ struct WindowsLaunchCommand {
     command: Vec<u16>,
     cwd: Vec<u16>,
     environment: Vec<u16>,
+    input: Option<WindowsInputPipe>,
 }
 
 #[cfg(windows)]
@@ -539,6 +544,7 @@ impl WindowsLaunchCommand {
         args: &[std::ffi::OsString],
         cwd: &std::path::Path,
         environment: Vec<u16>,
+        pipe_stdin: bool,
     ) -> Result<Self, String> {
         use std::os::windows::ffi::OsStrExt;
         let executable = wide(executable.as_os_str());
@@ -561,7 +567,51 @@ impl WindowsLaunchCommand {
             command: windows_command_line::encode(&arguments)?,
             cwd,
             environment,
+            input: if pipe_stdin {
+                Some(WindowsInputPipe::create()?)
+            } else {
+                None
+            },
         })
+    }
+}
+
+/// Pipe endpoints are RAII-owned before entering the raw launch boundary.
+#[cfg(windows)]
+struct WindowsInputPipe {
+    child: std::fs::File,
+    parent: std::fs::File,
+}
+
+#[cfg(windows)]
+impl WindowsInputPipe {
+    fn create() -> Result<Self, String> {
+        use std::os::windows::io::FromRawHandle;
+        use windows_sys::Win32::Foundation::{HANDLE_FLAG_INHERIT, SetHandleInformation};
+        use windows_sys::Win32::Security::SECURITY_ATTRIBUTES;
+        let security = SECURITY_ATTRIBUTES {
+            nLength: std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32,
+            lpSecurityDescriptor: std::ptr::null_mut(),
+            bInheritHandle: 1,
+        };
+        let mut read = std::ptr::null_mut();
+        let mut write = std::ptr::null_mut();
+        // SAFETY: ADR-068's accepted I300 extension permits the same native
+        // pipe/allowlist boundary for finite foreground stdin. Each successful
+        // endpoint is immediately transferred to a unique RAII file owner.
+        unsafe {
+            if windows_sys::Win32::System::Pipes::CreatePipe(&mut read, &mut write, &security, 0)
+                == 0
+            {
+                return Err(last_windows_error("CreatePipe(stdin)"));
+            }
+            let child = std::fs::File::from_raw_handle(read as _);
+            let parent = std::fs::File::from_raw_handle(write as _);
+            if SetHandleInformation(write, HANDLE_FLAG_INHERIT, 0) == 0 {
+                return Err(last_windows_error("SetHandleInformation(stdin)"));
+            }
+            Ok(Self { child, parent })
+        }
     }
 }
 
@@ -616,9 +666,9 @@ fn create_windows_job_native(
     let mut attr_storage = Vec::<usize>::new();
     #[cfg(test)]
     let mut attrs_initialized = false;
-    // Keep native-borrowed list storage alive through audited Delete, including negatives.
-    #[cfg(test)]
-    let mut audit_handle_list = [std::ptr::null_mut(); 2];
+    // UpdateProcThreadAttribute borrows this storage until Delete, including
+    // failure cleanup outside the launch closure in production and tests.
+    let mut inherited_handle_list = Vec::with_capacity(3);
     #[cfg(test)]
     macro_rules! acquired {
         ($role:ident, $value:expr) => {
@@ -721,19 +771,20 @@ fn create_windows_job_native(
         if hooks.fault == Some(WindowsLaunchFault::AttributeList) {
             return Err("injected attribute-list setup failure".to_owned());
         }
-        #[cfg(not(test))]
-        let handles = [out_write, err_write];
-        #[cfg(test)]
         let handles = {
-            audit_handle_list.copy_from_slice(&[out_write, err_write]);
-            &audit_handle_list
+            use std::os::windows::io::AsRawHandle;
+            inherited_handle_list.extend([out_write, err_write]);
+            if let Some(input) = &command.input {
+                inherited_handle_list.push(input.child.as_raw_handle() as _);
+            }
+            &inherited_handle_list
         };
         if UpdateProcThreadAttribute(
             attrs,
             0,
             PROC_THREAD_ATTRIBUTE_HANDLE_LIST as usize,
             handles.as_ptr() as *const _,
-            size_of::<[HANDLE; 2]>(),
+            handles.len() * size_of::<HANDLE>(),
             std::ptr::null_mut(),
             std::ptr::null_mut(),
         ) == 0
@@ -746,6 +797,10 @@ fn create_windows_job_native(
         startup.StartupInfo.dwFlags = 0x00000100;
         startup.StartupInfo.hStdOutput = out_write;
         startup.StartupInfo.hStdError = err_write;
+        if let Some(input) = &command.input {
+            use std::os::windows::io::AsRawHandle;
+            startup.StartupInfo.hStdInput = input.child.as_raw_handle() as _;
+        }
         let mut info: PROCESS_INFORMATION = zeroed();
         #[cfg(test)]
         observe!("before_process");
@@ -816,6 +871,10 @@ fn create_windows_job_native(
             process,
             stdout,
             stderr,
+            stdin: command.input.take().map(|input| {
+                drop(input.child);
+                tokio::fs::File::from_std(input.parent)
+            }),
         })
     })();
     if result.is_err() {
