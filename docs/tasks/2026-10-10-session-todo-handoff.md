@@ -3661,3 +3661,41 @@ This does not establish Windows runtime evidence. Corrected standard preflight
 is running as session 76149; log:
 /tmp/talos-i300-rebased-preflight-corrected.log. The real-normalizer compatibility
 gap remains open; production Pull remains disabled.
+
+Resolution authorization design review (2026-10-18): resolver increment committed
+as 98de1988; native inventory baseline committed as 92b4ca8d. Both governance
+validators pass. Independent review rejected the proposed raw-approval followed
+by resolved-approval shortcut: WorktreeTarget::capture itself canonicalizes and
+captures ancestor metadata/Windows handles before a mismatched resolved target
+has admission. Refusing the mismatch is therefore not proof that all discovery
+reads were authorized. Production Pull must remain disabled. A component-wise
+admitted resolver or explicitly accepted bounded link-metadata capability is
+required before activation; the proposed configuration-only capability in
+ADR-089 is not accepted and does not cover Pull. Do not implement a second-stage
+resolved token as a retroactive grant for the first resolution. Existing
+27/27 resolver tests establish parsing/identity behavior, not this permission
+boundary. Full preflight session 76149 remains live at this checkpoint.
+
+Corrected preflight result (2026-10-18): session 76149 exited 101. Workspace
+check and Clippy passed; tools had 824 passing tests and one failure:
+prepared_local_push_runs_all_eight_admitted_stages could not launch ps under
+the sandbox (EPERM at prepared_add.rs:7464). The exact all-feature locked test
+was rerun outside the sandbox as session 97898 and passed (1/1). This isolated
+pass is not a full-preflight pass. A fresh complete standard preflight outside
+the sandbox is running as session 59099, log:
+/tmp/talos-i300-preflight-outside-sandbox.log. ADR-089 now contains a concrete,
+disabled Pull worktree-resolution metadata proposal; maintainer decision has
+been requested. No new capability is accepted by the implementation yet.
+
+Outside-sandbox preflight follow-up (2026-10-18): session 59099 exited 1 only
+at the final external SDK fixture check. All workspace tests and doctests,
+check, Clippy and preceding preflight phases passed. The independent fixture
+Cargo.lock omitted talos-tools' accepted same-file direct dependency. A minimal
+one-line lock correction is under validation as session 52464, log:
+/tmp/talos-i300-sdk-lock-validation.log; unrelated offline resolver downgrades
+were discarded before this run. Full preflight success is still not claimed.
+Fetch found origin/main 8fa2a500 (#732); rebase waits for the fixture validation
+and checkpoint commits so no test runs across a moving source tree. Independent
+review refined the disabled Pull resolution proposal's commondir syntax,
+external chain scope, invocation-wide budgets and Windows handle accounting.
+Maintainer decision remains pending; no capability is enabled.
