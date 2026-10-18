@@ -214,9 +214,23 @@ impl PathIdentity {
         };
         #[cfg(windows)]
         let ancestors = std::panic::catch_unwind(|| {
+            use std::os::windows::fs::OpenOptionsExt;
+            use windows_sys::Win32::Storage::FileSystem::{
+                FILE_FLAG_BACKUP_SEMANTICS, FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE,
+            };
             resolved
                 .ancestors()
-                .map(same_file::Handle::from_path)
+                .map(|path| {
+                    // Content-read handles on descendants can prevent ancestor
+                    // renames on Windows. Retain identity with metadata-only
+                    // access and allow replacement while the handle stays live.
+                    let file = std::fs::OpenOptions::new()
+                        .access_mode(0)
+                        .share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE)
+                        .custom_flags(FILE_FLAG_BACKUP_SEMANTICS)
+                        .open(path)?;
+                    same_file::Handle::from_file(file)
+                })
                 .collect::<std::io::Result<Vec<_>>>()
         })
         .map_err(|_| std::io::Error::other("Windows Git path identity inspection panicked"))??;
