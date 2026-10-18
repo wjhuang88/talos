@@ -42,3 +42,34 @@ fn missing_leaf_revalidation_binds_closest_parent_and_streams_regular_contents()
         "identical replacement is drift"
     );
 }
+
+#[test]
+fn metadata_captures_share_cumulative_body_allowance_even_after_drop() {
+    let root = tempfile::tempdir().expect("fixture");
+    let output = std::process::Command::new("git")
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .env("GIT_CONFIG_GLOBAL", root.path().join("absent-config"))
+        .args(["init", "--quiet"])
+        .arg(root.path())
+        .output()
+        .expect("Git fixture");
+    assert!(output.status.success(), "{output:?}");
+    let repository =
+        super::super::repository_state::RepositoryState::capture(root.path()).expect("repository");
+    std::fs::write(
+        repository.git_dir.join("FETCH_HEAD"),
+        vec![b'x'; 3 * 1024 * 1024],
+    )
+    .expect("metadata body");
+    let budget = super::super::pull_inventory::ReferenceBudget::default();
+    let first = PullEvidence::capture_with_budget(&repository, None, false, &budget)
+        .expect("first capture");
+    first
+        .revalidate()
+        .expect("comparison does not recapture body");
+    drop(first);
+    assert!(
+        PullEvidence::capture_with_budget(&repository, None, false, &budget).is_err(),
+        "replacement capture cannot reset the invocation budget"
+    );
+}

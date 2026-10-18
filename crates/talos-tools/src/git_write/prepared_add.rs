@@ -1360,8 +1360,12 @@ impl AddPlan {
                 }
             }
         }
-        let evidence =
-            super::pull_state::PullEvidence::capture(&self.repository, tracking.as_deref(), false)?;
+        let evidence = super::pull_state::PullEvidence::capture_with_budget(
+            &self.repository,
+            tracking.as_deref(),
+            false,
+            &self.pull_reference_budget,
+        )?;
         evidence.require_no_pending_merge()?;
         evidence.require_index(&index_evidence)?;
         if initial.requires_empty_initial_index()
@@ -1550,8 +1554,12 @@ impl AddPlan {
             .map(|branch| super::pull_state::tracking_reference(&records, branch, remote))
             .transpose()?
             .flatten();
-        let evidence =
-            super::pull_state::PullEvidence::capture(&self.repository, tracking.as_deref(), true)?;
+        let evidence = super::pull_state::PullEvidence::capture_with_budget(
+            &self.repository,
+            tracking.as_deref(),
+            true,
+            &self.pull_reference_budget,
+        )?;
         self.repository.revalidate_location()?;
         let repository = RepositoryState::capture(&self.repository.workdir)?;
         evidence.revalidate()?;
