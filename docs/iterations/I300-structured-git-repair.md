@@ -4460,3 +4460,15 @@ approved external standard preflight is running in session 82402, log
 `/tmp/talos-i300-lifecycle-preflight-external.log`. It began before the fixture
 correction above, so do not treat it as exact-candidate evidence for that change.
 T7 remains Active; production Pull and non-Unix preparation remain disabled.
+
+External preflight result (2026-10-18): session 82402 exited 0 and ends
+`release preflight: passed`. Tools passed 869/869, and both external Runtime SDK
+fixture variants passed. This closes the local process-observation environment
+failure; it does not establish the cause of the earlier remote frontier failure
+or provide native Windows evidence. Independent review of `68cd246a` found no
+production behavior change or authorization bypass; its diagnostics remain
+partial (some helper failures still combine path, OS and quota causes). Both
+governance validators and formatting pass. Fresh origin/main fetch has behind 0 /
+ahead 182, so no rebase is needed. Publish the stable stage to #735 for native
+Windows lifecycle results and remote post-fetch diagnostics; do not merge while
+preparation and full Pull acceptance remain incomplete.
