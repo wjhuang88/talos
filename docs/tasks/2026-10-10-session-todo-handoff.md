@@ -4118,3 +4118,34 @@ for implementation `d830597a`. Log:
 `/tmp/talos-i300-shared-alternates-preflight-unsandboxed.log`. Publish this
 reviewed stage to #735; native Windows verification and the full remaining
 handoff are still required. No T7 completion is claimed.
+
+
+Pull pointer-authorization integration (2026-10-18, `36853e60`): retained
+registration pointers now request the dedicated resolution capability before
+component inspection; resolved targets receive fresh exact Path Read facets
+before reference discovery. Parent and child inventories share the resolver's
+cumulative allowance with reference/alternate captures, including failed
+captures; retained revalidation does not recharge. The old canonicalize-based
+worktree target resolver is removed. Independent security review found no new
+authorization bypass. All-feature Pull tests pass 123/123, the permission scope
+matrix passes 1/1, library Clippy with warnings denied and formatting pass.
+Logs: `/tmp/talos-i300-resolution-pull-final.log`,
+`/tmp/talos-i300-resolution-grant-tests.log`, and
+`/tmp/talos-i300-resolution-final-clippy.log`.
+
+Windows CI 39124767443 still fails the parent-rename identity test despite
+metadata-only handles. Commit `0f445a84` retains every original identity assertion
+and live handle, but moves the same leaf out before replacing the empty parent,
+then restores it. The targeted local test passes; native Windows evidence is
+still required. Current-source standard preflight session 57864 exited 101:
+LLVM stripping ran out of disk and left the CLI binary as a non-executable
+3376-byte file; all 15 config_unset cases then failed to execute it. This is not
+a passing gate. Within prior cleanup authorization, removed rebuildable examples,
+incremental and the damaged CLI outputs, restoring approximately 1.8 GiB free.
+Approved external standard preflight now runs in session 75918, log
+`/tmp/talos-i300-resolution-stage-preflight-unsandboxed.log`.
+
+Remaining: directory/path/identity/temporary peak quota unification, recursive
+Pull and final integration execution, real wrapper acceptance and native Windows
+validation. This stage does not prove full ADR-089 resource accounting. Production
+Pull and non-Unix preparation remain disabled; T7 and the full handoff remain open.
