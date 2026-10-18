@@ -1138,3 +1138,80 @@ inventory because the temporary boundary differs; the optional exact controlled-
 filters tests and proves no inventory acceptance. Do not bypass/update that guard. Existing
 fresh-phase Desktop matrices and separate uninstrumented full-workspace job remain the required
 path. Independent incoming-compatibility review confirms these cfg(test)/anchor limits.
+
+## CI3224 And Later-Sample Observation — 2026-10-18
+
+CI3224/run39030619999 exact0b86ac3b9dce750283ea07aa391e3961f87804b6 attempt1 SUCCESS:
+all8jobs, both60process matrices each1110passed/0failed/0ignored; combined120/2220/0/0.
+All6normalized source hashes/12rawWindows restoration receipts and artifact SHA256/CRC/extracted
+bytes independently verified. Baseline12100646363 (65files) SHA256
+878246e86996ad8aef9e92b0ec2d3da19a7922e205afe22cf237c00b3f902c73; instrumented12100730324
+(67files) SHA256273f137f6680cf6d0e08eec205fc1712bd9a66f2097fc9c1d8e4f7c5b2b3d0e8.
+Expiration2026-10-31. Both event receipts match parent3652/child7868/handle480/waiter146,
+creation134367121760719007/exit134367121782616966; all60 new identity/lifetime pairs intact.
+
+| Recorded interval | ms |
+|---|---:|
+| Creation to exit | 2189.7959 |
+| Creation to logged40961 | 985.4130 |
+| Logged40961 to40962 | 754.9076 |
+| Logged40962 to exit | 449.4753 |
+
+Six600s/400/403 match the same lifetime; first600at1680.0342ms aftercreation,400at1733.8262ms,
+403at2156.3634ms. These are recorded marker intervals, not exact first executed code, exclusive
+initialization costs or historical-failure cause. Independent Agent read-only review APPROVE
+bounded evidence; #705 comment6234327173. CI3222 unavailable receipts remain separate evidence.
+
+Offline crossrun review (#705 comment6237240831) found CI3214 later single23 lifecycle1978.9712ms,
+single24at1029.3306ms despite first2662.0459ms. Single23 parent1428/child5320/handle328/waiter4:
+assignment toexit1821.6983ms, exit toobservation10.4224ms, waitreturn topipejoin0.1547ms,
+CPU0.1875to0.296875s with read counters advancing. No associated event query selected that child.
+CI3214 has60/60 intact lifetimes, median172.40175ms; CI3220 has59/60, median224.5244ms,
+parallel2 fragmented, so first6126.0167ms is only the longest OBSERVED intact lifetime.
+CI3224 first2189.7959ms is longest of60, median168.38505ms, second487.997ms. Thus later children
+can also be slow; first-only startup attribution is unsupported. Shared Agent review is not
+distinct human approval. All old failures/evaluator5s/old10s/15s/Plugin unknowns remain retained.
+
+Next explicit hypothesis: a long later child's recorded delay may precede40961, fall between
+console/provider/engine markers, or follow them. Existing first-only evidence cannot distinguish
+these alternatives. Preserve first-child queries and additionally select the longest valid
+OBSERVED later lifetime from fixed50single+9parallel logs after the original full matrix and
+successful six-source restoration. The selected case is not retried. Results/exit codes and
+all original assertions remain unchanged. No extra test process or prewarm is introduced.
+
+Selection scans only59 literal matrix paths, <=8MiB per source and <=16MiB aggregate plus one
+overflow-detection byte. Each iteration requires45s left in the existing35min script budget.
+Missing, fragmented, invalid or overflowing FILETIME records count as invalid; no exit is inferred.
+Receipt later-child-selection.json reports expected59,valid,invalid and complete/partial coverage,
+the selected fixed case/PID/lifetime, or unavailable on budget/byte exhaustion/no valid records.
+Ties retain fixed matrix order. Partial coverage establishes only the maximum among valid records,
+never the missing cases or timed-out children without usable exit receipts. Valid exit metadata
+can follow cleanup/cancellation and is not proof of natural exit.
+
+Up to two additional postrestoration queries reuse the existing fixed channels/providers/IDs,
+ownedPID/lifetime bounds,16accepted events/131072bytes,30squery/5sreap/5sreaderjoin and45s remaining
+gate EACH. Same35minscript/40minstep/45minjob budgets; no added time. Collector re-reads the fixed
+selected source and requires the exact selected tuple before launching. Arbitrary source paths
+are rejected. Separate later-child-engine-events.json/later-child-console-events.json preserve
+first receipts; unavailable selection writes explicit unavailable event receipts without launch.
+Only fixed case label/scalar identity/time/counts survive; no event body/command/XML/error text.
+No logging/policy enablement, otherPID observation, native API, Rustoverlay or production change.
+
+Selftests cover complete/tied and partial58/1 ranking, all59missing, LF/CRLF, parser FILETIME
+overflow as invalid, source-path/window mismatch with noPopen, scan byte/budget exhaustion,
+actual wrapper dual-channel receipts and first-receipt preservation, sequential remaining-margin
+skip after scan+classic query. Existing cleanup/thread/reap/caps/privacy fixtures remain.
+All6generated Rust overlays must match exact0b86ac3 byteforbyte against the same current sources.
+Selftest/classifier14/textboundary23/claims0warnings/diffcheck pass; localCargo remains absent,
+so no fresh pinnedRust/fullpreflight success claim. Exactcandidate independent review/nativeCI
+remain required, not acceptance from these local checks.
+Fresh projectgovernance attempt FAILED1error/0warnings: SQLite consumer metadata cannot invoke
+missing cargo; delivery12fixtures pass. Keep this environment failure explicit.
+
+Currentmain8fa2a50016143b7c12f4fe7652d75078ab30f006 incorporates separate #731 I305 closeout and
+#732 dormant Search ownership. Synchronize main wholesale; no takeover or changes to their
+production/native/acceptance/governance/dependency/lock content. Workflow preserves incoming
+installed-module collection and unchanged37line705job; only same3diagnosticfiles differ main.
+I301/I304/I305 closed slices stay closed; #717/Search residuals retain their owners. Rust1.99.0,
+Auto15s/cleanup10s/tool120s/evaluator5s and all current-main assertions stay. No retry-to-green,
+ignored test, threshold relaxation, merge/release or overall timeout-root closure authorization.

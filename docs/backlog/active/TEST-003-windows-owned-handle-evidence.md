@@ -281,3 +281,13 @@ candidate may replace the global+2 oracle with actual enumerated-resource accept
 that independent owner. New instrumentation/all40/real negative native evidence remains pending;
 raw counts/direct controls/history stay. TEST003 remains Review/Claimed with unexplained/untracked
 native-resource residual OPEN; no Completion Commit or cache/global-leak-absence conclusion.
+
+## Merged Diagnostics And Retained Residual — 2026-10-17
+
+#716 merged b5b8241e2d8fa72d6e469bd96ccbdf54ff851c69 after CI3221 all6jobs SUCCESS and
+protected full-stage review/CAS6233550377. Native resource outer/all40/four-negative assertions,
+audit/inventory/CRLF and full workspace pass (tools463/0); successful raw receipts remain captured.
+TEST004/I305 alone receives bounded Complete/Closed closeout. This owner stays Review/Claimed:
+unknown/untracked/native-private lifetime, failed-output/init production gaps and broader lifecycle
+limits remain OPEN#717. Original+3, CI3219 and all prior failures remain; no global-leak or legitimate
+cache conclusion. Search#643/#624 remainOPEN and #705 retains independent diagnosis.

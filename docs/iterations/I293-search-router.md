@@ -10,7 +10,7 @@
 | Source Issue | #643 |
 | Depends on | Accepted ADR-085; SEARCH-001-B / #642 complete in #656; NET-001 boundary coordination |
 | Claim State | Claimed |
-| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 merged TLS/CONNECT subset; #716 bounded form transport Review / CI3175..3177 failed; checked existing cleanup diagnostic pending, richer self-snapshot proposal Unclaimed (default activation Pending) |
+| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 merged TLS/CONNECT subset; #716 merged bounded form/diagnostic stage at `b5b8241e`; CI3221 all6jobs pass; owned-request candidate delivery tracked from #643; full C/EP and default activation Pending |
 | Completion | Pending |
 
 ## Collaboration Claim
@@ -26,7 +26,7 @@
 | Governance Claim PR | #712 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer accepted bounded production scope 2026-10-13; independent protected security/API contract review, exact-head CI, governance validators, Issue reconciliation and final CAS required for #712 merge. No release or native admission authorized. |
-| Last Updated | 2026-10-14 |
+| Last Updated | 2026-10-18 |
 | Handoff / Release Condition | Original #664 claim effective at `d801790454e252699684253166984662ea9dab6a`; expanded scope effective only after #712 accepted-contract merge. Start implementation from that merge or later main; activation requires ADR-090 transport/parity/D gates. |
 
 ## Scope
@@ -1071,3 +1071,79 @@ Windows cross-check/Clippy, graphs and governance pass; these are not native obs
 The earlier457/1 Linux EOF failure remains unresolved evidence; a later pass does not prove a
 fixture repair or scheduling cause. Production transport and all original deadlines/assertions
 are unchanged. Fresh stable-head protected review and unfiltered full CI remain required.
+
+## Merged Bounded Form Stage — 2026-10-17
+
+#716 merged as b5b8241e2d8fa72d6e469bd96ccbdf54ff851c69 after exact198cb751/tree29ac46f2,
+all6CI3221 jobs, protected full-stage review and CAS6233550377. This adds only dormant private
+bounded form transport and its tested TLS/redirect/authority constraints; no default WebSearch or
+provider admission. Full C/EP/protocol parity, prepared-binding, D/privacy/root/rollback and actual
+activation gates remain Pending; this owner stays Active/Claimed, #643/#624OPEN.
+TEST004/I305 closes only its known-resource test criterion with existing merged evidence. #717
+retains unexplained native resources and prior failures. Passing captured assertions are not raw
+numeric receipts or cache/global-leak proof; #705 and completed I301/I303/I304 remain separate.
+
+## Owned Transport Request Stage — 2026-10-17
+
+Selection base: main `891f6c4992c12afdc91f702b4c85d2316065b541`. Effective #712 claim and
+ADR-090 cover this existing controlled-transport prerequisite before branch creation.
+Inventory: I293 Active/Claimed continues this slice; I294 Active retains independent D evidence;
+I300 Active retains structured Git and PERM-007-H is not claimed here; I302 Review retains #717
+native attribution; I277 Review retains deferred device/human checks; I249 Planned stays deferred;
+I164 Paused stays superseded. I301/I303/I304/I305 stay Complete/Closed. Only open PR #705 owns
+Windows timeout diagnostics; no overlap, takeover, retry-to-green or acceptance relaxation.
+Historical status-change notes in completed I146/I147/I150 and I162's completed review outcome
+are not new nonterminal work. No unrelated owner or inventory status is changed.
+
+Bounded runnable deliverable: private immutable PreparedTransportRequest constructors and consuming
+execute_prepared, with deterministic/local-socket fixtures. Own actual parsed URL/method/encoded
+body/fixed type before execution, validate scope locally, reject cross-invocation consumption before
+DNS or budget reservation, and preserve all live authority, address/TLS/redirect/deadline fences.
+Pure preparation performs no authority check, DNS, send or budget consumption. Raw entry points
+become test-only adapters. No new API/dependency/lock/configuration or default-search behavior.
+Independent protected design preview approved this boundary, with exact-source review still needed.
+
+This is explicitly library-only. An object cannot be mutated or cloned through its API and is
+consumed once; the same manifest may prepare multiple objects. This is not global exactly-once
+execution, proof of preparation before approval, request-fingerprint integration, or official Agent
+root binding. Future prepared tool invocation must retain this same object across admission.
+Session scope remains query-independent; query/body and digests never enter approval scope.
+Affected reference: SEARCH-001-C-CONTROLLED-TRANSPORT.md. Full C/EP/parity/D/root/rollback and
+default activation remain Pending, with #643/#624 open and #717 independently unresolved.
+
+Historical local convergence before workspace maintenance: pinned Rust1.99.0, locked focused
+transport tests52/0; full release_preflight PASSED (3734 primary workspace tests plus1 existing
+exact-selection child, 0failed/ignored; independent Runtime SDK default and coding modes pass).
+Only the prior authorized Unix socket fixture was filtered locally; the child selects its one
+existing proxy-isolation test, filtering465 sibling tests covered by the parent. Remote CI stays
+unfiltered. Workspace check/Clippy, format/site/installers, governance(SQL17/delivery12)/claims
+0warnings, text23/0 and classifier14 passed. Scale remains high-risk/release-managed/on-demand.
+Prior Linux EOF457/1 and Windows/global-count failures remain historical; this pass is not a repair.
+
+Independent working-source technical/security review APPROVE found no blocker; source blobs:
+transport46b2855d039c1e5d8ce95c8bcab9559404dd973f,
+fixtures6f2cf1e2d93a78c5445e3d45046a5c5d852ad4e2,
+prepared25efbdcb3587baba17d4ef418852de073ba82ffa. Shared Agent/account identity is not distinct
+human approval. Stable exact-head protected review, unfiltered CI and final CAS remain required
+before deliberate merge. The source Issue delivery comment links the resulting candidate PR.
+I293 stays Active/Claimed, Completion Pending. No release or default activation is authorized.
+
+### Workspace Recovery — 2026-10-18
+
+Automated workspace maintenance removed the unpublished candidate, local logs and toolchain/cache.
+Main remains891f6c49. The candidate is reconstructed from the recorded patch and source fingerprints;
+the historical pass above does not substitute for fresh candidate validation. The prior final
+test-Clippy/governance commands had not been collected before maintenance, so no result is claimed
+for them. The already-collected full-preflight governance/claims results above are separate from
+those later standalone commands. Fresh pinned checks, exact-source review, stable publication and
+remote gates follow.
+
+Fresh reconstructed-candidate validation PASSED: pinned Rust1.99.0 locked full
+release_preflight, 3734 primary workspace tests plus1 existing exact-selection child,
+0failed/ignored, both independent Runtime SDK modes, focused transport52/0 and network-feature
+test-target Clippy with -D warnings. The sole local socket filter and existing exact-child
+selection remain as described above; no new skip or remote CI filter. Governance(SQL17/delivery12),
+claims0warnings, text23/0, classifier14, site/installers and format pass. No source change was needed
+after reconstruction. Three reviewed source fingerprints remain exact; this is fresh local evidence,
+not a reclassification of any earlier failed run. This prerequisite's candidate is Review;
+I293 remains Active/Claimed and Completion Pending. Exact remote CI/review/CAS remain pending.

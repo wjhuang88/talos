@@ -149,3 +149,21 @@ New diagnostic-source local full preflight passed3717primary+1existingchild and 
 with only the prior authorized local filter; old457/1 failure remains. No repair/rootcause or
 native pass is inferred. Fixed-source Windows cross-check/Clippy/graphs/gates pass; fresh exact
 protected review/full unfiltered CI remain. I293 remains Active/Claimed/incomplete, #643/#624 open.
+
+## Merged Bounded Form Stage — 2026-10-17
+
+#716 merged as b5b8241e2d8fa72d6e469bd96ccbdf54ff851c69 after exact198cb751/tree29ac46f2,
+all6CI3221 jobs, protected full-stage review and CAS6233550377. This adds only dormant private
+bounded form transport and its tested TLS/redirect/authority constraints; no default WebSearch or
+provider admission. Full C/EP/protocol parity, prepared-binding, D/privacy/root/rollback and actual
+activation gates remain Pending; this owner stays Active/Claimed, #643/#624OPEN.
+TEST004/I305 closes only its known-resource test criterion with existing merged evidence. #717
+retains unexplained native resources and prior failures. Passing captured assertions are not raw
+numeric receipts or cache/global-leak proof; #705 and completed I301/I303/I304 remain separate.
+
+2026-10-17 next dormant prerequisite: I293 owns immutable, invocation-bound transport payload
+preparation and consuming execution. Its production transport entry consumes the prepared URL/body
+instead of accepting replacement raw parameters; test-only raw adapters retain the fixture suite. This proves ownership
+and per-invocation object matching, not construction before approval or official Agent binding.
+See the controlled-transport reference and I293 validation journal. Full C/EP/parity/D/root/rollback
+and default activation remain Pending; #643/#624 stay open, #717/#705 retain separate residuals.

@@ -3,9 +3,9 @@
 ## Purpose
 
 [I305](I305-windows-known-resource-acceptance.md) / [TEST-004](../backlog/active/TEST-004-windows-known-resource-acceptance.md)
-is Review/Claimed for maintainer-accepted known-resource cleanup acceptance. #730 mergedc81782b6
-establishes claim/amendedADR091; #716 contains a test-only real-operation candidate needing native
-positive/negative CI and exact review. I302 retains unexplained native-resource residuals; no closure.
+is Complete/Closed for the narrowed known-resource test criterion. Completion Commit `b5b8241e`
+(#716), exact-head CI3221 all6jobs and protected review/CAS passed. #717/I302 retains the broader
+unexplained native-resource residual; full SEARCH-C remains incomplete.
 
 [I304](I304-absent-journal-pause.md) / [RUNTIME-011](../backlog/active/RUNTIME-011-absent-journal-pause.md)
 is Complete / Closed for the absent-journal pause no-op, distinct from I301 recovery reads.
@@ -18,13 +18,13 @@ is Complete / Closed for #719 under ADR-092; implementation #721 merged as `6d72
 after exact-head CI, independent security/API review and CAS.
 
 [I302](I302-windows-owned-handle-evidence.md) / [TEST-003](../backlog/active/TEST-003-windows-owned-handle-evidence.md)
-is Review/Claimed for bounded diagnostic candidate #716. #718 merged f4313237 / ADR-091
-effective. CI3204 failed cold73→76 while modes1–6 succeeded. Exact DLL cache candidates and
-direct no-PSS mode7 need fresh protected review/native CI. Original cold40/+2 failure is retained.
+is Review/Claimed after diagnostic #716 mergedb5b8241e. CI3221 all6jobs pass; TEST004/I305 closes
+only known-resource acceptance. Prior cold73→76, static mechanism candidates and unknown/native
+lifetime remain an OPEN#717 residual.
 I293/I294/I300 remain Active; I277 retains Review, I249 Planned and I164 Paused.
 I301 bounded startup closeout is recorded below.
 I302 records the full inventory/non-overlap and workspace-recovery receipts; separate I302 commits
-in #716 do not close original defects or authorize Search activation/merge.
+in #716 do not close original global-resource questions or authorize Search activation.
 
 [I293](I293-search-router.md) retains SEARCH-001-C ownership. The maintainer accepted bounded
 production endpoint-authority/search wiring on 2026-10-13; [ADR-090](../decisions/090-invocation-bound-search-endpoint-authority.md)
@@ -32,11 +32,9 @@ and the existing C claim's scope amendment became effective in #712 (989fec2e), 
 review, CI and CAS. #713 carrier merged69e1e116 after exact-head review/CI/CAS. The private
 controlled direct transport merged in #714 (d78dc75c); TLS/CONNECT subset merged under the same
 claim in #715 (d66e380a) after protected review/full CI3173/CAS and native TLS recovery.
-Bounded form transport #716 is Review (47 focused fixtures); CI3175 failed the pre-existing
-Windows process-wide handle-count test. CI3176 also failed in the isolated worker73→76;
-test-only per-attempt trace diagnostics await fresh review/native CI; complete parity remains.
-CI3177 records first Pipe+1 and first Assignment+2 then stable. Checked existing cleanup is the
-next bounded diagnostic; a self-only type-snapshot proposal remains unclaimed, with no PSS code.
+Bounded form transport #716 mergedb5b8241e after all6CI3221/protectedreview/CAS. Its reviewed
+PSS/direct controls and TEST004 real-resource gate pass; prior first-use/global-count failures
+remain historical evidence, with #717 lifetime/attribution residual open. Complete parity remains.
 WebSearch default activation and full C/EP acceptance remain Pending, #643/#624 open. I300 and
 PERM-007-H retain their separate scopes.
 

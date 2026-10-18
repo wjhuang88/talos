@@ -31,6 +31,9 @@ PLAN = "crates/talos-agent/src/request_plan.rs"
 SESSION = "crates/talos-agent/src/session.rs"
 STORE = "crates/talos-session/src/pending_submission.rs"
 END_BY = float("inf")
+LATER_CASES = tuple(f"instrumented-single-{i}" for i in range(1, 51)) + tuple(
+    f"instrumented-suite-parallel-{i}" for i in range(1, 10))
+LATER_SCAN_BYTES = 16_777_216
 CONTROLLED_TEST = "process_boundary::windows_tests::windows_auto_diagnostic_descendant_pipe_hold_is_observable_and_cleanup_bounded"
 
 
@@ -103,7 +106,8 @@ def lifecycle_metadata(raw: bytes, child: int, created: int, exited: int, *, con
     return result
 
 
-def collect_first_child_events(output: Path, *, console: bool = False) -> None:
+def collect_first_child_events(output: Path, *, console: bool = False,
+                               later: tuple[str, tuple[int, int, int]] | None = None) -> None:
     receipt = {"status": "unavailable", "events": []}
     cleanup_failed = False
     try:
@@ -111,11 +115,18 @@ def collect_first_child_events(output: Path, *, console: bool = False) -> None:
         # Do not start a host utility if the existing experiment margin is exhausted.
         if END_BY - time.monotonic() < 45:
             raise ValueError("collection budget")
-        with (output / "instrumented-suite-first-1.log").open("rb") as source:
+        case = "instrumented-suite-first-1" if later is None else later[0]
+        if later is not None and case not in LATER_CASES:
+            raise ValueError("unsupported source case")
+        with (output / f"{case}.log").open("rb") as source:
             data = source.read(8_388_609)
         if len(data) > 8_388_608:
             raise ValueError("source byte cap")
         child, created, exited = first_child_window(data.decode("utf-8"))
+        if later is not None:
+            if (child, created, exited) != later[1]:
+                raise ValueError("selected window changed")
+            receipt["source_case"] = case
         receipt.update(child_pid=child, created_100ns=created, exited_100ns=exited)
         command = [str(Path(os.environ["SystemRoot"]) / "System32" / "wevtutil.exe"),
                    "qe", "Microsoft-Windows-PowerShell/Operational" if console else "Windows PowerShell",
@@ -159,9 +170,65 @@ def collect_first_child_events(output: Path, *, console: bool = False) -> None:
     except (OSError, ValueError, OverflowError, KeyError, TypeError, AttributeError, ET.ParseError):
         # Missing logs, unsupported schema and identities are unknown, never zero-duration evidence.
         pass
-    (output / ("first-child-console-events.json" if console else "first-child-engine-events.json")).write_text(json.dumps(receipt, indent=2), encoding="utf-8")
+    prefix = "first-child" if later is None else "later-child"
+    channel = "console" if console else "engine"
+    (output / f"{prefix}-{channel}-events.json").write_text(json.dumps(receipt, indent=2), encoding="utf-8")
     if cleanup_failed:
         raise RuntimeError("owned event collector cleanup unconfirmed")
+
+
+def select_later_child(output: Path) -> tuple[str, tuple[int, int, int]] | None:
+    # Fixed matrix paths only. Rank intact observed lifetimes, never infer missing exits.
+    receipt = {"status": "unavailable", "expected_cases": len(LATER_CASES),
+               "valid_cases": 0, "invalid_cases": 0, "reason": "no_valid_window"}
+    selected = None
+    remaining_bytes = LATER_SCAN_BYTES
+    try:
+        for case in LATER_CASES:
+            if END_BY - time.monotonic() < 45:
+                raise ValueError("collection budget")
+            if remaining_bytes <= 0:
+                raise ValueError("scan byte cap")
+            try:
+                limit = min(8_388_608, remaining_bytes)
+                with (output / f"{case}.log").open("rb") as source:
+                    data = source.read(limit + 1)
+            except OSError:
+                receipt["invalid_cases"] += 1
+                continue
+            if len(data) > limit:
+                raise OverflowError("scan byte cap")
+            remaining_bytes -= len(data)
+            try:
+                window = first_child_window(data.decode("utf-8"))
+            except (ValueError, OverflowError):
+                receipt["invalid_cases"] += 1
+                continue
+            receipt["valid_cases"] += 1
+            if selected is None or window[2] - window[1] > selected[1][2] - selected[1][1]:
+                selected = (case, window)  # Fixed matrix order breaks ties deterministically.
+        if selected is not None:
+            case, (child, created, exited) = selected
+            receipt.update(status="selected", source_case=case, child_pid=child,
+                           created_100ns=created, exited_100ns=exited,
+                           coverage="complete" if receipt["valid_cases"] == len(LATER_CASES) else "partial")
+            receipt.pop("reason")
+    except (ValueError, OverflowError):
+        selected = None  # Budget/byte-cap exhaustion cannot establish even an observed maximum.
+        receipt["reason"] = "budget_or_byte_cap"
+    (output / "later-child-selection.json").write_text(json.dumps(receipt, indent=2), encoding="utf-8")
+    return selected
+
+
+def collect_later_child_events(output: Path) -> None:
+    later = select_later_child(output)
+    if later is None:
+        for channel in ("engine", "console"):
+            (output / f"later-child-{channel}-events.json").write_text(
+                json.dumps({"status": "unavailable", "events": []}), encoding="utf-8")
+        return
+    collect_first_child_events(output, later=later)
+    collect_first_child_events(output, console=True, later=later)
 
 
 def lifecycle_self_test() -> None:
@@ -300,6 +367,59 @@ def lifecycle_self_test() -> None:
             collect_first_child_events(output)
         assert utility.killed and utility.stdout.closed
         assert json.loads((output / "first-child-engine-events.json").read_text())["status"] == "unavailable"
+
+        # Missing/invalid later logs are counted, never repaired or called full coverage.
+        assert select_later_child(output) is None
+        selection = json.loads((output / "later-child-selection.json").read_text())
+        assert selection["valid_cases"] == 0 and selection["invalid_cases"] == 59
+        for case in LATER_CASES:
+            (output / f"{case}.log").write_bytes(source.encode("utf-8"))
+        assert select_later_child(output) == (LATER_CASES[0], (3400, created, exited))
+        assert json.loads((output / "later-child-selection.json").read_text())["coverage"] == "complete"
+        longer = source.replace(str(exited), str(exited + 1_000_000))
+        (output / f"{LATER_CASES[22]}.log").write_bytes(longer.replace("\n", "\r\n").encode("utf-8"))
+        (output / f"{LATER_CASES[1]}.log").write_text("fragmented identity", encoding="utf-8")
+        later = select_later_child(output)
+        assert later == (LATER_CASES[22], (3400, created, exited + 1_000_000))
+        selection = json.loads((output / "later-child-selection.json").read_text())
+        assert selection["valid_cases"] == 58 and selection["invalid_cases"] == 1 and selection["coverage"] == "partial"
+        huge = 10 ** 30
+        overflow = source.replace(str(created), str(huge)).replace(str(exited), str(huge + 1_000_000)).replace(
+            "134366156919112821", str(huge + 1))
+        (output / f"{LATER_CASES[1]}.log").write_text(overflow, encoding="utf-8")
+        assert select_later_child(output) == later
+        assert json.loads((output / "later-child-selection.json").read_text())["coverage"] == "partial"
+        utility = Utility(False, False)
+        with patch.dict(os.environ, {"SystemRoot": directory}), patch.object(subprocess, "Popen", return_value=utility):
+            collect_first_child_events(output, later=later)
+        receipt = json.loads((output / "later-child-engine-events.json").read_text())
+        assert receipt["status"] == "records" and receipt["source_case"] == LATER_CASES[22]
+        # Re-read identity must match the selected window; no arbitrary paths/PIDs.
+        for invalid in (("../outside", later[1]), (later[0], (3401, created, exited))):
+            with patch.object(subprocess, "Popen") as launch:
+                collect_first_child_events(output, later=invalid)
+            launch.assert_not_called()
+        first_receipt = (output / "first-child-engine-events.json").read_bytes()
+        console_utility = Utility(False, False)
+        console_utility.stdout = io.BytesIO(console_raw)
+        with patch.dict(os.environ, {"SystemRoot": directory}), patch.object(subprocess, "Popen", side_effect=(Utility(False, False), console_utility)) as launch:
+            collect_later_child_events(output)
+        assert launch.call_count == 2
+        assert (output / "first-child-engine-events.json").read_bytes() == first_receipt
+        assert json.loads((output / "later-child-console-events.json").read_text())["status"] == "records"
+        # Scan + first later query may leave insufficient budget for the console query.
+        with patch.dict(globals(), {"END_BY": 100}), patch.object(time, "monotonic", side_effect=([0] * 60 + [60])):
+            with patch.dict(os.environ, {"SystemRoot": directory}), patch.object(subprocess, "Popen", return_value=Utility(False, False)) as launch:
+                collect_later_child_events(output)
+            assert launch.call_count == 1
+        assert json.loads((output / "later-child-engine-events.json").read_text())["status"] == "records"
+        assert json.loads((output / "later-child-console-events.json").read_text())["status"] == "unavailable"
+        for changes in ({"END_BY": 0}, {"LATER_SCAN_BYTES": 1}):
+            with patch.dict(globals(), changes), patch.object(subprocess, "Popen") as launch:
+                collect_later_child_events(output)
+            launch.assert_not_called()
+            assert json.loads((output / "later-child-selection.json").read_text())["status"] == "unavailable"
+            assert json.loads((output / "later-child-console-events.json").read_text())["status"] == "unavailable"
 
 CONTROLLED_FIXTURE = '''    #[tokio::test(flavor = "current_thread")]
     async fn windows_auto_diagnostic_descendant_pipe_hold_is_observable_and_cleanup_bounded() {
@@ -912,6 +1032,7 @@ def main() -> int:
         if args.fresh_phase == "instrumented" and fresh_matrix_completed:
             collect_first_child_events(output)
             collect_first_child_events(output, console=True)
+            collect_later_child_events(output)
     return int(any(result["exit_code"] != 0 for result in results))
 
 
