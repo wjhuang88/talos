@@ -376,12 +376,10 @@ impl AddPlan {
         }
         #[cfg(not(unix))]
         {
-            if input.is_some() {
-                return Err(GitToolError::InvalidInput(
-                    "Supervised Git input unavailable on this platform".into(),
-                ));
-            }
-            super::run_host_command_output(command, deadline, limit).await
+            let _ = (command, deadline, limit, input);
+            Err(GitToolError::InvalidInput(
+                "Structured Git requires process-tree supervision; Windows Job integration is not yet available".into(),
+            ))
         }
     }
 
@@ -477,6 +475,13 @@ impl AddPlan {
         operation: Operation,
         selected: Option<Vec<String>>,
     ) -> Result<Self, GitToolError> {
+        // Do not inspect configuration or launch Git through a direct-child-only
+        // fallback while the ADR-068 foreground Job integration is incomplete.
+        if !cfg!(unix) {
+            return Err(GitToolError::InvalidInput(
+                "Structured Git requires process-tree supervision; Windows Job integration is not yet available".into(),
+            ));
+        }
         let environment = execution_environment();
         validate_environment(&environment)?;
         let environment = trace_suppressed_environment(environment);

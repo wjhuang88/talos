@@ -3871,3 +3871,86 @@ tests: dedicated capability admission, invocation-wide inventory accounting,
 replacement of the old resolver, Windows runtime evidence and independent
 security review are still required before production use. The accepted decision
 and T7 are not closed; production Pull remains disabled.
+
+Windows foreground supervision checkpoint (2026-10-18): independent review of
+49cc215ff710aae078716366e171ab4b485d3b69 found a merge blocker: the non-Unix
+structured Git runner used direct-child cleanup, so Commit maintenance and Push
+receiver descendants could survive cancellation. The maintainer accepted extending
+ADR-068 by reusing the existing Job launcher, without a new dependency or duplicate
+Job FFI. Acceptance is now recorded in ADR-068. As immediate containment, all
+non-Unix structured Git preparation refuses before configuration discovery, and
+the command runner independently refuses instead of invoking the unsafe fallback.
+This is not the Job implementation or cross-platform completion. Remaining work:
+lossless command/environment transfer, owned foreground Job operation and cleanup
+receipt, bounded stdin/output/deadline/cancellation/shutdown, real Windows tests,
+and fresh independent exact-head review. Existing Windows success tests require
+explicit reconciliation with containment; do not hide failures with test bypasses.
+The full preflight started on 49cc215f is still running and cannot certify these
+subsequent changes. No stage has been merged. T7 remains Active.
+
+Windows Job command-line preparation checkpoint (2026-10-18): the existing native
+launcher now uses a shared UTF-16 argument encoder with no lossy conversion,
+rejecting embedded NUL and command lines above 32,767 UTF-16 units including the
+terminator. Separate platform-independent tests pass 3/3 with all features,
+including unpaired UTF-16 units, quoting and expansion limits. A default-feature
+run selected zero tests and is not counted as evidence. Frozen OsString command
+and environment extraction, stdin and foreground ownership/cleanup integration
+remain open; Windows structured Git remains refused. The original 49cc215f full
+release preflight completed successfully, but does not certify these later edits.
+
+Windows Job environment checkpoint (2026-10-18): the existing background launcher
+now snapshots vars_os rather than panicking on non-Unicode environment values.
+A shared explicit-snapshot encoder uses std Command's Windows key ordering and
+case-equivalent override handling without spawning; UTF-16 values are preserved,
+invalid names/NUL rejected, and empty/nonempty blocks terminate with double NUL.
+Tests are separate: six combined environment/command-line tests pass on macOS;
+all-feature/all-target locked Clippy passes. The Windows-specific key-override
+test is not executed on macOS. Full-feature Windows cross-check failed before
+Talos compilation because x86_64-w64-mingw32-gcc is missing; this is not Windows
+validation evidence. Git-only cross-check is tracked separately. Foreground Git
+still requires exact frozen-environment transfer, stdin and Job ownership/receipt
+integration; this helper does not claim end-to-end non-Unicode launch support.
+
+Environment review correction: independent review identified that std Windows
+key ordering may panic before validation for an empty key. Snapshot now validates
+all UTF-16 key/value pairs before Command insertion and catches ordering panics
+as errors. Windows snapshot regression assertions include invalid keys. Git-only
+Windows cross-check passes with three unused fallback warnings; it is compile
+evidence only. Full-feature cross-check still needs the missing MinGW compiler.
+
+Windows native launch input checkpoint (2026-10-18): the existing background
+entrypoint now prepares lossless OsStr/OsString argument buffers and an explicit
+environment block before any native handles are allocated. The same native
+create/assign/resume/cleanup implementation consumes only those buffers and
+never re-reads PATH or parent environment. Background executable resolution
+and inherited-environment selection remain in its compatibility wrapper; original
+argv[0] spelling is retained. A separate Windows-only input regression is added
+but has not run on Windows. Git-only Windows cross-compilation passes; foreground
+Git ownership, finite stdin and receipts are still incomplete and remain refused.
+
+Finite Windows stdin primitive checkpoint (2026-10-18): the shared native Job
+launcher accepts an optional RAII pipe prepared before raw launch allocation.
+Only the child read endpoint joins the inherited-handle allowlist; the parent
+writer is explicitly non-inheritable. Failure drops both endpoints; successful
+launch closes the local child endpoint and transfers the writer to the caller.
+Background launch continues to request no input. A separate Windows-only test
+checks inheritance flags, binary bytes and EOF, but is not executed on macOS.
+Git-only Windows cross-compilation passes. Foreground input delivery/deadlines,
+cancellation and terminal Job receipts remain unimplemented; no activation or
+Windows runtime verification is claimed. The no-input foreground NUL handle and
+full setup-fault/resource matrix also remain required before activation.
+
+Stdin review correction: the inherited-handle buffer now lives outside the
+launch closure in both production and tests, through failure-path attribute-list
+deletion. Independent review identified premature Vec drop in the initial
+production-only branch; that divergent branch was removed. Windows Git-only
+cross-check passes after correction. Real Windows lifecycle evidence remains open.
+
+Current Windows checkpoint (2026-10-18): cleanup confirmation is committed as
+02f5136c (ActiveProcesses must reach zero within five seconds), explicit NUL EOF
+as f358673f, and exclusive Pipe/Null ownership as 1d7fe170. Source review found no
+blocker in these deltas; Git-only Windows cross-check and macOS all-feature locked
+Clippy pass. Windows runtime tests have not run. Native input fault/release proof,
+foreground operation/receipt wiring and the complete Pull implementation remain
+open. Both governance validators pass with zero warnings. Fresh origin/main fetch
+shows no upstream-only commits; no rebase needed. No T7 stage has been merged.
