@@ -1883,6 +1883,18 @@ impl AddPlan {
                 &path.join(".git"),
                 "Pull selected child Git marker",
             )?);
+            // Publish the name-based fallback in the same identity wave. This
+            // grants no permission to inspect it before this wave is approved,
+            // and does not make an unavailable checkout a usable repository.
+            if let Some(candidate) = self.pull_child_name(path).and_then(|name| {
+                super::pull_children::legacy_metadata_candidate(&self.repository.common_dir, name)
+            }) {
+                self.facets.push(path_facet(
+                    ToolNature::Read,
+                    &candidate,
+                    "Pull selected child legacy metadata candidate; layout validation deferred",
+                )?);
+            }
         }
         self.identity = PreparedPlanIdentity::new();
         self.phase = if !paths.is_empty() {
@@ -14455,6 +14467,12 @@ pub(super) mod tests {
         .await
         .expect("configuration");
         let child = plan.repository.workdir.join("child");
+        let mut modules = super::super::pull_children::Tree::parse(b"", 40).expect("modules");
+        modules
+            .module_names
+            .insert("child".into(), "group/named-child".into());
+        plan.pull_current_modules = Some(modules);
+        let fallback = plan.repository.common_dir.join("modules/group/named-child");
         let stale = proof(&plan)
             .consume_for_prepared(&plan.request(), &plan.identity)
             .expect("old tokens");
@@ -14464,7 +14482,7 @@ pub(super) mod tests {
         plan.select_pull_child_identity()
             .expect("select current child");
         assert!(plan.phase == Phase::PullChildIdentity);
-        for path in [&child, &child.join(".git")] {
+        for path in [&child, &child.join(".git"), &fallback] {
             assert!(plan.facets.iter().any(|facet| {
                 facet.nature == ToolNature::Read && facet.resource.as_deref() == path.to_str()
             }));
@@ -14473,6 +14491,11 @@ pub(super) mod tests {
         let tokens = proof(&plan)
             .consume_for_prepared(&plan.request(), &plan.identity)
             .expect("fresh child tokens");
+        assert!(plan.child_read(&fallback, &tokens).is_ok());
+        assert!(
+            !fallback.exists(),
+            "candidate admission must not create metadata"
+        );
         assert!(plan.child_locations.is_empty());
         let plan = plan
             .discover_pull_child_identity(&tokens)

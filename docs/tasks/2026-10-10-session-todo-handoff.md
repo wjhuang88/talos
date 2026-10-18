@@ -3732,3 +3732,17 @@ execution, recursive retry/integration, resolution authority and original
 platform/runtime/publication gates remain. No fresh full preflight is needed
 solely to repeat the separately verified test addition; substantive upcoming
 code changes require fresh appropriate validation and final exact-head gates.
+
+Legacy child admission frontier (2026-10-18): selected modules now publish a
+name-based `common/modules/<name>` exact Read candidate in the existing identity
+wave. Construction performs no filesystem inspection; fresh approval is required,
+and malformed names omit this candidate without blocking populated discovery.
+Pull tests pass 109/109, the separate lexical escape regression passes 1/1,
+and all-feature/all-target Clippy passes with warnings denied. Independent
+review found no blocker for this inert frontier. This does not implement fallback
+execution: prefix-repository/alias validation, configured gitdir mappings and
+explicit populated/metadata-only layout remain required. Native source review
+also confirms scheduling and layout are independent: index tasks preserve
+configured worktree setup, while changed tasks always override `--work-tree=.`
+with cwd=gitdir. Do not apply that override to every metadata-only child.
+Fetch advanced origin/main from 8fa2a500 to dea3edcc; rebase is the next step.

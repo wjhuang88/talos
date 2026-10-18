@@ -5,6 +5,28 @@ use std::collections::BTreeMap;
 
 use super::GitToolError;
 
+/// Construct a legacy fallback candidate without inspecting the filesystem.
+/// This is an approval frontier, not proof that the candidate is a repository.
+/// Native prefix-repository checks and configured gitdir mappings remain separate
+/// discovery obligations before this path can be used.
+pub(super) fn legacy_metadata_candidate(
+    common_dir: &std::path::Path,
+    name: &str,
+) -> Option<std::path::PathBuf> {
+    // Reject portable lexical escapes, including Windows trailing-dot/space
+    // aliases. Filesystem aliases and reserved devices still require validation
+    // before use; this helper performs no filesystem lookup.
+    if name.is_empty()
+        || name.contains(['\\', ':', '\0', '\n', '\r'])
+        || name.split('/').any(|part| {
+            part.is_empty() || part.ends_with(['.', ' ']) || part.eq_ignore_ascii_case(".git")
+        })
+    {
+        return None;
+    }
+    Some(common_dir.join("modules").join(name))
+}
+
 /// Validate exact batch-check responses without peeling tags or interpreting a
 /// failed Git invocation as a missing object. Presence is only a transient result.
 pub(super) fn commit_batch_output(objects: &[String], output: &[u8]) -> Result<bool, GitToolError> {
@@ -469,6 +491,39 @@ impl Tree {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn legacy_metadata_candidate_cannot_escape_modules() {
+        let common = std::path::Path::new("parent.git");
+        assert_eq!(
+            legacy_metadata_candidate(common, "group/named-child"),
+            Some(common.join("modules/group/named-child"))
+        );
+        for name in [
+            "",
+            "/absolute",
+            "../outside",
+            "nested/../outside",
+            "./child",
+            "nested//child",
+            "child/",
+            "C:/outside",
+            "C:outside",
+            "a\\b",
+            "a/.Git/b",
+            "nested/.. /outside",
+            "nested/child./outside",
+            "nested/child /outside",
+            "a\0b",
+            "a\nb",
+            "a\rb",
+        ] {
+            assert!(
+                legacy_metadata_candidate(common, name).is_none(),
+                "{name:?}"
+            );
+        }
+    }
 
     #[test]
     fn native_recursive_fetch_updates_selected_unpopulated_module() {
