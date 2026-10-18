@@ -3,6 +3,9 @@
 #[cfg(any(windows, test))]
 mod windows_command_line;
 
+#[cfg(any(windows, test))]
+mod windows_environment;
+
 #[cfg(feature = "shell")]
 use std::process::Stdio;
 
@@ -680,7 +683,7 @@ fn create_windows_job_with_hooks(
             .collect::<Vec<_>>();
         let mut command_w = windows_command_line::encode(&arguments)?;
         let cwd_w = wide(cwd.as_os_str());
-        let mut environment = windows_environment(extra_env);
+        let mut environment = windows_environment(extra_env)?;
         let mut startup: STARTUPINFOEXW = zeroed();
         startup.StartupInfo.cb = size_of::<STARTUPINFOEXW>() as u32;
         startup.lpAttributeList = attrs;
@@ -863,37 +866,22 @@ fn create_windows_job_with_hooks(
 }
 
 #[cfg(windows)]
-fn windows_environment(extra: &std::collections::BTreeMap<String, String>) -> Vec<u16> {
-    use std::os::windows::ffi::OsStrExt;
+fn windows_environment(
+    extra: &std::collections::BTreeMap<String, String>,
+) -> Result<Vec<u16>, String> {
     let dangerous = talos_sandbox::hardening::ProcessHardening::dangerous_env_var_names();
-    let mut values = std::collections::BTreeMap::<String, String>::new();
-    for (name, value) in std::env::vars() {
-        if !dangerous
-            .iter()
-            .any(|item| item.eq_ignore_ascii_case(&name))
-        {
-            values.insert(name, value);
-        }
-    }
-    values.extend(
-        extra
-            .iter()
-            .filter(|(name, _)| {
-                !dangerous
-                    .iter()
-                    .any(|item| item.eq_ignore_ascii_case(name.as_str()))
-            })
-            .map(|(name, value)| (name.clone(), value.clone())),
-    );
-    let mut block = Vec::new();
-    for (name, value) in values {
-        std::ffi::OsStr::new(&format!("{name}={value}"))
-            .encode_wide()
-            .for_each(|unit| block.push(unit));
-        block.push(0);
-    }
-    block.push(0);
-    block
+    let entries = std::env::vars_os().chain(extra.iter().map(|(name, value)| {
+        (
+            std::ffi::OsString::from(name),
+            std::ffi::OsString::from(value),
+        )
+    }));
+    windows_environment::snapshot(entries.filter(|(name, _)| {
+        !dangerous.iter().any(|item| {
+            name.to_str()
+                .is_some_and(|name| item.eq_ignore_ascii_case(name))
+        })
+    }))
 }
 
 #[cfg(windows)]
@@ -1081,7 +1069,8 @@ mod windows_tests {
         };
         let mut extra = BTreeMap::new();
         extra.insert(name.to_ascii_lowercase(), "must-not-appear".to_owned());
-        let block = String::from_utf16_lossy(&windows_environment(&extra));
+        let block =
+            String::from_utf16_lossy(&windows_environment(&extra).expect("valid environment"));
         assert!(!block.contains("must-not-appear"));
     }
 
