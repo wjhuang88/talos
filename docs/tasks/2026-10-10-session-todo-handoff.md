@@ -3981,3 +3981,12 @@ fixture (`/tmp/talos-i300-foreground-preflight.log`). The earlier sandbox EPERM
 push regression passed outside the sandbox; the refreshed protected native-source
 inventory tests pass 3/3 after independent review. No Windows runtime or merge
 completion is inferred from these macOS results.
+
+Stage publication (2026-10-18): pushed implementation candidate f16c2d09 and
+opened draft PR #735 (https://github.com/wjhuang88/talos/pull/735), based on the
+effective #704 claim. The candidate includes the accumulated T7 implementation;
+it is not a Windows-only change and does not close T7. Local standard preflight
+passed as recorded above. Real Windows CI and exact-head final review remain
+required. Production Pull and non-Unix preparation remain disabled. Resume with
+PR #735 check results and invocation-wide Pull budget/resolution authorization;
+preserve the full original handoff queue.
