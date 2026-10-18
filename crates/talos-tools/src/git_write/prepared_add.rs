@@ -3177,6 +3177,7 @@ impl AddPlan {
                 .await?;
             let path = output
                 .strip_suffix(b"\n")
+                .map(|path| path.strip_suffix(b"\r").unwrap_or(path))
                 .and_then(|path| std::str::from_utf8(path).ok())
                 .map(PathBuf::from)
                 .filter(|path| {
@@ -5856,6 +5857,12 @@ impl AddPlan {
             && (program.canonicalize().ok().as_ref() != Some(&self.program)
                 || capture_program(&self.program)? != self.program_entry)
         {
+            #[cfg(test)]
+            eprintln!(
+                "Git maintenance binding rejected: child={program:?}, canonical={:?}, bound={:?}",
+                program.canonicalize(),
+                self.program,
+            );
             return Err(GitToolError::InvalidInput("Git maintenance executable differs from the bound Git binary; use a separately authorized invocation".into()));
         }
         Ok(())
