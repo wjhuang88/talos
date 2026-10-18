@@ -209,29 +209,8 @@ impl Inventory {
         for (path, expected) in &self.directories {
             revalidate_children(path, expected)?;
         }
-        let mut budget = super::snapshot::Budget {
-            entries: 4,
-            bytes: 256 * 1024,
-        };
-        for (path, expected) in &self.alternates {
-            if &super::snapshot::RegularEvidence::capture(path, &mut budget)
-                .map_err(|_| invalid())?
-                != expected
-            {
-                return Err(invalid());
-            }
-        }
-        let mut budget = super::snapshot::Budget {
-            entries: 4096,
-            bytes: 4 * 1024 * 1024,
-        };
-        for (path, expected) in &self.references {
-            if &super::snapshot::RegularEvidence::capture(path, &mut budget)
-                .map_err(|_| invalid())?
-                != expected
-            {
-                return Err(invalid());
-            }
+        for (path, expected) in self.alternates.iter().chain(&self.references) {
+            expected.revalidate(path).map_err(|_| invalid())?;
         }
         Ok(())
     }

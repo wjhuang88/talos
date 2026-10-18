@@ -4,6 +4,10 @@
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
+#[cfg(test)]
+#[path = "snapshot_regular_tests.rs"]
+mod regular_tests;
+
 #[derive(Debug, PartialEq, Eq)]
 pub(super) enum Entry {
     Missing,
@@ -31,6 +35,27 @@ struct LeafIdentity {
 }
 
 impl LeafIdentity {
+    fn matches_file(&self, file: &std::fs::File) -> std::io::Result<bool> {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::MetadataExt;
+            let metadata = file.metadata()?;
+            Ok((self.device, self.inode) == (metadata.dev(), metadata.ino()))
+        }
+        #[cfg(windows)]
+        {
+            let handle =
+                std::panic::catch_unwind(|| same_file::Handle::from_file(file.try_clone()?))
+                    .map_err(|_| std::io::Error::other("Windows Git leaf comparison panicked"))??;
+            Ok(self.handle == handle)
+        }
+        #[cfg(not(any(unix, windows)))]
+        {
+            let _ = file;
+            Err(std::io::Error::other("Git leaf identity unsupported"))
+        }
+    }
+
     fn capture(path: &Path) -> std::io::Result<Option<Self>> {
         let metadata = match std::fs::symlink_metadata(path) {
             Ok(metadata) if metadata.is_file() => metadata,
@@ -48,7 +73,13 @@ impl LeafIdentity {
         }
         #[cfg(windows)]
         {
-            let _ = metadata;
+            use std::os::windows::fs::MetadataExt;
+            use windows_sys::Win32::Storage::FileSystem::FILE_ATTRIBUTE_REPARSE_POINT;
+            if metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+                return Err(std::io::Error::other(
+                    "Git evidence leaf is a reparse point",
+                ));
+            }
             let handle = std::panic::catch_unwind(|| same_file::Handle::from_path(path)).map_err(
                 |_| std::io::Error::other("Windows Git leaf identity inspection panicked"),
             )??;
@@ -63,6 +94,58 @@ impl LeafIdentity {
 }
 
 impl RegularEvidence {
+    /// Compare retained regular-file evidence without allocating another file
+    /// body. Identity and permissions must remain unchanged as well as bytes.
+    pub(super) fn revalidate(&self, path: &Path) -> std::io::Result<()> {
+        let invalid = || std::io::Error::other("Git regular evidence changed");
+        if LeafIdentity::capture(path)? != self.leaf {
+            return Err(invalid());
+        }
+        let Entry::File(permissions, expected) = &self.entry else {
+            return if self.entry == Entry::Missing && self.leaf.is_none() {
+                Ok(())
+            } else {
+                Err(invalid())
+            };
+        };
+        let leaf = self.leaf.as_ref().ok_or_else(invalid)?;
+        let mut file = open_regular(path)?;
+        let metadata = file.metadata()?;
+        if !metadata.is_file()
+            || metadata.len() != expected.len() as u64
+            || &metadata.permissions() != permissions
+            || !leaf.matches_file(&file)?
+        {
+            return Err(invalid());
+        }
+        #[cfg(windows)]
+        {
+            use std::os::windows::fs::MetadataExt;
+            use windows_sys::Win32::Storage::FileSystem::FILE_ATTRIBUTE_REPARSE_POINT;
+            if metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+                return Err(invalid());
+            }
+        }
+        let mut buffer = [0u8; 8192];
+        for chunk in expected.chunks(buffer.len()) {
+            file.read_exact(&mut buffer[..chunk.len()])?;
+            if &buffer[..chunk.len()] != chunk {
+                return Err(invalid());
+            }
+        }
+        if file.read(&mut buffer[..1])? != 0 {
+            return Err(invalid());
+        }
+        let after = file.metadata()?;
+        if after.len() != expected.len() as u64
+            || &after.permissions() != permissions
+            || LeafIdentity::capture(path)? != self.leaf
+        {
+            return Err(invalid());
+        }
+        Ok(())
+    }
+
     pub(super) fn capture(path: &Path, budget: &mut Budget) -> std::io::Result<Self> {
         let before = LeafIdentity::capture(path)?;
         let entry = Entry::capture_regular(path, budget)?;
@@ -77,6 +160,23 @@ impl RegularEvidence {
             leaf: before,
         })
     }
+}
+
+fn open_regular(path: &Path) -> std::io::Result<std::fs::File> {
+    let mut options = std::fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK);
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+        use windows_sys::Win32::Storage::FileSystem::FILE_FLAG_OPEN_REPARSE_POINT;
+        options.custom_flags(FILE_FLAG_OPEN_REPARSE_POINT);
+    }
+    options.open(path)
 }
 
 /// Shared budget across all selected roots, not a separate allowance per file.
@@ -149,20 +249,7 @@ impl Entry {
         if !before.is_file() || before.len() > budget.bytes as u64 {
             return Err(invalid());
         }
-        let mut options = std::fs::OpenOptions::new();
-        options.read(true);
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::OpenOptionsExt;
-            options.custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK);
-        }
-        #[cfg(windows)]
-        {
-            use std::os::windows::fs::OpenOptionsExt;
-            use windows_sys::Win32::Storage::FileSystem::FILE_FLAG_OPEN_REPARSE_POINT;
-            options.custom_flags(FILE_FLAG_OPEN_REPARSE_POINT);
-        }
-        let file = options.open(path)?;
+        let file = open_regular(path)?;
         let opened = file.metadata()?;
         if !opened.is_file() || opened.len() > budget.bytes as u64 {
             return Err(invalid());
