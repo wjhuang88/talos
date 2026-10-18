@@ -4248,3 +4248,18 @@ and workspace format checking pass. Independent security delta review found no
 new blocker or read-scope expansion. This removes duplicate path retention only:
 bitmap, directory handles and temporary platform path allocations still require
 invocation-wide accounting. Production Pull remains disabled; T7 remains Active.
+
+Pull file revalidation checkpoint (2026-10-18): alternate/reference evidence now
+compares retained bytes through an 8192-byte stack buffer rather than capturing
+a second whole-file snapshot with a reset budget. Checks retain missing-state,
+leaf identity, permissions and content semantics, and compare opened-file
+identity, length and EOF. Shared regular opening retains existing no-follow /
+nonblocking Unix and open-reparse Windows flags. Independent review found a lost
+Windows post-read reparse rejection; the leaf identity helper now rejects
+reparse metadata before both identity checks, and follow-up review closed that
+static blocker. Snapshot tests pass 11/11, inventory tests 29/29, Pull-prefixed
+tests 72/72, and all-feature tools library Clippy passes with warnings denied.
+The corrected Windows Git-only library cross-check passes; it is not runtime
+evidence. Fixed scratch and temporary handles still need invocation-wide quota
+reservation, and existing path-based TOCTOU residuals remain. No activation or
+T7 completion is claimed.
