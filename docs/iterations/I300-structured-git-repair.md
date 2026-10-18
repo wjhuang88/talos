@@ -4424,3 +4424,21 @@ Review found no static spawn bypass, but opening the common preparation gate
 also requires native Add/Commit/Checkout/Push authorization/execution coverage,
 concurrent-operation isolation, large-input/two-output-stream and failure cleanup
 acceptance. Keep the gate closed pending those results.
+
+Windows concurrency/IO acceptance extension (2026-10-18): add native CI cases
+that cancel one acknowledged live operation while another remains blocked until
+explicit release, and mirror 512 KiB of binary stdin into both stdout and stderr.
+The concurrency case requires a cancelled JoinError, independent cleanup receipt,
+and exact successful output from the surviving operation. Static independent
+review identified the missing cancellation-result assertion; it is now retained
+and checked after cleanup. These tests still require native Windows execution.
+Fresh fetch finds origin/main behind 0 / implementation ahead 180 before this
+batch, so no rebase is required. Standard preflight is running in session 12231,
+log `/tmp/talos-i300-windows-lifecycle-preflight.log`.
+
+CI 39127288380 is terminal failure, not only a Windows failure: the main full
+workspace test job fails `pull_postfetch_rebuilds_evidence_before_selecting_integration`
+at the linked-budget frontier with an inventory InvalidInput. The current local
+isolated test passes 1/1 (`/tmp/talos-i300-postfetch-repro.log`); this does not
+invalidate the remote failure or establish its cause. Investigate before merge.
+Remote job log: `/tmp/talos-i300-linux-39127288380.log` (job 117675006825).
