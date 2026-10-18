@@ -15,6 +15,8 @@ use thiserror::Error;
 // Staged, private transport infrastructure. Not wired into WebSearchTool before
 // ADR-090's protocol/parity/D activation gates. Uses the existing staged seam.
 mod transport;
+// Dormant response parsing prerequisite; activation still requires ADR-090 parity/D gates.
+mod ddg_parser;
 
 /// Backend identity retained across normalization and routing decisions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
