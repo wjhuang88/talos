@@ -6,9 +6,9 @@ use crate::process_boundary::windows_foreground::{OwnedCommandExecutor, OwnedCom
 use talos_sandbox::{OwnedCommandExecutor, OwnedCommandOperation};
 
 use std::path::{Component, Path, PathBuf};
-#[cfg(not(unix))]
+#[cfg(all(test, not(unix)))]
 use std::process::Stdio;
-#[cfg(any(test, not(unix)))]
+#[cfg(test)]
 use std::time::Duration;
 
 use async_trait::async_trait;
@@ -19,7 +19,7 @@ use talos_core::tool::{
     AgentTool, ToolFamily, ToolNature, ToolPermissionFacet, ToolResourceKind, ToolResult,
 };
 use talos_core::tool_parameters;
-#[cfg(any(test, not(unix)))]
+#[cfg(test)]
 use tokio::io::{AsyncRead, AsyncReadExt};
 
 use super::{GitToolError, discover_repo};
@@ -84,7 +84,7 @@ pub(crate) async fn run_host_git_with_program(
     run_host_git_bounded(program, workdir, args, Duration::from_secs(300), 256 * 1024).await
 }
 
-#[cfg(any(test, not(unix)))]
+#[cfg(test)]
 async fn read_host_pipe(
     pipe: impl AsyncRead + Unpin,
     limit: u64,
@@ -137,7 +137,7 @@ async fn run_host_command(
     Ok(output.stdout)
 }
 
-#[cfg(not(unix))]
+#[cfg(all(test, not(unix)))]
 async fn run_host_command_output(
     mut command: tokio::process::Command,
     budget: Duration,
@@ -197,7 +197,7 @@ async fn run_host_command_output(
     })
 }
 
-#[cfg(not(unix))]
+#[cfg(all(test, not(unix)))]
 async fn run_host_command(
     command: tokio::process::Command,
     budget: Duration,
