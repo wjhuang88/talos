@@ -1,6 +1,55 @@
 use super::*;
 
 #[test]
+fn reference_allowance_is_shared_across_inventories_and_not_reset_by_rebinding() {
+    let temp = tempfile::tempdir().expect("fixture");
+    let base = temp.path().canonicalize().expect("base");
+    let budget = ReferenceBudget(Arc::new(Mutex::new((10, 9))));
+    let mut inventories = Vec::new();
+    for name in ["parent", "child"] {
+        let root = base.join(name);
+        std::fs::create_dir(&root).expect("repository");
+        std::fs::write(root.join("HEAD"), b"aaaa\n").expect("reference");
+        let mut inventory = Inventory::with_reference_budget(&root, &root, budget.clone());
+        while !inventory.complete() {
+            inventory.advance(|_| true).expect("admitted frontier");
+        }
+        inventories.push((root, inventory));
+    }
+    let (root, parent) = &mut inventories[0];
+    parent.bind_references(root, root).expect("first capture");
+    parent
+        .bind_references(root, root)
+        .expect("retained evidence");
+    assert_eq!(*budget.0.lock().expect("budget"), (9, 4));
+    let (root, child) = &mut inventories[1];
+    assert!(child.bind_references(root, root).is_err());
+    assert_eq!(*budget.0.lock().expect("failed capture budget"), (8, 4));
+    // Dropping an inventory does not refund cumulative discovery work.
+    drop(inventories);
+    let root = base.join("parent");
+    let mut replacement = Inventory::with_reference_budget(&root, &root, budget);
+    while !replacement.complete() {
+        replacement.advance(|_| true).expect("replacement frontier");
+    }
+    assert!(replacement.bind_references(&root, &root).is_err());
+}
+
+#[test]
+fn shared_reference_entry_allowance_refuses_after_exhaustion() {
+    let temp = tempfile::tempdir().expect("fixture");
+    let path = temp.path().join("HEAD");
+    std::fs::write(&path, b"aaaa\n").expect("reference");
+    let budget = ReferenceBudget(Arc::new(Mutex::new((1, 100))));
+    let retained = budget.capture(&path).expect("first entry");
+    assert!(budget.clone().capture(&path).is_err());
+    assert_eq!(*budget.0.lock().expect("budget"), (0, 95));
+    retained
+        .revalidate(&path)
+        .expect("existing evidence remains valid");
+}
+
+#[test]
 fn directory_revalidation_compares_the_retained_set_without_rebaselining() {
     let temp = tempfile::tempdir().expect("fixture");
     let root = temp.path().canonicalize().expect("root");

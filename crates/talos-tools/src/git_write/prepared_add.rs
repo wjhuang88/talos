@@ -225,6 +225,7 @@ pub(super) struct AddPlan {
     pull_hook_evidence: Vec<(PathBuf, snapshot::RegularEvidence)>,
     pull_graph_paths: Option<Vec<PathBuf>>,
     pull_inventory: Option<super::pull_inventory::Inventory>,
+    pull_reference_budget: super::pull_inventory::ReferenceBudget,
     pull_integration: Option<super::pull_state::Integration>,
     pull_ref_tips: Option<Vec<String>>,
     pull_new_commits: Vec<String>,
@@ -689,6 +690,7 @@ impl AddPlan {
             pull_hook_evidence: Vec::new(),
             pull_graph_paths: None,
             pull_inventory: None,
+            pull_reference_budget: super::pull_inventory::ReferenceBudget::default(),
             pull_integration: None,
             pull_ref_tips: None,
             pull_new_commits: Vec::new(),
@@ -1461,9 +1463,10 @@ impl AddPlan {
             ));
         }
         let mut inventory = self.pull_inventory.take().unwrap_or_else(|| {
-            super::pull_inventory::Inventory::new(
+            super::pull_inventory::Inventory::with_reference_budget(
                 &self.repository.git_dir,
                 &self.repository.common_dir,
+                self.pull_reference_budget.clone(),
             )
         });
         if !self.advance_pull_parent_inventory(&mut inventory, authorizations)? {
@@ -2285,8 +2288,11 @@ impl AddPlan {
             }
             self.pull_child_fetch_targets
                 .insert(workdir.clone(), (remote, destinations));
-            let inventory =
-                super::pull_inventory::Inventory::new(&location.git_dir, &location.common_dir);
+            let inventory = super::pull_inventory::Inventory::with_reference_budget(
+                &location.git_dir,
+                &location.common_dir,
+                self.pull_reference_budget.clone(),
+            );
             self.pull_child_inventories
                 .insert(workdir.clone(), inventory);
             self.child_configs.push((workdir.clone(), config));
@@ -2626,7 +2632,11 @@ impl AddPlan {
                     })?;
                 self.pull_child_inventories.insert(
                     path,
-                    super::pull_inventory::Inventory::new(&location.git_dir, &location.common_dir),
+                    super::pull_inventory::Inventory::with_reference_budget(
+                        &location.git_dir,
+                        &location.common_dir,
+                        self.pull_reference_budget.clone(),
+                    ),
                 );
             }
             break;
@@ -3047,9 +3057,10 @@ impl AddPlan {
                 )?);
             }
             self.identity = PreparedPlanIdentity::new();
-            let inventory = super::pull_inventory::Inventory::new(
+            let inventory = super::pull_inventory::Inventory::with_reference_budget(
                 &self.repository.git_dir,
                 &self.repository.common_dir,
+                self.pull_reference_budget.clone(),
             );
             for path in
                 super::pull_state::PullEvidence::required_paths(&self.repository, None, false)?
