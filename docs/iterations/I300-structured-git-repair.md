@@ -4472,3 +4472,25 @@ governance validators and formatting pass. Fresh origin/main fetch has behind 0 
 ahead 182, so no rebase is needed. Publish the stable stage to #735 for native
 Windows lifecycle results and remote post-fetch diagnostics; do not merge while
 preparation and full Pull acceptance remain incomplete.
+
+Streaming identity revalidation (2026-10-18): Pull inventory now compares each
+retained ancestor identity without constructing a second full PathIdentity.
+Windows uses the same metadata-only, rename-compatible handle opener for initial
+capture and comparison; each comparison handle is dropped before the next
+ancestor. Missing entries, leaf links, type changes and replaced parents still
+refuse. Independent static review found no authorization bypass or weakened
+identity predicate. Inventory tests pass 34/34 and the shared identity replacement
+test passes 1/1; Windows Git-only library cross-check passes with seven existing
+feature-only warnings. Logs: `/tmp/talos-i300-inventory-stream-revalidate.log`,
+`/tmp/talos-i300-stream-identity.log`,
+`/tmp/talos-i300-stream-identity-windows.log`. Native execution is still required.
+The fresh external standard preflight runs in session 92511, log
+`/tmp/talos-i300-stream-identity-preflight.log`; no terminal result yet.
+
+Quota scope audit: the four graph inventories are not the entire Pull invocation.
+PullEvidence still has its own 16 MiB capture budget and reconstructs evidence on
+revalidation; repository/configuration/child-location evidence also retains
+identities independently. Full shared cumulative and peak accounting must cover
+these paths as well as graph discovery and pointer resolution. The streaming
+comparison above is a prerequisite, not a claim of completed quota enforcement.
+The preceding stable candidate is pushed as `290628dc`; CI 39129652021 is running.

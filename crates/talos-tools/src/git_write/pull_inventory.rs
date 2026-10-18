@@ -220,9 +220,7 @@ impl Inventory {
             target.revalidate()?;
         }
         for (path, expected) in &self.visited {
-            if &identity(path)? != expected {
-                return Err(invalid());
-            }
+            revalidate_identity(path, expected.as_ref())?;
         }
         for (path, expected) in &self.directories {
             revalidate_children(path, expected)?;
@@ -526,9 +524,7 @@ impl Inventory {
                 }
                 self.directories.insert(path.clone(), entries);
             }
-            if identity(path)? != before {
-                return Err(invalid());
-            }
+            revalidate_identity(path, before.as_ref())?;
             self.visited.insert(path.clone(), before);
         }
         next.sort();
@@ -586,6 +582,20 @@ fn identity(path: &Path) -> Result<Option<PathIdentity>, GitToolError> {
                 return Err(invalid());
             }
             PathIdentity::capture(path).map(Some).map_err(|_| invalid())
+        }
+        _ => Err(invalid()),
+    }
+}
+
+fn revalidate_identity(path: &Path, expected: Option<&PathIdentity>) -> Result<(), GitToolError> {
+    let parent = path.parent().ok_or_else(invalid)?;
+    if parent.canonicalize().map_err(|_| invalid())? != parent {
+        return Err(invalid());
+    }
+    match (std::fs::symlink_metadata(path), expected) {
+        (Err(error), None) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        (Ok(metadata), Some(expected)) if metadata.is_file() || metadata.is_dir() => {
+            expected.revalidate(path).map_err(|_| invalid())
         }
         _ => Err(invalid()),
     }
