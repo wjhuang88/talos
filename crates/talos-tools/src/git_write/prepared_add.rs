@@ -763,6 +763,60 @@ impl AddPlan {
             .await
     }
 
+    fn pull_resolution_admitted(facets: &[ToolPermissionFacet]) -> bool {
+        facets.iter().any(|facet| {
+            facet.nature == ToolNature::Read
+                && facet.resource_kind == Some(ToolResourceKind::Remote)
+                && facet.resource.as_deref() == Some("git:pull-worktree-resolution")
+        })
+    }
+
+    // Only called after execute_stage consumes the complete current prepared
+    // proof. Remote capabilities are covered by that profile proof; the tokens
+    // returned from it additionally bind exact target paths below.
+    fn advance_pull_worktree_targets(
+        inventory: &mut super::pull_inventory::Inventory,
+        common: &Path,
+        facets: &mut Vec<ToolPermissionFacet>,
+        workspace: &Path,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+        admitted_resolution: bool,
+    ) -> Result<bool, GitToolError> {
+        let discovered = inventory.discover_worktree_targets(common)?;
+        if !inventory.has_worktree_targets() {
+            return Ok(false);
+        }
+        if !admitted_resolution && !Self::pull_resolution_admitted(facets) {
+            facets.push(ToolPermissionFacet::with_resource(
+                ToolNature::Read,
+                "git:pull-worktree-resolution",
+                ToolResourceKind::Remote,
+                ).with_description("resolve retained linked-worktree pointers, including external component metadata and link text; no file contents, directory enumeration, execution or writes"));
+        }
+        // Freeze newly discovered inputs in a fresh plan before inspecting
+        // their chains, even when an earlier pointer used this capability.
+        if discovered || !admitted_resolution {
+            return Ok(true);
+        }
+        if inventory.resolve_worktree_targets()? {
+            // Caller publishes resolved exact Path facets for a fresh approval.
+            return Ok(true);
+        }
+        inventory.bind_worktree_targets(|path| {
+            authorizations
+                .iter()
+                .find(|token| {
+                    token.authorizes_path(
+                        "git_pull",
+                        ToolNature::Read,
+                        workspace,
+                        path.to_str().unwrap_or_default(),
+                    )
+                })
+                .map(|token| token.normalized_path().to_owned())
+        })
+    }
+
     fn advance_pull_parent_inventory(
         &mut self,
         inventory: &mut super::pull_inventory::Inventory,
@@ -795,13 +849,15 @@ impl AddPlan {
             if !pending {
                 inventory.bind_alternates(gitdir, common)?;
                 inventory.bind_references(gitdir, common)?;
-                pending = if inventory.discover_worktree_targets(common)? {
-                    true
-                } else {
-                    inventory.bind_worktree_targets(|path| {
-                        exact(path).map(|token| token.normalized_path().to_owned())
-                    })?
-                };
+                let resolution_admitted = Self::pull_resolution_admitted(&self.facets);
+                pending = Self::advance_pull_worktree_targets(
+                    inventory,
+                    common,
+                    &mut self.facets,
+                    &self.workspace,
+                    authorizations,
+                    resolution_admitted,
+                )?;
             }
         }
         for path in inventory.exact_paths(gitdir, common) {
@@ -2113,6 +2169,9 @@ impl AddPlan {
         mut self: Box<Self>,
         authorizations: &[talos_core::tool::ToolExecutionAuthorization],
     ) -> Result<Box<Self>, GitToolError> {
+        // Capture from the admitted profile before any inventory can append
+        // facets. One child's new request cannot authorize another child.
+        let resolution_admitted = Self::pull_resolution_admitted(&self.facets);
         if !self.facets.iter().any(|facet| {
             facet.nature == ToolNature::Read
                 && facet.resource_kind == Some(ToolResourceKind::Remote)
@@ -2419,23 +2478,14 @@ impl AddPlan {
                 })?;
             inventory.bind_alternates(&location.git_dir, &location.common_dir)?;
             inventory.bind_references(&location.git_dir, &location.common_dir)?;
-            let discovered = if inventory.discover_worktree_targets(&location.common_dir)? {
-                true
-            } else {
-                inventory.bind_worktree_targets(|path| {
-                    authorizations
-                        .iter()
-                        .find(|token| {
-                            token.authorizes_path(
-                                "git_pull",
-                                ToolNature::Read,
-                                &self.workspace,
-                                path.to_str().unwrap_or_default(),
-                            )
-                        })
-                        .map(|token| token.normalized_path().to_owned())
-                })?
-            };
+            let discovered = Self::advance_pull_worktree_targets(
+                inventory,
+                &location.common_dir,
+                &mut self.facets,
+                &self.workspace,
+                authorizations,
+                resolution_admitted,
+            )?;
             pending |= discovered;
             for path in inventory.exact_paths(&location.git_dir, &location.common_dir) {
                 if !self.facets.iter().any(|facet| {

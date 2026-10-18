@@ -398,11 +398,30 @@ fn compile_facets(
                         .as_deref()
                         .is_some_and(|path| Path::new(path).is_absolute())
             });
+        let pull_resolution = facet.nature == ToolNature::Read
+            && resource_kind == ToolResourceKind::Remote
+            && facet.resource.as_deref() == Some("git:pull-worktree-resolution")
+            && request.tool_name() == "git_pull"
+            && bound_git_command
+            && request.facets().iter().any(|scope| {
+                scope.nature == ToolNature::Read
+                    && scope.resource_kind == Some(ToolResourceKind::Remote)
+                    && scope.resource.as_deref() == Some("git:pull-repository-metadata")
+            })
+            && request.facets().iter().any(|root| {
+                root.nature == ToolNature::Read
+                    && root.resource_kind == Some(ToolResourceKind::Path)
+                    && root
+                        .resource
+                        .as_deref()
+                        .is_some_and(|path| Path::new(path).is_absolute())
+            });
         if !supported_resource_pair(facet.nature, resource_kind)
             && !git_config_discovery
             && !receiver_reference_tree
             && !receiver_metadata
             && !pull_metadata
+            && !pull_resolution
         {
             return Err(GrantError::MissingResource(index));
         }
@@ -660,6 +679,57 @@ const fn kind_tag(value: ToolResourceKind) -> u8 {
 mod discovery_tests {
     use super::*;
     use talos_core::tool::ToolPermissionFacet;
+
+    #[test]
+    fn pull_resolution_capability_requires_pull_metadata_and_bound_command() {
+        let root = std::env::current_dir().expect("workspace");
+        let input = serde_json::json!({"remote": "origin"});
+        let facets = vec![
+            ToolPermissionFacet::with_resource(
+                ToolNature::Read,
+                "git:pull-worktree-resolution",
+                ToolResourceKind::Remote,
+            ),
+            ToolPermissionFacet::with_resource(
+                ToolNature::Read,
+                "git:pull-repository-metadata",
+                ToolResourceKind::Remote,
+            ),
+            ToolPermissionFacet::with_resource(
+                ToolNature::Execute,
+                root.join("git").to_string_lossy().into_owned(),
+                ToolResourceKind::Command,
+            ),
+            ToolPermissionFacet::with_resource(
+                ToolNature::Read,
+                root.join("repo/.git").to_string_lossy().into_owned(),
+                ToolResourceKind::Path,
+            ),
+        ];
+        let allowed = |tool: &str, facets: &[ToolPermissionFacet]| {
+            compile_facets(
+                &PermissionRequest::native(tool, facets, &input),
+                Some(&root),
+                true,
+            )
+            .is_ok()
+        };
+        assert!(allowed("git_pull", &facets));
+        for tool in ["git_push", "git_checkout", "read_file"] {
+            assert!(!allowed(tool, &facets));
+        }
+        for omitted in 1..facets.len() {
+            let mut incomplete = facets.clone();
+            incomplete.remove(omitted);
+            assert!(!allowed("git_pull", &incomplete));
+        }
+        let mut wrong_nature = facets.clone();
+        wrong_nature[0].nature = ToolNature::Write;
+        assert!(!allowed("git_pull", &wrong_nature));
+        let mut generic = facets;
+        generic[0].resource = Some("git:arbitrary-read".into());
+        assert!(!allowed("git_pull", &generic));
+    }
 
     #[test]
     fn closed_git_discovery_scope_cannot_become_generic_remote_read() {

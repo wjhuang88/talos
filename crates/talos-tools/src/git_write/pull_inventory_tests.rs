@@ -1,5 +1,44 @@
 use super::*;
 
+fn capture_target(
+    path: &Path,
+    allow_missing: bool,
+) -> Result<super::super::pull_resolution::Resolution, GitToolError> {
+    ReferenceBudget::default().resolve(path, allow_missing)
+}
+
+#[test]
+fn resolution_and_reference_capture_share_cumulative_allowance() {
+    let temp = tempfile::tempdir().expect("fixture");
+    let root = temp.path().canonicalize().expect("root");
+    let reference = root.join("HEAD");
+    std::fs::write(&reference, b"aaaa\n").expect("reference");
+    let budget = ReferenceBudget::default();
+    let resolution = budget.resolve(&root, false).expect("parent resolution");
+    let after_resolution = *budget.0.lock().expect("budget");
+    assert!(after_resolution.0 < 4096);
+    assert!(after_resolution.1 < 4 * 1024 * 1024);
+    resolution.revalidate().expect("retained chain");
+    assert_eq!(*budget.0.lock().expect("budget"), after_resolution);
+    budget.clone().capture(&reference).expect("child reference");
+    assert_eq!(
+        *budget.0.lock().expect("budget"),
+        (after_resolution.0 - 1, after_resolution.1 - 5)
+    );
+    let before_failure = *budget.0.lock().expect("budget");
+    assert!(
+        budget
+            .clone()
+            .resolve(&root.join("missing"), false)
+            .is_err()
+    );
+    let after_failure = *budget.0.lock().expect("budget");
+    assert!(after_failure.0 < before_failure.0);
+    assert!(after_failure.1 < before_failure.1);
+    drop(resolution);
+    assert_eq!(*budget.0.lock().expect("budget"), after_failure);
+}
+
 #[test]
 fn alternates_share_reference_allowance_and_rebinding_does_not_recharge() {
     let temp = tempfile::tempdir().expect("fixture");
@@ -304,11 +343,17 @@ fn linked_pointer_targets_wait_for_fresh_admission() {
     );
     assert!(inventory.worktree_targets.values().all(Option::is_none));
     std::fs::create_dir(&target).expect("target created independently");
+    inventory
+        .resolve_worktree_targets()
+        .expect("resolution admitted");
     assert!(
         inventory
             .bind_worktree_targets(|_| Some(root.clone()))
             .is_err()
     );
+    inventory
+        .resolve_worktree_targets()
+        .expect("resolution admitted");
     inventory
         .bind_worktree_targets(|path| path.canonicalize().ok())
         .expect("fresh admission");
@@ -331,16 +376,13 @@ fn missing_worktree_target_requires_checkout_mode_and_retains_parent_identity() 
     let parent = root.join("checkout-parent");
     std::fs::create_dir(&parent).expect("parent");
     let path = parent.join("missing");
-    assert!(WorktreeTarget::capture(&path, false).is_err());
-    let evidence = WorktreeTarget::capture(&path, true).expect("missing checkout");
-    assert_eq!(evidence.resolved, path);
+    assert!(capture_target(&path, false).is_err());
+    let evidence = capture_target(&path, true).expect("missing checkout");
+    assert_eq!(evidence.resolved(), path);
     std::fs::rename(&parent, root.join("saved-parent")).expect("move parent");
     std::fs::create_dir(&parent).expect("replace parent");
     #[cfg(any(unix, windows))]
-    assert_ne!(
-        evidence,
-        WorktreeTarget::capture(&path, true).expect("replacement")
-    );
+    assert_ne!(evidence, capture_target(&path, true).expect("replacement"));
 }
 
 #[test]
@@ -348,11 +390,11 @@ fn missing_worktree_suffix_resolves_parent_components() {
     let temp = tempfile::tempdir().expect("repo");
     let root = temp.path().canonicalize().expect("root");
     let path = root.join("missing/deep/../../checkout");
-    assert!(WorktreeTarget::capture(&path, false).is_err());
-    let evidence = WorktreeTarget::capture(&path, true).expect("forgiving target");
-    assert_eq!(evidence.resolved, root.join("checkout"));
+    assert!(capture_target(&path, false).is_err());
+    let evidence = capture_target(&path, true).expect("forgiving target");
+    assert_eq!(evidence.resolved(), root.join("checkout"));
     std::fs::write(root.join("missing"), b"not a directory").expect("replace absence");
-    assert!(WorktreeTarget::capture(&path, true).is_err());
+    assert!(capture_target(&path, true).is_err());
 }
 
 #[cfg(unix)]
@@ -364,13 +406,13 @@ fn missing_worktree_suffix_keeps_existing_symlink_parent_semantics() {
     std::os::unix::fs::symlink(root.join("actual/nested"), root.join("link"))
         .expect("existing link");
     let path = root.join("link/../missing/../checkout");
-    let evidence = WorktreeTarget::capture(&path, true).expect("forgiving target");
-    assert_eq!(evidence.resolved, root.join("actual/checkout"));
+    let evidence = capture_target(&path, true).expect("forgiving target");
+    assert_eq!(evidence.resolved(), root.join("actual/checkout"));
     let interleaved = root.join("missing/../link/../checkout");
     assert_eq!(
-        WorktreeTarget::capture(&interleaved, true)
+        capture_target(&interleaved, true)
             .expect("interleaved symlink and parent")
-            .resolved,
+            .resolved(),
         root.join("actual/checkout")
     );
     std::fs::create_dir_all(root.join("elsewhere/nested")).expect("redirect target");
@@ -378,7 +420,7 @@ fn missing_worktree_suffix_keeps_existing_symlink_parent_semantics() {
         .expect("redirect absent component");
     assert_ne!(
         evidence,
-        WorktreeTarget::capture(&path, true).expect("redirected target")
+        capture_target(&path, true).expect("redirected target")
     );
 }
 
@@ -390,13 +432,13 @@ fn cancelling_missing_suffix_resolves_later_existing_symlink() {
     std::fs::create_dir(root.join("actual")).expect("target");
     std::os::unix::fs::symlink(root.join("actual"), root.join("link")).expect("link");
     let path = root.join("missing/../link/checkout");
-    let evidence = WorktreeTarget::capture(&path, true).expect("forgiving target");
-    assert_eq!(evidence.resolved, root.join("actual/checkout"));
+    let evidence = capture_target(&path, true).expect("forgiving target");
+    assert_eq!(evidence.resolved(), root.join("actual/checkout"));
     std::fs::rename(root.join("actual"), root.join("saved")).expect("move target");
     std::fs::create_dir(root.join("actual")).expect("replace target");
     assert_ne!(
         evidence,
-        WorktreeTarget::capture(&path, true).expect("replacement target")
+        capture_target(&path, true).expect("replacement target")
     );
 }
 
@@ -407,7 +449,7 @@ fn missing_worktree_target_rejects_dangling_symlink_suffix() {
     let root = temp.path().canonicalize().expect("root");
     let link = root.join("dangling");
     std::os::unix::fs::symlink(root.join("missing"), &link).expect("link");
-    assert!(WorktreeTarget::capture(&link.join("checkout"), true).is_err());
+    assert!(capture_target(&link.join("checkout"), true).is_err());
 }
 
 #[test]
@@ -428,6 +470,9 @@ fn relative_missing_worktree_backlink_binds_absence_and_ancestor() {
             .expect("discover")
     );
     assert!(inventory.bind_worktree_targets(|_| None).is_err());
+    inventory
+        .resolve_worktree_targets()
+        .expect("resolution admitted");
     inventory
         .bind_worktree_targets(|_| Some(root.join("missing/deep")))
         .expect("admitted missing checkout");
@@ -462,17 +507,14 @@ fn relative_backlink_resolves_interleaved_missing_and_symlink_after_admission() 
             .expect("discover")
     );
     assert!(inventory.bind_worktree_targets(|_| None).is_err());
-    // The current general permission normalizer is lexical before resolving
-    // symlinks. It must not authorize Git's different interpretation.
+    inventory
+        .resolve_worktree_targets()
+        .expect("resolution admitted");
+    // A grant for the lexical interpretation of the original raw spelling
+    // cannot authorize Git's different component-wise result.
     assert!(
         inventory
-            .bind_worktree_targets(|path| {
-                talos_core::tool::normalize_authorized_path(
-                    &root,
-                    path.to_str().expect("UTF-8 fixture"),
-                )
-                .ok()
-            })
+            .bind_worktree_targets(|_| Some(root.join("checkout")))
             .is_err()
     );
     inventory
@@ -547,6 +589,9 @@ fn linked_worktree_common_refs_get_a_separate_frontier() {
             .discover_worktree_targets(&repo)
             .expect("raw targets")
     );
+    inventory
+        .resolve_worktree_targets()
+        .expect("resolution admitted");
     assert!(
         inventory
             .bind_worktree_targets(|path| path.canonicalize().ok())

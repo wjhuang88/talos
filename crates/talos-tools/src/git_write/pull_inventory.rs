@@ -8,8 +8,8 @@ use std::sync::{Arc, Mutex};
 
 use super::{GitToolError, snapshot::PathIdentity};
 
-/// Cumulative file-evidence allowance shared by every inventory in one Pull.
-/// Path traversal and transient handle accounting are separate remaining work.
+/// Cumulative file and pointer-resolution allowance for all Pull inventories.
+/// Directory evidence and full transient-resource accounting remain separate.
 #[derive(Clone, Debug)]
 pub(super) struct ReferenceBudget(Arc<Mutex<(usize, usize)>>);
 
@@ -20,6 +20,22 @@ impl Default for ReferenceBudget {
 }
 
 impl ReferenceBudget {
+    fn resolve(
+        &self,
+        path: &Path,
+        allow_missing: bool,
+    ) -> Result<super::pull_resolution::Resolution, GitToolError> {
+        let mut remaining = self.0.lock().map_err(|_| invalid())?;
+        let mut allowance = super::pull_resolution::Budget {
+            entries: remaining.0,
+            bytes: remaining.1,
+        };
+        let result =
+            super::pull_resolution::Resolution::capture(path, allow_missing, &mut allowance);
+        *remaining = (allowance.entries, allowance.bytes);
+        result
+    }
+
     fn capture(&self, path: &Path) -> Result<super::snapshot::RegularEvidence, GitToolError> {
         self.capture_limited(path, usize::MAX)
     }
@@ -54,65 +70,9 @@ pub(super) struct Inventory {
     directories: BTreeMap<PathBuf, Vec<PathBuf>>,
     alternates: Vec<(PathBuf, super::snapshot::RegularEvidence)>,
     references: Vec<(PathBuf, super::snapshot::RegularEvidence)>,
-    worktree_targets: BTreeMap<PathBuf, Option<WorktreeTarget>>,
+    worktree_targets: BTreeMap<PathBuf, Option<super::pull_resolution::Resolution>>,
     worktree_common_targets: BTreeSet<PathBuf>,
     worktree_reference_roots: BTreeSet<PathBuf>,
-}
-
-/// Resolution evidence for an existing target or a missing checkout suffix.
-/// Common directories still require an existing target before refs discovery.
-#[derive(Debug, PartialEq, Eq)]
-struct WorktreeTarget {
-    resolved: PathBuf,
-    ancestors: Vec<PathIdentity>,
-}
-
-impl WorktreeTarget {
-    fn capture(path: &Path, allow_missing: bool) -> Result<Self, GitToolError> {
-        let mut spelling = path.to_owned();
-        let mut ancestors = Vec::new();
-        'resolve: loop {
-            let mut ancestor = spelling.as_path();
-            let mut suffix = Vec::new();
-            let mut resolved = loop {
-                match ancestor.canonicalize() {
-                    Ok(resolved) => break resolved,
-                    Err(error) if allow_missing && error.kind() == std::io::ErrorKind::NotFound => {
-                        // A dangling link is not an absent checkout component.
-                        match std::fs::symlink_metadata(ancestor) {
-                            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-                            _ => return Err(invalid()),
-                        }
-                        match ancestor.components().next_back().ok_or_else(invalid)? {
-                            std::path::Component::Normal(name) => suffix.push(name.to_owned()),
-                            std::path::Component::ParentDir => suffix.push("..".into()),
-                            _ => return Err(invalid()),
-                        }
-                        ancestor = ancestor.parent().ok_or_else(invalid)?;
-                    }
-                    Err(_) => return Err(invalid()),
-                }
-            };
-            ancestors.push(PathIdentity::capture(ancestor).map_err(|_| invalid())?);
-            let mut remaining = suffix.into_iter().rev();
-            while let Some(name) = remaining.next() {
-                if name == ".." {
-                    // A cancelled missing component may expose an existing
-                    // symlink. Re-resolve before interpreting any later `..`.
-                    // Each pass removes a ParentDir; use a loop, not recursion.
-                    resolved.pop();
-                    resolved.extend(remaining);
-                    spelling = resolved;
-                    continue 'resolve;
-                }
-                resolved.push(name);
-            }
-            return Ok(Self {
-                resolved,
-                ancestors,
-            });
-        }
-    }
 }
 
 fn invalid() -> GitToolError {
@@ -209,7 +169,11 @@ impl Inventory {
             .keys()
             .cloned()
             .chain(self.pending.iter().cloned())
-            .chain(self.worktree_targets.keys().cloned())
+            .chain(
+                self.worktree_targets.values().filter_map(|target| {
+                    target.as_ref().map(|target| target.resolved().to_owned())
+                }),
+            )
             .collect()
     }
 
@@ -217,13 +181,16 @@ impl Inventory {
         self.pending.is_empty()
     }
 
-    /// Paths not covered by the bound metadata roots, plus raw pointer targets
-    /// whose approved normalization must be checked separately before binding.
+    /// External frontiers and resolved targets. Raw pointer spellings never
+    /// enter Path facets or the general lexical permission normalizer.
     pub(super) fn exact_paths(&self, gitdir: &Path, common: &Path) -> Vec<PathBuf> {
         self.paths()
             .into_iter()
             .filter(|path| {
-                self.worktree_targets.contains_key(path)
+                self.worktree_targets
+                    .values()
+                    .flatten()
+                    .any(|target| target.resolved() == path)
                     || (!path.starts_with(gitdir) && !path.starts_with(common))
             })
             .collect()
@@ -241,15 +208,8 @@ impl Inventory {
     }
 
     pub(super) fn revalidate(&self) -> Result<(), GitToolError> {
-        for (path, expected) in &self.worktree_targets {
-            if let Some(expected) = expected
-                && WorktreeTarget::capture(path, !self.worktree_common_targets.contains(path))
-                    .ok()
-                    .as_ref()
-                    != Some(expected)
-            {
-                return Err(invalid());
-            }
+        for target in self.worktree_targets.values().flatten() {
+            target.revalidate()?;
         }
         for (path, expected) in &self.visited {
             if &identity(path)? != expected {
@@ -420,31 +380,46 @@ impl Inventory {
         Ok(added)
     }
 
+    pub(super) fn has_worktree_targets(&self) -> bool {
+        !self.worktree_targets.is_empty()
+    }
+
+    /// Caller must consume a current prepared proof covering the dedicated
+    /// resolution capability before entering. No target content is read here.
+    pub(super) fn resolve_worktree_targets(&mut self) -> Result<bool, GitToolError> {
+        self.revalidate()?;
+        let mut discovered = false;
+        for (path, target) in &mut self.worktree_targets {
+            if target.is_none() {
+                *target = Some(
+                    self.reference_budget
+                        .resolve(path, !self.worktree_common_targets.contains(path))?,
+                );
+                discovered = true;
+            }
+        }
+        self.revalidate()?;
+        Ok(discovered)
+    }
+
     pub(super) fn bind_worktree_targets(
         &mut self,
         admitted: impl Fn(&Path) -> Option<PathBuf>,
     ) -> Result<bool, GitToolError> {
-        // Check all admissions before touching any newly discovered target.
+        // Resolution is separately authorized; binding only consumes exact
+        // resolved target grants. Never send raw spellings to a normalizer.
         let mappings = self
             .worktree_targets
-            .keys()
-            .map(|path| {
-                admitted(path)
-                    .map(|normalized| (path.clone(), normalized))
-                    .ok_or_else(invalid)
+            .iter()
+            .map(|(raw, target)| {
+                let resolved = target.as_ref().ok_or_else(invalid)?.resolved();
+                let normalized = admitted(resolved).ok_or_else(invalid)?;
+                if normalized != resolved {
+                    return Err(invalid());
+                }
+                Ok((raw.clone(), normalized))
             })
             .collect::<Result<BTreeMap<_, _>, _>>()?;
-        self.revalidate()?;
-        for (path, identity) in &mut self.worktree_targets {
-            let current =
-                WorktreeTarget::capture(path, !self.worktree_common_targets.contains(path))?;
-            if current.resolved != mappings[path] {
-                return Err(invalid());
-            }
-            if identity.is_none() {
-                *identity = Some(current);
-            }
-        }
         self.revalidate()?;
         // Resolving a common directory does not grant access to its reference
         // store. Publish only names here; the next advance requires fresh grants
