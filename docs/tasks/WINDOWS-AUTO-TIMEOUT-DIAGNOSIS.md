@@ -1215,3 +1215,86 @@ installed-module collection and unchanged37line705job; only same3diagnosticfiles
 I301/I304/I305 closed slices stay closed; #717/Search residuals retain their owners. Rust1.99.0,
 Auto15s/cleanup10s/tool120s/evaluator5s and all current-main assertions stay. No retry-to-green,
 ignored test, threshold relaxation, merge/release or overall timeout-root closure authorization.
+
+## CI3229 Two Failures And Evaluator-Entry Probes — 2026-10-18
+
+CI3229/run39096530310 exact1cfdc8b5c4ecaec402570a8ccfbdfb881bda573d attempt1 FAILED.
+Six ordinary jobs passed; BOTH diagnostic jobs failed. Each60process phase completed with
+1109passed/1failed/0ignored, combined120processes/2218passed/2failed. No retry replaces either.
+All6normalized source hashes/12rawWindows restoration receipts match reviewed production.
+Artifacts expire2026-11-01; ZIP SHA256/CRC/extracted bytes independently verified:
+
+- baseline12125251606 (65files):8120ffa00c22a5cb28beb743ff1327ac2ef65866fd53493a3f54c5d1e5d80a55;
+- instrumented12125255614 (70files):0741a6c0b77275de4c2ac8508ee02bd5fb0fe4ea50abdfd6dfc98197bc549fe8.
+
+Failure1: baseline-suite-first-1 original Auto15s watchdog; decision127.6654ms/request170.825ms,
+assessment/report present, no result/approval/explanation. Original auto_tests.rs152 assertion
+fails; baseline provides no owned-child timing attribution.
+Failure2: instrumented-suite-parallel-5 production_evaluation_uses_authorized_artifacts_and_rejects_stale_or_superseded_results
+fails actual observations reach assessor:Elapsed(()). Source verifies the EXISTING10s
+entered.notified() assertion (original runtime_host.rs2573–2575; instrumented2616). This is NOT
+the historical evaluator composite5s timeout or evaluator30s deadline. Preserve all three facts;
+no threshold is changed or conflated.
+
+All60 identity/lifetime pairs are intact; later selector ranks59/59valid/0invalid and selects
+parallel5 parent2032/child9024/handle592/waiter144. Both later event receipts match creation
+134367709597017054/exit134367709642751378. Its Auto test SUCCEEDS at5.7671577s. Same process
+does not make that child part of the failed evaluator test's execution chain.
+
+| Recorded later-child interval | ms |
+|---|---:|
+| Creation to exit | 4573.4324 |
+| Creation to console40961 | 52.5242 |
+| Console40961 to first600 | 4448.7875 |
+| Six600 span | 1.1222 |
+| Last600 to400 | 6.5160 |
+| 400 to40962 | 1.0413 |
+| 40962 to403 | 59.5547 |
+| 403 to exit | 3.8865 |
+
+Exit to native observation7.5488ms; exit to waitreturn7.8211ms; subsequent pipejoin0.1316ms.
+Four early CPU samples remain0.09375s/read96753bytes; otherops894to931 initially advance then
+plateau. FinalCPU0.25s/read2137062bytes advance. Thus most observed child lifetime is between
+logged console markers; this does not identify the CPU-off cause, scheduler, Defender, disk,
+exclusive initialization work or the evaluator failure. Firstchild9380 remains valid at
+2302.2469ms: creation to40961 1105.8259ms,40961tofirst600695.5073ms. Distinct phase distributions
+must not be collapsed into one startup cause. Independent Agent review APPROVE bounded evidence,
+#705 comment6245924181; shared-account review is not distinct human approval.
+
+ObservedArtifactAssessor calls notify_one after its artifact assertions. An unsatisfied entered
+gate does not establish a lost notification. Evidence preparation can return unavailable before
+assessor dispatch; existing probes lack scenario/phase attribution. Next explicit hypothesis:
+the10s failure either precedes dispatch (delayed phase or unavailable result), enters an assessor
+but fails before notify, or reaches notification yet the observer gate still times out.
+
+Add temporary HOST-overlay markers only: fixed current/stale/new-submit/restart scenario,
+Evaluate sent/received/busy/missing-service/future-polled, revision enter/return/unavailable,
+context unavailable, artifact capture enter/return/unavailable, service enter/report/failure,
+assessor entry BEFORE original assertions, notification return, gate begin/satisfied/timeout.
+Target fixture uses current_thread; correlate intact fixed-scenario markers by PID/Rust thread
+and sequence, never process identity alone. Missing/interleaved or migrating-thread markers
+remain ambiguous; no scenario is reconstructed. No workspace, artifact, request/claim IDs,
+goal, content, error body or verdict data is logged. Fixed-stage strings plus time/PID/thread
+use a preformatted newline-fenced stderr write; no OS atomicity guarantee follows.
+Service report/failure marks service return BEFORE later subject validation; it is not final
+delivery success. Some early-return/overflow/output-drop paths remain unmarked, so absent
+downstream markers do not identify a unique cause.
+
+No await, branch result, existing assertion, notifier call or time budget is added/removed by
+these markers. Await-count guard compares before/after this increment (existing heartbeat
+already adds one await). Exactprior-overlay comparison preserves all assert/expect counts and
+Duration secs/millis tokens. Other5generated Rust overlays remain byteidentical1cfdc8b against
+the SAME current sources. Existing sampling/selection/queries/caps/restoration stay unchanged;
+scalar-only diagnostic logging has observation overhead and is not an uninstrumented result.
+
+Local selftest/classifier14/text23/claims0warnings/whitespace pass. Local Cargo is absent; no fresh
+pinnedRust/fullpreflight success. Exactcandidate independent technical/security/evidence review
+and native CI remain required. Currentmain dea3edccb163420806e08ddeef51c65f977bac59 includes
+separate Search#733; preserve all eight incoming files exactly. Same3diagnosticfiles versusmain;
+no Search/PSS/I305 takeover, native API, dependency/lock/toolchain, production behavior, ignored
+test, prewarm, retry-to-green or relaxed threshold. Rust1.99.0 and all original current-main
+assertions/budgets remain, including evaluator composite5s, assessor gate10s, Auto15s,
+cleanup10s/tool120s. All earlier failures/Plugin unknowns and closed I301/I304/I305 slices remain.
+#705 OPEN/UNMERGED; no merge/release or overall timeout-root closure authorization.
+Fresh projectgovernance FAILED1error/0warnings because missingcargo prevents SQLite metadata;
+delivery12fixtures passed. Retain this local environment failure explicitly.

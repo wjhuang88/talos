@@ -630,6 +630,65 @@ fn windows_auto_identity_receipt(receipt: String) {
 
 '''
     host = replace_once(host, "#[allow(clippy::too_many_arguments)]\nasync fn run_host(", host_helper + "#[allow(clippy::too_many_arguments)]\nasync fn run_host(")
+    # Attribute the new assessor-entry timeout independently of concurrent Auto children.
+    evaluation_awaits = host.count(".await")
+    evaluation_helper = '''fn windows_auto_evaluation_stage(stage: &str) {
+    use std::io::Write as _;
+    let record = format!("\\nWINDOWS_AUTO_DIAG time={:?} pid={} thread={:?} stage={}\\n",
+        std::time::SystemTime::now(), std::process::id(), std::thread::current().id(), stage);
+    let _ = std::io::stderr().lock().write_all(record.as_bytes());
+}
+
+'''
+    host = replace_once(host, "fn windows_auto_host_stage(stage: &str) {", evaluation_helper + "fn windows_auto_host_stage(stage: &str) {")
+    begin = host.index("    struct ObservedArtifactAssessor {")
+    end = host.index("    async fn next_production_output(", begin)
+    assessor = host[begin:end]
+    assessor = replace_once(assessor, "            use talos_core::evaluation::{", '            windows_auto_evaluation_stage("eval_prod_assessor_enter");\n            use talos_core::evaluation::{')
+    assessor = replace_once(assessor, "            self.entered.notify_one();", '            self.entered.notify_one();\n            windows_auto_evaluation_stage("eval_prod_assessor_notified");')
+    host = host[:begin] + assessor + host[end:]
+    begin = host.index("    async fn production_evaluation_uses_authorized_artifacts_and_rejects_stale_or_superseded_results()")
+    end = host.index("    #[tokio::test", begin)
+    fixture = host[begin:end]
+    fixture = replace_once(fixture, '        for scenario in ["current", "stale", "new-submit", "restart"] {', '''        for scenario in ["current", "stale", "new-submit", "restart"] {
+            windows_auto_evaluation_stage(match scenario {
+                "current" => "eval_prod_case_current",
+                "stale" => "eval_prod_case_stale",
+                "new-submit" => "eval_prod_case_new_submit",
+                _ => "eval_prod_case_restart",
+            });''')
+    fixture = replace_once(fixture, '                .expect("evaluate");', '                .expect("evaluate");\n            windows_auto_evaluation_stage("eval_prod_request_sent");')
+    fixture = replace_once(fixture, '                tokio::time::timeout(std::time::Duration::from_secs(10), entered.notified())', '                windows_auto_evaluation_stage("eval_prod_assessor_gate_begin");\n                tokio::time::timeout(std::time::Duration::from_secs(10), entered.notified())')
+    fixture = replace_once(fixture, '                    .expect("actual observations reach assessor");', '                    .inspect_err(|_| windows_auto_evaluation_stage("eval_prod_assessor_gate_timeout"))\n                    .expect("actual observations reach assessor");\n                windows_auto_evaluation_stage("eval_prod_assessor_gate_satisfied");')
+    host = host[:begin] + fixture + host[end:]
+    begin = host.index("                    Some(RuntimeCommand::Evaluate(goal)) => {")
+    end = host.index("            event = handle.next_event() => {", begin)
+    evaluation = host[begin:end]
+    evaluation = replace_once(evaluation, "                    Some(RuntimeCommand::Evaluate(goal)) => {", '                    Some(RuntimeCommand::Evaluate(goal)) => {\n                        windows_auto_evaluation_stage("eval_prod_request_received");')
+    evaluation = replace_once(evaluation, "                        if evaluation.is_some() {", '                        if evaluation.is_some() {\n                            windows_auto_evaluation_stage("eval_prod_busy_skip");')
+    evaluation = replace_once(evaluation, '                            let reason = if evidence_source.is_none() {', '                            windows_auto_evaluation_stage("eval_prod_missing_source_or_service");\n                            let reason = if evidence_source.is_none() {')
+    evaluation = replace_once(evaluation, "                        evaluation = Some(Box::pin(async move {", '                        evaluation = Some(Box::pin(async move {\n                        windows_auto_evaluation_stage("eval_prod_future_polled");')
+    context_end = evaluation.index("                        let context = evaluation_context;")
+    context = evaluation[:context_end]
+    context = replace_once(context, "                            let workspace = match source.workspace_revision_async().await {", '''                            windows_auto_evaluation_stage("eval_prod_revision_enter");
+                            let workspace_result = source.workspace_revision_async().await;
+                            windows_auto_evaluation_stage("eval_prod_revision_return");
+                            let workspace = match workspace_result {''')
+    context = replace_once(context, "                                    return RuntimeOutput::EvaluationUnavailable { reason: error };", '                                    windows_auto_evaluation_stage("eval_prod_revision_unavailable");\n                                    return RuntimeOutput::EvaluationUnavailable { reason: error };')
+    context = replace_once(context, "                                    return RuntimeOutput::EvaluationUnavailable { reason: error.to_string() };", '                                    windows_auto_evaluation_stage("eval_prod_context_unavailable");\n                                    return RuntimeOutput::EvaluationUnavailable { reason: error.to_string() };')
+    evaluation = context + evaluation[context_end:]
+    evaluation = replace_once(evaluation, "                                let snapshot = match if let Some(registry) = artifact_registry {", '                                windows_auto_evaluation_stage("eval_prod_capture_enter");\n                                let snapshot_result = if let Some(registry) = artifact_registry {')
+    evaluation = replace_once(evaluation, "                                } {\n                                    Ok(snapshot) => snapshot,", '                                };\n                                windows_auto_evaluation_stage("eval_prod_capture_return");\n                                let snapshot = match snapshot_result {\n                                    Ok(snapshot) => snapshot,')
+    evaluation = replace_once(evaluation, "                                    Err(error) => return RuntimeOutput::EvaluationUnavailable { reason: error },\n                                };\n                                let mut result = service", '                                    Err(error) => { windows_auto_evaluation_stage("eval_prod_capture_unavailable"); return RuntimeOutput::EvaluationUnavailable { reason: error }; },\n                                };\n                                windows_auto_evaluation_stage("eval_prod_service_enter");\n                                let mut result = service')
+    evaluation = replace_once(evaluation, "                                    .evaluate_snapshot(source.session_id(), context.claim(), &snapshot)\n                                    .await;", '''                                    .evaluate_snapshot(source.session_id(), context.claim(), &snapshot)
+                                    .await;
+                                windows_auto_evaluation_stage(match &result {
+                                    talos_runtime::EvaluatorOutcome::Report { .. } => "eval_prod_service_report",
+                                    talos_runtime::EvaluatorOutcome::Failure(_) => "eval_prod_service_failure",
+                                });''')
+    host = host[:begin] + evaluation + host[end:]
+    if host.count(".await") != evaluation_awaits:
+        raise ValueError("evaluation probes must preserve await count")
     host = replace_once(host, "    impl Drop for EvaluationDropReceipt {\n        fn drop(&mut self) {\n            self.0.notify_one();", '    impl Drop for EvaluationDropReceipt {\n        fn drop(&mut self) {\n            windows_auto_host_stage("eval_assessor_drop");\n            self.0.notify_one();')
     host = replace_once(host, "            let _receipt = EvaluationDropReceipt(self.dropped.clone());\n            self.started.notify_one();", '            let _receipt = EvaluationDropReceipt(self.dropped.clone());\n            windows_auto_host_stage("eval_assessor_enter");\n            self.started.notify_one();')
     begin = host.index("    async fn paused_evaluation_does_not_block_interrupt_or_shutdown()")
@@ -930,6 +989,15 @@ def main() -> int:
         assert "Duration::from_secs(10)" in patched[AUTO]
         assert patched[BOUNDARY].count("windows_auto_probe(") >= 10
         assert patched[HOST].count("stage=host_heartbeat") == 1
+        for stage in ("case_current", "case_stale", "case_new_submit", "case_restart",
+                      "request_sent", "request_received", "future_polled", "revision_enter",
+                      "revision_return", "revision_unavailable", "context_unavailable",
+                      "capture_enter", "capture_return", "capture_unavailable", "service_enter",
+                      "service_report", "service_failure", "assessor_enter", "assessor_notified",
+                      "assessor_gate_begin", "assessor_gate_timeout", "assessor_gate_satisfied"):
+            assert patched[HOST].count('"eval_prod_' + stage + '"') == 1
+        assert patched[HOST].count('expect("actual observations reach assessor")') == originals[HOST].count('expect("actual observations reach assessor")') == 1
+        assert "Duration::from_secs(10), entered.notified()" in patched[HOST]
         assert "WaitForSingleObject(process, 1_000)" in patched[BOUNDARY]
         assert "observed != windows_sys::Win32::Foundation::WAIT_TIMEOUT" in patched[BOUNDARY]
         assert "GetProcessTimes(process," in patched[BOUNDARY]
