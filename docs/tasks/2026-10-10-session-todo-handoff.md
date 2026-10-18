@@ -3840,3 +3840,18 @@ by separate exact target Read approval. ADR-089 records acceptance without
 enabling the capability or waiving denial/drift/budget/security-review gates.
 The existing unbounded resolver must be replaced before consuming this scope;
 production Pull remains disabled and T7 remains Active.
+
+Legacy metadata prefix approval frontier (2026-10-18): selected legacy
+candidates now publish the modules container and each enclosing module-name
+prefix, plus its HEAD/objects/refs, before any future collision validation.
+Candidate construction remains filesystem-free, with invalid lexical names
+producing no prefix resources. The real permission-pipeline regression checks
+stale approval and individual token removal for every prefix resource while
+preserving populated-child discovery. Locked focused test passes 1/1, Pull
+tests pass 110/110, all-feature/all-target Clippy and formatting pass. Logs:
+/tmp/talos-i300-prefix-frontier-{tests,pull-tests,clippy,governance}.log.
+This only publishes the read frontier; identity/alias binding, collision checks,
+configured mapping and metadata-only fallback execution remain open. No new
+filesystem reads or production Pull activation are introduced.
+Independent review found no blocker in this frontier-only change; it explicitly
+retains prefix identity, alias and enclosing-repository validation as residuals.

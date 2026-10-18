@@ -45,6 +45,30 @@ pub(super) fn legacy_metadata_candidate(
     Some(common_dir.join("modules").join(name))
 }
 
+/// Exact resources needed to inspect a legacy candidate's enclosing module
+/// names. No resource is opened here. Each prefix must be identity-bound before
+/// checking whether its HEAD/objects/refs make it an enclosing Git repository.
+pub(super) fn legacy_metadata_prefix_reads(
+    common_dir: &std::path::Path,
+    name: &str,
+) -> Vec<std::path::PathBuf> {
+    let Some(candidate) = legacy_metadata_candidate(common_dir, name) else {
+        return Vec::new();
+    };
+    let modules = common_dir.join("modules");
+    let mut prefix = modules.clone();
+    let mut reads = vec![modules];
+    for component in name.split('/') {
+        prefix.push(component);
+        if prefix == candidate {
+            break;
+        }
+        reads.push(prefix.clone());
+        reads.extend(["HEAD", "objects", "refs"].map(|leaf| prefix.join(leaf)));
+    }
+    reads
+}
+
 /// Validate exact batch-check responses without peeling tags or interpreting a
 /// failed Git invocation as a missing object. Presence is only a transient result.
 pub(super) fn commit_batch_output(objects: &[String], output: &[u8]) -> Result<bool, GitToolError> {
