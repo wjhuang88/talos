@@ -1,5 +1,8 @@
 //! Shared non-interactive process boundary for command tools.
 
+#[cfg(all(windows, feature = "git"))]
+pub(crate) mod windows_foreground;
+
 #[cfg(any(windows, test))]
 mod windows_command_line;
 
@@ -22,6 +25,7 @@ use talos_core::background_job::{
 };
 #[cfg(all(unix, feature = "shell"))]
 use tokio::io::{AsyncRead, AsyncReadExt};
+#[cfg(any(unix, feature = "shell"))]
 use tokio::process::Command;
 
 #[cfg(windows)]
@@ -785,7 +789,9 @@ fn create_windows_job_native(
             }
         };
     }
-    let result = (|| unsafe {
+    // Keep raw owners in this scope so an unwind takes the same cleanup path
+    // as an ordinary launch failure. Attribute backing storage also stays live.
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| unsafe {
         #[cfg(test)]
         observe!("before_pipe");
         if CreatePipe(&mut out_read, &mut out_write, &security, 0) == 0 {
@@ -839,11 +845,13 @@ fn create_windows_job_native(
         let _ = InitializeProcThreadAttributeList(std::ptr::null_mut(), 1, 0, &mut attr_size);
         let attr_words = attr_size.div_ceil(size_of::<usize>());
         attr_storage = vec![0usize; attr_words];
-        attrs = attr_storage.as_mut_ptr()
+        let pending_attrs = attr_storage.as_mut_ptr()
             as windows_sys::Win32::System::Threading::LPPROC_THREAD_ATTRIBUTE_LIST;
-        if InitializeProcThreadAttributeList(attrs, 1, 0, &mut attr_size) == 0 {
+        if InitializeProcThreadAttributeList(pending_attrs, 1, 0, &mut attr_size) == 0 {
             return Err(last_windows_error("InitializeProcThreadAttributeList"));
         }
+        // Publish only initialized lists to the shared failure cleanup.
+        attrs = pending_attrs;
         #[cfg(test)]
         {
             attrs_initialized = true;
@@ -935,10 +943,12 @@ fn create_windows_job_native(
         out_write = std::ptr::null_mut();
         CloseHandle(err_write);
         err_write = std::ptr::null_mut();
-        let stdout = tokio::fs::File::from_std(std::fs::File::from_raw_handle(out_read as _));
+        let stdout = std::fs::File::from_raw_handle(out_read as _);
         out_read = std::ptr::null_mut();
-        let stderr = tokio::fs::File::from_std(std::fs::File::from_raw_handle(err_read as _));
+        let stdout = tokio::fs::File::from_std(stdout);
+        let stderr = std::fs::File::from_raw_handle(err_read as _);
         err_read = std::ptr::null_mut();
+        let stderr = tokio::fs::File::from_std(stderr);
         Ok(WindowsLaunchHandles {
             job,
             process,
@@ -946,7 +956,8 @@ fn create_windows_job_native(
             stderr,
             stdin: command.input.into_writer(),
         })
-    })();
+    }))
+    .unwrap_or_else(|_| Err("Windows native launch panicked; cleanup required".to_owned()));
     if result.is_err() {
         #[cfg(test)]
         observe!("before_cleanup");

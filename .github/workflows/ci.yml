@@ -252,6 +252,12 @@ jobs:
         shell: pwsh
         run: |
           $tests = @(
+            'process_boundary::windows_foreground::tests::panicked_io_worker_never_confirms_cleanup',
+            'process_boundary::windows_foreground::tests::ordinary_io_error_has_completed_resource_ownership',
+            'process_boundary::windows_foreground::tests::dropped_reservation_is_sticky_but_other_operations_are_isolated',
+            'process_boundary::windows_foreground::tests::foreground_finite_binary_input_reaches_eof_and_returns_exact_output',
+            'process_boundary::windows_foreground::tests::foreground_timeout_confirms_job_and_io_cleanup',
+            'process_boundary::windows_foreground::tests::dropped_foreground_wait_keeps_cleanup_owned',
             'git::git_write::prepared_add::tests::windows_program_guard_allows_real_git_startup',
             'git::git_write::prepared_add::tests::program_evidence_retains_windows_replacement_guard',
             'git::git_write::snapshot::tests::path_identity_retains_leaf_and_ancestor_identity',

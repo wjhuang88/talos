@@ -1,5 +1,10 @@
 //! Git write tools — host-git-backed operations (add, commit, push, pull, checkout).
 
+#[cfg(windows)]
+use crate::process_boundary::windows_foreground::{OwnedCommandExecutor, OwnedCommandOperation};
+#[cfg(unix)]
+use talos_sandbox::{OwnedCommandExecutor, OwnedCommandOperation};
+
 use std::path::{Component, Path, PathBuf};
 #[cfg(not(unix))]
 use std::process::Stdio;
@@ -539,23 +544,23 @@ pub struct GitAddInput {
 
 pub struct GitAddTool {
     workspace_root: PathBuf,
-    #[cfg(unix)]
-    executor: std::sync::Arc<talos_sandbox::OwnedCommandExecutor>,
+    #[cfg(any(unix, windows))]
+    executor: std::sync::Arc<OwnedCommandExecutor>,
 }
 
 impl GitAddTool {
     pub fn new(workspace_root: PathBuf) -> Self {
         Self {
             workspace_root,
-            #[cfg(unix)]
-            executor: std::sync::Arc::new(talos_sandbox::OwnedCommandExecutor::default()),
+            #[cfg(any(unix, windows))]
+            executor: std::sync::Arc::new(OwnedCommandExecutor::default()),
         }
     }
 }
 
 #[async_trait]
 impl AgentTool for GitAddTool {
-    #[cfg(unix)]
+    #[cfg(any(unix, windows))]
     fn cleanup_receipt(&self) -> Option<std::sync::Arc<dyn talos_core::tool::ToolCleanupOwner>> {
         Some(self.executor.clone())
     }
@@ -585,7 +590,7 @@ impl AgentTool for GitAddTool {
     ) -> Result<Option<Box<dyn talos_core::tool::PreparedNormalToolInvocation>>, String> {
         prepared_add::AddPlan::prepare(&self.workspace_root, input, provenance)
             .map(|plan| {
-                #[cfg(unix)]
+                #[cfg(any(unix, windows))]
                 let plan = plan.bind_operation(self.executor.operation());
                 Some(Box::new(plan) as Box<dyn talos_core::tool::PreparedNormalToolInvocation>)
             })
@@ -627,23 +632,23 @@ pub struct GitCommitInput {
 
 pub struct GitCommitTool {
     workspace_root: PathBuf,
-    #[cfg(unix)]
-    executor: std::sync::Arc<talos_sandbox::OwnedCommandExecutor>,
+    #[cfg(any(unix, windows))]
+    executor: std::sync::Arc<OwnedCommandExecutor>,
 }
 
 impl GitCommitTool {
     pub fn new(workspace_root: PathBuf) -> Self {
         Self {
             workspace_root,
-            #[cfg(unix)]
-            executor: std::sync::Arc::new(talos_sandbox::OwnedCommandExecutor::default()),
+            #[cfg(any(unix, windows))]
+            executor: std::sync::Arc::new(OwnedCommandExecutor::default()),
         }
     }
 }
 
 #[async_trait]
 impl AgentTool for GitCommitTool {
-    #[cfg(unix)]
+    #[cfg(any(unix, windows))]
     fn cleanup_receipt(&self) -> Option<std::sync::Arc<dyn talos_core::tool::ToolCleanupOwner>> {
         Some(self.executor.clone())
     }
@@ -673,7 +678,7 @@ impl AgentTool for GitCommitTool {
     ) -> Result<Option<Box<dyn talos_core::tool::PreparedNormalToolInvocation>>, String> {
         prepared_add::AddPlan::prepare_commit(&self.workspace_root, input, provenance)
             .map(|plan| {
-                #[cfg(unix)]
+                #[cfg(any(unix, windows))]
                 let plan = plan.bind_operation(self.executor.operation());
                 Some(Box::new(plan) as Box<dyn talos_core::tool::PreparedNormalToolInvocation>)
             })
@@ -713,16 +718,16 @@ pub struct GitPushInput {
 
 pub struct GitPushTool {
     workspace_root: PathBuf,
-    #[cfg(unix)]
-    executor: std::sync::Arc<talos_sandbox::OwnedCommandExecutor>,
+    #[cfg(any(unix, windows))]
+    executor: std::sync::Arc<OwnedCommandExecutor>,
 }
 
 impl GitPushTool {
     pub fn new(workspace_root: PathBuf) -> Self {
         Self {
             workspace_root,
-            #[cfg(unix)]
-            executor: std::sync::Arc::new(talos_sandbox::OwnedCommandExecutor::default()),
+            #[cfg(any(unix, windows))]
+            executor: std::sync::Arc::new(OwnedCommandExecutor::default()),
         }
     }
     #[cfg(test)]
@@ -758,7 +763,7 @@ impl AgentTool for GitPushTool {
     fn nature(&self) -> ToolNature {
         ToolNature::Execute
     }
-    #[cfg(unix)]
+    #[cfg(any(unix, windows))]
     fn cleanup_receipt(&self) -> Option<std::sync::Arc<dyn talos_core::tool::ToolCleanupOwner>> {
         Some(self.executor.clone())
     }
@@ -769,7 +774,7 @@ impl AgentTool for GitPushTool {
     ) -> Result<Option<Box<dyn talos_core::tool::PreparedNormalToolInvocation>>, String> {
         prepared_add::AddPlan::prepare_push(&self.workspace_root, input, provenance)
             .map(|plan| {
-                #[cfg(unix)]
+                #[cfg(any(unix, windows))]
                 let plan = plan.bind_operation(self.executor.operation());
                 Some(Box::new(plan) as Box<dyn talos_core::tool::PreparedNormalToolInvocation>)
             })
@@ -792,16 +797,16 @@ pub struct GitPullInput {
 
 pub struct GitPullTool {
     workspace_root: PathBuf,
-    #[cfg(unix)]
-    executor: std::sync::Arc<talos_sandbox::OwnedCommandExecutor>,
+    #[cfg(any(unix, windows))]
+    executor: std::sync::Arc<OwnedCommandExecutor>,
 }
 
 impl GitPullTool {
     pub fn new(workspace_root: PathBuf) -> Self {
         Self {
             workspace_root,
-            #[cfg(unix)]
-            executor: std::sync::Arc::new(talos_sandbox::OwnedCommandExecutor::default()),
+            #[cfg(any(unix, windows))]
+            executor: std::sync::Arc::new(OwnedCommandExecutor::default()),
         }
     }
 }
@@ -826,7 +831,7 @@ impl AgentTool for GitPullTool {
         ToolFamily::Git
     }
 
-    #[cfg(unix)]
+    #[cfg(any(unix, windows))]
     fn cleanup_receipt(&self) -> Option<std::sync::Arc<dyn talos_core::tool::ToolCleanupOwner>> {
         Some(self.executor.clone())
     }
@@ -838,7 +843,7 @@ impl AgentTool for GitPullTool {
     ) -> Result<Option<Box<dyn talos_core::tool::PreparedNormalToolInvocation>>, String> {
         prepared_add::AddPlan::prepare_pull(&self.workspace_root, input, provenance)
             .map(|plan| {
-                #[cfg(unix)]
+                #[cfg(any(unix, windows))]
                 let plan = plan.bind_operation(self.executor.operation());
                 Some(Box::new(plan) as Box<dyn talos_core::tool::PreparedNormalToolInvocation>)
             })
@@ -908,16 +913,16 @@ pub struct GitCheckoutInput {
 
 pub struct GitCheckoutTool {
     workspace_root: PathBuf,
-    #[cfg(unix)]
-    executor: std::sync::Arc<talos_sandbox::OwnedCommandExecutor>,
+    #[cfg(any(unix, windows))]
+    executor: std::sync::Arc<OwnedCommandExecutor>,
 }
 
 impl GitCheckoutTool {
     pub fn new(workspace_root: PathBuf) -> Self {
         Self {
             workspace_root,
-            #[cfg(unix)]
-            executor: std::sync::Arc::new(talos_sandbox::OwnedCommandExecutor::default()),
+            #[cfg(any(unix, windows))]
+            executor: std::sync::Arc::new(OwnedCommandExecutor::default()),
         }
     }
 }
@@ -942,7 +947,7 @@ impl AgentTool for GitCheckoutTool {
         ToolFamily::Git
     }
 
-    #[cfg(unix)]
+    #[cfg(any(unix, windows))]
     fn cleanup_receipt(&self) -> Option<std::sync::Arc<dyn talos_core::tool::ToolCleanupOwner>> {
         Some(self.executor.clone())
     }
@@ -953,7 +958,7 @@ impl AgentTool for GitCheckoutTool {
     ) -> Result<Option<Box<dyn talos_core::tool::PreparedNormalToolInvocation>>, String> {
         prepared_add::AddPlan::prepare_checkout(&self.workspace_root, input, provenance)
             .map(|plan| {
-                #[cfg(unix)]
+                #[cfg(any(unix, windows))]
                 let plan = plan.bind_operation(self.executor.operation());
                 Some(Box::new(plan) as Box<dyn talos_core::tool::PreparedNormalToolInvocation>)
             })

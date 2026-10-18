@@ -4183,3 +4183,29 @@ no blocker; early-error local stdin closure precedes outer native cleanup, while
 the attribute-list backing buffer still outlives deletion. Git-only Windows
 cross-check, all-feature/all-target locked Clippy, project governance and claim
 validators pass. Native failure/release evidence and foreground integration remain.
+
+### Windows foreground integration checkpoint (2026-10-18)
+
+The foreground executor now reuses the assigned-before-resume native Job launch
+boundary, retaining IO workers through cancellation/timeout and requiring Job
+termination plus joined IO before confirming cleanup. IO worker panics and launch
+failures produce sticky unconfirmed receipts. Native launch panics take the same
+raw-owner cleanup path; only initialized attribute lists enter that cleanup.
+Tests live separately in `process_boundary/windows_foreground_tests.rs`. Windows
+CI explicitly requires six named lifecycle/finite-input/timeout/cancellation
+regressions. These tests still require Windows compilation and execution.
+
+Evidence correction: earlier Git-only Windows checks excluded the native module
+through `lib.rs` cfg. The corrected gate now compiles the actual foreground/native
+Job code. Locked Windows GNU library checking passes with unused fallback and
+background-helper warnings; macOS locked all-feature/all-target Clippy passes.
+Neither result is Windows runtime evidence. The non-Unix preparation refusal stays
+in place until runtime/failure-path validation and final review are complete.
+T7 remains Active; this checkpoint is not feature delivery or handoff completion.
+
+The standard release preflight exited 0 for this candidate, including locked
+workspace check, Clippy, tests and the external SDK fixture; log:
+`/tmp/talos-i300-foreground-preflight.log`. Protected native inventory now includes
+`windows_foreground.rs`, with updated baselines after independent protected-source
+review. Its three mutation/baseline tests pass. No Windows runtime, exact-head CI
+or merged delivery is claimed.
