@@ -51,10 +51,11 @@ fn alternates_share_reference_allowance_and_rebinding_does_not_recharge() {
         if name == "parent" {
             std::fs::write(root.join("HEAD"), b"aaaa\n").expect("reference");
         }
-        let mut inventory = Inventory::with_reference_budget(&root, &root, budget.clone());
+        let mut inventory = Inventory::new(&root, &root);
         while !inventory.complete() {
             inventory.advance(|_| true).expect("frontier");
         }
+        inventory.reference_budget = budget.clone();
         if name == "parent" {
             inventory
                 .bind_references(&root, &root)
@@ -79,10 +80,11 @@ fn rejected_nonempty_alternate_consumes_shared_allowance() {
     std::fs::create_dir_all(root.join("objects/info")).expect("objects");
     std::fs::write(root.join("objects/info/alternates"), b"external\n").expect("alternate");
     let budget = ReferenceBudget(Arc::new(Mutex::new((2, 1024 * 1024))));
-    let mut inventory = Inventory::with_reference_budget(&root, &root, budget.clone());
+    let mut inventory = Inventory::new(&root, &root);
     while !inventory.complete() {
         inventory.advance(|_| true).expect("frontier");
     }
+    inventory.reference_budget = budget.clone();
     assert!(inventory.bind_alternates(&root, &root).is_err());
     assert_eq!(*budget.0.lock().expect("budget"), (1, 1024 * 1024 - 9));
 }
@@ -97,10 +99,11 @@ fn reference_allowance_is_shared_across_inventories_and_not_reset_by_rebinding()
         let root = base.join(name);
         std::fs::create_dir(&root).expect("repository");
         std::fs::write(root.join("HEAD"), b"aaaa\n").expect("reference");
-        let mut inventory = Inventory::with_reference_budget(&root, &root, budget.clone());
+        let mut inventory = Inventory::new(&root, &root);
         while !inventory.complete() {
             inventory.advance(|_| true).expect("admitted frontier");
         }
+        inventory.reference_budget = budget.clone();
         inventories.push((root, inventory));
     }
     let (root, parent) = &mut inventories[0];
@@ -115,10 +118,11 @@ fn reference_allowance_is_shared_across_inventories_and_not_reset_by_rebinding()
     // Dropping an inventory does not refund cumulative discovery work.
     drop(inventories);
     let root = base.join("parent");
-    let mut replacement = Inventory::with_reference_budget(&root, &root, budget);
+    let mut replacement = Inventory::new(&root, &root);
     while !replacement.complete() {
         replacement.advance(|_| true).expect("replacement frontier");
     }
+    replacement.reference_budget = budget;
     assert!(replacement.bind_references(&root, &root).is_err());
 }
 
@@ -143,7 +147,7 @@ fn directory_revalidation_compares_the_retained_set_without_rebaselining() {
     for name in ["a", "b", "c"] {
         std::fs::write(root.join(name), b"contents").expect("entry");
     }
-    let retained = children(&root).expect("capture names");
+    let retained = children(&root, &ReferenceBudget::default()).expect("capture names");
     revalidate_children(&root, &retained).expect("same set");
     std::fs::remove_file(root.join("b")).expect("remove entry");
     assert!(revalidate_children(&root, &retained).is_err());
@@ -153,7 +157,10 @@ fn directory_revalidation_compares_the_retained_set_without_rebaselining() {
     std::fs::write(root.join("b"), b"contents").expect("restore name");
     revalidate_children(&root, &retained).expect("original set");
     // This checks names only; entry identities are validated independently.
-    assert_eq!(retained, children(&root).expect("unchanged baseline"));
+    assert_eq!(
+        retained,
+        children(&root, &ReferenceBudget::default()).expect("unchanged baseline")
+    );
 }
 
 #[test]
