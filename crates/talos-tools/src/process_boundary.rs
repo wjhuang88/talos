@@ -328,17 +328,52 @@ unsafe impl Sync for WindowsJobControl {}
 #[async_trait]
 impl BackgroundProcessControl for WindowsJobControl {
     async fn terminate(&self) -> Result<(), String> {
-        // A Job Object is the ownership boundary; terminating the job cannot leave descendants.
+        // Termination acceptance is not proof that all descendants have exited.
         let ok = unsafe { windows_sys::Win32::System::JobObjects::TerminateJobObject(self.job, 1) };
         if ok == 0 {
-            Err(last_windows_error("TerminateJobObject"))
-        } else {
-            Ok(())
+            return Err(last_windows_error("TerminateJobObject"));
+        }
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
+        loop {
+            if self.active_processes()? == 0 {
+                return Ok(());
+            }
+            if tokio::time::Instant::now() >= deadline {
+                return Err("Windows Job cleanup unconfirmed after 5 seconds".into());
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
         }
     }
 
     async fn force_terminate(&self) -> Result<(), String> {
         self.terminate().await
+    }
+}
+
+#[cfg(windows)]
+impl WindowsJobControl {
+    fn active_processes(&self) -> Result<u32, String> {
+        use windows_sys::Win32::System::JobObjects::{
+            JOBOBJECT_BASIC_ACCOUNTING_INFORMATION, JobObjectBasicAccountingInformation,
+            QueryInformationJobObject,
+        };
+        // SAFETY: this POD output is initialized, correctly sized, and exclusively
+        // borrowed. The Job handle remains owned by self for the entire query.
+        let mut accounting: JOBOBJECT_BASIC_ACCOUNTING_INFORMATION = unsafe { std::mem::zeroed() };
+        let ok = unsafe {
+            QueryInformationJobObject(
+                self.job,
+                JobObjectBasicAccountingInformation,
+                std::ptr::from_mut(&mut accounting).cast(),
+                std::mem::size_of_val(&accounting) as u32,
+                std::ptr::null_mut(),
+            )
+        };
+        if ok == 0 {
+            Err(last_windows_error("QueryInformationJobObject"))
+        } else {
+            Ok(accounting.ActiveProcesses)
+        }
     }
 }
 
