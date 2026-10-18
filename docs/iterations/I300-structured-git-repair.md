@@ -4375,8 +4375,12 @@ LLVM stripping ran out of disk and left the CLI binary as a non-executable
 3376-byte file; all 15 config_unset cases then failed to execute it. This is not
 a passing gate. Within prior cleanup authorization, removed rebuildable examples,
 incremental and the damaged CLI outputs, restoring approximately 1.8 GiB free.
-Approved external standard preflight now runs in session 75918, log
-`/tmp/talos-i300-resolution-stage-preflight-unsandboxed.log`.
+Approved external standard preflight session 75918 then exited 0, ending
+`release preflight: passed`; the standard locked workspace gate and external
+Runtime SDK fixture passed for implementation `36853e60`. Log:
+`/tmp/talos-i300-resolution-stage-preflight-unsandboxed.log`. Both governance
+validators also pass without warnings. Publish the reviewed candidate to #735
+for fresh native Windows validation; no platform completion is implied.
 
 Remaining: directory/path/identity/temporary peak quota unification, recursive
 Pull and final integration execution, real wrapper acceptance and native Windows
