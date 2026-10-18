@@ -10,7 +10,7 @@
 | Source Issue | #643 |
 | Depends on | Accepted ADR-085; SEARCH-001-B / #642 complete in #656; NET-001 boundary coordination |
 | Claim State | Claimed |
-| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 merged TLS/CONNECT subset; #716 merged bounded form/diagnostic stage at `b5b8241e`; #732 merged owned payload at `8fa2a50`; dormant parser candidate delivery tracked from #643; full C/EP and default activation Pending |
+| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 merged TLS/CONNECT subset; #716 merged bounded form/diagnostic stage at `b5b8241e`; #732 merged owned payload at `8fa2a50`; #733 merged Lite/HTML parsing at `dea3edc`; Instant Answer candidate delivery tracked from #643; full C/EP and default activation Pending |
 | Completion | Pending |
 
 ## Collaboration Claim
@@ -1208,3 +1208,59 @@ Shared Agent/account identity is not distinct-human approval. This dormant prere
 for stable candidate Review; exact-head protected review, all native CI and final CAS remain
 required before deliberate merge. The source Issue delivery index will name the actual candidate.
 Parent I293 remains Active/Claimed, Completion Pending; no release or default activation.
+
+## Merged Lite/HTML / Dormant Instant Answer Stage — 2026-10-18
+
+#733 merged as dea3edccb163420806e08ddeef51c65f977bac59, sourcehead3dce62bb/tree9a5382fb.
+CI3230/run39096940347 attempt1 all6jobs SUCCESS. Windows tools480/0failed/0ignored/0filtered,
+macOS tools478/0/0/0 include all12parser fixtures; original Unix socket/SDK2modes/fullpreflight
+and subsequent gates pass. Protected source review6245623527, final full-stage review/CAS6245774420
+and source delivery6245778297 preceded/recorded the verified merge. This backfills actual #733,
+as partial C evidence only. Parent I293 stays Active/Claimed, Completion Pending.
+
+Selection base: main dea3edc. Before branch, verified effective #712/ADR-090 claim and no
+overlapping PR; only #705 open, retaining Windows timeout diagnostics. Inventory: I293 Active
+continues its existing bounded protocol internalization; I294 Active retains D research,
+I300 Active retains Git/PERM-007-H boundaries; I302 Review retains #717; I277 Review retains
+deferred device/human checks; I249 Planned deferred, I164 Paused superseded. I301/I303/I304/I305
+remain Complete/Closed. Historical I146/I147/I150 review notes and I162 completed review outcome
+do not establish new nonterminal work. No owner takeover, new claim, dependency or activation.
+
+Runnable deliverable: private dormant Instant Answer JSON parser with synthetic fixtures, reusing
+the common bounded/redacted DDG candidate boundary and existing network-free entity helper.
+Explicitly library-only: no HTTP/request factory/header change, live provider query/response,
+Agent root wiring, new backend/API/lock/dependency/permission or default-search behavior. Affected
+reference: SEARCH-001-C-DDG-RESPONSE-PARSER.md. Full C/EP/D/privacy/parity/root/rollback remain pending.
+
+Before copying, reverified retained0.1.2 archive06b90d9a/VCS b30180a0/crates/websearch and freshly
+retrieved pinned Instant Answer source SHA256b3aad75760fcad2e079bb9d15ec155e072748482d6ca1906b3ad19e109ca6ced.
+Archived and retrieved source match exactly; retained full MIT notice matches freshly retrieved
+pinned root notice (trailing newline only). This is not another fresh archive download or D admission.
+Independent protected design preview APPROVE required direct typed schema, required-unused fields,
+raw topic first-sentence splitting, limited cleanup, query encoding and explicit migration limits.
+
+First local focused run16passed/1failed: a fixture incorrectly expected general numeric entity
+decoding for &#46;. Inspection of the pinned network-free helper confirms only seven fixed
+replacements, excluding that entity; corrected the fixture to retain it, with no implementation
+repair or acceptance relaxation. Also corrected a duplicate-field fixture's JSON spelling locally
+before stable publication. Fresh focused/full checks, source review, package inclusion, native CI
+and final CAS follow. No historical failure is reclassified; #643/#624/#717 stay open, #705 independent.
+
+Fresh local convergence PASSED: pinned Rust1.99.0 locked full release_preflight,3763primary
+workspace tests plus1 existing exact-selection child,0failed/ignored; independent SDK default
+and coding modes pass. Focused Instant Answer17/0 and network-feature test-target Clippy
+with -D warnings pass. Package --list includes Instant Answer source/fixtures and full MIT notice.
+Only the previously authorized socket fixture is locally filtered; the exact proxy child filters
+494siblings covered by the parent. Remote CI remains unfiltered, with no new skip or ignored test.
+Workspace check/Clippy, site/installers/format, governanceSQL17/delivery12, claims0warnings,
+text23/0 and classifier14 pass. Scale remains high-risk/release-managed/on-demand, sources489,
+packages31/workflows4. No version/lock/dependency/public API or permission change.
+
+Independent protected working-source/provenance review APPROVE found no blocking finding;
+parser blobf13f4360f3e6cc8965b1f64d0846035b34c4b194 and fixture
+a55fc7026c9d6fa9df16e7d176db01ef3430d7fe. Reviewer independently fetched/hash-checked pinned
+source, helper and root license; did not build or independently redownload the archive. Shared
+Agent/account identity is not distinct-human approval. This prerequisite is ready for stable
+candidate Review; exact-local/remote review, native CI and final CAS remain merge gates.
+I293 stays Active/Claimed, Completion Pending; full C/EP/parity/D/privacy/root/rollback/activation
+remain gated. The source Issue index will record the actual candidate PR and exact evidence.

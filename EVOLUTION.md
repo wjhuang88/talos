@@ -76,6 +76,7 @@ repeating known mistakes.
 | 64 | TLS fixtures | Native platform verification includes certificate policy, not just roots | I293 / #715 |
 | 65 | Resource tests | Process-wide counters need isolated workers and owned descendant cleanup | I293 / #716 |
 | 66 | Native borrowing | Attribute value buffers need independent stable storage through native list deletion | I302 / #716 |
+| 67 | Parser compatibility | Verify the exact helper replacement set before defining entity-decoding fixtures | I293 / Instant Answer |
 
 ## Lessons
 
@@ -1312,3 +1313,14 @@ CI3219 exposed a test that converted already-CRLF source into CR-CR-LF. Normaliz
 toLF first, derive both LF/CRLF variants, and run against both incoming checkout forms. Preserve
 actual source hashes and validators. Successful harness assertions do not imply raw receipts were
 visible; distinguish passed assertions from independently emitted evidence.
+
+## 2026-10-18 — Preserve the exact entity helper contract
+
+- Trigger: the first Instant Answer focused run passed16/failed1 on a numeric entity fixture.
+- Symptom: the fixture expected &#46; to become a period, but the existing helper retained it.
+- Root cause: treating a fixed seven-replacement helper as a general HTML entity decoder.
+- Fix: inspect the pinned helper and preserve the literal entity in the compatibility expectation;
+  no implementation change or test suppression.
+- Prevention: characterize named and numeric entities, tag-cleanup order and raw sentence splitting
+  against the exact helper before claiming parity.
+- Promoted to rule/check: instant_answer topic/limited-cleanup tests and the parser reference.

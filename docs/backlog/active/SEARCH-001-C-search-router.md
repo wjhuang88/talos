@@ -173,3 +173,9 @@ evidence. The next dormant prerequisite is bounded Lite/HTML response parsing wi
 provenance and synthetic fixtures, using existing network-free helpers. It does not activate search
 or admit links/providers. Scraper-version/charset/header/probe/retry/proxy/official-root/full-parity
 gates remain open, along with D/privacy/rollback. Parent C and #643/#624 remain incomplete/open.
+
+#733 Lite/HTML parser merged dea3edc after CI3230 all6jobs and protected review/CAS6245774420.
+The next dormant prerequisite adds Instant Answer JSON parsing, preserving typed schema,
+result ordering, limited cleanup and source/license provenance. Explicit count/depth/encoding
+limits differ from upstream and remain parity gates. I293 records validation and source delivery;
+no default activation, D admission or parent completion follows.
