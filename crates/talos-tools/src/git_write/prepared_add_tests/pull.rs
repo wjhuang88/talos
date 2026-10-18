@@ -1132,6 +1132,7 @@ async fn pull_postfetch_rebuilds_evidence_before_selecting_integration() {
         let git = |args: &[&str]| {
             let output = std::process::Command::new("git")
                 .current_dir(root.path())
+                .args(["-c", "maintenance.autoDetach=false", "-c", "gc.autoDetach=false"])
                 .args(args)
                 .output()
                 .expect("Git");
@@ -1273,7 +1274,11 @@ async fn pull_postfetch_rebuilds_evidence_before_selecting_integration() {
             .expect("external common pointer");
         }
         if source == "linked-budget" {
-            let deep = external.path().join("refs/heads/a/b/c/d/e/f/g/h/i/j/topic");
+            let deep = external
+                .path()
+                .canonicalize()
+                .expect("canonical external root")
+                .join("refs/heads/a/b/c/d/e/f/g/h/i/j/topic");
             std::fs::create_dir_all(deep.parent().expect("parents")).expect("deep refs");
             std::fs::write(&deep, format!("{target}\n")).expect("external ref");
             let fetched =
@@ -1286,7 +1291,9 @@ async fn pull_postfetch_rebuilds_evidence_before_selecting_integration() {
                 plan = plan
                     .discover_pull_postfetch(&tokens)
                     .await
-                    .expect("frontier");
+                    .unwrap_or_else(|error| {
+                        panic!("{source} frontier at stage {recorded_stages}: {error}")
+                    });
                 assert!(plan.phase == Phase::PullPostFetch);
             }
             assert_eq!(recorded_stages, 8);
