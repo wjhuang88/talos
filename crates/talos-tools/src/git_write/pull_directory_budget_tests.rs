@@ -1,6 +1,24 @@
 use super::*;
 
 #[test]
+fn reference_body_does_not_authorize_an_unbudgeted_retained_path() {
+    let temp = tempfile::tempdir().expect("fixture");
+    let root = temp.path().canonicalize().expect("root");
+    std::fs::write(root.join("HEAD"), b"aaaa\n").expect("reference");
+    let mut inventory = Inventory::new(&root, &root);
+    while !inventory.complete() {
+        inventory.advance(|_| true).expect("frontier");
+    }
+    let budget = ReferenceBudget(Arc::new(Mutex::new((2, 5))));
+    inventory.reference_budget = budget.clone();
+    assert!(inventory.bind_references(&root, &root).is_err());
+    assert!(inventory.references.is_empty());
+    assert_eq!(*budget.0.lock().expect("allowance"), (0, 0));
+    assert!(inventory.bind_references(&root, &root).is_err());
+    assert_eq!(*budget.0.lock().expect("allowance"), (0, 0));
+}
+
+#[test]
 fn worktree_binding_refuses_before_retaining_unbudgeted_reference_roots() {
     let temp = tempfile::tempdir().expect("fixture");
     let root = temp.path().canonicalize().expect("root");
@@ -77,7 +95,13 @@ fn retained_directory_revalidation_does_not_restart_discovery() {
     // discovery, rather than a fresh body allowance.
     assert_eq!(
         *budget.0.lock().expect("allowance"),
-        (retained.0 - 2, retained.1 - 8)
+        (
+            retained.0 - 4,
+            retained.1
+                - 8
+                - root.join("HEAD").as_os_str().as_encoded_bytes().len()
+                - root.join("refs/main").as_os_str().as_encoded_bytes().len()
+        )
     );
 }
 

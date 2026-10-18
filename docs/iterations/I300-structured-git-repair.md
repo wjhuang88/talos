@@ -4679,3 +4679,17 @@ regression tests pass 133/133 (`/tmp/talos-i300-worktree-budget-final.log`),
 including the separate binding exhaustion/retry test. Reference-evidence path
 copies, source/required-path extensions, identities and handle accounting remain
 open; no full quota closure or production activation is claimed.
+
+Reference-path quota checkpoint (2026-10-18): reference evidence now charges
+its retained path copy before cloning through the existing invocation ledger.
+Reference/boundary/worktree classification borrows relative path components
+instead of repeatedly allocating joined prefix paths. Existing body-budget
+fixtures now include retained path cost; a separate test proves that successful
+body capture with no remaining path bytes refuses publication and cannot refund
+on retry. Independent static review found the classification and authorization
+sets unchanged. Pull tests pass 134/134
+(`/tmp/talos-i300-reference-path-budget-final.log`); tools all-target/all-feature
+Clippy passes with warnings denied (`/tmp/talos-i300-reference-path-clippy.log`).
+Source/required-path extensions, serialized identities and peak identity handles
+remain quota residuals. Full-stage validation and original T7 functional gates
+remain outstanding; Pull remains disabled.
