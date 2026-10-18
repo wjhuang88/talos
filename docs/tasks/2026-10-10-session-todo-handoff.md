@@ -3818,3 +3818,17 @@ Locked Pull tests pass 110/110 and all-feature/all-target Clippy passes with
 warnings denied (logs: /tmp/talos-i300-historical-layout-{tests,clippy}.log).
 Independent review found no blocker. This does not implement missing-checkout
 metadata fallback; production Pull and all original T7 closure gates remain open.
+
+Prepared test responsibility split (2026-10-18): the extracted 10,582-line test
+file is now a 110-line shared-fixture entrypoint plus six include fragments for
+authorization, checkout, commit, pull, pull children, and push. Includes retain
+the original module path, private access and external execute_approved helper.
+All 140 conditional test declarations and extracted function contents are
+preserved. No production behavior changes. All-feature/all-target locked Clippy
+and formatting checks pass. The sandbox run passed 137/138, with the existing
+process-observation EPERM case requiring an outside-sandbox rerun; final rerun
+evidence is recorded below. T7 and the full handoff remain Active/incomplete.
+Outside-sandbox locked rerun passes 138/138 prepared tests
+(/tmp/talos-i300-test-fragments-unsandboxed.log); the environment failure is
+closed for this slice. This is focused test evidence, not the final workspace
+preflight, Windows runtime validation, or production Pull activation.
