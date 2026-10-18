@@ -568,8 +568,7 @@ struct WindowsLaunchCommand {
     command: Vec<u16>,
     cwd: Vec<u16>,
     environment: Vec<u16>,
-    input: Option<WindowsInputPipe>,
-    null_input: Option<std::fs::File>,
+    input: WindowsInput,
 }
 
 #[cfg(windows)]
@@ -598,32 +597,49 @@ impl WindowsLaunchCommand {
         if !environment.ends_with(&[0, 0]) {
             return Err("Windows environment block is not terminated".into());
         }
-        let command = Self {
+        Ok(Self {
             executable,
             command: windows_command_line::encode(&arguments)?,
             cwd,
             environment,
             input: if pipe_stdin {
-                Some(WindowsInputPipe::create()?)
+                WindowsInput::Pipe(WindowsInputPipe::create()?)
             } else {
-                None
+                WindowsInput::null()?
             },
-            null_input: None,
-        };
-        if pipe_stdin {
-            Ok(command)
-        } else {
-            command.with_null_input()
+        })
+    }
+}
+
+#[cfg(windows)]
+enum WindowsInput {
+    Pipe(WindowsInputPipe),
+    Null(std::fs::File),
+}
+
+#[cfg(windows)]
+impl WindowsInput {
+    fn child(&self) -> windows_sys::Win32::Foundation::HANDLE {
+        use std::os::windows::io::AsRawHandle;
+        match self {
+            Self::Pipe(pipe) => pipe.child.as_raw_handle() as _,
+            Self::Null(file) => file.as_raw_handle() as _,
         }
     }
 
-    /// Foreground calls without finite input receive an explicit EOF device.
-    fn with_null_input(mut self) -> Result<Self, String> {
+    fn into_writer(self) -> Option<tokio::fs::File> {
+        match self {
+            Self::Pipe(pipe) => {
+                drop(pipe.child);
+                Some(tokio::fs::File::from_std(pipe.parent))
+            }
+            Self::Null(_) => None,
+        }
+    }
+
+    fn null() -> Result<Self, String> {
         use std::os::windows::io::AsRawHandle;
         use windows_sys::Win32::Foundation::{HANDLE_FLAG_INHERIT, SetHandleInformation};
-        if self.input.is_some() {
-            return Err("Windows launch already has finite stdin".into());
-        }
         let input = std::fs::File::open(r"\\.\NUL")
             .map_err(|error| format!("open Windows stdin NUL: {error}"))?;
         // SAFETY: uniquely owned live handle; only this handle's inheritance flag
@@ -638,8 +654,7 @@ impl WindowsLaunchCommand {
         {
             return Err(last_windows_error("SetHandleInformation(stdin NUL)"));
         }
-        self.null_input = Some(input);
-        Ok(self)
+        Ok(Self::Null(input))
     }
 }
 
@@ -838,17 +853,8 @@ fn create_windows_job_native(
         if hooks.fault == Some(WindowsLaunchFault::AttributeList) {
             return Err("injected attribute-list setup failure".to_owned());
         }
-        let handles = {
-            use std::os::windows::io::AsRawHandle;
-            inherited_handle_list.extend([out_write, err_write]);
-            if let Some(input) = &command.input {
-                inherited_handle_list.push(input.child.as_raw_handle() as _);
-            }
-            if let Some(input) = &command.null_input {
-                inherited_handle_list.push(input.as_raw_handle() as _);
-            }
-            &inherited_handle_list
-        };
+        inherited_handle_list.extend([out_write, err_write, command.input.child()]);
+        let handles = &inherited_handle_list;
         if UpdateProcThreadAttribute(
             attrs,
             0,
@@ -867,14 +873,7 @@ fn create_windows_job_native(
         startup.StartupInfo.dwFlags = 0x00000100;
         startup.StartupInfo.hStdOutput = out_write;
         startup.StartupInfo.hStdError = err_write;
-        if let Some(input) = &command.input {
-            use std::os::windows::io::AsRawHandle;
-            startup.StartupInfo.hStdInput = input.child.as_raw_handle() as _;
-        }
-        if let Some(input) = &command.null_input {
-            use std::os::windows::io::AsRawHandle;
-            startup.StartupInfo.hStdInput = input.as_raw_handle() as _;
-        }
+        startup.StartupInfo.hStdInput = command.input.child();
         let mut info: PROCESS_INFORMATION = zeroed();
         #[cfg(test)]
         observe!("before_process");
@@ -945,10 +944,7 @@ fn create_windows_job_native(
             process,
             stdout,
             stderr,
-            stdin: command.input.take().map(|input| {
-                drop(input.child);
-                tokio::fs::File::from_std(input.parent)
-            }),
+            stdin: command.input.into_writer(),
         })
     })();
     if result.is_err() {

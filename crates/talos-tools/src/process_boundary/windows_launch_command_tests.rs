@@ -51,8 +51,9 @@ fn no_input_launch_owns_inheritable_nul_with_immediate_eof() {
         false,
     )
     .expect("no-input command");
-    assert!(command.input.is_none());
-    let input = command.null_input.as_mut().expect("explicit EOF handle");
+    let WindowsInput::Null(input) = &mut command.input else {
+        panic!("explicit EOF handle required");
+    };
     let mut flags = 0;
     // SAFETY: borrowed live handle and valid writable flags output.
     assert_ne!(
