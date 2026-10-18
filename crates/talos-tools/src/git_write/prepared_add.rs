@@ -1913,6 +1913,18 @@ impl AddPlan {
                     &candidate,
                     "Pull selected child legacy metadata candidate; layout validation deferred",
                 )?);
+                for prefix in super::pull_children::legacy_metadata_prefix_reads(
+                    &self.repository.common_dir,
+                    self.pull_child_name(path).ok_or_else(|| {
+                        GitToolError::InvalidInput("Pull child module name missing".into())
+                    })?,
+                ) {
+                    self.facets.push(path_facet(
+                        ToolNature::Read,
+                        &prefix,
+                        "Pull legacy metadata prefix identity and repository collision checks; reads deferred",
+                    )?);
+                }
             }
         }
         self.identity = PreparedPlanIdentity::new();

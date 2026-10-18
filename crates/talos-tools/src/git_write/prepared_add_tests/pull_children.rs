@@ -1001,7 +1001,18 @@ async fn pull_current_child_without_changes_requires_fresh_identity_admission() 
     plan.select_pull_child_identity()
         .expect("select current child");
     assert!(plan.phase == Phase::PullChildIdentity);
-    for path in [&child, &child.join(".git"), &fallback] {
+    let prefix = plan.repository.common_dir.join("modules/group");
+    let frontier = [
+        child.clone(),
+        child.join(".git"),
+        fallback.clone(),
+        plan.repository.common_dir.join("modules"),
+        prefix.clone(),
+        prefix.join("HEAD"),
+        prefix.join("objects"),
+        prefix.join("refs"),
+    ];
+    for path in &frontier {
         assert!(plan.facets.iter().any(|facet| {
             facet.nature == ToolNature::Read && facet.resource.as_deref() == path.to_str()
         }));
@@ -1010,6 +1021,14 @@ async fn pull_current_child_without_changes_requires_fresh_identity_admission() 
     let tokens = proof(&plan)
         .consume_for_prepared(&plan.request(), &plan.identity)
         .expect("fresh child tokens");
+    for path in &frontier {
+        assert!(plan.child_read(path, &tokens).is_ok());
+        let mut denied = proof(&plan)
+            .consume_for_prepared(&plan.request(), &plan.identity)
+            .expect("independent denial proof");
+        denied.retain(|token| token.normalized_path() != path);
+        assert!(plan.child_read(path, &denied).is_err());
+    }
     assert!(plan.child_read(&fallback, &tokens).is_ok());
     assert!(
         !fallback.exists(),
