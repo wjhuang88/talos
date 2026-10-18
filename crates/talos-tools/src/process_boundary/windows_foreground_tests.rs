@@ -82,6 +82,27 @@ async fn foreground_finite_binary_input_reaches_eof_and_returns_exact_output() {
 }
 
 #[tokio::test]
+async fn foreground_large_input_drains_both_output_pipes_concurrently() {
+    let owner = OwnedCommandExecutor::default();
+    let input: Vec<u8> = (0..512 * 1024).map(|index| (index % 256) as u8).collect();
+    let result = owner.operation().execute_with_input(
+        powershell("$inputStream = [Console]::OpenStandardInput(); $out = [Console]::OpenStandardOutput(); $err = [Console]::OpenStandardError(); $buffer = New-Object byte[] 4096; while (($count = $inputStream.Read($buffer, 0, $buffer.Length)) -gt 0) { $out.Write($buffer, 0, $count); $out.Flush(); $err.Write($buffer, 0, $count); $err.Flush() }"),
+        Duration::from_secs(30),
+        2 * 1024 * 1024,
+        input.clone(),
+    ).await;
+    owner.seal();
+    owner
+        .wait(Duration::from_secs(10))
+        .await
+        .expect("large IO cleanup");
+    let output = result.expect("large input and both output streams");
+    assert!(output.status.success());
+    assert_eq!(output.stdout, input);
+    assert_eq!(output.stderr, input);
+}
+
+#[tokio::test]
 async fn foreground_timeout_confirms_job_and_io_cleanup() {
     let owner = OwnedCommandExecutor::default();
     let result = owner
@@ -219,4 +240,72 @@ async fn dropped_foreground_wait_keeps_cleanup_owned() {
     let cleanup = owner.wait(Duration::from_secs(10)).await;
     assert!(started.is_ok(), "child never acknowledged startup");
     cleanup.expect("confirmed cancellation cleanup");
+}
+
+#[tokio::test]
+async fn cancelling_one_foreground_operation_preserves_another_live_job() {
+    let owner = OwnedCommandExecutor::default();
+    let directory = tempfile::tempdir().expect("concurrent jobs");
+    let ready_a = directory.path().join("ready-a");
+    let ready_b = directory.path().join("ready-b");
+    let release_b = directory.path().join("release-b");
+    let quote = |path: &std::path::Path| path.to_string_lossy().replace('\'', "''");
+    let first = owner.operation();
+    let first_receipt = first.cleanup_receipt();
+    let first_script = format!(
+        "[System.IO.File]::WriteAllText('{}', 'ready'); Start-Sleep -Seconds 60",
+        quote(&ready_a),
+    );
+    let first = tokio::spawn(async move {
+        first
+            .execute(powershell(&first_script), Duration::from_secs(60), 4096)
+            .await
+    });
+    let second = owner.operation();
+    let second_script = format!(
+        "[System.IO.File]::WriteAllText('{}', 'ready'); while (!(Test-Path -LiteralPath '{}')) {{ Start-Sleep -Milliseconds 10 }}; [Console]::Write('survived')",
+        quote(&ready_b),
+        quote(&release_b),
+    );
+    let mut second = tokio::spawn(async move {
+        second
+            .execute(powershell(&second_script), Duration::from_secs(60), 4096)
+            .await
+    });
+    let ready = tokio::time::timeout(Duration::from_secs(20), async {
+        while !(ready_a.exists() && ready_b.exists()) {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await;
+    let first_was_running = !first.is_finished();
+    first.abort();
+    let cancelled = first.await;
+    let first_closed = first_receipt.wait(Duration::from_secs(10)).await;
+    // Release the other operation only after the cancelled operation's cleanup.
+    // A shared-Job cancellation bug makes its exact success output impossible.
+    let released = std::fs::write(release_b, "release");
+    let survived = tokio::time::timeout(Duration::from_secs(20), &mut second).await;
+    if survived.is_err() {
+        second.abort();
+        let _ = second.await;
+    }
+    owner.seal();
+    let cleanup = owner.wait(Duration::from_secs(10)).await;
+    assert!(ready.is_ok(), "both jobs must acknowledge startup");
+    first_closed.expect("cancelled operation cleanup");
+    released.expect("release second job");
+    cleanup.expect("all jobs cleaned up");
+    assert!(first_was_running, "first operation must still be running");
+    assert!(
+        cancelled
+            .expect_err("first task was cancelled")
+            .is_cancelled()
+    );
+    let output = survived
+        .expect("second job deadline")
+        .expect("second task")
+        .expect("second execution");
+    assert!(output.status.success());
+    assert_eq!(output.stdout, b"survived");
 }
