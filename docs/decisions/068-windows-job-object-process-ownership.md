@@ -12,6 +12,27 @@ separate implementation iteration and claim and must independently satisfy this 
 
 ## Context
 
+### I300 foreground extension accepted on 2026-10-18
+
+The maintainer explicitly accepted reusing the existing Windows Job implementation for
+structured Git foreground calls. This extends the background-only scope below for I300;
+ordinary foreground PowerShell/direct-exec behavior remains outside this extension.
+No new dependency or duplicate Job FFI implementation is authorized by this extension.
+
+Structured Git must establish assigned-before-resume ownership and retain it through bounded
+output collection, timeout, cancellation and shutdown cleanup receipts. Unsupported supervision
+must refuse execution. Preserve command arguments and environment without lossy conversion.
+Independent security review and real Windows lifecycle tests are required before claiming delivery.
+Decision acceptance alone does not enable this path. Until integration satisfies these gates,
+structured Git preparation and its non-Unix command runner refuse execution rather than using
+direct-child-only cleanup. This containment is not completion of the accepted Windows work.
+
+Finite foreground stdin uses a pipe with uniquely owned RAII endpoints. Only its child read
+endpoint joins the existing stdout/stderr inheritance allowlist; the parent write endpoint
+is non-inheritable. The foreground supervisor must close the writer at EOF and include pending
+input delivery in the same deadline and cancellation cleanup as output. This extends the
+existing native pipe boundary; it does not authorize a second process launcher.
+
 ADR-060 requires every background process to be owned by a supervisor and requires Windows to
 remain fail-closed until a separately accepted Job Object boundary can own descendants. ADR-057
 defines the existing Windows PowerShell identity and intentionally retains direct-child-only
