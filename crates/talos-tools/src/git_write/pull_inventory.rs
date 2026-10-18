@@ -21,15 +21,27 @@ impl Default for ReferenceBudget {
 
 impl ReferenceBudget {
     fn capture(&self, path: &Path) -> Result<super::snapshot::RegularEvidence, GitToolError> {
+        self.capture_limited(path, usize::MAX)
+    }
+
+    fn capture_limited(
+        &self,
+        path: &Path,
+        max_bytes: usize,
+    ) -> Result<super::snapshot::RegularEvidence, GitToolError> {
         let mut remaining = self.0.lock().map_err(|_| invalid())?;
+        let available_bytes = remaining.1.min(max_bytes);
         let mut allowance = super::snapshot::Budget {
             entries: remaining.0,
-            bytes: remaining.1,
+            bytes: available_bytes,
         };
         let result = super::snapshot::RegularEvidence::capture(path, &mut allowance);
         // Failed captures also consume any work already charged. A continuation
         // or replacement inventory must never restore the invocation allowance.
-        *remaining = (allowance.entries, allowance.bytes);
+        remaining.0 = allowance.entries;
+        remaining.1 -= available_bytes
+            .checked_sub(allowance.bytes)
+            .ok_or_else(invalid)?;
         result.map_err(|_| invalid())
     }
 }
@@ -481,14 +493,16 @@ impl Inventory {
                 }
             }
         }
-        let mut budget = super::snapshot::Budget {
-            entries: 4,
-            bytes: 256 * 1024,
-        };
         let mut evidence = Vec::new();
         for path in paths {
-            let entry = super::snapshot::RegularEvidence::capture(&path, &mut budget)
-                .map_err(|_| invalid())?;
+            if self
+                .alternates
+                .iter()
+                .any(|(retained, _)| retained == &path)
+            {
+                continue;
+            }
+            let entry = self.reference_budget.capture_limited(&path, 256 * 1024)?;
             if !matches!(&entry.entry, super::snapshot::Entry::File(_, bytes) if bytes.is_empty()) {
                 return Err(GitToolError::InvalidInput(
                     "Pull child alternate object stores require separate discovery and admission"
@@ -498,7 +512,7 @@ impl Inventory {
             evidence.push((path, entry));
         }
         self.revalidate()?;
-        self.alternates = evidence;
+        self.alternates.extend(evidence);
         self.revalidate()
     }
 
