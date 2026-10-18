@@ -2109,6 +2109,7 @@ impl AddPlan {
             self.revalidate()?;
         }
         for (workdir, location) in &self.child_locations {
+            let historical = self.pull_child_is_historical(workdir);
             if !authorizations.iter().any(|token| {
                 token.authorizes_path(
                     "git_pull",
@@ -2151,7 +2152,7 @@ impl AddPlan {
                     &location.common_dir,
                     metadata.has_common(),
                 )?;
-                for target in &startup.targets {
+                for target in startup.targets.iter().filter(|_| !historical) {
                     self.facets.push(path_facet(
                         ToolNature::Read,
                         target,
@@ -2164,12 +2165,12 @@ impl AddPlan {
                     GitToolError::InvalidInput("Pull child startup evidence missing".into())
                 })?;
                 startup.revalidate()?;
-                for target in &startup.targets {
+                for target in startup.targets.iter().filter(|_| !historical) {
                     self.child_read(target, authorizations)?;
                 }
             }
-            // Discovery alone overrides setup; retain configured layout values
-            // for independent admission before any ordinary child command.
+            // Retain startup bytes even when historical fetch overrides their
+            // worktree target. Current tasks still require target admission.
             let output = self
                 .inspect_child_bootstrap_config(&location.git_dir, workdir)
                 .await?;
@@ -2669,6 +2670,17 @@ impl AddPlan {
         Ok(false)
     }
 
+    fn pull_child_is_historical(&self, selected: &Path) -> bool {
+        !self
+            .pull_current_fetch_children
+            .keys()
+            .any(|path| self.repository.workdir.join(path) == selected)
+            && self
+                .pull_changed_children
+                .values()
+                .any(|child| self.repository.workdir.join(&child.path) == selected)
+    }
+
     fn pull_child_fetch_command(&self, selected: &Path, gitdir: &Path) -> tokio::process::Command {
         let mut command = tokio::process::Command::new(&self.program);
         command
@@ -2681,11 +2693,7 @@ impl AddPlan {
         // Git schedules index tasks first, including OnDemand tasks. Only
         // historical tasks override worktree setup; this is unrelated to the
         // unconditional-fetch policy and to whether a checkout is populated.
-        if !self
-            .pull_current_fetch_children
-            .keys()
-            .any(|path| self.repository.workdir.join(path) == selected)
-        {
+        if self.pull_child_is_historical(selected) {
             command.arg("--work-tree=.");
         }
         command
@@ -2764,12 +2772,22 @@ impl AddPlan {
             GitToolError::InvalidInput("Pull child startup evidence missing".into())
         })?;
         startup.revalidate()?;
-        let target = startup
-            .targets
-            .iter()
-            .next()
-            .cloned()
-            .unwrap_or_else(|| workdir.to_owned());
+        let target = if self.pull_child_is_historical(workdir) {
+            self.child_locations
+                .iter()
+                .find(|(path, _)| path == workdir)
+                .map(|(_, location)| location.git_dir.clone())
+                .ok_or_else(|| {
+                    GitToolError::InvalidInput("Pull historical child metadata missing".into())
+                })?
+        } else {
+            startup
+                .targets
+                .iter()
+                .next()
+                .cloned()
+                .unwrap_or_else(|| workdir.to_owned())
+        };
         let admitted = self.child_read(&target, authorizations)?;
         let identity = snapshot::PathIdentity::capture(&target).map_err(|_| {
             GitToolError::InvalidInput("Pull child startup worktree identity unavailable".into())

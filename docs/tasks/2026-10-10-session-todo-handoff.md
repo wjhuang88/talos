@@ -3808,3 +3808,13 @@ suite passes 110/110; all-feature/all-target Clippy passes; independent review
 found no blocker. Existing startup target admission/revalidation is retained;
 metadata-only fallback and removal of unnecessary historical target admission
 remain open. Production Pull stays disabled and original closure gates remain.
+
+Historical child probe layout (2026-10-18): historical selected tasks now bind
+object probes to their admitted gitdir and omit admission of the core.worktree
+target overridden by fetch. Startup configuration bytes remain retained and
+revalidated; current-index tasks retain configured target admission. The real
+historical fetch regression succeeds with a nonexistent configured worktree.
+Locked Pull tests pass 110/110 and all-feature/all-target Clippy passes with
+warnings denied (logs: /tmp/talos-i300-historical-layout-{tests,clippy}.log).
+Independent review found no blocker. This does not implement missing-checkout
+metadata fallback; production Pull and all original T7 closure gates remain open.

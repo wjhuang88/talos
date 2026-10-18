@@ -6084,6 +6084,13 @@ async fn pull_child_fetch_has_own_write_stage_and_rebuilds_graph() {
             );
             git(&child, &["worktree", "add", "--detach", "../sibling"]);
         }
+        let stale = root.path().join("missing-historical-worktree");
+        if mode == "historical-on" {
+            git(
+                &child,
+                &["config", "core.worktree", stale.to_str().expect("stale")],
+            );
+        }
         let mut plan = Box::new(
             AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
                 .expect("plan"),
@@ -6186,6 +6193,17 @@ async fn pull_child_fetch_has_own_write_stage_and_rebuilds_graph() {
             mode, "relative-hook",
             "executable hook must be refused before fetch"
         );
+        if mode == "historical-on" {
+            assert!(plan.pull_child_startup[&child].targets.contains(&stale));
+            assert_eq!(plan.pull_child_worktrees[&child].0, child.join(".git"));
+            assert!(
+                !plan
+                    .facets
+                    .iter()
+                    .any(|facet| facet.resource.as_deref() == stale.to_str())
+            );
+            assert!(!stale.exists());
+        }
         assert!(plan.phase == Phase::PullChildFetch);
         assert!(!child.join(".git/FETCH_HEAD").exists());
         let mut tokens = proof(&plan)
