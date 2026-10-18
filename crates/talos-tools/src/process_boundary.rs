@@ -569,6 +569,7 @@ struct WindowsLaunchCommand {
     cwd: Vec<u16>,
     environment: Vec<u16>,
     input: Option<WindowsInputPipe>,
+    null_input: Option<std::fs::File>,
 }
 
 #[cfg(windows)]
@@ -597,7 +598,7 @@ impl WindowsLaunchCommand {
         if !environment.ends_with(&[0, 0]) {
             return Err("Windows environment block is not terminated".into());
         }
-        Ok(Self {
+        let command = Self {
             executable,
             command: windows_command_line::encode(&arguments)?,
             cwd,
@@ -607,7 +608,38 @@ impl WindowsLaunchCommand {
             } else {
                 None
             },
-        })
+            null_input: None,
+        };
+        if pipe_stdin {
+            Ok(command)
+        } else {
+            command.with_null_input()
+        }
+    }
+
+    /// Foreground calls without finite input receive an explicit EOF device.
+    fn with_null_input(mut self) -> Result<Self, String> {
+        use std::os::windows::io::AsRawHandle;
+        use windows_sys::Win32::Foundation::{HANDLE_FLAG_INHERIT, SetHandleInformation};
+        if self.input.is_some() {
+            return Err("Windows launch already has finite stdin".into());
+        }
+        let input = std::fs::File::open(r"\\.\NUL")
+            .map_err(|error| format!("open Windows stdin NUL: {error}"))?;
+        // SAFETY: uniquely owned live handle; only this handle's inheritance flag
+        // changes. The native launcher includes it in its explicit allowlist.
+        if unsafe {
+            SetHandleInformation(
+                input.as_raw_handle() as _,
+                HANDLE_FLAG_INHERIT,
+                HANDLE_FLAG_INHERIT,
+            )
+        } == 0
+        {
+            return Err(last_windows_error("SetHandleInformation(stdin NUL)"));
+        }
+        self.null_input = Some(input);
+        Ok(self)
     }
 }
 
@@ -812,6 +844,9 @@ fn create_windows_job_native(
             if let Some(input) = &command.input {
                 inherited_handle_list.push(input.child.as_raw_handle() as _);
             }
+            if let Some(input) = &command.null_input {
+                inherited_handle_list.push(input.as_raw_handle() as _);
+            }
             &inherited_handle_list
         };
         if UpdateProcThreadAttribute(
@@ -835,6 +870,10 @@ fn create_windows_job_native(
         if let Some(input) = &command.input {
             use std::os::windows::io::AsRawHandle;
             startup.StartupInfo.hStdInput = input.child.as_raw_handle() as _;
+        }
+        if let Some(input) = &command.null_input {
+            use std::os::windows::io::AsRawHandle;
+            startup.StartupInfo.hStdInput = input.as_raw_handle() as _;
         }
         let mut info: PROCESS_INFORMATION = zeroed();
         #[cfg(test)]
