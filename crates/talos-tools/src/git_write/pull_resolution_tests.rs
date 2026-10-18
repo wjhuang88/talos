@@ -1,6 +1,41 @@
 use super::*;
 
 #[test]
+fn component_queue_reservation_precedes_metadata_discovery() {
+    let temp = tempfile::tempdir().expect("fixture");
+    let path = temp.path().join("missing/../checkout");
+    let mut budget = Budget {
+        entries: 4096,
+        bytes: 1,
+    };
+    assert!(Resolution::capture(&path, true, &mut budget).is_err());
+    // No component metadata record was charged before the queue was refused.
+    assert_eq!((budget.entries, budget.bytes), (4096, 1));
+}
+
+#[cfg(unix)]
+#[test]
+fn link_expansion_refuses_when_only_its_queue_exceeds_remaining_bytes() {
+    let temp = tempfile::tempdir().expect("fixture");
+    let root = temp.path().canonicalize().expect("root");
+    let link = root.join("link");
+    std::os::unix::fs::symlink(".", &link).expect("link to parent");
+    let mut complete = Budget::default();
+    let initial_bytes = complete.bytes;
+    let resolved = Resolution::capture(&link, false, &mut complete).expect("full allowance");
+    assert_eq!(resolved.resolved(), root);
+    // The final expansion is `.` and needs queue text but no new record.
+    // Removing one byte must refuse, without resetting discovery already done.
+    let mut limited = Budget {
+        entries: 4096,
+        bytes: initial_bytes - complete.bytes - 1,
+    };
+    assert!(Resolution::capture(&link, false, &mut limited).is_err());
+    assert_eq!(limited.entries, complete.entries);
+    assert_eq!(limited.bytes, 0);
+}
+
+#[test]
 fn rejects_files_even_when_cancelled() {
     let temp = tempfile::tempdir().expect("fixture");
     std::fs::write(temp.path().join("file"), b"data").expect("file");
