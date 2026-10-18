@@ -3774,3 +3774,12 @@ and failed only the existing process-observation EPERM case; the full outside
 rerun closes that environment failure. Independent review compared the extracted
 module and confirmed scope/content preservation. Production orchestration remains
 large and T7 remains Active; this is test separation, not feature completion.
+
+Legacy child device-name boundary (2026-10-18): the lexical fallback candidate
+now omits Windows DOS device names, including extensions, superscript COM/LPT
+numbers and spaces before extensions. The latter alias was found during
+independent review and added to regression coverage. Both candidate tests pass
+with --locked; all-feature/all-target Clippy passes with warnings denied.
+This is portable candidate filtering only, not native Windows runtime evidence
+or metadata-only fallback execution. Filesystem prefix/alias validation,
+execution layout, resolution authority and original T7 delivery gates remain.
