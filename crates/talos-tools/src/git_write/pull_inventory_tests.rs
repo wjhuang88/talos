@@ -1,6 +1,54 @@
 use super::*;
 
 #[test]
+fn alternates_share_reference_allowance_and_rebinding_does_not_recharge() {
+    let temp = tempfile::tempdir().expect("fixture");
+    let base = temp.path().canonicalize().expect("base");
+    let budget = ReferenceBudget(Arc::new(Mutex::new((2, 1024 * 1024))));
+    for name in ["parent", "child"] {
+        let root = base.join(name);
+        std::fs::create_dir_all(root.join("objects/info")).expect("objects");
+        std::fs::write(root.join("objects/info/alternates"), b"").expect("alternate");
+        if name == "parent" {
+            std::fs::write(root.join("HEAD"), b"aaaa\n").expect("reference");
+        }
+        let mut inventory = Inventory::with_reference_budget(&root, &root, budget.clone());
+        while !inventory.complete() {
+            inventory.advance(|_| true).expect("frontier");
+        }
+        if name == "parent" {
+            inventory
+                .bind_references(&root, &root)
+                .expect("first entry");
+            inventory
+                .bind_alternates(&root, &root)
+                .expect("second entry");
+            inventory
+                .bind_alternates(&root, &root)
+                .expect("retained entry");
+            assert_eq!(*budget.0.lock().expect("budget"), (0, 1024 * 1024 - 5));
+        } else {
+            assert!(inventory.bind_alternates(&root, &root).is_err());
+        }
+    }
+}
+
+#[test]
+fn rejected_nonempty_alternate_consumes_shared_allowance() {
+    let temp = tempfile::tempdir().expect("fixture");
+    let root = temp.path().canonicalize().expect("root");
+    std::fs::create_dir_all(root.join("objects/info")).expect("objects");
+    std::fs::write(root.join("objects/info/alternates"), b"external\n").expect("alternate");
+    let budget = ReferenceBudget(Arc::new(Mutex::new((2, 1024 * 1024))));
+    let mut inventory = Inventory::with_reference_budget(&root, &root, budget.clone());
+    while !inventory.complete() {
+        inventory.advance(|_| true).expect("frontier");
+    }
+    assert!(inventory.bind_alternates(&root, &root).is_err());
+    assert_eq!(*budget.0.lock().expect("budget"), (1, 1024 * 1024 - 9));
+}
+
+#[test]
 fn reference_allowance_is_shared_across_inventories_and_not_reset_by_rebinding() {
     let temp = tempfile::tempdir().expect("fixture");
     let base = temp.path().canonicalize().expect("base");
