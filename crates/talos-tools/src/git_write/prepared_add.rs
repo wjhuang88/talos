@@ -1870,6 +1870,25 @@ impl AddPlan {
             .collect()
     }
 
+    fn pull_child_unconditional(&self, workdir: &Path) -> bool {
+        use super::pull_children::Recursion;
+        // Current-index tasks are scheduled first and claim the module name.
+        // A historical task cannot upgrade the winning task's recursion mode.
+        if let Some((_, mode)) = self
+            .pull_current_fetch_children
+            .iter()
+            .find(|(path, _)| self.repository.workdir.join(path) == workdir)
+        {
+            return *mode == Recursion::On;
+        }
+        self.pull_changed_children.iter().any(|(name, child)| {
+            self.pull_child_name(workdir).map_or_else(
+                || self.repository.workdir.join(&child.path) == workdir,
+                |selected| selected == name,
+            ) && child.effective_recursion == Some(Recursion::On)
+        })
+    }
+
     fn select_pull_child_identity(&mut self) -> Result<(), GitToolError> {
         let paths = self.selected_pull_child_paths();
         for path in &paths {
@@ -2525,15 +2544,7 @@ impl AddPlan {
                 GitToolError::InvalidInput("Pull child effective worktree missing".into())
             })?;
             let objects = self.pull_child_objects(workdir);
-            let unconditional = self.pull_current_fetch_children.iter().any(|(path, mode)| {
-                self.repository.workdir.join(path) == *workdir
-                    && *mode == super::pull_children::Recursion::On
-            }) || self.pull_changed_children.iter().any(|(name, child)| {
-                self.pull_child_name(workdir).map_or_else(
-                    || self.repository.workdir.join(&child.path) == *workdir,
-                    |selected| selected == name,
-                ) && child.effective_recursion == Some(super::pull_children::Recursion::On)
-            });
+            let unconditional = self.pull_child_unconditional(workdir);
             // Never use discovery's presence result across the write approval.
             if !unconditional
                 && self
@@ -13191,6 +13202,7 @@ pub(super) mod tests {
             "linked",
             "linked-tamper",
             "renamed-on",
+            "historical-on",
         ] {
             let root = fixture();
             git(root.path(), &["init", "child"]);
@@ -13204,7 +13216,7 @@ pub(super) mod tests {
                     &format!("git://127.0.0.1:{port}/"),
                 ],
             );
-            if mode == "skip" || mode == "renamed-on" {
+            if matches!(mode, "skip" | "renamed-on" | "historical-on") {
                 git(
                     &child,
                     &[
@@ -13239,9 +13251,17 @@ pub(super) mod tests {
             .discover()
             .await
             .expect("config");
-            plan.pull_current_fetch_children
-                .insert("child".into(), super::super::pull_children::Recursion::On);
-            if mode == "skip" || mode == "renamed-on" {
+            if mode != "historical-on" {
+                plan.pull_current_fetch_children.insert(
+                    "child".into(),
+                    if mode == "skip" || mode == "renamed-on" {
+                        super::super::pull_children::Recursion::OnDemand
+                    } else {
+                        super::super::pull_children::Recursion::On
+                    },
+                );
+            }
+            if matches!(mode, "skip" | "renamed-on" | "historical-on") {
                 plan.pull_changed_children.insert(
                     "child".into(),
                     super::super::pull_children::Changed {
@@ -13249,7 +13269,11 @@ pub(super) mod tests {
                         path: "child".into(),
                         objects: [expected.clone()].into_iter().collect(),
                         historical_recursion: None,
-                        effective_recursion: Some(super::super::pull_children::Recursion::OnDemand),
+                        effective_recursion: Some(if mode == "historical-on" {
+                            super::super::pull_children::Recursion::On
+                        } else {
+                            super::super::pull_children::Recursion::OnDemand
+                        }),
                         activity: Some(super::super::pull_children::Activity::Enabled),
                     },
                 );
@@ -13296,12 +13320,6 @@ pub(super) mod tests {
             }
             assert!(plan.phase == Phase::PullChildFetch);
             assert!(!child.join(".git/FETCH_HEAD").exists());
-            if mode == "skip" || mode == "renamed-on" {
-                plan.pull_current_fetch_children.insert(
-                    "child".into(),
-                    super::super::pull_children::Recursion::OnDemand,
-                );
-            }
             let mut tokens = proof(&plan)
                 .consume_for_prepared(&plan.request(), &plan.identity)
                 .expect("fetch proof");
@@ -13370,7 +13388,7 @@ pub(super) mod tests {
                     .iter()
                     .any(|facet| matches!(facet.nature, ToolNature::Write | ToolNature::Network))
             );
-            if mode == "allow" || mode.starts_with("linked") || mode == "renamed-on" {
+            if mode == "allow" || mode.starts_with("linked") || mode == "historical-on" {
                 assert!(
                     std::fs::read_to_string(child.join(".git/FETCH_HEAD"))
                         .expect("fetch head")
