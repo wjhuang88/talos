@@ -500,6 +500,74 @@ fn create_windows_job_with_hooks(
     args: &[String],
     cwd: &std::path::Path,
     extra_env: &std::collections::BTreeMap<String, String>,
+    #[cfg(test)] hooks: WindowsLaunchTestHooks<'_>,
+) -> Result<WindowsLaunchHandles, String> {
+    let executable = resolve_windows_program(program)?;
+    let args = args
+        .iter()
+        .map(std::ffi::OsString::from)
+        .collect::<Vec<_>>();
+    let command = WindowsLaunchCommand::new(
+        &executable,
+        std::ffi::OsStr::new(program),
+        &args,
+        cwd,
+        windows_environment(extra_env)?,
+    )?;
+    create_windows_job_native(
+        command,
+        #[cfg(test)]
+        hooks,
+    )
+}
+
+/// Fully encoded launch inputs. Native resource ownership never re-reads PATH
+/// or the environment; foreground callers can supply their approved snapshot.
+#[cfg(windows)]
+struct WindowsLaunchCommand {
+    executable: Vec<u16>,
+    command: Vec<u16>,
+    cwd: Vec<u16>,
+    environment: Vec<u16>,
+}
+
+#[cfg(windows)]
+impl WindowsLaunchCommand {
+    fn new(
+        executable: &std::path::Path,
+        arg0: &std::ffi::OsStr,
+        args: &[std::ffi::OsString],
+        cwd: &std::path::Path,
+        environment: Vec<u16>,
+    ) -> Result<Self, String> {
+        use std::os::windows::ffi::OsStrExt;
+        let executable = wide(executable.as_os_str());
+        let cwd = wide(cwd.as_os_str());
+        let arg0 = arg0.encode_wide().collect::<Vec<_>>();
+        if executable[..executable.len() - 1].contains(&0)
+            || cwd[..cwd.len() - 1].contains(&0)
+            || arg0.iter().any(|unit| matches!(*unit, 0 | 34))
+        {
+            return Err("Windows launch path contains NUL or an unsupported program quote".into());
+        }
+        let arguments = std::iter::once(arg0)
+            .chain(args.iter().map(|arg| arg.encode_wide().collect()))
+            .collect::<Vec<_>>();
+        if !environment.ends_with(&[0, 0]) {
+            return Err("Windows environment block is not terminated".into());
+        }
+        Ok(Self {
+            executable,
+            command: windows_command_line::encode(&arguments)?,
+            cwd,
+            environment,
+        })
+    }
+}
+
+#[cfg(windows)]
+fn create_windows_job_native(
+    mut command: WindowsLaunchCommand,
     #[cfg(test)] mut hooks: WindowsLaunchTestHooks<'_>,
 ) -> Result<WindowsLaunchHandles, String> {
     use std::mem::{size_of, zeroed};
@@ -672,18 +740,6 @@ fn create_windows_job_with_hooks(
         {
             return Err(last_windows_error("UpdateProcThreadAttribute"));
         }
-        if program.contains(['\0', '"']) {
-            return Err("Windows program path contains an unsupported quote or NUL".to_owned());
-        }
-        let resolved_program = resolve_windows_program(program)?;
-        let mut program_w = wide(resolved_program.as_os_str());
-        let arguments = std::iter::once(program)
-            .chain(args.iter().map(String::as_str))
-            .map(|argument| argument.encode_utf16().collect())
-            .collect::<Vec<_>>();
-        let mut command_w = windows_command_line::encode(&arguments)?;
-        let cwd_w = wide(cwd.as_os_str());
-        let mut environment = windows_environment(extra_env)?;
         let mut startup: STARTUPINFOEXW = zeroed();
         startup.StartupInfo.cb = size_of::<STARTUPINFOEXW>() as u32;
         startup.lpAttributeList = attrs;
@@ -694,14 +750,14 @@ fn create_windows_job_with_hooks(
         #[cfg(test)]
         observe!("before_process");
         if CreateProcessW(
-            program_w.as_mut_ptr(),
-            command_w.as_mut_ptr(),
+            command.executable.as_mut_ptr(),
+            command.command.as_mut_ptr(),
             std::ptr::null_mut(),
             std::ptr::null_mut(),
             1,
             CREATE_SUSPENDED | EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT,
-            environment.as_mut_ptr() as *mut _,
-            cwd_w.as_ptr(),
+            command.environment.as_mut_ptr() as *mut _,
+            command.cwd.as_ptr(),
             &startup as *const STARTUPINFOEXW as *const _,
             &mut info,
         ) == 0
@@ -916,6 +972,9 @@ mod native_inventory;
 
 #[cfg(all(test, windows))]
 mod resource_acceptance;
+
+#[cfg(all(test, windows))]
+mod windows_launch_command_tests;
 
 #[cfg(all(test, windows))]
 mod handle_snapshot;
