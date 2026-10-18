@@ -521,8 +521,12 @@ fn linked_worktree_references_require_admission_and_retain_contents() {
             .bind_references(&root, &root)
             .expect("bind references");
         assert!(inventory.references.iter().any(|(bound, _)| bound == &path));
+        inventory
+            .bind_references(&root, &root)
+            .expect("unchanged retained references can be rebound");
         std::fs::write(&path, format!("{}\n", "b".repeat(40))).expect("in-place change");
         assert!(inventory.revalidate().is_err());
+        assert!(inventory.bind_references(&root, &root).is_err());
     }
 }
 

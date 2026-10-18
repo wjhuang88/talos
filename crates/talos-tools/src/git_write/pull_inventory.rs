@@ -231,8 +231,24 @@ impl Inventory {
             entries: 4096,
             bytes: 4 * 1024 * 1024,
         };
+        // Existing evidence has just been revalidated in place. Keep its
+        // identity handles and bytes rather than capturing a second full copy.
+        // It still consumes the same allowance when admitting new references.
+        for (_, retained) in &self.references {
+            budget.entries = budget.entries.checked_sub(1).ok_or_else(invalid)?;
+            if let super::snapshot::Entry::File(_, bytes) = &retained.entry {
+                budget.bytes = budget.bytes.checked_sub(bytes.len()).ok_or_else(invalid)?;
+            }
+        }
         let mut evidence = Vec::new();
         for (path, identity) in &self.visited {
+            if self
+                .references
+                .binary_search_by(|(retained, _)| retained.cmp(path))
+                .is_ok()
+            {
+                continue;
+            }
             let reference = [gitdir, common]
                 .into_iter()
                 .chain(self.worktree_reference_roots.iter().map(PathBuf::as_path))
@@ -295,7 +311,9 @@ impl Inventory {
             }
         }
         self.revalidate()?;
-        self.references = evidence;
+        self.references.extend(evidence);
+        self.references
+            .sort_by(|(left, _), (right, _)| left.cmp(right));
         self.revalidate()
     }
 
