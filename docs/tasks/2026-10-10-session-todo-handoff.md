@@ -4083,3 +4083,31 @@ Windows CI 39122382667 compiled the previously failing test target and ran
 foreground tests, but path_identity_retains_leaf_and_ancestor_identity failed
 when renaming a parent directory with retained handles (Access denied). This
 must be resolved and revalidated on Windows; no platform completion is claimed.
+
+Windows metadata-handle correction (2026-10-18, `f4c3ba0d`): PathIdentity now
+uses metadata-only handles with explicit read/write/delete sharing instead of
+same-file's content-read path constructor. Independent review found no blocker;
+all original replacement assertions remain, local snapshot tests pass 9/9 and
+Windows GNU Git-only library check passes (seven existing feature-only warnings).
+Native Windows runtime success remains unproven. Standard full preflight is
+running in session 48484, log `/tmp/talos-i300-metadata-handle-preflight.log`.
+Resume by checking that session, then publish a validated stable candidate for
+fresh Windows CI. Shared full resource accounting, resolution authorization,
+complete Pull execution and the original remaining queue are still open.
+
+Shared alternate evidence checkpoint (2026-10-18, `d830597a`): fixed alternate
+files join the shared reference-file allowance; repeated binding reuses retained
+evidence after drift checks. Nonempty alternate stores still refuse. Independent
+review found no blocker; inventory tests pass 33/33 and all-feature library
+Clippy passes. Session 48484 failed on sandbox PermissionDenied executing CLI
+fixtures. Approved standard preflight session 96720 is live with log
+`/tmp/talos-i300-shared-alternates-preflight-unsandboxed.log`; inspect that handle
+before restarting any validation. Native Windows CI, unified non-file resource
+accounting, dedicated resolution authorization, complete Pull and the remaining
+original queue are still required.
+
+Stage synchronization (2026-10-18): fetch succeeds, current implementation
+`d830597a` is ahead 170 / behind 0 origin/main; no rebase needed. Both governance
+validators pass without warnings. CI 39122382667 is terminal with Linux workspace
+success and the previously recorded Windows identity runtime failure; it predates
+the corrective handle change. Check live preflight 96720 before publishing.
