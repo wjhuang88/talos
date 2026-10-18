@@ -839,11 +839,10 @@ impl AddPlan {
             path.starts_with(gitdir) || path.starts_with(common) || exact(path).is_some()
         };
         let mut pending = inventory
-            .exact_paths(gitdir, common)
-            .iter()
+            .iter_exact_paths(gitdir, common)
             .any(|path| exact(path).is_none());
         if !pending {
-            while !inventory.complete() && inventory.paths().iter().all(|path| admitted(path)) {
+            while !inventory.complete() && inventory.iter_paths().all(&admitted) {
                 inventory.advance(admitted)?;
             }
             pending = !inventory.complete();
@@ -861,7 +860,7 @@ impl AddPlan {
                 )?;
             }
         }
-        for path in inventory.exact_paths(gitdir, common) {
+        for path in inventory.iter_exact_paths(gitdir, common) {
             if !self.facets.iter().any(|facet| {
                 facet.nature == ToolNature::Read
                     && facet.resource_kind == Some(ToolResourceKind::Path)
@@ -869,7 +868,7 @@ impl AddPlan {
             }) {
                 self.facets.push(path_facet(
                     ToolNature::Read,
-                    &path,
+                    path,
                     "Pull parent linked-worktree target or reference frontier; reads deferred",
                 )?);
             }
@@ -1070,7 +1069,7 @@ impl AddPlan {
             // Current module declarations are worktree input, never covered by
             // the dedicated metadata capability. Admit even an absent file.
             source_paths.push(self.repository.workdir.join(".gitmodules"));
-            let mut paths = inventory.paths();
+            let mut paths = inventory.capture_paths()?;
             paths.extend(source_paths);
             if inventory.complete() {
                 // Fixed evidence names are known at configuration discovery
@@ -2457,11 +2456,11 @@ impl AddPlan {
             // Directory depth within approved metadata roots consumes no new
             // runner stage. External reference frontiers still wait for exact
             // grants, including each newly discovered descendant.
-            while !inventory.complete() && inventory.paths().iter().all(|path| admitted(path)) {
+            while !inventory.complete() && inventory.iter_paths().all(&admitted) {
                 inventory.advance(admitted)?;
             }
             pending |= !inventory.complete();
-            for path in inventory.exact_paths(&location.git_dir, &location.common_dir) {
+            for path in inventory.iter_exact_paths(&location.git_dir, &location.common_dir) {
                 if !self.facets.iter().any(|facet| {
                     facet.nature == ToolNature::Read
                         && facet.resource_kind == Some(ToolResourceKind::Path)
@@ -2469,7 +2468,7 @@ impl AddPlan {
                 }) {
                     self.facets.push(path_facet(
                         ToolNature::Read,
-                        &path,
+                        path,
                         "Pull child object and reference inventory frontier",
                     )?);
                 }
@@ -2497,7 +2496,7 @@ impl AddPlan {
                 resolution_admitted,
             )?;
             pending |= discovered;
-            for path in inventory.exact_paths(&location.git_dir, &location.common_dir) {
+            for path in inventory.iter_exact_paths(&location.git_dir, &location.common_dir) {
                 if !self.facets.iter().any(|facet| {
                     facet.nature == ToolNature::Read
                         && facet.resource_kind == Some(ToolResourceKind::Path)
@@ -2505,7 +2504,7 @@ impl AddPlan {
                 }) {
                     self.facets.push(path_facet(
                         ToolNature::Read,
-                        &path,
+                        path,
                         "Pull linked worktree target or reference frontier; descendant reads deferred",
                     )?);
                 }
@@ -2584,7 +2583,7 @@ impl AddPlan {
             }
             // Parent graph evidence cannot be silently rebased by a child fetch.
             if self.pull_inventory.as_ref().is_some_and(|inventory| {
-                inventory.paths().iter().any(|path| {
+                inventory.iter_paths().any(|path| {
                     [&location.git_dir, &location.common_dir]
                         .iter()
                         .any(|root| path.starts_with(root) || root.starts_with(path))
@@ -2672,7 +2671,7 @@ impl AddPlan {
                 .pull_child_inventories
                 .iter()
                 .filter(|(_, inventory)| {
-                    inventory.paths().iter().any(|path| {
+                    inventory.iter_paths().any(|path| {
                         roots
                             .iter()
                             .any(|root| path.starts_with(root) || root.starts_with(path))
