@@ -3796,3 +3796,15 @@ Clippy passes. Stale core.worktree did not fail in these fetch probes, so native
 source commentary is not evidence that this case must fail. This correction does
 not implement missing-checkout fallback, enable local transports, remove startup
 admission, or activate production Pull. Full T7 and handoff closure remain open.
+
+Child fetch command separation (2026-10-18): fetch now has a dedicated command
+builder instead of sharing the explicitly bound object-probe worktree override.
+Current-index tasks, including OnDemand, keep native worktree setup; historical
+ones use --work-tree=. with cwd=gitdir. Object probes retain their separately
+bound layout. The real fetch matrix verifies arguments and execution for current,
+OnDemand, renamed/current-wins and historical-only cases. Scheduling inputs are
+still fixture-seeded, not end-to-end parent discovery evidence. Locked Pull
+suite passes 110/110; all-feature/all-target Clippy passes; independent review
+found no blocker. Existing startup target admission/revalidation is retained;
+metadata-only fallback and removal of unnecessary historical target admission
+remain open. Production Pull stays disabled and original closure gates remain.

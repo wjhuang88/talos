@@ -2549,8 +2549,7 @@ impl AddPlan {
             let (remote, _) = self.pull_child_fetch_targets.get(workdir).ok_or_else(|| {
                 GitToolError::InvalidInput("Pull child fetch remote missing".into())
             })?;
-            let mut command =
-                self.pull_child_command(&location.git_dir, &location.git_dir, worktree);
+            let mut command = self.pull_child_fetch_command(workdir, &location.git_dir);
             command.args([
                 "-c",
                 "maintenance.autoDetach=false",
@@ -2670,6 +2669,29 @@ impl AddPlan {
         Ok(false)
     }
 
+    fn pull_child_fetch_command(&self, selected: &Path, gitdir: &Path) -> tokio::process::Command {
+        let mut command = tokio::process::Command::new(&self.program);
+        command
+            .current_dir(gitdir)
+            .arg("--no-pager")
+            .arg("--git-dir")
+            .arg(gitdir)
+            .env_clear()
+            .envs(&self.environment);
+        // Git schedules index tasks first, including OnDemand tasks. Only
+        // historical tasks override worktree setup; this is unrelated to the
+        // unconditional-fetch policy and to whether a checkout is populated.
+        if !self
+            .pull_current_fetch_children
+            .keys()
+            .any(|path| self.repository.workdir.join(path) == selected)
+        {
+            command.arg("--work-tree=.");
+        }
+        command
+    }
+
+    // Object probes use their independently bound layout, not fetch scheduling.
     fn pull_child_command(
         &self,
         workdir: &Path,
