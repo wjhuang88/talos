@@ -4570,3 +4570,25 @@ preparation gate, child-bootstrap and selected Add acceptance cases, then fails
 executable differs from bound Git. The remaining later operation cases were not
 run. Log `/tmp/talos-i300-windows-117697889352.log`. Investigate executable binding;
 do not weaken the guard or claim Windows operation acceptance.
+
+Maintenance binding diagnostic checkpoint (2026-10-18): the native f29e4ed0
+candidate's Format/Check/Clippy/Test job finished successfully, but the Windows
+job failed at the maintenance binding guard described above. The next candidate
+accepts CRLF as well as LF framing for the path-only `--exec-path` response and
+adds test-only rejected-child/canonical/bound path diagnostics. This is a narrow
+line-protocol normalization (including the trailing-CR ambiguity on Unix), not
+evidence of the Windows root cause. The canonical diagnostic is a second
+observation after rejection, not an atomic snapshot of the failed comparison.
+Fresh child Read/Execute admission and the canonical executable identity guard
+are unchanged; independent review found no authorization-boundary relaxation.
+The focused local Commit test passes 1/1
+(`/tmp/talos-i300-maintenance-crlf.log`). Native Commit/Checkout/Push acceptance
+and production Windows preparation remain outstanding.
+
+Final local stage validation: the pinned-toolchain standard
+`./scripts/release_preflight.sh` exited 0 with incremental compilation disabled,
+debug info disabled and two build jobs. Log:
+`/tmp/talos-i300-metadata-maintenance-preflight.log`. It covers 2134fb19,
+24449b2c and the maintenance path/diagnostic source changes, including workspace
+tests and both external Runtime SDK fixture variants. This is local validation;
+fresh remote evidence is still required for this stage and no merge is claimed.
