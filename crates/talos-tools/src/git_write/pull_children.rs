@@ -471,6 +471,109 @@ mod tests {
     use super::*;
 
     #[test]
+    fn native_recursive_fetch_updates_selected_unpopulated_module() {
+        let fixture = tempfile::tempdir().expect("fixture");
+        let root = fixture.path();
+        let git = |cwd: &std::path::Path, args: &[&str]| {
+            let output = std::process::Command::new("git")
+                .current_dir(cwd)
+                .env("GIT_CONFIG_NOSYSTEM", "1")
+                .env("GIT_CONFIG_GLOBAL", root.join("absent-config"))
+                .env("GIT_AUTHOR_NAME", "Fixture")
+                .env("GIT_AUTHOR_EMAIL", "fixture@example.invalid")
+                .env("GIT_COMMITTER_NAME", "Fixture")
+                .env("GIT_COMMITTER_EMAIL", "fixture@example.invalid")
+                .env("GIT_TRACE2", "0")
+                .env("GIT_TRACE2_EVENT", "0")
+                .env("GIT_TRACE2_PERF", "0")
+                .args([
+                    "-c",
+                    "protocol.file.allow=always",
+                    "-c",
+                    "maintenance.autoDetach=false",
+                    "-c",
+                    "gc.autoDetach=false",
+                ])
+                .args(args)
+                .output()
+                .expect("fixture Git");
+            assert!(output.status.success(), "{args:?}: {output:?}");
+            String::from_utf8(output.stdout)
+                .expect("UTF-8")
+                .trim()
+                .to_owned()
+        };
+        let source = root.join("source");
+        let parent = root.join("parent");
+        let consumer = root.join("consumer");
+        for path in [&source, &parent] {
+            std::fs::create_dir(path).expect("repository directory");
+            git(path, &["init", "-qb", "main"]);
+        }
+        std::fs::write(source.join("file"), b"one").expect("source");
+        git(&source, &["add", "."]);
+        git(&source, &["commit", "-qm", "one"]);
+        git(
+            &parent,
+            &[
+                "submodule",
+                "add",
+                "--name",
+                "named-child",
+                source.to_str().expect("path"),
+                "checkout",
+            ],
+        );
+        git(&parent, &["commit", "-qam", "parent"]);
+        git(
+            root,
+            &[
+                "clone",
+                "--recurse-submodules",
+                parent.to_str().expect("path"),
+                "consumer",
+            ],
+        );
+        git(&consumer, &["submodule", "deinit", "-f", "checkout"]);
+        git(
+            &consumer,
+            &["config", "submodule.named-child.active", "true"],
+        );
+        git(
+            &consumer,
+            &[
+                "config",
+                "submodule.named-child.url",
+                source.to_str().expect("path"),
+            ],
+        );
+        std::fs::write(source.join("file"), b"two").expect("advance source");
+        git(&source, &["commit", "-qam", "two"]);
+        let expected = git(&source, &["rev-parse", "HEAD"]);
+        git(&parent.join("checkout"), &["fetch"]);
+        git(&parent.join("checkout"), &["checkout", &expected]);
+        git(&parent, &["add", "checkout"]);
+        git(&parent, &["commit", "-qm", "advance"]);
+        git(&consumer, &["fetch", "--recurse-submodules=yes"]);
+        assert!(!consumer.join("checkout/.git").exists());
+        let metadata = consumer.join(".git/modules/named-child");
+        assert_eq!(
+            git(
+                &consumer,
+                &[
+                    "--git-dir",
+                    metadata.to_str().expect("path"),
+                    "rev-parse",
+                    "refs/remotes/origin/main"
+                ]
+            ),
+            expected
+        );
+        // Native parity evidence only: the prepared Pull fallback still needs
+        // its own metadata admission and execution coverage before activation.
+    }
+
+    #[test]
     fn pull_commit_batch_distinguishes_missing_and_rejects_noncommits_and_bad_protocol() {
         let objects = vec!["a".repeat(40), "b".repeat(40)];
         let output = format!("{} commit\n{} missing\n", objects[0], objects[1]);
