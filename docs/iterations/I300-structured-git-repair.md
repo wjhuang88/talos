@@ -4286,3 +4286,15 @@ run failed only on process observation EPERM and is superseded for this gate.
 Fetch found no origin/main-only commits (ahead 165 / behind 0), so no rebase
 was needed. Publish this reviewed batch to PR #735 for fresh Windows test
 compilation/runtime evidence. This does not complete T7 or enable Pull.
+
+Pull retained-reference checkpoint (2026-10-18): repeated reference binding
+now revalidates existing bytes/leaf identities in place and captures only new
+paths. Existing evidence consumes the same per-inventory file allowance before
+new capture; no second full copy of retained file bodies/handles is created.
+Independent review found no blocker. Inventory tests pass 29/29, including
+repeated binding and subsequent drift refusal; all-feature library Clippy with
+warnings denied and formatting pass. Logs:
+`/tmp/talos-i300-retained-reference-{tests,clippy}.log`. This is not invocation-wide
+accounting: shared parent/child/continuation quotas, temporary resource peaks,
+resolution authorization and full Pull delivery remain open. Production Pull
+stays disabled and T7 remains Active.
