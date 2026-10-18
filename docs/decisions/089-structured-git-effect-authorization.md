@@ -318,15 +318,16 @@ denied frontier preserving all repository state, approval-between-stage drift,
 budgets, final effects, real prepared Agent/Runtime/MCP execution, and independent
 security review. Full support remains outstanding until those gates pass.
 
-### Proposed Pull worktree resolution metadata capability (2026-10-18)
+### Accepted Pull worktree resolution metadata capability (2026-10-18)
 
-Status: Proposed; not accepted or enabled. Exact Path Read normalizes `..`
+Status: Accepted by the maintainer on 2026-10-18; implementation and activation
+gates remain outstanding. Exact Path Read normalizes `..`
 lexically before resolving links. Git's relative linked-worktree backlinks
 resolve components in filesystem order, so the approved normalized path may
 not identify the actual resolution target. A later target grant cannot
 retroactively authorize metadata reads performed while discovering it.
 
-Propose Read(Remote `git:pull-worktree-resolution`) for structured Pull only.
+Accepted Read(Remote `git:pull-worktree-resolution`) for structured Pull only.
 Its immutable inputs are relative `gitdir` backlinks and `commondir` pointers
 retained from separately admitted linked-worktree registration files. Inputs include
 both absolute and relative commondir values under the existing strict syntax;
@@ -368,7 +369,10 @@ confinement. Denial, redirection, budget exhaustion and real permission-pipeline
 tests plus independent security review are required before enabling this path.
 
 This is separate from the unaccepted Checkout configuration-link proposal.
-Maintainer acceptance is required before implementation enables the capability.
+Maintainer acceptance authorizes implementation within this scope; it does not
+waive the denial, drift, cumulative-budget, target-admission or independent
+security-review gates above. Production Pull remains disabled until its full
+delivery gates pass.
 
 ### Foreground maintenance accepted (2026-10-12)
 
