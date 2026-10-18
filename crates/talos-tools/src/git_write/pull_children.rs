@@ -14,12 +14,30 @@ pub(super) fn legacy_metadata_candidate(
     name: &str,
 ) -> Option<std::path::PathBuf> {
     // Reject portable lexical escapes, including Windows trailing-dot/space
-    // aliases. Filesystem aliases and reserved devices still require validation
+    // aliases and reserved devices. Filesystem aliases still require validation
     // before use; this helper performs no filesystem lookup.
     if name.is_empty()
         || name.contains(['\\', ':', '\0', '\n', '\r'])
         || name.split('/').any(|part| {
-            part.is_empty() || part.ends_with(['.', ' ']) || part.eq_ignore_ascii_case(".git")
+            let stem = part
+                .split('.')
+                .next()
+                .unwrap_or_default()
+                .trim_end_matches(' ');
+            let device = matches!(
+                stem.to_ascii_uppercase().as_str(),
+                "CON" | "PRN" | "AUX" | "NUL" | "CONIN$" | "CONOUT$"
+            ) || stem.get(..3).is_some_and(|prefix| {
+                (prefix.eq_ignore_ascii_case("COM") || prefix.eq_ignore_ascii_case("LPT"))
+                    && matches!(
+                        stem.get(3..),
+                        Some("1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "¹" | "²" | "³")
+                    )
+            });
+            part.is_empty()
+                || part.ends_with(['.', ' '])
+                || part.eq_ignore_ascii_case(".git")
+                || device
         })
     {
         return None;
@@ -491,6 +509,47 @@ impl Tree {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn legacy_metadata_candidate_excludes_windows_devices() {
+        let common = std::path::Path::new("parent.git");
+        for name in [
+            "CON",
+            "nested/nul.config",
+            "aux",
+            "PRN.txt",
+            "COM1",
+            "lpt9.log",
+            "COM¹",
+            "LPT².config",
+            "com³",
+            "CONIN$",
+            "conout$.log",
+            "CON .txt",
+            "nested/NUL .config",
+            "COM1 .log",
+            "LPT² .config",
+        ] {
+            assert!(
+                legacy_metadata_candidate(common, name).is_none(),
+                "{name:?}"
+            );
+        }
+        for name in [
+            "COM0",
+            "COM10",
+            "LPT0",
+            "LPT10",
+            "console",
+            "auxiliary",
+            "日本語",
+        ] {
+            assert!(
+                legacy_metadata_candidate(common, name).is_some(),
+                "{name:?}"
+            );
+        }
+    }
 
     #[test]
     fn legacy_metadata_candidate_cannot_escape_modules() {
