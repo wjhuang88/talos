@@ -3832,3 +3832,11 @@ Outside-sandbox locked rerun passes 138/138 prepared tests
 (/tmp/talos-i300-test-fragments-unsandboxed.log); the environment failure is
 closed for this slice. This is focused test evidence, not the final workspace
 preflight, Windows runtime validation, or production Pull activation.
+
+Pull worktree-resolution decision accepted (2026-10-18): maintainer explicitly
+accepted the dedicated git:pull-worktree-resolution metadata-only capability
+with 64 link hops/source and invocation-wide 4096-entry/4-MiB limits, followed
+by separate exact target Read approval. ADR-089 records acceptance without
+enabling the capability or waiving denial/drift/budget/security-review gates.
+The existing unbounded resolver must be replaced before consuming this scope;
+production Pull remains disabled and T7 remains Active.
