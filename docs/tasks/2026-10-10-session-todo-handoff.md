@@ -3751,3 +3751,16 @@ documentation is 7aa96710. Post-rebase locked Pull tests again pass 109/109 and
 all-feature/all-target Clippy passes with warnings denied (logs:
 `/tmp/talos-i300-frontier-post-rebase-{tests,clippy}.log`). Both governance
 validators passed before rebase; final delivery still requires exact-head gates.
+
+Pull recursion precedence correction (2026-10-18): native source review found
+that the previous OR of current/historical unconditional modes was incorrect.
+The selected current-index task now owns its recursion mode; a historical On
+cannot upgrade current OnDemand. The real fetch fixture now expects renamed-on
+to skip reachable objects and separately verifies historical-only On still
+fetches. Its scheduling state is established before discovery rather than changed
+after approval. Locked Pull tests pass 109/109 and all-target/all-feature Clippy
+passes; independent review found no new blocker. These fixtures manually seed
+the selected task state, so they do not prove native changed-list calculation or
+full runner delivery. Metadata-only fallback, execution layout, resolution
+authority and original T7 closure gates remain open. The reusable test-model
+lesson is recorded in EVOLUTION.md.

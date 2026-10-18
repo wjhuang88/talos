@@ -5,6 +5,15 @@
 Record reusable lessons from failures, corrections, and unexpected successes. Check here before
 repeating known mistakes.
 
+## 2026-10-18 - Preserve the winning Git task's recursion policy
+
+- Trigger: Native source review while implementing metadata-only Pull children.
+- Symptom: A historical `On` policy incorrectly forced fetch for a current-index `OnDemand` task whose objects were already reachable; the fixture expected that incorrect fetch.
+- Root cause: Current and historical policies were OR-combined despite Git scheduling current tasks first and deduplicating by module name.
+- Fix: Use the current task's mode when present; consult historical mode only for a historical task. Establish fixture policy before discovery, not after approval.
+- Prevention: Verify native task selection and deduplication before combining settings from multiple snapshots; tests can preserve a mistaken model.
+- Promoted to rule/check: `pull_child_fetch_has_own_write_stage_and_rebuilds_graph` checks renamed historical `On` cannot upgrade current `OnDemand`, while historical-only `On` still fetches.
+
 ## 2026-10-16 - Git config write calls do not define declaration order
 
 - Trigger: Native recursive-fetch parity fixture for I300.
@@ -25,6 +34,7 @@ repeating known mistakes.
 
 ## Lesson Index
 
+- [Preserve the winning Git task's recursion policy](#2026-10-18---preserve-the-winning-git-tasks-recursion-policy) — I300.
 - [Git config write calls do not define declaration order](#2026-10-16---git-config-write-calls-do-not-define-declaration-order) — I300.
 - [Git hooks are not limited to executable files](#2026-10-14---git-hooks-are-not-limited-to-executable-files) — I300.
 - [Async decision receipts are not authorization](#2026-10-14---async-decision-receipts-are-not-authorization) — I300.
