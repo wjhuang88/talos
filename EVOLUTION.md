@@ -5,6 +5,15 @@
 Record reusable lessons from failures, corrections, and unexpected successes. Check here before
 repeating known mistakes.
 
+## 2026-10-18 - Bind fetch resources to its execution directory
+
+- Trigger: Native Git 2.54 probes during I300 child execution layout review.
+- Symptom: The plan approved relative hooks and local remotes under the child worktree while fetch consumed them under its gitdir.
+- Root cause: Worktree setup and process-relative resource lookup were treated as the same base; source comments about stale worktrees were overgeneralized.
+- Fix: Plan both child fetch hook waves and local remote candidates from the retained gitdir. Keep startup evidence separate.
+- Prevention: Verify actual resource consumption with native fixtures before translating configured paths into permission facets.
+- Promoted to rule/check: `native_child_fetch_uses_gitdir_for_relative_hooks_and_remote` records real hook cwd and relative-source success; the prepared child matrix refuses executable relative hooks before fetch.
+
 ## 2026-10-18 - Preserve the winning Git task's recursion policy
 
 - Trigger: Native source review while implementing metadata-only Pull children.
@@ -34,6 +43,7 @@ repeating known mistakes.
 
 ## Lesson Index
 
+- [Bind fetch resources to its execution directory](#2026-10-18---bind-fetch-resources-to-its-execution-directory) — I300.
 - [Preserve the winning Git task's recursion policy](#2026-10-18---preserve-the-winning-git-tasks-recursion-policy) — I300.
 - [Git config write calls do not define declaration order](#2026-10-16---git-config-write-calls-do-not-define-declaration-order) — I300.
 - [Git hooks are not limited to executable files](#2026-10-14---git-hooks-are-not-limited-to-executable-files) — I300.

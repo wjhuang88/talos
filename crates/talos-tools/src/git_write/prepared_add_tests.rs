@@ -5848,6 +5848,113 @@ async fn pull_initialized_current_child_suppresses_same_historical_name() {
     }
 }
 
+// Match native recursive fetch's cwd/GIT_DIR setup and the prepared command's
+// explicit worktree override. Neither changes relative fetch resource lookup.
+#[cfg(unix)]
+#[test]
+fn native_child_fetch_uses_gitdir_for_relative_hooks_and_remote() {
+    use std::os::unix::fs::PermissionsExt;
+    let source = fixture();
+    let git = |cwd: &Path, args: &[&str]| {
+        let output = std::process::Command::new("git")
+            .current_dir(cwd)
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .args(args)
+            .output()
+            .expect("Git");
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    };
+    git(
+        source.path(),
+        &[
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.com",
+            "commit",
+            "--allow-empty",
+            "-m",
+            "source",
+        ],
+    );
+    for mode in ["native", "configured", "stale", "historical", "prepared"] {
+        let child = fixture();
+        let root = child.path().canonicalize().expect("root");
+        let gitdir = root.join(".git");
+        let worktree = root.join("configured-worktree");
+        if mode != "stale" {
+            std::fs::create_dir(&worktree).expect("worktree");
+        }
+        if mode != "native" {
+            git(
+                &root,
+                &["config", "core.worktree", worktree.to_str().expect("path")],
+            );
+        }
+        git(
+            &gitdir,
+            &[
+                "clone",
+                "--bare",
+                source.path().to_str().expect("source"),
+                "relative-source",
+            ],
+        );
+        git(&root, &["config", "remote.origin.url", "relative-source"]);
+        git(&root, &["config", "core.hooksPath", "relative-hooks"]);
+        let hooks = gitdir.join("relative-hooks");
+        std::fs::create_dir(&hooks).expect("hooks");
+        let hook = hooks.join("reference-transaction");
+        std::fs::write(&hook, "#!/bin/sh\npwd > hook-ran\n").expect("hook");
+        std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o755)).expect("mode");
+        let mut command = std::process::Command::new("git");
+        command
+            .current_dir(&gitdir)
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .env("GIT_DIR", ".");
+        if mode == "historical" {
+            command.arg("--work-tree=.");
+        } else if mode == "prepared" {
+            command
+                .arg("--git-dir")
+                .arg(&gitdir)
+                .arg("--work-tree")
+                .arg(&worktree);
+        }
+        let output = command
+            .args([
+                "-c",
+                "maintenance.autoDetach=false",
+                "-c",
+                "gc.autoDetach=false",
+                "fetch",
+                "--no-recurse-submodules",
+                "origin",
+                "HEAD:refs/heads/fetched",
+            ])
+            .output()
+            .expect("fetch");
+        assert!(
+            output.status.success(),
+            "{mode}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let receipt = std::fs::read_to_string(gitdir.join("hook-ran")).expect("hook ran in gitdir");
+        assert_eq!(
+            Path::new(receipt.trim()).canonicalize().expect("hook cwd"),
+            gitdir
+        );
+        assert!(!root.join("hook-ran").exists());
+        assert!(!worktree.join("hook-ran").exists());
+    }
+}
+
 #[tokio::test]
 async fn pull_child_fetch_has_own_write_stage_and_rebuilds_graph() {
     let remote = fixture();
@@ -5910,8 +6017,10 @@ async fn pull_child_fetch_has_own_write_stage_and_rebuilds_graph() {
     })
     .await
     .expect("ready");
-    for mode in [
+    'cases: for mode in [
         "allow",
+        "relative-hook",
+        "relative-local",
         "missing-write",
         "skip",
         "linked",
@@ -5922,6 +6031,19 @@ async fn pull_child_fetch_has_own_write_stage_and_rebuilds_graph() {
         let root = fixture();
         git(root.path(), &["init", "child"]);
         let child = root.path().join("child").canonicalize().expect("child");
+        if mode == "relative-hook" {
+            git(&child, &["config", "core.hooksPath", "relative-hooks"]);
+            let hooks = child.join(".git/relative-hooks");
+            std::fs::create_dir(&hooks).expect("hooks");
+            let hook = hooks.join("reference-transaction");
+            std::fs::write(&hook, "#!/bin/sh\necho ran > hook-ran\n").expect("hook");
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o755))
+                    .expect("executable hook");
+            }
+        }
         git(
             &child,
             &[
@@ -5931,6 +6053,9 @@ async fn pull_child_fetch_has_own_write_stage_and_rebuilds_graph() {
                 &format!("git://127.0.0.1:{port}/"),
             ],
         );
+        if mode == "relative-local" {
+            git(&child, &["remote", "set-url", "origin", "relative-source"]);
+        }
         if matches!(mode, "skip" | "renamed-on" | "historical-on") {
             git(
                 &child,
@@ -6027,11 +6152,32 @@ async fn pull_child_fetch_has_own_write_stage_and_rebuilds_graph() {
             let tokens = proof(&plan)
                 .consume_for_prepared(&plan.request(), &plan.identity)
                 .expect("config proof");
-            plan = plan
-                .discover_pull_child_configuration(&tokens)
-                .await
-                .expect("child config");
+            let result = plan.discover_pull_child_configuration(&tokens).await;
+            if mode == "relative-hook" && result.is_err() {
+                let error = result.err().expect("hook refusal");
+                assert!(
+                    error.to_string().contains("Executable Git fetch hooks"),
+                    "{error}"
+                );
+                assert!(!child.join(".git/FETCH_HEAD").exists());
+                assert!(!child.join(".git/hook-ran").exists());
+                continue 'cases;
+            }
+            plan = result.expect("child config");
+            if mode == "relative-local" {
+                let expected = child.join(".git/relative-source");
+                assert!(plan.facets.iter().any(|facet| {
+                    facet.nature == ToolNature::Read
+                        && facet.resource.as_deref() == expected.to_str()
+                }));
+                assert!(!child.join(".git/FETCH_HEAD").exists());
+                continue 'cases;
+            }
         }
+        assert_ne!(
+            mode, "relative-hook",
+            "executable hook must be refused before fetch"
+        );
         assert!(plan.phase == Phase::PullChildFetch);
         assert!(!child.join(".git/FETCH_HEAD").exists());
         let mut tokens = proof(&plan)
