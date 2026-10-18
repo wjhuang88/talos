@@ -4647,3 +4647,15 @@ The object-layout assertion and production capture are unchanged. Log:
 passes 14/14 (`/tmp/talos-i300-repository-maintenance.log`). Both governance
 validators pass with zero warnings. Fresh full-stage validation and native
 Windows acceptance remain outstanding.
+
+Borrowed Pull inventory checkpoint (2026-10-18): production path and exact-path
+queries now borrow inventory entries rather than cloning full path vectors.
+Retained graph inventory copies charge the invocation ReferenceBudget before
+each clone; failed partial captures do not refund consumed allowance. Test-only
+owned query helpers preserve existing fixture assertions. Independent static
+review found no authorization-set change or retry refund. Pull regression tests
+pass 131/131 (`/tmp/talos-i300-borrowed-paths-final.log`); the additional focused
+exhaustion test passes 1/1 (`/tmp/talos-i300-borrowed-budget-final.log`).
+Source/required-path
+extensions, worktree-target copies, identity serialization and handles remain
+quota residuals; this does not close the full resource bound or enable Pull.

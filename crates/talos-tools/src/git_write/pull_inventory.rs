@@ -201,17 +201,30 @@ impl Inventory {
         })
     }
 
+    #[cfg(test)]
     pub(super) fn paths(&self) -> Vec<PathBuf> {
+        self.iter_paths().map(Path::to_owned).collect()
+    }
+
+    pub(super) fn capture_paths(&self) -> Result<Vec<PathBuf>, GitToolError> {
+        self.iter_paths()
+            .map(|path| {
+                self.reference_budget.retain_path(path)?;
+                Ok(path.to_owned())
+            })
+            .collect()
+    }
+
+    pub(super) fn iter_paths(&self) -> impl Iterator<Item = &Path> {
         self.visited
             .keys()
-            .cloned()
-            .chain(self.pending.iter().cloned())
+            .map(PathBuf::as_path)
+            .chain(self.pending.iter().map(PathBuf::as_path))
             .chain(
-                self.worktree_targets.values().filter_map(|target| {
-                    target.as_ref().map(|target| target.resolved().to_owned())
-                }),
+                self.worktree_targets
+                    .values()
+                    .filter_map(|target| target.as_ref().map(|target| target.resolved())),
             )
-            .collect()
     }
 
     pub(super) fn complete(&self) -> bool {
@@ -220,17 +233,25 @@ impl Inventory {
 
     /// External frontiers and resolved targets. Raw pointer spellings never
     /// enter Path facets or the general lexical permission normalizer.
+    #[cfg(test)]
     pub(super) fn exact_paths(&self, gitdir: &Path, common: &Path) -> Vec<PathBuf> {
-        self.paths()
-            .into_iter()
-            .filter(|path| {
-                self.worktree_targets
-                    .values()
-                    .flatten()
-                    .any(|target| target.resolved() == path)
-                    || (!path.starts_with(gitdir) && !path.starts_with(common))
-            })
+        self.iter_exact_paths(gitdir, common)
+            .map(Path::to_owned)
             .collect()
+    }
+
+    pub(super) fn iter_exact_paths<'a>(
+        &'a self,
+        gitdir: &'a Path,
+        common: &'a Path,
+    ) -> impl Iterator<Item = &'a Path> {
+        self.iter_paths().filter(move |path| {
+            self.worktree_targets
+                .values()
+                .flatten()
+                .any(|target| target.resolved() == *path)
+                || (!path.starts_with(gitdir) && !path.starts_with(common))
+        })
     }
 
     pub(super) fn subtree_complete(&self, root: &Path) -> bool {
@@ -530,7 +551,7 @@ impl Inventory {
         // Check every resource before metadata access, including previously
         // visited entries used for revalidation. Never traverse an unapproved
         // child simply because its parent was approved.
-        if self.paths().iter().any(|path| !admitted(path)) {
+        if self.iter_paths().any(|path| !admitted(path)) {
             return Err(invalid());
         }
         self.revalidate()?;

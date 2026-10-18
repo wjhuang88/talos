@@ -1,6 +1,26 @@
 use super::*;
 
 #[test]
+fn borrowed_queries_preserve_allowance_but_owned_capture_cannot_retry_exhaustion() {
+    let temp = tempfile::tempdir().expect("fixture");
+    let root = temp.path().canonicalize().expect("root");
+    let budget = ReferenceBudget(Arc::new(Mutex::new((21, 1024 * 1024))));
+    let inventory =
+        Inventory::with_reference_budget(&root, &root, budget.clone()).expect("frontier");
+    let before = *budget.0.lock().expect("allowance");
+    assert_eq!(before.0, 1);
+    assert!(inventory.iter_paths().count() > 1);
+    assert_eq!(inventory.iter_exact_paths(&root, &root).count(), 0);
+    assert_eq!(*budget.0.lock().expect("allowance"), before);
+    assert!(inventory.capture_paths().is_err());
+    let exhausted = *budget.0.lock().expect("allowance");
+    assert_eq!(exhausted.0, 0);
+    assert!(exhausted.1 < before.1);
+    assert!(inventory.capture_paths().is_err());
+    assert_eq!(*budget.0.lock().expect("allowance"), exhausted);
+}
+
+#[test]
 fn retained_directory_revalidation_does_not_restart_discovery() {
     let temp = tempfile::tempdir().expect("fixture");
     let root = temp.path().canonicalize().expect("root");
