@@ -3745,4 +3745,9 @@ explicit populated/metadata-only layout remain required. Native source review
 also confirms scheduling and layout are independent: index tasks preserve
 configured worktree setup, while changed tasks always override `--work-tree=.`
 with cwd=gitdir. Do not apply that override to every metadata-only child.
-Fetch advanced origin/main from 8fa2a500 to dea3edcc; rebase is the next step.
+Fetch advanced origin/main from 8fa2a500 to dea3edcc; all 136 local commits
+rebased cleanly. Frontier implementation is now 565fc093 and preceding validation
+documentation is 7aa96710. Post-rebase locked Pull tests again pass 109/109 and
+all-feature/all-target Clippy passes with warnings denied (logs:
+`/tmp/talos-i300-frontier-post-rebase-{tests,clippy}.log`). Both governance
+validators passed before rebase; final delivery still requires exact-head gates.
