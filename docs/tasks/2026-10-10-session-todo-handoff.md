@@ -4111,3 +4111,10 @@ Stage synchronization (2026-10-18): fetch succeeds, current implementation
 validators pass without warnings. CI 39122382667 is terminal with Linux workspace
 success and the previously recorded Windows identity runtime failure; it predates
 the corrective handle change. Check live preflight 96720 before publishing.
+
+Stable-candidate gate result (2026-10-18): session 96720 exited 0 and standard
+preflight passed, including tools 865/865 and external runtime SDK fixtures,
+for implementation `d830597a`. Log:
+`/tmp/talos-i300-shared-alternates-preflight-unsandboxed.log`. Publish this
+reviewed stage to #735; native Windows verification and the full remaining
+handoff are still required. No T7 completion is claimed.

@@ -4344,3 +4344,10 @@ Both governance validators pass with zero warnings. Remote run 39122382667 is
 terminal: Linux standard workspace gate passed; Windows identity runtime failed
 as recorded above. That run predates the metadata-handle correction and does not
 validate it. Await external preflight session 96720 before publishing this batch.
+
+Stable-candidate gate result (2026-10-18): approved external session 96720
+exited 0; its log ends `release preflight: passed`. This validates implementation
+`d830597a` through the standard locked workspace check/Clippy/tests (tools
+865/865) and independent external runtime SDK fixtures. Publish the reviewed
+batch to #735 for native Windows evidence. This does not activate Pull or close
+T7; the original handoff queue remains authoritative.
