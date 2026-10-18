@@ -3699,3 +3699,36 @@ and checkpoint commits so no test runs across a moving source tree. Independent
 review refined the disabled Pull resolution proposal's commondir syntax,
 external chain scope, invocation-wide budgets and Windows handle accounting.
 Maintainer decision remains pending; no capability is enabled.
+
+Rebase and native fallback evidence (2026-10-18): SDK fixture session 52464
+passed in both default and coding modes after the one-line lock fix. All 133
+local commits rebased cleanly onto origin/main 8fa2a500. Rewritten stage SHAs:
+a172c725 (native inventory), 48de42ad (backlink resolver), 0a4f33d1 (SDK lock),
+40ea5b83 (pending authority proposal). Post-rebase preflight session 99760 is
+running; log /tmp/talos-i300-post-rebase-preflight.log. A new test-only native
+fallback fixture was added while that run was active; do not claim the run
+validates that new test unless its output selects it. Separate all-feature
+focused validation is session 17853, log:
+/tmp/talos-i300-unpopulated-native-test.log. A real Git fixture confirms an active
+unpopulated child with no checkout/.git can fetch via modules/named-child when
+the fetched parent advances its gitlink. The first manual fixture omitted an
+upstream parent advance and activity restoration, so it was inconclusive and
+is not positive evidence. Prepared Pull does not yet implement this fallback:
+its bootstrap config command currently requires a worktree and must gain an
+explicit metadata-only mode with fresh admission, not a fabricated worktree.
+The Pull resolution metadata proposal remains unaccepted and disabled.
+Focused native fallback regression session 17853 passed 1/1 with --locked and
+--all-features. It is native behavior evidence, not prepared fallback delivery.
+Affected all-feature/all-target Clippy session 40706 is running.
+
+Post-rebase full validation result (2026-10-18): standard preflight session
+99760 exited 0 with `release preflight: passed`. The tools binary selected
+830 tests and did not contain the later native fallback test; its separate
+locked all-feature run passed 1/1 and affected all-target/all-feature Clippy
+session 40706 exited 0. SDK default/coding execution passed in the full run.
+Native fallback evidence is committed as acd572e8. This closes the current
+local preflight failures, not T7 activation or delivery: metadata-only child
+execution, recursive retry/integration, resolution authority and original
+platform/runtime/publication gates remain. No fresh full preflight is needed
+solely to repeat the separately verified test addition; substantive upcoming
+code changes require fresh appropriate validation and final exact-head gates.
