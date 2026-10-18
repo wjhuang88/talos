@@ -4277,3 +4277,12 @@ encoder tests pass 3/3; standalone edition-2024 native inventory tests pass
 3/3; formatting and diff checks pass. These macOS checks do not compile or run
 the Windows control. Fresh Windows test-target/runtime CI and current-head full
 preflight remain required. Production Pull remains disabled; T7 is not complete.
+
+Current-source full validation (2026-10-18, implementation `42492944`):
+standard locked release preflight exited 0 outside the sandbox; tools tests
+861/861 and external runtime SDK fixtures passed. Log:
+`/tmp/talos-i300-control-fix-preflight-unsandboxed.log`. The earlier sandboxed
+run failed only on process observation EPERM and is superseded for this gate.
+Fetch found no origin/main-only commits (ahead 165 / behind 0), so no rebase
+was needed. Publish this reviewed batch to PR #735 for fresh Windows test
+compilation/runtime evidence. This does not complete T7 or enable Pull.
