@@ -421,8 +421,12 @@ impl Inventory {
             if gitdir && Path::new(text).is_absolute() {
                 continue;
             }
-            let target = path.parent().ok_or_else(invalid)?.join(text);
-            if !gitdir {
+            let parent = path.parent().ok_or_else(invalid)?;
+            self.reference_budget
+                .retain_child_name(parent, std::ffi::OsStr::new(text))?;
+            let target = parent.join(text);
+            if !gitdir && !self.worktree_common_targets.contains(&target) {
+                self.reference_budget.retain_path(&target)?;
                 self.worktree_common_targets.insert(target.clone());
             }
             if !self.worktree_targets.contains_key(&target) {
@@ -464,27 +468,33 @@ impl Inventory {
     ) -> Result<bool, GitToolError> {
         // Resolution is separately authorized; binding only consumes exact
         // resolved target grants. Never send raw spellings to a normalizer.
-        let mappings = self
-            .worktree_targets
-            .iter()
-            .map(|(raw, target)| {
-                let resolved = target.as_ref().ok_or_else(invalid)?.resolved();
-                let normalized = admitted(resolved).ok_or_else(invalid)?;
-                if normalized != resolved {
-                    return Err(invalid());
-                }
-                Ok((raw.clone(), normalized))
-            })
-            .collect::<Result<BTreeMap<_, _>, _>>()?;
+        for target in self.worktree_targets.values() {
+            let resolved = target.as_ref().ok_or_else(invalid)?.resolved();
+            self.reference_budget.retain_path(resolved)?;
+            let normalized = admitted(resolved).ok_or_else(invalid)?;
+            if normalized != resolved {
+                return Err(invalid());
+            }
+        }
         self.revalidate()?;
         // Resolving a common directory does not grant access to its reference
         // store. Publish only names here; the next advance requires fresh grants
         // before inspecting their type, contents, or descendants.
         let mut added = false;
         for raw in &self.worktree_common_targets {
-            let root = &mappings[raw];
-            self.worktree_reference_roots.insert(root.clone());
+            let root = self
+                .worktree_targets
+                .get(raw)
+                .and_then(Option::as_ref)
+                .ok_or_else(invalid)?
+                .resolved();
+            if !self.worktree_reference_roots.contains(root) {
+                self.reference_budget.retain_path(root)?;
+                self.worktree_reference_roots.insert(root.to_owned());
+            }
             for name in ["refs", "packed-refs", "reftable"] {
+                self.reference_budget
+                    .retain_child_name(root, std::ffi::OsStr::new(name))?;
                 let path = root.join(name);
                 if !self.visited.contains_key(&path) && !self.pending.contains(&path) {
                     if self.visited.len() + self.pending.len() + self.worktree_targets.len() >= 4096

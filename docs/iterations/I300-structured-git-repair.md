@@ -4659,3 +4659,23 @@ exhaustion test passes 1/1 (`/tmp/talos-i300-borrowed-budget-final.log`).
 Source/required-path
 extensions, worktree-target copies, identity serialization and handles remain
 quota residuals; this does not close the full resource bound or enable Pull.
+
+Borrowed-path full validation (2026-10-18): standard preflight initially stopped
+at the real Push fixture's process observation (macOS PermissionDenied; 876 tools
+tests passed). The unchanged standard command then exited 0 with explicit
+sandbox escalation, including workspace tests and both external Runtime SDK
+fixtures (`/tmp/talos-i300-borrowed-preflight-unsandboxed.log`). This validates
+27af3fa1; it does not validate subsequent worktree quota changes. Fetch confirmed
+no origin/main-only commits, so no rebase was necessary.
+
+Linked-worktree quota checkpoint (2026-10-18): binding validates each existing
+Resolution directly instead of building a temporary raw-to-normalized path map.
+Authorization-result copies, raw target joins, common-target/reference-root
+copies and reference frontier joins charge the same invocation ledger before
+allocation. Failed partial binding retains only charged state and never refunds;
+retries cannot invoke the grant-path callback after exhaustion. Independent
+static review found no authorization widening or early descendant reads. Pull
+regression tests pass 133/133 (`/tmp/talos-i300-worktree-budget-final.log`),
+including the separate binding exhaustion/retry test. Reference-evidence path
+copies, source/required-path extensions, identities and handle accounting remain
+open; no full quota closure or production activation is claimed.
