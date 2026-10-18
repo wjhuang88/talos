@@ -4007,3 +4007,28 @@ focused test passed separately. Do not label this a final-head full pass.
 Pull retained-byte discovery was separately committed as 4c9fec62 after 28/28
 inventory tests, Git library Clippy, both governance validators, and independent
 review. Shared budgets/raw-target authorization and the full queue remain open.
+Preflight continuation: session 65235 exited 101; the sole tools failure was
+prepared_local_push_runs_all_eight_admitted_stages, whose process observation
+returned sandbox EPERM (857 tools tests passed). An approved sandbox-external
+standard preflight is now running in session 78771, log
+/tmp/talos-i300-ci-correction-preflight-unsandboxed.log, against cd9755be source.
+Windows test-target cross-check also requires the absent MinGW C compiler and
+therefore did not compile/validate the Windows tests. Do not infer success.
+Local commits 83a0521f and cd9755be contain the independently reviewed CI fixes;
+keep these local until the stable-candidate validation checkpoint completes.
+Standing gix tracking recheck (2026-10-18): GitHub releases API still lists
+gix-v0.89.0 (published 2026-10-08) as the newest gix crate release in the most
+recent 100 releases; gix-utils/gix-error patch releases on 2026-10-11 are separate
+crates. Release notes confirm linked-worktree add/checkout/removal APIs and
+submodule configuration trust/provenance fixes, not an announced complete Talos
+push/pull/add/commit replacement. This corroborates, rather than supersedes, the
+2026-10-15 source audit. No dependency update or host-Git removal date is inferred.
+Source: https://github.com/GitoxideLabs/gitoxide/releases/tag/gix-v0.89.0 .
+
+CI correction preflight result (2026-10-18): sandbox-external session 78771
+exited 0; its log ends `release preflight: passed`. This validates cd9755be
+source through the standard locked workspace gates and external SDK fixtures.
+The owner I300 records the result. Publish the reviewed local correction batch
+to PR #735 and obtain fresh remote CI; Windows runtime verification, shared Pull
+budget/resolution admission, full Pull execution and the original remaining queue
+are still open. No T7 completion or merge is claimed.

@@ -4219,3 +4219,14 @@ source validation/binding refuse. Inventory tests pass 28/28. Independent target
 review found no new bypass in this delta; raw-target Path normalization and the
 invocation-wide accounting/resolution capability remain open and production Pull
 remains disabled. This is not final T7 security approval or completion.
+
+CI correction validation checkpoint (2026-10-18): source cd9755be passed the
+standard locked release preflight outside the sandbox (session 78771 exited 0;
+`/tmp/talos-i300-ci-correction-preflight-unsandboxed.log`), including workspace
+checks, Clippy, tests and both external SDK fixture runs. Commits 83a0521f and
+cd9755be respectively restrict obsolete host helpers to tests and apply accepted
+foreground maintenance settings to the post-fetch test fixture. The earlier
+sandbox run failed process observation with EPERM; this successful run supersedes
+that local validation failure, not the outstanding remote Windows CI. The fixture
+race cause remains tentative. PR #735 still requires fresh exact-head CI and
+review; production Pull and non-Unix preparation remain disabled, and T7 Active.
