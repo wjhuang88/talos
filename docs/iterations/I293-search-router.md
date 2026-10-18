@@ -10,7 +10,7 @@
 | Source Issue | #643 |
 | Depends on | Accepted ADR-085; SEARCH-001-B / #642 complete in #656; NET-001 boundary coordination |
 | Claim State | Claimed |
-| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 merged TLS/CONNECT subset; #716 merged bounded form/diagnostic stage at `b5b8241e`; CI3221 all6jobs pass; owned-request candidate delivery tracked from #643; full C/EP and default activation Pending |
+| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 merged TLS/CONNECT subset; #716 merged bounded form/diagnostic stage at `b5b8241e`; #732 merged owned payload at `8fa2a50`; dormant parser candidate delivery tracked from #643; full C/EP and default activation Pending |
 | Completion | Pending |
 
 ## Collaboration Claim
@@ -1147,3 +1147,64 @@ claims0warnings, text23/0, classifier14, site/installers and format pass. No sou
 after reconstruction. Three reviewed source fingerprints remain exact; this is fresh local evidence,
 not a reclassification of any earlier failed run. This prerequisite's candidate is Review;
 I293 remains Active/Claimed and Completion Pending. Exact remote CI/review/CAS remain pending.
+
+## Merged Owned Payload / Dormant DDG Parser Stage — 2026-10-18
+
+#732 merged as `8fa2a50016143b7c12f4fe7652d75078ab30f006`, source headb0ae0827/tree7c741724.
+CI3227/run39053154860 attempt1 all6jobs SUCCESS; Windows tools468/0failed/0ignored/0filtered,
+new5prepared fixtures/realOnce clear pass; macOS unfiltered original Unix socket, new fixtures,
+SDK2modes/fullpreflight and subsequent gates pass. Protected full-stage review/CAS6237834927 and
+delivery6237844190 record the evidence. This backfills actual #732; it is partial C evidence,
+not a Completion Commit for this still-incomplete parent. Historical failures remain unchanged.
+
+Selection base: main8fa2a50. The effective #712 claim already covers controlled existing-protocol
+internalization under ADR-090. Inventory before branch: I293 Active continues; I294 Active retains
+independent provider evidence; I300 Active retains Git/PERM-007-H boundaries; I302 Review retains
+#717; I277 Review keeps deferred device/human checks; I249 Planned stays deferred, I164 Paused
+stays superseded. I301/I303/I304/I305 remain Complete/Closed. Only #705 was open, owning Windows
+timeout diagnostics, with no overlapping parser scope. No separate owner/claim or new dependency.
+
+Runnable deliverable: private dormant Lite/HTML response parser plus synthetic fixtures, existing
+network-free rust-websearch helpers and bounded selection/text collection. This is explicitly
+library-only; no live query/response acquisition, request factory, default WebSearch switch,
+official root integration, new API/provider/dependency/lock or release. Affected reference:
+SEARCH-001-C-DDG-RESPONSE-PARSER.md. Full C/EP/parity/D/privacy/root/rollback/activation remain pending.
+
+Before deriving source, downloaded rust-websearch0.1.2 and verified archive06b90d9a9ad9e7e347c4cd85c3fb37189256703db4fab1d6c6fb963ae1eed0ee.
+VCS metadata pins b30180a03609580e8b28dfb682284cb2ba249fba/crates/websearch. Lite/HTML/html_utils
+archive files exactly match those independently retrieved from that GitHub revision. Full upstream
+MIT notice was retrieved before copying and retained inside the tools crate for package inclusion;
+per-file provenance and changes are recorded in the reference. No service-use admission follows.
+
+Protected design preview APPROVE scoped this to parser-only. Candidate outputs remain untrusted;
+javascript/relative/malformed links are deliberately not silently converted into approved URLs.
+Existing helper quirks, snippet alignment and Lite/HTML challenge differences remain characterized.
+Strict UTF-8/BOM rejection, 1MiB input,16KiB field and1..20 result bounds are explicit migration
+differences. Talos scraper0.27 versus upstream0.22 malformed-DOM parity remains unproven.
+Selector iterators do not make the DOM parser streaming; bounds do not prove hard process-memory
+or CPU deadlines, and catch_unwind does not catch abort/OOM or suppress global panic hooks.
+
+Workspace maintenance removed the prior checkout/cache; main was cloned and pinned Rust1.99.0
+restored. No prior check is relabeled as current validation. Fresh parser fixtures12/0 pass;
+full checks, crate license-inclusion validation, exact candidate review/CI and final CAS follow.
+I293 stays Active/Claimed, Completion Pending; #643/#624/#717 remain open and #705 stays independent.
+
+Fresh local convergence PASSED on pinned Rust1.99.0: locked full release_preflight,
+3746 primary workspace tests plus1 existing exact-selection proxy child, 0failed/ignored;
+independent Runtime SDK default and coding modes pass. Only the authorized socket fixture is
+filtered locally; the exact child filters477 sibling cases covered by the parent. Remote CI stays
+unfiltered. Focused parser12/0 and network-feature test-target Clippy with -D warnings pass.
+Package --list includes the full MIT notice and both parser source/fixture files. Workspace
+check/Clippy, format/site/installers, governance(SQL17/delivery12), claims0warnings, text23/0
+and classifier14 pass. Scale remains high-risk/release-managed/on-demand. No prior native/EOF
+or Windows failure is reclassified by this pass.
+
+Independent protected working-source/provenance review APPROVE found no blocking finding:
+parser blobf36a11a5df341347c5d9634d2740f333b70f64db,
+fixtures e4041ee25ad285f7731e60456abaae6a6f4aaaff,
+MIT notice a9159334333b7406e04f5b5e765402b41cdcce95. Reviewer independently checked the pinned
+GitHub source hashes and complete license, not a separate archive download or test execution.
+Shared Agent/account identity is not distinct-human approval. This dormant prerequisite is ready
+for stable candidate Review; exact-head protected review, all native CI and final CAS remain
+required before deliberate merge. The source Issue delivery index will name the actual candidate.
+Parent I293 remains Active/Claimed, Completion Pending; no release or default activation.

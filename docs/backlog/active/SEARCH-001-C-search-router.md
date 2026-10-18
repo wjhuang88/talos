@@ -167,3 +167,9 @@ instead of accepting replacement raw parameters; test-only raw adapters retain t
 and per-invocation object matching, not construction before approval or official Agent binding.
 See the controlled-transport reference and I293 validation journal. Full C/EP/parity/D/root/rollback
 and default activation remain Pending; #643/#624 stay open, #717/#705 retain separate residuals.
+
+#732 owned payload merged8fa2a50 after all6CI3227/protected review/CAS; I293 records actual
+evidence. The next dormant prerequisite is bounded Lite/HTML response parsing with licensed-source
+provenance and synthetic fixtures, using existing network-free helpers. It does not activate search
+or admit links/providers. Scraper-version/charset/header/probe/retry/proxy/official-root/full-parity
+gates remain open, along with D/privacy/rollback. Parent C and #643/#624 remain incomplete/open.
