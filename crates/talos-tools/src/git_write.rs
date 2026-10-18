@@ -56,6 +56,12 @@ mod receiver_storage;
 #[path = "git_write/pull_state.rs"]
 mod pull_state;
 
+// Bounded resolver stays test-only until dedicated authorization and shared
+// inventory accounting are connected. No production reader uses it yet.
+#[cfg(test)]
+#[path = "git_write/pull_resolution.rs"]
+mod pull_resolution;
+
 #[path = "git_write/pull_inventory.rs"]
 mod pull_inventory;
 

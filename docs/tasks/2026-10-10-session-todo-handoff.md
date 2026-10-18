@@ -3855,3 +3855,19 @@ configured mapping and metadata-only fallback execution remain open. No new
 filesystem reads or production Pull activation are introduced.
 Independent review found no blocker in this frontier-only change; it explicitly
 retains prefix identity, alias and enclosing-repository validation as residuals.
+
+Bounded Pull resolver characterization (2026-10-18): added a test-only,
+component-wise resolver and a separate test file. It retains cancelled ancestors,
+absence, link text and directory identity; refuses file components, dangling
+links, unsupported entries and Windows drive-relative link targets; bounds link
+expansion to 64 hops and charges an explicit cumulative budget before metadata
+inspection. Revalidation replays retained evidence without resetting counters.
+Five focused tests pass, covering the hop boundary/loop, symlink-before-parent
+semantics, redirection, missing suffix/ancestor drift, file-parent rejection and
+atomic cumulative budget exhaustion. The hop fixture canonicalizes its root so
+macOS temporary-directory aliases do not consume its intended 64-hop boundary.
+All-feature/all-target locked Clippy passes. This module is compiled only for
+tests: dedicated capability admission, invocation-wide inventory accounting,
+replacement of the old resolver, Windows runtime evidence and independent
+security review are still required before production use. The accepted decision
+and T7 are not closed; production Pull remains disabled.
