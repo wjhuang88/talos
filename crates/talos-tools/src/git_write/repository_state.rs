@@ -660,6 +660,14 @@ mod tests {
     fn git(root: &Path, args: &[&str]) {
         let output = std::process::Command::new("git")
             .current_dir(root)
+            // Fixtures compare object layouts immediately after commits. Wait
+            // for maintenance so its temporary lock cannot race the snapshots.
+            .args([
+                "-c",
+                "maintenance.autoDetach=false",
+                "-c",
+                "gc.autoDetach=false",
+            ])
             .args(args)
             .output()
             .expect("fixture Git");
