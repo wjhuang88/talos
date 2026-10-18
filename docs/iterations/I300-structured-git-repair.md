@@ -4494,3 +4494,24 @@ identities independently. Full shared cumulative and peak accounting must cover
 these paths as well as graph discovery and pointer resolution. The streaming
 comparison above is a prerequisite, not a claim of completed quota enforcement.
 The preceding stable candidate is pushed as `290628dc`; CI 39129652021 is running.
+
+Windows operation acceptance checkpoint (2026-10-18): external standard
+preflight session 92511 exited 0; the stream-identity log ends
+`release preflight: passed`. This supersedes its running status above and covers
+786d9c2a, not subsequent unit-harness changes. Native Windows job 117682063849
+passed the new output-exhaustion, descendant-cleanup, concurrent-cancellation and
+large duplex-I/O regressions, then failed the child-bootstrap fixture at the
+still-closed preparation gate. This is primitive lifecycle evidence, not full
+prepared-operation acceptance.
+
+The next candidate opens preparation only under Windows cfg(test), adds seven
+existing Add/Commit/Checkout acceptance cases to the Windows CI inventory, and
+adds an integration test linking the production library to assert all five write
+tools still reject before repository discovery. No production activation is
+claimed. Formatting passes. Local prepared-operation tests initially passed
+138/139 with the local-push process observer denied by the sandbox; the approved
+external rerun passes 139/139, log
+`/tmp/talos-i300-windows-unit-gate-external.log`. The new Windows-only integration
+test still requires native CI; a host run cannot validate its body. Remaining
+Pull functionality, unified quota, Windows operation acceptance and publication
+remain owned here; T7 remains Active.

@@ -490,9 +490,10 @@ impl AddPlan {
         operation: Operation,
         selected: Option<Vec<String>>,
     ) -> Result<Self, GitToolError> {
-        // Do not inspect configuration or launch Git through a direct-child-only
-        // fallback while the ADR-068 foreground Job integration is incomplete.
-        if !cfg!(unix) {
+        // Production Windows preparation stays closed pending full native
+        // acceptance. The unit harness exercises the existing Job-backed path
+        // in isolated fixtures; this is not a feature or runtime opt-in.
+        if !cfg!(any(unix, all(test, windows))) {
             return Err(GitToolError::InvalidInput(
                 "Structured Git requires process-tree supervision; Windows Job integration is not yet available".into(),
             ));

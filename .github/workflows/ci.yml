@@ -266,9 +266,23 @@ jobs:
             'git::git_write::prepared_add::tests::program_evidence_retains_windows_replacement_guard',
             'git::git_write::snapshot::tests::path_identity_retains_leaf_and_ancestor_identity',
             'git::git_write::snapshot::tests::regular_evidence_rejects_identical_byte_inode_replacement',
-            'git::git_write::prepared_add::tests::pull_child_bootstrap_defers_worktree_and_retains_startup_evidence'
+            'git::git_write::prepared_add::tests::pull_child_bootstrap_defers_worktree_and_retains_startup_evidence',
+            'git::git_write::prepared_add::tests::exact_approved_plan_stages_selected_file',
+            'git::git_write::prepared_add::tests::direct_and_forged_or_exchanged_proofs_cannot_stage',
+            'git::git_write::prepared_add::tests::approval_is_bound_to_prepared_source_and_index',
+            'git::git_write::prepared_add::tests::real_commit_preserves_index_semantics_and_all_excludes_untracked',
+            'git::git_write::prepared_add::tests::commit_plan_binds_tracked_sources_and_rejects_add_proof',
+            'git::git_write::prepared_add::tests::checkout_nonrecursive_gitlink_preserves_dirty_child_worktree',
+            'git::git_write::prepared_add::tests::checkout_ref_movement_after_discovery_invalidates_plan'
           )
           $listed = @(cargo test -p talos-tools --features git --locked --lib -- --list)
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $gateTests = @(cargo test -p talos-tools --features git --locked --test windows_git_preparation_gate -- --list)
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($gateTests -notcontains 'production_windows_preparation_stays_closed_before_repository_discovery: test') {
+            throw 'Required production Windows preparation gate regression is missing'
+          }
+          cargo test -p talos-tools --features git --locked --test windows_git_preparation_gate
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           foreach ($test in $tests) {
             if ($listed -notcontains "${test}: test") {
