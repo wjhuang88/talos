@@ -4442,3 +4442,21 @@ at the linked-budget frontier with an inventory InvalidInput. The current local
 isolated test passes 1/1 (`/tmp/talos-i300-postfetch-repro.log`); this does not
 invalidate the remote failure or establish its cause. Investigate before merge.
 Remote job log: `/tmp/talos-i300-linux-39127288380.log` (job 117675006825).
+
+Post-fetch fixture correction (2026-10-18): independent investigation confirms
+the remote failure ran on macOS with Git 2.55.0, but has not established its root
+cause. The linked-budget assertion now uses the same canonical external root as
+the commondir pointer, avoiding a false negative through `/var` aliases. Fixture
+Git calls fix foreground maintenance scheduling to match the accepted production
+policy. Test-only inventory diagnostics identify the rejecting source location
+without printing repository paths or reference contents; frontier failures also
+report the source case and stage number. The focused post-fetch test passes
+locally (`/tmp/talos-i300-postfetch-diagnostics.log`); this is not proof that the
+remote failure is resolved.
+
+Standard preflight session 12231 exited 101: tools 868 passed / 1 failed because
+the local-push fixture's process observation received OS PermissionDenied. The
+approved external standard preflight is running in session 82402, log
+`/tmp/talos-i300-lifecycle-preflight-external.log`. It began before the fixture
+correction above, so do not treat it as exact-candidate evidence for that change.
+T7 remains Active; production Pull and non-Unix preparation remain disabled.

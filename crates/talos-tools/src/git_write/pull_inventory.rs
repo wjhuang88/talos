@@ -75,7 +75,15 @@ pub(super) struct Inventory {
     worktree_reference_roots: BTreeSet<PathBuf>,
 }
 
+#[cfg_attr(test, track_caller)]
 fn invalid() -> GitToolError {
+    // Keep production errors opaque, but identify the rejecting invariant in
+    // test failures without logging repository paths or reference contents.
+    #[cfg(test)]
+    eprintln!(
+        "Pull inventory rejection at {}",
+        std::panic::Location::caller()
+    );
     GitToolError::InvalidInput(
         "Pull graph inventory changed, redirected, or exceeded its limit".into(),
     )
