@@ -1,4 +1,23 @@
 #[tokio::test]
+async fn pull_interactive_rebase_scope_does_not_authorize_sequence_editor() {
+    let root = fixture();
+    let mut plan = integration_scope_fixture(root.path()).await;
+    plan.pull_integration = Some(super::super::pull_state::Integration::Rebase {
+        onto: "1".repeat(40),
+        upstream: "2".repeat(40),
+        mode: super::super::pull_state::Rebase::Interactive,
+        autostash: false,
+    });
+    let before = std::fs::read(root.path().join(".git/HEAD")).expect("HEAD");
+    let error = match plan.discover_pull_integration_hooks() {
+        Ok(_) => panic!("worktree scope cannot grant editor execution"),
+        Err(error) => error,
+    };
+    assert!(error.to_string().contains("sequence editor execution authorization"));
+    assert_eq!(std::fs::read(root.path().join(".git/HEAD")).expect("HEAD"), before);
+}
+
+#[tokio::test]
 async fn pull_child_completion_returns_hook_frontier_without_computation_only_approval() {
     let root = fixture();
     let mut plan = integration_scope_fixture(root.path()).await;

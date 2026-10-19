@@ -5193,3 +5193,18 @@ implementation increments have independent review evidence recorded above;
 publish this stable batch for fresh Windows invocation-spelling evidence.
 Windows runtime, actual supervised Pull integration and all original handoff
 acceptance remain open; T7/I300 stays Active.
+
+Interactive integration execution boundary (2026-10-19): hook discovery now
+refuses retained interactive rebase before publishing the combined integration
+scope. That worktree scope does not grant sequence-editor execution. The new
+split prepared-plan regression checks the discovery refusal and unchanged HEAD;
+noninteractive operation matching remains unchanged. Locked all-feature
+Pull-focused tests pass 144/144, all-target/all-feature Clippy passes with
+warnings denied, and formatting passes. Logs:
+`/tmp/talos-i300-editor-pull-tests.log`,
+`/tmp/talos-i300-editor-clippy.log`. Independent static authorization review
+found no new blocker. This is not complete editor/effect coverage or actual
+integration execution; those residuals remain owned here. The preceding full
+workspace gate does not cover this later change. Published head `4f8610cb` is
+under CI run 39205382544, confirmed running; do not restart it for this local
+increment.
