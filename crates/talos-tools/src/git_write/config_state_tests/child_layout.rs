@@ -8,7 +8,11 @@ fn child_startup_layout_matches_native_selection_rules() {
         "no-version",
     ] {
         let root = tempfile::tempdir().expect("fixture");
-        let worktree = root.path().canonicalize().expect("canonical");
+        let worktree = if cfg!(windows) {
+            root.path().to_owned()
+        } else {
+            root.path().canonicalize().expect("canonical")
+        };
         assert!(
             std::process::Command::new("git")
                 .current_dir(&worktree)
@@ -47,22 +51,26 @@ fn child_startup_layout_matches_native_selection_rules() {
         };
         std::fs::write(
             gitdir.join("config"),
-            format!(
-                "[core]\n{version}bare={bare}\nworktree={}\n{extension}",
-                raw.display()
-            ),
+            format!("[core]\n{version}bare={bare}\n{extension}"),
         )
         .expect("config");
+        let set_worktree = |file: &std::path::Path, target: &std::path::Path| {
+            let output = std::process::Command::new("git")
+                .args(["config", "--file"])
+                .arg(file)
+                .arg("core.worktree")
+                .arg(target)
+                .output()
+                .expect("configure worktree");
+            assert!(output.status.success(), "{output:?}");
+        };
+        set_worktree(&gitdir.join("config"), &raw);
         let private_target = if case == "private-override" {
             selected.clone()
         } else {
             worktree.join("ignored-missing")
         };
-        std::fs::write(
-            gitdir.join("config.worktree"),
-            format!("[core]\nworktree={}\n", private_target.display()),
-        )
-        .expect("private config");
+        set_worktree(&gitdir.join("config.worktree"), &private_target);
         let layout =
             super::ChildStartupLayout::capture(&gitdir, &gitdir, has_common).expect("layout");
         let expected = if matches!(case, "stale-private" | "private-override") {
