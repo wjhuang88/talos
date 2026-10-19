@@ -76,6 +76,21 @@ pub(crate) async fn execute_approved(plan: AddPlan) -> ToolExecutionOutput {
     }
 }
 
+// Complete sender discovery through its admitted executable frontier, as the
+// production stage dispatcher does. Windows Git installations can use distinct
+// entry and internal binaries; calling discover() directly skips that binding.
+async fn discover_sender_approved(mut plan: Box<AddPlan>) -> Result<Box<AddPlan>, GitToolError> {
+    loop {
+        let tokens = proof(&plan)
+            .consume_for_prepared(&plan.request(), &plan.identity)
+            .expect("sender discovery admission");
+        plan = plan.discover_sender(&tokens).await?;
+        if plan.sender_program_candidate.is_none() {
+            return Ok(plan);
+        }
+    }
+}
+
 fn fixture() -> tempfile::TempDir {
     let root = tempfile::tempdir().expect("fixture");
     let output = std::process::Command::new("git")
