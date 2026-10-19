@@ -5475,3 +5475,13 @@ production. Existing branch merge-option validation also handles editor options.
 Do not add a redundant environment guard or silently force auto-edit off; retain
 these existing checks when assembling final execution. Both governance validators
 pass with zero warnings after this checkpoint.
+
+Gate follow-up: session 51544 exited 101, tools 944/945 passed. Sole failure
+was the existing eight-stage Push test's process observation returning sandbox
+PermissionDenied/Operation not permitted. Approved external standard preflight
+session 36855 is live, log
+`/tmp/talos-i300-discovery-editor-preflight-unsandboxed.log`; inspect it before
+rerunning. CI 39225369123 is now terminal failure: Linux workspace and Linux
+Desktop passed, Windows failed the old checkout discovery fixture above.
+The local correction has not yet received native Windows CI. Both governance
+validators passed with zero warnings. No full-gate success is claimed yet.
