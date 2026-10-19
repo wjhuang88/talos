@@ -5005,3 +5005,20 @@ tests. Published Windows job 117882260178 is terminal failed: sender discovery
 now passes executable spelling validation but fails later at configuration
 inspection with values withheld. The underlying configuration failure remains
 unproven; do not claim native Windows completion.
+
+Current-head validation checkpoint (2026-10-19): implementation `64cc4674`
+adds bounded configuration-failure diagnostics (exit status and output byte counts,
+never configuration contents) and a regression test with a secret-bearing invalid
+configuration fixture. Targeted diagnostic and sender-binding tests and all-target,
+all-feature Clippy passed; independent static review reported no blocker. This is
+failure classification, not a fix for the native Windows configuration failure.
+Remote run 39197138949 at `f92b64a827109a44d21c843a7bfdded3f18f5043`
+is now terminal: Linux Format + Check + Clippy + Test, Linux Desktop, installer,
+and remote owner reconciliation passed; Windows Rust workspace failed. Current
+source standard preflight session 89793 remains live, with check and Clippy passed
+and test compilation in progress; log:
+`/tmp/talos-i300-modules-diagnostic-preflight.log`. Poll that session before starting
+another full validation. No current-head full pass or Windows completion is claimed.
+The accepted Pull integration worktree scope still lacks its runtime consumer and
+actual integration dispatcher; production Pull remains disabled. All original T7
+acceptance and the subsequent handoff queue remain required.
