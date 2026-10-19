@@ -258,6 +258,8 @@ pub(super) struct AddPlan {
     program: PathBuf,
     program_entry: ProgramEvidence,
     maintenance_program: Option<PathBuf>,
+    sender_program_candidate: Option<PathBuf>,
+    sender_entry_program: Option<(PathBuf, ProgramEvidence)>,
     config: Option<super::config_state::ConfigState>,
     child_configs: Vec<(PathBuf, super::config_state::ChildConfig)>,
     pull_config_sources_discovered: bool,
@@ -721,6 +723,8 @@ impl AddPlan {
             program,
             program_entry,
             maintenance_program: None,
+            sender_program_candidate: None,
+            sender_entry_program: None,
             config,
             child_configs: Vec::new(),
             pull_config_sources_discovered: false,
@@ -3034,6 +3038,92 @@ impl AddPlan {
         Ok(())
     }
 
+    // Fixed path-only discovery: reported executable contents require a new proof.
+    async fn inspect_maintenance_program(&self) -> Result<PathBuf, GitToolError> {
+        let mut command = tokio::process::Command::new(&self.program);
+        command
+            .current_dir(&self.repository.workdir)
+            .arg("--exec-path")
+            .env_clear()
+            .envs(&self.environment);
+        let output = self
+            .run_command(command, std::time::Duration::from_secs(10), 16 * 1024)
+            .await?;
+        let path = output
+            .strip_suffix(b"\n")
+            .map(|path| path.strip_suffix(b"\r").unwrap_or(path))
+            .and_then(|path| std::str::from_utf8(path).ok())
+            .map(PathBuf::from)
+            .filter(|path| path.is_absolute() && !path.as_os_str().as_encoded_bytes().contains(&0))
+            .ok_or_else(|| {
+                GitToolError::InvalidInput("Git child executable directory is unavailable".into())
+            })?;
+        Ok(path.join(if cfg!(windows) { "git.exe" } else { "git" }))
+    }
+
+    async fn request_sender_program(mut self: Box<Self>) -> Result<Box<Self>, GitToolError> {
+        self.revalidate()?;
+        let candidate = self.inspect_maintenance_program().await?;
+        // Keep all original Read frontiers; first full sender discovery still
+        // needs the original sources and repository evidence.
+        self.facets
+            .retain(|facet| facet.nature != ToolNature::Execute);
+        self.facets.push(path_facet(
+            ToolNature::Read,
+            &self.program,
+            "entry Git executable drift evidence; no further execution",
+        )?);
+        self.facets.push(path_facet(
+            ToolNature::Read,
+            &candidate,
+            "internal Git executable identity before first sender discovery",
+        )?);
+        self.facets.push(ToolPermissionFacet::with_resource(
+            ToolNature::Execute,
+            candidate.to_str().ok_or_else(|| {
+                GitToolError::InvalidInput("Internal Git executable path is not UTF-8".into())
+            })?,
+            ToolResourceKind::Command,
+        ));
+        self.sender_program_candidate = Some(candidate);
+        self.identity = PreparedPlanIdentity::new();
+        Ok(self)
+    }
+
+    async fn discover_sender(
+        mut self: Box<Self>,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<Box<Self>, GitToolError> {
+        if let Some(candidate) = self.sender_program_candidate.take() {
+            self.revalidate()?;
+            let admitted = self.receiver_read_path(&candidate, authorizations)?;
+            let bound = ReceiverChildExecutable::capture(&candidate, admitted)?;
+            let old_path = std::mem::replace(&mut self.program, bound.canonical);
+            let old_entry = std::mem::replace(&mut self.program_entry, bound.program);
+            self.sender_entry_program = Some((old_path, old_entry));
+            // A second migration is never allowed. Do this before configuration,
+            // target or child discovery through the newly admitted executable.
+            let maintenance = self.inspect_maintenance_program().await?;
+            if maintenance != candidate
+                || maintenance.canonicalize().ok().as_ref() != Some(&self.program)
+            {
+                return Err(GitToolError::InvalidInput(
+                    "Internal Git exec-path does not bind to its admitted executable".into(),
+                ));
+            }
+            self.revalidate()?;
+        } else if cfg!(windows)
+            && self.sender_entry_program.is_none()
+            && matches!(
+                self.operation,
+                Operation::Commit(_) | Operation::Checkout(_)
+            )
+        {
+            return self.request_sender_program().await;
+        }
+        self.discover().await
+    }
+
     async fn discover(mut self: Box<Self>) -> Result<Box<Self>, GitToolError> {
         self.revalidate()?;
         if matches!(
@@ -3164,32 +3254,7 @@ impl AddPlan {
             self.operation,
             Operation::Commit(_) | Operation::Checkout(_) | Operation::Push(_)
         ) {
-            // Path-only query against the already-admitted executable. Defer
-            // reading the reported child executable to continuation admission.
-            let mut command = tokio::process::Command::new(&self.program);
-            command
-                .current_dir(&self.repository.workdir)
-                .arg("--exec-path")
-                .env_clear()
-                .envs(&self.environment);
-            let output = self
-                .run_command(command, std::time::Duration::from_secs(10), 16 * 1024)
-                .await?;
-            let path = output
-                .strip_suffix(b"\n")
-                .map(|path| path.strip_suffix(b"\r").unwrap_or(path))
-                .and_then(|path| std::str::from_utf8(path).ok())
-                .map(PathBuf::from)
-                .filter(|path| {
-                    path.is_absolute() && !path.as_os_str().as_encoded_bytes().contains(&0)
-                })
-                .ok_or_else(|| {
-                    GitToolError::InvalidInput(
-                        "Git child executable directory is unavailable".into(),
-                    )
-                })?;
-            self.maintenance_program =
-                Some(path.join(if cfg!(windows) { "git.exe" } else { "git" }));
+            self.maintenance_program = Some(self.inspect_maintenance_program().await?);
         }
         if let Operation::Checkout(checkout) = &self.operation {
             let (resolved, tracking_source) =
@@ -6069,6 +6134,13 @@ impl AddPlan {
     }
 
     fn revalidate(&self) -> Result<(), GitToolError> {
+        if let Some((path, entry)) = &self.sender_entry_program
+            && capture_program(path)? != *entry
+        {
+            return Err(GitToolError::InvalidInput(
+                "Entry Git executable changed after internal program binding".into(),
+            ));
+        }
         // Refuse a moved layout pointer before rediscovery can read a new root
         // using the retained plan's old-root admission.
         self.repository.revalidate_location()?;
@@ -7352,7 +7424,7 @@ impl PreparedNormalToolInvocation for AddPlan {
                 plan.phase = Phase::PullPostFetch;
                 Ok(plan)
             }
-            Phase::SenderConfiguration => self.discover().await,
+            Phase::SenderConfiguration => self.discover_sender(&authorizations).await,
             Phase::ReceiverRoots => self.discover_receiver_roots(&authorizations),
             Phase::ReceiverMetadata => self.discover_receiver_metadata(&authorizations),
             Phase::ReceiverCommon => self.discover_receiver_common(&authorizations),
