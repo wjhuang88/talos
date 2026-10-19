@@ -1235,6 +1235,17 @@ impl ConfigState {
         integration: &super::pull_state::Integration,
     ) -> Result<Vec<PathBuf>, GitToolError> {
         use super::pull_state::Integration;
+        if matches!(
+            integration,
+            Integration::Rebase {
+                mode: super::pull_state::Rebase::Interactive,
+                ..
+            }
+        ) {
+            return Err(unsupported(
+                "Interactive Pull rebase requires separate sequence editor execution authorization",
+            ));
+        }
         self.validate_pull_integration_signing(integration)?;
         let directory = configured_path(&self.values, b"core.hookspath", environment)?
             .unwrap_or_else(|| repository.common_dir.join("hooks"));
