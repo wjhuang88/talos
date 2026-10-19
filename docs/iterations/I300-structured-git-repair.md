@@ -4831,3 +4831,22 @@ Accepted decisions remain accepted; do not ask for them again. The next
 functional delivery target remains Pull integration effect discovery, fresh
 admission and supervised execution, rather than enabling the current refusal
 branch without those effects.
+
+Pull state test separation checkpoint (2026-10-19): the 24 previously inline
+tests now live in six `git_write/pull_state_tests/` files (evidence, policy,
+activity, merge, reconciliation and unborn HEAD). The existing two separate
+evidence tests remain. The production file decreases from 2934 to 1323 lines;
+each new test file is at most 388 lines. A source comparison verified all moved
+test bodies/attributes modulo formatting and module qualification, and unchanged
+production code modulo whitespace and test module declarations. Locked
+all-feature Pull state tests pass 26/26 after restoring the Unix-only attributes
+to their moved tests (`/tmp/talos-i300-pull-test-split-final.log`). All-target,
+all-feature locked Clippy passes with warnings denied
+(`/tmp/talos-i300-pull-test-split-clippy.log`). The initial extraction left two
+leading Unix attributes behind; Clippy detected this, and the final equivalence
+check includes the entire leading attribute set rather than starting at cfg(test).
+This addresses the requested test layout, not Pull activation or T7 completion.
+The maintainer accepted dedicated one-Pull-integration worktree scope
+authorization on 2026-10-19. ADR-089 records the accepted boundary; compiler,
+executor and independent security validation remain required before activation.
+Production integration remains disabled.
