@@ -4173,3 +4173,10 @@ Editor follow-up: existing `validate_environment` already rejects inherited
 GIT_MERGE_AUTOEDIT/GIT_EDITOR overrides; branch merge-option validation handles
 editor options. No extra environment guard or configuration suppression is needed
 for these known routes. Both governance validators pass with zero warnings.
+Gate follow-up: 51544 exited 101 with tools 944/945, solely sandbox process
+observation PermissionDenied in the existing eight-stage Push test. Approved
+external preflight session 36855 is live; log
+`/tmp/talos-i300-discovery-editor-preflight-unsandboxed.log`. Inspect before
+rerunning. CI 39225369123 is terminal failure (Linux workspace/Desktop passed;
+Windows failed the old fixture corrected in bc7fd24a). Native validation of the
+correction and full local gate remain pending. Governance validators both pass.
