@@ -1850,19 +1850,15 @@ mod windows_tests {
                     "injected pipe setup failure",
                 );
                 record_handle_stage("first_pipe_cleanup", &mut phases, &mut observations);
-                // Existing input rejection is AFTER UpdateProcThreadAttribute and BEFORE
-                // resolve/environment/CreateProcessW. No new hook/native/unsafe is needed.
+                // Fail after initializing the attribute list so this stage measures
+                // cleanup of acquired native resources, not early input rejection.
                 assert_handle_stage_failure(
                     &launcher,
-                    "invalid\"program",
-                    None,
-                    "Windows program path contains an unsupported quote or NUL",
+                    &launcher.program,
+                    Some(WindowsLaunchFault::AttributeList),
+                    "injected attribute-list setup failure",
                 );
-                record_handle_stage(
-                    "attributes_prepared_then_rejected",
-                    &mut phases,
-                    &mut observations,
-                );
+                record_handle_stage("attribute_list_cleanup", &mut phases, &mut observations);
             } else {
                 let resolved =
                     resolve_windows_program(&launcher.program).expect("known fixture program");
@@ -2088,7 +2084,7 @@ mod windows_tests {
                     3 => [
                         "control_baseline",
                         "first_pipe_cleanup",
-                        "attributes_prepared_then_rejected",
+                        "attribute_list_cleanup",
                         "suspended_process_cleanup",
                     ],
                     4 => [
@@ -2260,7 +2256,7 @@ mod windows_tests {
         let pid = std::process::id().wrapping_add(1).max(1);
         let mut data = serde_json::json!({"child_pid":pid,"snapshots":4,"changes":[],
             "phase_sizes":[["control_baseline",73],["first_pipe_cleanup",74],
-                ["attributes_prepared_then_rejected",74],["suspended_process_cleanup",76]]});
+                ["attribute_list_cleanup",74],["suspended_process_cleanup",76]]});
         std::fs::write(&path, serde_json::to_vec(&data).expect("fixture JSON"))
             .expect("fixture write");
         assert!(validate_handle_receipt(&path, 3).is_ok());
