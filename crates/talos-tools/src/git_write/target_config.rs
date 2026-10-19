@@ -1063,6 +1063,21 @@ fn invalid_config() -> GitToolError {
 
 #[cfg(test)]
 mod tests {
+    // Canonicalization introduces a verbatim prefix on Windows. Git's config
+    // CLI does not reliably accept that spelling; these native parity fixtures
+    // must use the ordinary absolute spelling supplied by tempfile instead.
+    fn native_fixture_root(temporary: &tempfile::TempDir) -> std::path::PathBuf {
+        #[cfg(windows)]
+        {
+            let root = temporary.path().to_path_buf();
+            assert!(root.is_absolute());
+            assert!(!root.as_os_str().to_string_lossy().starts_with("\\\\?\\"));
+            root
+        }
+        #[cfg(not(windows))]
+        temporary.path().canonicalize().expect("canonical root")
+    }
+
     #[cfg(unix)]
     #[test]
     fn native_symlink_include_uses_spelled_origin_for_relative_children() {
@@ -1793,7 +1808,7 @@ mod tests {
     #[test]
     fn ordered_expansion_matches_native_git_at_include_positions() {
         let temporary = tempfile::tempdir().expect("fixture");
-        let root = temporary.path().canonicalize().expect("canonical root");
+        let root = native_fixture_root(&temporary);
         let git = |args: &[&str]| {
             std::process::Command::new("git")
                 .current_dir(&root)
@@ -1850,7 +1865,7 @@ mod tests {
     #[test]
     fn ordered_expansion_obeys_depth_missing_and_cycle_rules() {
         let temporary = tempfile::tempdir().expect("fixture");
-        let root = temporary.path().canonicalize().expect("root");
+        let root = native_fixture_root(&temporary);
         for index in 0..=10 {
             std::fs::write(
                 root.join(format!("config{index}")),
@@ -2117,7 +2132,7 @@ mod tests {
     #[test]
     fn host_root_order_and_worktree_selection_match_native_git() {
         let temporary = tempfile::tempdir().expect("fixture");
-        let root = temporary.path().canonicalize().expect("root");
+        let root = native_fixture_root(&temporary);
         let home = root.join("home");
         let xdg = root.join("xdg");
         let repository = root.join("repo");
