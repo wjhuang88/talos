@@ -4799,3 +4799,35 @@ Clippy passes with warnings denied (session 82353), output
 running when this subsequent source work began; its eventual result must not
 be cited as exact-head validation of the typed-plan change. Fresh stable-source
 validation and effect discovery/admission/execution remain required.
+
+
+Typed-plan stable candidate validation (2026-10-19): preceding standard
+preflight session 11898 exited 0, including workspace tests and both Runtime
+SDK fixtures, but source changed during that run and it is not final exact-head
+proof. Windows Git-only library cross-check session 15246 exited 0 with the
+existing seven feature-only warnings (`/tmp/talos-i300-typed-windows.log`).
+Implementation `edca7e14` is frozen for standard external preflight session
+98420 (`/tmp/talos-i300-typed-final-preflight.log`), which exited 0 with
+`release preflight: passed`, including locked workspace checks, Clippy, tests
+and both external Runtime SDK fixtures. Only this owner document changed during
+that run. Both governance validators subsequently passed with zero warnings.
+Fresh origin fetch succeeded; HEAD is ahead 199 / behind 0 origin/main, so no
+additional rebase is needed. Existing
+independent reviewer git_plan_review completed read-only static review of the
+drift-diagnostic, Windows test-selection and typed-integration delta with no
+blocker: short-circuit read order, candidate ordering, policy fields and native
+parity command semantics are retained. That review did not run builds/tests or
+validate native Windows or integration mutation authority. Native Windows
+runtime, Pull effects/execution, recursive fetch residuals and final delivery
+remain open; no Complete status or completion evidence is claimed.
+
+Maintainer execution guidance (2026-10-19): when a compatibility, behavior or
+scope choice would create a disproportionately long implementation chain, bring
+the concrete alternatives, recommendation, behavior impact and remaining cost
+to the maintainer promptly. This is design guidance, not runtime authorization:
+it does not replace effect admission, repository identity validation or owned
+process cleanup, and it does not silently narrow the published handoff scope.
+Accepted decisions remain accepted; do not ask for them again. The next
+functional delivery target remains Pull integration effect discovery, fresh
+admission and supervised execution, rather than enabling the current refusal
+branch without those effects.
