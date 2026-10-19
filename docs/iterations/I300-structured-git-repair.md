@@ -5219,3 +5219,20 @@ Locked all-feature Pull tests remain 144/144 passing
 (`/tmp/talos-i300-split-pull-tests.log`); formatting and whitespace checks pass.
 This addresses test maintainability, not production Pull activation or T7
 completion. Integration/external-effect and native Windows residuals remain.
+
+Windows invocation binding checkpoint (2026-10-19): completed Windows job
+117906997821 (run 39205382544) shows default configuration inspection succeeds
+through the entry and admitted internal spellings, but fails through the
+canonical internal spelling. Preserve the admitted spelling for Windows
+invocation while retaining the canonical executable evidence and original path
+identity for revalidation, including Push rebinding. The canonical diagnostic
+probe remains visible but is not a production startup requirement. Independent
+review identified two canonical-only evidence captures; both now use the
+retained canonical target and the reviewer confirmed that blocker is resolved.
+Locked all-feature program-binding tests pass 6/6 and the configuration matrix
+passes 1/1; all-target/all-feature Clippy with warnings denied and whitespace
+checks pass. Logs: `/tmp/talos-i300-spelling-final-tests.log`,
+`/tmp/talos-i300-spelling-final-configuration.log`, and
+`/tmp/talos-i300-spelling-final-clippy.log`. Native Windows confirmation and a
+fresh full workspace gate remain required. This does not activate production
+Pull or close T7; actual integration execution and the full handoff remain open.
