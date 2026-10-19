@@ -4180,3 +4180,8 @@ external preflight session 36855 is live; log
 rerunning. CI 39225369123 is terminal failure (Linux workspace/Desktop passed;
 Windows failed the old fixture corrected in bc7fd24a). Native validation of the
 correction and full local gate remain pending. Governance validators both pass.
+Superseding gate result: approved external session 36855 exited zero; log
+`/tmp/talos-i300-discovery-editor-preflight-unsandboxed.log` ends
+`release preflight: passed`. Pinned locked workspace gate, tools 945/945,
+doctests and both external Runtime SDK modes pass for bc7fd24a/6587407c.
+Publish the stable stage for fresh native Windows CI. T7 remains incomplete.
