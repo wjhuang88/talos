@@ -5361,3 +5361,21 @@ Published stage `9d5fd3bb` has CI 39211752607 running; native Windows job
 Incremental independent static security review found no new blocker. The existing
 integration-focused suite also passes 8/8; both governance validators pass with
 zero warnings. No fresh full workspace gate is claimed for this later increment.
+
+Windows auxiliary traversal follow-up (2026-10-19): native Windows job
+117926517309 terminated with a failure in the nonrecursive dirty-child checkout
+fixture: explicit-directory argument tests now pass, but auxiliary path capture
+rejects an unavailable path. Component traversal inspected an incomplete Windows
+prefix before its RootDir. Skip only that incomplete prefix; retain inspection
+of the complete root, every subsequent component and every symlink hop. Add a
+Windows existing/missing-path regression and require its exact name in CI.
+The same dirty-child checkout regression passes locally (1/1); this Unix result
+does not prove the Windows fix. Native confirmation remains pending. Prior
+follow-up all-feature Clippy and Windows GNU library cross-check exited zero;
+logs: `/tmp/talos-i300-directory-followup-clippy.log` and
+`/tmp/talos-i300-directory-followup-wincheck.log`. T7 remains incomplete.
+Independent static security review found no blocker: full-root inspection,
+symlink hops and pre-`..` ancestors remain retained. Review did not execute Windows
+and the new fixture does not directly cover UNC or symlink paths.
+Both project governance and Collaboration Claim validators pass with zero
+warnings for this follow-up.
