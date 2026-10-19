@@ -138,3 +138,75 @@ async fn pull_integration_hook_discovery_does_not_read_external_candidates() {
     );
     assert!(!root.path().join(".git/FETCH_HEAD").exists());
 }
+
+async fn integration_scope_fixture(root: &Path) -> Box<AddPlan> {
+    std::fs::write(
+        root.join(".git/FETCH_HEAD"),
+        format!("{}\t\thttps://private.invalid/DO_NOT_DISCLOSE\n", "1".repeat(40)),
+    ).expect("FETCH_HEAD");
+    let plan = AddPlan::prepare_pull(root, &serde_json::json!({}), ToolProvenance::Native)
+        .expect("Pull");
+    let mut plan = Box::new(plan).discover().await.expect("configuration");
+    plan.pull_integration = Some(super::super::pull_state::Integration::Merge {
+        heads: vec!["1".repeat(40)],
+        fast_forward: super::super::pull_state::FastForward::Allow,
+        autostash: false,
+    });
+    plan.pull_evidence = Some(super::super::pull_state::PullEvidence::capture(
+        &plan.repository, None, true,
+    ).expect("retained evidence"));
+    plan
+}
+
+#[tokio::test]
+async fn pull_integration_scope_binds_new_proof_and_hides_fetch_descriptions() {
+    let root = fixture();
+    let plan = integration_scope_fixture(root.path()).await;
+    let stale = proof(&plan);
+    let plan = plan.prepare_pull_integration_scope().expect("scope");
+    assert!(plan.phase == Phase::PullIntegrationMutation);
+    assert!(stale.consume_for_prepared(&plan.request(), &plan.identity).is_err());
+    for nature in [ToolNature::Read, ToolNature::Write] {
+        let scope = plan.facets.iter().find(|facet| facet.nature == nature
+            && facet.resource.as_deref() == Some("git:pull-integration-worktree"))
+            .expect("scope");
+        let description = scope.description.as_deref().expect("description");
+        assert!(description.contains(&"1".repeat(40)));
+        assert!(description.contains("FETCH_HEAD sha256="));
+        assert!(!description.contains("DO_NOT_DISCLOSE"));
+        assert!(!description.contains("private.invalid"));
+    }
+    assert!(plan.validate_pull_integration_scope(&[]).is_err());
+    let admission = proof(&plan);
+    let tokens = admission.consume_for_prepared(&plan.request(), &plan.identity).expect("proof");
+    plan.validate_pull_integration_scope(&tokens).expect("bound roots");
+    std::fs::write(root.path().join(".git/FETCH_HEAD"), b"changed").expect("drift");
+    assert!(plan.validate_pull_integration_scope(&tokens).is_err());
+}
+
+#[tokio::test]
+async fn pull_integration_scope_refuses_missing_capability_even_with_root_tokens() {
+    let root = fixture();
+    let mut plan = integration_scope_fixture(root.path()).await
+        .prepare_pull_integration_scope().expect("scope");
+    plan.facets.retain(|facet| !(facet.nature == ToolNature::Write
+        && facet.resource.as_deref() == Some("git:pull-integration-worktree")));
+    let admission = proof(&plan);
+    let tokens = admission.consume_for_prepared(&plan.request(), &plan.identity).expect("proof");
+    assert!(plan.validate_pull_integration_scope(&tokens).expect_err("missing scope")
+        .to_string().contains("capability missing"));
+}
+
+#[tokio::test]
+async fn pull_integration_scope_runs_through_admitted_continuations_without_mutation() {
+    let root = fixture();
+    let plan = integration_scope_fixture(root.path()).await
+        .discover_pull_integration_hooks().expect("hook frontier");
+    let before = std::fs::read(root.path().join(".git/FETCH_HEAD")).expect("before");
+    let output = execute_approved(*plan).await;
+    assert!(output.result.is_error);
+    assert!(output.result.content.contains("Pull integration scope admitted"), "{}", output.result.content);
+    assert_eq!(std::fs::read(root.path().join(".git/FETCH_HEAD")).expect("after"), before);
+    assert!(!root.path().join(".git/index").exists());
+    assert!(!root.path().join(".git/MERGE_HEAD").exists());
+}

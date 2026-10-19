@@ -5042,3 +5042,27 @@ sealed-owner assertions locally; native Windows remains unproven. A fresh
 `git fetch origin` succeeded; this source is ahead 217 / behind 0 origin/main,
 so no rebase was needed. Publish the reviewed stable batch to #735 for fresh CI;
 production Pull integration and all remaining handoff gates remain open.
+
+Pull integration scope consumer checkpoint (2026-10-19): after separately admitted
+hook inspection, the prepared continuation now publishes a fresh integration
+scope stage. Read/Write worktree authority and metadata authority each require
+their dedicated Remote capability and exact identity-bound root Path facets.
+The displayed operation contains selected OIDs and a SHA-256 digest of retained
+FETCH_HEAD bytes, never its potentially credential-bearing remote descriptions.
+The stage consumes its own immutable prepared proof before checking both natures
+and all workdir/gitdir/common roots; retained evidence drift is refused. It still
+terminates without mutation until external-effect admission and supervised
+integration execution are implemented. This is infrastructure preparation, not
+new user-facing Pull behavior or production activation.
+
+Independent static review found no new security blocker, and explicitly retained
+the eight-stage successful-flow residual. Pull tests passed 139/139 before the
+additional continuation test; all-target/all-feature Clippy passed. The final
+focused scope suite passes 3/3, including real admitted hook-to-scope continuation
+and terminal no-mutation assertions, stale proof/evidence, missing capability,
+and hidden FETCH_HEAD descriptions. Logs: `/tmp/talos-i300-scope-pull-tests.log`,
+`/tmp/talos-i300-scope-clippy.log`, `/tmp/talos-i300-integration-scope-tests.log`.
+These checks do not prove the full Pull stage budget, external effects, execution,
+or final runtime acceptance. Native Windows run 39199780959 at published
+`c1ba37d669550eca0b7ebc099507a08cdd7369b0` remains live; poll that run rather than
+restart it. No T7 completion or current-scope full workspace pass is claimed.

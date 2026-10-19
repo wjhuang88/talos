@@ -4,6 +4,118 @@ use super::super as git_write;
 use super::*;
 
 impl AddPlan {
+    pub(super) fn prepare_pull_integration_scope(
+        mut self: Box<Self>,
+    ) -> Result<Box<Self>, GitToolError> {
+        self.revalidate()?;
+        let integration = self.pull_integration.as_ref().ok_or_else(|| {
+            GitToolError::InvalidInput("Missing retained Pull integration operation".into())
+        })?;
+        let fetched = self
+            .pull_evidence
+            .as_ref()
+            .ok_or_else(|| {
+                GitToolError::InvalidInput("Missing retained Pull integration evidence".into())
+            })?
+            .fetch_head()?;
+        // Never display FETCH_HEAD contents: remote descriptions can contain
+        // credentials. The digest binds the displayed plan to retained bytes.
+        let mut hasher = gix::hash::hasher(gix::hash::Kind::Sha256);
+        hasher.update(fetched);
+        let digest = hasher
+            .try_finalize()
+            .map_err(|error| GitToolError::Git(error.to_string()))?;
+        let description = format!(
+            "one Pull integration {integration:?}; retained FETCH_HEAD sha256={digest}; no retry or rollback"
+        );
+        self.facets
+            .retain(|facet| !matches!(facet.nature, ToolNature::Write | ToolNature::Network));
+        for nature in [ToolNature::Read, ToolNature::Write] {
+            self.facets
+                .push(path_facet(nature, &self.repository.workdir, &description)?);
+            self.facets.push(
+                ToolPermissionFacet::with_resource(
+                    nature,
+                    "git:pull-integration-worktree",
+                    ToolResourceKind::Remote,
+                )
+                .with_description(&description),
+            );
+            for root in [&self.repository.git_dir, &self.repository.common_dir] {
+                self.facets.push(path_facet(
+                    nature,
+                    root,
+                    "this Pull integration Git metadata root",
+                )?);
+            }
+            self.facets.push(
+                ToolPermissionFacet::with_resource(
+                    nature,
+                    "git:pull-repository-metadata",
+                    ToolResourceKind::Remote,
+                )
+                .with_description("metadata for this integration and foreground maintenance only"),
+            );
+        }
+        self.identity = PreparedPlanIdentity::new();
+        self.phase = Phase::PullIntegrationMutation;
+        Ok(self)
+    }
+
+    pub(super) fn validate_pull_integration_scope(
+        &self,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<(), GitToolError> {
+        self.revalidate()?;
+        if self.phase != Phase::PullIntegrationMutation || self.pull_integration.is_none() {
+            return Err(GitToolError::InvalidInput(
+                "Pull integration stage missing".into(),
+            ));
+        }
+        self.pull_evidence
+            .as_ref()
+            .ok_or_else(|| GitToolError::InvalidInput("Pull integration evidence missing".into()))?
+            .fetch_head()?;
+        // Called only after execute_stage consumes this immutable plan's proof.
+        // Remote capabilities are retained facets, not general recursive Path
+        // tokens. Every actual root still needs its own exact authorization.
+        for nature in [ToolNature::Read, ToolNature::Write] {
+            for scope in [
+                "git:pull-integration-worktree",
+                "git:pull-repository-metadata",
+            ] {
+                if !self.facets.iter().any(|facet| {
+                    facet.nature == nature
+                        && facet.resource_kind == Some(ToolResourceKind::Remote)
+                        && facet.resource.as_deref() == Some(scope)
+                }) {
+                    return Err(GitToolError::InvalidInput(
+                        "Pull integration capability missing".into(),
+                    ));
+                }
+            }
+            for root in [
+                &self.repository.workdir,
+                &self.repository.git_dir,
+                &self.repository.common_dir,
+            ] {
+                if !authorizations.iter().any(|token| {
+                    token.authorizes_path(
+                        "git_pull",
+                        nature,
+                        &self.workspace,
+                        root.to_str().unwrap_or_default(),
+                    )
+                }) {
+                    return Err(GitToolError::InvalidInput(
+                        "Pull integration root lacks fresh admission".into(),
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+
     pub(super) fn discover_pull_integration_hooks(
         mut self: Box<Self>,
     ) -> Result<Box<Self>, GitToolError> {
