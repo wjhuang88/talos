@@ -6448,44 +6448,56 @@ impl AddPlan {
         }
         let current_environment = execution_environment();
         validate_environment(&current_environment)?;
-        if trace_suppressed_environment(current_environment) != self.environment
-            || capture_program(&self.program)? != self.program_entry
-            || RepositoryState::capture(&self.workspace)? != self.repository
-            || match &self.operation {
-                Operation::Push(_) | Operation::Pull(_) => false,
-                Operation::Add => {
-                    literal_add_paths(
-                        &self.workspace,
+        if trace_suppressed_environment(current_environment) != self.environment {
+            return Err(GitToolError::InvalidInput(
+                "Git environment changed after preparation; request a fresh authorization".into(),
+            ));
+        }
+        if capture_program(&self.program)? != self.program_entry {
+            return Err(GitToolError::InvalidInput(
+                "Git executable changed after preparation; request a fresh authorization".into(),
+            ));
+        }
+        if RepositoryState::capture(&self.workspace)? != self.repository {
+            return Err(GitToolError::InvalidInput(
+                "Git repository metadata changed after preparation; request a fresh authorization"
+                    .into(),
+            ));
+        }
+        if match &self.operation {
+            Operation::Push(_) | Operation::Pull(_) => false,
+            Operation::Add => {
+                literal_add_paths(
+                    &self.workspace,
+                    &self.repository.workdir,
+                    &serde_json::from_value::<GitAddInput>(self.input.clone())
+                        .map_err(|error| GitToolError::InvalidInput(error.to_string()))?
+                        .paths,
+                )? != self.paths
+            }
+            Operation::Checkout(_) => {
+                if tracked_commit_sources(&self.repository.workdir)?.1 != self.gitlinks {
+                    true
+                } else if let Some(expected) = &self.checkout_parents {
+                    &super::checkout_state::TargetParents::capture(
                         &self.repository.workdir,
-                        &serde_json::from_value::<GitAddInput>(self.input.clone())
-                            .map_err(|error| GitToolError::InvalidInput(error.to_string()))?
-                            .paths,
-                    )? != self.paths
-                }
-                Operation::Checkout(_) => {
-                    if tracked_commit_sources(&self.repository.workdir)?.1 != self.gitlinks {
-                        true
-                    } else if let Some(expected) = &self.checkout_parents {
-                        &super::checkout_state::TargetParents::capture(
-                            &self.repository.workdir,
-                            &self.paths,
-                        )? != expected
-                    } else {
-                        false
-                    }
-                }
-                Operation::Commit(_) => {
-                    let (paths, gitlinks) = tracked_commit_sources(&self.repository.workdir)?;
-                    paths != self.paths || gitlinks != self.gitlinks
+                        &self.paths,
+                    )? != expected
+                } else {
+                    false
                 }
             }
-            || match &self.operation {
-                Operation::Push(_) | Operation::Pull(_) => Vec::new(),
-                Operation::Add => capture_add_sources(&self.repository.workdir, &self.paths)?,
-                Operation::Commit(_) | Operation::Checkout(_) => {
-                    capture_tracked_sources(&self.repository.workdir, &self.paths)?
-                }
-            } != self.sources
+            Operation::Commit(_) => {
+                let (paths, gitlinks) = tracked_commit_sources(&self.repository.workdir)?;
+                paths != self.paths || gitlinks != self.gitlinks
+            }
+        } || match &self.operation {
+            Operation::Push(_) | Operation::Pull(_) => Vec::new(),
+            Operation::Add => capture_add_sources(&self.repository.workdir, &self.paths)?,
+            Operation::Commit(_) | Operation::Checkout(_) => {
+                capture_tracked_sources(&self.repository.workdir, &self.paths)?
+            }
+        } != self.sources
         {
             return Err(GitToolError::InvalidInput(
                 "Git repository or sources changed after preparation; request a fresh authorization".into(),

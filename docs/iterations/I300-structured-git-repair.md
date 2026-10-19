@@ -4760,7 +4760,26 @@ Separate regression tests pass 2/2, including changed-destination refusal and
 exact candidate Execute facets without receiver reads. All-target/all-feature
 Clippy and Windows Git-only library cross-check pass; independent incremental
 review found no blocker. These are local candidate checks, not native Windows
-or whole-T7 acceptance. Standard external preflight is running in session 80821,
-with output at `/tmp/talos-i300-push-program-preflight.log`; its result is not
-yet established. Native Push/eight-stage proof, Pull integration and the
+or whole-T7 acceptance. Standard external preflight session 80821 exited 0 for the Push candidate
+(before rebase), including workspace tests and both Runtime SDK fixtures;
+output is at `/tmp/talos-i300-push-program-preflight.log`. Implementation
+commit after rebase is `4f7a199a`. The branch now includes origin/main
+`45cf9eb9`; the EVOLUTION append conflict retained both independent records.
+Post-rebase validation remains required. Older CI run 39182330307 additionally
+failed Runtime conditional Checkout with source drift; local preflight passing
+does not explain or close that CI failure, which remains a reproducibility item. Native Push/eight-stage proof, Pull integration and the
 previously recorded delivery residuals remain open. No completion is claimed.
+
+
+Post-rebase diagnosis checkpoint (2026-10-19): Runtime conditional Checkout
+passes in a focused locked local run (session 40805). This does not reproduce
+or resolve the older Linux CI failure. Revalidation now distinguishes environment,
+executable and repository-metadata drift while preserving short-circuit checks
+and the same refusal conditions. The Windows CI required-test list now explicitly
+selects all four sender/Push program-binding regressions and rejects missing test
+names. The first post-rebase preflight stopped at formatting while diagnosis was
+being edited; formatting is corrected. Standard external preflight session 11898
+is running against this candidate, with output in
+`/tmp/talos-i300-drift-diagnostics-preflight.log`; no pass is claimed yet.
+Native Windows execution, real Windows Push and the original Pull/T7 residuals
+remain required.
