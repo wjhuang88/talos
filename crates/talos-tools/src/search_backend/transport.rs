@@ -1,6 +1,8 @@
 //! Controlled HTTP transport for the staged search compatibility migration.
 //! No default wiring; proxy support is limited to HTTP CONNECT / HTTPS IPv4 literals.
 
+pub(super) mod compatibility;
+
 use std::{
     net::{IpAddr, SocketAddr},
     sync::{
@@ -156,6 +158,13 @@ impl BodyFormat {
 }
 
 fn encode_form(fields: &[(String, String)]) -> Result<Vec<u8>, TransportError> {
+    encode_form_with_limit(fields, 16_384)
+}
+
+fn encode_form_with_limit(
+    fields: &[(String, String)],
+    limit: usize,
+) -> Result<Vec<u8>, TransportError> {
     // Check exact serializer expansion before allocating the encoded body. Every pair
     // costs '=' plus separators; even empty fields therefore have a bounded count.
     if fields.len() > 8192 {
@@ -165,7 +174,7 @@ fn encode_form(fields: &[(String, String)]) -> Result<Vec<u8>, TransportError> {
     for (index, (name, value)) in fields.iter().enumerate() {
         length = length
             .checked_add(if index == 0 { 1 } else { 2 })
-            .filter(|n| *n <= 16_384)
+            .filter(|n| *n <= limit)
             .ok_or(TransportError::InvalidRequest)?;
         for field in [name, value] {
             if field.len() > 16_384 {
@@ -181,7 +190,7 @@ fn encode_form(fields: &[(String, String)]) -> Result<Vec<u8>, TransportError> {
                 };
                 length = length
                     .checked_add(size)
-                    .filter(|n| *n <= 16_384)
+                    .filter(|n| *n <= limit)
                     .ok_or(TransportError::InvalidRequest)?;
             }
         }

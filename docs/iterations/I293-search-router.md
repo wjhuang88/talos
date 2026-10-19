@@ -10,7 +10,7 @@
 | Source Issue | #643 |
 | Depends on | Accepted ADR-085; SEARCH-001-B / #642 complete in #656; NET-001 boundary coordination |
 | Claim State | Claimed |
-| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 merged TLS/CONNECT subset; #716 merged bounded form/diagnostic stage at `b5b8241e`; #732 merged owned payload at `8fa2a50`; #733 merged Lite/HTML parsing at `dea3edc`; #734 merged Instant Answer at `45cf9eb9`; Bing parser candidate delivery tracked from #643; full C/EP and default activation Pending |
+| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 merged TLS/CONNECT subset; #716 merged bounded form/diagnostic stage at `b5b8241e`; #732 merged owned payload at `8fa2a50`; #733 merged Lite/HTML parsing at `dea3edc`; #734 merged Instant Answer at `45cf9eb9`; #736 merged Bing parsing at `2b015a6b`; fixed request candidate delivery tracked from #643; full C/EP and default activation Pending |
 | Completion | Pending |
 
 ## Collaboration Claim
@@ -1323,3 +1323,68 @@ after DOM entity decoding, before trim. This prerequisite is ready for stable ca
 exact-local/remote review, native CI and final CAS remain required before deliberate merge.
 Parent I293 remains Active/Claimed, Completion Pending; the source Issue index will record the
 actual candidate PR/head/tree. No default activation, D admission or release follows.
+
+## Merged Bing / Dormant Fixed Request Stage — 2026-10-19
+
+#736 merged2b015a6bba10e646ac4b022514177c4a92ba372c, sourcehead78780d93/tree709e6bbf.
+CI3245/run39184232215 attempt1 all6jobs SUCCESS: Windows tools511/0failed/0ignored/0filtered,
+macOS tools509/0/0/0 include all14new fixtures; original socket/SDK2modes/fullpreflight and
+later gates pass. Protected source approval6257545314, final full-stage review/CAS6257754612
+and source delivery6257761924 record actual merged evidence. This backfills #736 as partial C
+evidence. No historical failure is reclassified; I293 stays Active/Claimed, Completion Pending.
+
+Selection base: main2b015a6bba10e646ac4b022514177c4a92ba372c. Effective #712/ADR-090 claim
+verified before implementation branch. Inventory: I293 Active continues existing-protocol
+internalization; I294 Active retains D research; I300 Active retains Git/PERM-007-H; I302 Review
+retains #717; I277 Review retains deferred human/device checks; I249 Planned deferred, I164
+Paused superseded. I301/I303/I304/I305 Complete/Closed; historical I146/I147/I150 and completed
+I162 review notes are not new nonterminal work. Open #705 remains timeout diagnostics; #735
+head0b42e580 is I300/#704 Git and does not touch search_backend/I293. No takeover or approval.
+
+Runnable deliverable: private pure fixed request factories for Lite/HTML/Instant Answer/Bing,
+returning the existing immutable PreparedTransportRequest; exact encoded limits and manifest
+membership/invocation binding remain mandatory. Explicitly library-only: no production caller,
+HTTP/DNS/authority/budget effect, root/router/default or model behavior, new backend/public API,
+dependency/version/lock/permission change. Affected reference:
+SEARCH-001-C-COMPATIBILITY-REQUESTS.md; controlled transport reference links it. Full protocol
+headers/UA/parity/D/privacy/parser binding/result admission/root/rollback/activation stay pending.
+
+Independent protected design preview APPROVE requires actual fixed-destination derivation,
+ordered fields, complete encoded GET4096/POST16384 limits before serializer allocation,
+raw bound before blank check, preserved nonblank bytes and adversarial scope/invocation fixtures.
+No approval seal/global once/query fingerprint is claimed. Shared Agent/account identity is not
+distinct-human approval; exact candidate and terminal gates still require separate review.
+
+Fresh archive SHA25606b90d9a9ad9e7e347c4cd85c3fb37189256703db4fab1d6c6fb963ae1eed0ee
+and VCS b30180a0/crates/websearch verified. All four archived sources match freshly retrieved
+immutable pinned sources byte-for-byte; hashes and complete MIT notice are in the reference.
+An initial local comparison reconstructed trailing newlines incorrectly for Bing and asserted;
+rechecking the exact retrieved strings confirmed identical source bytes and the complete retained
+MIT notice (final LF only). No source mismatch, live query, D admission or test failure is claimed.
+
+Workspace maintenance removed the old toolchain/cache. Official manifest-checksummed Rust1.99.0
+was restored and executed; fresh focused tests, full preflight, network-test Clippy, package
+inclusion, protected exact-source/head review, native CI and final CAS follow. Only the existing
+authorized local socket filter is allowed; remote CI remains unfiltered. #643/#624/#717 stay open,
+#729 stays closed and #705/#735 remain independent. Parent completion and default activation Pending.
+
+Fresh local convergence PASSED on pinned Rust1.99.0: standard locked release_preflight.sh
+exited0, including workspace check/strict Clippy/tests and independent SDK default/coding modes.
+The redirected preflight journal retained only an early fragment; no aggregate suite count is
+claimed from that fragment. The command's terminal exit0 is observed. Native exact-head logs
+must independently establish unfiltered tests and the original socket fixture before merge.
+Focused request fixtures11/0 passed first run; network-feature test-target Clippy -D warnings,
+format/whitespace, reference links and package inclusion of source/fixtures/full MIT all pass.
+Governance SQL17/delivery12 and claims0warnings were observed. Only the existing authorized
+local socket filter is used, no additional skip/ignore/retry or threshold change. Scale remains
+high-risk/release-managed/on-demand, sources493/packages31/workflows4. No prior failure is repaired.
+
+Independent protected working-source/provenance review APPROVE found no blocking finding:
+transport blob2ff93a7187030968a805d20b7b3669ea54618af9,
+factory8f3ecd98e9f039568a4814620b680459605d57c5,
+fixtures6a56c07be70911d263df5f07909e1e9c3e5a58a1. Reviewer independently retrieved/hash-checked
+all four pinned sources and complete root MIT; did not independently download the archive or
+build. Shared Agent/account identity is not distinct-human approval. This prerequisite enters
+stable candidate Review; exact-local/remote protected review, native terminal CI and final CAS
+remain required. Actual candidate PR/head/tree will be indexed from #643; I293 remains Active/
+Claimed, Completion Pending, with full C/EP/parity/D/privacy/root/rollback/default activation gated.
