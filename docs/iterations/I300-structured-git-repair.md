@@ -5108,3 +5108,15 @@ session 44449 is running at
 `/tmp/talos-i300-command-stage-preflight-unsandboxed.log`; poll it rather than
 restart. The sandbox failure is not a passing workspace gate. Fetch succeeded,
 with current implementation ahead 220 / behind 0 origin/main; no rebase needed.
+
+Stable-batch validation superseding the running checkpoint (2026-10-19):
+authorized external session 44449 exited 0 with `release preflight: passed`.
+The standard pinned-toolchain/locked workspace checks, Clippy, tests, doctests,
+governance checks and external SDK fixtures passed; tools tests pass 936/936.
+The log explicitly includes the new sender configuration isolation test from
+`95baec5f`, as well as the retained command and fresh-scope changes from
+`30a74c2a` and `ef37e810`. Evidence:
+`/tmp/talos-i300-command-stage-preflight-unsandboxed.log`.
+This clears the local standard gate for this batch only. Native Windows
+diagnosis, exact-head remote gates, actual supervised Pull integration and
+the original T7/handoff acceptance remain open; T7 stays Active.
