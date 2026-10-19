@@ -306,12 +306,7 @@ async fn checkout_ref_movement_after_discovery_invalidates_plan() {
         ToolProvenance::Native,
     )
     .expect("plan");
-    let admission = proof(&plan);
-    let PreparedNormalStage::Continue(next) =
-        Box::new(plan).execute_stage(Box::new(admission)).await
-    else {
-        panic!("discovery");
-    };
+    let mut next: Box<dyn PreparedNormalToolInvocation> = Box::new(plan);
     let engine =
         PermissionSessionState::new(PermissionEngine::with_workspace_root(root.path().into()));
     let context = PermissionContext::new(
@@ -319,21 +314,37 @@ async fn checkout_ref_movement_after_discovery_invalidates_plan() {
         InteractionCapability::Available,
     );
     let input = serde_json::json!({"branch":"target"});
-    let request = PermissionRequest::native("git_checkout", next.permission_profile(), &input);
-    let proposal = engine
-        .propose(&request, &context, GrantScope::Once)
-        .expect("proposal");
-    let pending = engine
-        .approve_once(proposal, &request, &context)
-        .expect("approve");
-    let proof = engine
-        .try_admit_prepared_invocation(
-            pending,
-            &request,
-            &context,
+    let mut history = talos_core::tool::PreparedStageHistory::default();
+    let proof = loop {
+        assert!(history.record_profile(
             next.plan_identity().expect("identity"),
-        )
-        .expect("admit");
+            next.permission_profile(),
+        ), "discovery stage budget");
+        let request = PermissionRequest::native("git_checkout", next.permission_profile(), &input);
+        let proposal = engine
+            .propose(&request, &context, GrantScope::Once)
+            .expect("proposal");
+        let pending = engine
+            .approve_once(proposal, &request, &context)
+            .expect("approve");
+        let admission = engine
+            .try_admit_prepared_invocation(
+                pending,
+                &request,
+                &context,
+                next.plan_identity().expect("identity"),
+            )
+            .expect("admit");
+        // Configuration frontiers differ by platform. Reach the actual
+        // mutation plan before changing its retained target reference.
+        if next.permission_profile().iter().any(|facet| facet.nature == ToolNature::Write) {
+            break admission;
+        }
+        match next.execute_stage(Box::new(admission)).await {
+            PreparedNormalStage::Continue(continuation) => next = continuation,
+            PreparedNormalStage::Complete(output) => panic!("discovery: {}", output.result.content),
+        }
+    };
     git(&["update-ref", "refs/heads/target", &current]);
     let output = next.execute(Box::new(proof)).await;
     assert!(
