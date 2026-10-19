@@ -4920,3 +4920,17 @@ passes with locked all-feature tools tests, as do the two sender-program tests.
 All-target/all-feature locked Clippy with warnings denied passes. Independent
 static security review found no blocker or enlarged authority; it did not run
 tests. Native Windows diagnosis remains required; no Windows fix is claimed.
+
+Stable candidate validation (2026-10-19): rebased onto origin/main 2b015a6b
+without conflicts; Git source is unchanged by that rebase. Full standard
+`./scripts/release_preflight.sh` on frozen 0cdfb928 passes outside the sandbox
+(session 15707, `/tmp/talos-i300-binding-full-preflight-approved.log`, exit 0,
+ending `release preflight: passed`). This includes locked workspace check,
+Clippy, tests/doctests, governance/claims and both external Runtime SDK modes.
+The initial sandbox run failed only at process observation EPERM in the local
+eight-stage Push test; that test passes in the approved full rerun. Independent
+static authorization review of the Git/permission delta from 0b42e580 to
+0cdfb928 found no code blocker, without running tests. Current-head remote CI,
+native Windows diagnosis, actual Pull integration execution and the original
+T7/handoff completion gates remain outstanding. No production Pull activation
+or completion is claimed.
