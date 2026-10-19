@@ -5634,3 +5634,16 @@ This does not activate structured Git on Windows or complete T7.
 Windows shell/git feature library cross-check passes with --locked for
 x86_64-pc-windows-gnu (/tmp/talos-i300-null-job-process-check.log). This compiles
 the changed Job boundary; it does not run the Windows tests.
+
+Windows native config fixture correction (2026-10-19): three Git config CLI
+parity fixtures now retain tempfile's ordinary absolute Windows root instead of
+passing a Rust canonical verbatim root to Git. Non-Windows roots stay canonical.
+The tests still compare declaration/include ordering, depth handling and host
+configuration selection; no production parser or permission behavior changes.
+Locked target_config tests pass 29/29 on macOS
+(/tmp/talos-i300-config-fixture-tests.log); format passes. Native Windows runtime
+results and the distinct parent-traversal failures remain pending.
+Windows MSVC test-target cargo xwin check passes with --locked and git feature
+(/tmp/talos-i300-config-fixture-xwin.log); feature-reduced build emits existing
+dead-code warnings, so this is compile evidence, not a warning-free Clippy gate
+or native test execution.
