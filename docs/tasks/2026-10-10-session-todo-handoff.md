@@ -4221,3 +4221,15 @@ CI 39228852503 at the previous pushed head has Linux workspace failure in
 during discovery. Root cause is not established. Windows workspace remains live;
 do not restart the run merely because another job failed. T7 and the original
 handoff queue remain incomplete.
+
+2026-10-19 superseding integration validation and reconciliation binding:
+The standard external preflight log
+`/tmp/talos-i300-integration-runner-preflight.log` ends
+`release preflight: passed` for implementation `e438f6b4` / `654770d0`.
+This supersedes the running-session entry above. Subsequent reconciliation
+selection now binds the exact reconciled HEAD, including rejection if HEAD
+moves back to the original commit. The native reconciliation regression passed;
+all-target/all-feature locked tools Clippy passed with warnings denied.
+Independent static review found no new blocker for this binding. This later
+edit is not covered by the preceding full preflight. Prepared reconciliation
+continuation, production activation and the full original handoff remain open.
