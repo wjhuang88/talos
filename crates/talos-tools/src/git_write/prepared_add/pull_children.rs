@@ -796,7 +796,7 @@ impl AddPlan {
             let (remote, _) = self.pull_child_fetch_targets.get(workdir).ok_or_else(|| {
                 GitToolError::InvalidInput("Pull child fetch remote missing".into())
             })?;
-            let mut command = self.pull_child_fetch_command(workdir, &location.git_dir);
+            let mut command = self.pull_child_fetch_command(workdir, &location.git_dir)?;
             command.args([
                 "-c",
                 "maintenance.autoDetach=false",
@@ -891,7 +891,7 @@ impl AddPlan {
         // enough; every requested commit must be reachable from an existing ref.
         // This and cat-file are transient observations, not an atomic snapshot.
         self.revalidate()?;
-        let mut command = self.pull_child_command(workdir, gitdir, worktree);
+        let mut command = self.pull_child_command(workdir, gitdir, worktree)?;
         command.args(["rev-list", "-n", "1", "--stdin", "--not", "--all"]);
         let input = format!("{}\n", objects.join("\n")).into_bytes();
         let output = self
@@ -935,13 +935,13 @@ impl AddPlan {
         &self,
         selected: &Path,
         gitdir: &Path,
-    ) -> tokio::process::Command {
+    ) -> Result<tokio::process::Command, GitToolError> {
         let mut command = tokio::process::Command::new(&self.program);
         command
             .current_dir(gitdir)
             .arg("--no-pager")
             .arg("--git-dir")
-            .arg(gitdir)
+            .arg(host_path::directory_argument(gitdir)?.as_os_str())
             .env_clear()
             .envs(&self.environment);
         // Git schedules index tasks first, including OnDemand tasks. Only
@@ -950,7 +950,7 @@ impl AddPlan {
         if self.pull_child_is_historical(selected) {
             command.arg("--work-tree=.");
         }
-        command
+        Ok(command)
     }
 
     // Object probes use their independently bound layout, not fetch scheduling.
@@ -959,18 +959,18 @@ impl AddPlan {
         workdir: &Path,
         gitdir: &Path,
         worktree: &Path,
-    ) -> tokio::process::Command {
+    ) -> Result<tokio::process::Command, GitToolError> {
         let mut command = tokio::process::Command::new(&self.program);
         command
             .current_dir(workdir)
             .arg("--no-pager")
             .arg("--git-dir")
-            .arg(gitdir)
+            .arg(host_path::directory_argument(gitdir)?.as_os_str())
             .arg("--work-tree")
-            .arg(worktree)
+            .arg(host_path::directory_argument(worktree)?.as_os_str())
             .env_clear()
             .envs(&self.environment);
-        command
+        Ok(command)
     }
 
     pub(super) async fn pull_child_commit_objects(
@@ -999,7 +999,7 @@ impl AddPlan {
             }
         }
         self.revalidate()?;
-        let mut command = self.pull_child_command(workdir, gitdir, worktree);
+        let mut command = self.pull_child_command(workdir, gitdir, worktree)?;
         command.args(["cat-file", "--batch-check=%(objectname) %(objecttype)"]);
         let output = self
             .run_command_output_with_input(
