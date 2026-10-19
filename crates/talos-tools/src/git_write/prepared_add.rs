@@ -24,6 +24,17 @@ struct ChildInspectionEvidence {
     status: Vec<(PathBuf, super::status_state::StatusState)>,
 }
 
+// Git for Windows converts the executable's retained verbatim spelling to
+// forward slashes. Compare that representation without resolving a new path,
+// stripping prefixes, folding case, or interpreting dot components.
+#[cfg(any(windows, test))]
+fn windows_bound_program_spelling(reported: &Path, bound: &Path) -> bool {
+    match (reported.to_str(), bound.to_str()) {
+        (Some(reported), Some(bound)) => reported.replace('\\', "/") == bound.replace('\\', "/"),
+        _ => false,
+    }
+}
+
 fn validate_internal_program(
     reported: &Path,
     admitted: &Path,
@@ -32,14 +43,19 @@ fn validate_internal_program(
     // Preserve the spelling check before opening the newly reported path: a
     // different exec-path has no inherited Read authority, even if it might
     // resolve to the same file. Diagnostics must not canonicalize it first.
-    if reported != admitted {
+    let same_spelling = reported == admitted;
+    #[cfg(windows)]
+    let same_spelling = same_spelling || windows_bound_program_spelling(reported, bound);
+    if !same_spelling {
         return Err(GitToolError::InvalidInput(format!(
             "Internal Git exec-path spelling changed after executable admission: admitted={}, reported={}",
             admitted.display(),
             reported.display(),
         )));
     }
-    let canonical = reported.canonicalize().map_err(|error| {
+    // Reopen only the admitted spelling, never the reported alternative. The
+    // caller also retains executable bytes/identity and revalidates them.
+    let canonical = admitted.canonicalize().map_err(|error| {
         GitToolError::InvalidInput(format!(
             "Internal Git exec-path cannot be resolved after executable admission: {error}"
         ))

@@ -266,6 +266,8 @@ jobs:
             'git::git_write::prepared_add::tests::program_evidence_retains_windows_replacement_guard',
             'git::git_write::prepared_add::tests::sender_program_binding_requires_new_exact_read_admission',
             'git::git_write::prepared_add::tests::sender_program_binding_preserves_invocation_budget',
+            'git::git_write::prepared_add::tests::windows_internal_program_report_matches_only_retained_canonical_spelling',
+            'git::git_write::prepared_add::tests::internal_program_validation_distinguishes_unadmitted_path_from_target_drift',
             'git::git_write::prepared_add::tests::push_program_rebind_preserves_sender_effects_without_receiver_reads',
             'git::git_write::prepared_add::tests::push_program_rebind_rejects_changed_destination_plan',
             'git::git_write::snapshot::tests::path_identity_retains_leaf_and_ancestor_identity',
