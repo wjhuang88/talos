@@ -133,7 +133,12 @@ impl AddPlan {
             .ok_or_else(|| {
                 GitToolError::Git("Missing retained Pull integration configuration".into())
             })?
-            .pull_integration_hook_paths(&self.repository, &self.environment, integration)?;
+            .pull_integration_hook_paths(
+                &self.repository,
+                &self.environment,
+                integration,
+                self.pull_before.as_ref().and_then(|before| before.branch()),
+            )?;
         // Hook paths are known without opening them. Co-publish their exact
         // Read facets with the retained operation's integration scope rather
         // than requiring another approval just to assemble that same plan.

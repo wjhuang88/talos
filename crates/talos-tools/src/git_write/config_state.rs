@@ -10,6 +10,9 @@ type CheckoutCandidates = (Vec<(String, String)>, Option<String>);
 
 type Values = BTreeMap<Vec<u8>, Vec<Option<Vec<u8>>>>;
 
+#[path = "config_state/merge_options.rs"]
+mod merge_options;
+
 /// Receiver dependencies named by configuration. Construction never opens the
 /// paths; their contents belong to the next independently admitted Read stage.
 pub(super) struct ReceiverEffects {
@@ -1233,6 +1236,7 @@ impl ConfigState {
         repository: &RepositoryState,
         environment: &BTreeMap<OsString, OsString>,
         integration: &super::pull_state::Integration,
+        branch: Option<&str>,
     ) -> Result<Vec<PathBuf>, GitToolError> {
         use super::pull_state::Integration;
         if matches!(
@@ -1247,6 +1251,9 @@ impl ConfigState {
             ));
         }
         self.validate_pull_integration_signing(integration)?;
+        if matches!(integration, Integration::Merge { .. }) {
+            self.validate_pull_merge_options(branch)?;
+        }
         let directory = configured_path(&self.values, b"core.hookspath", environment)?
             .unwrap_or_else(|| repository.common_dir.join("hooks"));
         let directory = if directory.is_absolute() {
