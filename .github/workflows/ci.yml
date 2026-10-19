@@ -249,6 +249,9 @@ jobs:
           exit $LASTEXITCODE
 
       - name: Structured Git executable and path identity guard tests
+        # Independent evidence must still run after a Desktop failure.
+        # Earlier failures remain failures of the job.
+        if: ${{ !cancelled() }}
         shell: pwsh
         run: |
           $tests = @(
