@@ -5296,3 +5296,29 @@ Git rejected a verbatim `\\?\C:\...\child\.git` argument. Full job log is
 `/tmp/talos-i300-windows-binding-stage.log`. Child explicit-root invocation spelling
 needs correction while preserving canonical identity evidence; no Windows pass
 or T7 completion is claimed. Linux main job was still running at this observation.
+
+Windows explicit-directory argument correction (2026-10-19): all five explicit
+`--git-dir`/`--work-tree` arguments now use a Git-compatible conventional Windows
+spelling after canonical target and retained ancestor identity validation.
+Canonical permission/evidence paths remain unchanged; Unix borrows its original
+argument. Verbatim-only trailing-dot/space names, colon/ADS and DOS device
+components refuse before conversion; unsupported names do not broaden authority.
+The child filter command now propagates conversion failure. Two native Windows
+regressions (Unicode/spaces, rejected verbatim-only names, real explicit-root Git)
+are required by CI. Incremental independent static security review found no new
+blocker; it did not execute tests or establish filesystem confinement.
+
+Local verification: locked all-feature dirty-child checkout and effective-root
+filter regressions pass, all-target/all-feature Clippy with warnings denied
+passes, format/whitespace checks pass, and Git-only Windows GNU library check
+passes with seven existing feature-only warnings. Logs are
+`/tmp/talos-i300-directory-{checkout,filter,clippy}.log` and
+`/tmp/talos-i300-directory-argument-windows-lib.log`. Full-feature cross-check
+cannot complete because this host lacks `x86_64-w64-mingw32-gcc`; native Windows
+runtime and configuration-origin compatibility remain unproven. Standard full
+preflight is running in session 31795 with log
+`/tmp/talos-i300-directory-full-preflight.log`; no success is claimed yet.
+Previous run 39207944752 is now terminal: Linux main and Desktop passed, Windows
+workspace failed as recorded above. Fetch completed; HEAD has no commits behind
+origin/main. Actual Pull integration execution, native acceptance, final review
+and the original T7/handoff deliverables remain open.

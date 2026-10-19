@@ -263,6 +263,8 @@ jobs:
             'process_boundary::windows_foreground::tests::dropped_foreground_wait_keeps_cleanup_owned',
             'process_boundary::windows_foreground::tests::cancelling_one_foreground_operation_preserves_another_live_job',
             'git::git_write::prepared_add::tests::windows_program_guard_allows_real_git_startup',
+            'git::git_write::prepared_add::host_path::tests::explicit_git_directory_argument_preserves_canonical_identity',
+            'git::git_write::prepared_add::host_path::tests::explicit_git_directory_arguments_run_native_git',
             'git::git_write::prepared_add::tests::program_evidence_retains_windows_replacement_guard',
             'git::git_write::prepared_add::tests::sender_program_binding_requires_new_exact_read_admission',
             'git::git_write::prepared_add::tests::sender_configuration_sources_remain_readable_after_rebinding',
