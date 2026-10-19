@@ -262,3 +262,49 @@ async fn pull_integration_scope_does_not_replace_exact_hook_read_admission() {
     );
     assert!(!root.path().join(".git/index").exists());
 }
+
+#[tokio::test]
+async fn pull_rebase_instruction_format_requires_separate_todo_authorization() {
+    for mode in [
+        super::super::pull_state::Rebase::On,
+        super::super::pull_state::Rebase::Merges,
+    ] {
+        let root = fixture();
+        assert!(std::process::Command::new("git")
+            .current_dir(root.path())
+            .args(["config", "rebase.instructionFormat", "%s%nexec echo private-value > format-helper-ran"])
+            .output().expect("configure format").status.success());
+        let mut plan = integration_scope_fixture(root.path()).await;
+        plan.pull_integration = Some(super::super::pull_state::Integration::Rebase {
+            onto: "1".repeat(40), upstream: "2".repeat(40), mode, autostash: false,
+        });
+        let before = std::fs::read(root.path().join(".git/HEAD")).expect("HEAD");
+        let error = match plan.discover_pull_integration_hooks() {
+            Ok(_) => panic!("format-created exec cannot inherit worktree scope"),
+            Err(error) => error.to_string(),
+        };
+        assert!(error.contains("executable-todo effect authorization"), "{error}");
+        assert!(!error.contains("private-value"));
+        assert!(!root.path().join("format-helper-ran").exists());
+        assert_eq!(std::fs::read(root.path().join(".git/HEAD")).expect("HEAD"), before);
+    }
+}
+
+#[tokio::test]
+async fn pull_instruction_format_is_dormant_for_merge_and_empty_for_rebase() {
+    for (format, rebase) in [("%s%nexec echo probe", false), ("", true)] {
+        let root = fixture();
+        assert!(std::process::Command::new("git")
+            .current_dir(root.path())
+            .args(["config", "rebase.instructionFormat", format])
+            .output().expect("configure format").status.success());
+        let mut plan = integration_scope_fixture(root.path()).await;
+        if rebase {
+            plan.pull_integration = Some(super::super::pull_state::Integration::Rebase {
+                onto: "1".repeat(40), upstream: "2".repeat(40),
+                mode: super::super::pull_state::Rebase::On, autostash: false,
+            });
+        }
+        plan.discover_pull_integration_hooks().expect("inactive custom format");
+    }
+}

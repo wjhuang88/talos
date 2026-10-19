@@ -1251,6 +1251,21 @@ impl ConfigState {
             ));
         }
         self.validate_pull_integration_signing(integration)?;
+        // The sequencer expands this format into its executable todo list.
+        // In particular, %nexec can launch a command even for noninteractive
+        // rebase. Worktree scope does not authorize those commands. Empty
+        // formats retain Git's default; custom formats need effect discovery.
+        if matches!(integration, Integration::Rebase { .. })
+            && self
+                .values
+                .get(b"rebase.instructionformat".as_slice())
+                .and_then(|values| values.last())
+                .is_some_and(|value| value.as_deref().is_none_or(|value| !value.is_empty()))
+        {
+            return Err(unsupported(
+                "Custom rebase instruction format requires separate executable-todo effect authorization",
+            ));
+        }
         if matches!(integration, Integration::Merge { .. }) {
             self.validate_pull_merge_options(branch)?;
         }
