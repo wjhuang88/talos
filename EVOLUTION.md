@@ -1463,3 +1463,14 @@ visible; distinguish passed assertions from independently emitted evidence.
 - Promoted to rule/check: checkout target-hook, configuration rewrite, alias/`..`,
   and absent global-configuration-path regressions in prepared_add.rs; I300 retains
   final security review and production acceptance gates.
+
+## 2026-10-19 - Compare HTTP fixture headers by protocol semantics
+
+- Trigger: I300 full preflight failed four unrelated provider registration fixtures.
+- Evidence: The same failures reproduced outside the sandbox; changing only header
+  name comparison to ASCII case-insensitive matching made all eight registration
+  tests pass. Credential values remain exact after HTTP whitespace trimming.
+- Root cause: The fixture required a lowercase wire spelling for case-insensitive
+  HTTP field names. It confused a representation choice with missing credentials.
+- Prevention/check: The shared registration fixture now compares names and values
+  separately; retain strict credential-value and empty-GET-body assertions.

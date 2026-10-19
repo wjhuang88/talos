@@ -4951,3 +4951,16 @@ and Windows preparation remain disabled. Log evidence:
 `/tmp/talos-i300-fold-hook-frontier.log`,
 `/tmp/talos-i300-bound-spelling-tests.log`,
 `/tmp/talos-i300-ci-39189835232-windows.log`.
+
+Validation follow-up: run 39189835232 is terminal; all jobs except Windows pass.
+The first local full preflight stopped at four CLI registration header assertions,
+also reproduced outside the sandbox. Bounded fixture maintenance 6923d481 fixes
+HTTP name-case comparison without changing product behavior or credential values;
+all eight registration tests pass. Standard full preflight passed outside
+the sandbox at frozen source 6923d481 (session 53843, exit 0,
+`/tmp/talos-i300-canonical-full-preflight-approved.log`, ending
+`release preflight: passed`). Locked workspace check, Clippy, tests/doctests,
+governance/claims and both external Runtime SDK modes passed. Subsequent fetch
+found origin/main ae6a0791 (#737); rebase and validation of the resulting
+candidate remain required. Native Windows confirmation, actual Pull integration
+execution and the original T7/handoff delivery gates remain outstanding.
