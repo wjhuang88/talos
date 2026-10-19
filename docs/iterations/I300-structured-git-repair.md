@@ -5260,3 +5260,17 @@ and both external Runtime SDK modes. The failed sandbox observation above is
 retained as historical evidence, not a source failure or passing gate. Publish
 this stable stage for native Windows verification; final exact-head CI/review,
 actual integration execution and all original handoff acceptance remain open.
+
+Configuration test split (2026-10-19): moved the 28 inline configuration tests
+into six same-module files for child layout/configuration, checkout, receiver
+and Push, parsing, and Pull. Each new file is 120–257 lines; the production
+file is now 1,964 lines. Exact comparison confirms all test blocks and platform
+attributes are preserved after removing their module indentation, and the
+production prefix is byte-identical. The existing signing include remains in
+the same module. Locked all-feature configuration tests pass 29/29
+(`/tmp/talos-i300-config-split-tests.log`), all-target/all-feature Clippy with
+warnings denied passes (`/tmp/talos-i300-config-split-clippy.log`), and format
+and whitespace checks pass. This is test maintenance only; it neither closes
+integration execution nor changes I300/T7 status. Published candidate `2f6a1a5b`
+is under native CI run 39207944752; its evidence does not include this later
+test-only split.
