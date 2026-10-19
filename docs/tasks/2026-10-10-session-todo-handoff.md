@@ -4367,3 +4367,12 @@ Locked macOS target_config tests pass 29/29
 (/tmp/talos-i300-traversal-tests.log); Windows MSVC test-target cargo xwin check
 passes (/tmp/talos-i300-config-fixture-xwin.log), with existing reduced-feature
 dead-code warnings. Native Windows execution remains pending.
+
+Windows handle-cleanup fixture checkpoint (2026-10-19): mode 3 now uses the
+existing AttributeList fault after native attribute-list initialization instead
+of an invalid program rejected before native resource acquisition. Receipt
+phase names match the exercised cleanup. Independent process-boundary review
+found no blocker and no production change; mode 3 remains diagnostic, while
+mode 0 retains per-resource audit responsibility. Locked all-feature MSVC test
+target checking via cargo xwin passes. Native Windows runtime evidence remains
+pending; this does not activate Windows structured Git or complete T7.
