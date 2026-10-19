@@ -16,16 +16,6 @@ impl AddPlan {
         let integration = self.pull_integration.as_ref().ok_or_else(|| {
             GitToolError::InvalidInput("Missing retained Pull integration operation".into())
         })?;
-        // Reconciliation must return to evidence discovery and obtain another
-        // approval. Never report an isolated read-tree as a completed Pull.
-        if matches!(
-            integration,
-            git_write::pull_state::Integration::Reconcile { .. }
-        ) {
-            return Err(GitToolError::InvalidInput(
-                "Pull reconciliation continuation is not yet implemented".into(),
-            ));
-        }
         for arguments in integration.commands()? {
             // Earlier commands legitimately change index/refs. Recheck root
             // identity here without requiring pre-mutation metadata bytes.

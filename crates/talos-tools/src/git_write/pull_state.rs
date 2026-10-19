@@ -694,7 +694,7 @@ impl BeforeFetch {
         self.integration_stage(fetched, oid_length, None, run).await
     }
 
-    async fn integration_stage<F, Fut>(
+    pub(super) async fn integration_stage<F, Fut>(
         &self,
         fetched: &[u8],
         oid_length: usize,

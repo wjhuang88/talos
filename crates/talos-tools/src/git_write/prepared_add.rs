@@ -26,6 +26,8 @@ mod pull_children;
 mod pull_discovery;
 #[path = "prepared_add/pull_integration.rs"]
 mod pull_integration;
+#[path = "prepared_add/pull_reconcile.rs"]
+mod pull_reconcile;
 
 struct ChildInspectionEvidence {
     attributes: Vec<(PathBuf, snapshot::Entry)>,
@@ -5298,10 +5300,15 @@ impl PreparedNormalToolInvocation for AddPlan {
                     Ok(()) => self.execute_pull_integration().await,
                     Err(error) => Err(error),
                 };
-                return PreparedNormalStage::Complete(match result {
-                    Err(error) => ToolExecutionOutput::error(format!("Pull integration failed: {error}; fetched effects are retained; inspect repository before retrying")),
-                    Ok(()) => ToolExecutionOutput::success("Pull integration completed"),
-                });
+                match result {
+                    Ok(()) if matches!(self.pull_integration, Some(super::pull_state::Integration::Reconcile { .. })) => {
+                        self.refresh_reconciled_pull().await.map_err(|error| GitToolError::Git(format!("Pull worktree reconciliation completed but continuation discovery failed: {error}; partial effects are retained; inspect repository before retrying")))
+                    }
+                    result => return PreparedNormalStage::Complete(match result {
+                        Err(error) => ToolExecutionOutput::error(format!("Pull integration failed: {error}; fetched effects are retained; inspect repository before retrying")),
+                        Ok(()) => ToolExecutionOutput::success("Pull integration completed"),
+                    }),
+                }
             }
             Phase::PullFetch => {
                 if let Err(error) = self.revalidate() {

@@ -4,6 +4,45 @@ use super::super as git_write;
 use super::*;
 
 impl AddPlan {
+    pub(super) async fn validate_pull_source_filters(&self) -> Result<(), GitToolError> {
+        if let Some(sources) = &self.pull_sources {
+            for batch in sources.paths.chunks(16) {
+                let mut args = vec![
+                    "check-attr".into(),
+                    "-z".into(),
+                    "filter".into(),
+                    "--".into(),
+                ];
+                args.extend(batch.iter().cloned());
+                let output = self.pull_probe(args).await?;
+                if !output.status.success() || !output.stderr.is_empty() {
+                    return Err(GitToolError::Git("Pull filter inspection failed".into()));
+                }
+                let fields = output.stdout.split(|byte| *byte == 0).collect::<Vec<_>>();
+                if fields.last() != Some(&b"".as_slice()) || fields.len() - 1 != batch.len() * 3 {
+                    return Err(GitToolError::InvalidInput(
+                        "Invalid Pull filter inspection output".into(),
+                    ));
+                }
+                for (fields, path) in fields[..fields.len() - 1]
+                    .as_chunks::<3>()
+                    .0
+                    .iter()
+                    .zip(batch)
+                {
+                    if fields[0] != path.as_bytes()
+                        || fields[1] != b"filter"
+                        || !matches!(fields[2], b"unspecified" | b"unset")
+                    {
+                        return Err(GitToolError::InvalidInput("Pull tracked source uses a configured filter; requires separate authorization".into()));
+                    }
+                }
+                self.revalidate()?;
+            }
+        }
+        Ok(())
+    }
+
     pub(super) async fn pull_probe(
         &self,
         args: Vec<String>,
@@ -598,42 +637,7 @@ impl AddPlan {
                 &self.repository.workdir,
                 source_names,
             )?);
-            if let Some(sources) = &self.pull_sources {
-                for batch in sources.paths.chunks(16) {
-                    let mut args = vec![
-                        "check-attr".into(),
-                        "-z".into(),
-                        "filter".into(),
-                        "--".into(),
-                    ];
-                    args.extend(batch.iter().cloned());
-                    let output = self.pull_probe(args).await?;
-                    if !output.status.success() || !output.stderr.is_empty() {
-                        return Err(GitToolError::Git("Pull filter inspection failed".into()));
-                    }
-                    let fields = output.stdout.split(|byte| *byte == 0).collect::<Vec<_>>();
-                    if fields.last() != Some(&b"".as_slice()) || fields.len() - 1 != batch.len() * 3
-                    {
-                        return Err(GitToolError::InvalidInput(
-                            "Invalid Pull filter inspection output".into(),
-                        ));
-                    }
-                    for (fields, path) in fields[..fields.len() - 1]
-                        .as_chunks::<3>()
-                        .0
-                        .iter()
-                        .zip(batch)
-                    {
-                        if fields[0] != path.as_bytes()
-                            || fields[1] != b"filter"
-                            || !matches!(fields[2], b"unspecified" | b"unset")
-                        {
-                            return Err(GitToolError::InvalidInput("Pull tracked source uses a configured filter; requires separate authorization".into()));
-                        }
-                    }
-                    self.revalidate()?;
-                }
-            }
+            self.validate_pull_source_filters().await?;
         }
         let evidence = git_write::pull_state::PullEvidence::capture_with_budget(
             &self.repository,
