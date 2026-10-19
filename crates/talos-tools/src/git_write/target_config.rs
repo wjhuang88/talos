@@ -1140,6 +1140,7 @@ mod tests {
 
     use super::*;
 
+    #[cfg(unix)]
     #[test]
     fn parent_traversal_keeps_cancelled_directory_admission_and_identity() {
         let temporary = tempfile::tempdir().expect("fixture");
@@ -1176,6 +1177,7 @@ mod tests {
         assert!(sources.revalidate().is_err());
     }
 
+    #[cfg(unix)]
     #[test]
     fn missing_parent_traversal_never_reads_lexically_normalized_source() {
         let temporary = tempfile::tempdir().expect("fixture");
@@ -1777,15 +1779,18 @@ mod tests {
             let mut links = Sources::new(Some(b"main"), [link]).expect("roots");
             assert!(links.advance(|_| true, &Default::default()).is_err());
         }
-        let mut traversal = Sources::new(Some(b"main"), [root.join("missing/../source")])
-            .expect("traversal frontier");
-        traversal
-            .advance(|_| true, &Default::default())
-            .expect("native missing traversal");
-        assert!(matches!(
-            traversal.files.values().next().expect("source").entry,
-            super::super::snapshot::Entry::Missing
-        ));
+        #[cfg(unix)]
+        {
+            let mut traversal = Sources::new(Some(b"main"), [root.join("missing/../source")])
+                .expect("traversal frontier");
+            traversal
+                .advance(|_| true, &Default::default())
+                .expect("native missing traversal");
+            assert!(matches!(
+                traversal.files.values().next().expect("source").entry,
+                super::super::snapshot::Entry::Missing
+            ));
+        }
         assert!(
             Sources::new(
                 Some(b"main"),
@@ -1793,6 +1798,42 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn verbatim_join_normalization_precedes_source_admission() {
+        let temporary = tempfile::tempdir().expect("fixture");
+        let root = temporary.path().canonicalize().expect("verbatim root");
+        let source = root.join("missing/../source");
+        // Rust PathBuf::push/join removes dot components for verbatim roots.
+        // No missing directory is traversed by the resulting source path.
+        assert_eq!(source, root.join("source"));
+        std::fs::write(&source, b"[fixture]\nmarker=effective\n").expect("source");
+        let mut sources = Sources::new(None, [source.clone()]).expect("frontier");
+        assert!(sources.paths().contains(&source));
+        assert!(!sources.paths().contains(&root.join("missing")));
+        assert!(
+            sources
+                .advance(|path| path != source, &Default::default())
+                .is_err()
+        );
+        assert!(sources.files.is_empty());
+        while !sources.complete() {
+            sources
+                .advance(|_| true, &Default::default())
+                .expect("admitted");
+        }
+        let records = sources
+            .ordered_records(std::slice::from_ref(&source), &Default::default(), None)
+            .expect("records");
+        assert!(
+            records
+                .iter()
+                .any(|(origin, record)| origin == &source && record.key == b"fixture.marker")
+        );
+        std::fs::write(&source, b"[fixture]\nmarker=changed\n").expect("drift");
+        assert!(sources.revalidate().is_err());
     }
 
     #[test]
