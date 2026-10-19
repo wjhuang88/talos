@@ -332,6 +332,9 @@ unsafe impl Sync for WindowsJobControl {}
 #[async_trait]
 impl BackgroundProcessControl for WindowsJobControl {
     async fn terminate(&self) -> Result<(), String> {
+        if self.job.is_null() {
+            return Err("Windows Job control has no owned handle".into());
+        }
         // Termination acceptance is not proof that all descendants have exited.
         let ok = unsafe { windows_sys::Win32::System::JobObjects::TerminateJobObject(self.job, 1) };
         if ok == 0 {
@@ -357,6 +360,11 @@ impl BackgroundProcessControl for WindowsJobControl {
 #[cfg(windows)]
 impl WindowsJobControl {
     fn active_processes(&self) -> Result<u32, String> {
+        // NULL queries the calling process's Job, not our owned Job. Reject it
+        // explicitly so a missing handle cannot produce unrelated cleanup proof.
+        if self.job.is_null() {
+            return Err("Windows Job control has no owned handle".into());
+        }
         use windows_sys::Win32::System::JobObjects::{
             JOBOBJECT_BASIC_ACCOUNTING_INFORMATION, JobObjectBasicAccountingInformation,
             QueryInformationJobObject,
