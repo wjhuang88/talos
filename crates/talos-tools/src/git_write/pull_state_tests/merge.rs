@@ -388,3 +388,62 @@ async fn real_pull_obeys_branch_ff_and_autostash_policy() {
         }
     }
 }
+
+/// A closed stdin does not prevent an inherited auto-edit request from
+/// executing an editor. Keep this native behavior visible to effect discovery.
+#[cfg(unix)]
+#[test]
+fn pull_merge_editor_effect_depends_on_inherited_autoedit() {
+    use std::os::unix::fs::PermissionsExt;
+    let root = tempfile::tempdir().expect("fixture");
+    let marker = root.path().join("editor-ran");
+    let editor = root.path().join("editor");
+    std::fs::write(&editor, "#!/bin/sh\nprintf editor > editor-ran\n").expect("editor");
+    std::fs::set_permissions(&editor, std::fs::Permissions::from_mode(0o700))
+        .expect("executable editor");
+    let run = |args: &[&str], autoedit: Option<&str>| {
+        let mut command = std::process::Command::new("git");
+        command
+            .current_dir(root.path())
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_CONFIG_GLOBAL", root.path().join("absent-config"))
+            .env_remove("GIT_CONFIG_COUNT")
+            .env_remove("GIT_CONFIG_PARAMETERS")
+            .env_remove("GIT_MERGE_AUTOEDIT")
+            .env("GIT_EDITOR", "./editor")
+            .stdin(std::process::Stdio::null())
+            .args([
+                "-c",
+                "user.name=Fixture",
+                "-c",
+                "user.email=fixture@example.invalid",
+                "-c",
+                "commit.gpgsign=false",
+                "-c",
+                "maintenance.auto=false",
+            ])
+            .args(args);
+        if let Some(value) = autoedit {
+            command.env("GIT_MERGE_AUTOEDIT", value);
+        }
+        let output = command.output().expect("native Git");
+        assert!(output.status.success(), "{args:?}: {output:?}");
+        String::from_utf8(output.stdout).expect("Git output")
+    };
+    run(&["init", "-b", "main"], None);
+    run(&["commit", "--allow-empty", "-m", "base"], None);
+    run(&["branch", "other"], None);
+    run(&["commit", "--allow-empty", "-m", "local"], None);
+    let local = run(&["rev-parse", "HEAD"], None);
+    run(&["checkout", "other"], None);
+    run(&["commit", "--allow-empty", "-m", "remote"], None);
+    run(&["checkout", "main"], None);
+    for (autoedit, executes) in [(None, false), (Some("yes"), true), (Some("no"), false)] {
+        run(&["reset", "--hard", local.trim()], None);
+        if marker.exists() {
+            std::fs::remove_file(&marker).expect("reset marker");
+        }
+        run(&["merge", "--no-autostash", "--ff", "other"], autoedit);
+        assert_eq!(marker.exists(), executes, "autoedit={autoedit:?}");
+    }
+}
