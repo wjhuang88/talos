@@ -4185,3 +4185,19 @@ Superseding gate result: approved external session 36855 exited zero; log
 `release preflight: passed`. Pinned locked workspace gate, tools 945/945,
 doctests and both external Runtime SDK modes pass for bc7fd24a/6587407c.
 Publish the stable stage for fresh native Windows CI. T7 remains incomplete.
+
+2026-10-19 integration continuation: native Git v2.54.0
+`builtin/merge.c:add_strategies` confirms direct `merge FETCH_HEAD` selects
+`pull.twohead` / `pull.octopus` and may discover custom `git-merge-*` programs.
+The existing merge-options module now conservatively validates both strategy lists
+(parent reduction can change the selected key), preserving only internal
+recursive/ort/subtree strategies and refusing external helper execution without
+printing configuration values. Focused locked all-feature tests (2/2), all-target
+all-feature Clippy and diff whitespace checks pass. Initial independent review
+caught parent-reduction selection and built-in helper execution gaps; both were
+corrected and static re-review found no new blocker within this guard. Default
+octopus helper effects still need final execution validation; execution remains
+disabled. CI 39228852503 at a04fe659 remains
+live (Linux Desktop passed; Windows Desktop and Linux preflight running).
+Resume actual integration effect validation and supervised execution; do not
+mistake this guard for Pull completion or omit the original T1–T8 queue.

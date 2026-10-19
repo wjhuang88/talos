@@ -3,6 +3,31 @@
 use super::{ConfigState, GitToolError, unsupported};
 
 impl ConfigState {
+    pub(super) fn validate_pull_merge_strategy(&self) -> Result<(), GitToolError> {
+        // builtin/merge.c:add_strategies splits on literal spaces, without
+        // shell quoting. The selected config can discover git-merge-* on PATH.
+        // Native reduce_parents can change which key applies. Until that
+        // reduction is retained as evidence, conservatively inspect both.
+        // Default octopus helper effects still require execution validation.
+        for key in [b"pull.octopus".as_slice(), b"pull.twohead".as_slice()] {
+            let Some(value) = self.values.get(key).and_then(|values| values.last()) else {
+                continue;
+            };
+            let value = value
+                .as_deref()
+                .ok_or_else(|| unsupported("Merge strategy needs a value"))?;
+            if value
+                .split(|byte| *byte == b' ')
+                .any(|strategy| !matches!(strategy, b"recursive" | b"ort" | b"subtree"))
+            {
+                return Err(unsupported(
+                    "External Pull merge strategy requires separate program execution authorization",
+                ));
+            }
+        }
+        Ok(())
+    }
+
     pub(super) fn validate_pull_merge_options(
         &self,
         branch: Option<&str>,
