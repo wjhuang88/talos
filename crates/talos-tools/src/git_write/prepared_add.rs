@@ -168,6 +168,7 @@ enum Phase {
     PullChildConfiguration,
     PullChildFetch,
     PullIntegration,
+    PullIntegrationHooks,
 }
 
 pub(super) struct AddPlan {
@@ -1863,6 +1864,62 @@ impl AddPlan {
             self.select_pull_child_identity()?;
         }
         Ok(self)
+    }
+
+    fn discover_pull_integration_hooks(mut self: Box<Self>) -> Result<Box<Self>, GitToolError> {
+        self.revalidate()?;
+        let integration = self
+            .pull_integration
+            .as_ref()
+            .ok_or_else(|| GitToolError::Git("Missing retained Pull integration plan".into()))?;
+        let paths = self
+            .config
+            .as_ref()
+            .ok_or_else(|| {
+                GitToolError::Git("Missing retained Pull integration configuration".into())
+            })?
+            .pull_integration_hook_paths(&self.repository, &self.environment, integration)?;
+        // Drop fetch/child Write and Network facets. This stage admits only
+        // integration hook reads, not integration mutation or hook execution.
+        self.facets
+            .retain(|facet| !matches!(facet.nature, ToolNature::Write | ToolNature::Network));
+        for path in &paths {
+            self.facets.push(path_facet(
+                ToolNature::Read,
+                path,
+                "Pull integration hook candidate; content inspection requires this new stage",
+            )?);
+        }
+        self.pull_hook_paths = paths;
+        self.pull_hook_evidence.clear();
+        self.identity = PreparedPlanIdentity::new();
+        self.phase = Phase::PullIntegrationHooks;
+        Ok(self)
+    }
+
+    fn capture_pull_integration_hooks(
+        &mut self,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<(), GitToolError> {
+        self.revalidate()?;
+        // Validate the complete frontier before opening any candidate.
+        for path in &self.pull_hook_paths {
+            if !authorizations.iter().any(|token| {
+                token.authorizes_path(
+                    "git_pull",
+                    ToolNature::Read,
+                    &self.workspace,
+                    path.to_str().unwrap_or_default(),
+                )
+            }) {
+                return Err(GitToolError::InvalidInput(
+                    "Pull integration hook frontier lacks fresh Read admission".into(),
+                ));
+            }
+        }
+        let evidence = super::config_state::ConfigState::capture_pull_hooks(&self.pull_hook_paths)?;
+        self.pull_hook_evidence = evidence;
+        self.revalidate()
     }
 
     async fn discover_pull_child_attributes(
@@ -7429,7 +7486,7 @@ impl PreparedNormalToolInvocation for AddPlan {
     }
 
     async fn execute_stage(
-        self: Box<Self>,
+        mut self: Box<Self>,
         admission: Box<dyn std::any::Any + Send>,
     ) -> PreparedNormalStage {
         if self.phase == Phase::Mutation {
@@ -7483,12 +7540,17 @@ impl PreparedNormalToolInvocation for AddPlan {
                 "Pull child fetch stage failed: {error}; this operation may have partial fetch effects retained; inspect repositories before retrying",
             ))),
             Phase::PullPostFetch => self.discover_pull_postfetch(&authorizations).await.map_err(|error| GitToolError::Git(format!("Pull parent fetch completed; post-fetch discovery failed: {error}; fetched effects are retained; inspect repository before retrying"))),
-            Phase::PullIntegration => {
-                if let Err(error) = self.revalidate() {
-                    return PreparedNormalStage::Complete(ToolExecutionOutput::error(error.to_string()));
+            Phase::PullIntegration => self.discover_pull_integration_hooks().map_err(|error| {
+                GitToolError::Git(format!("Pull integration effect discovery failed: {error}; fetched effects are retained; inspect repository before retrying"))
+            }),
+            Phase::PullIntegrationHooks => {
+                if let Err(error) = self.capture_pull_integration_hooks(&authorizations) {
+                    return PreparedNormalStage::Complete(ToolExecutionOutput::error(format!(
+                        "Pull integration hook discovery failed: {error}; fetched effects are retained; inspect repository before retrying",
+                    )));
                 }
                 return PreparedNormalStage::Complete(ToolExecutionOutput::error(
-                    "Pull parent fetch and integration selection completed; integration effect admission and execution are not yet implemented; fetched metadata is retained; inspect repository before retrying",
+                    "Pull parent fetch and integration selection completed; integration mutation effect admission and execution are not yet implemented; fetched metadata is retained; inspect repository before retrying",
                 ));
             }
             Phase::PullFetch => {
