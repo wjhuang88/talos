@@ -5182,3 +5182,14 @@ independent security review found no blocker. The underlying Windows failure
 is still unknown. Authorized full standard preflight session 49774 is running
 at `/tmp/talos-i300-coalesced-full-preflight.log`; poll that handle rather than
 restart. Earlier run 39201923094 is terminal failure, not a current-batch gate.
+
+Current-batch standard gate (2026-10-19): session 49774 exited 0 and
+`/tmp/talos-i300-coalesced-full-preflight.log` ends with
+`release preflight: passed`. The pinned-toolchain locked workspace check,
+Clippy, tests (including tools 938/938), doctests and external SDK fixture
+passed for implementation through `f4eed9eb`. This supersedes the running
+checkpoint above. Fetch confirmed no origin/main-only commits. The three
+implementation increments have independent review evidence recorded above;
+publish this stable batch for fresh Windows invocation-spelling evidence.
+Windows runtime, actual supervised Pull integration and all original handoff
+acceptance remain open; T7/I300 stays Active.
