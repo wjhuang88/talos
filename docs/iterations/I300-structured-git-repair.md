@@ -4721,3 +4721,28 @@ comparison. Do not rerun discover on the populated plan or equate two programs
 by installation/version. This is reviewed implementation guidance, not an
 implemented rebind or a completed Windows gate. Fetch found no upstream-only
 main commits at this checkpoint (193 local-only commits).
+
+Windows sender-first binding checkpoint (2026-10-19): Commit/Checkout now query
+only the entry Git's exec-path before first sender discovery, then require a new
+prepared proof retaining original Read frontiers plus internal executable
+Read/Execute and configuration-chain admission. After exact path binding, the
+internal Git must report the identical exec-path candidate and canonical self;
+no second migration is accepted. Only then does full sender discovery run for
+the first time. This avoids dual populated discovery plans and preserves the
+same command budget and supervisor. The original executable evidence remains
+bound for drift checks. Independent static review found no security blocker.
+Separate sender-program tests pass 2/2, including stale-proof refusal, missing
+Read refusal and deliberately reduced budget retention. All-target/all-feature
+Clippy passes; Windows Git-only library cross-check passes with the existing
+feature-only warnings. Prepared Git regression passes 140 tests but its real
+Push process-observation case fails with sandbox PermissionDenied; this is not
+a full passing suite. The authorized standard external preflight is running in
+session 95706 (`/tmp/talos-i300-sender-program-preflight.log`).
+
+This supersedes the dual-discovery comparison guidance above only for
+Commit/Checkout: no old sender configuration or derived effects exist when the
+program changes. Push is unchanged and remains subject to the earlier
+ReceiverRoots re-preparation requirement. Windows always takes an extra admission
+even for a same-path installation; complex Checkout eight-stage coverage,
+distinct-path/entry-replacement regression cases and native Windows acceptance
+remain outstanding. Production Windows preparation and Pull remain disabled.
