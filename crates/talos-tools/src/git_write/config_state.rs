@@ -1277,6 +1277,7 @@ impl ConfigState {
             ));
         }
         if matches!(integration, Integration::Merge { .. }) {
+            self.validate_pull_merge_strategy()?;
             self.validate_pull_merge_options(branch)?;
         }
         let directory = configured_path(&self.values, b"core.hookspath", environment)?

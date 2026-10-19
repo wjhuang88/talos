@@ -81,6 +81,47 @@ fn only_selected_branch_options_enter_integration_effect_validation() {
         stable_auxiliary: Default::default(),
         hooks: Vec::new(),
     };
+    for key in [b"pull.twohead".as_slice(), b"pull.octopus".as_slice()] {
+        for value in ["ort", "recursive", "subtree", "ort recursive"] {
+            config
+                .values
+                .insert(key.to_vec(), vec![Some(value.as_bytes().to_vec())]);
+            config
+                .validate_pull_merge_strategy()
+                .expect("Git strategies");
+        }
+        for value in [
+            "octopus",
+            "resolve",
+            "ours",
+            "secret",
+            "ort secret",
+            " ort",
+            "ort ",
+            "ort  recursive",
+            "'ort'",
+            "ort\trecursive",
+            "",
+        ] {
+            config
+                .values
+                .insert(key.to_vec(), vec![Some(value.as_bytes().to_vec())]);
+            let error = config
+                .validate_pull_merge_strategy()
+                .expect_err("unmodeled strategy");
+            assert!(!error.to_string().contains("secret"));
+        }
+        config.values.insert(key.to_vec(), vec![None]);
+        assert!(config.validate_pull_merge_strategy().is_err());
+        config.values.insert(
+            key.to_vec(),
+            vec![Some(b"secret".to_vec()), Some(b"ort".to_vec())],
+        );
+        config
+            .validate_pull_merge_strategy()
+            .expect("last strategy wins");
+        config.values.remove(key);
+    }
     config.values.insert(
         b"branch.other.mergeoptions".to_vec(),
         vec![Some(b"-Ssecret".to_vec())],
