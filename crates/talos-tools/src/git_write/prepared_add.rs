@@ -5294,10 +5294,14 @@ impl PreparedNormalToolInvocation for AddPlan {
             Phase::PullIntegrationMutation => {
                 let result = self.validate_pull_integration_scope(&authorizations)
                     .and_then(|()| self.capture_pull_integration_hooks(&authorizations));
-                return PreparedNormalStage::Complete(ToolExecutionOutput::error(match result {
-                    Err(error) => format!("Pull integration admission failed: {error}; fetched effects are retained; inspect repository before retrying"),
-                    Ok(()) => "Pull integration scope admitted; external-effect validation and supervised integration execution are not yet implemented; fetched effects are retained; inspect repository before retrying".into(),
-                }));
+                let result = match result {
+                    Ok(()) => self.execute_pull_integration().await,
+                    Err(error) => Err(error),
+                };
+                return PreparedNormalStage::Complete(match result {
+                    Err(error) => ToolExecutionOutput::error(format!("Pull integration failed: {error}; fetched effects are retained; inspect repository before retrying")),
+                    Ok(()) => ToolExecutionOutput::success("Pull integration completed"),
+                });
             }
             Phase::PullFetch => {
                 if let Err(error) = self.revalidate() {
