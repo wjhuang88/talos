@@ -607,7 +607,8 @@ async fn child_filter_command_uses_effective_root_without_discovery_prefix() {
         .expect("discovery attributes");
     let plan = prepare(root.path());
     let command =
-        plan.child_filter_command(&discovery.join(".git"), root.path(), &["tracked".into()]);
+        plan.child_filter_command(&discovery.join(".git"), root.path(), &["tracked".into()])
+            .expect("bound directory arguments");
     let output = plan
         .run_command(command, std::time::Duration::from_secs(10), 4096)
         .await

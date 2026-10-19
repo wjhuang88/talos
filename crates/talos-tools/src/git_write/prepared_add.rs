@@ -18,6 +18,8 @@ use super::{
     capture_add_sources, literal_add_paths, repository_state::RepositoryState, snapshot,
 };
 
+#[path = "prepared_add/host_path.rs"]
+mod host_path;
 #[path = "prepared_add/pull_children.rs"]
 mod pull_children;
 #[path = "prepared_add/pull_discovery.rs"]
@@ -2688,7 +2690,7 @@ impl AddPlan {
             .current_dir(gitdir)
             .arg("--no-pager")
             .arg("--git-dir")
-            .arg(gitdir)
+            .arg(host_path::directory_argument(gitdir)?.as_os_str())
             .args(["config", "--show-origin", "--null", "--list", "--includes"])
             .env_clear()
             .envs(&self.environment);
@@ -2713,9 +2715,9 @@ impl AddPlan {
             .current_dir(worktree)
             .arg("--no-pager")
             .arg("--git-dir")
-            .arg(gitdir)
+            .arg(host_path::directory_argument(gitdir)?.as_os_str())
             .arg("--work-tree")
-            .arg(worktree)
+            .arg(host_path::directory_argument(worktree)?.as_os_str())
             .args(["config", "--show-origin", "--null", "--list", "--includes"])
             .env_clear()
             .envs(&self.environment);
@@ -4022,7 +4024,7 @@ impl AddPlan {
                 &location.git_dir,
                 self.checkout_child_effective_worktree(workdir),
                 paths,
-            );
+            )?;
             let output = self
                 .run_command(command, std::time::Duration::from_secs(10), 256 * 1024)
                 .await?;
@@ -4079,21 +4081,21 @@ impl AddPlan {
         gitdir: &Path,
         worktree: &Path,
         paths: &[String],
-    ) -> tokio::process::Command {
+    ) -> Result<tokio::process::Command, GitToolError> {
         let mut command = tokio::process::Command::new(&self.program);
         command
             // Index paths are root-relative, even when discovery was inside
             // core.worktree. Explicit roots prevent cwd-prefix reinterpretation.
             .current_dir(worktree)
             .arg("--git-dir")
-            .arg(gitdir)
+            .arg(host_path::directory_argument(gitdir)?.as_os_str())
             .arg("--work-tree")
-            .arg(worktree)
+            .arg(host_path::directory_argument(worktree)?.as_os_str())
             .args(["--no-pager", "check-attr", "-z", "filter", "--"])
             .args(paths)
             .env_clear()
             .envs(&self.environment);
-        command
+        Ok(command)
     }
 
     fn revalidate(&self) -> Result<(), GitToolError> {
