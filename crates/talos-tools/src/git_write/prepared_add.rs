@@ -146,6 +146,7 @@ impl Operation {
 enum Phase {
     SenderConfiguration,
     ReceiverRoots,
+    PushProgram,
     ReceiverMetadata,
     ReceiverCommon,
     ReceiverConfiguration,
@@ -3124,6 +3125,169 @@ impl AddPlan {
         self.discover().await
     }
 
+    fn add_push_program_admission(&mut self) -> Result<(), GitToolError> {
+        let candidate = self.maintenance_program.as_ref().ok_or_else(|| {
+            GitToolError::InvalidInput("Push internal Git candidate missing".into())
+        })?;
+        self.facets.push(path_facet(
+            ToolNature::Read,
+            &self.program,
+            "entry Git executable retained for drift checks",
+        )?);
+        self.facets.push(path_facet(
+            ToolNature::Read,
+            candidate,
+            "internal Git executable before Push re-discovery",
+        )?);
+        self.facets.push(ToolPermissionFacet::with_resource(
+            ToolNature::Execute,
+            candidate.to_str().ok_or_else(|| {
+                GitToolError::InvalidInput("Internal Git path is not UTF-8".into())
+            })?,
+            ToolResourceKind::Command,
+        ));
+        self.facets.push(
+            ToolPermissionFacet::with_resource(
+                ToolNature::Read,
+                "git:configuration-chain",
+                ToolResourceKind::Remote,
+            )
+            .with_description("fresh internal Git configuration discovery before receiver reads"),
+        );
+        Ok(())
+    }
+
+    async fn rebind_push_program(
+        mut self: Box<Self>,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<Box<Self>, GitToolError> {
+        let Operation::Push(push) = &self.operation else {
+            return Err(GitToolError::InvalidInput(
+                "Push re-discovery requires Push".into(),
+            ));
+        };
+        if !self.paths.is_empty()
+            || !self.child_attributes.is_empty()
+            || !self.child_configs.is_empty()
+            || self.sender_entry_program.is_some()
+            || !self.facets.iter().any(|facet| {
+                facet.resource.as_deref() == Some("git:configuration-chain")
+                    && facet.nature == ToolNature::Read
+            })
+        {
+            return Err(GitToolError::InvalidInput(
+                "Invalid Push re-discovery state".into(),
+            ));
+        }
+        let remote = push.remote.as_deref().unwrap_or("origin").to_owned();
+        self.revalidate()?;
+        let candidate = self.maintenance_program.clone().ok_or_else(|| {
+            GitToolError::InvalidInput("Push internal Git candidate missing".into())
+        })?;
+        let admitted = self.receiver_read_path(&candidate, authorizations)?;
+        let bound = ReceiverChildExecutable::capture(&candidate, admitted)?;
+        let old_path = std::mem::replace(&mut self.program, bound.canonical);
+        let old_entry = std::mem::replace(&mut self.program_entry, bound.program);
+        self.sender_entry_program = Some((old_path.clone(), old_entry));
+        let maintenance = self.inspect_maintenance_program().await?;
+        if maintenance != candidate
+            || maintenance.canonicalize().ok().as_ref() != Some(&self.program)
+        {
+            return Err(GitToolError::InvalidInput(
+                "Push internal Git exec-path differs".into(),
+            ));
+        }
+        // Only the fresh configuration-chain proof covers newly reported config
+        // files. Other newly reported paths are compared, never opened here.
+        let output = self.inspect_config().await?;
+        let mut config = super::config_state::ConfigState::capture_host(
+            &output,
+            &self.repository,
+            &self.environment,
+        )?;
+        super::remote_state::reject_legacy_remotes(&self.repository.common_dir)?;
+        config.prepare_push(&self.repository, &self.environment, &remote)?;
+        let destinations = super::remote_state::destinations(
+            &super::remote_state::records(&output)?,
+            &remote,
+            true,
+        )?;
+        let mut roots = Vec::new();
+        for destination in &destinations {
+            if let Some(path) =
+                super::remote_state::local_destination(destination, &self.repository.workdir)?
+            {
+                roots.push(path);
+            }
+        }
+        if destinations != self.push_destinations || roots != self.receiver_roots {
+            return Err(GitToolError::InvalidInput(
+                "Push destinations changed with internal Git".into(),
+            ));
+        }
+        for variable in ["GIT_ATTR_SYSTEM", "GIT_ATTR_GLOBAL"] {
+            let path = self
+                .inspect_attribute_path_at(&self.repository.workdir, variable)
+                .await?;
+            config.stable_auxiliary.insert(path.clone());
+            config.auxiliary.insert(path);
+        }
+        for variable in ["GIT_CONFIG_SYSTEM", "GIT_CONFIG_GLOBAL"] {
+            let paths = self.inspect_config_paths(variable).await?;
+            config.stable_auxiliary.extend(paths.iter().cloned());
+            config.auxiliary.extend(paths);
+        }
+        config.verify_host(&self.inspect_config().await?)?;
+        if Some(&config) != self.config.as_ref() {
+            return Err(GitToolError::InvalidInput(
+                "Push configuration or auxiliary sources changed with internal Git".into(),
+            ));
+        }
+        let mut children = Vec::new();
+        if !roots.is_empty() {
+            let directory = candidate.parent().ok_or_else(|| {
+                GitToolError::InvalidInput("Push exec-path directory missing".into())
+            })?;
+            children.push(directory.join(if cfg!(windows) {
+                "git-receive-pack.exe"
+            } else {
+                "git-receive-pack"
+            }));
+            children.push(self.inspect_git_shell_path().await?);
+            if !children.contains(&candidate) {
+                children.push(candidate);
+            }
+        }
+        if children != self.receiver_child_paths {
+            return Err(GitToolError::InvalidInput(
+                "Push child executable paths changed with internal Git".into(),
+            ));
+        }
+        self.config = Some(config);
+        let entry_read = path_facet(
+            ToolNature::Read,
+            &old_path,
+            "entry Git executable retained for drift checks",
+        )?;
+        let new_program = self
+            .program
+            .to_str()
+            .ok_or_else(|| GitToolError::InvalidInput("Internal Git path is not UTF-8".into()))?;
+        for facets in [&mut self.facets, &mut self.sender_mutation_facets] {
+            facets.retain(|facet| facet.resource.as_deref() != Some("git:configuration-chain"));
+            for facet in facets.iter_mut() {
+                if facet.nature == ToolNature::Execute
+                    && facet.resource.as_deref() == old_path.to_str()
+                {
+                    facet.resource = Some(new_program.to_owned());
+                }
+            }
+            facets.push(entry_read.clone());
+        }
+        self.revalidate()?;
+        Ok(self)
+    }
+
     async fn discover(mut self: Box<Self>) -> Result<Box<Self>, GitToolError> {
         self.revalidate()?;
         if matches!(
@@ -3679,6 +3843,14 @@ impl AddPlan {
             self.facets.retain(|facet| facet.nature == ToolNature::Read);
             Phase::ReceiverRoots
         };
+        if cfg!(windows) && matches!(self.operation, Operation::Push(_)) {
+            if self.phase == Phase::Mutation {
+                self.sender_mutation_facets = self.facets.clone();
+                self.facets.retain(|facet| facet.nature == ToolNature::Read);
+                self.phase = Phase::PushProgram;
+            }
+            self.add_push_program_admission()?;
+        }
         Ok(self)
     }
 
@@ -7425,7 +7597,23 @@ impl PreparedNormalToolInvocation for AddPlan {
                 Ok(plan)
             }
             Phase::SenderConfiguration => self.discover_sender(&authorizations).await,
-            Phase::ReceiverRoots => self.discover_receiver_roots(&authorizations),
+            Phase::ReceiverRoots => {
+                let plan = if cfg!(windows) {
+                    self.rebind_push_program(&authorizations).await
+                } else { Ok(self) };
+                plan.and_then(|plan| plan.discover_receiver_roots(&authorizations))
+            }
+            Phase::PushProgram => {
+                match self.rebind_push_program(&authorizations).await {
+                    Ok(mut plan) => {
+                        plan.facets.append(&mut plan.sender_mutation_facets);
+                        plan.phase = Phase::Mutation;
+                        plan.identity = PreparedPlanIdentity::new();
+                        Ok(plan)
+                    }
+                    Err(error) => Err(error),
+                }
+            }
             Phase::ReceiverMetadata => self.discover_receiver_metadata(&authorizations),
             Phase::ReceiverCommon => self.discover_receiver_common(&authorizations),
             Phase::ReceiverConfiguration => {

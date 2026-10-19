@@ -4748,3 +4748,19 @@ ReceiverRoots re-preparation requirement. Windows always takes an extra admissio
 even for a same-path installation; complex Checkout eight-stage coverage,
 distinct-path/entry-replacement regression cases and native Windows acceptance
 remain outstanding. Production Windows preparation and Pull remain disabled.
+
+Windows Push binding candidate (2026-10-19): local Push rebinds the internal
+Git at the start of ReceiverRoots, before receiver capture; remote-only Push
+uses a separate PushProgram admission. Both require fresh exact executable
+Read/Execute and configuration-chain proof, retain the original executable
+evidence, invocation budget and supervisor, and compare complete configuration,
+ordered destinations, local roots and child executable paths before continuing.
+The temporary configuration-chain grant is removed before mutation admission.
+Separate regression tests pass 2/2, including changed-destination refusal and
+exact candidate Execute facets without receiver reads. All-target/all-feature
+Clippy and Windows Git-only library cross-check pass; independent incremental
+review found no blocker. These are local candidate checks, not native Windows
+or whole-T7 acceptance. Standard external preflight is running in session 80821,
+with output at `/tmp/talos-i300-push-program-preflight.log`; its result is not
+yet established. Native Push/eight-stage proof, Pull integration and the
+previously recorded delivery residuals remain open. No completion is claimed.
