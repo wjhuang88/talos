@@ -220,6 +220,7 @@ enum Phase {
     PullChildFetch,
     PullIntegration,
     PullIntegrationHooks,
+    PullIntegrationMutation,
 }
 
 pub(super) struct AddPlan {
@@ -5249,9 +5250,14 @@ impl PreparedNormalToolInvocation for AddPlan {
                         "Pull integration hook discovery failed: {error}; fetched effects are retained; inspect repository before retrying",
                     )));
                 }
-                return PreparedNormalStage::Complete(ToolExecutionOutput::error(
-                    "Pull parent fetch and integration selection completed; integration mutation effect admission and execution are not yet implemented; fetched metadata is retained; inspect repository before retrying",
-                ));
+                self.prepare_pull_integration_scope()
+            }
+            Phase::PullIntegrationMutation => {
+                let result = self.validate_pull_integration_scope(&authorizations);
+                return PreparedNormalStage::Complete(ToolExecutionOutput::error(match result {
+                    Err(error) => format!("Pull integration admission failed: {error}; fetched effects are retained; inspect repository before retrying"),
+                    Ok(()) => "Pull integration scope admitted; external-effect validation and supervised integration execution are not yet implemented; fetched effects are retained; inspect repository before retrying".into(),
+                }));
             }
             Phase::PullFetch => {
                 if let Err(error) = self.revalidate() {
