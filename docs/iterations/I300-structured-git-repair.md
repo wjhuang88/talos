@@ -4736,8 +4736,10 @@ Read refusal and deliberately reduced budget retention. All-target/all-feature
 Clippy passes; Windows Git-only library cross-check passes with the existing
 feature-only warnings. Prepared Git regression passes 140 tests but its real
 Push process-observation case fails with sandbox PermissionDenied; this is not
-a full passing suite. The authorized standard external preflight is running in
-session 95706 (`/tmp/talos-i300-sender-program-preflight.log`).
+a full passing suite. The unchanged authorized standard external preflight
+then exited 0 for implementation 1be6f4f9, including all workspace tests and
+both Runtime SDK fixtures (`/tmp/talos-i300-sender-program-preflight.log`).
+Both governance validators also pass. Native Windows evidence remains required.
 
 This supersedes the dual-discovery comparison guidance above only for
 Commit/Checkout: no old sender configuration or derived effects exist when the
