@@ -83,6 +83,12 @@ struct ReceiverChildExecutable {
     program: ProgramEvidence,
 }
 
+struct SenderProgramBinding {
+    spelling: PathBuf,
+    canonical: PathBuf,
+    identity: snapshot::PathIdentity,
+}
+
 impl ReceiverChildExecutable {
     fn capture(spelling: &Path, admitted: &Path) -> Result<Self, GitToolError> {
         let canonical = spelling.canonicalize().map_err(|_| {
@@ -313,6 +319,7 @@ pub(super) struct AddPlan {
     maintenance_program: Option<PathBuf>,
     sender_program_candidate: Option<PathBuf>,
     sender_entry_program: Option<(PathBuf, ProgramEvidence)>,
+    sender_program_binding: Option<SenderProgramBinding>,
     config: Option<super::config_state::ConfigState>,
     child_configs: Vec<(PathBuf, super::config_state::ChildConfig)>,
     pull_config_sources_discovered: bool,
@@ -778,6 +785,7 @@ impl AddPlan {
             maintenance_program: None,
             sender_program_candidate: None,
             sender_entry_program: None,
+            sender_program_binding: None,
             config,
             child_configs: Vec::new(),
             pull_config_sources_discovered: false,
@@ -855,13 +863,23 @@ impl AddPlan {
             self.revalidate()?;
             let admitted = self.receiver_read_path(&candidate, authorizations)?;
             let bound = ReceiverChildExecutable::capture(&candidate, admitted)?;
-            let old_path = std::mem::replace(&mut self.program, bound.canonical);
+            let invocation = if cfg!(windows) {
+                bound.spelling.clone()
+            } else {
+                bound.canonical.clone()
+            };
+            let old_path = std::mem::replace(&mut self.program, invocation);
             let old_entry = std::mem::replace(&mut self.program_entry, bound.program);
             self.sender_entry_program = Some((old_path, old_entry));
+            self.sender_program_binding = Some(SenderProgramBinding {
+                spelling: bound.spelling,
+                canonical: bound.canonical,
+                identity: bound.identity,
+            });
             // A second migration is never allowed. Do this before configuration,
             // target or child discovery through the newly admitted executable.
             let maintenance = self.inspect_maintenance_program().await?;
-            validate_internal_program(&maintenance, &candidate, &self.program)?;
+            validate_internal_program(&maintenance, &candidate, self.sender_program_target())?;
             self.revalidate()?;
         } else if cfg!(windows)
             && self.sender_entry_program.is_none()
@@ -936,11 +954,21 @@ impl AddPlan {
         })?;
         let admitted = self.receiver_read_path(&candidate, authorizations)?;
         let bound = ReceiverChildExecutable::capture(&candidate, admitted)?;
-        let old_path = std::mem::replace(&mut self.program, bound.canonical);
+        let invocation = if cfg!(windows) {
+            bound.spelling.clone()
+        } else {
+            bound.canonical.clone()
+        };
+        let old_path = std::mem::replace(&mut self.program, invocation);
         let old_entry = std::mem::replace(&mut self.program_entry, bound.program);
         self.sender_entry_program = Some((old_path.clone(), old_entry));
+        self.sender_program_binding = Some(SenderProgramBinding {
+            spelling: bound.spelling,
+            canonical: bound.canonical,
+            identity: bound.identity,
+        });
         let maintenance = self.inspect_maintenance_program().await?;
-        validate_internal_program(&maintenance, &candidate, &self.program)?;
+        validate_internal_program(&maintenance, &candidate, self.sender_program_target())?;
         // Only the fresh configuration-chain proof covers newly reported config
         // files. Other newly reported paths are compared, never opened here.
         let output = self.inspect_config().await?;
@@ -3846,10 +3874,16 @@ impl AddPlan {
         }
     }
 
+    fn sender_program_target(&self) -> &Path {
+        self.sender_program_binding
+            .as_ref()
+            .map_or(&self.program, |binding| &binding.canonical)
+    }
+
     fn revalidate_maintenance_program(&self) -> Result<(), GitToolError> {
         if let Some(program) = &self.maintenance_program
-            && (program.canonicalize().ok().as_ref() != Some(&self.program)
-                || capture_program(&self.program)? != self.program_entry)
+            && (program.canonicalize().ok().as_deref() != Some(self.sender_program_target())
+                || capture_program(self.sender_program_target())? != self.program_entry)
         {
             #[cfg(test)]
             eprintln!(
@@ -4063,6 +4097,18 @@ impl AddPlan {
     }
 
     fn revalidate(&self) -> Result<(), GitToolError> {
+        if let Some(binding) = &self.sender_program_binding
+            && (self.program.canonicalize().ok().as_ref() != Some(&binding.canonical)
+                || binding.spelling.canonicalize().ok().as_ref() != Some(&binding.canonical)
+                || snapshot::PathIdentity::capture(&binding.spelling)
+                    .ok()
+                    .as_ref()
+                    != Some(&binding.identity))
+        {
+            return Err(GitToolError::InvalidInput(
+                "Internal Git executable path identity changed after admission".into(),
+            ));
+        }
         if let Some((path, entry)) = &self.sender_entry_program
             && capture_program(path)? != *entry
         {
@@ -4210,7 +4256,7 @@ impl AddPlan {
                 "Git environment changed after preparation; request a fresh authorization".into(),
             ));
         }
-        if capture_program(&self.program)? != self.program_entry {
+        if capture_program(self.sender_program_target())? != self.program_entry {
             return Err(GitToolError::InvalidInput(
                 "Git executable changed after preparation; request a fresh authorization".into(),
             ));

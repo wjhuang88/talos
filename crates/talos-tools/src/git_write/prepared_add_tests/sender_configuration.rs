@@ -39,7 +39,10 @@ async fn sender_configuration_sources_remain_readable_after_rebinding() {
             ).await;
             match output {
                 Ok(output) => {
-                    if scope == "default" {
+                    // The canonical Windows spelling is diagnostic only: Git
+                    // startup can misresolve installation paths through it.
+                    // Production must use the admitted spelling instead.
+                    if scope == "default" && (program_label != "internal" || !cfg!(windows)) {
                         defaults_readable &= output.status.success();
                     }
                     // Neither stream nor program/configuration paths may appear

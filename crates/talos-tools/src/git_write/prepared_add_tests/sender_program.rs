@@ -73,19 +73,28 @@ async fn sender_program_binding_preserves_invocation_budget() {
         .request_sender_program()
         .await
         .expect("path discovery");
+    let candidate = plan.sender_program_candidate.clone().expect("candidate");
+    let canonical = candidate.canonicalize().expect("target");
     let proof = proof(&plan);
     let authorizations = proof
         .consume_for_prepared(&plan.request(), &plan.identity)
         .expect("fresh admission");
-    let plan = plan
+    let mut plan = plan
         .discover_sender(&authorizations)
         .await
         .expect("first discovery");
     assert!(plan.sender_program_candidate.is_none());
     assert!(plan.sender_entry_program.is_some());
+    assert_eq!(plan.sender_program_target(), canonical);
+    assert_eq!(plan.program, if cfg!(windows) { candidate.clone() } else { canonical });
+    assert_eq!(plan.sender_program_binding.as_ref().expect("binding").spelling, candidate);
     assert!(plan.config.is_some());
     assert!(plan.command_budget.lock().expect("budget").commands < 18);
     plan.revalidate().expect("bound state");
+    // The invocation spelling is not a substitute for the retained target.
+    plan.sender_program_binding.as_mut().expect("binding").canonical = root.path().join("wrong-target");
+    let error = plan.revalidate().expect_err("retained target mismatch");
+    assert!(error.to_string().contains("path identity changed"));
 }
 
 #[tokio::test]
@@ -115,6 +124,8 @@ async fn push_program_rebind_preserves_sender_effects_without_receiver_reads() {
         ],
     );
     plan.command_budget.lock().expect("budget").commands = 20;
+    let candidate = plan.maintenance_program.clone().expect("candidate");
+    let canonical = candidate.canonicalize().expect("target");
     let admission = proof(&plan);
     let authorizations = admission
         .consume_for_prepared(&plan.request(), &plan.identity)
@@ -126,6 +137,8 @@ async fn push_program_rebind_preserves_sender_effects_without_receiver_reads() {
     assert!(plan.phase == Phase::ReceiverRoots);
     assert!(plan.receiver_layouts.is_empty());
     assert!(plan.sender_entry_program.is_some());
+    assert_eq!(plan.sender_program_target(), canonical);
+    assert_eq!(plan.program, if cfg!(windows) { candidate } else { canonical });
     assert!(!receiver.exists());
     assert!(plan.command_budget.lock().expect("budget").commands < 20);
     assert!(
