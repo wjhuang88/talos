@@ -5338,3 +5338,26 @@ workspace check, Clippy, tests/doctests (tools 941/941), both governance validat
 and both external Runtime SDK fixture modes. The earlier sandbox failure remains
 recorded separately. Publish this converged stage to #735 for native Windows
 verification; no final integration execution or T7/handoff completion is claimed.
+
+Pull sequencer-format effect checkpoint (2026-10-19): isolated native Git 2.54
+reproduction configured `rebase.instructionFormat` with `%s%nexec` and observed
+its helper create a marker during noninteractive `rebase --rebase-merges`.
+Git v2.54.0 `sequencer.c` around line 6151 reads that format into todo generation;
+worktree scope does not authorize the resulting commands. Integration discovery
+now refuses nonempty custom instruction formats for Rebase before publishing the
+mutation plan. Empty formats retain Git's default; Merge does not consume this
+setting. Refusal does not print configured values. This conservative unsupported
+configuration still needs a separately effect-authorized path; no silent config
+override or general executable-todo approval is introduced.
+
+Locked all-feature focused regressions pass 2/2 for On/Merges refusal, unchanged
+HEAD/no helper marker, redaction, dormant Merge and default empty format; all-target
+all-feature Clippy with warnings denied and formatting/whitespace checks pass.
+Logs: `/tmp/talos-i300-instruction-format-final-tests.log` and
+`/tmp/talos-i300-instruction-format-clippy.log`. Production integration remains
+disabled until the remaining external effects and owned execution are complete.
+Published stage `9d5fd3bb` has CI 39211752607 running; native Windows job
+117926517309 is live and its result is not claimed by these local checks.
+Incremental independent static security review found no new blocker. The existing
+integration-focused suite also passes 8/8; both governance validators pass with
+zero warnings. No fresh full workspace gate is claimed for this later increment.
