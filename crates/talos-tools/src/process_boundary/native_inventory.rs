@@ -9,7 +9,7 @@ const SOURCES: [&str; 5] = [
     include_str!("windows_foreground.rs"),
 ];
 const EXPECTED: [u64; 5] = [
-    0xfdd464d0974c62fb,
+    0xc080cbefcd2d8c27,
     0xaaf4ee820de4ea11,
     0x77b368f79911fbee,
     0xa95c60b55dcdf0fc,
