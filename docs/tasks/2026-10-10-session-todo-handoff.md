@@ -4324,3 +4324,21 @@ run39236567890 is terminal: Linux full validation, Desktop, issue reconciliation
 and Windows compile/Clippy/focused guards pass; Windows workspace tests fail.
 Production activation and exact-head cross-platform acceptance remain open.
 Fresh origin fetch shows ahead250/behind0; no rebase is needed.
+
+Windows Job null-handle correction (2026-10-19): Microsoft documents that
+QueryInformationJobObject(NULL, ...) queries the calling process's Job. The
+previous invalid-handle test therefore exposed an ownership-proof bug on a
+Job-hosted runner, rather than a reliable API error. WindowsJobControl now
+rejects NULL before both query and termination; existing empty/live Job tests
+and the NULL regression remain enabled. Independent process-hardening review
+found no blocker and confirmed ADR-068 compatibility. Format passes. The initial
+GNU-target cross-check used the wrong validation route: this project uses cargo
+xwin with x86_64-pc-windows-msvc. Missing MinGW is not a project blocker. The
+correct xwin all-feature check now passes with the pinned MSVC standard
+library (/tmp/talos-i300-null-job-xwin-check.log); native Windows CI remains
+required for execution evidence.
+Reference: https://learn.microsoft.com/en-us/windows/win32/api/jobapi2/nf-jobapi2-queryinformationjobobject
+This does not activate structured Git on Windows or complete T7.
+Windows shell/git feature library cross-check passes with --locked for
+x86_64-pc-windows-gnu (/tmp/talos-i300-null-job-process-check.log). This compiles
+the changed Job boundary; it does not run the Windows tests.
