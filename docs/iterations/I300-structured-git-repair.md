@@ -5668,3 +5668,12 @@ found no blocker and no production change; mode 3 remains diagnostic, while
 mode 0 retains per-resource audit responsibility. Locked all-feature MSVC test
 target checking via cargo xwin passes. Native Windows runtime evidence remains
 pending; this does not activate Windows structured Git or complete T7.
+
+Cross-platform diff mode checkpoint (2026-10-19): Git diff now retains the
+index mode when a gitlink is replaced by a regular worktree file on platforms
+without Unix permission bits, so the `160000 -> 100644` type transition is
+reported while ordinary content changes with `core.fileMode=false` do not gain
+an executable-mode header. The replacement and mode-tracking regressions pass
+24/24 in the locked tools diff suite; standard workspace preflight passes at
+`0a017af1`. This is a focused parity fix and does not activate Pull or close
+T7; native Windows runtime and the remaining Pull/effect gates remain open.
