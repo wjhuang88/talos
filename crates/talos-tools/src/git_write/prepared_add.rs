@@ -24,6 +24,34 @@ struct ChildInspectionEvidence {
     status: Vec<(PathBuf, super::status_state::StatusState)>,
 }
 
+fn validate_internal_program(
+    reported: &Path,
+    admitted: &Path,
+    bound: &Path,
+) -> Result<(), GitToolError> {
+    // Preserve the spelling check before opening the newly reported path: a
+    // different exec-path has no inherited Read authority, even if it might
+    // resolve to the same file. Diagnostics must not canonicalize it first.
+    if reported != admitted {
+        return Err(GitToolError::InvalidInput(format!(
+            "Internal Git exec-path spelling changed after executable admission: admitted={}, reported={}",
+            admitted.display(),
+            reported.display(),
+        )));
+    }
+    let canonical = reported.canonicalize().map_err(|error| {
+        GitToolError::InvalidInput(format!(
+            "Internal Git exec-path cannot be resolved after executable admission: {error}"
+        ))
+    })?;
+    if canonical != bound {
+        return Err(GitToolError::InvalidInput(
+            "Internal Git exec-path canonical target changed after executable admission".into(),
+        ));
+    }
+    Ok(())
+}
+
 #[derive(PartialEq, Eq)]
 struct ReceiverChildExecutable {
     spelling: PathBuf,
@@ -3162,13 +3190,7 @@ impl AddPlan {
             // A second migration is never allowed. Do this before configuration,
             // target or child discovery through the newly admitted executable.
             let maintenance = self.inspect_maintenance_program().await?;
-            if maintenance != candidate
-                || maintenance.canonicalize().ok().as_ref() != Some(&self.program)
-            {
-                return Err(GitToolError::InvalidInput(
-                    "Internal Git exec-path does not bind to its admitted executable".into(),
-                ));
-            }
+            validate_internal_program(&maintenance, &candidate, &self.program)?;
             self.revalidate()?;
         } else if cfg!(windows)
             && self.sender_entry_program.is_none()
@@ -3247,13 +3269,7 @@ impl AddPlan {
         let old_entry = std::mem::replace(&mut self.program_entry, bound.program);
         self.sender_entry_program = Some((old_path.clone(), old_entry));
         let maintenance = self.inspect_maintenance_program().await?;
-        if maintenance != candidate
-            || maintenance.canonicalize().ok().as_ref() != Some(&self.program)
-        {
-            return Err(GitToolError::InvalidInput(
-                "Push internal Git exec-path differs".into(),
-            ));
-        }
+        validate_internal_program(&maintenance, &candidate, &self.program)?;
         // Only the fresh configuration-chain proof covers newly reported config
         // files. Other newly reported paths are compared, never opened here.
         let output = self.inspect_config().await?;

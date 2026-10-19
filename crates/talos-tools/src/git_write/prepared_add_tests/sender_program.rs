@@ -1,3 +1,23 @@
+#[test]
+fn internal_program_validation_distinguishes_unadmitted_path_from_target_drift() {
+    let root = tempfile::tempdir().expect("fixture");
+    let admitted = root.path().join("admitted");
+    let unadmitted = root.path().join("unadmitted-missing");
+    std::fs::write(&admitted, b"fixture").expect("program fixture");
+    let bound = admitted.canonicalize().expect("bound target");
+    validate_internal_program(&admitted, &admitted, &bound).expect("unchanged binding");
+    let error = validate_internal_program(&unadmitted, &admitted, &bound)
+        .expect_err("unadmitted spelling");
+    assert!(error.to_string().contains("spelling changed"), "{error}");
+    let error = validate_internal_program(&admitted, &admitted, &unadmitted)
+        .expect_err("different canonical target");
+    assert!(error.to_string().contains("canonical target changed"), "{error}");
+    std::fs::remove_file(&admitted).expect("remove admitted program");
+    let error = validate_internal_program(&admitted, &admitted, &bound)
+        .expect_err("missing admitted executable");
+    assert!(error.to_string().contains("cannot be resolved"), "{error}");
+}
+
 #[tokio::test]
 async fn sender_program_binding_requires_new_exact_read_admission() {
     let root = fixture();
