@@ -1360,6 +1360,36 @@ impl ConfigState {
         Ok(())
     }
 
+    /// Integration can rewrite dynamic paths: retained executable/configuration
+    /// sources must therefore live outside its worktree mutation range.
+    pub(super) fn validate_pull_integration_sources(
+        &self,
+        repository: &RepositoryState,
+        hooks: &[PathBuf],
+    ) -> Result<(), GitToolError> {
+        for path in self
+            .files
+            .iter()
+            .map(|(path, _)| path)
+            .chain(self.stable_auxiliary.iter())
+            .chain(hooks.iter())
+        {
+            for resolved in auxiliary_spellings(path)? {
+                if resolved != repository.workdir
+                    && potential_path_prefix(&repository.workdir, &resolved)
+                    && ![&repository.git_dir, &repository.common_dir]
+                        .iter()
+                        .any(|root| resolved.starts_with(root))
+                {
+                    return Err(unsupported(
+                        "Pull integration may rewrite an effective configuration or hook source",
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Capture fetch-triggered hooks only after their exact paths were admitted.
     pub(super) fn capture_pull_hooks(
         paths: &[PathBuf],
@@ -1987,6 +2017,7 @@ mod tests {
     use super::*;
 
     include!("config_state_tests/pull_signing.rs");
+    include!("config_state_tests/pull_sources.rs");
     include!("config_state_tests/child_layout.rs");
     include!("config_state_tests/child_configuration.rs");
     include!("config_state_tests/checkout.rs");
