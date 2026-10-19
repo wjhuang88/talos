@@ -691,15 +691,14 @@ impl BeforeFetch {
         F: FnMut(Vec<String>) -> Fut,
         Fut: std::future::Future<Output = Result<std::process::Output, GitToolError>>,
     {
-        self.integration_stage(fetched, oid_length, false, run)
-            .await
+        self.integration_stage(fetched, oid_length, None, run).await
     }
 
     async fn integration_stage<F, Fut>(
         &self,
         fetched: &[u8],
         oid_length: usize,
-        reconciled: bool,
+        reconciled_head: Option<&str>,
         mut run: F,
     ) -> Result<Integration, GitToolError>
     where
@@ -738,9 +737,14 @@ impl BeforeFetch {
                 "Pull branch changed during fetch".into(),
             ));
         }
+        if reconciled_head.is_some_and(|expected| current.head.as_deref() != Some(expected)) {
+            return Err(GitToolError::InvalidInput(
+                "Pull HEAD changed after worktree reconciliation; request fresh discovery and authorization".into(),
+            ));
+        }
         if current.head != self.head {
             match (&self.head, &current.head) {
-                (Some(original), Some(current)) if !reconciled => {
+                (Some(original), Some(current)) if reconciled_head.is_none() => {
                     return Ok(Integration::Reconcile {
                         original: original.clone(),
                         current: current.clone(),

@@ -127,8 +127,24 @@ async fn real_pull_current_branch_fetch_reconciles_index_and_worktree() {
             &commands[0].iter().map(String::as_str).collect::<Vec<_>>(),
         );
         let split_success = if reconciled.status.success() {
+            // A completed read-tree is not permission to accept another HEAD
+            // movement while selecting the next independently approved step.
+            git(&split, &["update-ref", "HEAD", original.trim()]);
+            let drift = retained
+                .integration_stage(&fetched, 40, Some(&current), |args| {
+                    let output = run(&split, &args.iter().map(String::as_str).collect::<Vec<_>>());
+                    async move { Ok(output) }
+                })
+                .await
+                .expect_err("reconciled HEAD must remain bound");
+            assert!(
+                drift
+                    .to_string()
+                    .contains("HEAD changed after worktree reconciliation")
+            );
+            git(&split, &["update-ref", "HEAD", &current]);
             let next = retained
-                .integration_stage(&fetched, 40, true, |args| {
+                .integration_stage(&fetched, 40, Some(&current), |args| {
                     let output = run(&split, &args.iter().map(String::as_str).collect::<Vec<_>>());
                     async move { Ok(output) }
                 })
