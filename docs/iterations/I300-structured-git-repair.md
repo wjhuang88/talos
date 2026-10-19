@@ -4693,3 +4693,31 @@ Clippy passes with warnings denied (`/tmp/talos-i300-reference-path-clippy.log`)
 Source/required-path extensions, serialized identities and peak identity handles
 remain quota residuals. Full-stage validation and original T7 functional gates
 remain outstanding; Pull remains disabled.
+
+Remote candidate 27af3fa1 run 39139847519 completed: main
+Format/Check/Clippy/Test passed (117711870239), confirming the fixture maintenance
+race correction on that candidate. Windows job 117711870368 still fails Commit
+at the maintenance identity guard: bin/git.exe differs from
+ucrt64/libexec/git-core/git.exe. Log:
+`/tmp/talos-i300-windows-117711870368.log`. This is the existing distinct-program
+binding blocker, not Windows acceptance. Standard full preflight for
+eeec0ced exited 0 (`/tmp/talos-i300-reference-stage-preflight.log`), ending
+`release preflight: passed`, including locked workspace gates and both external
+Runtime SDK fixtures. This validates the two local quota increments, not native
+Windows acceptance or complete Pull execution.
+
+Windows rebind implementation boundary (2026-10-19): independent static review
+requires re-preparation immediately after first sender discovery, before any
+Checkout-derived continuation. Commit/Checkout may use a separate discovery
+stage; local Push must reuse the start of ReceiverRoots to retain eight stages.
+The internal executable needs fresh exact Read/Execute and configuration-chain
+admission. Re-discovery must preserve the invocation command budget and process
+supervisor, start from original tracked inputs, and rebuild all sender evidence.
+Before installation, compare ordered configuration/source contents, child
+locations/configuration, target OIDs/modes/tracking writes, deletion/new-gitlink
+classification, auxiliary sources, destinations, receiver roots and executable
+paths as well as semantic permission facets. No receiver capture precedes this
+comparison. Do not rerun discover on the populated plan or equate two programs
+by installation/version. This is reviewed implementation guidance, not an
+implemented rebind or a completed Windows gate. Fetch found no upstream-only
+main commits at this checkpoint (193 local-only commits).
