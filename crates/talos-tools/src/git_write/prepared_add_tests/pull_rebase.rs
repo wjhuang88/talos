@@ -278,3 +278,112 @@ async fn pull_rebase_filter_refuses_without_running_helper() {
     assert!(!root.path().join("helper-ran").exists());
     assert!(!root.path().join(".git/FETCH_HEAD").exists());
 }
+
+#[tokio::test]
+async fn pull_rebase_executes_divergent_history_with_each_backend() {
+    for (backend, mode) in [
+        ("merge", super::super::pull_state::Rebase::On),
+        ("apply", super::super::pull_state::Rebase::On),
+        ("apply", super::super::pull_state::Rebase::Merges),
+    ] {
+        let root = fixture();
+        let git = |args: &[&str]| integration_git(root.path(), args);
+        git(&["config", "user.name", "Fixture"]);
+        git(&["config", "user.email", "fixture@example.invalid"]);
+        git(&["config", "rebase.backend", "apply"]);
+        git(&["config", "--add", "rebase.backend", backend]);
+        git(&["add", "file"]);
+        git(&["commit", "-m", "base"]);
+        let base = git(&["rev-parse", "HEAD"]);
+        std::fs::write(root.path().join("remote"), "remote\n").expect("remote");
+        git(&["add", "remote"]);
+        git(&["commit", "-m", "remote"]);
+        let target = git(&["rev-parse", "HEAD"]);
+        git(&["reset", "--hard", &base]);
+        std::fs::write(root.path().join("local"), "local\n").expect("local");
+        git(&["add", "local"]);
+        git(&["commit", "-m", "local"]);
+        let original = git(&["rev-parse", "HEAD"]);
+        let mut plan = integration_scope_fixture(root.path()).await;
+        std::fs::write(
+            root.path().join(".git/FETCH_HEAD"),
+            format!("{target}\t\tfixture\n"),
+        )
+        .expect("FETCH_HEAD");
+        plan.pull_evidence = Some(
+            super::super::pull_state::PullEvidence::capture(&plan.repository, None, true)
+                .expect("evidence"),
+        );
+        plan.pull_integration = Some(super::super::pull_state::Integration::Rebase {
+            onto: target.clone(),
+            upstream: target.clone(),
+            mode: mode.clone(),
+            autostash: false,
+        });
+        let plan = plan.discover_pull_integration_hooks().expect("frontier");
+        for name in ["applypatch-msg", "pre-applypatch", "post-applypatch"] {
+            assert_eq!(
+                plan.pull_hook_paths.iter().any(|path| path.ends_with(name)),
+                backend == "apply" && mode == super::super::pull_state::Rebase::On
+            );
+        }
+        let admission = proof(&plan);
+        let PreparedNormalStage::Complete(output) = plan.execute_stage(Box::new(admission)).await
+        else {
+            panic!("final stage")
+        };
+        assert!(
+            !output.result.is_error,
+            "{backend}: {}",
+            output.result.content
+        );
+        assert_ne!(git(&["rev-parse", "HEAD"]), original);
+        assert_eq!(git(&["rev-parse", "HEAD^"]), target);
+        assert_eq!(git(&["log", "-1", "--format=%s"]), "local");
+        assert_eq!(
+            std::fs::read(root.path().join("local")).expect("local"),
+            b"local\n"
+        );
+        assert_eq!(
+            std::fs::read(root.path().join("remote")).expect("remote"),
+            b"remote\n"
+        );
+        assert!(git(&["status", "--porcelain"]).is_empty());
+    }
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn pull_apply_backend_refuses_executable_patch_hooks_before_mutation() {
+    use std::os::unix::fs::PermissionsExt;
+    for name in ["applypatch-msg", "pre-applypatch", "post-applypatch"] {
+        let root = fixture();
+        integration_git(root.path(), &["config", "rebase.backend", "apply"]);
+        let hook = root.path().join(".git/hooks").join(name);
+        std::fs::write(&hook, "#!/bin/sh\ntouch patch-hook-ran\n").expect("hook");
+        std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o755)).expect("mode");
+        let mut plan = integration_scope_fixture(root.path()).await;
+        plan.pull_integration = Some(super::super::pull_state::Integration::Rebase {
+            onto: "1".repeat(40),
+            upstream: "2".repeat(40),
+            mode: super::super::pull_state::Rebase::On,
+            autostash: false,
+        });
+        let plan = plan
+            .discover_pull_integration_hooks()
+            .expect("hook frontier");
+        let admission = proof(&plan);
+        let PreparedNormalStage::Complete(output) = plan.execute_stage(Box::new(admission)).await
+        else {
+            panic!("hook refusal")
+        };
+        assert!(output.result.is_error);
+        assert!(
+            output.result.content.contains("Executable Git Pull hooks"),
+            "{}",
+            output.result.content
+        );
+        assert!(!root.path().join("patch-hook-ran").exists());
+        assert!(!root.path().join(".git/index").exists());
+    }
+}

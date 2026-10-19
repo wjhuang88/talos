@@ -1313,7 +1313,29 @@ impl ConfigState {
                 &["reference-transaction", "post-index-change"]
             }
         };
-        Ok(names.iter().map(|name| directory.join(name)).collect())
+        let mut paths: Vec<_> = names.iter().map(|name| directory.join(name)).collect();
+        // Plain rebase honors rebase.backend=apply and invokes git-am.
+        // --rebase-merges selects the merge backend regardless of this setting.
+        if matches!(
+            integration,
+            Integration::Rebase {
+                mode: super::pull_state::Rebase::On,
+                ..
+            }
+        ) && self
+            .values
+            .get(b"rebase.backend".as_slice())
+            .and_then(|values| values.last())
+            .and_then(|value| value.as_deref())
+            == Some(b"apply")
+        {
+            paths.extend(
+                ["applypatch-msg", "pre-applypatch", "post-applypatch"]
+                    .iter()
+                    .map(|name| directory.join(name)),
+            );
+        }
+        Ok(paths)
     }
 
     // These booleans can start a signing/verifier program even when no hook

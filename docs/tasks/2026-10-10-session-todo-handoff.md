@@ -4285,3 +4285,42 @@ repeat completed fetches. Final recursive worktree updates, remaining effects,
 native Windows/runtime acceptance and exact-head delivery gates remain open.
 Production Pull stays disabled; T7 and the original handoff queue remain Active.
 Fetch confirms HEAD is ahead249/behind0 origin/main; no rebase was needed.
+
+Pull rebase backend checkpoint (2026-10-19): reconciliation continuation was
+committed/pushed as 54a34618. The next uncommitted increment adds applypatch-msg,
+pre-applypatch and post-applypatch to the exact hook frontier for ordinary
+rebase with effective rebase.backend=apply. Real divergent-history tests pass
+for merge and apply backends, asserting rewritten parentage, preserved local
+and remote files, and a clean worktree. Each executable applypatch hook is
+refused before mutation in the separate Unix regression. Independent static
+review against Git 2.54 confirms backend selection and finds no blocker in
+this increment; it does not establish complete external-effect safety or
+production activation. The earlier 784b1d8d CI Linux workspace job passed;
+Windows remains running. Current-head 54a34618 CI is run39236567890.
+
+Rebase backend validation follow-up (2026-10-19): real execution additionally
+covers duplicate backend declarations (last value wins) and explicit
+--rebase-merges with backend=apply (merge backend, no applypatch frontier).
+All Pull-focused locked tests pass 153/153; format and whitespace checks pass.
+Full standard preflight is running at
+/tmp/talos-i300-apply-backend-preflight.log. No activation or completion claimed.
+
+Windows diagnostics checkpoint (2026-10-19): run39234578410 is terminal
+(overall cancelled; Windows job failure), not still waiting. Nocapture now
+preserves tools failure summaries: 825 passed/60 failed, with concrete target
+configuration path failures and Job test assumptions in addition to the known
+production activation gate. Ordered config expansion passes a verbatim Windows
+path to Git, which reports unable to read that path; missing-component/..
+fixtures also disagree with Windows resolution. The invalid-Job test's
+active_processes().is_err() assertion fails. These are distinct pending fixes;
+no cause beyond the observed diagnostics is yet established. Log retained at
+/tmp/talos-i300-windows-784b.log. Do not remove production gates to hide failures.
+
+Rebase backend stage validation (2026-10-19): standard locked release preflight
+completed with exit 0 (/tmp/talos-i300-apply-backend-preflight.log). This covers
+the final backend/hook changes above; Pull-focused tests pass 153/153 and
+all-target/all-feature tools Clippy passes. Current committed-head CI
+run39236567890 is terminal: Linux full validation, Desktop, issue reconciliation
+and Windows compile/Clippy/focused guards pass; Windows workspace tests fail.
+Production activation and exact-head cross-platform acceptance remain open.
+Fresh origin fetch shows ahead250/behind0; no rebase is needed.
