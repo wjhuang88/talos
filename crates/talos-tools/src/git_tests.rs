@@ -1152,7 +1152,13 @@ async fn git_diff_submodule_replaced_by_file_preserves_content() {
         "{}",
         result.content
     );
-    assert!(result.content.contains("160000"), "{}", result.content);
+    assert!(
+        result
+            .content
+            .contains("old mode 160000\nnew mode 100644\n"),
+        "{}",
+        result.content
+    );
     git(&["add", "module"]);
     std::fs::write(root.path().join("module"), "edited replacement\n").expect("edit");
     let result = tool.execute(serde_json::json!({})).await;
@@ -1167,6 +1173,38 @@ async fn git_diff_submodule_replaced_by_file_preserves_content() {
         "{}",
         result.content
     );
+}
+
+#[tokio::test]
+async fn git_diff_retains_index_executable_mode_without_filemode_tracking() {
+    let root = tempfile::tempdir().expect("workspace");
+    let git = |args: &[&str]| {
+        let out = std::process::Command::new("git")
+            .args(args)
+            .current_dir(root.path())
+            .output()
+            .expect("Git fixture");
+        assert!(out.status.success(), "{out:?}");
+        String::from_utf8(out.stdout).expect("text")
+    };
+    git(&["init"]);
+    git(&["config", "core.fileMode", "false"]);
+    std::fs::write(root.path().join("script"), "before\n").expect("file");
+    git(&["add", "script"]);
+    git(&["update-index", "--chmod=+x", "script"]);
+    std::fs::write(root.path().join("script"), "after\n").expect("edit");
+    let host = git(&["diff", "--no-ext-diff", "--no-textconv"]);
+    assert!(!host.contains("old mode"), "{host}");
+    let result = GitDiffTool::new(root.path().to_path_buf())
+        .execute(serde_json::json!({}))
+        .await;
+    assert!(!result.is_error, "{}", result.content);
+    assert!(
+        result.content.contains("-before\n+after"),
+        "{}",
+        result.content
+    );
+    assert!(!result.content.contains("old mode"), "{}", result.content);
 }
 
 #[cfg(unix)]

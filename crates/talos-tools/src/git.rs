@@ -711,8 +711,10 @@ impl GitDiffTool {
 
             // core.fileMode affects only executable-bit comparisons for ordinary
             // worktree files, never staged modes or file/symlink type changes.
+            // Platforms without Unix mode bits retain the index executable bit,
+            // while still reporting the worktree entry's file type.
             let new_mode = if !staged
-                && !trust_file_mode
+                && (!trust_file_mode || !cfg!(unix))
                 && matches!(old_mode, Some(0o100644 | 0o100755))
                 && matches!(new_mode, Some(0o100644 | 0o100755))
             {
@@ -977,7 +979,7 @@ fn read_worktree_mode(workdir: &Path, path: &Path) -> Result<Option<u32>, GitToo
         }))
     }
     #[cfg(not(unix))]
-    Ok(None)
+    Ok(Some(0o100644))
 }
 
 fn read_worktree_blob_content(
