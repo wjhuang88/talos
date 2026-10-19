@@ -4201,3 +4201,23 @@ disabled. CI 39228852503 at a04fe659 remains
 live (Linux Desktop passed; Windows Desktop and Linux preflight running).
 Resume actual integration effect validation and supervised execution; do not
 mistake this guard for Pull completion or omit the original T1–T8 queue.
+
+2026-10-19 Pull integration runner checkpoint: the final admitted stage now
+uses retained Integration commands through the existing owned process runner
+(120-second command deadline, 1 MiB output reservation, shared invocation budget).
+Commands stop on the first failure, preserve conflict/partial state, and recheck
+repository root identity before each command and after success. Reconcile still
+refuses until its fresh-evidence continuation exists. Production activation is
+still explicitly disabled before any integration command; this is implemented
+execution under test, not a released Pull capability. Focused locked all-feature
+integration tests pass 11/11, including real fast-forward HEAD/worktree updates
+and real merge conflict retention (HEAD unchanged, MERGE_HEAD and unmerged index
+preserved). Independent static review found no new blocker for this test wiring;
+external effects, other modes, cancellation and activation evidence remain open.
+Standard external preflight session 10382 is running, log
+`/tmp/talos-i300-integration-runner-preflight.log`; inspect before rerunning.
+CI 39228852503 at the previous pushed head has Linux workspace failure in
+`checkout_target_hook_missing_evidence_refuses_later_creation`: metadata changed
+during discovery. Root cause is not established. Windows workspace remains live;
+do not restart the run merely because another job failed. T7 and the original
+handoff queue remain incomplete.

@@ -4,6 +4,60 @@ use super::super as git_write;
 use super::*;
 
 impl AddPlan {
+    pub(super) async fn execute_pull_integration(&self) -> Result<(), GitToolError> {
+        // Keep production inert until all integration effects and runtime
+        // approval/denial behavior have independent activation evidence.
+        if !cfg!(test) {
+            return Err(GitToolError::InvalidInput(
+                "Pull integration awaits external-effect and independent activation gates".into(),
+            ));
+        }
+        self.revalidate()?;
+        let integration = self.pull_integration.as_ref().ok_or_else(|| {
+            GitToolError::InvalidInput("Missing retained Pull integration operation".into())
+        })?;
+        // Reconciliation must return to evidence discovery and obtain another
+        // approval. Never report an isolated read-tree as a completed Pull.
+        if matches!(
+            integration,
+            git_write::pull_state::Integration::Reconcile { .. }
+        ) {
+            return Err(GitToolError::InvalidInput(
+                "Pull reconciliation continuation is not yet implemented".into(),
+            ));
+        }
+        for arguments in integration.commands()? {
+            // Earlier commands legitimately change index/refs. Recheck root
+            // identity here without requiring pre-mutation metadata bytes.
+            self.repository.revalidate_location()?;
+            let mut command = tokio::process::Command::new(&self.program);
+            command
+                .current_dir(&self.repository.workdir)
+                .args([
+                    "-c",
+                    "maintenance.autoDetach=false",
+                    "-c",
+                    "gc.autoDetach=false",
+                    "--no-pager",
+                ])
+                .args(arguments)
+                .env_clear()
+                .envs(&self.environment);
+            let output = self
+                .run_command_output(command, std::time::Duration::from_secs(120), 1024 * 1024)
+                .await?;
+            if !output.status.success() {
+                // Git may have left conflicts or partial unborn integration.
+                // Do not retry, abort, or reset the user's repository.
+                return Err(GitToolError::Git(format!(
+                    "Pull integration command failed ({}); conflicts or partial effects may remain; inspect repository before retrying",
+                    output.status,
+                )));
+            }
+        }
+        self.repository.revalidate_location()
+    }
+
     pub(super) fn prepare_pull_integration_scope(
         mut self: Box<Self>,
     ) -> Result<Box<Self>, GitToolError> {

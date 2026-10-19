@@ -221,10 +221,41 @@ async fn pull_integration_scope_runs_through_admitted_continuations_without_muta
         panic!("hook reads and integration scope must consume one stage, not another continuation")
     };
     assert!(output.result.is_error);
-    assert!(output.result.content.contains("Pull integration scope admitted"), "{}", output.result.content);
+    assert!(output.result.content.contains("Pull integration command failed"), "{}", output.result.content);
     assert_eq!(std::fs::read(root.path().join(".git/FETCH_HEAD")).expect("after"), before);
     assert!(!root.path().join(".git/index").exists());
     assert!(!root.path().join(".git/MERGE_HEAD").exists());
+}
+
+#[tokio::test]
+async fn pull_integration_executes_admitted_fast_forward_with_owned_runner() {
+    let root = fixture();
+    let git = |args: &[&str]| integration_git(root.path(), args);
+    git(&["add", "file"]);
+    git(&["commit", "-m", "base"]);
+    let original = git(&["rev-parse", "HEAD"]);
+    std::fs::write(root.path().join("file"), "fetched content").expect("target content");
+    git(&["commit", "-am", "target"]);
+    let target = git(&["rev-parse", "HEAD"]);
+    git(&["reset", "--hard", &original]);
+    let mut plan = integration_scope_fixture(root.path()).await;
+    std::fs::write(root.path().join(".git/FETCH_HEAD"), format!("{target}\t\tfixture\n")).expect("fetched target");
+    plan.pull_evidence = Some(super::super::pull_state::PullEvidence::capture(
+        &plan.repository, None, true,
+    ).expect("fresh target evidence"));
+    plan.pull_integration = Some(super::super::pull_state::Integration::Merge {
+        heads: vec![target.clone()],
+        fast_forward: super::super::pull_state::FastForward::Only,
+        autostash: false,
+    });
+    let plan = plan.discover_pull_integration_hooks().expect("integration frontier");
+    let admission = proof(&plan);
+    let PreparedNormalStage::Complete(output) = plan.execute_stage(Box::new(admission)).await else {
+        panic!("final integration stage");
+    };
+    assert!(!output.result.is_error, "{}", output.result.content);
+    assert_eq!(git(&["rev-parse", "HEAD"]), target);
+    assert_eq!(std::fs::read_to_string(root.path().join("file")).expect("integrated file"), "fetched content");
 }
 
 #[tokio::test]
@@ -307,4 +338,50 @@ async fn pull_instruction_format_is_dormant_for_merge_and_empty_for_rebase() {
         }
         plan.discover_pull_integration_hooks().expect("inactive custom format");
     }
+}
+
+#[tokio::test]
+async fn pull_integration_conflict_retains_user_state_and_reports_partial_effects() {
+    let root = fixture();
+    let git = |args: &[&str]| integration_git(root.path(), args);
+    git(&["add", "file"]);
+    git(&["commit", "-m", "base"]);
+    let base = git(&["rev-parse", "HEAD"]);
+    std::fs::write(root.path().join("file"), "remote\n").expect("remote");
+    git(&["commit", "-am", "remote"]);
+    let target = git(&["rev-parse", "HEAD"]);
+    git(&["reset", "--hard", &base]);
+    std::fs::write(root.path().join("file"), "local\n").expect("local");
+    git(&["commit", "-am", "local"]);
+    let original = git(&["rev-parse", "HEAD"]);
+    let mut plan = integration_scope_fixture(root.path()).await;
+    std::fs::write(root.path().join(".git/FETCH_HEAD"), format!("{target}\t\tfixture\n")).expect("FETCH_HEAD");
+    plan.pull_evidence = Some(super::super::pull_state::PullEvidence::capture(
+        &plan.repository, None, true,
+    ).expect("fresh evidence"));
+    plan.pull_integration = Some(super::super::pull_state::Integration::Merge {
+        heads: vec![target.clone()],
+        fast_forward: super::super::pull_state::FastForward::Allow,
+        autostash: false,
+    });
+    let plan = plan.discover_pull_integration_hooks().expect("integration frontier");
+    let admission = proof(&plan);
+    let PreparedNormalStage::Complete(output) = plan.execute_stage(Box::new(admission)).await else {
+        panic!("final integration stage");
+    };
+    assert!(output.result.is_error);
+    assert!(output.result.content.contains("conflicts or partial effects may remain"));
+    assert_eq!(git(&["rev-parse", "HEAD"]), original);
+    assert_eq!(git(&["rev-parse", "MERGE_HEAD"]), target);
+    assert!(!git(&["ls-files", "--unmerged"]).is_empty());
+    assert!(std::fs::read_to_string(root.path().join("file")).expect("conflict").contains("<<<<<<<"));
+}
+
+fn integration_git(root: &Path, args: &[&str]) -> String {
+    let output = std::process::Command::new("git")
+        .current_dir(root)
+        .args(["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid"])
+        .args(args).output().expect("Git fixture");
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    String::from_utf8(output.stdout).expect("Git output").trim().to_owned()
 }
