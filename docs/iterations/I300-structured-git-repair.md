@@ -5022,3 +5022,13 @@ another full validation. No current-head full pass or Windows completion is clai
 The accepted Pull integration worktree scope still lacks its runtime consumer and
 actual integration dispatcher; production Pull remains disabled. All original T7
 acceptance and the subsequent handoff queue remain required.
+
+Validation correction (2026-10-19): session 89793 terminated with exit 101;
+tools tests passed 930/931, with the sealed-owner regression still expecting the
+old configuration-error wording. Actual execution was refused with the new
+redacted runner-failure diagnostic. Update both stale string assertions while
+retaining the rejection, absent-index and cleanup-receipt assertions, then rerun
+the focused test and standard full gate. This supersedes the live-session note
+above; no passing full gate is claimed for `64cc4674`.
+Focused sealed-owner test now passes 1/1 with all original effect/cleanup checks
+retained (`/tmp/talos-i300-sealed-owner-diagnostic-test.log`); formatting passes.
