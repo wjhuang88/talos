@@ -44,7 +44,9 @@ async fn checkout_linked_worktree_admits_actual_metadata_and_preserves_main_head
         ToolProvenance::Native,
     )
     .expect("plan");
-    let discovered = Box::new(plan).discover().await.expect("discover");
+    let discovered = discover_sender_approved(Box::new(plan))
+        .await
+        .expect("discover");
     for path in [
         &discovered.repository.git_dir,
         &discovered.repository.common_dir,
@@ -155,7 +157,9 @@ async fn checkout_existing_local_branch_preserves_onbranch_configuration() {
         ToolProvenance::Native,
     )
     .expect("stale config plan");
-    let discovered = Box::new(plan).discover().await.expect("discovery");
+    let discovered = discover_sender_approved(Box::new(plan))
+        .await
+        .expect("discovery");
     let admission = proof(&discovered);
     std::fs::write(
         root.path().join("source.config"),
@@ -401,7 +405,9 @@ async fn checkout_protects_captured_target_only_config_from_tree_replacement() {
         ToolProvenance::Native,
     )
     .expect("plan");
-    let plan = Box::new(plan).discover().await.expect("discovery");
+    let plan = discover_sender_approved(Box::new(plan))
+        .await
+        .expect("discovery");
     let mut sources = super::super::target_config::Sources::new(Some(b"topic"), [source.clone()])
         .expect("sources");
     while !sources.complete() {
@@ -673,7 +679,9 @@ async fn checkout_target_only_configuration_drift_invalidates_retained_plan() {
         ToolProvenance::Native,
     )
     .expect("plan");
-    let mut plan = Box::new(plan).discover().await.expect("discovery");
+    let mut plan = discover_sender_approved(Box::new(plan))
+        .await
+        .expect("discovery");
     let sources = plan.target_config_sources.as_mut().expect("target chain");
     // Isolate the retained evidence guard from the unfinished final-effects
     // stage. This helper admits each exact frontier only inside the test.
@@ -750,7 +758,9 @@ async fn checkout_target_hooks_wait_for_all_exact_read_tokens() {
         .expect("plan");
         let mut history = talos_core::tool::PreparedStageHistory::default();
         assert!(history.record_profile(&plan.identity, &plan.facets));
-        let mut plan = Box::new(plan).discover().await.expect("discovery");
+        let mut plan = discover_sender_approved(Box::new(plan))
+            .await
+            .expect("discovery");
         while plan.target_hook_paths.is_none() {
             assert!(history.record_profile(&plan.identity, &plan.facets));
             assert!(plan.phase == Phase::TargetConfiguration);
@@ -905,7 +915,9 @@ async fn checkout_target_hook_missing_evidence_refuses_later_creation() {
         ToolProvenance::Native,
     )
     .expect("plan");
-    let mut plan = Box::new(plan).discover().await.expect("discovery");
+    let mut plan = discover_sender_approved(Box::new(plan))
+        .await
+        .expect("discovery");
     let parent = plan.repository.workdir.join("late-hooks");
     std::fs::create_dir(&parent).expect("hook directory");
     let path = parent.join("post-checkout");
@@ -976,7 +988,9 @@ async fn checkout_tracking_prediction_from_detached_head_matches_native() {
             ToolProvenance::Native,
         )
         .expect("plan");
-        let plan = Box::new(plan).discover().await.expect("discovery");
+        let plan = discover_sender_approved(Box::new(plan))
+            .await
+            .expect("discovery");
         let predicted = plan.checkout_tracking_writes.clone();
         let output = execute_approved(*plan).await;
         assert!(
@@ -1038,7 +1052,9 @@ async fn checkout_tracking_prediction_matches_native_mode_matrix() {
                     ToolProvenance::Native,
                 )
                 .expect("plan");
-                let plan = Box::new(plan).discover().await.expect("discovery");
+                let plan = discover_sender_approved(Box::new(plan))
+                    .await
+                    .expect("discovery");
                 let predicted = plan.checkout_tracking_writes.clone();
                 let output = execute_approved(*plan).await;
                 assert!(
@@ -1104,7 +1120,9 @@ async fn checkout_guess_binds_remote_and_reference_even_for_equal_commits() {
             ToolProvenance::Native,
         )
         .expect("plan");
-        let plan = Box::new(plan).discover().await.expect("discovery");
+        let plan = discover_sender_approved(Box::new(plan))
+            .await
+            .expect("discovery");
         assert!(plan.checkout_guessed);
         assert_eq!(plan.checkout_new_branch.as_deref(), Some("topic"));
         assert_eq!(
@@ -1124,7 +1142,9 @@ async fn checkout_guess_binds_remote_and_reference_even_for_equal_commits() {
         ToolProvenance::Native,
     )
     .expect("stale-source plan");
-    let plan = Box::new(plan).discover().await.expect("discovery");
+    let plan = discover_sender_approved(Box::new(plan))
+        .await
+        .expect("discovery");
     let admission = proof(&plan);
     let branch = git(&["branch", "--show-current"]);
     let index = std::fs::read(root.path().join(".git/index")).expect("index");
@@ -1182,7 +1202,9 @@ async fn checkout_created_branch_binds_native_previous_name_expansion() {
         ToolProvenance::Native,
     )
     .expect("plan");
-    let plan = Box::new(plan).discover().await.expect("discovery");
+    let plan = discover_sender_approved(Box::new(plan))
+        .await
+        .expect("discovery");
     assert_eq!(plan.checkout_new_branch.as_deref(), Some("previous"));
     assert!(!plan.checkout_guessed);
     let output = execute_approved(*plan).await;
@@ -1194,7 +1216,7 @@ async fn checkout_created_branch_binds_native_previous_name_expansion() {
         ToolProvenance::Native,
     )
     .expect("lexical plan");
-    assert!(Box::new(plan).discover().await.is_err());
+    assert!(discover_sender_approved(Box::new(plan)).await.is_err());
     assert_eq!(git(&["branch", "--show-current"]), "previous");
 }
 
@@ -1235,7 +1257,9 @@ async fn checkout_same_oid_previous_branch_reflog_change_invalidates_plan() {
     let input = serde_json::json!({"branch":"@{-1}"});
     let plan =
         AddPlan::prepare_checkout(root.path(), &input, ToolProvenance::Native).expect("plan");
-    let plan = Box::new(plan).discover().await.expect("discovery");
+    let plan = discover_sender_approved(Box::new(plan))
+        .await
+        .expect("discovery");
     let oid = git(&["rev-parse", "@{-1}"]);
     let log_path = root.path().join(".git/logs/HEAD");
     let log = std::fs::read_to_string(&log_path).expect("reflog");
@@ -1627,7 +1651,9 @@ async fn checkout_tracked_symlink_to_gitlink_preserves_referent_and_dirty_link()
                 }),
                 "link target must not become a source permission"
             );
-            let plan = Box::new(plan).discover().await.expect("symlink discovery");
+            let plan = discover_sender_approved(Box::new(plan))
+                .await
+                .expect("symlink discovery");
             if late {
                 std::fs::remove_file(&link).expect("remove fixture link");
                 std::os::unix::fs::symlink(&dirty, &link).expect("late link change");
@@ -1894,7 +1920,9 @@ async fn checkout_new_gitlink_preserves_initialized_child() {
                 ToolProvenance::Native,
             )
             .expect("plan");
-            let mut plan = Box::new(plan).discover().await.expect("parent discovery");
+            let mut plan = discover_sender_approved(Box::new(plan))
+                .await
+                .expect("parent discovery");
             let tokens = proof(&plan)
                 .consume_for_prepared(&plan.request(), &plan.identity)
                 .expect("names proof");
@@ -2117,7 +2145,9 @@ async fn checkout_new_gitlink_accepts_empty_directory_and_rejects_late_changes()
             } else if change == "initialized" {
                 assert!(execute_approved(plan).await.result.is_error);
             } else {
-                let plan = Box::new(plan).discover().await.expect("discovery");
+                let plan = discover_sender_approved(Box::new(plan))
+                    .await
+                    .expect("discovery");
                 assert!(plan.phase == Phase::CheckoutNewGitlinks);
                 let old_proof = proof(&plan);
                 let mut tokens = proof(&plan)
@@ -2415,7 +2445,9 @@ async fn checkout_tracked_file_to_gitlink_preserves_dirty_source() {
         ToolProvenance::Native,
     )
     .expect("guessed deletion plan");
-    let mut plan = Box::new(plan).discover().await.expect("guessed discovery");
+    let mut plan = discover_sender_approved(Box::new(plan))
+        .await
+        .expect("guessed discovery");
     assert!(plan.phase == Phase::TargetConfiguration);
     while plan.phase == Phase::TargetConfiguration {
         assert!(
@@ -2496,7 +2528,9 @@ async fn checkout_tracked_file_to_gitlink_preserves_dirty_source() {
             ToolProvenance::Native,
         )
         .expect("deletion refusal plan");
-        let mut plan = Box::new(plan).discover().await.expect("deletion discovery");
+        let mut plan = discover_sender_approved(Box::new(plan))
+            .await
+            .expect("deletion discovery");
         while plan.phase == Phase::CheckoutDeletion {
             let tokens = proof(&plan)
                 .consume_for_prepared(&plan.request(), &plan.identity)
@@ -2573,7 +2607,9 @@ async fn checkout_tracked_file_to_gitlink_preserves_dirty_source() {
         ToolProvenance::Native,
     )
     .expect("nonempty reverse plan");
-    let mut plan = Box::new(plan).discover().await.expect("config discovery");
+    let mut plan = discover_sender_approved(Box::new(plan))
+        .await
+        .expect("config discovery");
     while plan.phase == Phase::CheckoutDeletion {
         assert!(
             !plan
@@ -2609,7 +2645,9 @@ async fn checkout_tracked_file_to_gitlink_preserves_dirty_source() {
         ToolProvenance::Native,
     )
     .expect("empty reverse plan");
-    let plan = Box::new(plan).discover().await.expect("empty discovery");
+    let plan = discover_sender_approved(Box::new(plan))
+        .await
+        .expect("empty discovery");
     std::fs::write(root.path().join("file/late"), b"preserve").expect("late child");
     let admission = proof(&plan);
     let output = plan.execute(Box::new(admission)).await;
@@ -2629,8 +2667,7 @@ async fn checkout_tracked_file_to_gitlink_preserves_dirty_source() {
             ToolProvenance::Native,
         )
         .expect("replacement plan");
-        let plan = Box::new(plan)
-            .discover()
+        let plan = discover_sender_approved(Box::new(plan))
             .await
             .expect("replacement discovery");
         std::fs::rename(root.path().join("file"), root.path().join("saved-empty"))
@@ -2840,15 +2877,14 @@ async fn checkout_nonrecursive_gitlink_preserves_dirty_child_worktree() {
         ToolProvenance::Native,
     )
     .expect("plan");
-    let discovered = Box::new(
+    let discovered = discover_sender_approved(Box::new(
         AddPlan::prepare_checkout(
             root.path(),
             &serde_json::json!({"branch":"target"}),
             ToolProvenance::Native,
         )
         .expect("permission plan"),
-    )
-    .discover()
+    ))
     .await
     .expect("discovery");
     assert!(discovered.facets.iter().any(|facet| {
