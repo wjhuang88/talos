@@ -79,11 +79,12 @@ fn configuration_verification_rejects_cross_key_reordering() {
 #[test]
 fn path_interpolation_uses_only_the_frozen_environment() {
     let values = parse_host(b"core.attributesfile\n~/rules\0").expect("config");
-    let environment =
-        BTreeMap::from([(OsString::from("HOME"), OsString::from("/captured-home"))]);
+    let root = tempfile::tempdir().expect("fixture");
+    let home = root.path().join("captured-home");
+    let environment = BTreeMap::from([(OsString::from("HOME"), home.clone().into_os_string())]);
     assert_eq!(
         configured_path(&values, b"core.attributesfile", &environment).expect("captured home"),
-        Some(PathBuf::from("/captured-home/rules")),
+        Some(home.join("rules")),
     );
     assert!(configured_path(&values, b"core.attributesfile", &BTreeMap::new()).is_err());
 }

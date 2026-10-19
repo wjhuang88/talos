@@ -34,19 +34,21 @@ fn child_excludes_follow_child_config_and_frozen_environment() {
     let root = tempfile::tempdir().expect("fixture");
     let config = ChildConfig::capture(b"", root.path()).expect("empty config");
     let common = root.path().join("metadata");
+    let home = root.path().join("home-fixture");
+    let xdg = root.path().join("xdg-fixture");
     let environment = BTreeMap::from([
-        (OsString::from("HOME"), OsString::from("/home-fixture")),
+        (OsString::from("HOME"), home.clone().into_os_string()),
         (
             OsString::from("XDG_CONFIG_HOME"),
-            OsString::from("/xdg-fixture"),
+            xdg.clone().into_os_string(),
         ),
     ]);
     let paths = config
         .attribute_paths(root.path(), &common, &environment)
         .expect("defaults");
-    assert!(paths.contains(&PathBuf::from("/xdg-fixture/git/ignore")));
+    assert!(paths.contains(&xdg.join("git/ignore")));
     assert!(paths.contains(&common.join("info/exclude")));
-    assert!(!paths.contains(&PathBuf::from("/home-fixture/.config/git/ignore")));
+    assert!(!paths.contains(&home.join(".config/git/ignore")));
     let source = root.path().join("config");
     std::fs::write(&source, "[core]\n excludesFile = rules\n").expect("source");
     let output = format!("file:{}\0core.excludesfile\nrules\0", source.display());
@@ -55,7 +57,7 @@ fn child_excludes_follow_child_config_and_frozen_environment() {
         .attribute_paths(root.path(), &common, &environment)
         .expect("override");
     assert!(paths.contains(&root.path().join("rules")));
-    assert!(!paths.contains(&PathBuf::from("/xdg-fixture/git/ignore")));
+    assert!(!paths.contains(&xdg.join("git/ignore")));
 }
 
 #[test]
