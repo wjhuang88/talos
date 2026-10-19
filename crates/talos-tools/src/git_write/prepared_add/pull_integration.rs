@@ -176,6 +176,12 @@ impl AddPlan {
                 ));
             }
         }
+        self.config
+            .as_ref()
+            .ok_or_else(|| {
+                GitToolError::Git("Missing retained Pull integration configuration".into())
+            })?
+            .validate_pull_integration_sources(&self.repository, &self.pull_hook_paths)?;
         let evidence =
             git_write::config_state::ConfigState::capture_pull_hooks(&self.pull_hook_paths)?;
         self.pull_hook_evidence = evidence;

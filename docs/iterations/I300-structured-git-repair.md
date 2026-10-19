@@ -5402,3 +5402,26 @@ Superseding full-gate result: approved external session 72915 exited zero and
 its log ends `release preflight: passed`. Pinned locked workspace checks, Clippy,
 tests/doctests (tools 943/943) and both external Runtime SDK fixture modes pass
 for implementation `81232433`. Native Windows exact-head CI remains outstanding.
+
+Pull dynamic-source checkpoint (2026-10-19): after integration scope and exact
+hook Read admission, reject effective configuration, stable auxiliary or hook
+paths whose retained spellings traverse the mutable worktree outside strictly
+spelled bound metadata roots. This avoids reloading a source that this operation
+may rewrite. Existing auxiliary symlink-hop/ancestor inspection is reused; this
+is no proof of arbitrary external-source immutability or full effect validation.
+An independent review caught misuse of conservative potential-path matching for
+metadata exemptions; replaced it with strict component-prefix matching and added
+a `.GIT` regression. Static re-review found the blocker resolved. Split regression
+also covers default metadata hooks, missing worktree hooks, external sources and
+Unix external aliases into the worktree. Focused integration tests pass 9/9
+(`/tmp/talos-i300-integration-sources-tests.log`). Execution remains disabled.
+
+Published head `eb7bfc8e` CI 39220084842: native Windows job 117953134257
+failed before Git regressions in Desktop Auto approval flow: decision/report and
+ToolStarted arrived, but no ToolResult before watchdog timeout (105/106 passed).
+Log `/tmp/talos-i300-root-windows-ci.log`. This does not confirm or falsify the
+Git path fixes; native confirmation remains pending and the timeout needs
+investigation. Linux full job was still running at last observation.
+Dynamic-source follow-up all-target all-feature Clippy with warnings denied,
+formatting, whitespace and both governance validators pass (zero warnings).
+No fresh full-workspace gate is claimed for this later increment.
