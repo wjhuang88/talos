@@ -944,7 +944,7 @@ async fn pull_fetch_refuses_executable_reference_transaction_hook() {
         PreparedNormalStage::Continue(_) => panic!("fetch stage unexpectedly continued"),
     };
     assert!(output.result.is_error);
-    assert!(output.result.content.contains("Executable Git fetch hooks"));
+    assert!(output.result.content.contains("Executable Git Pull hooks"));
     assert!(!root.path().join("hook-ran").exists());
     assert!(!root.path().join(".git/FETCH_HEAD").exists());
 }

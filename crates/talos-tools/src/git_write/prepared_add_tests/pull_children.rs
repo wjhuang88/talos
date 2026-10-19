@@ -481,7 +481,7 @@ async fn pull_child_fetch_has_own_write_stage_and_rebuilds_graph() {
             if mode == "relative-hook" && result.is_err() {
                 let error = result.err().expect("hook refusal");
                 assert!(
-                    error.to_string().contains("Executable Git fetch hooks"),
+                    error.to_string().contains("Executable Git Pull hooks"),
                     "{error}"
                 );
                 assert!(!child.join(".git/FETCH_HEAD").exists());
@@ -784,7 +784,7 @@ async fn pull_child_metadata_scope_batches_depth_and_requires_own_root() {
                 next.err()
                     .expect("hook refusal")
                     .to_string()
-                    .contains("Executable Git fetch hooks")
+                    .contains("Executable Git Pull hooks")
             );
             continue;
         }

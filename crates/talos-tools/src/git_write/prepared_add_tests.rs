@@ -110,3 +110,5 @@ include!("prepared_add_tests/pull_children.rs");
 include!("prepared_add_tests/push.rs");
 
 include!("prepared_add_tests/sender_program.rs");
+
+include!("prepared_add_tests/pull_integration.rs");

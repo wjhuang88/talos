@@ -4871,3 +4871,27 @@ validation, Linux Desktop explicit feature, installer and issue reconciliation
 passed. Windows workspace failed in Desktop auto-approval runtime testing before
 its Git-specific steps; native Windows Git execution remains unverified. This
 run predates the test separation and capability compiler changes.
+
+Pull integration hook discovery work-in-progress (2026-10-19): integration
+selection now publishes a separately admitted hook Read frontier with a fresh
+prepared identity, after child scheduling completes. Candidate parsing uses
+retained configuration only, respects external/relative core.hooksPath, and
+does not open candidates. The new stage removes Write/Network facets, checks
+the complete exact Read frontier before capture, and revalidates before and
+after capture. Failures report retained fetch effects. Executable hooks remain
+unsupported pending separate execution authorization; no hook is disabled.
+Two separate-file regressions cover old-proof rejection, external candidate
+discovery without opening it, missing Read denial before type inspection, and
+nonregular-file refusal after admission. Independent incremental static review
+found no blocker for this inert discovery stage, without rerunning tests.
+Initial full Pull tests exposed three old fetch-specific diagnostic assertions;
+the shared hook error now says Pull, and those assertions were updated.
+Full integration effects (including filters/drivers/editors), admitted worktree
+mutation, eight-stage success capacity and all original T7 gates remain open.
+Production Pull remains disabled; this stage is not a completion claim.
+Final-source validation for the hook frontier: locked all-feature Pull tests
+pass 136/136 (session 96006, `/tmp/talos-i300-integration-hooks-final2.log`);
+locked all-target/all-feature Clippy with warnings denied passes (session 37898,
+`/tmp/talos-i300-integration-hooks-clippy-final.log`). Both governance validators
+pass with zero warnings (sessions 62979/68782). The Windows rerun remains an
+external, earlier-head validation and cannot validate these source changes.

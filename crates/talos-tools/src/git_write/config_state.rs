@@ -1226,6 +1226,51 @@ impl ConfigState {
         Ok(paths)
     }
 
+    /// Resolve integration hook candidates without reading or executing them.
+    /// Fetch admission does not cover this separately admitted frontier.
+    pub(super) fn pull_integration_hook_paths(
+        &self,
+        repository: &RepositoryState,
+        environment: &BTreeMap<OsString, OsString>,
+        integration: &super::pull_state::Integration,
+    ) -> Result<Vec<PathBuf>, GitToolError> {
+        use super::pull_state::Integration;
+        let directory = configured_path(&self.values, b"core.hookspath", environment)?
+            .unwrap_or_else(|| repository.common_dir.join("hooks"));
+        let directory = if directory.is_absolute() {
+            directory
+        } else {
+            repository.workdir.join(directory)
+        };
+        let names: &[&str] = match integration {
+            Integration::Merge { .. } => &[
+                "pre-merge-commit",
+                "prepare-commit-msg",
+                "commit-msg",
+                "post-merge",
+                "post-checkout",
+                "post-index-change",
+                "reference-transaction",
+                "pre-auto-gc",
+            ],
+            Integration::Rebase { .. } => &[
+                "pre-rebase",
+                "prepare-commit-msg",
+                "commit-msg",
+                "post-commit",
+                "post-checkout",
+                "post-index-change",
+                "post-rewrite",
+                "reference-transaction",
+                "pre-auto-gc",
+            ],
+            Integration::Unborn(_) | Integration::Reconcile { .. } => {
+                &["reference-transaction", "post-index-change"]
+            }
+        };
+        Ok(names.iter().map(|name| directory.join(name)).collect())
+    }
+
     /// Validate the selected fetch remote after policy discovery, before any fetch mutation.
     pub(super) fn prepare_pull_transport(&self, remote: &str) -> Result<(), GitToolError> {
         validate_fetch_external_effects(&self.values)?;
@@ -1254,7 +1299,7 @@ impl ConfigState {
             .iter()
             .map(|path| {
                 let evidence = snapshot::RegularEvidence::capture(path, &mut budget)
-                    .map_err(|_| unsupported("Git fetch hook must be a regular file"))?;
+                    .map_err(|_| unsupported("Git Pull hook must be a regular file"))?;
                 if let snapshot::Entry::File(permissions, _) = &evidence.entry {
                     #[cfg(unix)]
                     let executable = {
@@ -1268,7 +1313,7 @@ impl ConfigState {
                     };
                     if executable {
                         return Err(unsupported(
-                            "Executable Git fetch hooks require separate execution authorization",
+                            "Executable Git Pull hooks require separate execution authorization",
                         ));
                     }
                 }
