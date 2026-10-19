@@ -451,7 +451,9 @@ async fn pull_child_fetch_has_own_write_stage_and_rebuilds_graph() {
             changed.effective_recursion = Some(super::super::pull_children::Recursion::On);
         }
         plan.select_pull_child_identity().expect("select");
-        let fetch_command = plan.pull_child_fetch_command(&child, &child.join(".git"));
+        let fetch_command = plan
+            .pull_child_fetch_command(&child, &child.join(".git"))
+            .expect("identity-preserving fetch command");
         let fetch_arguments: Vec<_> = fetch_command.as_std().get_args().collect();
         assert_eq!(
             fetch_arguments.iter().any(|arg| *arg == "--work-tree=."),
