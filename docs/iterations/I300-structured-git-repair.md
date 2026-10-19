@@ -5707,3 +5707,17 @@ T7 and the full serial handoff queue remain incomplete.
 Current-source pinned locked cargo xwin MSVC test-target check passes after both
 fixture commits; reduced-feature dead-code warnings remain. Formatting and
 whitespace checks pass. This is cross-compile evidence only.
+
+Checkout sender admission fixture checkpoint (2026-10-20): `58ddc8a9` routes
+Checkout's direct-discovery fixtures through the production discover_sender
+method with freshly consumed permission proofs, including Windows internal
+executable re-admission. This fixes fixture bypass of the retained executable
+binding; it does not relax production checks. Locked Git-feature Checkout tests
+pass 49/49 on macOS (/tmp/talos-i300-checkout-sender-final.log), and pinned locked
+cargo xwin MSVC test-target checking passes
+(/tmp/talos-i300-checkout-sender-xwin.log). Native Windows execution remains
+pending. These focused helpers are not full runner-stage-budget evidence.
+Standard workspace preflight is running in session 84989, log
+/tmp/talos-i300-sender-preflight.log; do not restart without polling that handle.
+Windows preparation and production Pull remain closed. No T7 or handoff
+completion, merge, publication or current-head full-preflight pass is claimed.
