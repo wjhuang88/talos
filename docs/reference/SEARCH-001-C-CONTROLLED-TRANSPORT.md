@@ -203,3 +203,7 @@ exact candidate gates are recorded in I293; these tests do not establish officia
 The next [dormant DDG parser prerequisite](SEARCH-001-C-DDG-RESPONSE-PARSER.md) owns bounded
 response parsing and licensed-source provenance; it does not switch a transport or satisfy the
 remaining request/header/probe/retry/charset/root/D activation gates above.
+
+The [dormant fixed request factories](SEARCH-001-C-COMPATIBILITY-REQUESTS.md) now prepare the
+four fixed compatibility URL/method/ordered parameter shapes into the same owned object.
+They do not execute requests, bind parsers or complete headers/UA/parity/D/default activation.
