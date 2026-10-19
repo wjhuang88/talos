@@ -549,6 +549,42 @@ Acceptance alone does not enable fetch or claim Pull delivery. The implementatio
 must replace the layer-by-layer production inventory with admitted bounded
 evidence under this dedicated scope rather than retain two contradictory modes.
 
+### Pull integration worktree scope (accepted 2026-10-19)
+
+The maintainer accepted a dedicated one-Pull-integration worktree scope instead
+of requiring an exhaustive prediction of conflict files, renames and interactive
+replay outputs before execution. This is a wider single-stage authorization,
+not permission to execute integration after fetch admission alone.
+
+The closed capability `git:pull-integration-worktree` is reserved for a fresh
+prepared `git_pull` integration stage. Its plan must display the concrete
+integration operation, retained FETCH_HEAD evidence and selected commit OIDs,
+and the full absolute, identity-bound worktree root. Read and Write scopes must
+be explicit; Git metadata retains its separately approved roots and capability.
+Compilation must require the matching absolute Path facet and bound Git Command;
+the executor must verify the retained worktree identity and immutable operation
+proof before consuming the capability. Generic recursive Path authorization is
+unchanged. The scope expires with this integration stage and cannot authorize a
+later Pull, sibling worktree or recursive child integration.
+
+The admitted worktree scope covers dynamic files produced by this operation,
+including conflicts, renames and replay results. Repository-external paths,
+redirected metadata, hooks, filters, merge drivers, editors and other programs
+still require separate effect discovery and authorization. The scope does not
+permit following a worktree symlink to write outside the approved root.
+Identity revalidation reduces stale-path risk; it is not OS-level confinement.
+Existing process supervision, invocation deadlines, stage limits, cancellation
+cleanup and terminal partial-failure reporting remain mandatory. No automatic
+rollback or retry is introduced.
+
+Before enabling production integration, implement and independently review the
+compiler and runtime consumers, reject wrong-tool/missing-root/missing-command
+and nature-mismatch grants, and verify approval/denial, stale identity, external
+path effects, conflicts, failure and cancellation through the applicable I300
+runtime gates. Acceptance records the design decision only. Remove prediction
+logic made obsolete by this scope while retaining analysis needed to discover
+external effects; do not maintain competing authorization modes.
+
 ### Recursive child fetch extension (accepted 2026-10-16)
 
 Native Git 2.54 source inspection and an isolated fixture confirmed that the
