@@ -5091,3 +5091,20 @@ and 39 stderr bytes. The diagnostic withholds all configuration values and
 paths. This proves Git started and failed during config inspection, not its
 underlying cause. Native Windows completion and actual Pull execution remain
 open; production Pull stays disabled and T7 remains Active.
+
+Windows configuration isolation follow-up (2026-10-19): a separate test now
+compares entry/internal Git across default/system/global/local configuration
+sources with the same frozen environment, cwd and owned runner, after candidate
+Read and configuration-chain admission. It collects all eight results before
+asserting default discovery success; only fixed labels, exit codes and stream
+lengths are exposed. Windows CI selects it before the existing failing binding
+test. The focused locked all-feature test passes locally (1/1,
+`/tmp/talos-i300-sender-config-matrix-test.log`); independent static review found
+no blocker. This is diagnosis, not a Windows repair or platform completion.
+
+Standard preflight session 43993 failed: tools 934/935, with the real local-push
+test denied process observation by the sandbox. Authorized external preflight
+session 44449 is running at
+`/tmp/talos-i300-command-stage-preflight-unsandboxed.log`; poll it rather than
+restart. The sandbox failure is not a passing workspace gate. Fetch succeeded,
+with current implementation ahead 220 / behind 0 origin/main; no rebase needed.
