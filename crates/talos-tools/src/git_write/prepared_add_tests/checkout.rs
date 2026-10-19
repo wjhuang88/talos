@@ -1691,10 +1691,6 @@ fn new_gitlink_directory_binds_names_without_reading_descendants() {
             .expect("broken external link");
         let _socket = std::os::unix::net::UnixListener::bind(child.join("socket")).expect("socket");
     }
-    if cfg!(windows) {
-        assert!(capture_new_gitlink_directory(&child, false).is_err());
-        return;
-    }
     let before = capture_new_gitlink_directory(&child, false).expect("ordinary descendants");
     std::fs::write(child.join("deep/nested/late"), b"not inspected").expect("deep change");
     assert_eq!(
@@ -1723,6 +1719,26 @@ fn new_gitlink_directory_binds_names_without_reading_descendants() {
         std::fs::write(child.join(format!("entry-{index}")), []).expect("budget entry");
     }
     assert!(capture_new_gitlink_directory(&child, false).is_err());
+
+    let windows_component_is_valid = |name: &str| {
+        std::panic::catch_unwind(|| {
+            gix::validate::path::component(
+                name.as_bytes().into(),
+                None,
+                gix::validate::path::component::Options {
+                    protect_windows: true,
+                    protect_hfs: true,
+                    protect_ntfs: true,
+                },
+            )
+            .is_ok()
+        })
+        .expect("path validation")
+    };
+    assert!(windows_component_is_valid("ordinary-name"));
+    for unsafe_name in ["CON", "NUL.txt", "bad:name", "trailing.", "trailing "] {
+        assert!(!windows_component_is_valid(unsafe_name), "{unsafe_name}");
+    }
 }
 
 #[tokio::test]
@@ -2097,7 +2113,7 @@ async fn checkout_new_gitlink_accepts_empty_directory_and_rejects_late_changes()
             )
             .expect("plan");
             if change == "nonempty" {
-                assert_eq!(execute_approved(plan).await.result.is_error, cfg!(windows));
+                assert!(!execute_approved(plan).await.result.is_error);
             } else if change == "initialized" {
                 assert!(execute_approved(plan).await.result.is_error);
             } else {
@@ -2173,8 +2189,7 @@ async fn checkout_new_gitlink_accepts_empty_directory_and_rejects_late_changes()
                 }
             }
         }
-        if matches!(change, "native" | "native-nonempty" | "none")
-            || (change == "nonempty" && !cfg!(windows))
+        if matches!(change, "native" | "native-nonempty" | "none" | "nonempty")
         {
             assert_eq!(git(&["branch", "--show-current"]), "linked");
             assert!(git(&["ls-files", "--stage", "child"]).starts_with("160000 "));
