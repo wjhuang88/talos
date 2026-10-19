@@ -5690,3 +5690,20 @@ the Windows MSVC test target pass. Independent static review found no blocker,
 but explicitly requires native Windows CI before this path is considered runtime
 validated. Production Windows preparation remains closed; this stage does not
 close T7 or the initialized-child, Pull, recursive, and delivery gates.
+
+Windows configuration fixture checkpoint (2026-10-20): commits `995da5d4`
+and `de6ba2a3` replace POSIX-only HOME/XDG test roots with host-native absolute
+paths and write startup-layout core.worktree values through Git config, which
+quotes Windows backslashes. Windows fixtures retain ordinary absolute paths
+for native Git rather than Rust verbatim canonical paths. The locked Git-feature
+configuration suite passes 32/32 on macOS. These are fixture corrections, not
+native Windows runtime evidence or production activation. The uncommitted
+Windows preparation gate removal was withdrawn; the original gate is retained.
+Current published b9c01b0d Windows workspace CI remains failed (tools 834 passed,
+53 failed; Agent/MCP/Runtime also fail at the production gate). Other path,
+executable-binding, CRLF, Pull-resolution and final delivery residuals remain.
+T7 and the full serial handoff queue remain incomplete.
+
+Current-source pinned locked cargo xwin MSVC test-target check passes after both
+fixture commits; reduced-feature dead-code warnings remain. Formatting and
+whitespace checks pass. This is cross-compile evidence only.
