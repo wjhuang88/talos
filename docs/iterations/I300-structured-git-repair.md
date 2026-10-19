@@ -5425,3 +5425,21 @@ investigation. Linux full job was still running at last observation.
 Dynamic-source follow-up all-target all-feature Clippy with warnings denied,
 formatting, whitespace and both governance validators pass (zero warnings).
 No fresh full-workspace gate is claimed for this later increment.
+
+Windows evidence isolation checkpoint (2026-10-19): Desktop Auto's successful
+assessment reaches ToolStarted but its outer 15-second watchdog expires before
+PowerShell returns (tool default timeout is 120 seconds). Source inspection
+confirms this path uses WindowsBackgroundLauncher, not the structured Git
+foreground executor. Root cause remains unproven; no timeout relaxation or
+passing claim is made. Make the independent Windows Git guard step run unless
+the workflow is cancelled, even after Desktop failure. Earlier failures continue
+to fail the job; this change only prevents unrelated failure from hiding Git
+regression evidence. CI 39220084842 remains the prior-head evidence.
+
+Resumed validation evidence: `/tmp/talos-i300-sources-full-preflight.log` ends
+`release preflight: passed`, with tools 944/944 and both external Runtime SDK
+fixture modes passing for implementation `b9075e47`. The interrupted execution
+cell is no longer available, so its shell exit status was not recovered; the
+standard script completion marker is the retained evidence. Both governance
+validators pass with zero warnings. Prior-head CI 39220084842 is now terminal
+failure; this does not validate the current increment.
