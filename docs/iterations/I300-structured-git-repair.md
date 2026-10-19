@@ -5274,3 +5274,25 @@ and whitespace checks pass. This is test maintenance only; it neither closes
 integration execution nor changes I300/T7 status. Published candidate `2f6a1a5b`
 is under native CI run 39207944752; its evidence does not include this later
 test-only split.
+
+Pull branch merge-option evidence (2026-10-19): integration discovery now checks
+only the retained current branch's effective last `mergeOptions` declaration.
+A small Git-style byte tokenizer preserves quoting, literal comments/assignments,
+backslash-newline and empty arguments; flags with unmodeled external effects,
+value arguments or abbreviations refuse without exposing configuration values.
+The admitted flag subset does not replace complete hook/editor/driver validation.
+The first native comparison exposed an incorrect VT/FF whitespace assumption;
+Git 2.54 `ctype.c` confirms only space/tab/LF/CR. The corrected implementation
+passes native alias/direct-argv differential cases. Locked all-feature config
+checks pass 31/31, integration checks 8/8 and all-target/all-feature Clippy passes
+with warnings denied (`/tmp/talos-i300-merge-options-{tests,integration-tests,clippy}.log`).
+Independent static review found no new blocker in this guarded increment;
+production integration remains disabled and full effect execution is still open.
+
+Native Windows follow-up: job 117914809238 in run 39207944752 is terminal failed.
+It passed the earlier executable binding checks and real commit fixture, then
+`checkout_nonrecursive_gitlink_preserves_dirty_child_worktree` failed because
+Git rejected a verbatim `\\?\C:\...\child\.git` argument. Full job log is
+`/tmp/talos-i300-windows-binding-stage.log`. Child explicit-root invocation spelling
+needs correction while preserving canonical identity evidence; no Windows pass
+or T7 completion is claimed. Linux main job was still running at this observation.
