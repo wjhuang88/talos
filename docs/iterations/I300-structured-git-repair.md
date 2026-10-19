@@ -4975,3 +4975,33 @@ tests/doctests, governance/claims and both external Runtime SDK modes. PR #735
 describes the bounded CLI fixture maintenance exception and remaining delivery
 gaps. Fresh exact-head remote CI, native Windows repair confirmation and final
 authorization review remain required; T7 stays Active.
+
+Standing gix tracking recheck (2026-10-19): the GitHub releases API's latest
+100 releases still identifies `gix-v0.89.0` (2026-10-08) as the newest main
+crate release when filtered with `^gix-v[0-9]`; `gix-validate` and `gix-utils`
+are separate crates. Cargo.lock remains on 0.87.1. The release notes add
+linked-worktree capabilities and change public error APIs; they do not establish
+complete replacement of Talos's structured Git operations. This confirms the
+existing source-audit baseline rather than a new capability assessment. No
+dependency upgrade or host-Git removal date is claimed. crates.io returned HTTP
+403, so this check uses GitHub release evidence only:
+https://github.com/GitoxideLabs/gitoxide/releases/tag/gix-v0.89.0 .
+
+Pull module extraction checkpoint (2026-10-19, 210b7d88): moved existing
+prepared Pull discovery, child-fetch and integration-hook methods from the
+large dispatcher into three private modules under `prepared_add/`. Method-body
+comparison after namespace, parent-only visibility and formatting normalization
+found no behavioral changes. Locked all-feature Pull tests pass 137/137
+(`/tmp/talos-i300-pull-module-tests.log`), and locked all-target/all-feature
+Clippy passes with warnings denied (`/tmp/talos-i300-pull-module-clippy.log`).
+This reduces the dispatcher by approximately 2350 lines without adding a
+parallel implementation or changing authorization. The extraction remains local;
+published f92b64a8 CI does not validate it. Integration scope consumption,
+external-effect admission and actual integration execution remain unfinished.
+Independent static review of the complete four-file extraction found no new
+blocker: all 27 moved methods preserve behavior and the remaining parent file
+is unchanged apart from private module declarations. The reviewer did not run
+tests. Published Windows job 117882260178 is terminal failed: sender discovery
+now passes executable spelling validation but fails later at configuration
+inspection with values withheld. The underlying configuration failure remains
+unproven; do not claim native Windows completion.
