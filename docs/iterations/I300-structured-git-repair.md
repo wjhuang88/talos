@@ -5379,3 +5379,26 @@ symlink hops and pre-`..` ancestors remain retained. Review did not execute Wind
 and the new fixture does not directly cover UNC or symlink paths.
 Both project governance and Collaboration Claim validators pass with zero
 warnings for this follow-up.
+
+Recursive Pull directory argument checkpoint (2026-10-19): implementation
+`81232433` routes the two remaining explicit child Git directory/worktree
+command constructors through the existing identity-preserving host-path adapter.
+All three production callers propagate conversion errors before process startup;
+cwd, historical `--work-tree=.` scheduling, environment and authorization remain
+unchanged. Focused locked all-feature child regressions pass 22/22
+(`/tmp/talos-i300-child-directory-tests.log`); formatting and whitespace checks
+pass. Independent static security review found no blocker or missing caller;
+native Windows validation remains required.
+
+The standard sandboxed full gate for `2cecc982` exited 101: tools 942/943 passed,
+and the sole failure was process observation denied by the sandbox in
+`prepared_local_push_runs_all_eight_admitted_stages`. Log:
+`/tmp/talos-i300-root-followup-preflight.log`. Approved external full gate
+session 72915 now validates the source including `81232433`; log
+`/tmp/talos-i300-child-directory-preflight-unsandboxed.log`. Its result remains
+pending. No full-gate success, Windows completion or T7 completion is claimed.
+
+Superseding full-gate result: approved external session 72915 exited zero and
+its log ends `release preflight: passed`. Pinned locked workspace checks, Clippy,
+tests/doctests (tools 943/943) and both external Runtime SDK fixture modes pass
+for implementation `81232433`. Native Windows exact-head CI remains outstanding.
