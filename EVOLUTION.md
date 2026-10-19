@@ -5,6 +5,15 @@
 Record reusable lessons from failures, corrections, and unexpected successes. Check here before
 repeating known mistakes.
 
+## 2026-10-19 - Use the established Windows cross-compilation route
+
+- Trigger: Maintainer correction during I300 Windows Job validation.
+- Symptom: A GNU-target check reported missing MinGW as a Windows validation blocker.
+- Root cause: The installed GNU target was mistaken for the project's intended cross-compilation route.
+- Fix: Use cargo xwin with x86_64-pc-windows-msvc and install the MSVC standard library for the pinned toolchain.
+- Prevention: Check the project build route before choosing a target; distinguish cross-compilation from native runtime evidence.
+- Promoted to rule/check: `docs/sop/LOCAL-DEV.md`, Windows Cross-Compilation From macOS/Linux.
+
 ## 2026-10-18 - Bind fetch resources to its execution directory
 
 - Trigger: Native Git 2.54 probes during I300 child execution layout review.
@@ -42,6 +51,8 @@ repeating known mistakes.
 - Promoted to rule/check: `checkout_existing_local_branch_preserves_onbranch_configuration` covers post-checkout and reference-transaction command refusal.
 
 ## Lesson Index
+
+- [Use the established Windows cross-compilation route](#2026-10-19---use-the-established-windows-cross-compilation-route) — I300.
 
 - [Bind fetch resources to its execution directory](#2026-10-18---bind-fetch-resources-to-its-execution-directory) — I300.
 - [Preserve the winning Git task's recursion policy](#2026-10-18---preserve-the-winning-git-tasks-recursion-policy) — I300.
