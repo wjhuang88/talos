@@ -175,3 +175,17 @@ fn checkout_hooks_are_deferred_and_recursive_effects_are_explicit() {
             .contains("target-branch discovery")
     );
 }
+
+#[cfg(windows)]
+#[test]
+fn auxiliary_spelling_walk_starts_at_complete_windows_root() {
+    let root = tempfile::tempdir().expect("fixture");
+    let canonical = root.path().canonicalize().expect("canonical root");
+    let file = canonical.join("config");
+    std::fs::write(&file, b"[core]\n").expect("config");
+    for path in [&file, &canonical.join("absent").join("config")] {
+        let spellings = auxiliary_spellings(path).expect("absolute Windows traversal");
+        assert!(spellings.contains(path));
+        assert!(spellings.iter().all(|spelling| spelling.is_absolute()));
+    }
+}

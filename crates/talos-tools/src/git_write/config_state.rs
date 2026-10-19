@@ -639,6 +639,16 @@ fn auxiliary_spellings(path: &std::path::Path) -> Result<BTreeSet<PathBuf>, GitT
         let mut next = None;
         for (position, component) in components.iter().enumerate() {
             prefix.push(component.as_os_str());
+            // A Windows prefix alone (notably \\?\C:) is not the absolute
+            // root. Inspect it only after appending the following RootDir.
+            if matches!(component, std::path::Component::Prefix(_))
+                && matches!(
+                    components.get(position + 1),
+                    Some(std::path::Component::RootDir)
+                )
+            {
+                continue;
+            }
             // Even an ancestor later followed by `..` is a real traversal
             // dependency; replacing it can turn a valid lookup into ENOTDIR.
             spellings.insert(lexical_path(&prefix));
