@@ -5032,3 +5032,13 @@ the focused test and standard full gate. This supersedes the live-session note
 above; no passing full gate is claimed for `64cc4674`.
 Focused sealed-owner test now passes 1/1 with all original effect/cleanup checks
 retained (`/tmp/talos-i300-sealed-owner-diagnostic-test.log`); formatting passes.
+
+Stable-batch full gate (2026-10-19): standard preflight session 21926 exited 0
+for source `35693ea1`, ending `release preflight: passed`. Locked workspace checks,
+Clippy, tests/doctests, governance/claim gates and both external Runtime SDK modes
+passed. Log: `/tmp/talos-i300-sealed-diagnostic-full-preflight.log`. This validates
+the private Pull module extraction, redacted config diagnostic and corrected
+sealed-owner assertions locally; native Windows remains unproven. A fresh
+`git fetch origin` succeeded; this source is ahead 217 / behind 0 origin/main,
+so no rebase was needed. Publish the reviewed stable batch to #735 for fresh CI;
+production Pull integration and all remaining handoff gates remain open.
