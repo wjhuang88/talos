@@ -422,7 +422,7 @@ async fn sealed_owner_refuses_discovery_and_prepared_continuation() {
         output
             .result
             .content
-            .contains("configuration inspection failed"),
+            .contains("configuration inspection runner failed; configuration values withheld"),
         "{}",
         output.result.content
     );
@@ -434,7 +434,7 @@ async fn sealed_owner_refuses_discovery_and_prepared_continuation() {
     assert!(
         error
             .to_string()
-            .contains("configuration inspection failed")
+            .contains("configuration inspection runner failed; configuration values withheld")
     );
     assert!(!root.path().join(".git/index").exists());
     receipt
