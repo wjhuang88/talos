@@ -4355,3 +4355,15 @@ Windows MSVC test-target cargo xwin check passes with --locked and git feature
 (/tmp/talos-i300-config-fixture-xwin.log); feature-reduced build emits existing
 dead-code warnings, so this is compile evidence, not a warning-free Clippy gate
 or native test execution.
+
+Platform-specific parent traversal fixture correction (2026-10-19): Rust's
+documented verbatim PathBuf join behavior removes dot components before Sources
+receives the path. The two POSIX traversal tests and the POSIX missing-parent
+assertion now run on Unix; a Windows replacement explicitly verifies normalized
+source admission, denial without capture, admitted contents and drift refusal.
+No production path handling changed. Independent review found no blocker and
+confirmed this does not prove arbitrary raw Windows path traversal semantics.
+Locked macOS target_config tests pass 29/29
+(/tmp/talos-i300-traversal-tests.log); Windows MSVC test-target cargo xwin check
+passes (/tmp/talos-i300-config-fixture-xwin.log), with existing reduced-feature
+dead-code warnings. Native Windows execution remains pending.
