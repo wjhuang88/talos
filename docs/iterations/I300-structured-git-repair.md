@@ -5443,3 +5443,35 @@ cell is no longer available, so its shell exit status was not recovered; the
 standard script completion marker is the retained evidence. Both governance
 validators pass with zero warnings. Prior-head CI 39220084842 is now terminal
 failure; this does not validate the current increment.
+
+Native integration-effect and Windows fixture checkpoint (2026-10-19):
+`bc7fd24a` corrects `checkout_ref_movement_after_discovery_invalidates_plan`
+to admit each actual discovery frontier, with the normal stage-history limit,
+until a Write plan exists before moving the target reference. Windows job
+117970282428 in run 39225369123 passed Desktop validation but failed this test
+with "Git mutation requires a completed discovery phase"; the old fixture
+assumed one continuation was sufficient. Original rejection and unchanged
+HEAD/branch/file assertions remain. Local locked all-feature focused test passes;
+this is not native Windows confirmation. Job log:
+`/tmp/talos-i300-windows-39225369123.log`. The overall run remains live at this
+checkpoint; do not restart it merely because its Windows job is terminal.
+
+`6587407c` retains a native Git merge-editor experiment in the split merge tests.
+On Git 2.54.0 with null stdin, an unset GIT_MERGE_AUTOEDIT did not execute the
+configured GIT_EDITOR; `yes` executed it and `no` did not. Locked all-feature
+regression passes, as does all-target/all-feature Clippy with warnings denied.
+Closed stdin therefore cannot substitute for external-execution effect admission.
+The ordinary no-editor case must not be rejected merely because an editor is
+configured. This is behavioral evidence, not an editor authorization implementation.
+Fetch succeeded: HEAD before these two commits was ahead 240 / behind 0
+origin/main. Standard preflight is running in session 51544, log
+`/tmp/talos-i300-discovery-editor-preflight.log`; inspect that handle before any
+rerun. Pull final execution remains guarded; T7 and the complete handoff remain
+Active/incomplete, including the original later task queue.
+Source follow-up: `prepared_add::validate_environment` already refuses inherited
+GIT_* overrides except GIT_PAGER, including both GIT_MERGE_AUTOEDIT and GIT_EDITOR.
+The experiment's enabled environment therefore is not currently admitted in
+production. Existing branch merge-option validation also handles editor options.
+Do not add a redundant environment guard or silently force auto-edit off; retain
+these existing checks when assembling final execution. Both governance validators
+pass with zero warnings after this checkpoint.

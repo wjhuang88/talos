@@ -4153,3 +4153,23 @@ Remaining: directory/path/identity/temporary peak quota unification, recursive
 Pull and final integration execution, real wrapper acceptance and native Windows
 validation. This stage does not prove full ADR-089 resource accounting. Production
 Pull and non-Unix preparation remain disabled; T7 and the full handoff remain open.
+
+2026-10-19 resumed execution: `bc7fd24a` repairs the Windows checkout reference
+movement fixture to reach the actual mutation stage through fresh approvals,
+rather than assuming one discovery continuation. Local focused test passes;
+native Windows rerun remains required. CI 39225369123 Windows job 117970282428
+passed Desktop then failed the old fixture with incomplete-discovery rejection;
+overall run was still live when checked. Log:
+`/tmp/talos-i300-windows-39225369123.log`.
+`6587407c` adds native merge-editor evidence: Git 2.54.0 with null stdin executes
+GIT_EDITOR when GIT_MERGE_AUTOEDIT=yes, but not when unset or no. Focused locked
+all-feature test and all-target/all-feature Clippy pass. This narrows effect
+handling requirements without changing inherited configuration or enabling Pull.
+Fresh fetch requires no rebase (ahead 240 / behind 0 before these commits).
+Standard preflight session 51544 is live; log
+`/tmp/talos-i300-discovery-editor-preflight.log`. Inspect before rerunning.
+T7 and the original full task queue remain incomplete; no completion is claimed.
+Editor follow-up: existing `validate_environment` already rejects inherited
+GIT_MERGE_AUTOEDIT/GIT_EDITOR overrides; branch merge-option validation handles
+editor options. No extra environment guard or configuration suppression is needed
+for these known routes. Both governance validators pass with zero warnings.
