@@ -4895,3 +4895,28 @@ locked all-target/all-feature Clippy with warnings denied passes (session 37898,
 `/tmp/talos-i300-integration-hooks-clippy-final.log`). Both governance validators
 pass with zero warnings (sessions 62979/68782). The Windows rerun remains an
 external, earlier-head validation and cannot validate these source changes.
+
+Windows rerun evidence (2026-10-19): run 39185762993 attempt 2 on 0b42e580
+is terminal and failed in Structured Git executable and path identity guard
+tests. Desktop explicit feature validation passed on this attempt. All ten
+selected foreground supervision tests passed, followed by real Git startup,
+executable replacement protection and fresh sender Read admission tests.
+`sender_program_binding_preserves_invocation_budget` failed during first sender
+discovery with `Internal Git exec-path does not bind to its admitted executable`.
+The current combined check does not distinguish textual path mismatch from
+canonical executable mismatch; the cause is unproven. Diagnose both comparisons
+on native Windows before changing identity policy. Later selected tests did not
+run, and this earlier-head run cannot establish current-head Windows support.
+Failed-step evidence is retained at
+`/tmp/talos-i300-ci-39185762993-attempt2-failed.log`. T7 remains Active, with
+production Windows preparation and Pull still disabled.
+
+Binding diagnostic follow-up: the two sender binding checks now share a helper
+that distinguishes spelling drift, resolution failure and canonical-target drift.
+It preserves the original short circuit: a differently reported path is rejected
+before canonicalization, so diagnostics do not open an unadmitted replacement.
+The new regression exercises all three failures and an unchanged binding; it
+passes with locked all-feature tools tests, as do the two sender-program tests.
+All-target/all-feature locked Clippy with warnings denied passes. Independent
+static security review found no blocker or enlarged authority; it did not run
+tests. Native Windows diagnosis remains required; no Windows fix is claimed.
