@@ -119,3 +119,4 @@ include!("prepared_add_tests/sender_program.rs");
 include!("prepared_add_tests/sender_configuration.rs");
 
 include!("prepared_add_tests/pull_integration.rs");
+include!("prepared_add_tests/pull_reconcile.rs");

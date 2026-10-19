@@ -4255,3 +4255,33 @@ Runtime structured-Git acceptance still hits the explicit non-test Windows
 preparation gate, although the unit path already uses the shared Job runner.
 CI now requests libtest `--nocapture` so panic diagnostics survive a subsequent
 hang. This changes evidence capture only; no Windows activation is implied.
+
+2026-10-19 stable-stage validation/publication: standard external preflight
+session 56255 exited 0 for source HEAD `784b1d8d`; log
+`/tmp/talos-i300-binding-final-preflight.log` ends `release preflight: passed`.
+Pinned locked workspace checks/Clippy/tests/doctests, tools 947/947 and both
+external Runtime SDK modes passed. Commits `654770d0`, `e438f6b4`, `f8522f85`
+and `784b1d8d` were pushed to the existing PR735 branch. Fetch confirmed
+HEAD ahead 249 / behind 0 of origin/main before publication; no rebase needed.
+Fresh remote exact-head gates and all original T7/handoff requirements remain
+open. Production Pull and Windows structured-Git activation remain disabled.
+
+Pull reconciliation continuation checkpoint (2026-10-19): the test-gated
+executor now returns successful read-tree reconciliation to refreshed
+repository/index/worktree evidence and a fresh integration approval, rather
+than claiming an isolated reconciliation completes Pull. FETCH_HEAD bytes,
+configuration, external/metadata attributes, inventory and reconciled HEAD stay
+bound. Independent review found metadata info/attributes was incorrectly
+refreshable inside workdir; excluding gitdir/common roots fixes it, and static
+re-review confirms that finding closed. Real-repository coverage verifies new
+tracked files, old-proof denial, separately approved success, and refusal of
+post-command FETCH_HEAD/config/HEAD/metadata-attribute drift. Final tools tests
+pass 948/948 and all-target/all-feature Clippy passes. Standard preflight also
+passes (/tmp/talos-i300-reconcile-preflight.log); it started before the metadata
+attribute correction, which is covered by the final full tools run
+(/tmp/talos-i300-reconcile-final-tools.log). Both governance validators pass.
+Git v2.54.0 builtin/pull.c confirms child fetch precedes reconciliation; do not
+repeat completed fetches. Final recursive worktree updates, remaining effects,
+native Windows/runtime acceptance and exact-head delivery gates remain open.
+Production Pull stays disabled; T7 and the original handoff queue remain Active.
+Fetch confirms HEAD is ahead249/behind0 origin/main; no rebase was needed.
