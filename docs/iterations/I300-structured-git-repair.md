@@ -4783,3 +4783,19 @@ is running against this candidate, with output in
 `/tmp/talos-i300-drift-diagnostics-preflight.log`; no pass is claimed yet.
 Native Windows execution, real Windows Push and the original Pull/T7 residuals
 remain required.
+
+Pull typed integration work-in-progress (2026-10-19): replace the opaque
+Command vector with Merge/Rebase variants retaining merge candidate OIDs,
+fast-forward policy, autostash, rebase mode, onto and upstream. Unborn and
+Reconcile remain distinct. Command rendering is test-only for native Git parity
+fixtures; this does not authorize or enable production integration. Locked
+pull_state tests pass 26/26 (session 1030), output
+`/tmp/talos-i300-typed-integration.log`; prepared Pull tests pass 41/41
+(session 53705), output `/tmp/talos-i300-typed-prepared-pull.log`.
+The strengthened post-fetch candidate-OID assertion passes (session
+15126), output `/tmp/talos-i300-typed-head-binding.log`. All-target/all-feature
+Clippy passes with warnings denied (session 82353), output
+`/tmp/talos-i300-typed-integration-clippy.log`. Standard preflight 11898 was already
+running when this subsequent source work began; its eventual result must not
+be cited as exact-head validation of the typed-plan change. Fresh stable-source
+validation and effect discovery/admission/execution remain required.

@@ -1398,10 +1398,13 @@ async fn pull_postfetch_rebuilds_evidence_before_selecting_integration() {
             root.path().join(".gitmodules").exists(),
             source == "worktree"
         );
-        assert!(matches!(
-            next.pull_integration,
-            Some(super::super::pull_state::Integration::Command(_))
-        ));
+        match next.pull_integration.as_ref().expect("integration") {
+            super::super::pull_state::Integration::Merge { heads, .. } => {
+                let fetched = git(&["rev-parse", "FETCH_HEAD^{commit}"]);
+                assert_eq!(heads, &[String::from_utf8(fetched).expect("OID").trim().to_owned()]);
+            }
+            other => panic!("expected merge plan, got {other:?}"),
+        }
         next.revalidate().expect("fresh evidence");
         std::fs::write(root.path().join(".gitmodules"), b"changed after admission")
             .expect("tamper modules");
