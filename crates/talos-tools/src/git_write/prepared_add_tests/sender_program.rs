@@ -1,4 +1,22 @@
 #[test]
+fn windows_internal_program_report_matches_only_retained_canonical_spelling() {
+    let bound = Path::new(r"\\?\C:\Program Files\Git\ucrt64\libexec\git-core\git.exe");
+    assert!(windows_bound_program_spelling(
+        Path::new(r"//?/C:/Program Files/Git/ucrt64/libexec/git-core\git.exe"),
+        bound,
+    ));
+    for reported in [
+        "C:/Program Files/Git/ucrt64/libexec/git-core/git.exe",
+        "//?/C:/Program Files/Git/ucrt64/libexec/git-core/../git-core/git.exe",
+        "//?/C:/Program Files/Git/ucrt64/libexec/git-core/other.exe",
+        "//?/c:/Program Files/Git/ucrt64/libexec/git-core/git.exe",
+        "//./C:/Program Files/Git/ucrt64/libexec/git-core/git.exe",
+    ] {
+        assert!(!windows_bound_program_spelling(Path::new(reported), bound));
+    }
+}
+
+#[test]
 fn internal_program_validation_distinguishes_unadmitted_path_from_target_drift() {
     let root = tempfile::tempdir().expect("fixture");
     let admitted = root.path().join("admitted");
@@ -6,6 +24,16 @@ fn internal_program_validation_distinguishes_unadmitted_path_from_target_drift()
     std::fs::write(&admitted, b"fixture").expect("program fixture");
     let bound = admitted.canonicalize().expect("bound target");
     validate_internal_program(&admitted, &admitted, &bound).expect("unchanged binding");
+    #[cfg(windows)]
+    {
+        let reported = bound.to_str().expect("fixture path").replace('\\', "/");
+        validate_internal_program(Path::new(&reported), &admitted, &bound)
+            .expect("Git for Windows canonical report");
+        let missing = root.path().join("missing-admitted");
+        let error = validate_internal_program(Path::new(&reported), &missing, &bound)
+            .expect_err("canonical report must not bypass admitted path revalidation");
+        assert!(error.to_string().contains("cannot be resolved"), "{error}");
+    }
     let error = validate_internal_program(&unadmitted, &admitted, &bound)
         .expect_err("unadmitted spelling");
     assert!(error.to_string().contains("spelling changed"), "{error}");
