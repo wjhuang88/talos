@@ -20,13 +20,16 @@ impl AddPlan {
             .fetch_head()?;
         // Never display FETCH_HEAD contents: remote descriptions can contain
         // credentials. The digest binds the displayed plan to retained bytes.
-        let mut hasher = gix::hash::hasher(gix::hash::Kind::Sha256);
-        hasher.update(fetched);
-        let digest = hasher
-            .try_finalize()
-            .map_err(|error| GitToolError::Git(error.to_string()))?;
+        let digest = std::panic::catch_unwind(|| {
+            let mut hasher = gix::hash::hasher(gix::hash::Kind::Sha256);
+            hasher.update(fetched);
+            hasher.try_finalize()
+        })
+        .map_err(|_| GitToolError::Git("Pull integration evidence digest failed".into()))?
+        .map_err(|_| GitToolError::Git("Pull integration evidence digest failed".into()))?;
+        let commands = integration.commands()?;
         let description = format!(
-            "one Pull integration {integration:?}; retained FETCH_HEAD sha256={digest}; no retry or rollback"
+            "one Pull integration {integration:?}; commands={commands:?}; retained FETCH_HEAD sha256={digest}; no retry or rollback"
         );
         self.facets
             .retain(|facet| !matches!(facet.nature, ToolNature::Write | ToolNature::Network));

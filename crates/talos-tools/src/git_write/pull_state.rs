@@ -1087,7 +1087,80 @@ pub(super) enum Integration {
 }
 
 impl Integration {
-    #[cfg(test)]
+    /// Fixed commands for this retained operation, without starting a process.
+    /// Callers must stop at the first failure; reconciliation needs fresh
+    /// evidence and a separately admitted next integration afterwards.
+    pub(super) fn commands(&self) -> Result<Vec<Vec<String>>, GitToolError> {
+        std::panic::catch_unwind(|| self.commands_inner()).unwrap_or_else(|_| {
+            Err(GitToolError::Git(
+                "Pull integration command preparation failed".into(),
+            ))
+        })
+    }
+
+    fn commands_inner(&self) -> Result<Vec<Vec<String>>, GitToolError> {
+        let ids: Vec<&str> = match self {
+            Self::Unborn(target) => vec![target],
+            Self::Merge { heads, .. } => heads.iter().map(String::as_str).collect(),
+            Self::Rebase { onto, upstream, .. } => vec![onto, upstream],
+            Self::Reconcile { original, current } => vec![original, current],
+        };
+        let length = ids.first().map_or(0, |id| id.len());
+        if !matches!(length, 40 | 64)
+            || ids
+                .iter()
+                .any(|id| id.len() != length || !id.bytes().all(|byte| byte.is_ascii_hexdigit()))
+        {
+            return Err(GitToolError::InvalidInput(
+                "Invalid Pull integration object identity".into(),
+            ));
+        }
+        if let Some(command) = self.command() {
+            return Ok(vec![command]);
+        }
+        match self {
+            Self::Unborn(target) => {
+                let hash = if length == 40 {
+                    gix::hash::Kind::Sha1
+                } else {
+                    gix::hash::Kind::Sha256
+                };
+                let mut hasher = gix::hash::hasher(hash);
+                hasher.update(b"tree 0\0");
+                let empty = hasher
+                    .try_finalize()
+                    .map_err(|error| GitToolError::Git(error.to_string()))?;
+                Ok(vec![
+                    vec![
+                        "read-tree".into(),
+                        "-u".into(),
+                        "-m".into(),
+                        empty.to_string(),
+                        target.clone(),
+                    ],
+                    vec![
+                        "update-ref".into(),
+                        "-m".into(),
+                        "initial pull".into(),
+                        "HEAD".into(),
+                        target.clone(),
+                        "0".repeat(length),
+                    ],
+                ])
+            }
+            Self::Reconcile { original, current } => Ok(vec![vec![
+                "read-tree".into(),
+                "-u".into(),
+                "-m".into(),
+                original.clone(),
+                current.clone(),
+            ]]),
+            _ => Err(GitToolError::InvalidInput(
+                "Missing Pull integration command".into(),
+            )),
+        }
+    }
+
     fn command(&self) -> Option<Vec<String>> {
         let (operation, autostash) = match self {
             Self::Merge { autostash, .. } => ("merge", autostash),

@@ -314,7 +314,9 @@ async fn real_pull_obeys_branch_ff_and_autostash_policy() {
         }
         let split_success = match integration {
             Ok(plan @ (Integration::Merge { .. } | Integration::Rebase { .. })) => {
-                let args = plan.command().expect("integration command");
+                let commands = plan.commands().expect("integration commands");
+                assert_eq!(commands.len(), 1);
+                let args = &commands[0];
                 run(&split, &args.iter().map(String::as_str).collect::<Vec<_>>())
                     .status
                     .success()
