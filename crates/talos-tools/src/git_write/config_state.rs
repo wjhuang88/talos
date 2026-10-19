@@ -1235,6 +1235,7 @@ impl ConfigState {
         integration: &super::pull_state::Integration,
     ) -> Result<Vec<PathBuf>, GitToolError> {
         use super::pull_state::Integration;
+        self.validate_pull_integration_signing(integration)?;
         let directory = configured_path(&self.values, b"core.hookspath", environment)?
             .unwrap_or_else(|| repository.common_dir.join("hooks"));
         let directory = if directory.is_absolute() {
@@ -1269,6 +1270,35 @@ impl ConfigState {
             }
         };
         Ok(names.iter().map(|name| directory.join(name)).collect())
+    }
+
+    // These booleans can start a signing/verifier program even when no hook
+    // exists. Worktree scope approval does not authorize that execution.
+    // Branch merge options and other external effects need their own checks;
+    // this is deliberately not a complete integration execution validator.
+    fn validate_pull_integration_signing(
+        &self,
+        integration: &super::pull_state::Integration,
+    ) -> Result<(), GitToolError> {
+        use super::pull_state::Integration;
+        let keys: &[&[u8]] = match integration {
+            Integration::Merge { .. } => &[b"commit.gpgsign", b"merge.verifysignatures"],
+            Integration::Rebase { .. } => &[b"commit.gpgsign"],
+            Integration::Unborn(_) | Integration::Reconcile { .. } => &[],
+        };
+        for key in keys {
+            let mut enabled = false;
+            for value in self.values.get(*key).into_iter().flatten() {
+                // Git parses every declaration, including overridden values.
+                enabled = git_boolean(value.as_deref())?;
+            }
+            if enabled {
+                return Err(unsupported(
+                    "Pull integration signing or signature verification requires separate execution authorization",
+                ));
+            }
+        }
+        Ok(())
     }
 
     /// Validate the selected fetch remote after policy discovery, before any fetch mutation.
@@ -1911,6 +1941,8 @@ pub(super) fn parse_host(bytes: &[u8]) -> Result<Values, GitToolError> {
 
 #[cfg(test)]
 mod tests {
+    include!("config_state_tests/pull_signing.rs");
+
     #[test]
     fn child_startup_layout_matches_native_selection_rules() {
         for case in [
