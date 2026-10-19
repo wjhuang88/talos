@@ -15,7 +15,15 @@ async fn sender_configuration_sources_remain_readable_after_rebinding() {
     let bound = ReceiverChildExecutable::capture(candidate, admitted).expect("bound program");
     let mut diagnostics = Vec::new();
     let mut defaults_readable = true;
-    for (program_label, program) in [("entry", &plan.program), ("internal", &bound.canonical)] {
+    // Probe both already-admitted spellings of the same retained executable.
+    // In particular, Windows canonicalization adds a verbatim path prefix;
+    // diagnose its effect without changing production execution or identity.
+    for (program_label, program) in [
+        ("entry", &plan.program),
+        ("internal", &bound.canonical),
+        ("internal-admitted", &bound.spelling),
+    ] {
+        bound.revalidate(admitted).expect("retained executable");
         for scope in ["default", "system", "global", "local"] {
             let mut command = tokio::process::Command::new(program);
             command

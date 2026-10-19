@@ -5170,3 +5170,15 @@ API while other workflow jobs were still running. No stream contents or paths
 are published. This narrows investigation to internal executable rebinding or
 startup differences; it does not establish the underlying cause. Do not loosen
 identity checks or mark Windows complete on this evidence.
+
+Windows invocation-spelling follow-up: the matrix now also probes the retained
+internal executable's already-admitted original spelling, revalidating the
+binding before each executable group. All twelve probes retain the same frozen
+environment, cwd, runner and redacted diagnostics. This tests the canonical
+verbatim-prefix/startup hypothesis without changing production execution or
+reading any newly reported executable. The focused locked all-feature test
+passes locally (1/1, `/tmp/talos-i300-windows-spelling-matrix-test.log`), and
+independent security review found no blocker. The underlying Windows failure
+is still unknown. Authorized full standard preflight session 49774 is running
+at `/tmp/talos-i300-coalesced-full-preflight.log`; poll that handle rather than
+restart. Earlier run 39201923094 is terminal failure, not a current-batch gate.
