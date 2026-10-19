@@ -1151,7 +1151,7 @@ impl BeforeFetch {
         }
         let rebase =
             self.policy.rebase != Rebase::Off && self.policy.fast_forward != FastForward::Only;
-        let mut args = if rebase && !can_ff {
+        let integration = if rebase && !can_ff {
             let mut upstream = heads[0].clone();
             if let Some(fork) = &self.fork_point {
                 let output = run(vec![
@@ -1178,42 +1178,24 @@ impl BeforeFetch {
                     upstream = fork.clone();
                 }
             }
-            let mut args = vec!["rebase".into()];
-            match self.policy.rebase {
-                Rebase::Merges => args.push("--rebase-merges".into()),
-                Rebase::Interactive => args.push("--interactive".into()),
-                _ => {}
+            Integration::Rebase {
+                onto: heads[0].clone(),
+                upstream,
+                mode: self.policy.rebase.clone(),
+                autostash: self.policy.autostash,
             }
-            args.extend(["--onto".into(), heads[0].clone(), upstream]);
-            args
         } else {
-            let mut args = vec!["merge".into()];
-            let ff = if rebase && can_ff {
-                &FastForward::Only
-            } else {
-                &self.policy.fast_forward
-            };
-            match ff {
-                FastForward::Allow => args.push("--ff".into()),
-                FastForward::Never => args.push("--no-ff".into()),
-                FastForward::Only => args.push("--ff-only".into()),
-                FastForward::Unspecified => {}
+            Integration::Merge {
+                heads,
+                fast_forward: if rebase && can_ff {
+                    FastForward::Only
+                } else {
+                    self.policy.fast_forward.clone()
+                },
+                autostash: self.policy.autostash,
             }
-            // Preserve FETCH_HEAD descriptions for merge messages. Its bytes
-            // must remain bound to the final integration approval.
-            args.push("FETCH_HEAD".into());
-            args
         };
-        args.insert(
-            1,
-            if self.policy.autostash {
-                "--autostash"
-            } else {
-                "--no-autostash"
-            }
-            .into(),
-        );
-        Ok(Integration::Command(args))
+        Ok(integration)
     }
 
     pub(super) async fn probe<F, Fut>(
@@ -1409,20 +1391,79 @@ impl BeforeFetch {
 #[derive(Debug, PartialEq, Eq)]
 pub(super) enum Integration {
     Unborn(String),
-    Command(Vec<String>),
-    Reconcile { original: String, current: String },
+    Merge {
+        heads: Vec<String>,
+        fast_forward: FastForward,
+        autostash: bool,
+    },
+    Rebase {
+        onto: String,
+        upstream: String,
+        mode: Rebase,
+        autostash: bool,
+    },
+    Reconcile {
+        original: String,
+        current: String,
+    },
 }
 
-#[derive(Debug, PartialEq, Eq)]
-enum Rebase {
+impl Integration {
+    #[cfg(test)]
+    fn command(&self) -> Option<Vec<String>> {
+        let (operation, autostash) = match self {
+            Self::Merge { autostash, .. } => ("merge", autostash),
+            Self::Rebase { autostash, .. } => ("rebase", autostash),
+            _ => return None,
+        };
+        let mut args = vec![
+            operation.into(),
+            if *autostash {
+                "--autostash"
+            } else {
+                "--no-autostash"
+            }
+            .into(),
+        ];
+        match self {
+            Self::Merge { fast_forward, .. } => {
+                match fast_forward {
+                    FastForward::Allow => args.push("--ff".into()),
+                    FastForward::Never => args.push("--no-ff".into()),
+                    FastForward::Only => args.push("--ff-only".into()),
+                    FastForward::Unspecified => {}
+                }
+                args.push("FETCH_HEAD".into());
+            }
+            Self::Rebase {
+                onto,
+                upstream,
+                mode,
+                ..
+            } => {
+                match mode {
+                    Rebase::Merges => args.push("--rebase-merges".into()),
+                    Rebase::Interactive => args.push("--interactive".into()),
+                    _ => {}
+                }
+                args.extend(["--onto".into(), onto.clone(), upstream.clone()]);
+            }
+            _ => return None,
+        }
+        Some(args)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum Rebase {
     Off,
     On,
     Merges,
     Interactive,
 }
 
-#[derive(Debug, PartialEq, Eq)]
-enum FastForward {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum FastForward {
     Unspecified,
     Allow,
     Never,
@@ -2499,7 +2540,8 @@ async fn real_pull_obeys_branch_ff_and_autostash_policy() {
             fetched_evidence.revalidate().expect("restored FETCH_HEAD");
         }
         let split_success = match integration {
-            Ok(Integration::Command(args)) => {
+            Ok(plan @ (Integration::Merge { .. } | Integration::Rebase { .. })) => {
+                let args = plan.command().expect("integration command");
                 run(&split, &args.iter().map(String::as_str).collect::<Vec<_>>())
                     .status
                     .success()
@@ -2733,9 +2775,7 @@ async fn real_pull_current_branch_fetch_reconciles_index_and_worktree() {
                 })
                 .await
                 .expect("integration after reconciliation");
-            let Integration::Command(args) = next else {
-                panic!("expected merge");
-            };
+            let args = next.command().expect("expected merge");
             run(&split, &args.iter().map(String::as_str).collect::<Vec<_>>())
                 .status
                 .success()
