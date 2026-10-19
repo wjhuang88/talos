@@ -111,6 +111,7 @@ async fn real_pull_current_branch_fetch_reconciles_index_and_worktree() {
             })
             .await
             .expect("selected integration");
+        let commands = integration.commands().expect("reconciliation commands");
         let Integration::Reconcile {
             original: old,
             current,
@@ -120,7 +121,11 @@ async fn real_pull_current_branch_fetch_reconciles_index_and_worktree() {
         };
         assert_eq!(old, original.trim());
         assert_eq!(current, expected.trim());
-        let reconciled = run(&split, &["read-tree", "-u", "-m", &old, &current]);
+        assert_eq!(commands.len(), 1);
+        let reconciled = run(
+            &split,
+            &commands[0].iter().map(String::as_str).collect::<Vec<_>>(),
+        );
         let split_success = if reconciled.status.success() {
             let next = retained
                 .integration_stage(&fetched, 40, true, |args| {
@@ -129,7 +134,9 @@ async fn real_pull_current_branch_fetch_reconciles_index_and_worktree() {
                 })
                 .await
                 .expect("integration after reconciliation");
-            let args = next.command().expect("expected merge");
+            let commands = next.commands().expect("expected merge");
+            assert_eq!(commands.len(), 1);
+            let args = &commands[0];
             run(&split, &args.iter().map(String::as_str).collect::<Vec<_>>())
                 .status
                 .success()

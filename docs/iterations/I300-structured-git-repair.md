@@ -5066,3 +5066,28 @@ These checks do not prove the full Pull stage budget, external effects, executio
 or final runtime acceptance. Native Windows run 39199780959 at published
 `c1ba37d669550eca0b7ebc099507a08cdd7369b0` remains live; poll that run rather than
 restart it. No T7 completion or current-scope full workspace pass is claimed.
+
+Pull integration command convergence (2026-10-19): the retained integration now
+generates the command vectors used by both the approval description and native
+parity tests. Merge/rebase keep their existing argv; unborn checkout generates
+read-tree followed by compare-old update-ref, and reconciliation generates
+read-tree before a separately selected/admitted next operation. Invalid, empty,
+option-looking and mixed-format object identities are refused. SHA-1 and SHA-256
+unborn fixtures cover clean, disjoint staged and conflicting untracked files.
+Hashing and command preparation have panic boundaries. No integration process
+execution is enabled by this change.
+
+Current-source locked Pull tests pass 141/141 and all-target/all-feature Clippy
+passes with warnings denied. Logs:
+`/tmp/talos-i300-command-final-pull-tests.log` and
+`/tmp/talos-i300-command-final-clippy.log`. Independent review of the command
+generator identified missing hash panic boundaries; those are now present in
+both command generation and the FETCH_HEAD approval digest. Full stable-batch
+preflight and exact-head remote gates remain required before publication/merge.
+
+The previously live Windows run 39199780959 is terminal failed at job
+117890194603: sender configuration inspection exits 128 after 200 stdout bytes
+and 39 stderr bytes. The diagnostic withholds all configuration values and
+paths. This proves Git started and failed during config inspection, not its
+underlying cause. Native Windows completion and actual Pull execution remain
+open; production Pull stays disabled and T7 remains Active.
