@@ -4233,3 +4233,25 @@ all-target/all-feature locked tools Clippy passed with warnings denied.
 Independent static review found no new blocker for this binding. This later
 edit is not covered by the preceding full preflight. Prepared reconciliation
 continuation, production activation and the full original handoff remain open.
+
+2026-10-19 remote gate follow-up: CI 39228852503 is terminal; both Linux
+workspace and Windows workspace failed. Windows failed-step log is retained at
+`/tmp/talos-i300-ci-39228852503-windows.log`. Three Agent Git-add acceptance
+cases explicitly encounter the production Windows structured-Git supervision
+gate, rather than reaching approval/mutation. Numerous tools tests also report
+failure; their individual causes are not yet established and must not be
+collapsed into this one diagnosis. Linux checkout missing-hook regression was
+rerun locally with the locked all-feature tools library filter: 1/1 passed.
+This does not resolve the remote metadata-drift failure. Both local governance
+validators completed with zero warnings for the preceding binding checkpoint.
+Windows activation/runtime acceptance and both remote workspace gates remain
+open; no rerun or publication is claimed.
+
+2026-10-19 Windows evidence correction: downloaded full workspace artifact to
+`/tmp/talos-i300-windows-39228852503/`. The Test workspace step timed out after
+20 minutes, before the tools binary emitted its failure-summary diagnostics.
+Thus individual tools causes cannot be inferred from names alone. Agent/MCP/
+Runtime structured-Git acceptance still hits the explicit non-test Windows
+preparation gate, although the unit path already uses the shared Job runner.
+CI now requests libtest `--nocapture` so panic diagnostics survive a subsequent
+hang. This changes evidence capture only; no Windows activation is implied.

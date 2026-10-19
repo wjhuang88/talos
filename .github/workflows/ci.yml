@@ -417,7 +417,8 @@ jobs:
             }
             Write-Host ('I302_INSTALLED_MODULE ' + ($record | ConvertTo-Json -Compress))
           }
-          cargo test --workspace --locked --no-fail-fast 2>&1 | Tee-Object -FilePath windows-workspace-tests.log
+          # Preserve panic diagnostics even if a later test hangs until the step timeout.
+          cargo test --workspace --locked --no-fail-fast -- --nocapture 2>&1 | Tee-Object -FilePath windows-workspace-tests.log
           $testExit = $LASTEXITCODE
           if ($testExit -ne 0) {
             Write-Host "=== Windows workspace failure summary ==="
