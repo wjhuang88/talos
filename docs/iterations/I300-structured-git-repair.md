@@ -5236,3 +5236,27 @@ checks pass. Logs: `/tmp/talos-i300-spelling-final-tests.log`,
 `/tmp/talos-i300-spelling-final-clippy.log`. Native Windows confirmation and a
 fresh full workspace gate remain required. This does not activate production
 Pull or close T7; actual integration execution and the full handoff remain open.
+
+Full-gate follow-up (2026-10-19, implementation `56784d58`): standard preflight
+session 57232 exited 101. Tools passed 938/939; the remaining test
+`prepared_local_push_runs_all_eight_admitted_stages` failed because its process
+observation returned sandbox `Operation not permitted`, not a passing cleanup
+assertion. Log: `/tmp/talos-i300-spelling-full-preflight.log`. The unchanged
+standard command was rerun with approved external execution as session 35403;
+its successful result is recorded below. Read-only integration design review
+confirms existing scope,
+command generation, evidence and owned runner are reusable, but the complete
+external-effect admission and configuration-reload boundary must precede guard
+removal. Merge/Rebase/Unborn/Reconcile execution, conflict/cancel/partial effects,
+successful stage-budget evidence, native Windows and all original handoff
+deliverables remain required.
+
+Superseding full-gate result (2026-10-19): approved external session 35403
+exited 0 and `/tmp/talos-i300-spelling-full-preflight-unsandboxed.log` ends
+`release preflight: passed`. This covers implementation `56784d58`, including
+the preceding interactive-editor boundary and Pull test split: pinned locked
+workspace check, Clippy, tests/doctests, tools 939/939, both governance validators
+and both external Runtime SDK modes. The failed sandbox observation above is
+retained as historical evidence, not a source failure or passing gate. Publish
+this stable stage for native Windows verification; final exact-head CI/review,
+actual integration execution and all original handoff acceptance remain open.
