@@ -4964,3 +4964,14 @@ governance/claims and both external Runtime SDK modes passed. Subsequent fetch
 found origin/main ae6a0791 (#737); rebase and validation of the resulting
 candidate remain required. Native Windows confirmation, actual Pull integration
 execution and the original T7/handoff delivery gates remain outstanding.
+
+Rebase validation checkpoint (2026-10-19): rebased without conflicts onto
+origin/main ae6a0791 (#737), producing frozen candidate 34115871. The tree delta
+from the pre-rebase candidate is exactly the six incoming search files; the Git
+implementation is unchanged. Standard full preflight passed outside the sandbox
+(session 13599, exit 0, `/tmp/talos-i300-rebased-34115871-preflight.log`, ending
+`release preflight: passed`), including locked workspace checks, Clippy,
+tests/doctests, governance/claims and both external Runtime SDK modes. PR #735
+describes the bounded CLI fixture maintenance exception and remaining delivery
+gaps. Fresh exact-head remote CI, native Windows repair confirmation and final
+authorization review remain required; T7 stays Active.
