@@ -4680,17 +4680,17 @@ fn capture_new_gitlink_directory(
             return Err(invalid());
         }
         // No child stat/open: reject metadata names and filesystem aliases
-        // from names alone. Windows nonempty support awaits runtime evidence.
-        if cfg!(windows) {
-            return Err(invalid());
-        }
+        // from names alone. On Windows, enable Git's device/illegal-name
+        // protections before allowing the bounded name inventory to continue;
+        // the mutation stage still revalidates the directory identity and
+        // repeats this complete inventory.
         let valid = (allow_marker && name == ".git")
             || std::panic::catch_unwind(|| {
                 gix::validate::path::component(
                     name.as_encoded_bytes().into(),
                     None,
                     gix::validate::path::component::Options {
-                        protect_windows: false,
+                        protect_windows: cfg!(windows),
                         protect_hfs: true,
                         protect_ntfs: true,
                     },

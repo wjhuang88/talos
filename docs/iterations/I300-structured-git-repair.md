@@ -5677,3 +5677,16 @@ an executable-mode header. The replacement and mode-tracking regressions pass
 24/24 in the locked tools diff suite; standard workspace preflight passes at
 `0a017af1`. This is a focused parity fix and does not activate Pull or close
 T7; native Windows runtime and the remaining Pull/effect gates remain open.
+
+Windows nonempty new-gitlink discovery checkpoint (2026-10-19): bounded
+new-gitlink directory inventory now applies Git's Windows component protections
+instead of refusing every nonempty directory on Windows. It still rejects a
+reparse-point root, never stats or opens descendants, and retains exact root
+Read admission plus directory identity/name-list revalidation before mutation.
+The fixture now requires preservation of ordinary nonempty directory contents
+and checks Windows device/illegal-name rejection. Checkout focused tests pass
+2/2 on macOS; all-target/all-feature locked Clippy and `cargo xwin check` for
+the Windows MSVC test target pass. Independent static review found no blocker,
+but explicitly requires native Windows CI before this path is considered runtime
+validated. Production Windows preparation remains closed; this stage does not
+close T7 or the initialized-child, Pull, recursive, and delivery gates.
