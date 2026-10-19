@@ -5485,3 +5485,11 @@ rerunning. CI 39225369123 is now terminal failure: Linux workspace and Linux
 Desktop passed, Windows failed the old checkout discovery fixture above.
 The local correction has not yet received native Windows CI. Both governance
 validators passed with zero warnings. No full-gate success is claimed yet.
+
+Superseding standard gate result (2026-10-19): approved external session 36855
+exited zero and `/tmp/talos-i300-discovery-editor-preflight-unsandboxed.log`
+ends `release preflight: passed`. Locked pinned workspace checks, Clippy,
+tests/doctests (tools 945/945) and both external Runtime SDK modes pass for
+implementation `bc7fd24a` / `6587407c`. Publish this stable stage for fresh
+Windows evidence; the previous-head failure is not a result for these fixes.
+Pull integration execution and all original handoff residuals remain open.
