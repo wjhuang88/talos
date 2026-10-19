@@ -4934,3 +4934,20 @@ static authorization review of the Git/permission delta from 0b42e580 to
 native Windows diagnosis, actual Pull integration execution and the original
 T7/handoff completion gates remain outstanding. No production Pull activation
 or completion is claimed.
+
+Follow-up (2026-10-19, c541320a / be5e98ff): integration hook path computation
+now happens before returning the next approval frontier, saving one stage while
+retaining fresh exact hook Read admission. Pull tests pass 137/137, including
+the actual child-completion dispatch and stale-proof rejection; this is not
+complete eight-stage integration evidence. Windows CI run 39189835232 at
+f9c22a76 failed sender binding because Git reported `//?/C:/...` after an
+initial `C:/...` candidate. The fix compares only the retained canonical
+spelling with slash conversion and re-resolves only the admitted path; no
+prefix, case or dot-component alias expansion is introduced. Six focused
+program tests and all-target/all-feature locked Clippy pass locally. Independent
+static authorization review found no blocker in either change. Windows runtime
+confirmation and full preflight on be5e98ff remain pending; production Pull
+and Windows preparation remain disabled. Log evidence:
+`/tmp/talos-i300-fold-hook-frontier.log`,
+`/tmp/talos-i300-bound-spelling-tests.log`,
+`/tmp/talos-i300-ci-39189835232-windows.log`.
