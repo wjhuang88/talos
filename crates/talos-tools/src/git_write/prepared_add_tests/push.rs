@@ -1111,8 +1111,10 @@ async fn local_push_receiver_requires_path_admission_without_receiver_reads() {
     }));
     assert!(!next.permission_profile().iter().any(|facet| matches!(
         facet.nature,
-        ToolNature::Network | ToolNature::Write | ToolNature::Execute
+        ToolNature::Network | ToolNature::Write
     )));
+    assert_eq!(next.permission_profile().iter().any(|facet|
+        facet.nature == ToolNature::Execute), cfg!(windows));
     assert!(!receiver.exists());
     assert!(!root.path().join(".git/index").exists());
 }
