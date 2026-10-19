@@ -5120,3 +5120,27 @@ The log explicitly includes the new sender configuration isolation test from
 This clears the local standard gate for this batch only. Native Windows
 diagnosis, exact-head remote gates, actual supervised Pull integration and
 the original T7/handoff acceptance remain open; T7 stays Active.
+
+Pull signing-effect checkpoint (2026-10-19): integration hook discovery now
+refuses configured commit signing for merge/rebase and signature verification
+for merge before publishing hook paths. Git 2.54 merge/rebase configuration
+callbacks consume these booleans independently of hooks; worktree scope does
+not grant signer/verifier execution. Every declaration is parsed, including
+invalid early values later overridden by false. Final false values proceed;
+read-tree/update-ref-only unborn/reconciliation operations are unaffected.
+Tests live in a separate `config_state_tests/pull_signing.rs` file and cover
+implicit/numeric booleans, overrides and secret-bearing invalid values.
+Independent static review found no new blocker. This is a conservative external
+execution boundary (even a fast-forward may be refused when signing is enabled),
+not full native compatibility or a complete effect validator. Branch merge
+options, attributes/drivers/filters, editors, strategies, rerere and actual
+integration execution remain open. Production Pull remains disabled.
+
+Locked all-feature configuration tests pass 29/29, Pull-focused tests pass
+142/142, and all-target/all-feature Clippy passes with warnings denied. Logs:
+`/tmp/talos-i300-pull-signing-config-tests.log`,
+`/tmp/talos-i300-pull-signing-pull-tests.log`,
+`/tmp/talos-i300-pull-signing-clippy.log`. These targeted checks do not extend
+the preceding full-workspace gate to this new implementation. Published
+`44b03138` remains under exact-head CI run 39201923094; do not restart that
+live run or treat its earlier-head result as approval of this signing change.
