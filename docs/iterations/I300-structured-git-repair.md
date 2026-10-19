@@ -5322,3 +5322,19 @@ Previous run 39207944752 is now terminal: Linux main and Desktop passed, Windows
 workspace failed as recorded above. Fetch completed; HEAD has no commits behind
 origin/main. Actual Pull integration execution, native acceptance, final review
 and the original T7/handoff deliverables remain open.
+
+Directory-stage gate follow-up: implementation `ed3d9e36` is committed. Both
+standalone governance validators pass with zero warnings. Standard session 31795
+exited 101: tools 940/941 passed; `prepared_local_push_runs_all_eight_admitted_stages`
+could not observe processes because the sandbox returned `Operation not permitted`.
+This is not passing cleanup evidence. Approved external execution of the unchanged
+preflight is running as session 20275, log
+`/tmp/talos-i300-directory-full-preflight-unsandboxed.log`; its result is pending.
+
+Superseding directory-stage full gate: approved external session 20275 exited 0;
+`/tmp/talos-i300-directory-full-preflight-unsandboxed.log` ends
+`release preflight: passed`. Implementation `ed3d9e36` passes pinned locked
+workspace check, Clippy, tests/doctests (tools 941/941), both governance validators
+and both external Runtime SDK fixture modes. The earlier sandbox failure remains
+recorded separately. Publish this converged stage to #735 for native Windows
+verification; no final integration execution or T7/handoff completion is claimed.
