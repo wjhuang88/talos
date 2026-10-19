@@ -17,8 +17,8 @@ use thiserror::Error;
 
 use super::{SearchBackendId, SearchBackendResult};
 
-const MAX_BODY_BYTES: usize = 1_048_576;
-const MAX_FIELD_BYTES: usize = 16_384;
+pub(super) const MAX_BODY_BYTES: usize = 1_048_576;
+pub(super) const MAX_FIELD_BYTES: usize = 16_384;
 
 #[derive(Debug, Clone, Copy)]
 pub(super) enum DdgFormat {
@@ -51,6 +51,10 @@ impl fmt::Debug for DdgCandidates {
 }
 
 impl DdgCandidates {
+    pub(super) fn new(candidates: Vec<SearchBackendResult>) -> Self {
+        Self(candidates)
+    }
+
     /// These are untrusted candidates, not approved URLs or fetch destinations.
     pub(super) fn into_candidates(self) -> Vec<SearchBackendResult> {
         self.0

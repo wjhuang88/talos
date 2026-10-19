@@ -17,6 +17,7 @@ use thiserror::Error;
 mod transport;
 // Dormant response parsing prerequisite; activation still requires ADR-090 parity/D gates.
 mod ddg_parser;
+mod instant_answer;
 
 /// Backend identity retained across normalization and routing decisions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
