@@ -3337,14 +3337,27 @@ impl AddPlan {
             ])
             .env_clear()
             .envs(&self.environment);
-        self.run_command(command, std::time::Duration::from_secs(10), 256 * 1024)
+        let output = self
+            .run_command_output(command, std::time::Duration::from_secs(10), 256 * 1024)
             .await
             .map_err(|error| match error {
                 GitToolError::InvalidInput(_) => error,
                 _ => GitToolError::Git(
-                    "Git configuration inspection failed; configuration values withheld".into(),
+                    "Git configuration inspection runner failed; configuration values withheld"
+                        .into(),
                 ),
-            })
+            })?;
+        if !output.status.success() {
+            // Report only process metadata: stderr can contain configuration
+            // values, credentials and external paths, even on parse failure.
+            return Err(GitToolError::Git(format!(
+                "Git configuration inspection exited unsuccessfully (code={:?}, stdout_bytes={}, stderr_bytes={}); configuration values withheld",
+                output.status.code(),
+                output.stdout.len(),
+                output.stderr.len(),
+            )));
+        }
+        Ok(output.stdout)
     }
 
     async fn inspect_config_paths(&self, variable: &str) -> Result<Vec<PathBuf>, GitToolError> {

@@ -172,3 +172,20 @@ async fn push_program_rebind_rejects_changed_destination_plan() {
     );
     assert!(!receiver.exists());
 }
+
+#[tokio::test]
+async fn configuration_failure_reports_status_without_configuration_contents() {
+    let root = fixture();
+    let mut plan = prepare(root.path());
+    let invalid = root.path().join("invalid-config");
+    std::fs::write(&invalid, "[private]\ncredential=DO_NOT_DISCLOSE\n[broken\n")
+        .expect("invalid configuration");
+    plan.environment.insert("GIT_CONFIG_GLOBAL".into(), invalid.into_os_string());
+    let error = plan.inspect_config().await.expect_err("invalid configuration").to_string();
+    assert!(error.contains("exited unsuccessfully"), "{error}");
+    assert!(error.contains("code=Some("), "{error}");
+    assert!(error.contains("stderr_bytes="), "{error}");
+    assert!(!error.contains("DO_NOT_DISCLOSE"));
+    assert!(!error.contains("invalid-config"));
+    assert!(!error.contains("private"));
+}
