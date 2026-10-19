@@ -265,6 +265,7 @@ jobs:
             'git::git_write::prepared_add::tests::windows_program_guard_allows_real_git_startup',
             'git::git_write::prepared_add::tests::program_evidence_retains_windows_replacement_guard',
             'git::git_write::prepared_add::tests::sender_program_binding_requires_new_exact_read_admission',
+            'git::git_write::prepared_add::tests::sender_configuration_sources_remain_readable_after_rebinding',
             'git::git_write::prepared_add::tests::sender_program_binding_preserves_invocation_budget',
             'git::git_write::prepared_add::tests::windows_internal_program_report_matches_only_retained_canonical_spelling',
             'git::git_write::prepared_add::tests::internal_program_validation_distinguishes_unadmitted_path_from_target_drift',
