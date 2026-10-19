@@ -179,3 +179,9 @@ The next dormant prerequisite adds Instant Answer JSON parsing, preserving typed
 result ordering, limited cleanup and source/license provenance. Explicit count/depth/encoding
 limits differ from upstream and remain parity gates. I293 records validation and source delivery;
 no default activation, D admission or parent completion follows.
+
+#734 Instant Answer merged45cf9eb9 after CI3232 all6jobs and protected review/CAS6257354451.
+The next dormant prerequisite internalizes existing Bing CN response parsing, preserving
+per-row selectors, trim/cleanup/skip/dedup order and status/challenge classification with explicit
+encoding/bounds/scraper differences. This retains compound compatibility family identity only;
+I293 records source/license and validation. All request/integration/D/privacy/activation gates remain.

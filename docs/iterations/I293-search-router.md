@@ -10,7 +10,7 @@
 | Source Issue | #643 |
 | Depends on | Accepted ADR-085; SEARCH-001-B / #642 complete in #656; NET-001 boundary coordination |
 | Claim State | Claimed |
-| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 merged TLS/CONNECT subset; #716 merged bounded form/diagnostic stage at `b5b8241e`; #732 merged owned payload at `8fa2a50`; #733 merged Lite/HTML parsing at `dea3edc`; Instant Answer candidate delivery tracked from #643; full C/EP and default activation Pending |
+| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 merged TLS/CONNECT subset; #716 merged bounded form/diagnostic stage at `b5b8241e`; #732 merged owned payload at `8fa2a50`; #733 merged Lite/HTML parsing at `dea3edc`; #734 merged Instant Answer at `45cf9eb9`; Bing parser candidate delivery tracked from #643; full C/EP and default activation Pending |
 | Completion | Pending |
 
 ## Collaboration Claim
@@ -26,7 +26,7 @@
 | Governance Claim PR | #712 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer accepted bounded production scope 2026-10-13; independent protected security/API contract review, exact-head CI, governance validators, Issue reconciliation and final CAS required for #712 merge. No release or native admission authorized. |
-| Last Updated | 2026-10-18 |
+| Last Updated | 2026-10-19 |
 | Handoff / Release Condition | Original #664 claim effective at `d801790454e252699684253166984662ea9dab6a`; expanded scope effective only after #712 accepted-contract merge. Start implementation from that merge or later main; activation requires ADR-090 transport/parity/D gates. |
 
 ## Scope
@@ -1264,3 +1264,62 @@ Agent/account identity is not distinct-human approval. This prerequisite is read
 candidate Review; exact-local/remote review, native CI and final CAS remain merge gates.
 I293 stays Active/Claimed, Completion Pending; full C/EP/parity/D/privacy/root/rollback/activation
 remain gated. The source Issue index will record the actual candidate PR and exact evidence.
+
+## Merged Instant Answer / Dormant Bing Response Stage — 2026-10-19
+
+#734 merged45cf9eb98a0a90a1fc73d0d62ce75dbe78469519, sourceheadb1582f8a/treefd5d4058.
+CI3232/run39099268100 attempt1 all6jobs SUCCESS: Windows tools497/0failed/0ignored/0filtered,
+macOS tools495/0/0/0 include all17new fixtures; original socket/SDK2modes/fullpreflight and
+later gates pass. Protected source approval6245925720, final full-stage review/CAS6257354451
+and source delivery6257359977 record actual merged evidence. No historical failure is reclassified.
+This backfills actual #734 as partial C evidence, not parent completion.
+
+Selection base: main45cf9eb9. Effective I293/#712/ADR-090 claim verified before branch. Inventory:
+I293 Active continues existing-protocol internalization; I294 Active retains D research; I300
+Active retains structured Git/PERM-007-H boundaries; I302 Review retains #717; I277 Review retains
+deferred device/human checks; I249 Planned deferred, I164 Paused superseded. I301/I303/I304/I305
+remain Complete/Closed; historical I146/I147/I150 notes and I162 completed review outcome are not
+new nonterminal work. Open #705 owns timeout diagnostics; #735 owns I300/#704 Git and does not
+touch search_backend/I293. No claim/owner takeover or approval of either independent PR.
+
+Runnable deliverable: private dormant Bing CN response parser with synthetic HTML, closed errors,
+redacted candidates and bounded DOM/text traversal. Explicitly library-only: no HTTP/request
+factory/header/retry/Agent root/default change, new backend/API/dependency/lock/permission or release.
+Existing DuckDuckGo ID denotes the compound compatibility family, not Bing attribution or native
+admission. Affected reference: SEARCH-001-C-BING-RESPONSE-PARSER.md; DDG reference links it.
+
+Before deriving code, freshly downloaded0.1.2 archive06b90d9a9ad9e7e347c4cd85c3fb37189256703db4fab1d6c6fb963ae1eed0ee
+and verified VCS b30180a03609580e8b28dfb682284cb2ba249fba/crates/websearch. Archived src/bing.rs
+matches freshly retrieved pinned source SHA25673fe17e6156599bd0e0e109762f88bacf4b47d18024f5d7a3eb7e78dfb3334d0.
+Retained full tools-package MIT notice matches freshly retrieved pinned root notice (final LF only).
+Independent protected design preview APPROVE confirmed first-element/ordering/status/helper
+semantics, raw-href-before-trim bounds and family-ID limitation. No live provider query or result
+fixture was acquired, and source licensing is not D service-use/privacy admission.
+
+Workspace maintenance removed prior toolchain/cache; pinned Rust1.99.0 was restored from official
+manifest-checksummed packages. New candidate checks are required; no prior run becomes fresh
+validation. Focused fixtures, full preflight/test-Clippy, package inclusion, protected source/head
+review, native CI and final CAS follow. Full C/EP/parity/D/privacy/result admission/root/router/
+rollback/default activation remain pending; I293 stays Active/Claimed, Completion Pending.
+#643/#624/#717 stay open, #729 closed, #705/#735 remain independent.
+
+Fresh local convergence PASSED on pinned Rust1.99.0: locked full release_preflight,
+3777primary workspace tests plus1 existing exact-selection child,0failed/ignored; independent
+Runtime SDK default and coding modes pass. Focused Bing14/0 passed on its first run; network-feature
+test-target Clippy with -D warnings passes. Package --list includes Bing source/fixtures and the
+full MIT notice. Only the previously authorized socket fixture is locally filtered; the exact
+proxy child filters508siblings covered by the parent. Remote CI remains unfiltered, no new skip
+or ignored test. Workspace check/Clippy, site/installers/format, governanceSQL17/delivery12,
+claims0warnings,text23/0 and classifier14 pass. Scale remains high-risk/release-managed/on-demand,
+sources491/packages31/workflows4. No version/lock/dependency/API change or historical repair claim.
+
+Independent protected working-source/provenance review APPROVE found no blocking finding;
+parser blobd782bfdf16aabcc0b1ba2ff9e1ad6f5610d87745, fixtures134712d7d9325122528aa1ded502a1343db41368.
+Reviewer independently fetched/hash-checked pinned Bing source and root license; did not build or
+independently redownload the archive. Shared Agent/account identity is not distinct-human approval.
+The parent-module overview now accurately describes dormant infrastructure rather than only typed
+contracts; existing executable behavior is unchanged. The reference clarifies href bounds apply
+after DOM entity decoding, before trim. This prerequisite is ready for stable candidate Review;
+exact-local/remote review, native CI and final CAS remain required before deliberate merge.
+Parent I293 remains Active/Claimed, Completion Pending; the source Issue index will record the
+actual candidate PR/head/tree. No default activation, D admission or release follows.
