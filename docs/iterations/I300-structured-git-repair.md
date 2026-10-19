@@ -5144,3 +5144,29 @@ Locked all-feature configuration tests pass 29/29, Pull-focused tests pass
 the preceding full-workspace gate to this new implementation. Published
 `44b03138` remains under exact-head CI run 39201923094; do not restart that
 live run or treat its earlier-head result as approval of this signing change.
+
+Pull integration approval simplification (2026-10-19): hook candidate paths and
+the retained integration worktree/metadata scope now share one fresh plan.
+Path computation opens no hook contents. The consumer first consumes the new
+proof and validates the scope, then checks every exact hook Read token before
+capturing any hook. The obsolete PullIntegrationHooks state and its extra
+approval round are removed. Regressions cover stale proof, external candidate
+non-reading, missing exact hook Read despite granted scope, and completion of
+this local frontier in one admitted stage. Full Pull-focused tests pass 143/143
+and all-target/all-feature Clippy passes with warnings denied:
+`/tmp/talos-i300-coalesced-pull-tests.log`,
+`/tmp/talos-i300-coalesced-clippy.log`. Independent security review found no new
+blocker. This removes one local round, not proof of a complete eight-stage Pull;
+actual integration still stops at the existing no-mutation guard. Remaining
+external effects and the original T7 delivery acceptance are unchanged.
+
+Windows matrix result superseding the live-job checkpoint: job 117896536817
+in run 39201923094 failed the new matrix. With the same frozen environment/cwd,
+entry/default, entry/system and entry/local exit 0; internal/default exits 128
+(200 stdout/39 stderr bytes), internal/system exits 128 (0/102), and
+internal/local exits 128 (0/68). Both explicit global probes exit 128 (0/95).
+Evidence: `/tmp/talos-i300-windows-matrix.log`, fetched from the completed job
+API while other workflow jobs were still running. No stream contents or paths
+are published. This narrows investigation to internal executable rebinding or
+startup differences; it does not establish the underlying cause. Do not loosen
+identity checks or mark Windows complete on this evidence.

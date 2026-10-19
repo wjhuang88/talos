@@ -1,9 +1,7 @@
 #[tokio::test]
 async fn pull_child_completion_returns_hook_frontier_without_computation_only_approval() {
     let root = fixture();
-    let plan = AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
-        .expect("Pull");
-    let mut plan = Box::new(plan).discover().await.expect("configuration");
+    let mut plan = integration_scope_fixture(root.path()).await;
     plan.pull_integration = Some(super::super::pull_state::Integration::Merge {
         heads: vec!["1".repeat(40)],
         fast_forward: super::super::pull_state::FastForward::Allow,
@@ -29,9 +27,11 @@ async fn pull_child_completion_returns_hook_frontier_without_computation_only_ap
     assert!(next.permission_profile().iter().any(|facet| {
         facet.nature == ToolNature::Read && facet.resource.as_deref() == hook.to_str()
     }));
-    assert!(!next.permission_profile().iter().any(|facet| {
-        matches!(facet.nature, ToolNature::Write | ToolNature::Network)
+    assert!(next.permission_profile().iter().any(|facet| {
+        facet.nature == ToolNature::Write
+            && facet.resource.as_deref() == Some("git:pull-integration-worktree")
     }));
+    assert!(!next.permission_profile().iter().any(|facet| facet.nature == ToolNature::Network));
     let PreparedNormalStage::Complete(output) = next.execute_stage(Box::new(stale)).await else {
         panic!("child proof must not authorize hook reads")
     };
@@ -42,9 +42,7 @@ async fn pull_child_completion_returns_hook_frontier_without_computation_only_ap
 #[tokio::test]
 async fn pull_integration_hook_frontier_requires_a_new_plan_proof() {
     let root = fixture();
-    let plan = AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
-        .expect("Pull");
-    let mut plan = Box::new(plan).discover().await.expect("configuration");
+    let mut plan = integration_scope_fixture(root.path()).await;
     plan.pull_integration = Some(super::super::pull_state::Integration::Merge {
         heads: vec!["1".repeat(40)],
         fast_forward: super::super::pull_state::FastForward::Allow,
@@ -55,7 +53,7 @@ async fn pull_integration_hook_frontier_requires_a_new_plan_proof() {
     let plan = plan
         .discover_pull_integration_hooks()
         .expect("hook frontier");
-    assert!(plan.phase == Phase::PullIntegrationHooks);
+    assert!(plan.phase == Phase::PullIntegrationMutation);
     assert!(
         plan.pull_hook_paths
             .iter()
@@ -67,10 +65,8 @@ async fn pull_integration_hook_frontier_requires_a_new_plan_proof() {
             .any(|path| path.ends_with("post-merge"))
     );
     assert!(
-        !plan
-            .facets
-            .iter()
-            .any(|facet| matches!(facet.nature, ToolNature::Write | ToolNature::Network))
+        plan.facets.iter().any(|facet| facet.nature == ToolNature::Write
+            && facet.resource.as_deref() == Some("git:pull-integration-worktree"))
     );
     assert!(
         plan.pull_hook_evidence.is_empty(),
@@ -100,9 +96,7 @@ async fn pull_integration_hook_discovery_does_not_read_external_candidates() {
         .status()
         .expect("config");
     assert!(status.success());
-    let plan = AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
-        .expect("Pull");
-    let mut plan = Box::new(plan).discover().await.expect("configuration");
+    let mut plan = integration_scope_fixture(root.path()).await;
     // A directory cannot be captured as regular hook evidence. Discovery must
     // still succeed: this candidate has not received its own Read admission.
     std::fs::create_dir(outside.path().join("pre-rebase")).expect("candidate");
@@ -136,7 +130,7 @@ async fn pull_integration_hook_discovery_does_not_read_external_candidates() {
         "{}",
         output.result.content
     );
-    assert!(!root.path().join(".git/FETCH_HEAD").exists());
+    assert!(!root.path().join(".git/index").exists());
 }
 
 async fn integration_scope_fixture(root: &Path) -> Box<AddPlan> {
@@ -203,10 +197,49 @@ async fn pull_integration_scope_runs_through_admitted_continuations_without_muta
     let plan = integration_scope_fixture(root.path()).await
         .discover_pull_integration_hooks().expect("hook frontier");
     let before = std::fs::read(root.path().join(".git/FETCH_HEAD")).expect("before");
-    let output = execute_approved(*plan).await;
+    let admission = proof(&plan);
+    let PreparedNormalStage::Complete(output) = plan.execute_stage(Box::new(admission)).await else {
+        panic!("hook reads and integration scope must consume one stage, not another continuation")
+    };
     assert!(output.result.is_error);
     assert!(output.result.content.contains("Pull integration scope admitted"), "{}", output.result.content);
     assert_eq!(std::fs::read(root.path().join(".git/FETCH_HEAD")).expect("after"), before);
     assert!(!root.path().join(".git/index").exists());
     assert!(!root.path().join(".git/MERGE_HEAD").exists());
+}
+
+#[tokio::test]
+async fn pull_integration_scope_does_not_replace_exact_hook_read_admission() {
+    let root = fixture();
+    let mut plan = integration_scope_fixture(root.path())
+        .await
+        .discover_pull_integration_hooks()
+        .expect("combined frontier");
+    let hooks: Vec<_> = plan
+        .pull_hook_paths
+        .iter()
+        .map(|path| path.to_str().expect("path").to_owned())
+        .collect();
+    plan.facets.retain(|facet| {
+        !(facet.nature == ToolNature::Read
+            && facet
+                .resource
+                .as_ref()
+                .is_some_and(|resource| hooks.contains(resource)))
+    });
+    let admission = proof(&plan);
+    let PreparedNormalStage::Complete(output) = plan.execute_stage(Box::new(admission)).await
+    else {
+        panic!("worktree scope must not grant implicit hook reads")
+    };
+    assert!(output.result.is_error);
+    assert!(
+        output
+            .result
+            .content
+            .contains("hook frontier lacks fresh Read admission"),
+        "{}",
+        output.result.content
+    );
+    assert!(!root.path().join(".git/index").exists());
 }

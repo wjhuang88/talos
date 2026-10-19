@@ -134,8 +134,9 @@ impl AddPlan {
                 GitToolError::Git("Missing retained Pull integration configuration".into())
             })?
             .pull_integration_hook_paths(&self.repository, &self.environment, integration)?;
-        // Drop fetch/child Write and Network facets. This stage admits only
-        // integration hook reads, not integration mutation or hook execution.
+        // Hook paths are known without opening them. Co-publish their exact
+        // Read facets with the retained operation's integration scope rather
+        // than requiring another approval just to assemble that same plan.
         self.facets
             .retain(|facet| !matches!(facet.nature, ToolNature::Write | ToolNature::Network));
         for path in &paths {
@@ -147,9 +148,7 @@ impl AddPlan {
         }
         self.pull_hook_paths = paths;
         self.pull_hook_evidence.clear();
-        self.identity = PreparedPlanIdentity::new();
-        self.phase = Phase::PullIntegrationHooks;
-        Ok(self)
+        self.prepare_pull_integration_scope()
     }
 
     pub(super) fn capture_pull_integration_hooks(

@@ -219,7 +219,6 @@ enum Phase {
     PullChildConfiguration,
     PullChildFetch,
     PullIntegration,
-    PullIntegrationHooks,
     PullIntegrationMutation,
 }
 
@@ -5244,16 +5243,9 @@ impl PreparedNormalToolInvocation for AddPlan {
             Phase::PullIntegration => self.discover_pull_integration_hooks().map_err(|error| {
                 GitToolError::Git(format!("Pull integration effect discovery failed: {error}; fetched effects are retained; inspect repository before retrying"))
             }),
-            Phase::PullIntegrationHooks => {
-                if let Err(error) = self.capture_pull_integration_hooks(&authorizations) {
-                    return PreparedNormalStage::Complete(ToolExecutionOutput::error(format!(
-                        "Pull integration hook discovery failed: {error}; fetched effects are retained; inspect repository before retrying",
-                    )));
-                }
-                self.prepare_pull_integration_scope()
-            }
             Phase::PullIntegrationMutation => {
-                let result = self.validate_pull_integration_scope(&authorizations);
+                let result = self.validate_pull_integration_scope(&authorizations)
+                    .and_then(|()| self.capture_pull_integration_hooks(&authorizations));
                 return PreparedNormalStage::Complete(ToolExecutionOutput::error(match result {
                     Err(error) => format!("Pull integration admission failed: {error}; fetched effects are retained; inspect repository before retrying"),
                     Ok(()) => "Pull integration scope admitted; external-effect validation and supervised integration execution are not yet implemented; fetched effects are retained; inspect repository before retrying".into(),
