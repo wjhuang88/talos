@@ -398,6 +398,22 @@ fn compile_facets(
                         .as_deref()
                         .is_some_and(|path| Path::new(path).is_absolute())
             });
+        // Dedicated integration authority; generic Path grants remain exact.
+        // Runtime consumption additionally binds the actual worktree and stage.
+        let pull_integration_worktree =
+            matches!(facet.nature, ToolNature::Read | ToolNature::Write)
+                && resource_kind == ToolResourceKind::Remote
+                && facet.resource.as_deref() == Some("git:pull-integration-worktree")
+                && request.tool_name() == "git_pull"
+                && bound_git_command
+                && request.facets().iter().any(|root| {
+                    root.nature == facet.nature
+                        && root.resource_kind == Some(ToolResourceKind::Path)
+                        && root
+                            .resource
+                            .as_deref()
+                            .is_some_and(|path| Path::new(path).is_absolute())
+                });
         let pull_resolution = facet.nature == ToolNature::Read
             && resource_kind == ToolResourceKind::Remote
             && facet.resource.as_deref() == Some("git:pull-worktree-resolution")
@@ -422,6 +438,7 @@ fn compile_facets(
             && !receiver_metadata
             && !pull_metadata
             && !pull_resolution
+            && !pull_integration_worktree
         {
             return Err(GrantError::MissingResource(index));
         }
@@ -923,3 +940,7 @@ mod discovery_tests {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "grant_pull_integration_tests.rs"]
+mod pull_integration_tests;

@@ -4850,3 +4850,24 @@ The maintainer accepted dedicated one-Pull-integration worktree scope
 authorization on 2026-10-19. ADR-089 records the accepted boundary; compiler,
 executor and independent security validation remain required before activation.
 Production integration remains disabled.
+
+Pull integration capability compiler checkpoint (2026-10-19): implemented the
+closed `git:pull-integration-worktree` Read/Write facet for git_pull only, with
+matching-nature absolute Path root and absolute Execute Command prerequisites.
+The dedicated test file rejects other tools, missing roots/commands, relative
+roots/commands, nature mismatches, arbitrary scope names and Execute capability
+substitution. `cargo test --locked -p talos-permission` passes all 147 unit,
+11 integration and one doc tests (session 66438); locked all-target Clippy with
+`-D warnings` passes (session 2526). Generic Path compilation is unchanged.
+This is compiler preparation only: runtime worktree identity/stage consumption,
+external-effect discovery and supervised integration remain unfinished. No
+production activation or completed security review is claimed.
+Independent static security review by git_plan_review found no compiler-boundary
+blocker; it confirmed the capability remains Remote text and generic Path
+matching is unchanged. The reviewer did not rerun tests and explicitly requires
+runtime worktree/Git identity and stage binding before activation.
+Remote run 39185762993 on 0b42e580 is now terminal: Linux standard workspace
+validation, Linux Desktop explicit feature, installer and issue reconciliation
+passed. Windows workspace failed in Desktop auto-approval runtime testing before
+its Git-specific steps; native Windows Git execution remains unverified. This
+run predates the test separation and capability compiler changes.
