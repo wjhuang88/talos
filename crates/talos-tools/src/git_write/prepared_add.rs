@@ -7715,6 +7715,19 @@ impl PreparedNormalToolInvocation for AddPlan {
                 "Invalid discovery dispatch".into(),
             )),
         };
+        // Hook path discovery uses retained configuration only. Do it before
+        // returning the next plan instead of spending an admission stage on
+        // computation. Opening the candidates still requires the fresh hook
+        // frontier identity and its exact Read admissions.
+        let result = result.and_then(|plan| {
+            if plan.phase == Phase::PullIntegration {
+                plan.discover_pull_integration_hooks().map_err(|error| {
+                    GitToolError::Git(format!("Pull integration effect discovery failed: {error}; fetched effects are retained; inspect repository before retrying"))
+                })
+            } else {
+                Ok(plan)
+            }
+        });
         match result {
             Ok(plan) => PreparedNormalStage::Continue(plan),
             Err(error) => {

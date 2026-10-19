@@ -1,4 +1,45 @@
 #[tokio::test]
+async fn pull_child_completion_returns_hook_frontier_without_computation_only_approval() {
+    let root = fixture();
+    let plan = AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+        .expect("Pull");
+    let mut plan = Box::new(plan).discover().await.expect("configuration");
+    plan.pull_integration = Some(super::super::pull_state::Integration::Merge {
+        heads: vec!["1".repeat(40)],
+        fast_forward: super::super::pull_state::FastForward::Allow,
+        autostash: false,
+    });
+    // Resume after the selected-child configuration frontier has converged;
+    // no pending child fetch remains in this fixture.
+    plan.pull_config_sources_discovered = true;
+    plan.phase = Phase::PullChildConfiguration;
+    for capability in ["git:configuration-chain", "git:pull-repository-metadata"] {
+        plan.facets.push(ToolPermissionFacet::with_resource(
+            ToolNature::Read,
+            capability,
+            ToolResourceKind::Remote,
+        ));
+    }
+    let admitted = proof(&plan);
+    let stale = proof(&plan);
+    let hook = plan.repository.common_dir.join("hooks/pre-merge-commit");
+    let PreparedNormalStage::Continue(next) = plan.execute_stage(Box::new(admitted)).await else {
+        panic!("child completion must return the hook frontier")
+    };
+    assert!(next.permission_profile().iter().any(|facet| {
+        facet.nature == ToolNature::Read && facet.resource.as_deref() == hook.to_str()
+    }));
+    assert!(!next.permission_profile().iter().any(|facet| {
+        matches!(facet.nature, ToolNature::Write | ToolNature::Network)
+    }));
+    let PreparedNormalStage::Complete(output) = next.execute_stage(Box::new(stale)).await else {
+        panic!("child proof must not authorize hook reads")
+    };
+    assert!(output.result.is_error);
+    assert!(output.result.content.contains("does not authorize this plan"));
+}
+
+#[tokio::test]
 async fn pull_integration_hook_frontier_requires_a_new_plan_proof() {
     let root = fixture();
     let plan = AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
