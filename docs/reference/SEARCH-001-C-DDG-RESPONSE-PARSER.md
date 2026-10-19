@@ -134,3 +134,7 @@ query/title prefixes, byte bounds, encoding/status and redaction. Generated Unic
 do not claim proptest or an upstream differential run. Local validation and exact-head CI/review
 are recorded in I293 and the candidate PR. All previous activation gates remain effective;
 having three dormant DDG parsers does not establish complete DDG protocol or full C acceptance.
+
+The separate [dormant Bing compatibility response parser](SEARCH-001-C-BING-RESPONSE-PARSER.md)
+continues the same compound-family migration; it admits no native provider and leaves request,
+source/probe/retry, result admission and all activation gates effective.

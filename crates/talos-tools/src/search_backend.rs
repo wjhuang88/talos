@@ -1,6 +1,6 @@
 //! Private compatibility boundary for web-search backends.
 //!
-//! This module deliberately contains only typed contracts. The existing
+//! Typed contracts and dormant controlled compatibility infrastructure. The existing
 //! `WebSearchTool` remains the compatibility composition until SEARCH-001-C
 //! introduces Talos-owned routing behavior.
 //!
@@ -16,6 +16,7 @@ use thiserror::Error;
 // ADR-090's protocol/parity/D activation gates. Uses the existing staged seam.
 mod transport;
 // Dormant response parsing prerequisite; activation still requires ADR-090 parity/D gates.
+mod bing_parser;
 mod ddg_parser;
 mod instant_answer;
 
