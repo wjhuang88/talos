@@ -5208,3 +5208,14 @@ integration execution; those residuals remain owned here. The preceding full
 workspace gate does not cover this later change. Published head `4f8610cb` is
 under CI run 39205382544, confirmed running; do not restart it for this local
 increment.
+
+Pull test layout checkpoint (2026-10-19): split the 2,377-line prepared Pull
+test file into fetch command behavior, prefetch configuration, fetch admission,
+post-fetch selection, graph/source admission and rebase tests. The 31 existing
+test blocks and platform attributes are preserved; same-module includes retain
+their helpers and test names. Only separator blank lines at file ends changed.
+The original file is now 374 lines and each extracted file is at most 542 lines.
+Locked all-feature Pull tests remain 144/144 passing
+(`/tmp/talos-i300-split-pull-tests.log`); formatting and whitespace checks pass.
+This addresses test maintainability, not production Pull activation or T7
+completion. Integration/external-effect and native Windows residuals remain.

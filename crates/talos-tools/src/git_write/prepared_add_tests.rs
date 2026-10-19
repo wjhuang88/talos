@@ -104,6 +104,11 @@ include!("prepared_add_tests/checkout.rs");
 include!("prepared_add_tests/commit.rs");
 
 include!("prepared_add_tests/pull.rs");
+include!("prepared_add_tests/pull_prefetch.rs");
+include!("prepared_add_tests/pull_fetch_admission.rs");
+include!("prepared_add_tests/pull_postfetch.rs");
+include!("prepared_add_tests/pull_graph_admission.rs");
+include!("prepared_add_tests/pull_rebase.rs");
 
 include!("prepared_add_tests/pull_children.rs");
 
