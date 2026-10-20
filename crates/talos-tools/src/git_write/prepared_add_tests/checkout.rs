@@ -840,7 +840,7 @@ async fn checkout_target_hooks_wait_for_all_exact_read_tokens() {
                 assert_eq!(
                     output.result.is_error,
                     drift.is_some(),
-                    "{}",
+                    "drift={drift:?}: {}",
                     output.result.content
                 );
                 if let Some(kind) = drift {
