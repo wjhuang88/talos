@@ -912,9 +912,11 @@ async fn prepared_push_transfers_objects_to_admitted_git_daemon() {
     drop(listener);
     let daemon_log = tempfile::NamedTempFile::new().expect("daemon log");
     let mut daemon = tokio::process::Command::new("git")
-        // Fixture-only trace follows receive-pack child dispatch into the
-        // captured daemon stderr; production commands keep their trace policy.
+        // Fixture-only traces distinguish child dispatch from protocol progress.
+        // This isolated receiver contains only the fixed test payload, and the
+        // trace is printed only on failure; production trace policy is unchanged.
         .env("GIT_TRACE", "1")
+        .env("GIT_TRACE_PACKET", "1")
         .args([
             "daemon",
             "--verbose",
