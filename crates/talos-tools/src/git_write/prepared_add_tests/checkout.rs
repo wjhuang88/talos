@@ -1443,6 +1443,8 @@ async fn checkout_refuses_to_rewrite_effective_configuration_and_attributes() {
         git(&["config", "user.name", "Fixture"]);
         git(&["config", "user.email", "fixture@example.invalid"]);
         git(&["config", "commit.gpgSign", "false"]);
+        // Exercise preservation after native checkout has expanded line endings.
+        git(&["config", "core.autocrlf", "true"]);
         let (initial, changed) = if empty_include {
             ("", "[core]\n fsmonitor = touch marker\n")
         } else if kind != "core.attributesFile" {
@@ -1468,6 +1470,7 @@ async fn checkout_refuses_to_rewrite_effective_configuration_and_attributes() {
         }
         git(&["config", kind, source.to_str().expect("source path")]);
         git(&["config", "filter.evil.clean", "touch marker"]);
+        let source_before = std::fs::read(&source).expect("source before operation");
         let index = std::fs::read(root.path().join(".git/index")).expect("index");
         let plan = AddPlan::prepare_checkout(
             root.path(),
@@ -1482,7 +1485,7 @@ async fn checkout_refuses_to_rewrite_effective_configuration_and_attributes() {
             output.result.content
         );
         assert_eq!(git(&["branch", "--show-current"]), "base");
-        assert_eq!(std::fs::read_to_string(&source).expect("source"), initial);
+        assert_eq!(std::fs::read(&source).expect("source"), source_before);
         assert_eq!(
             std::fs::read(root.path().join(".git/index")).expect("index"),
             index
@@ -2302,17 +2305,18 @@ async fn checkout_tracked_file_to_gitlink_preserves_dirty_source() {
     git(&["config", "user.name", "Fixture"]);
     git(&["config", "user.email", "fixture@example.invalid"]);
     git(&["config", "submodule.recurse", "false"]);
+    git(&["config", "core.autocrlf", "true"]);
     std::fs::write(root.path().join("file"), b"[fixture]\n value = retained\n")
         .expect("config-compatible source");
     git(&["add", "file"]);
     git(&["commit", "-m", "base"]);
     git(&["branch", "base"]);
     let oid = git(&["rev-parse", "HEAD"]);
-    let original = std::fs::read(root.path().join("file")).expect("original");
     git(&["checkout", "-b", "linked"]);
     git(&["update-index", "--cacheinfo", "160000", &oid, "file"]);
     git(&["commit", "-m", "link"]);
     git(&["checkout", "base"]);
+    let original = std::fs::read(root.path().join("file")).expect("original");
     git(&["config", "include.path", "../file"]);
     let index_before = std::fs::read(root.path().join(".git/index")).expect("index");
     let plan = AddPlan::prepare_checkout(
