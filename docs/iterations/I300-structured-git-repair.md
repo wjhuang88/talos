@@ -93,6 +93,15 @@ The full permission suite was rerun successfully after the whitespace fix.
 
 ### Finite delivery packages
 
+P2 diagnostic checkpoint (2026-10-21): the isolated Git-daemon Push fixture now
+also captures packet tracing, distinguishing receive-pack dispatch from protocol
+progress. Only the fixed test receiver is traced; logs are surfaced on failure.
+The locked git-feature host regression passed 1/1 in 1.30 seconds. This does not
+establish the Windows timeout cause or validate a native fix; a native Windows
+run with this diagnostic is still required. Production policy, deadlines and
+Windows/Pull activation gates are unchanged. The incomplete auxiliary capture
+patch remains outside this test-only stage.
+
 These are execution packages inside I300, not five new Stories or revised acceptance.
 Each stays open until its exit evidence exists; none is complete at this checkpoint.
 
