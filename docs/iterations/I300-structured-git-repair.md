@@ -6413,3 +6413,14 @@ reads. Independent re-review has no blocker; MSVC xwin test-target check passes
 1/1 (/private/tmp/i300-shell-baseline-host.log). Candidate remains local while
 7036ddce CI 39444015640 runs. DLL/MSYS effects, native prepared Push and full
 Windows/Pull activation remain unproven; no completion claim.
+
+2026-10-20 Windows HOME startup regression: added a native-only shell fixture
+that places four startup sentinels in a temporary HOME, verifies all four are
+visible through that same shell's HOME expansion, and checks the fixed
+noninteractive command completes without executing the sentinels. Discovery and
+execution have ten-second deadlines and isolated child environments. Independent
+static review found no remaining blocker after adding the HOME visibility check.
+MSVC cargo xwin test-target checking passes (seven existing reduced-feature
+warnings); this is not native execution evidence or proof that startup files
+were never read. CI 39444015640 remains in progress at 7036ddce and does not
+contain this test or the local shell baseline. Production gates remain closed.
