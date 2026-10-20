@@ -5917,3 +5917,19 @@ gitlink, symlink and ancestor protection; native Windows evidence remains open.
 Initial linking failed for lack of space; previously authorized target/debug
 cleanup removed only examples outputs before successful rerun. Production
 Windows/Pull gates remain closed; this correction does not close T7.
+
+2026-10-20 Pull line-conversion checkpoint: a new dirty-autocrlf case reproduces
+native Windows' generic clean-worktree inspection error on macOS before the
+fix (`/private/tmp/i300-pull-autocrlf-before.log`). Successful diff output with
+change records now refuses as dirty even when Git also emits conversion
+warnings. Clean admission still requires empty stdout and stderr; diagnostics
+remain withheld. The rebase backend fixture compares complete worktree bytes
+against native checkout-index output rather than assuming LF regardless of
+configuration. Index/no-lock/no-FETCH_HEAD denial assertions remain intact.
+Pull-focused locked Git-feature tests pass 153/153, Clippy -D warnings and format
+pass. Windows MSVC test-target cargo xwin check passes with seven existing
+reduced-feature warnings; native Windows execution is still pending. Logs:
+`/private/tmp/i300-pull-autocrlf-suite.log`, `/private/tmp/i300-pull-autocrlf-clippy.log`,
+`/private/tmp/i300-pull-autocrlf-xwin.log`. Independent static security review
+found no blocker, no expanded clean admission and no diagnostic disclosure.
+Windows/Pull production gates and all original handoff requirements remain.

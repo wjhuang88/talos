@@ -690,7 +690,11 @@ impl AddPlan {
                 self.revalidate()?;
                 match output.status.code() {
                     Some(0) if output.stderr.is_empty() && output.stdout.is_empty() => {}
-                    Some(0) if output.stderr.is_empty() && !output.stdout.is_empty() => {
+                    // A successful diff with records proves the source is
+                    // dirty even when Git also warns about line conversion.
+                    // Refuse without exposing diagnostic contents. A clean
+                    // result still requires empty stdout and stderr above.
+                    Some(0) if !output.stdout.is_empty() => {
                         return Err(GitToolError::InvalidInput(
                             if cached {
                                 "Pull with rebase requires a clean index before fetch"

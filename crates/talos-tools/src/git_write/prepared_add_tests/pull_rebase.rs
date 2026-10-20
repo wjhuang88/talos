@@ -4,6 +4,7 @@ async fn pull_rebase_clean_probes_preserve_index_and_touch_semantics() {
         "clean",
         "touch",
         "dirty",
+        "dirty-autocrlf",
         "staged",
         "autostash",
         "pull-autostash",
@@ -37,6 +38,9 @@ async fn pull_rebase_clean_probes_preserve_index_and_touch_semantics() {
         git(&["config", "user.name", "Fixture"]);
         git(&["config", "user.email", "fixture@example.invalid"]);
         git(&["config", "commit.gpgSign", "false"]);
+        if state == "dirty-autocrlf" {
+            git(&["config", "core.autocrlf", "true"]);
+        }
         git(&["add", "file"]);
         git(&["commit", "-m", "base"]);
         git(&["config", "pull.rebase", "true"]);
@@ -99,7 +103,7 @@ async fn pull_rebase_clean_probes_preserve_index_and_touch_semantics() {
             .expect("mtime");
         } else if matches!(
             state,
-            "dirty" | "staged" | "autostash" | "pull-autostash" | "pull-no-autostash"
+            "dirty" | "dirty-autocrlf" | "staged" | "autostash" | "pull-autostash" | "pull-no-autostash"
         ) {
             std::fs::write(root.path().join("file"), "changed\n").expect("change");
             if state == "staged" {
@@ -203,7 +207,7 @@ async fn pull_rebase_clean_probes_preserve_index_and_touch_semantics() {
         let outcome = outcome.expect("bounded preparation");
         if matches!(
             state,
-            "dirty" | "staged" | "binary" | "deleted" | "mode" | "pull-no-autostash"
+            "dirty" | "dirty-autocrlf" | "staged" | "binary" | "deleted" | "mode" | "pull-no-autostash"
         ) {
             let error = outcome.expect_err("dirty source must refuse").to_string();
             assert!(
@@ -299,10 +303,14 @@ async fn pull_rebase_executes_divergent_history_with_each_backend() {
         git(&["add", "remote"]);
         git(&["commit", "-m", "remote"]);
         let target = git(&["rev-parse", "HEAD"]);
+        git(&["checkout-index", "--force", "--", "remote"]);
+        let expected_remote = std::fs::read(root.path().join("remote")).expect("native remote");
         git(&["reset", "--hard", &base]);
         std::fs::write(root.path().join("local"), "local\n").expect("local");
         git(&["add", "local"]);
         git(&["commit", "-m", "local"]);
+        git(&["checkout-index", "--force", "--", "local"]);
+        let expected_local = std::fs::read(root.path().join("local")).expect("native local");
         let original = git(&["rev-parse", "HEAD"]);
         let mut plan = integration_scope_fixture(root.path()).await;
         std::fs::write(
@@ -342,11 +350,11 @@ async fn pull_rebase_executes_divergent_history_with_each_backend() {
         assert_eq!(git(&["log", "-1", "--format=%s"]), "local");
         assert_eq!(
             std::fs::read(root.path().join("local")).expect("local"),
-            b"local\n"
+            expected_local
         );
         assert_eq!(
             std::fs::read(root.path().join("remote")).expect("remote"),
-            b"remote\n"
+            expected_remote
         );
         assert!(git(&["status", "--porcelain"]).is_empty());
     }
