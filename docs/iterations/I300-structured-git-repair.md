@@ -5896,3 +5896,7 @@ fixture session 87459 exited 0; its coding-feature consumer ran successfully
 (`/private/tmp/i300-sdk-resume.log`). This repairs the previously failed SDK
 subcheck only; final-source standard preflight and exact-head native validation
 are still required. Remaining disk space was 317 MiB at this checkpoint.
+Receiver bootstrap follow-up: the focused test completed 1/1 successfully
+(`/private/tmp/i300-receiver-bootstrap-test.log`), committed in `9421da53`;
+session 88143 above is historical, not a live wait. Governance and collaboration
+claim validators both pass with zero warnings for this evidence checkpoint.
