@@ -34,6 +34,63 @@ platform evidence. Soft: work-package order and candidate size may change on evi
 Assumption: existing authorization/evidence/process machinery can serve the remaining
 paths without a new general framework; verify this in P1 rather than designing one now.
 
+### P1 caller and authorization map — 2026-10-21
+
+- Sender discovery publishes auxiliary path Read facets in prepared_add.rs, but
+  those normalize spelling; they do not cover the full filesystem-order chain.
+- config_state auxiliary overlap helpers perform metadata/canonicalize/read_link;
+  capture_auxiliary then captures Entry bytes without a token parameter or retained
+  leaf identity. These are separate resolution/admission and evidence gaps.
+- execute_admitted captures before attribute probes and compares afterwards, but
+  further Checkout/receiver probes precede mutation. Final auxiliary evidence must
+  survive and be checked after those probes, immediately before spawn.
+- target_config::Sources checks its complete frontier before capture and retains
+  directory/regular evidence, but only for its own Checkout source set. It rejects
+  links and is not a general authorization for the auxiliary helpers.
+- Existing pull_resolution provides component/link/metadata-only handle machinery;
+  its current caller authority is Pull-pointer-only and its directory-target contract
+  must not be silently reused for file leaves or other operations.
+
+Independent reviewer git_plan_review confirmed the authority gap and the minimal
+separate capability on 2026-10-21. ADR-089 contains the concrete auxiliary resolution contract, accepted by the
+maintainer on 2026-10-21 through the explicit full-scope confirmation. Target configuration
+link support remains a distinct unaccepted proposal. No compiler/runtime activation
+has been made. Implement the accepted scope through actual callers; do not publish the incomplete
+capture patch as P1 closure. Independent Windows timeout diagnosis may continue.
+
+### P1 accepted capability compiler checkpoint — 2026-10-21
+
+The maintainer accepted the full auxiliary-resolution proposal. The permission
+compiler now recognizes only its fixed metadata Read capability for the five
+structured mutation tools with an absolute executable and source Read anchor.
+An actual negative test exposed generic Network/Remote acceptance of that name;
+the compiler now reserves it and rejects other natures rather than relying on
+the generic pair table. Independent review also caught trim-normalized Network/Internal spellings;
+reserved-name checking now matches compiler trimming and rejects padded variants.
+No prepared runtime publishes or consumes it yet.
+
+Tests cover missing/relative anchors, unrelated tools, wrong nature, unknown
+capability and changed tool/command/source set/input fingerprints. The existing
+and new discovery tests are in grant_discovery_tests.rs, keeping test code out
+of the production module. `cargo test -p talos-permission --locked` passes all
+148 unit, 11 integration and one doc test after the split. Existing Pull grants
+remain unchanged. Normalized fingerprints alone cannot distinguish original
+traversal spellings: runtime must bind the frozen source set to PreparedPlanIdentity.
+
+Remaining P1 work: reuse component resolver for file endpoints under the accepted
+capability, enforce at every real traversal call site, publish actual target/directory
+Read frontiers, retain shared budgets and identities across continuation/probes,
+and revalidate immediately before spawn. Preserve the eight-stage bound: fold
+resolution into an existing admitted discovery phase where possible; do not silently
+raise the limit or break ordinary local Push's existing eight-stage path. Native
+Windows and production-chain review/activation still follow the package exit gates.
+
+Fetch completed with no upstream-only main commits (322 local-only at e67a654d),
+so no rebase was needed. The auxiliary capture patch remains uncommitted and is
+not evidence of P1 closure. Both governance validators pass with zero warnings, formatting/diff checks pass,
+and final independent static review found no remaining compiler-stage blocker.
+The full permission suite was rerun successfully after the whitespace fix.
+
 ### Finite delivery packages
 
 These are execution packages inside I300, not five new Stories or revised acceptance.
