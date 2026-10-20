@@ -5933,3 +5933,24 @@ reduced-feature warnings; native Windows execution is still pending. Logs:
 `/private/tmp/i300-pull-autocrlf-xwin.log`. Independent static security review
 found no blocker, no expanded clean admission and no diagnostic disclosure.
 Windows/Pull production gates and all original handoff requirements remain.
+
+
+2026-10-20 Windows refusal-fixture checkpoint: two Checkout assertions now
+expect the earlier executable-hook refusal on Windows, consistent with its
+ordinary-file hook semantics. All no-write, HEAD/index/worktree and hook
+non-execution assertions remain. Recursive Pull child identity failures now
+include fixture mode and original error; no production comparison changed.
+Checkout tests pass 49/49 and cargo xwin MSVC test-target checking passes
+(existing seven reduced-feature warnings); independent static review finds
+no blocker. Logs: /private/tmp/i300-windows-hook-expectations.log and
+/private/tmp/i300-windows-hook-expectations-xwin.log. Full standard preflight
+38211 terminated 101 at talos-cli linking with ENOSPC, not a test assertion.
+Previously authorized cleanup removed only target/debug/examples; full retry
+81834 terminated 101: test execution found a corrupted, non-executable
+3,920-byte todo_presentation_chain artifact after objcopy ENOSPC warnings
+(/private/tmp/i300-stage-final-preflight-retry.log). This is not a test
+assertion failure. Authorized target/debug cleanup removes rebuildable
+artifacts before a fresh standard preflight; Windows target outputs remain.
+Both governance validators pass with zero warnings. No final pass is claimed.
+Windows production/Pull gates remain closed; native Windows, child Checkout,
+recursive Pull integration and original delivery requirements remain open.

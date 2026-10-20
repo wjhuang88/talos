@@ -470,7 +470,7 @@ async fn pull_child_fetch_has_own_write_stage_and_rebuilds_graph() {
                 .expect("identity proof");
             plan = plan
                 .discover_pull_child_identity(&tokens)
-                .expect("identity");
+                .unwrap_or_else(|error| panic!("{mode}: child identity: {error}"));
         }
         for _ in 0..8 {
             if plan.phase != Phase::PullChildConfiguration {

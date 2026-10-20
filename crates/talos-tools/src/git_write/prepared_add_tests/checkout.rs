@@ -548,7 +548,11 @@ async fn checkout_target_tree_cannot_create_or_replace_late_hook() {
             output
                 .result
                 .content
-                .contains("Checkout rewrites an effective configuration or auxiliary source"),
+                .contains(if cfg!(windows) && existing {
+                    "Target checkout hook execution is not bound"
+                } else {
+                    "Checkout rewrites an effective configuration or auxiliary source"
+                }),
             "{}",
             output.result.content
         );
@@ -843,6 +847,8 @@ async fn checkout_target_hooks_wait_for_all_exact_read_tokens() {
                     assert!(
                         output.result.content.contains(if kind != "hook" {
                             "Target Git configuration sources changed"
+                        } else if cfg!(windows) {
+                            "Target checkout hook execution is not bound"
                         } else {
                             "Target checkout hook evidence changed"
                         }),
