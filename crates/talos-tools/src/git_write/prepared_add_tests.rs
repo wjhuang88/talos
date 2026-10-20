@@ -103,6 +103,17 @@ fn fixture() -> tempfile::TempDir {
     root
 }
 
+// Git daemon concatenates base-path with the URL's slash-prefixed path and
+// compares the result byte-for-byte with its export list, even on Windows.
+fn daemon_fixture_path(path: &Path) -> String {
+    let text = path.to_str().expect("fixture path");
+    if cfg!(windows) {
+        text.replace('\\', "/")
+    } else {
+        text.to_owned()
+    }
+}
+
 fn prepare(root: &Path) -> AddPlan {
     AddPlan::prepare(
         root,

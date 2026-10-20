@@ -806,9 +806,9 @@ async fn prepared_push_transfers_objects_to_admitted_git_daemon() {
         .arg(format!("--port={port}"))
         .arg(format!(
             "--base-path={}",
-            receiver.path().parent().expect("parent").display()
+            daemon_fixture_path(receiver.path().parent().expect("parent"))
         ))
-        .arg(receiver.path())
+        .arg(daemon_fixture_path(receiver.path()))
         .kill_on_drop(true)
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())

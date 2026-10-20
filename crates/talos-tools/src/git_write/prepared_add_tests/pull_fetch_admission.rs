@@ -93,9 +93,9 @@ async fn pull_network_fetch_continuation_requires_fresh_admission() {
         .arg(format!("--port={port}"))
         .arg(format!(
             "--base-path={}",
-            remote.path().parent().expect("parent").display()
+            daemon_fixture_path(remote.path().parent().expect("parent"))
         ))
-        .arg(remote.path())
+        .arg(daemon_fixture_path(remote.path()))
         .kill_on_drop(true)
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())

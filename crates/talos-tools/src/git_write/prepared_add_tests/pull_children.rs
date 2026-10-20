@@ -309,8 +309,8 @@ async fn pull_child_fetch_has_own_write_stage_and_rebuilds_graph() {
             "--export-all",
         ])
         .arg(format!("--port={port}"))
-        .arg(format!("--base-path={}", remote.path().display()))
-        .arg(remote.path())
+        .arg(format!("--base-path={}", daemon_fixture_path(remote.path())))
+        .arg(daemon_fixture_path(remote.path()))
         .kill_on_drop(true)
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
