@@ -4548,3 +4548,18 @@ before restarting. Windows MSVC test-target cargo xwin check exited 0 (session
 warnings). This is not native Windows evidence. target/debug cleanup recovered
 about 10 GiB; production Windows and Pull remain disabled. No final preflight
 pass, T7 completion or subsequent-task activation is claimed by this checkpoint.
+
+
+2026-10-20 clean stage validation: standard release preflight session 41606
+exited 0 at implementation commit 02afc11f. The log
+/private/tmp/i300-stage-clean-preflight.log ends `release preflight: passed`:
+locked workspace check/Clippy/tests/doctests, tools 963/963, governance/claims
+and both independent Runtime SDK consumer modes pass. Windows MSVC test-target
+xwin checking also passed; native Windows execution is still pending. Fresh
+origin fetch finds zero main-only commits; no further rebase is needed. Remote
+feature head remains 77a8cf8412f5c4d01785454311a5580ef60f6ffb; patch-equivalence
+comparison finds no remote-only patch missing locally after the earlier rebase.
+Publish this stable candidate with an explicit lease on that feature head,
+then collect fresh native CI. Windows/Pull production gates, initialized-child
+Checkout, recursive Pull integration, independent delivery review and every
+remaining handoff task remain open; this is not completion evidence for T7.
