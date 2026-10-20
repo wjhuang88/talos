@@ -95,8 +95,12 @@ fn child_startup_layout_matches_native_selection_rules() {
                 String::from_utf8_lossy(&output.stderr)
             );
             assert_eq!(
-                PathBuf::from(String::from_utf8(output.stdout).expect("UTF8").trim()),
-                expected.iter().next().unwrap_or(&worktree).clone(),
+                PathBuf::from(String::from_utf8(output.stdout).expect("UTF8").trim())
+                    .canonicalize()
+                    .expect("native worktree identity"),
+                expected.iter().next().unwrap_or(&worktree)
+                    .canonicalize()
+                    .expect("expected worktree identity"),
                 "{case}"
             );
         }
