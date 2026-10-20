@@ -6226,3 +6226,26 @@ check exits 0 (/private/tmp/i300-admission-fixtures-xwin-final.log), with seven
 existing reduced-feature warnings. Production identity code and gates unchanged.
 CI 39383710845 tests the preceding published head 260e9228 and remains running;
 it does not contain this fixture follow-up. T7 and all later tasks remain open.
+
+
+2026-10-20 include ancestor preservation checkpoint: relative configuration
+includes now retain cancelled ancestors when their source uses a Windows verbatim
+root. Raw spelling concatenation avoids PathBuf join normalization; Windows
+relative separators are normalized before component inspection. Root-relative
+and drive-relative ambiguous includes are refused. Absolute includes retain the
+existing path. Tests cover both Windows separators, ParentDir retention and
+ancestor inventory. Independent static security review found no blocking issue;
+native Windows confirmation remains pending.
+Config-state host regressions pass 33/33 and the Checkout exact-read/ancestor
+replacement regression passes 1/1. Final cargo xwin MSVC test-target check exits 0
+with seven existing reduced-feature warnings. Evidence:
+/private/tmp/i300-include-config-tests-current.log,
+/private/tmp/i300-include-hook-current.log and
+/private/tmp/i300-include-final-xwin.log. This is not native execution evidence.
+CI 39383710845 at 260e9228 is terminal: Windows tools 895 passed / 6 failed;
+other jobs passed. This supersedes the preceding running-state observation.
+Remaining Windows failures concern Checkout stage budget, include ancestor
+identity, rebase unstaged-change detection, receiver shell support, post-fetch
+handle lifetime and daemon timeout. The local include and handle-lifetime fixes
+still need native confirmation. Production Windows/Pull remain disabled; T7 and
+all subsequent handoff tasks remain open.
