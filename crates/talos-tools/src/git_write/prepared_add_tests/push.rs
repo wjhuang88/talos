@@ -800,9 +800,11 @@ async fn prepared_push_transfers_objects_to_admitted_git_daemon() {
     let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("port");
     let port = listener.local_addr().expect("address").port();
     drop(listener);
+    let daemon_log = tempfile::NamedTempFile::new().expect("daemon log");
     let mut daemon = tokio::process::Command::new("git")
         .args([
             "daemon",
+            "--verbose",
             "--reuseaddr",
             "--listen=127.0.0.1",
             "--export-all",
@@ -816,7 +818,7 @@ async fn prepared_push_transfers_objects_to_admitted_git_daemon() {
         .arg(daemon_fixture_path(receiver.path()))
         .kill_on_drop(true)
         .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
+        .stderr(daemon_log.reopen().expect("daemon log writer"))
         .spawn()
         .expect("daemon");
     tokio::time::timeout(std::time::Duration::from_secs(5), async {
@@ -890,7 +892,14 @@ async fn prepared_push_transfers_objects_to_admitted_git_daemon() {
     let next = finish_push_program_approved(next).await;
     let admission = proof(&next);
     let output = next.execute(Box::new(admission)).await;
-    assert!(!output.result.is_error, "{}", output.result.content);
+    assert!(
+        !output.result.is_error,
+        "{}; daemon_state={:?}; receiver_ref_written={}; daemon_log={}",
+        output.result.content,
+        daemon.try_wait().expect("daemon state"),
+        receiver.path().join("refs/heads/approved").exists(),
+        std::fs::read_to_string(daemon_log.path()).expect("daemon diagnostics")
+    );
     assert_eq!(
         git(receiver.path(), &["rev-parse", "refs/heads/approved"]),
         expected
