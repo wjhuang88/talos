@@ -10,7 +10,7 @@
 | Source Issue | #643 |
 | Depends on | Accepted ADR-085; SEARCH-001-B / #642 complete in #656; NET-001 boundary coordination |
 | Claim State | Claimed |
-| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 merged TLS/CONNECT subset; #716 merged bounded form/diagnostic stage at `b5b8241e`; #732 merged owned payload at `8fa2a50`; #733 merged Lite/HTML parsing at `dea3edc`; #734 merged Instant Answer at `45cf9eb9`; #736 merged Bing parsing at `2b015a6b`; #737 merged fixed requests at `ae6a0791`; #738 merged bound execution at `2d7f4b36`; fixed header candidate tracked from #643; full C/EP and default activation Pending |
+| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 merged TLS/CONNECT subset; #716 merged bounded form/diagnostic stage at `b5b8241e`; #732 merged owned payload at `8fa2a50`; #733 merged Lite/HTML parsing at `dea3edc`; #734 merged Instant Answer at `45cf9eb9`; #736 merged Bing parsing at `2b015a6b`; #737 merged fixed requests at `ae6a0791`; #738 merged bound execution at `2d7f4b36`; #739 merged fixed headers at `91c330ba`; result admission candidate tracked from #643; full C/EP and default activation Pending |
 | Completion | Pending |
 
 ## Collaboration Claim
@@ -1606,3 +1606,64 @@ This dormant library prerequisite enters stable-candidate Review. Exact-local/re
 review, terminal unfiltered native CI and fresh final CAS remain required before merge. Actual
 PR/head/tree delivery will be indexed from #643. I293 remains Active/Claimed, Completion Pending;
 full C/EP/parity/D/privacy/root/router/rollback/default activation and release remain gated.
+
+## Merged Fixed Headers / Dormant Result Admission — 2026-10-20
+
+#739 merged91c330ba557234070b996775289849f54267e603; sourcee6e762f7/tree5352859b.
+CI3279/run39378524613 attempt1 all6jobs SUCCESS. Windows tools539/0failed/0ignored/0filtered,
+macOS537/0/0/0 include all7new/enhanced fixtures; actual original socket, SDK default/coding,
+standard preflight and all later gates PASS. LinuxDesktop112/0/0/0. Protected source6284613113,
+terminal review/freshCAS6285079987 and merged delivery6285092167 establish this partial stage.
+Actual merge tree80b2f6b0f23aa19cd59c7270f45dcf4e4966c085 matches clean computed integration,
+preserving unrelated provider-doc advancement at1a469954. No prior failures are reclassified.
+
+Fresh base/main91c330ba; effective#712/ADR090 actor and Work Slice remain unchanged before
+branch creation. Full current iteration inventory: I293 Active continues C; I294 Active retains D;
+I300 Active retains Git; I277 Review retains deferred human/device rows; I302 Review retains#717;
+I249 Planned deferred; I164 Paused/superseded. Historical I146/I147/I150 notes do not reactivate
+those tasks; I301/I303/I304/I305 remain Complete/Closed. Independent#735 drafthead260e92281d8190c4cbb1fa3ca93207aeb557031b
+has125files across2pages; #705head5848f8992457c72e13a48b7c2791635b6326453e has4diagnosticfiles.
+Fresh full changed-path checks find no search_backend/I293/SEARCH-C overlap. No other owner is
+taken over or approved, #705 stays open/unmerged and#729 stays closed.
+
+Runnable library-only deliverable: consuming fixed compatibility execution now returns an opaque,
+redacted, URL-admissible display-result wrapper. It parses at most20 candidates, checks the whole
+batch's count/field/backend bounds, filters URLs, then truncates to captured requested count1..20.
+This prevents invalid leading candidates from concealing later usable results inside that window.
+It does not scan beyond20, deduplicate further, confer fetch/rendering/SSRF authority or establish
+full protocol/service parity. Existing family DuckDuckGo identity is retained for all4formats.
+
+Protected design preview APPROVE requires complete trailing-bound/identity checks, guarded WHATWG
+URL parsing, preserved fields/order, shared pre/post parse/admission and final deadline fences,
+including errors. URL acceptance requires parsed absolute HTTP/HTTPS with host, empty parsed
+username and no password; an empty userinfo marker may be discarded by WHATWG. Repairs and
+original display text are explicit limitations. Bounds20input/20output,
+8192URLbytes and16384bytes each title/snippet are internal candidate limits, not accepted default
+activation policy, caller allocation caps or hard synchronous CPU/memory bounds. No new clock,
+authority, HTTP retry/source fallback, dependency, public API/model schema or permission change.
+
+Affected reference: SEARCH-001-C-COMPATIBILITY-ADMISSION.md and bound-execution reference. No
+official root calls this dormant code. Exact implementation review, local locked validation,
+stable publication, unfiltered native CI and final CAS remain required. Full C/EP/parity/D/privacy,
+roots/router/health/cancellation/rollback/default activation and release remain Pending.
+
+Fresh local convergence PASSED on pinned Rust1.99.0: focused locked network transport tests
+88passed/0failed/0ignored/227filtered, plus existing separate child reexecution1passed/314filtered.
+All8new fixtures and enhanced existing tests PASS. Strict network-test-target Clippy exits0;
+standard locked release_preflight.sh exits0 with actual release preflight: passed and terminal
+exit0 journal markers, workspace check/strict Clippy/tests/doctests and SDK default/coding PASS.
+Tools545/0failed/0ignored/0filtered. No source/test failure or retry occurred. Only the pre-existing
+authorized local runtime socket filter is used; remote exact-head native CI must run it unfiltered.
+Preflight journal SHA256:
+a9a4b4585b39b65e0b8677b697ec6444464a9b33a0c855050f7a4194ccbb0b5f.
+
+Governance SQLite17/delivery12/0warnings and claims0warnings passed within standard preflight.
+Format/whitespace, locked offline package inclusion of both admission modules and complete MIT
+notice pass. Scale498sources/31packages/4workflows remains high-risk/release-managed/on-demand.
+The admission code is Talos-authored; existing licensed parser/source provenance is unchanged.
+Independent protected working-source review APPROVE has no blockers and names frozen blobs:
+compatibilityff3a2545, executiontests642a0545, admissiondb8ff4b1 and admissiontestsc1989ffc.
+Its nonblocking empty-userinfo wording clarification was applied to docs, without source changes.
+Fresh main remains91c330ba. Final owner synchronization, staged review, exact-local/remote approval,
+terminal native CI and fresh CAS follow. This is stable-candidate Review only; I293 remains
+Active/Claimed, Completion Pending, #643/#624 OPEN and all remaining activation gates intact.
