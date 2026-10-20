@@ -633,6 +633,16 @@ T7 remains Active; later serial tasks and publication gates remain incomplete.
 
 # Iteration I300: Structured Git Permission And Diff Repair
 
+2026-10-20 verified auxiliary-parent stage: standard `release_preflight.sh`
+completed with exit 0 on c9167926 (session 49895), including workspace tests and
+both external Runtime SDK consumer modes. Log:
+`/private/tmp/i300-aux-parent-preflight.log`. The sandbox early-exit test and all
+48 sandbox tests passed in this full run; this does not establish the cause of
+the earlier intermittent failure. Fresh fetch has zero main-only commits.
+Native Windows run 39401797353 is still executing its workspace tests and does
+not contain c9167926. Publish the stable stage for native confirmation without
+claiming Windows activation, Pull delivery or completion of T7.
+
 2026-10-20 Windows auxiliary-parent candidate: verbatim include paths now
 resolve each `..` only after checking that its cancelled ancestor is an existing
 directory. Original ancestor spellings remain in the auxiliary inventory;
