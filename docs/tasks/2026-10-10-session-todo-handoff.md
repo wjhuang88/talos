@@ -4886,3 +4886,18 @@ not T7 completion. Final independent static review found no blocking issue;
 final MSVC test-target xwin checking passed
 (/private/tmp/i300-shell-final-xwin.log), with seven existing warnings. Both
 governance validators passed with zero warnings. Ready for stage commit.
+
+2026-10-20 current-state correction: the shell-selection stage is committed as
+67112a30. Its subsequent full preflight failed the sandbox early-exit input test
+with unconfirmed cleanup; focused and full sandbox-library retries pass (48/48),
+but the root cause is not established. Added test-only receipt diagnostics.
+The Windows auxiliary-parent candidate preserves cancelled-ancestor inventory,
+requires each cancelled ancestor to exist as a directory, and adds missing/file
+ancestor refusal coverage. Host config-state tests pass 31/31; locked cargo xwin
+MSVC test-target checking passes with seven existing warnings. Independent
+security review found no blocking issue; native Windows evidence is still
+pending. Checkout hook exact-read regression passes 1/1. A volume-root parent
+regression was added after review; final locked MSVC compilation passes. Both
+governance validators pass with zero warnings. Remote run
+39401797353 remains live, not failed or restarted. No production activation,
+T7 completion or advancement of the later serial tasks is claimed.
