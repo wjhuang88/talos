@@ -616,6 +616,61 @@ async fn receiver_command_quotes_executable_and_carries_foreground_settings() {
     assert!(receiver_command(Path::new("relative-git")).is_err());
 }
 
+#[cfg(windows)]
+#[tokio::test]
+async fn windows_receiver_command_executes_special_path_without_shell_injection() {
+    let executable = std::env::current_exe().expect("test executable");
+    let root = tempfile::tempdir_in(executable.parent().expect("executable directory"))
+        .expect("same-volume fixture");
+    let environment = execution_environment();
+    let directory = root.path().join("Git ' ; touch injected ; # 目录");
+    std::fs::create_dir(&directory).expect("directory");
+    let program = directory.join("git.exe");
+    // Use the native test executable so this checks shell dispatch without
+    // copying a Git installation's runtime DLLs or changing machine state.
+    std::fs::hard_link(&executable, &program)
+        .expect("fixture executable");
+    let program = program.canonicalize().expect("canonical program");
+    let expected = tokio::process::Command::new(&program)
+        .current_dir(root.path())
+        .env_clear()
+        .envs(&environment)
+        .args([
+            "-c", "maintenance.autoDetach=false", "-c", "gc.autoDetach=false", "receive-pack",
+        ])
+        .kill_on_drop(true)
+        .output();
+    let expected = tokio::time::timeout(std::time::Duration::from_secs(10), expected)
+        .await.expect("direct deadline").expect("direct execution");
+    assert!(!expected.status.success());
+    assert!(!expected.stderr.is_empty(), "test harness rejects Git arguments");
+    let git = resolve_git(&environment).expect("Git");
+    let shell = tokio::process::Command::new(git)
+        .current_dir(root.path())
+        .env_clear()
+        .envs(&environment)
+        .args(["var", "GIT_SHELL_PATH"])
+        .kill_on_drop(true)
+        .output();
+    let shell = tokio::time::timeout(std::time::Duration::from_secs(10), shell)
+        .await.expect("discovery deadline").expect("shell discovery");
+    assert!(shell.status.success());
+    let shell = String::from_utf8(shell.stdout).expect("shell path");
+    let actual = tokio::process::Command::new(shell.trim())
+        .current_dir(root.path())
+        .env_clear()
+        .envs(&environment)
+        .args(["-c", &receiver_command(&program).expect("receiver command")])
+        .kill_on_drop(true)
+        .output();
+    let actual = tokio::time::timeout(std::time::Duration::from_secs(10), actual)
+        .await.expect("shell deadline").expect("shell execution");
+    assert_eq!(actual.status.code(), expected.status.code());
+    assert_eq!(actual.stdout, expected.stdout);
+    assert_eq!(actual.stderr, expected.stderr);
+    assert!(!root.path().join("injected").exists());
+}
+
 #[cfg(unix)]
 #[test]
 fn receiver_child_executable_binds_link_target_and_identical_replacement() {
