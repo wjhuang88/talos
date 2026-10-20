@@ -4856,3 +4856,14 @@ no main-only commits. Native Windows confirmation is still required for the four
 candidate corrections; receiver shell support and daemon timeout remain open.
 Production Windows/Pull remain disabled. T7 and the later handoff queue remain
 incomplete; this checkpoint supplies stage validation, not completion evidence.
+
+
+2026-10-20 daemon diagnostic checkpoint: the real network Push fixture now
+retains verbose daemon stderr in a temporary file and includes daemon exit state
+and receiver-ref presence in its failure assertion. This distinguishes receiver
+progress from client timeout without changing production behavior or deadlines.
+Host regression with --features git passed 1/1
+(/private/tmp/i300-daemon-diagnostics-git-test.log). The preceding default-feature
+command ran zero relevant tests and is not validation evidence. Windows native
+timeout remains unresolved. Published e532e7a0 CI 39399935245 is still running;
+this diagnostic is a later local test-only change, not part of that CI head.
