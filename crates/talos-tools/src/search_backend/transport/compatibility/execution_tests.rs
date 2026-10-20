@@ -54,7 +54,7 @@ fn prepared(protocol: CompatibilityProtocol, query: &str, max: u32) -> PreparedC
         .expect("fixed factory")
 }
 
-fn body(protocol: CompatibilityProtocol) -> Vec<u8> {
+pub(super) fn body(protocol: CompatibilityProtocol) -> Vec<u8> {
     match protocol {
         CompatibilityProtocol::Lite => b"<table><tr><td><a class='result-link' href='https://first.invalid/'>First</a></td></tr><tr><td class='result-snippet'>one</td></tr><tr><td><a class='result-link' href='https://second.invalid/'>Second</a></td></tr></table>".to_vec(),
         CompatibilityProtocol::Html => b"<div><a class='result__a' href='https://first.invalid/'>First</a><a class='result__snippet'>one</a></div><div><a class='result__a' href='https://second.invalid/'>Second</a></div>".to_vec(),

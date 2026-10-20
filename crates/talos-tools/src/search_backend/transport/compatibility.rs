@@ -8,6 +8,7 @@
 //! Fixed UA/language snapshots remain dormant; retries/source/default activation gated.
 
 mod admission;
+pub(in crate::search_backend) mod chain;
 pub(super) mod headers;
 
 use crate::search_backend::{SearchBackendId, bing_parser, ddg_parser, instant_answer};
@@ -115,7 +116,7 @@ fn finish_response(
     admitted
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(in crate::search_backend) enum CompatibilityProtocol {
     Lite,
     Html,
@@ -201,6 +202,17 @@ impl CompatibilityProtocol {
         query: &str,
         select: impl FnOnce() -> &'static str + std::panic::UnwindSafe,
     ) -> Result<PreparedTransportRequest, TransportError> {
+        let mut request = self.prepare_payload(manifest, query)?;
+        request.headers = Some(headers::CompatibilityHeaders::capture(self, select)?);
+        Ok(request)
+    }
+
+    // Chain preparation validates every payload before selecting any header snapshots.
+    fn prepare_payload(
+        self,
+        manifest: &ToolNetworkManifest,
+        query: &str,
+    ) -> Result<PreparedTransportRequest, TransportError> {
         if query.len() > 16_384 || query.trim().is_empty() {
             return Err(TransportError::InvalidRequest);
         }
@@ -232,10 +244,7 @@ impl CompatibilityProtocol {
             ));
             None
         };
-        let mut request =
-            PreparedTransportRequest::new(manifest, url, method, body, BodyFormat::Form)?;
-        request.headers = Some(headers::CompatibilityHeaders::capture(self, select)?);
-        Ok(request)
+        PreparedTransportRequest::new(manifest, url, method, body, BodyFormat::Form)
     }
 }
 

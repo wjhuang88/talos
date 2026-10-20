@@ -243,11 +243,11 @@ async fn denied_form_scope_and_expired_budget_do_not_resolve_or_start() {
 }
 
 /// Owned local socket fixture: no upstream service, region or real credential.
-struct Server {
+pub(super) struct Server {
     port: u16,
     stop: Arc<AtomicBool>,
-    accepted: Arc<AtomicUsize>,
-    closed: Arc<AtomicUsize>,
+    pub(super) accepted: Arc<AtomicUsize>,
+    pub(super) closed: Arc<AtomicUsize>,
     read_errors: Arc<Mutex<Vec<std::io::ErrorKind>>>,
     read_error_count: Arc<AtomicUsize>,
     requests: Arc<Mutex<Vec<Vec<u8>>>>,
@@ -255,7 +255,7 @@ struct Server {
 }
 
 impl Server {
-    fn new(responses: Vec<String>) -> Self {
+    pub(super) fn new(responses: Vec<String>) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").expect("loopback fixture");
         listener.set_nonblocking(true).expect("nonblocking");
         let port = listener.local_addr().expect("address").port();
@@ -380,14 +380,14 @@ impl Server {
             worker: Mutex::new(Some(worker)),
         }
     }
-    fn url(&self, path: &str) -> Url {
+    pub(super) fn url(&self, path: &str) -> Url {
         Url::parse(&format!(
             "http://search-fixture.invalid:{}{path}",
             self.port
         ))
         .expect("url")
     }
-    fn count(&self) -> usize {
+    pub(super) fn count(&self) -> usize {
         self.finish();
         self.accepted.load(Ordering::Relaxed)
     }
@@ -397,7 +397,7 @@ impl Server {
             worker.join().expect("fixture cleanup");
         }
     }
-    fn request(&self, index: usize) -> String {
+    pub(super) fn request(&self, index: usize) -> String {
         String::from_utf8(self.requests.lock().expect("requests")[index].clone())
             .expect("http bytes")
     }

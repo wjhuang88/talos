@@ -84,3 +84,8 @@ D/privacy/result-use review, full result-policy acceptance, official CLI/SDK/MCP
 health, cancellation/rollback/default activation and release retain their gates. The private
 request/response binding prerequisite does not complete those rows. I293 remains Active/Claimed,
 Completion Pending; #643/#624 stay open, #705/#717/#735 remain independently owned.
+
+The [dormant fixed-source chain](SEARCH-001-C-COMPATIBILITY-CHAIN.md) now owns all4 prepared
+objects and consumes them sequentially through this entry, using one transport/budget and the
+explicit semantic-only continuation policy. It does not activate an official caller, add retries
+or complete upstream source/probe/privacy parity.

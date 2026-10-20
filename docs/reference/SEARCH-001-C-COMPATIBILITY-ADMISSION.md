@@ -66,3 +66,7 @@ The new admission code is Talos-authored; existing parser/full MIT provenance is
 Source/header/request/charset/probe/retry/entropy timing parity, optional adapters, D/privacy/result
 use, official CLI/SDK/MCP/standalone roots, router/health/cancellation/rollback/default activation
 and release retain their gates. I293 remains Active/Claimed, Completion Pending; #643/#624 stay open.
+
+The [dormant fixed-source chain](SEARCH-001-C-COMPATIBILITY-CHAIN.md) accepts only this admitted
+wrapper as a successful source outcome. Empty/Invalid result errors can advance within its fixed
+predeclared order; identity/limit/parse failures remain terminal under the same shared budget.

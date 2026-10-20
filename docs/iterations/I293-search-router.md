@@ -10,7 +10,7 @@
 | Source Issue | #643 |
 | Depends on | Accepted ADR-085; SEARCH-001-B / #642 complete in #656; NET-001 boundary coordination |
 | Claim State | Claimed |
-| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 merged TLS/CONNECT subset; #716 merged bounded form/diagnostic stage at `b5b8241e`; #732 merged owned payload at `8fa2a50`; #733 merged Lite/HTML parsing at `dea3edc`; #734 merged Instant Answer at `45cf9eb9`; #736 merged Bing parsing at `2b015a6b`; #737 merged fixed requests at `ae6a0791`; #738 merged bound execution at `2d7f4b36`; #739 merged fixed headers at `91c330ba`; result admission candidate tracked from #643; full C/EP and default activation Pending |
+| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 merged TLS/CONNECT subset; #716 merged bounded form/diagnostic stage at `b5b8241e`; #732 merged owned payload at `8fa2a50`; #733 merged Lite/HTML parsing at `dea3edc`; #734 merged Instant Answer at `45cf9eb9`; #736 merged Bing parsing at `2b015a6b`; #737 merged fixed requests at `ae6a0791`; #738 merged bound execution at `2d7f4b36`; #739 merged fixed headers at `91c330ba`; #741 merged result admission at `4e20ee95`; fixed-source chain candidate tracked from #643; full C/EP and default activation Pending |
 | Completion | Pending |
 
 ## Collaboration Claim
@@ -1667,3 +1667,92 @@ Its nonblocking empty-userinfo wording clarification was applied to docs, withou
 Fresh main remains91c330ba. Final owner synchronization, staged review, exact-local/remote approval,
 terminal native CI and fresh CAS follow. This is stable-candidate Review only; I293 remains
 Active/Claimed, Completion Pending, #643/#624 OPEN and all remaining activation gates intact.
+
+## Merged Result Admission / Dormant Fixed Source Chain — 2026-10-20
+
+#741 merged4e20ee955963bf22a0b9bc8df15c4bfc3771229a, source61af856e/treec84dc081.
+CI3285/run39387035530 attempt1 all6SUCCESS; Windows tools547/0failed/0ignored/0filtered,
+mac545/0/0/0 and all8new/enhanced fixtures PASS. Actual original socket, SDK default/coding,
+fullpreflight/laternative gates PASS; LinuxDesktop112/0/0/0. Protected source6285813092,
+terminal/freshCAS6286612496 and merged delivery6286667796 establish this partial stage. Remote
+parent91c330ba and exact candidate tree were verified. The local service disconnected after all
+checks; on recovery the clean checkout was fast-forwarded to4e20ee95 before new branch creation.
+No successful gate is retried or prior failure reclassified for that tooling interruption.
+
+Fresh main4e20ee95 and effective#712/ADR090 actor/Work Slice remain unchanged. Inventory: I293
+Active continues C, I294 Active retains D, I300 Active retains Git; I277 Review retains deferred
+human/device work and I302 Review retains#717. I249 Planned deferred, I164 Paused/superseded;
+I301/I303/I304/I305 Complete/Closed remain closed, historical I146/I147/I150 notes do not reactivate
+them. Independent#735 draftheadaf87f7bef89d5f0ae1248e3f0b159f5abb4c1e66 has125files across2pages;
+#705head5848f8992457c72e13a48b7c2791635b6326453e has4diagnosticfiles. All changed paths were
+checked, with no search_backend/I293/SEARCH-C overlap. #705 stays open/unmerged, #729 closed;
+no other task is taken over or approved.
+
+Runnable dormant library deliverable: one owned fixed-source preparation retains Lite, Instant
+Answer, HTML and Bing in that order. Count1..20 and all4 bounded payload/manifest memberships
+validate before any UA selection, then4 fixed snapshots are captured without reroll. The same
+objects survive future admission and consume one existing SearchTransport/shared budget. Only
+existing admitted display results can win; no later source starts after success or terminal error.
+Only explicit semantic Empty/Status/Challenge, Bing RateLimited and admission Empty/Invalid
+permit the next source. Every transport error, parser Limit/Encoding/Parse and admission Limit/
+Identity/Parse terminates. Parse includes recovered dependency panic, so it cannot safely be
+treated as ordinary malformed-response fallback. Ordered exhaustion retains4 actual closed errors.
+
+Protected design preview APPROVE requires exhaustive classification, validation-before-draw,
+capture-failure immediate stop, live shared pre/post outcome/final completion fences and joined
+actual socket evidence. This is the traditional sequential fixed4 subset, not full upstream
+source/probe/retry/entropy parity, an independent native backend/router or an activation. Four
+upfront draws include unused sources; transport failures remain terminal rather than upstream
+fallback. No rate limiter, cached probe, retry/backoff, paid/SearXNG/Wikipedia route, new authority,
+dependency, public API/model schema, permission relaxation or default/root change is introduced.
+
+Fresh archive SHA25606b90d9a9ad9e7e347c4cd85c3fb37189256703db4fab1d6c6fb963ae1eed0ee
+and pinnedVCSb30180a0 searcher.rs bytes independently compared with freshly fetched immutable
+source. SHA256768a3c5135434ed2e1fea766e42f92580bfafca193d24178d2adf3d3cde6effe. Existing full
+MIT notice remains packaged; Talos owns the prepared chain, safety classification and tests.
+Affected docs: SEARCH-001-C-COMPATIBILITY-CHAIN.md and execution/admission references. Caches and
+pinned toolchain were removed by workspace maintenance; checksummed official1.99 restored.
+Local standard validation, protected source/exact-head review, native CI and final CAS follow.
+I293 Active/Claimed, Completion Pending; #643/#624 stay open and all remaining C/EP/parity/D/
+privacy/roots/router/health/cancellation/rollback/default activation and release gates remain.
+
+Initial focused validation:95pass/2fail. Both failures reached Instant Answer and correctly
+terminated as Ddg(Parse): the new empty-result fixture used{}, omitting the pinned schema's
+required fields. This was fixture classification error, not a production continuation defect.
+The fixture now uses a complete empty response; a new actual controlled{} regression proves
+schema failures remain terminal before HTML. No parser/default/allowlist/timeout is relaxed.
+The original failed journal is retained as chain-focused-initial-failed.log; it is not a pass.
+Fresh corrected focused validation exits0:98passed/0failed/0ignored/227filtered, plus existing
+separate child1passed/324filtered. All10new tests PASS. Strict Clippy and full preflight follow.
+
+Stable local convergence PASSED on pinned Rust1.99.0: strict network-test-target Clippy exits0;
+standard locked release_preflight.sh exits0 with actual passed/terminal0 journal markers.
+Workspace check/strict Clippy/tests/doctests and independent SDK default/coding both PASS.
+Tools555passed/0failed/0ignored/0filtered, including all10new source-chain tests. The sole existing
+authorized local runtime socket filter remains; remote native CI must execute it unfiltered.
+The initial95/2 fixture failure above remains history and is not reclassified as a pass.
+Preflight journal SHA256:
+4ee51b140721d9de212052d1cf794581d910e322c86585443fc30d0dae92676a.
+Corrected focused SHA256efe221262a61d722d387779936a24aa7c421408547b5437cfab4b54a5c1546d2;
+strict network Clippy SHA25652acb8a6f3eb223b70b58f50a28b7962e07aaf0f8ee120fc2022b3afcd694578;
+initial failed journal SHA2567a66e8fbade38f96b3720dd547678abf365d6055a93ce4fcc40b34c8cffd1f94.
+
+Governance SQLite17/delivery12/0warnings and claims0warnings PASS. Locked offline package listing
+includes chain.rs, chain/tests.rs and the complete existing MIT notice. Scale500sources/31packages/
+4workflows remains high-risk/release-managed/on-demand. Protected working-source/delta review
+APPROVE has no blockers, naming blobs compatibilityb350997d, chain7cfb9f48, chaintestsc9b2c56c,
+executiontests6b7165eb and transporttests8dfdbad8. Shared identity is not natural-person approval.
+Final owner/staged review, exact-local publication review, stable remote exact-source review,
+unfiltered terminal native CI and immediate fresh CAS remain required. This is stage Review only;
+I293 Active/Claimed, Completion Pending and all parent/activation gates above remain unchanged.
+
+Publication refresh on2026-10-21: main remains4e20ee95; #735 advanced to
+7036ddce0b2ca575fa28e29e798bc95a10ea5674. Its complete125-file scope was checked again with no
+search_backend/I293/SEARCH-C overlap; #705 head remains5848f899. After successful preflight,
+workspace maintenance again removed the temporary toolchain/cache. The final documentation-only
+governance refresh initially could not run SQLite metadata because cargo was absent; this is an
+environment failure, not a validation pass. Restore checksummed pinned1.99 and repeat the affected
+governance/claims/format checks before publication; unchanged source validation above is retained.
+Restored-toolchain refresh subsequently exits0: SQLite17/delivery12, governance0warnings,
+claims0warnings, cargo fmt --all -- --check and diff whitespace PASS. Independent full staged-tree
+review96ce799a APPROVE has no blockers; exact committed head and remote gates follow.
