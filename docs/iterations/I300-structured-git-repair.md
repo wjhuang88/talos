@@ -6424,3 +6424,26 @@ MSVC cargo xwin test-target checking passes (seven existing reduced-feature
 warnings); this is not native execution evidence or proof that startup files
 were never read. CI 39444015640 remains in progress at 7036ddce and does not
 contain this test or the local shell baseline. Production gates remain closed.
+
+2026-10-20 Pull attribute execution containment: native merge fixtures reproduce
+execution of a custom merge driver and of a smudge filter selected only by new
+target attributes. Integration discovery now refuses configured executable
+filters and Merge/Rebase drivers before publishing the mutation scope. The
+prepared fixtures verify no helper execution or HEAD mutation after refusal.
+Independent static review found no blocker. Locked Pull-focused tests pass
+154/154 (/private/tmp/i300-pull-attribute-guards.log). Test-only local overrides
+isolate inherited global filters without changing global configuration.
+This is conservative containment, not finished capability: unused global LFS
+configuration is also refused. Precise current/target/intermediate attribute
+selection and separate selected-program authority remain required; default
+multihead strategy execution and production activation gates also remain open.
+Validation follow-up: MSVC test-target xwin check and all-target/all-feature
+Clippy -D warnings pass; both governance validators pass. CI 39444015640 is
+terminal failure: macOS main job passes; Windows tools 921 passed / 3 failed
+(Checkout exact hook tokens, receiver layout shell baseline, daemon Push).
+Agent/MCP/Runtime Windows production-gate failures remain. Native special-path
+shell dispatch and cancelled-ancestor include tests pass. Daemon trace now
+proves the builtin receive-pack child starts, but no receiver ref is written
+before timeout; root cause remains unresolved. Log:
+/private/tmp/i300-7036-windows.log. The CI head excludes the local baseline and
+HOME sentinel commits and this containment change.

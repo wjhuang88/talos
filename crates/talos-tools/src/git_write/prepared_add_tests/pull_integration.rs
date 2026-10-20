@@ -153,6 +153,7 @@ async fn pull_integration_hook_discovery_does_not_read_external_candidates() {
 }
 
 async fn integration_scope_fixture(root: &Path) -> Box<AddPlan> {
+    isolate_integration_fixture_filters(root);
     std::fs::write(
         root.join(".git/FETCH_HEAD"),
         format!("{}\t\thttps://private.invalid/DO_NOT_DISCLOSE\n", "1".repeat(40)),
@@ -169,6 +170,25 @@ async fn integration_scope_fixture(root: &Path) -> Box<AddPlan> {
         &plan.repository, None, true,
     ).expect("retained evidence"));
     plan
+}
+
+fn isolate_integration_fixture_filters(root: &Path) {
+    // These integration fixtures exercise repository-local configuration,
+    // not optional host filter installations (e.g. a global Git LFS driver).
+    let output = std::process::Command::new("git")
+        .current_dir(root)
+        .args(["config", "--global", "--name-only", "--get-regexp", "^filter\\."])
+        .output().expect("global filter names");
+    assert!(output.status.success() || output.status.code() == Some(1));
+    for key in String::from_utf8(output.stdout).expect("filter names").lines() {
+        if [".clean", ".smudge", ".process"].iter().any(|suffix| key.ends_with(suffix))
+            && !std::process::Command::new("git").current_dir(root)
+                .args(["config", "--local", "--get", key]).output()
+                .expect("local filter").status.success()
+        {
+            integration_git(root, &["config", key, ""]);
+        }
+    }
 }
 
 #[tokio::test]
@@ -390,4 +410,66 @@ fn integration_git(root: &Path, args: &[&str]) -> String {
         .args(args).output().expect("Git fixture");
     assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
     String::from_utf8(output.stdout).expect("Git output").trim().to_owned()
+}
+
+#[tokio::test]
+async fn pull_integration_attribute_programs_cannot_inherit_worktree_authority() {
+    for driver in [false, true] {
+        let root = fixture();
+        let git = |args: &[&str]| integration_git(root.path(), args);
+        if driver {
+            std::fs::write(root.path().join(".gitattributes"), "file merge=probe\n")
+                .expect("base attributes");
+        }
+        git(&["add", "."]);
+        git(&["commit", "-m", "base"]);
+        let base = git(&["rev-parse", "HEAD"]);
+        std::fs::write(root.path().join("file"), "remote\n").expect("remote");
+        if !driver {
+            std::fs::write(root.path().join(".gitattributes"), "file filter=probe\n")
+                .expect("target-only attributes");
+        }
+        git(&["add", "."]);
+        git(&["commit", "-m", "remote"]);
+        let target = git(&["rev-parse", "HEAD"]);
+        git(&["reset", "--hard", &base]);
+        std::fs::write(root.path().join("file"), "local\n").expect("local");
+        git(&["commit", "-am", "local"]);
+        let local = git(&["rev-parse", "HEAD"]);
+        let key = if driver { "merge.probe.driver" } else { "filter.probe.smudge" };
+        let program = if driver {
+            "printf executed > helper-ran"
+        } else {
+            "cat; printf executed > helper-ran"
+        };
+        git(&["config", key, program]);
+        // Establish that native integration really selects this program;
+        // target-only filter attributes are absent from the current worktree.
+        let native = std::process::Command::new("git")
+            .current_dir(root.path())
+            .args(["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+                "merge", "--no-edit", &target])
+            .output().expect("native merge");
+        assert!(root.path().join("helper-ran").exists(),
+            "driver={driver}: {}", String::from_utf8_lossy(&native.stderr));
+        git(&["config", "--unset", key]);
+        git(&["reset", "--hard", &local]);
+        std::fs::remove_file(root.path().join("helper-ran")).expect("remove native sentinel");
+        git(&["config", key, program]);
+        let mut plan = integration_scope_fixture(root.path()).await;
+        plan.pull_integration = Some(super::super::pull_state::Integration::Merge {
+            heads: vec![target],
+            fast_forward: super::super::pull_state::FastForward::Allow,
+            autostash: false,
+        });
+        let error = match plan.discover_pull_integration_hooks() {
+            Ok(_) => panic!("attribute program inherited worktree authority"),
+            Err(error) => error.to_string(),
+        };
+        assert!(error.contains(if driver { "custom merge driver" } else { "configured filter" }), "{error}");
+        assert!(!error.contains(program));
+        assert!(!root.path().join("helper-ran").exists());
+        assert_eq!(git(&["rev-parse", "HEAD"]), local);
+        assert!(!root.path().join(".git/MERGE_HEAD").exists());
+    }
 }
