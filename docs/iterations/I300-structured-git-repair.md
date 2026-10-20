@@ -6387,3 +6387,17 @@ Neither diagnostic nor cross-compilation proves Windows runtime correctness.
 reviewed separately. Both governance validators pass with zero warnings.
 Native special-path coverage, Windows shell admission and daemon root cause
 remain open; no production gate or completion state changes.
+
+
+2026-10-20 receiver candidate validation: standard release_preflight.sh exited
+0 (session 97754), including workspace tests and both external Runtime SDK
+consumer modes; /private/tmp/i300-receiver-candidate-preflight.log. A new
+Windows-only regression compares direct native fixture execution with the
+fixed receiver command through Git's selected shell at a path containing
+spaces, apostrophe, shell metacharacters and Unicode. It tests executable
+selection and injection refusal, not complete argument fidelity. Review found
+and corrected a cross-volume hard-link assumption by placing the fixture next
+to the test executable; commands share frozen environment/cwd and discovery
+has a deadline. These Windows-only follow-ups pass MSVC xwin checking but
+remain unexecuted on Windows. Fresh fetch has no main-only commits. Production
+Windows/Pull, remaining Checkout behavior and complete T7 delivery stay open.
