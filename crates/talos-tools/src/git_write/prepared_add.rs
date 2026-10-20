@@ -2290,6 +2290,18 @@ impl AddPlan {
         Ok(path)
     }
 
+    async fn revalidate_receiver_shell_selection(&self) -> Result<(), GitToolError> {
+        // Git for Windows resolves sh through PATH for each invocation.
+        // Compare spelling before capturing or executing a newly selected shell.
+        let shell = self.inspect_git_shell_path().await?;
+        if self.receiver_child_paths.first() != Some(&shell) {
+            return Err(GitToolError::InvalidInput(
+                "Receiver shell selection changed after approval".into(),
+            ));
+        }
+        Ok(())
+    }
+
     fn discover_receiver_roots(
         mut self: Box<Self>,
         authorizations: &[talos_core::tool::ToolExecutionAuthorization],
@@ -3869,6 +3881,12 @@ impl AddPlan {
             return Err(GitToolError::InvalidInput(
                 "Receiver metadata changed during final inspection".into(),
             ));
+        }
+        if !self.receiver_roots.is_empty() {
+            self.revalidate_receiver_shell_selection().await?;
+            self.revalidate()?;
+            self.revalidate_receiver_roots(authorizations)?;
+            self.validate_receiver_shell_baseline()?;
         }
         self.run_command(command, std::time::Duration::from_secs(300), 256 * 1024)
             .await.map_err(|error| {
