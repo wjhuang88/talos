@@ -6212,3 +6212,17 @@ were inspected. No production gate was enabled. Native CI failures and remaining
 original T7 acceptance requirements remain open; the macOS CI drift cause is not
 proven by a locally passing fixture. Earlier pending/uncommitted checkpoints
 above are superseded only for these validation and commit facts.
+
+
+2026-10-20 post-fetch identity fixture follow-up: content evidence is explicitly
+dropped after all reference-byte/pointer assertions and before renaming gitdir.
+The original RepositoryState and its live directory identity handles remain
+retained, so replacement must still fail before repository rediscovery. This
+separates content-handle lifetime from the directory substitution assertion;
+it is a candidate fix for native Windows AccessDenied, not yet native proof.
+Focused host regression passes 1/1
+(/private/tmp/i300-postfetch-release-content.log); MSVC cargo xwin test-target
+check exits 0 (/private/tmp/i300-admission-fixtures-xwin-final.log), with seven
+existing reduced-feature warnings. Production identity code and gates unchanged.
+CI 39383710845 tests the preceding published head 260e9228 and remains running;
+it does not contain this fixture follow-up. T7 and all later tasks remain open.
