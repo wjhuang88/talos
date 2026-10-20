@@ -10,7 +10,7 @@
 | Source Issue | #643 |
 | Depends on | Accepted ADR-085; SEARCH-001-B / #642 complete in #656; NET-001 boundary coordination |
 | Claim State | Claimed |
-| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 merged TLS/CONNECT subset; #716 merged bounded form/diagnostic stage at `b5b8241e`; #732 merged owned payload at `8fa2a50`; #733 merged Lite/HTML parsing at `dea3edc`; #734 merged Instant Answer at `45cf9eb9`; #736 merged Bing parsing at `2b015a6b`; #737 merged fixed requests at `ae6a0791`; bound execution candidate tracked from #643; full C/EP and default activation Pending |
+| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 merged TLS/CONNECT subset; #716 merged bounded form/diagnostic stage at `b5b8241e`; #732 merged owned payload at `8fa2a50`; #733 merged Lite/HTML parsing at `dea3edc`; #734 merged Instant Answer at `45cf9eb9`; #736 merged Bing parsing at `2b015a6b`; #737 merged fixed requests at `ae6a0791`; #738 merged bound execution at `2d7f4b36`; fixed header candidate tracked from #643; full C/EP and default activation Pending |
 | Completion | Pending |
 
 ## Collaboration Claim
@@ -1511,3 +1511,98 @@ library prerequisite enters stable-candidate Review; exact local/remote protecte
 unfiltered native terminal CI and final fresh CAS are still required before merge. Actual PR/
 head/tree delivery will be indexed from #643. I293 itself remains Active/Claimed, Completion
 Pending; no parent completion, new provider admission, default activation or release is claimed.
+
+## Merged Bound Execution / Dormant Fixed Headers — 2026-10-20
+
+#738 merged2d7f4b36c17ae17f5f74d34b167987876db8add2, source362215a0/tree1a5fa0b13c32ffd39608c41ff996ad183f7c1a10.
+CI3271/run39351058934 attempt1 all6jobs SUCCESS. Windows tools532/0failed/0ignored/0filtered,
+macOS tools530/0/0/0 include all10 new fixtures; original macOS socket/SDK2modes/fullpreflight
+and later gates PASS. Protected source6280849789, terminal review/freshCAS6281336287 and merged
+source delivery6281349020 establish this partial stage only. No prior interrupted/failed run is
+reclassified; full C/EP and default activation remain Pending.
+
+Fresh selection base/main2d7f4b36c17ae17f5f74d34b167987876db8add2. Effective #712/ADR090 actor,
+claim and Work Slice remain intact before branch creation. Inventory dispositions: I293 Active
+continues controlled compatibility internalization; I294 Active retains D; I300 Active retains
+Git/PERM-H; I302 Review retains #717; I277 Review retains deferred human/device rows; I249 Planned
+deferred, I164 Paused/superseded. I301/I303/I304/I305 Complete/Closed stay closed; historical
+I146/I147/I150 and completed I162 notes are not new activation. Independent #735 drafthead
+77a8cf8412f5c4d01785454311a5580ef60f6ffb has125files across two pages; #705head703cb39b has3
+diagnosticfiles. Full changed-path checks find no search_backend/I293/SEARCH-C overlap. No other
+owner is taken over or approved.
+
+Runnable library-only deliverable: fixed compatibility factories retain a private static UA/
+Bing-language snapshot inside the same invocation-bound PreparedTransportRequest; controlled
+execution and every scoped redirect apply that frozen profile. Generic JSON/form constructors
+retain None. No caller header map, credentials/cookies/referer facility, public API/model schema,
+dependency/lock/version/permission relaxation, official root/default or provider activation.
+Affected documentation: SEARCH-001-C-COMPATIBILITY-HEADERS.md, linked request/execution/transport
+references. I293 remains Active/Claimed, Completion Pending; #643/#624 stay open.
+
+Protected design preview and working-source review APPROVE: validate count/query/encoded bounds/
+actual scope before one existing pinned random_user_agent helper call, retain &'static str,
+catch panic into closed InvalidRequest with no reroll/fallback, bound nonblank visible ASCII
+UA<=512 and validate HeaderValue. Private suppliers permit deterministic error/order fixtures;
+no exposed override or global hook exists. Transport only applies the typed fixed profile after
+existing hop checks and before final authority fence. Existing identity encoding/content type,
+POST redirect/body isolation, DNS/address/TLS/proxy/budget/deadline controls remain authoritative.
+
+Seven new tests cover bounds/control/injection, panic closure/no retry, redaction/protocol
+language, invalid preparation zero helper calls/valid exactly one, generic wire header absence,
+scoped same/cross-origin GET snapshot retention and denied target zero sends. Existing four-format
+execution fixtures now compare actual wire UA with captured snapshot for count1/2, verify only
+Bing language, identity encoding and absent sensitive headers. Test-only relocation preserves
+the added field and revalidates an explicit literal-loopback scope; no production URL override.
+There is no assertion that random requests must differ, uniform draw proof or official-host query.
+
+Fresh archive06b90d9a9ad9e7e347c4cd85c3fb37189256703db4fab1d6c6fb963ae1eed0ee/VCSb30180a0
+verified; archived anti_detection/mod.rs, user_agent.rs and bing.rs exactly match freshly fetched
+immutable source bytes. Full MIT text matches the pinned root, with one final LF added by Talos.
+The root notice is1083bytes without LF; the retained notice is1084bytes, not byte-identical.
+Source hashes and modifications are recorded in the new reference. The existing public helper/12-entry static
+pool is reused, without copying a second production pool. Independent reviewer separately fetched
+and hashed pinned sources/full notice, but did not independently download the archive or build.
+Shared Agent/account review is not distinct-human approval.
+
+Preparation now includes local randomness/entropy access, while performing no network/authority/
+budget work. Snapshot-per-preparation differs from upstream client/source/retry scheduling, so full
+draw timing/distribution and protocol/service parity are not established. catch_unwind does not
+suppress panic hooks or recover abort/OOM. Charset/probe/retry/source/proxy parity, D/privacy/
+result use/admission, official CLI/SDK/MCP roots/router/health/cancellation/rollback/default
+activation and release remain gated. #705/#717/#735 retain owners; #729 remains closed.
+
+Workspace maintenance again removed the toolchain/cache/physical isolated target. The checkout
+survived unchanged at #738; official manifest-checksummed Rust1.99.0 was restored and executed.
+Focused transport tests, strict network-test Clippy and standard locked release_preflight run
+serially with existing bounded settings and streamed terminal journals. Only the authorized local
+runtime socket filter is permitted; remote native CI remains unfiltered. Full actual validation,
+package inclusion, exact-local/remote protected review, terminal native CI and final CAS follow.
+
+Fresh focused cargo test --locked -p talos-tools --features network --lib search_backend::transport
+exits0: primary suite80passed/0failed/0ignored/227filtered, with the existing separate child
+re-execution1passed/306filtered. All7new tests and enhanced four-format execution PASS; no test
+failure or retry occurred. Locked offline package-list includes both new headers modules and
+the complete MIT notice. Scale496sources/31packages/4workflows remains high-risk/release-managed/
+on-demand. Strict network-test Clippy and full standard preflight/SDK receipts follow.
+
+Local convergence PASSED on pinned Rust1.99.0: strict network-feature test-target Clippy exits0;
+standard locked release_preflight.sh exits0 with release preflight: passed and terminal exit0
+markers, including workspace check/strict Clippy/tests/doctests and independent SDK default/
+coding modes. Tools537/0failed/0ignored/0filtered includes all7new fixtures and enhanced wire
+assertions. No new source/test failure or retry occurred. Only the existing authorized local
+runtime socket filter is used; exact-head native CI must independently run that fixture and all
+tests unfiltered. Preflight journal SHA256:
+d5c5bace0cd864f099b2f5a66768eaf0e942e215f63bea222b6f46ff4fcb2f32.
+
+Governance SQLite17/delivery12 and claims0warnings, format/whitespace and packaged source/full
+MIT pass. Protected working-source/provenance review APPROVE names frozen transport1f3ed547,
+compatibilityc4244c10, headers582ba9a7, executiontests63e9def7, transporttests5aa15966 and
+headerwiretestsa8d8b5c0. The staged11-file diff contains only the bounded snapshot, tests and
+owner/reference synchronization. Fresh main remains2d7f4b36; independent #735 draft77a8cf84
+still has125non-overlapping files. #705 moveda5d3bddd772533506c212dc75a6747775e3896b0; all3
+diagnostic changed paths were rechecked, with no Search/I293/C overlap or approval of that work.
+
+This dormant library prerequisite enters stable-candidate Review. Exact-local/remote protected
+review, terminal unfiltered native CI and fresh final CAS remain required before merge. Actual
+PR/head/tree delivery will be indexed from #643. I293 remains Active/Claimed, Completion Pending;
+full C/EP/parity/D/privacy/root/router/rollback/default activation and release remain gated.

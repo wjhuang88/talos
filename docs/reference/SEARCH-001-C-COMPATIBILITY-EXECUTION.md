@@ -74,7 +74,10 @@ MIT provenance remain unchanged and distributed with talos-tools. See the
 [DDG parsers](SEARCH-001-C-DDG-RESPONSE-PARSER.md) and
 [Bing parser](SEARCH-001-C-BING-RESPONSE-PARSER.md) references.
 
-Headers/UA/Bing Accept-Language, probe/retry/source/proxy snapshots, full protocol/parser parity,
+The [fixed header snapshot prerequisite](SEARCH-001-C-COMPATIBILITY-HEADERS.md) now retains UA
+and Bing language in the same request. Preparation includes local entropy access; it still has
+no network/authority/budget effects. Header selection timing parity, probe/retry/source/proxy
+snapshots, full protocol/parser parity,
 D/privacy/result-use review, result admission, official CLI/SDK/MCP/standalone roots, router,
 health, cancellation/rollback/default activation and release retain their gates. The private
 request/response binding prerequisite does not complete those rows. I293 remains Active/Claimed,

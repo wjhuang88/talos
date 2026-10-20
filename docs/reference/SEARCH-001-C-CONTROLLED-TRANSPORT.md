@@ -211,3 +211,8 @@ They do not execute requests, bind parsers or complete headers/UA/parity/D/defau
 The following [bound execution prerequisite](SEARCH-001-C-COMPATIBILITY-EXECUTION.md) consumes
 fixed requests into their captured parser/query/count with existing pre/post deadline fences.
 Its controlled loopback fixtures do not establish official-host parity or default-root activation.
+
+The [dormant fixed header snapshot](SEARCH-001-C-COMPATIBILITY-HEADERS.md) adds only a typed
+compatibility UA/Bing-language payload. Generic JSON/form requests retain no such profile.
+The same validated, non-sensitive snapshot survives each scoped hop; existing final authority,
+redirect/body/proxy/TLS/budget fences remain in place. No caller header map is accepted.
