@@ -1244,7 +1244,12 @@ mod tests {
     #[test]
     fn host_layout_bootstrap_does_not_expand_global_or_include_configuration() {
         let directory = tempfile::tempdir().expect("fixture");
-        let base = directory.path().canonicalize().expect("canonical");
+        // Git for Windows does not accept every Rust verbatim path spelling.
+        let base = if cfg!(windows) {
+            directory.path().to_owned()
+        } else {
+            directory.path().canonicalize().expect("canonical")
+        };
         let repository = base.join("repository");
         let command = || {
             let mut command = std::process::Command::new("git");
@@ -1259,15 +1264,12 @@ mod tests {
                 .env("GIT_TRACE2_PERF", "0");
             command
         };
-        assert!(
-            command()
-                .arg("init")
-                .arg(&repository)
-                .output()
-                .expect("init")
-                .status
-                .success()
-        );
+        let output = command()
+            .arg("init")
+            .arg(&repository)
+            .output()
+            .expect("init");
+        assert!(output.status.success(), "{output:?}");
         let gitdir = repository.join(".git");
         std::fs::write(
             base.join(".gitconfig"),
