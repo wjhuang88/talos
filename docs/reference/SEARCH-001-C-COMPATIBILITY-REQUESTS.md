@@ -55,7 +55,8 @@ Archived request sources exactly match freshly retrieved immutable pinned files:
 
 The complete tools-package LICENSES/rust-websearch-MIT.txt matches the pinned root
 [MIT license](https://github.com/Rust-Framework/rust-agent-framework/blob/b30180a03609580e8b28dfb682284cb2ba249fba/LICENSE),
-Copyright(c)2026 Rust-Framework Contributors, with a final LF retained. Source comments record
+Copyright(c)2026 Rust-Framework Contributors. Talos adds one final LF to the upstream text;
+the full license text matches, while the files are not byte-identical. Source comments record
 derivation and Talos modifications. This is source-license evidence, not D service-use, query
 privacy, result reuse or native-provider admission. No live search query/response was acquired.
 
@@ -68,7 +69,8 @@ execution effects on preparation/cross-invocation rejection. They inspect prepar
 adding an endpoint override or performing an official-host request. Existing transport fixtures
 independently test actual controlled sends; this stage does not claim new full-wire evidence.
 
-Bing Accept-Language, common/random UA and headers, charset behavior, proxy/source snapshots,
+Bing language and UA now have a [dormant snapshot prerequisite](SEARCH-001-C-COMPATIBILITY-HEADERS.md).
+Random draw timing/scheduling parity, charset behavior, proxy/source snapshots,
 probes/retries, official adapter integration, result admission, full service/protocol parity and
 D/privacy remain pending. These factories are insufficient for adapter activation. Official
 CLI/SDK/MCP/standalone roots, deadline/cancellation/router/rollback/default activation and release

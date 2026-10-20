@@ -197,7 +197,7 @@ fn relocate(
         true,
     );
     let old = search.request;
-    let request = PreparedTransportRequest::new(
+    let mut request = PreparedTransportRequest::new(
         &manifest,
         url,
         old.method.clone(),
@@ -205,11 +205,13 @@ fn relocate(
         old.format,
     )
     .expect("fixture preparation");
+    request.headers = old.headers;
     assert_eq!(request.method, old.method);
     assert_eq!(request.body, old.body);
     assert_eq!(request.url.path(), old.url.path());
     assert_eq!(request.url.query(), old.url.query());
     assert_eq!(request.format.content_type(), old.format.content_type());
+    assert_eq!(request.headers, old.headers);
     assert_eq!(request.invocation_id, manifest.invocation_id());
     search.request = request;
     (search, manifest)
@@ -225,6 +227,7 @@ async fn all_four_protocols_send_frozen_bytes_and_use_captured_parser_query_and_
             let expected_query = search.request.url.query().map(str::to_owned);
             let path = search.request.url.path().to_owned();
             let method = search.request.method.clone();
+            let user_agent = search.request.headers.expect("fixed snapshot").user_agent();
             query.clear();
             query.push_str("replacement");
             let mut fixture = Fixture::new(200, body(protocol)).await;
@@ -264,6 +267,27 @@ async fn all_four_protocols_send_frozen_bytes_and_use_captured_parser_query_and_
             );
             assert!(sent.starts_with(&format!("{method} {target} HTTP/1.1\r\n")));
             let (headers, body) = sent.split_once("\r\n\r\n").expect("HTTP body");
+            let values = |name: &str| {
+                headers
+                    .lines()
+                    .filter_map(|line| line.split_once(':'))
+                    .filter(|(key, _)| key.eq_ignore_ascii_case(name))
+                    .map(|(_, value)| value.trim())
+                    .collect::<Vec<_>>()
+            };
+            assert_eq!(values("user-agent"), vec![user_agent]);
+            assert_eq!(
+                values("accept-language"),
+                if matches!(protocol, CompatibilityProtocol::Bing) {
+                    vec!["zh-CN,zh;q=0.9,en;q=0.8"]
+                } else {
+                    vec![]
+                }
+            );
+            assert_eq!(values("accept-encoding"), vec!["identity"]);
+            for forbidden in ["authorization", "proxy-authorization", "cookie", "referer"] {
+                assert!(values(forbidden).is_empty());
+            }
             assert_eq!(body.as_bytes(), expected.as_deref().unwrap_or_default());
             assert_eq!(
                 headers
@@ -274,6 +298,51 @@ async fn all_four_protocols_send_frozen_bytes_and_use_captured_parser_query_and_
             );
             assert!(!sent.contains("replacement"));
         }
+    }
+}
+
+#[test]
+fn invalid_preparation_never_selects_headers_and_valid_preparation_selects_once() {
+    for protocol in ALL {
+        let calls = AtomicUsize::new(0);
+        let choose = || {
+            calls.fetch_add(1, Ordering::Relaxed);
+            "Synthetic Fixture/1.0"
+        };
+        let manifest = scope(protocol.destination().expect("endpoint"), false);
+        for (query, count) in [
+            ("".to_owned(), 0),
+            ("q".to_owned(), 21),
+            (" ".to_owned(), 1),
+            ("q".repeat(16_385), 1),
+            ("中".repeat(1821), 1),
+        ] {
+            assert_eq!(
+                protocol
+                    .prepare_search_with(&manifest, &query, count, choose)
+                    .expect_err("invalid preparation"),
+                CompatibilityError::Transport(TransportError::InvalidRequest)
+            );
+        }
+        let wrong = scope(
+            ToolNetworkEndpoint::new("https", "other.invalid", 443, "GET", "/").expect("endpoint"),
+            false,
+        );
+        assert_eq!(
+            protocol
+                .prepare_search_with(&wrong, "q", 1, choose)
+                .expect_err("scope"),
+            CompatibilityError::Transport(TransportError::Unauthorized)
+        );
+        assert_eq!(calls.load(Ordering::Relaxed), 0);
+        let prepared = protocol
+            .prepare_search_with(&manifest, "q", 1, choose)
+            .expect("prepared");
+        assert_eq!(calls.load(Ordering::Relaxed), 1);
+        assert_eq!(
+            prepared.request.headers.expect("snapshot").user_agent(),
+            "Synthetic Fixture/1.0"
+        );
     }
 }
 

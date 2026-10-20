@@ -5,7 +5,9 @@
 //! crates/websearch/src/{duckduckgo/{lite,html,instant_answer},bing}.rs.
 //! MIT notice: crates/talos-tools/LICENSES/rust-websearch-MIT.txt.
 //! Talos adds fixed destinations, bounded encoding and owning invocation binding.
-//! Headers/UA, retries, source selection and default activation remain gated.
+//! Fixed UA/language snapshots remain dormant; retries/source/default activation gated.
+
+pub(super) mod headers;
 
 use crate::search_backend::{SearchBackendResult, bing_parser, ddg_parser, instant_answer};
 use thiserror::Error;
@@ -127,10 +129,26 @@ impl CompatibilityProtocol {
         query: &str,
         max_results: u32,
     ) -> Result<PreparedCompatibilitySearch, CompatibilityError> {
+        self.prepare_search_with(
+            manifest,
+            query,
+            max_results,
+            rust_websearch::anti_detection::random_user_agent,
+        )
+    }
+
+    // Private supplier permits deterministic validation-order tests, not a caller override.
+    fn prepare_search_with(
+        self,
+        manifest: &ToolNetworkManifest,
+        query: &str,
+        max_results: u32,
+        select: impl FnOnce() -> &'static str + std::panic::UnwindSafe,
+    ) -> Result<PreparedCompatibilitySearch, CompatibilityError> {
         if !(1..=20).contains(&max_results) {
             return Err(TransportError::InvalidRequest.into());
         }
-        let request = self.prepare(manifest, query)?;
+        let request = self.prepare_with(manifest, query, select)?;
         Ok(PreparedCompatibilitySearch {
             request,
             protocol: self,
@@ -168,6 +186,19 @@ impl CompatibilityProtocol {
         manifest: &ToolNetworkManifest,
         query: &str,
     ) -> Result<PreparedTransportRequest, TransportError> {
+        self.prepare_with(
+            manifest,
+            query,
+            rust_websearch::anti_detection::random_user_agent,
+        )
+    }
+
+    fn prepare_with(
+        self,
+        manifest: &ToolNetworkManifest,
+        query: &str,
+        select: impl FnOnce() -> &'static str + std::panic::UnwindSafe,
+    ) -> Result<PreparedTransportRequest, TransportError> {
         if query.len() > 16_384 || query.trim().is_empty() {
             return Err(TransportError::InvalidRequest);
         }
@@ -199,7 +230,10 @@ impl CompatibilityProtocol {
             ));
             None
         };
-        PreparedTransportRequest::new(manifest, url, method, body, BodyFormat::Form)
+        let mut request =
+            PreparedTransportRequest::new(manifest, url, method, body, BodyFormat::Form)?;
+        request.headers = Some(headers::CompatibilityHeaders::capture(self, select)?);
+        Ok(request)
     }
 }
 

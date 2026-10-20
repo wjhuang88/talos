@@ -214,6 +214,7 @@ pub(super) struct PreparedTransportRequest {
     method: Method,
     body: Option<Vec<u8>>,
     format: BodyFormat,
+    headers: Option<compatibility::headers::CompatibilityHeaders>,
 }
 
 impl std::fmt::Debug for PreparedTransportRequest {
@@ -290,6 +291,7 @@ impl PreparedTransportRequest {
             method,
             body,
             format,
+            headers: None,
         })
     }
 }
@@ -358,7 +360,13 @@ impl SearchTransport {
         self.budget.check_live()?;
         let result = timeout_at(
             self.budget.deadline,
-            self.execute_inner(request.url, request.method, request.body, request.format),
+            self.execute_inner(
+                request.url,
+                request.method,
+                request.body,
+                request.format,
+                request.headers,
+            ),
         )
         .await
         .map_err(|_| TransportError::Deadline)?;
@@ -396,6 +404,7 @@ impl SearchTransport {
         method: Method,
         body: Option<Vec<u8>>,
         format: BodyFormat,
+        headers: Option<compatibility::headers::CompatibilityHeaders>,
     ) -> Result<TransportResponse, TransportError> {
         let mut redirects = 0;
         loop {
@@ -460,6 +469,9 @@ impl SearchTransport {
             let mut request = client
                 .request(method.clone(), url.clone())
                 .header(reqwest::header::ACCEPT_ENCODING, "identity");
+            if let Some(headers) = headers {
+                request = headers.apply(request);
+            }
             if let Some(body) = body.as_ref() {
                 request = request
                     .header(reqwest::header::CONTENT_TYPE, format.content_type())
