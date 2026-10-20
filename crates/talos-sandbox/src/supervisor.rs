@@ -703,7 +703,16 @@ mod tests {
         .await
         .expect_err("undelivered input");
         assert!(error.to_string().contains("stdin write failed"));
-        cleanup.wait(Duration::from_secs(1)).await.expect("cleanup");
+        if let Err(cleanup_error) = cleanup.wait(Duration::from_secs(1)).await {
+            let state = cleanup
+                .state
+                .lock()
+                .unwrap_or_else(|error| error.into_inner());
+            panic!(
+                "{cleanup_error}; execution={error}; pending={}; failure={:?}",
+                state.pending, state.failure
+            );
+        }
     }
 
     #[tokio::test]
