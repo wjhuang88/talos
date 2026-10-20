@@ -5989,3 +5989,55 @@ Publish this stable candidate with an explicit lease on that feature head,
 then collect fresh native CI. Windows/Pull production gates, initialized-child
 Checkout, recursive Pull integration, independent delivery review and every
 remaining handoff task remain open; this is not completion evidence for T7.
+
+
+2026-10-20 native candidate result: PR #735 head 1a9ce740 was published using
+an explicit lease. CI 39367016204 completed: Linux full validation, Desktop,
+installer and issue-owner reconciliation passed; Windows tools reports 884
+passed / 16 failed. Log: /private/tmp/i300-native-1a9ce740.log. The conflict
+fixture now passes natively. Git reports shell C:/Program Files/Git/usr/bin/sh.exe.
+Linked-child identity fails specifically in linked mode; remaining failures
+include receiver executable/layout admission, Checkout stage/drift handling,
+rebase CRLF expectations, daemon exports and retained-handle rename semantics.
+Windows production and Pull remain closed; native CI is not green.
+
+Daemon fixture correction: Git for Windows daemon.c concatenates base-path and
+URL then compares exports with memcmp; mixed separators can reject the fixture
+repository. Three test daemons now use consistently slash-separated Windows
+base/export parameters, preserving their exact export roots and all permission
+assertions. No production code changes. Independent static review finds no
+blocker; format/diff checks pass. Git-enabled prepared tests pass 162/162
+(/private/tmp/i300-daemon-fixture-git-tests.log, session 40534 exit 0). Initial
+command without the optional git feature selected zero tests and is not evidence.
+Native verification and full final-source preflight remain required before
+publishing this correction. T7 and all subsequent handoff deliverables remain open.
+
+
+2026-10-20 rebase fixture byte correction: isolated Git reproduction confirms
+checkout-index --force preserves an existing stat-clean LF file even with
+core.autocrlf=true; deleting the fixture file first produces CRLF on checkout.
+Expected local/remote bytes now come from genuinely recreated index content,
+before the tested rebase. All byte/history/cleanliness assertions remain.
+Focused rebase test passes 1/1 (/private/tmp/i300-rebase-native-bytes.log);
+independent static review finds no blocker. Full batch standard preflight is
+running as 10879 (/private/tmp/i300-daemon-rebase-preflight.log), and MSVC test
+check as 72103 (/private/tmp/i300-daemon-rebase-xwin.log). Poll those handles
+before restarting. These fixes remain unpublished pending final gates; native
+Windows verification and all original T7/handoff requirements remain open.
+
+2026-10-20 validation continuation: MSVC test-target xwin session 72103
+exited 0; full preflight session 10879 remains live and is executing workspace
+tests. Native CI actually uses Git 2.56.0.windows.2, with exec-path
+C:/Program Files/Git/ucrt64/libexec/git-core. Rechecked daemon.c at that exact
+upstream tag: base-path concatenation and bytewise export comparison still
+match the fixture correction rationale. Windows CI now records existence and
+link targets for git.exe, git-receive-pack.exe and git-upload-pack.exe under
+the reported exec-path, to distinguish missing executables from layout
+assumptions before changing production admission. This diagnostic has not yet
+run remotely; receiver executable availability remains unproven.
+
+Final local batch result: standard preflight session 10879 exited 0 with
+`release preflight: passed`; daemon fixtures committed as b7d38522 and native
+rebase fixture bytes as 5ae25149. Both governance and collaboration validators
+also exited 0. Native Windows rerun, production activation and the original
+T7 residuals are still required; these commits do not complete T7.
