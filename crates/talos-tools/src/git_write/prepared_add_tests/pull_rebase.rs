@@ -303,12 +303,16 @@ async fn pull_rebase_executes_divergent_history_with_each_backend() {
         git(&["add", "remote"]);
         git(&["commit", "-m", "remote"]);
         let target = git(&["rev-parse", "HEAD"]);
+        // Even --force can retain a stat-clean file without applying checkout
+        // conversion. Recreate it to obtain the native worktree representation.
+        std::fs::remove_file(root.path().join("remote")).expect("recreate remote");
         git(&["checkout-index", "--force", "--", "remote"]);
         let expected_remote = std::fs::read(root.path().join("remote")).expect("native remote");
         git(&["reset", "--hard", &base]);
         std::fs::write(root.path().join("local"), "local\n").expect("local");
         git(&["add", "local"]);
         git(&["commit", "-m", "local"]);
+        std::fs::remove_file(root.path().join("local")).expect("recreate local");
         git(&["checkout-index", "--force", "--", "local"]);
         let expected_local = std::fs::read(root.path().join("local")).expect("native local");
         let original = git(&["rev-parse", "HEAD"]);
