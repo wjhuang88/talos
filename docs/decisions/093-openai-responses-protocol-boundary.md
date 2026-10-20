@@ -1,10 +1,18 @@
-# ADR-093: OpenAI Responses Protocol Boundary
+# ADR-093: Wire-Protocol Family Expansion Boundary (OpenAI Responses First)
 
 ## Status
 
-Proposed — contract for claiming PROVIDER-008 / #724. Ineffective until an accepted claim merges;
+Proposed — contract for claiming PROVIDER-008-A / #724. Ineffective until an accepted claim merges;
 it authorizes no implementation by itself. It supersedes the ADR-034 deferral
 ("The Responses API is a separate future decision") only for the boundaries defined here.
+
+**Scope amendment (2026-10-20):** #724 expanded to complete wire-protocol family coverage
+(OpenAI Responses, Google Gemini, Azure OpenAI, Amazon Bedrock; grouped by wire format). Sections
+1, 3, 4, 6 and 7 below are restated as **family-agnostic umbrella principles** binding every
+PROVIDER-008 child; section 2 (enum migration), 5 (catalog signals) and the Responses-specific
+mapping remain this ADR's PROVIDER-008-A contract. Each sibling family (Gemini, Azure, Bedrock)
+requires its own child ADR covering its wire mapping, auth and error semantics before its claim
+becomes effective.
 
 ## Context
 

@@ -77,7 +77,7 @@
 | [#729](https://github.com/wjhuang88/talos/issues/729) | known Windows returned-resource cleanup acceptance | [TEST-004](../backlog/active/TEST-004-windows-known-resource-acceptance.md) | Complete / Closed | #716 merged `b5b8241e`; owner Completion Commit plus CI3221/review/CAS. #729 closes only after closeout main merge; #717 residual open. |
 | [#717](https://github.com/wjhuang88/talos/issues/717) | Test-only current-process handle evidence | [TEST-003](../backlog/active/TEST-003-windows-owned-handle-evidence.md) | Review / Claimed | #718 effective f4313237; #716 mergedb5b8241e, CI3221 known-resource gate passed. I305 closes only narrowed criterion; prior+3/unknown/native lifetime residual remains open. |
 | [#719](https://github.com/wjhuang88/talos/issues/719) | Embedded Skill Level 1/2 progressive disclosure | [SKILL-006](../backlog/active/SKILL-006-embedded-skill-progressive-disclosure.md) | Complete / Closed | #721 merged as 6d72975e; closeout records Completion Commit. |
-| [#724](https://github.com/wjhuang88/talos/issues/724) | OpenAI Responses API support and protocol mode configuration | [PROVIDER-008](../backlog/active/PROVIDER-008-openai-responses-api-support.md) | Refinement / Unclaimed | Intake only; ADR-093 proposed; no claim, iteration or implementation. |
+| [#724](https://github.com/wjhuang88/talos/issues/724) | Complete wire-protocol family coverage (Responses, Gemini, Azure, Bedrock) | [PROVIDER-008](../backlog/active/PROVIDER-008-openai-responses-api-support.md) | Refinement / Unclaimed | Intake only; ADR-093 amended as umbrella + Responses contract; no claim, iteration or implementation. |
 
 ## Synchronization Notes
 
