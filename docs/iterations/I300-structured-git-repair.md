@@ -5954,3 +5954,23 @@ artifacts before a fresh standard preflight; Windows target outputs remain.
 Both governance validators pass with zero warnings. No final pass is claimed.
 Windows production/Pull gates remain closed; native Windows, child Checkout,
 recursive Pull integration and original delivery requirements remain open.
+
+
+2026-10-20 conflict-fixture correction: native
+Windows previously lacked MERGE_HEAD, but the fixture supplied identity only to
+its history-building commands. Isolated host Git reproduction with system/global
+configuration disabled and user.useConfigOnly=true exits 128 before MERGE_HEAD
+without repository identity; adding repository user.name/email reaches conflict
+(exit 1, MERGE_HEAD and unmerged index present). The test now supplies explicit
+repository identity and retains every conflict/partial-effect assertion, adding
+result content to missing-MERGE_HEAD diagnostics. Independent static review finds
+no blocker; format and whitespace checks pass. Native cause remains provisional
+until fresh Windows CI. Clean standard preflight 41606 has passed locked
+workspace check/Clippy/tests and doctests, including tools 963/963 and the
+modified conflict test. Its final external Runtime SDK validation is still
+compiling at /private/tmp/i300-stage-clean-preflight.log; poll that handle
+before restarting. Windows MSVC test-target cargo xwin check exited 0 (session
+50608, /private/tmp/i300-conflict-identity-xwin.log; seven existing reduced-feature
+warnings). This is not native Windows evidence. target/debug cleanup recovered
+about 10 GiB; production Windows and Pull remain disabled. No final preflight
+pass, T7 completion or subsequent-task activation is claimed by this checkpoint.

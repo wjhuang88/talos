@@ -344,6 +344,11 @@ async fn pull_instruction_format_is_dormant_for_merge_and_empty_for_rebase() {
 async fn pull_integration_conflict_retains_user_state_and_reports_partial_effects() {
     let root = fixture();
     let git = |args: &[&str]| integration_git(root.path(), args);
+    // The admitted merge needs its own committer identity; command-local
+    // overrides used to construct history do not reach the prepared runner.
+    git(&["config", "user.useConfigOnly", "true"]);
+    git(&["config", "user.name", "Fixture"]);
+    git(&["config", "user.email", "fixture@example.invalid"]);
     git(&["add", "file"]);
     git(&["commit", "-m", "base"]);
     let base = git(&["rev-parse", "HEAD"]);
@@ -372,6 +377,7 @@ async fn pull_integration_conflict_retains_user_state_and_reports_partial_effect
     assert!(output.result.is_error);
     assert!(output.result.content.contains("conflicts or partial effects may remain"));
     assert_eq!(git(&["rev-parse", "HEAD"]), original);
+    assert!(root.path().join(".git/MERGE_HEAD").exists(), "{}", output.result.content);
     assert_eq!(git(&["rev-parse", "MERGE_HEAD"]), target);
     assert!(!git(&["ls-files", "--unmerged"]).is_empty());
     assert!(std::fs::read_to_string(root.path().join("file")).expect("conflict").contains("<<<<<<<"));
