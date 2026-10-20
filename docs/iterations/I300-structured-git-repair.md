@@ -5762,3 +5762,19 @@ Windows execution is not yet verified. Standard preflight is running in session
 17900 (/tmp/talos-i300-resolution-root-preflight.log); poll before restarting.
 Previous published-head CI 39349870653 is still in progress. Windows production
 preparation and production Pull remain closed; T7 and the full queue remain open.
+
+
+2026-10-20 verified root/sender stage: `f9a51485` retains complete Windows
+root identities; `0be5b8d8` routes the Commit child-filter fixture through fresh
+sender executable admission. Focused Commit regression passes and final-source
+cargo xwin MSVC test-target checking passes. Sandboxed preflight 17900 exited
+101 solely at Push process observation (EPERM; tools 952/953). Authorized
+outside-sandbox preflight 24264 exited 0: locked workspace checks, Clippy, tests,
+tools 953/953, doctests and both external SDK fixture modes pass
+(/tmp/talos-i300-root-admitted-preflight.log). Governance 83941 and claims 54013
+both exited 0 with zero warnings. Fresh fetch finds HEAD 272 ahead/0 behind
+origin/main; no rebase needed. Published predecessor CI 39349870653 has passed
+Linux full validation; native Windows workspace tests remain in progress. This
+checkpoint does not establish native execution of the new root regression.
+Windows production and Pull remain closed; original T7 and handoff residuals
+remain open. Next: collect native CI failures and publish this verified stage.
