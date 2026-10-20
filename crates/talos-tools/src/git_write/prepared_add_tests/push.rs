@@ -1,3 +1,17 @@
+// Local receiver probes use the same fresh internal-program admission as the
+// production ReceiverRoots dispatcher before capturing child executables.
+async fn discover_receiver_sender_approved(plan: AddPlan) -> Box<AddPlan> {
+    let mut plan = Box::new(plan).discover().await.expect("sender discovery");
+    assert!(plan.phase == Phase::ReceiverRoots);
+    if cfg!(windows) {
+        let tokens = proof(&plan)
+            .consume_for_prepared(&plan.request(), &plan.identity)
+            .expect("receiver sender program admission");
+        plan = plan.rebind_push_program(&tokens).await.expect("receiver sender binding");
+    }
+    plan
+}
+
 // Network Push reaches its mutation plan only after Windows internal Git has
 // received fresh admission. Local receivers retain their separate root stage.
 async fn finish_push_program_approved(mut plan: Box<AddPlan>) -> Box<AddPlan> {
@@ -617,22 +631,17 @@ async fn receiver_child_requires_read_admission_before_capture() {
         ToolProvenance::Native,
     )
     .expect("plan");
-    let mut plan = Box::new(plan).discover().await.expect("discovery");
+    let mut plan = discover_receiver_sender_approved(plan).await;
     // This absent child has no Read facet. Admission must fail before capture
     // could report that its executable is unavailable.
     plan.receiver_child_paths = vec![sender.path().join("unadmitted-child")];
-    let admission = proof(&plan);
-    let PreparedNormalStage::Complete(output) = plan.execute_stage(Box::new(admission)).await
-    else {
+    let tokens = proof(&plan)
+        .consume_for_prepared(&plan.request(), &plan.identity)
+        .expect("root admission");
+    let Err(error) = plan.discover_receiver_roots(&tokens) else {
         panic!("unadmitted child cannot advance discovery");
     };
-    assert!(output.result.is_error);
-    assert!(
-        output
-            .result
-            .content
-            .contains("Receiver Read authorization missing")
-    );
+    assert!(error.to_string().contains("Receiver Read authorization missing"));
 }
 
 #[cfg(unix)]
@@ -654,7 +663,7 @@ async fn receiver_child_replacement_refuses_next_discovery_stage() {
         ToolProvenance::Native,
     )
     .expect("plan");
-    let mut plan = Box::new(plan).discover().await.expect("discovery");
+    let mut plan = discover_receiver_sender_approved(plan).await;
     // Substitute only the shell fixture. Git children must retain their
     // identity relationship with the configuration-discovery executable.
     plan.receiver_child_paths[1] = child.clone();
@@ -713,7 +722,7 @@ async fn receiver_reference_tree_refuses_exact_paths_without_closed_capability()
         ToolProvenance::Native,
     )
     .expect("plan");
-    let mut plan = Box::new(plan).discover().await.expect("sender discovery");
+    let mut plan = discover_receiver_sender_approved(plan).await;
     let authorization = proof(&plan)
         .consume_for_prepared(&plan.request(), &plan.identity)
         .expect("roots admission");
@@ -1207,7 +1216,7 @@ async fn receiver_home_includes_refuse_ambiguous_interpolation() {
             ToolProvenance::Native,
         )
         .expect("plan");
-        let mut plan = Box::new(plan).discover().await.expect("sender discovery");
+        let mut plan = discover_receiver_sender_approved(plan).await;
         plan.environment.insert("HOME".into(), home.into());
         let authorization = proof(&plan)
             .consume_for_prepared(&plan.request(), &plan.identity)
@@ -1255,7 +1264,7 @@ async fn receiver_external_hook_is_deferred_to_fresh_read_admission() {
         ToolProvenance::Native,
     )
     .expect("plan");
-    let plan = Box::new(plan).discover().await.expect("sender");
+    let plan = discover_receiver_sender_approved(plan).await;
     let authorization = proof(&plan)
         .consume_for_prepared(&plan.request(), &plan.identity)
         .expect("root admission");
@@ -1330,7 +1339,7 @@ async fn receiver_multiple_destinations_keep_sibling_bisect_evidence_separate() 
         ToolProvenance::Native,
     )
     .expect("plan");
-    let plan = Box::new(plan).discover().await.expect("sender discovery");
+    let plan = discover_receiver_sender_approved(plan).await;
     let authorization = proof(&plan)
         .consume_for_prepared(&plan.request(), &plan.identity)
         .expect("roots admission");
@@ -1454,7 +1463,7 @@ async fn receiver_layout_stages_accept_real_bare_normal_and_linked_repositories(
             ToolProvenance::Native,
         )
         .expect("plan");
-        let plan = Box::new(plan).discover().await.expect("sender discovery");
+        let plan = discover_receiver_sender_approved(plan).await;
         let authorization = proof(&plan)
             .consume_for_prepared(&plan.request(), &plan.identity)
             .expect("root admission");
@@ -1843,7 +1852,7 @@ async fn receiver_metadata_wave_defers_pointer_targets_and_binds_changes() {
             ToolProvenance::Native,
         )
         .expect("plan");
-        let plan = Box::new(plan).discover().await.expect("sender");
+        let plan = discover_receiver_sender_approved(plan).await;
         let authorization = proof(&plan)
             .consume_for_prepared(&plan.request(), &plan.identity)
             .expect("root proof");
@@ -1901,7 +1910,7 @@ async fn receiver_metadata_stage_rejects_changed_root_marker() {
         ToolProvenance::Native,
     )
     .expect("plan");
-    let plan = Box::new(plan).discover().await.expect("sender discovery");
+    let plan = discover_receiver_sender_approved(plan).await;
     let admission = proof(&plan);
     let authorizations = admission
         .consume_for_prepared(&plan.request(), &plan.identity)
