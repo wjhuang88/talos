@@ -5808,3 +5808,31 @@ evidence that production Windows Git is enabled. The Push fixture admission
 failure is addressed in `0cecd803`; exact-head CI run 39355259779 for `77a8cf84`
 is now running and must determine which failures remain. T7 remains Active, and
 no Windows runtime or delivery gate is considered closed yet.
+
+2026-10-20 latest Windows failure triage: exact-head run 39355259779 for
+`77a8cf84` is terminal failure. Linux full validation, Desktop and governance
+jobs passed; Windows tools recorded 860 passed/30 failed. Full failure artifact
+is retained at `/private/tmp/i300-windows-77a8cf84/windows-workspace-tests.log`.
+Two fixture corrections now use native `git config` to quote Trace2 target
+paths and canonicalize both sides of the native worktree comparison (Windows
+long/short path aliases). Each focused locked Git-only library test passes on
+macOS; formatting and diff checks pass. Log:
+`/private/tmp/i300-fixture-repair-tests.log`. These results do not prove native
+Windows execution. Remaining failures include sender/receiver executable
+admission shortcuts, hook/configuration expectations, Pull resolution and
+integration, plus cross-layer tests refused by the production Windows gate.
+T7 remains Active; no gate is removed and no completion is claimed.
+
+2026-10-20 local fixture revalidation: `282c8da7` fixes native worktree
+identity comparison and writes Trace2 fixture paths through Git config quoting.
+Receiver direct-stage fixtures now explicitly admit the Windows sender program
+before testing receiver roots; the missing-Read case isolates root capture after
+that admission rather than accidentally failing sender rediscovery. The final
+source passes locked Git-feature library tests 450/450 outside the sandbox
+(`/private/tmp/i300-tools-fixture-recheck.log`). The initial sandboxed run was
+449/450 because process observation via ps was denied; it was not a reproduced
+Git failure. Receiver fixture changes are committed as `7cc19789`. Locked Windows MSVC
+test-target checking via cargo xwin passes (seven reduced-feature dead-code
+warnings; `/private/tmp/i300-receiver-fixtures-xwin.log`). This is compilation
+evidence only; native Windows behavior, remaining failures and all original
+delivery gates stay open.
