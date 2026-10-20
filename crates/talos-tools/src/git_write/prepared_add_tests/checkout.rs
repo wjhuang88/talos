@@ -777,6 +777,10 @@ async fn checkout_target_hooks_wait_for_all_exact_read_tokens() {
         }
         assert!(history.record_profile(&plan.identity, &plan.facets));
         let paths = plan.target_hook_paths.as_ref().expect("hook frontier");
+        assert!(
+            paths.iter().any(|path| path == &plan.repository.workdir.join("late-hooks/post-checkout")),
+            "target hook fixture must bind its actual drift path: {paths:?}"
+        );
         let omitted = paths[1].clone();
         // A directory would fail regular-file capture if inspected. Missing any
         // exact token must fail admission first, before inspecting either leaf.
@@ -900,6 +904,10 @@ async fn checkout_target_hook_missing_evidence_refuses_later_creation() {
             "user.email=fixture@example.invalid",
             "-c",
             "commit.gpgSign=false",
+            "-c",
+            "maintenance.autoDetach=false",
+            "-c",
+            "gc.autoDetach=false",
             "commit",
             "-qm",
             "initial",
