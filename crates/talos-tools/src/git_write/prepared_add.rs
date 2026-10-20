@@ -1021,14 +1021,6 @@ impl AddPlan {
         }
         let mut children = Vec::new();
         if !roots.is_empty() {
-            let directory = candidate.parent().ok_or_else(|| {
-                GitToolError::InvalidInput("Push exec-path directory missing".into())
-            })?;
-            children.push(directory.join(if cfg!(windows) {
-                "git-receive-pack.exe"
-            } else {
-                "git-receive-pack"
-            }));
             children.push(self.inspect_git_shell_path().await?);
             if !children.contains(&candidate) {
                 children.push(candidate);
@@ -1558,32 +1550,13 @@ impl AddPlan {
             );
         }
         if !self.receiver_roots.is_empty() {
-            let exec_path = self
-                .maintenance_program
-                .as_ref()
-                .and_then(|program| program.parent())
-                .ok_or_else(|| {
-                    GitToolError::InvalidInput(
-                        "Git receive-pack executable directory is unavailable".into(),
-                    )
-                })?;
-            let receiver = exec_path.join(if cfg!(windows) {
-                "git-receive-pack.exe"
-            } else {
-                "git-receive-pack"
-            });
             let shell = self.inspect_git_shell_path().await?;
-            for (path, description) in [
-                (
-                    &receiver,
-                    "local Git receive-pack child executable identity",
-                ),
-                (&shell, "local Git transport shell executable identity"),
-            ] {
-                self.facets
-                    .push(path_facet(ToolNature::Read, path, description)?);
-                self.receiver_child_paths.push(path.clone());
-            }
+            self.facets.push(path_facet(
+                ToolNature::Read,
+                &shell,
+                "local Git transport shell executable identity",
+            )?);
+            self.receiver_child_paths.push(shell);
             let maintenance = self.maintenance_program.as_ref().ok_or_else(|| {
                 GitToolError::InvalidInput("Receiver Git child executable missing".into())
             })?;
@@ -3203,7 +3176,7 @@ impl AddPlan {
     fn validate_receiver_shell_baseline(&self) -> Result<(), GitToolError> {
         let path = self
             .receiver_child_paths
-            .get(1)
+            .first()
             .ok_or_else(|| GitToolError::InvalidInput("Receiver shell missing".into()))?;
         let evidence = self
             .receiver_child_executables
@@ -3221,20 +3194,17 @@ impl AddPlan {
         let maintenance = self.maintenance_program.as_ref().ok_or_else(|| {
             GitToolError::InvalidInput("Receiver Git child executable missing".into())
         })?;
-        let receive_pack = self.receiver_child_paths.first().ok_or_else(|| {
-            GitToolError::InvalidInput("Receiver receive-pack executable missing".into())
-        })?;
-        for path in [receive_pack, maintenance] {
-            let evidence = self
-                .receiver_child_executables
-                .iter()
-                .find(|evidence| &evidence.spelling == path)
-                .ok_or_else(|| {
-                    GitToolError::InvalidInput("Receiver Git executable evidence missing".into())
-                })?;
-            if evidence.program != self.program_entry {
-                return Err(GitToolError::InvalidInput("Receiver Git children differ from the configuration-discovery executable; use a separately authorized invocation".into()));
-            }
+        // The fixed receiver command invokes this Git's builtin receive-pack;
+        // no dashed git-receive-pack executable participates in dispatch.
+        let evidence = self
+            .receiver_child_executables
+            .iter()
+            .find(|evidence| &evidence.spelling == maintenance)
+            .ok_or_else(|| {
+                GitToolError::InvalidInput("Receiver Git executable evidence missing".into())
+            })?;
+        if evidence.program != self.program_entry {
+            return Err(GitToolError::InvalidInput("Receiver Git children differ from the configuration-discovery executable; use a separately authorized invocation".into()));
         }
         Ok(())
     }

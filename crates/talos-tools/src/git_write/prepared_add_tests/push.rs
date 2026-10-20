@@ -539,9 +539,14 @@ async fn fixed_receiver_command_performs_real_local_push() {
         .output()
         .expect("bare init");
     assert!(init.status.success());
+    // Exercise builtin dispatch with an empty GIT_EXEC_PATH.
+    // This is a command-level fixture; structured preparation intentionally
+    // rejects GIT_EXEC_PATH overrides without separate authorization.
+    let exec_path = tempfile::tempdir().expect("empty exec-path");
     let mut command = tokio::process::Command::new(&program);
     command
         .current_dir(sender.path())
+        .env("GIT_EXEC_PATH", exec_path.path())
         .arg("push")
         .arg(format!(
             "--receive-pack={}",
@@ -666,7 +671,7 @@ async fn receiver_child_replacement_refuses_next_discovery_stage() {
     let mut plan = discover_receiver_sender_approved(plan).await;
     // Substitute only the shell fixture. Git children must retain their
     // identity relationship with the configuration-discovery executable.
-    plan.receiver_child_paths[1] = child.clone();
+    plan.receiver_child_paths[0] = child.clone();
     plan.facets
         .push(path_facet(ToolNature::Read, &child, "fixture child").expect("facet"));
     let admission = proof(&plan);
