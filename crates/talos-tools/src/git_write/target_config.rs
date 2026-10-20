@@ -1476,7 +1476,7 @@ mod tests {
             "[BRANCH.topic]\nREMOTE=old\nMERGE=refs/heads/old\n[include]\npath=absent\n[branch \"topic\"]\n",
         ] {
             let temporary = tempfile::tempdir().expect("fixture");
-            let root = temporary.path().canonicalize().expect("root");
+            let root = native_fixture_root(&temporary);
             let git = |args: &[&str]| {
                 let output = std::process::Command::new("git")
                     .current_dir(&root)
@@ -2037,7 +2037,7 @@ mod tests {
             ),
         ] {
             let temporary = tempfile::tempdir().expect("fixture");
-            let root = temporary.path().canonicalize().expect("root");
+            let root = native_fixture_root(&temporary);
             let source = root.join("source");
             std::fs::write(&source, format!("[includeIf \"hasconfig:remote.*.url:{pattern}\"]\npath=child\n[include]\npath=later\n")).expect("source");
             std::fs::write(
@@ -2199,14 +2199,15 @@ mod tests {
                 .expect("native Git")
         };
         assert!(native(&["init", "--quiet"]).status.success());
-        std::fs::write(
-            &system,
-            format!(
-                "[fixture]\nmarker=system\n[include]\npath={}\n",
-                global.display()
-            ),
-        )
-        .expect("system");
+        std::fs::write(&system, b"[fixture]\nmarker=system\n").expect("system");
+        let configured = native(&[
+            "config",
+            "--file",
+            system.to_str().expect("system path"),
+            "include.path",
+            global.to_str().expect("global path"),
+        ]);
+        assert!(configured.status.success(), "{configured:?}");
         std::fs::write(&xdg_config, b"[fixture]\nmarker=xdg\n").expect("xdg");
         std::fs::write(
             &global,
@@ -2413,7 +2414,7 @@ mod tests {
     #[test]
     fn hasconfig_non_path_key_still_triggers_url_prohibition() {
         let temporary = tempfile::tempdir().expect("fixture");
-        let root = temporary.path().canonicalize().expect("root");
+        let root = native_fixture_root(&temporary);
         let source = root.join("source");
         let git = |args: &[&str]| {
             std::process::Command::new("git")
