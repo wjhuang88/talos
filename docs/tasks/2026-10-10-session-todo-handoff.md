@@ -4615,3 +4615,60 @@ Final local batch result: standard preflight session 10879 exited 0 with
 rebase fixture bytes as 5ae25149. Both governance and collaboration validators
 also exited 0. Native Windows rerun, production activation and the original
 T7 residuals are still required; these commits do not complete T7.
+
+2026-10-20 child backlink correction in progress: Pull and Checkout now
+share an alias check that converts only the already admitted canonical child
+root through the existing identity-checked Git directory argument helper.
+The declared backlink is never resolved or read. Before conversion, exact
+root and marker Read tokens are required and retained Root evidence is
+revalidated; evidence is revalidated again after conversion. Canonical
+spelling acceptance remains unchanged. Windows regression covers missing
+root/marker proof, approved conventional spelling and unrelated declarations.
+Independent static security review found no blocker; it did not run tests or
+instrument zero-I/O behavior. MSVC xwin test-target check passed (50695);
+initial sandboxed prepared tests reported 161 passed / 1 process-observation
+PermissionDenied, so the same selection is running with host permissions as
+15383 (/private/tmp/i300-child-backlink-tests.log). Checkout drift assertions
+now identify their fixture mode; focused local test passed 1/1. This correction
+is uncommitted and needs final validation and native Windows execution.
+Published head 92494edf has active CI run 39371203732; do not restart it.
+
+Host-permission rerun 15383 exited 0: prepared tests 162/162 passed.
+Final batch preflight is live as session 22365, log
+/private/tmp/i300-child-backlink-preflight.log. Poll that handle before
+restarting; no full batch pass or native Windows success is claimed yet.
+
+Session 22365 has now exited 0 with `release preflight: passed`. Child
+backlink correction is committed as 489d2fa5; Checkout fixture diagnostics as
+05783988, not yet published. Fresh fetch finds zero main-only commits.
+Next local batch removes the redundant dashed git-receive-pack executable
+binding: fixed receiver_command invokes the bound Git's builtin directly.
+Git for Windows 2.54 and 2.56 git.c confirm builtin-first dispatch. A native
+isolated push with empty receiver exec-path succeeds and verifies the receiver
+ref. The production eight-stage fixture now adds a git-only exec-path case,
+without an external receive-pack; focused test is running as 22469, log
+/private/tmp/i300-builtin-receiver-test.log. Actual Git, shell and maintenance
+identity/admission checks remain. Final batch validation/review remain pending.
+
+2026-10-20 builtin receiver regression correction: the attempted eight-stage
+fixture with GIT_EXEC_PATH override failed at preparation, as required by the
+existing separate-invocation authorization guard (session 46789). The earlier
+after-prepare override likewise correctly failed environment-drift validation.
+Both fixture approaches are removed; no production guard was weakened. The
+existing command-level real-push regression now uses an empty exec-path to
+verify builtin dispatch, while the original full eight-stage authorization
+fixture remains unchanged. This proves dispatch only, not support for
+environment overrides in structured Git. Final checks and review are pending.
+
+Builtin cleanup validation: command-level push passes 1/1; unchanged prepared
+authorization suite passes 162/162 with host process-observation permissions
+(/private/tmp/i300-builtin-prepared.log). Windows MSVC cargo xwin test-target
+check passes with the seven existing reduced-feature warnings
+(/private/tmp/i300-builtin-xwin.log). Independent static security review finds
+no blocker; its comment precision suggestion was applied. Full standard
+preflight is running as session 63768 (/private/tmp/i300-builtin-preflight.log);
+poll before restarting. Native CI 39371203732 at published 92494edf ended in
+failure: tools 885 passed / 15 failed, with additional Agent/MCP/Runtime
+failures. Log: /private/tmp/i300-native-92494edf.log. This CI excludes local
+489d2fa5, 05783988 and the current receiver cleanup. Production Windows/Pull
+remain disabled and all original T7/handoff completion gates remain open.
