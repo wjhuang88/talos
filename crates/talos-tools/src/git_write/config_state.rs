@@ -566,6 +566,10 @@ fn push_recursion_enabled(output: &[u8]) -> Result<bool, GitToolError> {
 // cannot hide its overlap with a target worktree entry. Missing suffixes are
 // retained as paths only; no content is read through them.
 fn resolve_optional_path(path: &std::path::Path) -> Result<PathBuf, GitToolError> {
+    #[cfg(windows)]
+    let resolved_parents = windows_auxiliary_parents(path)?;
+    #[cfg(windows)]
+    let path = resolved_parents.as_path();
     let mut prefix = path.to_path_buf();
     let mut suffix = Vec::new();
     loop {
@@ -594,6 +598,34 @@ fn resolve_optional_path(path: &std::path::Path) -> Result<PathBuf, GitToolError
             Err(_) => return Err(unsupported("Checkout auxiliary path cannot be resolved")),
         }
     }
+}
+
+// Verbatim Windows paths do not interpret `..` during filesystem access.
+// Resolve each cancelled directory through the filesystem before taking its
+// parent; lexical folding would incorrectly accept missing/file ancestors.
+// auxiliary_spellings separately inventories the original traversal spelling.
+#[cfg(windows)]
+fn windows_auxiliary_parents(path: &std::path::Path) -> Result<PathBuf, GitToolError> {
+    let mut prefix = PathBuf::new();
+    for part in path.components() {
+        if part == std::path::Component::ParentDir {
+            if !std::fs::metadata(&prefix)
+                .map_err(|_| unsupported("Checkout auxiliary ancestor unavailable"))?
+                .is_dir()
+            {
+                return Err(unsupported(
+                    "Checkout auxiliary ancestor is not a directory",
+                ));
+            }
+            prefix = prefix
+                .canonicalize()
+                .map_err(|_| unsupported("Checkout auxiliary ancestor cannot be resolved"))?;
+            prefix.pop();
+        } else {
+            prefix.push(part.as_os_str());
+        }
+    }
+    Ok(prefix)
 }
 
 // Target entries may not exist yet, so canonicalize alone cannot establish
@@ -638,6 +670,16 @@ fn auxiliary_spellings(path: &std::path::Path) -> Result<BTreeSet<PathBuf>, GitT
         let mut prefix = PathBuf::new();
         let mut next = None;
         for (position, component) in components.iter().enumerate() {
+            #[cfg(windows)]
+            if *component == std::path::Component::ParentDir {
+                // Keep the cancelled ancestor in spellings (inserted on the
+                // previous iteration), but use a resolved path for OS lookup.
+                let mut traversal = prefix.as_os_str().to_os_string();
+                traversal.push(r"\..");
+                prefix = windows_auxiliary_parents(std::path::Path::new(&traversal))?;
+                spellings.insert(prefix.clone());
+                continue;
+            }
             prefix.push(component.as_os_str());
             // A Windows prefix alone (notably \\?\C:) is not the absolute
             // root. Inspect it only after appending the following RootDir.

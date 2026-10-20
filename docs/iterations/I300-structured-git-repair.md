@@ -633,6 +633,27 @@ T7 remains Active; later serial tasks and publication gates remain incomplete.
 
 # Iteration I300: Structured Git Permission And Diff Repair
 
+2026-10-20 Windows auxiliary-parent candidate: verbatim include paths now
+resolve each `..` only after checking that its cancelled ancestor is an existing
+directory. Original ancestor spellings remain in the auxiliary inventory;
+missing and regular-file ancestors have an additional Windows-only refusal
+regression. Host config-state regressions pass 31/31, and the Windows MSVC test
+target passes `cargo xwin check --locked` (seven existing reduced-feature
+warnings). These are host and compilation evidence, not native Windows success.
+Independent static security review found no blocking issue; the existing
+check-to-use race remains. The Checkout hook exact-read regression also passes
+1/1. A Windows volume-root parent regression was added on review advice;
+final locked MSVC test-target compilation passes, while native confirmation
+remains required. Both governance validators pass with zero warnings.
+
+The latest full preflight on 67112a30 failed the sandbox early-exit stdin test
+with an unconfirmed cleanup receipt. A focused retry and all 48 sandbox library
+tests pass; the cause remains unknown, so the earlier preflight failure is not
+closed. The test now reports the execution error and internal receipt failure
+on recurrence. Run 39401797353 remains live at this checkpoint. Production
+Windows structured Git and Pull remain disabled; T7 and the full handoff queue
+remain incomplete.
+
 Current gate handle (2026-10-15): full approved standard preflight is live
 as session 52429, `/private/tmp/i300-new-directory-preflight-approved.log`;
 resume this handle rather than restart. Governance and claims pass with zero

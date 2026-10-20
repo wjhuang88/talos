@@ -56,6 +56,33 @@ fn declared_relative_include_retains_cancelled_ancestor_on_canonical_root() {
 
 #[cfg(windows)]
 #[test]
+fn cancelled_windows_auxiliary_ancestor_must_be_an_existing_directory() {
+    let root = tempfile::tempdir().expect("fixture");
+    let canonical = root.path().canonicalize().expect("canonical root");
+    std::fs::write(canonical.join("file"), b"not a directory").expect("file");
+    for ancestor in ["missing", "file"] {
+        let mut path = canonical.as_os_str().to_os_string();
+        path.push(format!(r"\{ancestor}\..\target.conf"));
+        assert!(auxiliary_spellings(std::path::Path::new(&path)).is_err());
+    }
+}
+
+#[cfg(windows)]
+#[test]
+fn windows_auxiliary_parent_at_volume_root_stays_at_root() {
+    let fixture = tempfile::tempdir().expect("fixture");
+    let canonical = fixture.path().canonicalize().expect("canonical fixture");
+    let root = canonical.ancestors().last().expect("volume root");
+    let mut path = root.as_os_str().to_os_string();
+    path.push(r"..\..");
+    assert_eq!(
+        windows_auxiliary_parents(std::path::Path::new(&path)).expect("root parents"),
+        root
+    );
+}
+
+#[cfg(windows)]
+#[test]
 fn declared_windows_include_paths_preserve_roots_and_reject_ambiguous_forms() {
     let environment = BTreeMap::new();
     let workdir = PathBuf::from(r"C:\work");
