@@ -6401,3 +6401,15 @@ to the test executable; commands share frozen environment/cwd and discovery
 has a deadline. These Windows-only follow-ups pass MSVC xwin checking but
 remain unexecuted on Windows. Fresh fetch has no main-only commits. Production
 Windows/Pull, remaining Checkout behavior and complete T7 delivery stay open.
+
+
+2026-10-20 Windows shell baseline local candidate: same-installation canonical
+path checks now support the observed ucrt64 Git layout in the gated unit path.
+Unknown layouts, other shells/roots/drives and invocation-spelling substitution
+refuse. Review caught and corrected use of rebound self.program; the baseline
+now consumes sender_program_target() retained canonical evidence without new
+reads. Independent re-review has no blocker; MSVC xwin test-target check passes
+(seven existing reduced-feature warnings), host Unix shell regression passes
+1/1 (/private/tmp/i300-shell-baseline-host.log). Candidate remains local while
+7036ddce CI 39444015640 runs. DLL/MSYS effects, native prepared Push and full
+Windows/Pull activation remain unproven; no completion claim.
