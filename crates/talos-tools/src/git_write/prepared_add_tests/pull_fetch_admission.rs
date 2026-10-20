@@ -118,6 +118,7 @@ async fn pull_network_fetch_continuation_requires_fresh_admission() {
     );
     for mode in ["allow", "deny", "replay"] {
         let local = fixture();
+        isolate_integration_fixture_filters(local.path());
         git(local.path(), &["remote", "add", "origin", &destination]);
         let branch = git(local.path(), &["symbolic-ref", "--short", "HEAD"]);
         git(

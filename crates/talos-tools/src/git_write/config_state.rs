@@ -1291,6 +1291,31 @@ impl ConfigState {
         branch: Option<&str>,
     ) -> Result<Vec<PathBuf>, GitToolError> {
         use super::pull_state::Integration;
+        // Current-worktree attributes cannot predict attributes introduced by
+        // the fetched tree or by replayed commits. A worktree write grant does
+        // not authorize configured programs selected by those new attributes.
+        for (key, values) in &self.values {
+            let filter = key.starts_with(b"filter.")
+                && [b".clean".as_slice(), b".smudge", b".process"]
+                    .iter()
+                    .any(|suffix| key.ends_with(suffix));
+            let driver = matches!(
+                integration,
+                Integration::Merge { .. } | Integration::Rebase { .. }
+            ) && key.starts_with(b"merge.")
+                && key.ends_with(b".driver");
+            if (filter || driver)
+                && values
+                    .last()
+                    .is_some_and(|value| value.as_deref().is_none_or(|value| !value.is_empty()))
+            {
+                return Err(unsupported(if filter {
+                    "Pull integration configured filter requires separate execution authorization"
+                } else {
+                    "Pull integration custom merge driver requires separate execution authorization"
+                }));
+            }
+        }
         if matches!(
             integration,
             Integration::Rebase {
