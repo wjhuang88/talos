@@ -1,3 +1,46 @@
+## Current whole-task convergence — 2026-10-21
+
+Start here, then read the [I300 convergence packages](../iterations/I300-structured-git-repair.md#current-convergence-plan--2026-10-21).
+Historical checkpoints below remain evidence; the Goal Execution Ledger and original
+requirements remain preserved. This update changes scheduling clarity, not scope,
+authority, acceptance or the Standard work mode. C0 is complete; T7 is Active and all
+later items remain unactivated. No percentage or completion date is established.
+
+The critical path is **common authorization boundary → Windows runtime closure →
+Checkout transitions → complete Pull → production acceptance and merge**. I300 owns
+the five finite packages, exit gates, fallback and human-decision triggers. A passing
+unit suite or inert preparation stage is progress but does not count as enabled behavior.
+Current code changes remain uncommitted pending the auxiliary identity/admission closure;
+the Windows daemon Push timeout still needs a causal native diagnosis.
+
+| Queue | Delivery boundary | Start/exit rule |
+|---|---|---|
+| T7 / I300 | Structured Git authorization and faithful diff/configured operations | Finish I300 P1–P5 and record merged evidence; keep Windows/Pull gates closed until reviewed production tests pass. |
+| T8 / PERM-007-H | Shared effect-aware Auto review for registered built-in tools | After T7, inventory actual tool coverage and reconcile higher-risk policy before activation; require real approval/denial/execution evidence, not registration alone. |
+| T2 + T3 / MODEL-014 | Custom-model capability/variant inference and its regression/user walkthrough | One consolidated implementation/test slice after T8; settle authority, explicit-negative overrides and schema before coding; no paid probing or inferred endpoint support claims. |
+| T4 / MEM-005 continuation | Whole-request compaction policy, visible outcomes and manual control | New effective owner after T2/T3; preserve raw history, pairing, hidden-output boundaries and failure/cancel behavior. I298 trimming is not this deliverable. |
+| T5 / Actor compaction/recovery | Model-callable safe-boundary compaction and bounded authoritative history recovery | Depends on T4; prove discovery, ordering, concurrency, privacy and persistence through the Actor. |
+| T1 / validate and agile | Discoverable tools reusing bounded validation and supported read-only agile services | After T5; gated host execution, timeout/cancel/output bounds and failure evidence before exposure. |
+| T6 / memory parameter | Consistent model-selectable process limit with unchanged 2 GiB default | After T1; units/range/inheritance, composition/background coverage and truthful platform enforcement; security review and documentation before closure. |
+
+Before activating each later item, refresh all Active/Review/Planned/Blocked owners,
+resolve overlap and establish its effective claim; this plan is not activation. Use one
+implementation stream. Resolve design/permission questions before each slice rather than
+building a speculative framework for the whole queue. Cross-cutting machinery is reused
+only where concrete callers justify it. gix release tracking stays in GIT-001 and is not
+a prerequisite for T7; replacement requires capability evidence, not a predicted date.
+
+At package boundaries: local convergence, logical commits, fetch/rebase when needed,
+current-head checks and independent review, stable-candidate CI, then gated merge where
+the stage is independently deliverable. Global unrelated Issue/Board drift stays separately
+owned under ADR-071; applicable acceptance/security failures still block the candidate.
+New scope/authorization choices go to the maintainer as concrete grouped alternatives;
+already accepted decisions are not reopened without materially new evidence.
+
+Planning validation is recorded in I300. No product completion is claimed by this update.
+
+---
+
 Linked-worktree reference closure checkpoint (2026-10-17): after separately
 admitted `commondir` targets are bound, external `refs` and `packed-refs` become
 fresh exact-path frontiers. Their descendants and contents use the existing

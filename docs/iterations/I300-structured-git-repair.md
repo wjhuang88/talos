@@ -1,3 +1,104 @@
+## Current convergence plan — 2026-10-21
+
+This is the current execution entrypoint. Earlier checkpoints are preserved evidence,
+not additional acceptance requirements. The published Scope And Acceptance remains
+binding. I300/T7 is **Active / Claimed**; Windows production Git and production Pull
+remain disabled. This plan does not grant new permissions or activate later tasks.
+
+Planning closure ledger: outcome = a finite delivery path for the existing repair;
+artifacts = this owner and the handoff coordinator; preserve = published baseline,
+accepted ADRs, historical evidence and uncommitted code; synchronization = owner first,
+coordinator second (Board state unchanged); checks = governance, collaboration and diff;
+remaining implementation/evidence = the five work packages below. No new iteration,
+branch mode or worktree policy is selected by this planning update.
+
+Planning validation (2026-10-21): repository and skill governance validators pass
+with zero warnings; collaboration claim validation passes with zero warnings;
+git diff --check passes. A table verb initially triggered the completion-status
+heuristic; clarified the pending action and reran successfully. No Rust changes
+were made or product tests rerun for this planning slice. I300 remains Active.
+
+### Diagnosis and constraints
+
+Confirmed: local HEAD b37026e3 contains three commits after remote candidate 7036ddce;
+CI 39444015640 at that earlier candidate failed three Windows tools tests, with further
+production-gate failures. Local auxiliary-capture changes are not ready: compilation
+and 31 host tests do not establish cancelled-ancestor/leaf identity binding. The daemon
+Push timeout root cause is unknown. Ordinary configured Pull behavior remains incomplete.
+Inference: the current loop optimizes individual defensive checks without a finite
+activation path; accumulated code/test counts therefore overstate delivered progress.
+
+Hard: authorization before effects, retained identity, bounded/cancellable process
+ownership, original configured-behavior acceptance, real production entrypoints and
+platform evidence. Soft: work-package order and candidate size may change on evidence.
+Assumption: existing authorization/evidence/process machinery can serve the remaining
+paths without a new general framework; verify this in P1 rather than designing one now.
+
+### Finite delivery packages
+
+These are execution packages inside I300, not five new Stories or revised acceptance.
+Each stays open until its exit evidence exists; none is complete at this checkpoint.
+
+| Package / dependency | Runnable outcome and remaining work | Exit evidence / fallback |
+|---|---|---|
+| P1 common authorization boundary / first | Finish auxiliary dependency admission, filesystem-order resolution, retained directory/link/leaf or absence evidence, and shared resource limits. Map existing Sources, PathIdentity and RegularEvidence to actual callers before adding code. | Denial before reads, cancelled-ancestor and same-content replacement, missing-to-present and link-redirection regressions; independent authorization review; Windows MSVC check plus native tests. Keep affected execution disabled if authority is insufficient; present the concrete contract gap together. |
+| P2 Windows execution / P1 | Make the existing supervised structured Git path work on Windows, including actual receiver Push and cancellation. Resolve the daemon timeout from a minimal native reproduction; verify receiver shell/install baseline and auxiliary capture fixes together. | Real transfer writes the approved receiver ref; deny/replay/identity/cancel tests and terminal cleanup receipts pass; production Agent/Runtime/MCP tests pass after reviewed activation. Keep gate closed on unexplained failure; never substitute a longer timeout or compile success. |
+| P3 Checkout transitions / P1, P2 for Windows evidence | Finish initialized-child Checkout transitions and configured effects through the existing admission chain, including target hooks/configuration and worktree/metadata boundaries. | Native success, denial before effects, identity changes and partial/failure behavior for the full transition matrix on supported platforms; protected review. Record an explicit unsupported case rather than claiming the whole transition complete. |
+| P4 complete Pull / P1, P3; P2 for Windows activation | Close selected current/target/intermediate attributes and executable filter/merge-driver authority, default multihead helper effects, parent and initialized-child fetch, then merge/rebase integration. Reuse accepted per-repository and worktree-scope grants. | Ordinary configurations including unused global LFS remain usable; selected programs require their own grants; recursive fetch, conflicts, cancellation and partial effects are truthful through real Agent/Runtime/MCP entrypoints. Review and enable the complete three-gate chain only when safe. Conservative broad refusal is containment, not the final exit. |
+| P5 delivery / P1–P4 | Reconcile every published acceptance row, original two-file staging fixture preserving unrelated index data, diff fidelity and configured mutation behavior; update user docs and publish the repair. | Current-head full release_preflight, Unix/Windows CI, protected review and merge-time CAS; README languages/GIT-001/owner/Board synchronization; PR #735 or explicitly recorded successor merged; already-pushed implementation SHAs before Complete. |
+
+P2's minimal timeout diagnosis may be investigated while P1 is under review, but no
+second implementation stream or new authorization is implied. The immediate sequence
+is P1 caller/authority map and contract decision if needed, P1 implementation and tests,
+then one coherent Windows candidate for P2. Do not resume isolated capture patches
+before that map explains how admission and evidence reach the mutation boundary.
+
+### Keep implementation and decisions bounded
+
+- Every new finding must cite an existing acceptance row or protected boundary and be
+  assigned to P1–P5. A reproducible escape, lost data, unmanaged process or supported
+  behavior regression blocks its package. Optional capabilities and gix replacement
+  research belong to their existing owners, not the T7 critical path. Unclear findings
+  receive one bounded reproduction/call-chain investigation before classification.
+- Implement shared boundary behavior once where actual callers need it. Keep operation
+  sequencing in operation modules and tests in test modules. Avoid a new policy engine,
+  generic plugin mechanism or speculative refactor. Remove only superseded code/tests.
+- Existing human decisions persist. Pull-only pointer resolution does not authorize
+  general auxiliary traversal; the proposed target-link capability is still unaccepted.
+  If exact Path Read cannot express P1's reads, present one concrete grouped decision:
+  exact operations, affected paths, bounds, denied cases, reuse, compatibility impact
+  and alternative. No silent widening or asking the same decision again.
+- Human judgment may select a documented operation scope or explicitly approve a
+  compatibility tradeoff. It cannot replace programmatic token enforcement, identity
+  validation, supervision or final evidence. Changes to promised supported behavior
+  require an explicit baseline amendment; leaving a gate closed does not finish T7.
+- Stop speculative patching when two successive attempts at the same blocker add no
+  new causal evidence. Summarize the failing trace, falsified hypotheses and smallest
+  next experiment; ask the maintainer only if a real contract/scope/environment choice
+  remains. This is a scheduling checkpoint, not a waiver or automatic task deferral.
+
+### Candidate and reporting cadence
+
+Use one logical commit per reviewed change, preserving current local work. Run focused
+checks during implementation; batch independent review around a coherent boundary.
+At a stable package candidate, fetch/reconcile main, run required local preflight and
+MSVC cargo xwin checks, then publish once for native exact-head CI. Native-only diagnosis
+may use a clearly labeled diagnostic candidate; it is not a merge-ready delivery stage.
+Inspect failures before retrying; substantive corrections require fresh head evidence.
+
+A stage may merge only if its advertised behavior is independently complete and all
+applicable gates pass. PR #735 is accumulated work: do not call it a narrow Windows-only
+stage or merge it on the strength of one passing sub-suite. If a safe subset is worth
+separating, first inventory its dependencies and review scope; no blind cherry-picking.
+An intermediate merge never closes remaining I300 acceptance rows.
+
+Report: production capability enabled, package exits passed, named blockers, next
+experiment/decision and evidence head. Do not estimate completion from commits, lines
+or test totals. No date estimate is justified until P1's authority and P2's timeout
+root cause are resolved. All later handoff tasks retain their serial dependencies.
+
+---
+
 Current Windows supervision checkpoint (2026-10-18): maintainer accepted
 ADR-068 foreground extension to reuse the existing Job implementation for
 structured Git. Independent review found direct-child-only cleanup on non-Unix
@@ -6447,3 +6548,17 @@ proves the builtin receive-pack child starts, but no receiver ref is written
 before timeout; root cause remains unresolved. Log:
 /private/tmp/i300-7036-windows.log. The CI head excludes the local baseline and
 HOME sentinel commits and this containment change.
+
+
+2026-10-21 auxiliary capture review checkpoint: the uncommitted Windows
+ParentDir capture candidate passes MSVC cargo xwin test-target checking
+(/private/tmp/i300-auxiliary-capture-xwin.log; seven existing warnings).
+Host config-state tests pass 31/31 with --no-default-features --features git
+--locked (/private/tmp/i300-auxiliary-config-tests.log). An earlier filter
+selected zero tests and is not validation evidence. Independent static review
+identified an unresolved identity-binding concern: retaining original spelling
+and equal bytes does not by itself prove that cancelled ancestors and the
+resolved target stayed identical. Existing Sources/identity coverage must be
+verified and reused or extended before committing this candidate. No complete
+call-chain bypass has been reproduced. Native Windows runtime confirmation,
+production activation and all T7/handoff closure requirements remain open.
