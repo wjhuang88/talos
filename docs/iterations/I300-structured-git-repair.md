@@ -5854,3 +5854,45 @@ symbols disabled to limit disk use (`/private/tmp/i300-rebased-preflight.log`).
 No publication, Windows/Pull activation or T7 completion is claimed. Next:
 finish this gate, then continue native receiver executable/path, Checkout hook
 and Pull failures; preserve the full original handoff queue.
+
+2026-10-20 raw Pull path fixture checkpoint: `0280cc41` preserves the raw
+`absent/..` and `missing/deep/../..` input text on Windows verbatim roots,
+instead of allowing PathBuf::join to normalize those components before the
+resolver is called. Both fixtures assert ParentDir is present and retain the
+original absence/replacement failure checks. Locked Git-feature missing-path
+regressions pass 25/25 (`/private/tmp/i300-raw-path-tests.log`); Windows MSVC
+test-target cargo xwin checking passes (`/private/tmp/i300-raw-path-xwin.log`).
+Native Windows runtime evidence is still required. Standard preflight session
+91790 remains live; it started before this test-only change, so its result must
+not be described as full validation of the final source. Disk pressure required
+only the previously authorized target/debug/incremental cleanup; no broader
+clean was used. Continue monitoring the live preflight and remaining Windows
+receiver/Checkout/Pull failures. T7 and the original handoff remain Active.
+
+2026-10-20 preflight terminal result: session 91790 exited 1. Workspace
+check, Clippy, workspace tests and doctests passed, and the independent SDK
+fixture default run passed. Its final coding-feature build failed with
+No space left on device, so the standard preflight did not pass. Full log:
+`/private/tmp/i300-rebased-preflight.log`. Previously authorized target/debug
+cleanup removed only six completed test executables to recover space; source,
+Git data and Windows target artifacts were retained. Receiver bootstrap fixture
+now retains ordinary Windows paths for host Git and prints complete init
+output on failure; focused validation is running in session 88143. Production
+receiver shell validation still only supports the Unix /bin/sh baseline;
+Windows local Push needs an explicitly bound Windows shell/effect solution,
+not just sender fixture admission. T7 remains Active.
+
+2026-10-20 receiver shell evidence checkpoint: Git for Windows upstream
+run-command.c `git_shell_path()` uses `locate_in_PATH("sh")` under
+GIT_WINDOWS_NATIVE, rather than the Unix compiled SHELL_PATH. Its mingw.c
+`path_lookup` searches PATH and can also fall back to BusyBox applets. Thus
+assuming an installation-relative usr/bin/sh.exe is not a supported resolution
+rule. The Windows workspace CI now records Git build/version, exec-path, actual
+GIT_SHELL_PATH and resolved git/sh application paths before tests, so the next
+native run can distinguish path discovery failures from the explicit Unix-only
+receiver baseline. This adds evidence collection, not Windows shell admission.
+Production Windows and Pull gates remain unchanged. The resumed independent SDK
+fixture session 87459 exited 0; its coding-feature consumer ran successfully
+(`/private/tmp/i300-sdk-resume.log`). This repairs the previously failed SDK
+subcheck only; final-source standard preflight and exact-head native validation
+are still required. Remaining disk space was 317 MiB at this checkpoint.

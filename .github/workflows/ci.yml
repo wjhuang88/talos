@@ -225,6 +225,20 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
+      - name: Record native Git transport executables
+        shell: pwsh
+        run: |
+          git version --build-options
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git --exec-path
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $transportShell = git var GIT_SHELL_PATH
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Write-Host "Git transport shell: $transportShell"
+          Get-Command git, sh -CommandType Application | Select-Object Name, Source
+          Get-Item -LiteralPath $transportShell -ErrorAction Stop |
+            Select-Object FullName, LinkType, Target
+
       - name: Format
         run: cargo fmt --all -- --check
 
