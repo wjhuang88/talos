@@ -1270,7 +1270,12 @@ mod tests {
             .output()
             .expect("init");
         assert!(output.status.success(), "{output:?}");
-        let gitdir = repository.join(".git");
+        // Metadata admission uses the canonical identity root, while host Git
+        // fixture commands retain the ordinary Windows spelling.
+        let gitdir = repository
+            .join(".git")
+            .canonicalize()
+            .expect("canonical gitdir");
         std::fs::write(
             base.join(".gitconfig"),
             "[extensions]\nworktreeConfig=true\n[core]\nworktree=../missing-global\n",
@@ -1301,7 +1306,7 @@ mod tests {
             assert_eq!(evidence.worktree_config.is_some(), enabled);
             assert!(evidence.local_worktrees.is_empty());
             let output = command()
-                .current_dir(&gitdir)
+                .current_dir(repository.join(".git"))
                 .args(["--git-dir=.", "config", "--null", "--list", "--includes"])
                 .output()
                 .expect("config query");
