@@ -38,6 +38,8 @@ async fn commit_maintenance_recent_objects_hook_requires_execution_authorization
             );
             output.stdout
         };
+        git(&["config", "user.name", "Fixture"]);
+        git(&["config", "user.email", "fixture@example.invalid"]);
         git(&["add", "file"]);
         git(&["commit", "-m", "initial"]);
         std::fs::write(root.path().join("file"), "changed").expect("change");
