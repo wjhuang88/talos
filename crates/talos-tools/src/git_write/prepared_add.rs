@@ -1725,6 +1725,37 @@ impl AddPlan {
             })
     }
 
+    fn child_backlink_matches(
+        &self,
+        layout: &super::receiver_state::Root,
+        marker: Option<&Path>,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<bool, GitToolError> {
+        let Some(marker) = marker else {
+            return Ok(true);
+        };
+        if marker == layout.canonical.join(".git") {
+            return Ok(true);
+        }
+        #[cfg(not(windows))]
+        {
+            let _ = authorizations;
+            Ok(false)
+        }
+        #[cfg(windows)]
+        {
+            let admitted = self.child_read(&layout.spelling, authorizations)?;
+            self.child_read(&layout.spelling.join(".git"), authorizations)?;
+            layout.revalidate(admitted)?;
+            // Convert only the already admitted root. Never resolve or open
+            // the backlink declaration, which may name an unrelated path.
+            let spelling = host_path::directory_argument(&layout.canonical)?;
+            let matches = marker == spelling.join(".git");
+            layout.revalidate(admitted)?;
+            Ok(matches)
+        }
+    }
+
     fn discover_checkout_child_markers(
         mut self: Box<Self>,
         authorizations: &[talos_core::tool::ToolExecutionAuthorization],
@@ -1777,11 +1808,11 @@ impl AddPlan {
             )?;
             // A linked child's backlink must name the already admitted marker.
             // Do not inspect a newly declared unrelated worktree marker.
-            if metadata
-                .worktree_marker
-                .as_ref()
-                .is_some_and(|path| path != &layout.canonical.join(".git"))
-            {
+            if !self.child_backlink_matches(
+                layout,
+                metadata.worktree_marker.as_deref(),
+                authorizations,
+            )? {
                 return Err(GitToolError::InvalidInput(
                     "New child backlink requires independent worktree discovery".into(),
                 ));
