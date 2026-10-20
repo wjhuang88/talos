@@ -37,6 +37,34 @@ impl AddPlan {
                 .run_command_output(command, std::time::Duration::from_secs(120), 1024 * 1024)
                 .await?;
             if !output.status.success() {
+                #[cfg(all(test, windows))]
+                {
+                    // Fixed categories only: Git diagnostics may contain
+                    // credentials, paths or configuration values.
+                    let diagnostic = String::from_utf8_lossy(&output.stderr);
+                    let categories: Vec<_> = [
+                        "unable to auto-detect email address",
+                        "Author identity unknown",
+                        "Committer identity unknown",
+                        "Permission denied",
+                        "cannot lock ref",
+                        "index.lock",
+                        "unstaged changes",
+                        "uncommitted changes",
+                        "could not execute",
+                        "cannot spawn",
+                        "invalid upstream",
+                        "could not apply",
+                    ]
+                    .into_iter()
+                    .filter(|category| diagnostic.contains(category))
+                    .collect();
+                    eprintln!(
+                        "Pull integration test diagnostic: categories={categories:?}, stdout_bytes={}, stderr_bytes={}",
+                        output.stdout.len(),
+                        output.stderr.len()
+                    );
+                }
                 // Git may have left conflicts or partial unborn integration.
                 // Do not retry, abort, or reset the user's repository.
                 return Err(GitToolError::Git(format!(
