@@ -318,6 +318,59 @@ denied frontier preserving all repository state, approval-between-stage drift,
 budgets, final effects, real prepared Agent/Runtime/MCP execution, and independent
 security review. Full support remains outstanding until those gates pass.
 
+### Accepted auxiliary path resolution capability (2026-10-21)
+
+Status: Accepted by the maintainer on 2026-10-21 in the explicit full-scope
+confirmation. Implementation and activation gates remain outstanding. This is the
+grouped P1 decision in I300, distinct from configuration-chain and Pull resolution.
+Independent static review confirms ordinary Path Read first folds `..` lexically
+and cannot authorize original alias entries, cancelled ancestors or a different
+filesystem-order target. Merely retaining original spellings is not admission.
+
+Accepted Read(Remote `git:auxiliary-path-resolution`) for prepared structured Git
+operations only, bound to the current operation, Git executable, repository identity
+and frozen auxiliary source set derived from already admitted configuration or the
+selected operation. It permits component metadata, link text and metadata-only
+identity handles needed to resolve those sources, including external local paths.
+It does not permit file contents, directory enumeration, program execution, writes
+or network access. UNC/network namespace paths and links to them refuse; ordinary
+Path Read is not a substitute network grant. Local paths backed by OS mounts are
+not a claim of network isolation; any stronger guarantee requires OS confinement.
+
+Each complete source resolution allows at most 64 link hops; the invocation shares
+4096 evidence entries and 4 MiB for path/link text and retained evidence, including
+Windows identity handles within the entry limit. Do not reset allowances per source
+or continuation. Preserve actual component order, cancelled ancestors, link identity
+and text, missing suffix evidence and actual target. Reject unsupported namespace,
+reparse type, cycles and exhausted limits. Retained checks reduce substitution risk;
+they do not claim race-free filesystem confinement.
+
+After resolution, publish fresh exact Path Read facets for actual targets and required
+directory dependencies. Check the complete frontier before capturing any file content;
+an old spelling token does not substitute for this new admission. Retain regular-file
+identity and bytes through probes. Revalidate the frozen chain before content access
+and again after final probes, immediately before mutation. Drift refuses; it never
+follows a replacement target under old proof. Discovery cannot grant mutation effects.
+
+Authorization must be checked at the actual resolution call sites, including overlap
+inspection, not only by displaying a facet. New auxiliary roots require a new prepared
+continuation/proof. Reuse existing resolution/evidence machinery where it meets these
+rules, without widening the accepted `git:pull-worktree-resolution` contract.
+
+This proposal does not accept or enable target configuration include-link traversal:
+Sources retains its existing exact frontier and link refusal; the separately proposed
+configuration-link capability above remains pending. It also does not authorize hooks,
+filters or drivers. Their program effects still need separate grants.
+
+Alternative: retain explicit unsupported-path refusal for auxiliary sources requiring
+unexpressible traversal. This cannot be counted as the final configured-behavior
+acceptance unless the maintainer explicitly amends that scope. No implicit permission
+expansion or wholesale configuration suppression is an acceptable implementation.
+
+Activation requires maintainer acceptance, grant compiler scope/denial tests, real
+prepared-stage denial before metadata/content, exact resolved-target admission,
+replacement and budget tests, native Windows/Unix evidence, and protected review.
+
 ### Accepted Pull worktree resolution metadata capability (2026-10-18)
 
 Status: Accepted by the maintainer on 2026-10-18; implementation and activation
