@@ -23,24 +23,26 @@ Transport errors terminate without selecting another parser, source or fallback.
 
 | Captured protocol | Response parser | Captured parser inputs |
 |---|---|---|
-| Lite | DDG Lite | status, body, count |
-| HTML | DDG HTML | status, body, count |
-| Instant Answer | DDG JSON | status, body, original query, count |
-| Bing | Bing CN | status, body, count |
+| Lite | DDG Lite | status, body, bounded20-candidate window |
+| HTML | DDG HTML | status, body, bounded20-candidate window |
+| Instant Answer | DDG JSON | status, body, original query, bounded20-candidate window |
+| Bing | Bing CN | status, body, bounded20-candidate window |
 
-CompatibilityCandidates is a common redacted wrapper around untrusted parser output. Explicit
-consumption retains fields/order and the existing compound family's DuckDuckGo ID. This does not
-attribute Bing as a native provider, validate result URLs, deduplicate further, select a winner,
-render or grant permission to fetch results. Empty/invalid/challenge responses retain closed
-DDG/Bing classifications; transport, DDG and Bing errors wrap only existing content-free enums.
-No raw query, body, URL or dependency diagnostic enters Debug/Display errors.
+The [result-admission prerequisite](SEARCH-001-C-COMPATIBILITY-ADMISSION.md) replaces the raw
+compatibility wrapper with opaque redacted AdmittedCompatibilityResults. Whole-batch bounds and
+family identity are checked; invalid URLs are filtered before captured requested-count truncation.
+Consumption preserves original fields/order and the compound family's DuckDuckGo ID. This does
+not attribute native Bing, deduplicate further, select a router winner, render or grant fetch
+authority. Parser errors retain closed DDG/Bing classifications; new admission errors are fixed
+content-free enums. No raw query, body, URL or dependency diagnostic enters Debug/Display errors.
 
 ## One Existing Execution Budget
 
 After the consuming send, the existing shared transport deadline is checked before parsing,
 then unconditionally after parsing, including parser failures. The parse result is saved before
 the second check. Deadline therefore dominates a success or failure completed after expiry.
-No new parse deadline or budget is created; request/byte accounting remains in transport.
+The same budget also fences result admission and its final success/error completion. No new
+parse/admission deadline or budget is created; request/byte accounting remains in transport.
 
 The private finishing helper receives the budget's live check from its sole production caller.
 Tests inject deterministic check outcomes to prove ordering, including failure paths; this is
@@ -78,7 +80,7 @@ The [fixed header snapshot prerequisite](SEARCH-001-C-COMPATIBILITY-HEADERS.md) 
 and Bing language in the same request. Preparation includes local entropy access; it still has
 no network/authority/budget effects. Header selection timing parity, probe/retry/source/proxy
 snapshots, full protocol/parser parity,
-D/privacy/result-use review, result admission, official CLI/SDK/MCP/standalone roots, router,
+D/privacy/result-use review, full result-policy acceptance, official CLI/SDK/MCP/standalone roots, router,
 health, cancellation/rollback/default activation and release retain their gates. The private
 request/response binding prerequisite does not complete those rows. I293 remains Active/Claimed,
 Completion Pending; #643/#624 stay open, #705/#717/#735 remain independently owned.

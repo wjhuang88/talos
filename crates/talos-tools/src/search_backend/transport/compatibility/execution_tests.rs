@@ -241,9 +241,9 @@ async fn all_four_protocols_send_frozen_bytes_and_use_captured_parser_query_and_
                 .expect("controlled response");
             assert_eq!(
                 format!("{candidates:?}"),
-                "CompatibilityCandidates(<redacted>)"
+                "AdmittedCompatibilityResults(<redacted>)"
             );
-            let rows = candidates.into_candidates();
+            let rows = candidates.into_results();
             assert_eq!(rows.len(), max as usize);
             assert!(
                 rows.iter()
@@ -342,6 +342,103 @@ fn invalid_preparation_never_selects_headers_and_valid_preparation_selects_once(
         assert_eq!(
             prepared.request.headers.expect("snapshot").user_agent(),
             "Synthetic Fixture/1.0"
+        );
+    }
+}
+
+#[tokio::test]
+async fn controlled_four_format_results_filter_before_count_and_reject_invalid_only() {
+    for protocol in ALL {
+        for valid_tail in [true, false] {
+            let tail = if valid_tail {
+                "https://second.invalid/"
+            } else {
+                "file:///second"
+            };
+            let response_body = if matches!(protocol, CompatibilityProtocol::InstantAnswer) {
+                serde_json::to_vec(&serde_json::json!({
+                    "AbstractText":"one", "AbstractURL":"file:///first", "AbstractSource":"", "Heading":"First",
+                    "Answer":"", "AnswerType":"", "Definition":"two", "DefinitionSource":tail,
+                    "RelatedTopics":[], "Infobox":null, "Type":""
+                })).expect("synthetic JSON")
+            } else {
+                String::from_utf8(body(protocol))
+                    .expect("HTML")
+                    .replace("https://first.invalid/", "file:///first")
+                    .replace("https://second.invalid/", tail)
+                    .into_bytes()
+            };
+            let mut fixture = Fixture::new(200, response_body).await;
+            let (search, manifest) = relocate(prepared(protocol, "toy-secret", 1), &fixture.url);
+            let (transport, _, budget) = transport(manifest);
+            let result = search.execute(&transport).await;
+            if valid_tail {
+                let rows = result.expect("mixed response").into_results();
+                assert_eq!(rows.len(), 1);
+                assert_eq!(rows[0].url, "https://second.invalid/");
+                assert_eq!(rows[0].backend, SearchBackendId::DuckDuckGo);
+            } else {
+                let error = result.expect_err("invalid-only response cannot win");
+                assert_eq!(
+                    error,
+                    CompatibilityError::Admission(AdmissionError::Invalid)
+                );
+                assert!(!format!("{error:?} {error}").contains("toy-secret"));
+            }
+            assert_eq!(budget.attempts.load(Ordering::Relaxed), 1);
+            fixture.finish().await;
+        }
+    }
+}
+
+#[test]
+fn final_deadline_fence_dominates_admission_success_and_failure() {
+    for invalid in [false, true] {
+        let response_body = String::from_utf8(body(CompatibilityProtocol::Lite)).expect("HTML");
+        let response_body = if invalid {
+            response_body
+                .replace("https://first.invalid/", "file:///first")
+                .replace("https://second.invalid/", "file:///second")
+        } else {
+            response_body
+        };
+        let mut total_checks = 0;
+        let baseline = finish_response(
+            CompatibilityProtocol::Lite,
+            "q",
+            1,
+            TransportResponse {
+                status: 200,
+                body: response_body.clone().into_bytes(),
+            },
+            || {
+                total_checks += 1;
+                Ok(())
+            },
+        );
+        assert_eq!(baseline.is_err(), invalid);
+        let mut checks = 0;
+        let result = finish_response(
+            CompatibilityProtocol::Lite,
+            "q",
+            1,
+            TransportResponse {
+                status: 200,
+                body: response_body.into_bytes(),
+            },
+            || {
+                checks += 1;
+                if checks == total_checks {
+                    Err(TransportError::Deadline)
+                } else {
+                    Ok(())
+                }
+            },
+        );
+        assert_eq!(checks, total_checks);
+        assert_eq!(
+            result.expect_err("completion after expiry"),
+            CompatibilityError::Transport(TransportError::Deadline)
         );
     }
 }
@@ -459,7 +556,7 @@ async fn parser_status_and_challenge_errors_remain_closed_after_real_controlled_
 }
 
 #[test]
-fn empty_responses_remain_non_winners_and_unsafe_candidates_remain_unadmitted() {
+fn empty_responses_remain_non_winners_and_mixed_results_filter_before_requested_count() {
     for protocol in [
         CompatibilityProtocol::Lite,
         CompatibilityProtocol::Html,
@@ -493,9 +590,10 @@ fn empty_responses_remain_non_winners_and_unsafe_candidates_remain_unadmitted() 
             },
             || Ok(()),
         )
-        .expect("untrusted data")
-        .into_candidates();
-        assert_eq!(rows[0].url, "file:///untrusted");
+        .expect("second result is admissible")
+        .into_results();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].url, "https://second.invalid/");
     }
 }
 

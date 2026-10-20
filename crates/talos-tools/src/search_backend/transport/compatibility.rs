@@ -7,10 +7,13 @@
 //! Talos adds fixed destinations, bounded encoding and owning invocation binding.
 //! Fixed UA/language snapshots remain dormant; retries/source/default activation gated.
 
+mod admission;
 pub(super) mod headers;
 
-use crate::search_backend::{SearchBackendResult, bing_parser, ddg_parser, instant_answer};
+use crate::search_backend::{SearchBackendId, bing_parser, ddg_parser, instant_answer};
 use thiserror::Error;
+
+use admission::{AdmissionError, AdmittedCompatibilityResults};
 
 use super::{
     BodyFormat, Method, PreparedTransportRequest, SearchTransport, ToolNetworkEndpoint,
@@ -26,21 +29,8 @@ pub(in crate::search_backend) enum CompatibilityError {
     Ddg(#[from] ddg_parser::DdgParseError),
     #[error(transparent)]
     Bing(#[from] bing_parser::BingParseError),
-}
-
-/// Untrusted parsed data; neither a router winner nor permission to fetch results.
-pub(in crate::search_backend) struct CompatibilityCandidates(Vec<SearchBackendResult>);
-
-impl std::fmt::Debug for CompatibilityCandidates {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("CompatibilityCandidates(<redacted>)")
-    }
-}
-
-impl CompatibilityCandidates {
-    pub(in crate::search_backend) fn into_candidates(self) -> Vec<SearchBackendResult> {
-        self.0
-    }
+    #[error(transparent)]
+    Admission(#[from] AdmissionError),
 }
 
 /// Retain this same object across future admission. No Clone or replacement inputs.
@@ -61,7 +51,7 @@ impl PreparedCompatibilitySearch {
     pub(in crate::search_backend) async fn execute(
         self,
         transport: &SearchTransport,
-    ) -> Result<CompatibilityCandidates, CompatibilityError> {
+    ) -> Result<AdmittedCompatibilityResults, CompatibilityError> {
         let response = transport.execute_prepared(self.request).await?;
         finish_response(
             self.protocol,
@@ -81,7 +71,7 @@ fn finish_response(
     max_results: u32,
     response: TransportResponse,
     mut check_live: impl FnMut() -> Result<(), TransportError>,
-) -> Result<CompatibilityCandidates, CompatibilityError> {
+) -> Result<AdmittedCompatibilityResults, CompatibilityError> {
     check_live()?;
     let parsed = match protocol {
         CompatibilityProtocol::Lite | CompatibilityProtocol::Html => ddg_parser::parse(
@@ -92,25 +82,37 @@ fn finish_response(
             },
             response.status,
             &response.body,
-            max_results,
+            admission::MAX_CANDIDATES,
         )
-        .map(|data| CompatibilityCandidates(data.into_candidates()))
+        .map(|data| data.into_candidates())
         .map_err(CompatibilityError::Ddg),
-        CompatibilityProtocol::InstantAnswer => {
-            instant_answer::parse(response.status, &response.body, query, max_results)
-                .map(|data| CompatibilityCandidates(data.into_candidates()))
-                .map_err(CompatibilityError::Ddg)
-        }
+        CompatibilityProtocol::InstantAnswer => instant_answer::parse(
+            response.status,
+            &response.body,
+            query,
+            admission::MAX_CANDIDATES,
+        )
+        .map(|data| data.into_candidates())
+        .map_err(CompatibilityError::Ddg),
         CompatibilityProtocol::Bing => {
-            bing_parser::parse(response.status, &response.body, max_results)
-                .map(|data| CompatibilityCandidates(data.into_candidates()))
+            bing_parser::parse(response.status, &response.body, admission::MAX_CANDIDATES)
+                .map(|data| data.into_candidates())
                 .map_err(CompatibilityError::Bing)
         }
     };
     // Always check after parsing, including an error; an expired partial winner cannot escape.
     // This fences completion, but cannot preempt synchronous parsing or suppress panic hooks.
     check_live()?;
-    parsed
+    let expected_backend = match protocol {
+        CompatibilityProtocol::Lite
+        | CompatibilityProtocol::Html
+        | CompatibilityProtocol::InstantAnswer
+        | CompatibilityProtocol::Bing => SearchBackendId::DuckDuckGo,
+    };
+    let admitted = admission::admit(expected_backend, parsed?, max_results, &mut check_live);
+    // An admission error completed after expiry cannot replace the enclosing deadline.
+    check_live()?;
+    admitted
 }
 
 #[derive(Debug, Clone, Copy)]
