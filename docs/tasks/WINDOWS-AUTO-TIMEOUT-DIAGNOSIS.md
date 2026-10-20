@@ -2,9 +2,9 @@
 
 Date: 2026-10-11. Baseline: `444a8137f054b33802f26bffdb55fb0f83a7a861`.
 
-Current stage (2026-10-16): add bounded event600 provider-lifecycle observations before engine availability; native execution pending.
+Current stage (2026-10-20): preserve CI3275 workspace config5s failure; prepare a separate bounded config phase probe. Native execution pending for that new candidate.
 Earlier matrices, pending statements and tool availability below are preserved staged history;
-the latest checkpoint defines the current fixed 120-process / 2220-test experiment.
+the latest checkpoint defines the unchanged Auto 120-process / 2220-test experiment and any separately counted config samples.
 
 ## Authorization And Scope
 
@@ -1334,3 +1334,66 @@ dependencies/lockfile and every original deadline/assertion, including historica
 assessor-entry10s, Auto15s, cleanup10s/tool120s and Plugin unknowns. #705 remains OPEN/UNMERGED.
 Current main2d7f4b36c17ae17f5f74d34b167987876db8add2 adds separate Search work since includeddea;
 no relevant probe source/dependency/workflow change. OpenGit#735 remains independently owned.
+
+## CI3275 failure and config phase follow-up (2026-10-20)
+
+CI3275/run39357790467 exacta5d3bddd772533506c212dc75a6747775e3896b0 attempt1
+FAILED: seven jobs passed, only Windows Rust workspace failed. Both Auto diagnostics passed,
+each60processes/1110passed/0failed/0ignored, combined120/2220/0. Six canonical hashes and
+twelve rawCRLF restoration receipts match exacthead. Independent completed-evidence review
+APPROVE, comment6284575212. SharedAgent review is not distinct human approval.
+
+ZIP SHA256/CRC/extracted bytes verified: baseline12236565981,65files,
+6d95cfb8bd0c94fad41f8f73c084bb2f9fb349063020cf71cf721799568503ec;
+instrumented12236705892,70files,
+fa69d300742876eb79730361a1671240d9eefe655d3d590c9a2e5369df5497e7;
+workspace12236254068,2files,
+ca324868a3732ec860bfcd52d80f290256991b5d9743e2e903acb53d3eab7608.
+Diagnostic artifacts expireNov3; original workspace logs expireOct23. No run was retried.
+Thirty evaluator gates satisfied, maximum108.3284ms; no reason-classification marker, so
+earlyUnavailable remains unverified. All60child tuples valid; later59/59 selectsparallel9
+child8408 lifetime652.4248ms; first8392life5386.1757ms. Four event receipts valid. These
+successful samples neither replace CI3229 nor identify OS/Defender/disk causes.
+
+New distinct failure: config store_finalization_tests::semantic_update_and_provider_unset_share_one_mutation_lock,
+originalline820, outerrecv_timeout5s reports Timeout; group224passed/1failed/0ignored.
+release_tx.send and update.join().expect already completed before this receive window.
+The update_config localMutationLock drops on return. Therefore the failure does NOT establish
+that the updater still holds the lock: only that no unset result arrived during the post-join5s
+window. Unset thread scheduling, lock acquisition, recovery, transaction preparation/apply/
+finalization or result delivery remain undistinguished. No association with the evaluator/Auto
+failures is established; this is a follow-up to observed Windows CI failure within #705.
+
+Next explicit hypothesis: distinguish no unsetworker entry, pending file-lock acquisition,
+post-lock transaction progress and result delivery at a future unchanged5s failure. Add only a
+separate opt-in config diagnostic matrix to existing ci.yml; mandatory jobs and existing Auto
+120/2220 matrix remain byte-identical. Each phase uses a fresh runner: one original complete
+225-test config lib suite at default concurrency first, then five fixed exact-case processes.
+Six original-test processes/230test executions perphase, planned combined12/460, separately
+counted from Auto. Cargo build/metadata selects exactly one test executable; wrong/zero/
+duplicate summary or missing inventory fails closed. Any failed attempt keeps the phase failed
+even if later samples succeed. No warmup or rerun-to-green; samples do not reproduce the entire
+workspace's prior crate execution/load and cannot be treated as identical workload.
+
+New Python script reuses the existing bounded owned-process runner/restoration helpers. Limits:
+20min script,25min step,30min job; build900s, each original-test process90s with existing owned
+PID/tree timeout cleanup. A124 watchdog stops further sampling after retaining the failed attempt;
+no success claim after incomplete execution. Restore all three temporary config sources byte-for-
+byte in finally and verify raw hashes. Perphase manifest/results/overlay/every log retained14days;
+instrumented cache never saved. Original Auto script, collectors and source overlays unchanged.
+
+Only temporary config store.rs, store/fs.rs and target fixture overlay: thread-local enablement
+in the fixture and its two original workers, fixed stage/time/PID/thread markers for callback,
+release/join, completion receive, lock open/acquire, recovery/prepare/apply/finalization and result
+return/send. StdFs checkpoint override preserves its original default Ok result and prints only
+the finite FsOperation enum name, never paths, config/credential/provider content or error text.
+Checkpoint marks precede operations, not exclusive operation durations. Same-thread ordered
+markers and original worker-entry receipts are required; missing/interleaved/logging-delayed
+markers do not uniquely identify a blocked operation. No worker/await/nativeAPI added, no lock
+or error result changed. Original100ms and5s assertions preserved; observer overhead remains.
+
+Bounded CI/fixture maintenance only: no product/storage implementation change or owner status
+change. I301/I304/I305 remain closed; no Search/Git/PSS takeover. Main2d7 remains non-overlapping;
+Git#735 independently owned. No merge/release/overallrootclosure, all older failures and Plugin
+unknowns retained. Exact-candidate local/static checks, independent review and new native CI are
+required; missing localCargo remains a preflight limitation, never a passing check.
