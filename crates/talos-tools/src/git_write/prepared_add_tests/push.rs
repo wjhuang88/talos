@@ -509,6 +509,24 @@ fn receiver_shell_startup_environment_refuses_without_mutating_parent_snapshot()
     .expect("Unix variable names are case sensitive");
 }
 
+#[cfg(windows)]
+#[test]
+fn receiver_shell_rejects_runtime_overrides_case_insensitively() {
+    for name in [
+        "MSYS", "CYGWIN", "CYGWIN_DEBUG", "MSYS2_ARG_CONV_EXCL", "MSYS2_ENV_CONV_EXCL",
+    ] {
+        for spelling in [name.to_owned(), name.to_ascii_lowercase()] {
+            let environment = BTreeMap::from([(
+                OsString::from(spelling),
+                OsString::from("error_start:unadmitted-program"),
+            )]);
+            let before = environment.clone();
+            assert!(validate_receiver_shell_environment(&environment).is_err());
+            assert_eq!(environment, before);
+        }
+    }
+}
+
 #[cfg(unix)]
 #[tokio::test]
 async fn fixed_receiver_command_performs_real_local_push() {

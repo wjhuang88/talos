@@ -649,3 +649,17 @@ Real prepared tests cover four receiver layouts; MCP covers success, denial and
 replay. Independent namespace/shell review found no new definite omission, but
 cancellation, partial effects and complete security/publication gates remain
 open. No cross-platform or complete I300 delivery claim follows from these tests.
+
+Windows receiver preparation checkpoint (2026-10-20): inherited `MSYS`,
+`CYGWIN`, `CYGWIN_DEBUG`, `MSYS2_ARG_CONV_EXCL`, and `MSYS2_ENV_CONV_EXCL`
+now require separately authorized invocation rather than silent removal. The
+MSYS runtime's option table includes `error_start`, which configures external
+error handling; argument/environment conversion overrides also undermine the
+fixed receiver command's representation. Source basis:
+[MSYS2 runtime environ.cc, msys2-3.6.5](https://github.com/msys2/msys2-runtime/blob/msys2-3.6.5/winsup/cygwin/environ.cc).
+This is a conservative preparation guard, not evidence that the runner uses
+this runtime revision or that every MSYS effect has been inventoried. Independent
+static review found no blocker. Windows-only tests cover case-insensitive
+refusal and unchanged environment snapshots; locked MSVC xwin checking passes,
+but native execution and the complete shell implementation remain outstanding.
+The production Windows structured-Git gate remains closed.
