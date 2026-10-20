@@ -407,7 +407,15 @@ fn missing_worktree_target_requires_checkout_mode_and_retains_parent_identity() 
 fn missing_worktree_suffix_resolves_parent_components() {
     let temp = tempfile::tempdir().expect("repo");
     let root = temp.path().canonicalize().expect("root");
-    let path = root.join("missing/deep/../../checkout");
+    // PathBuf::push normalizes `..` for Windows verbatim roots. Preserve the
+    // raw traversal so this fixture actually exercises cancelled components.
+    let mut spelling = root.as_os_str().to_owned();
+    spelling.push("/missing/deep/../../checkout".replace('/', std::path::MAIN_SEPARATOR_STR));
+    let path = PathBuf::from(spelling);
+    assert!(
+        path.components()
+            .any(|part| part == std::path::Component::ParentDir)
+    );
     assert!(capture_target(&path, false).is_err());
     let evidence = capture_target(&path, true).expect("forgiving target");
     assert_eq!(evidence.resolved(), root.join("checkout"));
