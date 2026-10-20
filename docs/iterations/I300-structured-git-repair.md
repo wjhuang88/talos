@@ -5747,3 +5747,18 @@ Fresh origin fetch found no main-only commits (268 ahead/0 behind before the
 matcher commit), so no rebase was needed. Windows production and Pull remain
 closed; native runtime, remaining Windows failures, initialized-child Checkout,
 Pull, independent delivery review and the full serial handoff remain open.
+
+
+2026-10-20 Pull root-resolution checkpoint: defer identity capture of a
+Windows prefix when an explicit RootDir follows. Rust gives VerbatimDisk an
+implicit root, so the former traversal inspected an incomplete `\\?\C:`
+before constructing the filesystem root. Component traversal, cancelled ancestor
+evidence, missing-path handling and cumulative allowances remain enforced.
+The separate Windows regression requires the first retained identity to be the
+complete root and revalidates the result. Locked local resolution tests pass
+7/7; cargo xwin MSVC test-target checking passes with the existing seven
+reduced-feature warnings (/tmp/talos-i300-resolution-root-xwin.log). Native
+Windows execution is not yet verified. Standard preflight is running in session
+17900 (/tmp/talos-i300-resolution-root-preflight.log); poll before restarting.
+Previous published-head CI 39349870653 is still in progress. Windows production
+preparation and production Pull remain closed; T7 and the full queue remain open.

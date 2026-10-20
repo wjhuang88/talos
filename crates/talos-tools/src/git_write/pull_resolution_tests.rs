@@ -1,5 +1,26 @@
 use super::*;
 
+#[cfg(windows)]
+#[test]
+fn verbatim_disk_resolution_records_the_complete_root() {
+    let temp = tempfile::tempdir().expect("fixture");
+    let root = temp.path().canonicalize().expect("verbatim root");
+    assert!(matches!(
+        root.components().next(),
+        Some(Component::Prefix(prefix))
+            if matches!(prefix.kind(), std::path::Prefix::VerbatimDisk(_))
+    ));
+    let evidence = Resolution::capture(&root, false, &mut Budget::default())
+        .expect("resolve verbatim disk path");
+    assert_eq!(evidence.resolved(), root);
+    let first = &evidence.records.first().expect("root record").path;
+    assert!(matches!(
+        first.components().next_back(),
+        Some(Component::RootDir)
+    ));
+    evidence.revalidate().expect("unchanged identities");
+}
+
 #[test]
 fn component_queue_reservation_precedes_metadata_discovery() {
     let temp = tempfile::tempdir().expect("fixture");
