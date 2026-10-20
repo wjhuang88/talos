@@ -5209,6 +5209,10 @@ fn path_facet(
 /// reach receive-pack. Carry the accepted scheduling overrides in its fixed
 /// command explicitly, quoting the independently bound Git executable.
 fn receiver_command(program: &Path) -> Result<String, GitToolError> {
+    #[cfg(windows)]
+    let represented = host_path::receiver_program(program)?;
+    #[cfg(windows)]
+    let program = Path::new(&represented);
     let text = program
         .to_str()
         .filter(|text| program.is_absolute() && !text.contains(['\0', '\n', '\r']))

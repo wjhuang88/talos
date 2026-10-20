@@ -4,6 +4,44 @@ use std::{borrow::Cow, path::Path};
 
 use super::GitToolError;
 
+/// Represent the bound Git executable for an MSYS shell without changing its
+/// file identity. Only the fixed git.exe leaf under a local drive is supported.
+#[cfg(windows)]
+pub(super) fn receiver_program(path: &Path) -> Result<String, GitToolError> {
+    use std::path::{Component, Prefix};
+
+    let invalid = || {
+        GitToolError::InvalidInput(
+            "Receiver Git executable cannot preserve its admitted Windows identity".into(),
+        )
+    };
+    if path.file_name() != Some(std::ffi::OsStr::new("git.exe"))
+        || !matches!(path.components().next(), Some(Component::Prefix(prefix))
+            if matches!(prefix.kind(), Prefix::Disk(_) | Prefix::VerbatimDisk(_)))
+        || !path.is_absolute()
+        || !path.is_file()
+    {
+        return Err(invalid());
+    }
+    let identity = super::snapshot::PathIdentity::capture(path).map_err(|_| invalid())?;
+    let parent = path.parent().ok_or_else(invalid)?;
+    let spelling = directory_argument(parent)?.join("git.exe");
+    // A local-drive junction may resolve to a network share. Check the
+    // converted spelling as well as the original, before MSYS interprets it.
+    if !matches!(spelling.components().next(), Some(Component::Prefix(prefix))
+        if matches!(prefix.kind(), Prefix::Disk(_)))
+        || !spelling.is_absolute()
+    {
+        return Err(invalid());
+    }
+    identity.revalidate(&spelling).map_err(|_| invalid())?;
+    let text = spelling.to_str().ok_or_else(invalid)?.replace('\\', "/");
+    if text.contains(['\0', '\n', '\r']) {
+        return Err(invalid());
+    }
+    Ok(text)
+}
+
 /// Git for Windows does not reliably accept Rust's verbatim path spelling as
 /// --git-dir/--work-tree. Use a conventional spelling only after proving that
 /// it resolves to the same directory. This grants no new path authority.
@@ -92,6 +130,33 @@ pub(super) fn directory_argument(path: &Path) -> Result<Cow<'_, Path>, GitToolEr
 #[cfg(all(test, windows))]
 mod tests {
     use super::*;
+
+    #[test]
+    fn receiver_program_preserves_identity_and_rejects_unsupported_forms() {
+        let root = tempfile::tempdir().expect("fixture");
+        let directory = root.path().join("Git space-'quote-目录");
+        std::fs::create_dir(&directory).expect("directory");
+        let program = directory.join("git.exe");
+        std::fs::write(&program, b"fixture executable").expect("program");
+        let canonical = program.canonicalize().expect("canonical");
+        let represented = receiver_program(&canonical).expect("shell path");
+        assert!(!represented.contains('\\'));
+        assert!(!represented.starts_with("//?/"));
+        assert_eq!(
+            Path::new(&represented).canonicalize().expect("same file"),
+            canonical
+        );
+        assert!(receiver_program(Path::new(r"\\server\share\git.exe")).is_err());
+        assert!(receiver_program(Path::new(r"C:git.exe")).is_err());
+        let other = directory.join("other.exe");
+        std::fs::write(&other, b"fixture executable").expect("other");
+        assert!(receiver_program(&other).is_err());
+        let bad_directory = root.path().canonicalize().expect("root").join("trailing.");
+        std::fs::create_dir(&bad_directory).expect("verbatim directory");
+        let bad_program = bad_directory.join("git.exe");
+        std::fs::write(&bad_program, b"fixture executable").expect("verbatim program");
+        assert!(receiver_program(&bad_program).is_err());
+    }
 
     #[test]
     fn explicit_git_directory_argument_preserves_canonical_identity() {
