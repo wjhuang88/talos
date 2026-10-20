@@ -236,11 +236,11 @@ impl AddPlan {
                     &layout.metadata_path,
                     self.child_read(&layout.metadata_path, authorizations)?,
                 )?;
-                if metadata
-                    .worktree_marker
-                    .as_ref()
-                    .is_some_and(|marker| marker != &layout.canonical.join(".git"))
-                {
+                if !self.child_backlink_matches(
+                    layout,
+                    metadata.worktree_marker.as_deref(),
+                    authorizations,
+                )? {
                     return Err(GitToolError::InvalidInput(
                         "Pull child backlink names an unadmitted worktree".into(),
                     ));

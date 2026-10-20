@@ -1,3 +1,45 @@
+#[cfg(windows)]
+#[test]
+fn child_backlink_alias_requires_bound_root_and_marker_reads() {
+    let root = fixture();
+    let canonical = root.path().canonicalize().expect("canonical");
+    let layout = super::super::receiver_state::Root::capture(root.path(), &canonical)
+        .expect("layout");
+    let conventional = host_path::directory_argument(&canonical).expect("Git spelling");
+    let marker = conventional.join(".git");
+    assert_ne!(marker, canonical.join(".git"));
+    for omitted in [None, Some("root"), Some("marker")] {
+        let mut plan = AddPlan::prepare_pull(
+            root.path(),
+            &serde_json::json!({}),
+            ToolProvenance::Native,
+        )
+        .expect("plan");
+        plan.facets.clear();
+        for (kind, path) in [
+            ("root", root.path().to_owned()),
+            ("marker", root.path().join(".git")),
+        ] {
+            if omitted != Some(kind) {
+                plan.facets.push(path_facet(ToolNature::Read, &path, kind).expect("facet"));
+            }
+        }
+        let tokens = proof(&plan)
+            .consume_for_prepared(&plan.request(), &plan.identity)
+            .expect("proof");
+        let result = plan.child_backlink_matches(&layout, Some(&marker), &tokens);
+        if omitted.is_some() {
+            assert!(result.is_err(), "missing {omitted:?}");
+        } else {
+            assert!(result.expect("admitted alias"));
+            let unrelated = conventional.join("unadmitted-missing/.git");
+            assert!(!plan.child_backlink_matches(&layout, Some(&unrelated), &tokens)
+                .expect("compare declaration without opening it"));
+            assert!(!unrelated.exists());
+        }
+    }
+}
+
 #[tokio::test]
 async fn pull_child_bootstrap_defers_worktree_and_retains_startup_evidence() {
     let root = fixture();
