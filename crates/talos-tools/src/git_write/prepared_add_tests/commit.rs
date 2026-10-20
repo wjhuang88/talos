@@ -180,15 +180,14 @@ async fn child_status_filter_is_refused_without_executing_helper() {
             parent_attributes.to_str().expect("path"),
         ],
     );
-    let plan = Box::new(
+    let plan = discover_sender_approved(Box::new(
         AddPlan::prepare_commit(
             root.path(),
             &serde_json::json!({"message":"parent"}),
             ToolProvenance::Native,
         )
         .expect("plan"),
-    )
-    .discover()
+    ))
     .await
     .expect("child attribute discovery");
     let child_global = plan
