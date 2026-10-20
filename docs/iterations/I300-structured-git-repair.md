@@ -5778,3 +5778,21 @@ Linux full validation; native Windows workspace tests remain in progress. This
 checkpoint does not establish native execution of the new root regression.
 Windows production and Pull remain closed; original T7 and handoff residuals
 remain open. Next: collect native CI failures and publish this verified stage.
+
+2026-10-20 Windows Push fixture checkpoint (`0cecd803`): the network Push
+mutation fixtures now pass through the production internal-Git-program admission
+stage before asserting mutation denial/success, removing a Windows-only fixture
+shortcut. The focused Push suite passes 15/15, the locked standard release
+preflight passes (tools 953/953 plus workspace checks, Clippy, tests, doctests
+and both external SDK fixture modes), and pinned `cargo xwin check --locked`
+passes for `x86_64-pc-windows-msvc`. Formatting and whitespace checks pass.
+The xwin result is compile evidence, not native Windows runtime evidence.
+Published PR #735 still points at `3128117a`; CI run 39352700931 is in progress
+on that older head, including its Windows workspace test job. Commit `0cecd803`
+is local-only at this checkpoint and requires a fresh exact-head CI run after
+publication. Remaining T7 work includes collecting native Windows execution
+results and fixing any failures, completing initialized-child Checkout and the
+authorized recursive Pull/fetch/integration path, then obtaining independent
+delivery/security/API review, fresh exact-head gates, synchronized user-facing
+docs and merge/completion evidence. Windows production preparation and
+production Pull remain closed; T7 and the serial handoff remain Active.
