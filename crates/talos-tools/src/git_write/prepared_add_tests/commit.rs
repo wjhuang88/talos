@@ -277,12 +277,9 @@ async fn child_invalid_index_is_read_only_after_continuation_admission() {
     let input = serde_json::json!({"message":"parent", "all":true});
     let plan = AddPlan::prepare_commit(root.path(), &input, ToolProvenance::Native)
         .expect("prepare without reading child index");
-    let admission = proof(&plan);
-    let PreparedNormalStage::Continue(next) =
-        Box::new(plan).execute_stage(Box::new(admission)).await
-    else {
-        panic!("discovery must not read child index")
-    };
+    let next = discover_sender_approved(Box::new(plan))
+        .await
+        .expect("discovery must not read child index");
     assert!(next.permission_profile().iter().any(|facet| {
         facet.nature == ToolNature::Read
             && facet.resource.as_deref()
@@ -346,23 +343,17 @@ async fn child_config_discovery_detects_included_fsmonitor_before_status() {
     let input = serde_json::json!({"message":"parent", "all":true});
     let plan = AddPlan::prepare_commit(root.path(), &input, ToolProvenance::Native)
         .expect("no child config before admission");
-    let admission = proof(&plan);
-    let PreparedNormalStage::Complete(output) =
-        Box::new(plan).execute_stage(Box::new(admission)).await
-    else {
+    let Err(error) = discover_sender_approved(Box::new(plan)).await else {
         panic!("child fsmonitor allowed")
     };
-    assert!(output.result.is_error && output.result.content.contains("submodule fsmonitor"));
+    assert!(error.to_string().contains("submodule fsmonitor"));
     assert!(!child.join("helper-ran").exists());
     assert!(!root.path().join(".git/COMMIT_EDITMSG").exists());
     std::fs::write(&included, "[core]\n fsmonitor = false\n").expect("disabled helper");
     let plan = AddPlan::prepare_commit(root.path(), &input, ToolProvenance::Native).expect("plan");
-    let admission = proof(&plan);
-    let PreparedNormalStage::Continue(next) =
-        Box::new(plan).execute_stage(Box::new(admission)).await
-    else {
-        panic!("disabled fsmonitor should discover")
-    };
+    let next = discover_sender_approved(Box::new(plan))
+        .await
+        .expect("disabled fsmonitor should discover");
     assert!(
         next.permission_profile()
             .iter()
@@ -881,12 +872,11 @@ async fn rerere_refuses_active_records_but_preserves_inert_and_disabled_configur
             ToolProvenance::Native,
         )
         .expect("plan");
-        let admission = proof(&plan);
-        match Box::new(plan).execute_stage(Box::new(admission)).await {
-            PreparedNormalStage::Continue(_) => assert!(!refused),
-            PreparedNormalStage::Complete(output) => {
-                assert!(refused, "{}", output.result.content);
-                assert!(output.result.is_error && output.result.content.contains("rerere replay"));
+        match discover_sender_approved(Box::new(plan)).await {
+            Ok(_) => assert!(!refused),
+            Err(error) => {
+                assert!(refused, "{error}");
+                assert!(error.to_string().contains("rerere replay"));
             }
         }
         assert!(!root.path().join(".git/COMMIT_EDITMSG").exists());
@@ -958,11 +948,9 @@ async fn commit_discovery_defers_hooks_and_ignores_inactive_template_and_tag_sig
         ToolProvenance::Native,
     )
     .expect("commit");
-    let proof = proof(&plan);
-    let PreparedNormalStage::Continue(next) = Box::new(plan).execute_stage(Box::new(proof)).await
-    else {
-        panic!("ordinary config discovery refused")
-    };
+    let next = discover_sender_approved(Box::new(plan))
+        .await
+        .expect("ordinary config discovery refused");
     for name in [
         "pre-commit",
         "prepare-commit-msg",

@@ -578,13 +578,10 @@ async fn maintenance_pack_redirection_requires_separate_effect_authorization() {
     ]);
     let input = serde_json::json!({"message":"parent"});
     let plan = AddPlan::prepare_commit(root.path(), &input, ToolProvenance::Native).expect("plan");
-    let admission = proof(&plan);
-    let PreparedNormalStage::Complete(output) =
-        Box::new(plan).execute_stage(Box::new(admission)).await
-    else {
+    let Err(error) = discover_sender_approved(Box::new(plan)).await else {
         panic!("redirect was allowed")
     };
-    assert!(output.result.is_error && output.result.content.contains("gc.repackFilterTo"));
+    assert!(error.to_string().contains("gc.repackFilterTo"));
     assert!(
         std::fs::read_dir(outside.path())
             .expect("outside unchanged")
