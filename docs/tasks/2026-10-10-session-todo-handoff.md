@@ -4425,3 +4425,29 @@ Standard workspace preflight is running in session 84989, log
 /tmp/talos-i300-sender-preflight.log; do not restart without polling that handle.
 Windows preparation and production Pull remain closed. No T7 or handoff
 completion, merge, publication or current-head full-preflight pass is claimed.
+
+
+2026-10-20 validation checkpoint: `a4547db4` repairs native config fixture paths
+and quoting; `c847f3ad` supplies maintenance fixture author identity; `279c29d3`
+retains actual Checkout source bytes after native checkout and explicitly tests
+repository-local autocrlf conversion. Locked macOS config tests pass 30/30,
+maintenance authorization 1/1, and Checkout 49/49.
+`e21618db` normalizes only admitted Windows path text for gitdir matching,
+following Git for Windows normalize_ntpath; patterns retain glob escapes,
+unsupported device namespaces fail closed, and authority/identity paths are
+unchanged. Regressions are split into target_config_path_tests.rs, including
+Unix backslash and literal HOME-dot preservation. Locked config tests pass
+32/32; final-source cargo xwin MSVC test-target checking passes with existing
+reduced-feature warnings. This is not native Windows execution evidence.
+Preflight 84989 failed at sandboxed Push process observation (EPERM, 950/951).
+Authorized outside-sandbox preflight 87720 passed, including tools 951/951 and
+both SDK fixture modes, but predates the final production matcher change.
+Final-source standard preflight at e21618db passes (session 96752 exit 0),
+including workspace tools 953/953, locked checks/Clippy/tests, doctests and both
+SDK fixture modes: /tmp/talos-i300-fixtures-preflight.log. Sessions 58738 and
+95219 also exited 0; final-source MSVC recheck passes. Both governance validators
+passed, zero warnings. Native Windows execution remains a separate CI gate.
+Fresh origin fetch found no main-only commits (268 ahead/0 behind before the
+matcher commit), so no rebase was needed. Windows production and Pull remain
+closed; native runtime, remaining Windows failures, initialized-child Checkout,
+Pull, independent delivery review and the full serial handoff remain open.
