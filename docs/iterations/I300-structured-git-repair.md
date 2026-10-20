@@ -5836,3 +5836,21 @@ test-target checking via cargo xwin passes (seven reduced-feature dead-code
 warnings; `/private/tmp/i300-receiver-fixtures-xwin.log`). This is compilation
 evidence only; native Windows behavior, remaining failures and all original
 delivery gates stay open.
+
+2026-10-20 Commit discovery fixture checkpoint: `03fcbe34` routes child
+index/fsmonitor, rerere, deferred hook and maintenance-redirection checks
+through the existing admitted sender-discovery helper. Windows internal Git
+admission must finish before these fixtures inspect configuration results.
+The denial messages and no-write assertions remain. Locked Git-feature library
+tests pass 450/450 outside the sandbox; Windows MSVC test-target checking via
+cargo xwin passes with the same seven reduced-feature warnings. Logs:
+`/private/tmp/i300-commit-discovery-tests.log` and
+`/private/tmp/i300-commit-discovery-xwin.log`. Native Windows remains unverified.
+Fetched origin/main `2d7f4b36` and rebased without conflicts; the tree delta
+against pre-rebase `df559867` contains only the incoming search compatibility
+change. Previous fixture commits are now `71d78bb8` and `144d86b3`. Standard
+preflight is running in session 91790 with incremental compilation and debug
+symbols disabled to limit disk use (`/private/tmp/i300-rebased-preflight.log`).
+No publication, Windows/Pull activation or T7 completion is claimed. Next:
+finish this gate, then continue native receiver executable/path, Checkout hook
+and Pull failures; preserve the full original handoff queue.
