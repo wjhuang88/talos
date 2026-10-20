@@ -1366,6 +1366,22 @@ impl AddPlan {
                 }
             }
             if !deletion_roots.is_empty() {
+                // These canonical child metadata locations were retained during
+                // admitted configuration discovery. Reject a known overlap
+                // without enumerating the metadata tree or spending its stages.
+                // Aliased/indirect sources still use the final deletion check.
+                for root in &deletion_roots {
+                    let root = self.repository.workdir.join(root);
+                    if self.child_locations.iter().any(|(_, location)| {
+                        location.common_dir.join("config").starts_with(&root)
+                            || location.git_dir.join("config.worktree").starts_with(&root)
+                    }) {
+                        return Err(GitToolError::InvalidInput(
+                            "Checkout deletion overlaps an effective configuration or auxiliary source"
+                                .into(),
+                        ));
+                    }
+                }
                 self.checkout_deletion = Some(super::checkout_deletion::Inventory::new(
                     &self.repository.workdir,
                     deletion_roots,
