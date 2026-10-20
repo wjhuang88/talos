@@ -260,6 +260,11 @@ fn postfetch_evidence_rebaselines_changed_metadata_only_under_retained_location(
         "{error}"
     );
     std::fs::remove_file(original.git_dir.join("commondir")).expect("restore pointer");
+    // Content evidence retains Windows leaf handles. Release the completed
+    // content probes before exercising the independent directory identity
+    // guard; keep `original` and all of its location handles alive.
+    drop(prefetch);
+    drop(fetched);
     std::fs::rename(&original.git_dir, local.join("saved-gitdir")).expect("retain original");
     std::fs::create_dir(&original.git_dir).expect("replace directory");
     let error = PullEvidence::capture(&original, None, true)
