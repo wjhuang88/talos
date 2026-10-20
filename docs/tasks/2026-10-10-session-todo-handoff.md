@@ -4844,3 +4844,15 @@ The final extra metadata-preservation assertion is checked separately in
 /private/tmp/i300-checkout-early-final.log. Native Windows confirmation remains
 pending. Production Windows/Pull remain disabled; all T7/handoff residuals remain
 open. Receiver Windows shell support and daemon timeout are next investigations.
+
+
+2026-10-20 rebased stage validation: standard release_preflight.sh completed
+with exit 0 on caaaed602a48013a76c8b8d67201b115785116f8 (session 17706).
+Evidence: /private/tmp/i300-stage-preflight-oct20-unsandboxed.log. Workspace
+validation and both independent Runtime SDK consumer modes passed. The earlier
+sandbox run failed on process-observation permission and is superseded by this
+approved host-permission run, not treated as a source failure. Fresh fetch shows
+no main-only commits. Native Windows confirmation is still required for the four
+candidate corrections; receiver shell support and daemon timeout remain open.
+Production Windows/Pull remain disabled. T7 and the later handoff queue remain
+incomplete; this checkpoint supplies stage validation, not completion evidence.
