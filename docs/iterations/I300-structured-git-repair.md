@@ -633,6 +633,14 @@ T7 remains Active; later serial tasks and publication gates remain incomplete.
 
 # Iteration I300: Structured Git Permission And Diff Repair
 
+2026-10-20 Windows shell environment preparation: receiver validation refuses
+MSYS/Cygwin runtime and argument/environment conversion overrides without
+changing the frozen environment. ADR-089 records the pinned research source and
+its limits. Host shell-environment regression passes 1/1; locked MSVC test-target
+xwin checking passes with seven existing warnings. Independent static review
+found no blocker; Windows-specific runtime tests and complete shell support
+remain unverified. No production Windows/Pull activation or T7 completion.
+
 2026-10-20 verified auxiliary-parent stage: standard `release_preflight.sh`
 completed with exit 0 on c9167926 (session 49895), including workspace tests and
 both external Runtime SDK consumer modes. Log:
@@ -6343,3 +6351,39 @@ not T7 completion. Final independent static review found no blocking issue;
 final MSVC test-target xwin checking passed
 (/private/tmp/i300-shell-final-xwin.log), with seven existing warnings. Both
 governance validators passed with zero warnings. Ready for stage commit.
+
+
+2026-10-20 Windows receiver continuation checkpoint: native CI 39401797353
+at af87f7be is terminal failure, not a live wait. Windows tools reports 914
+passed / 4 failed; Agent/MCP/Runtime production-gate failures also remain.
+Daemon diagnostics show a receive-pack request reached the daemon, but no
+receiver ref was written before the controlled foreground deadline. This
+narrows investigation to the service/receiver exchange; it does not establish
+a root cause or justify raising the timeout. Evidence:
+/private/tmp/i300-af87-windows.log. The local receiver executable spelling
+candidate converts only identity-checked local-drive git.exe paths to a
+slash-separated conventional spelling, rejecting unsupported forms. MSVC
+cargo xwin test-target check passed with seven existing reduced-feature
+warnings; formatting and whitespace checks pass. Native path behavior and
+security review remain required before publication. Production Windows/Pull
+remain disabled; T7 and the full handoff objective remain incomplete.
+
+
+Windows receiver path review follow-up (2026-10-20): independent review
+identified local-drive junction resolution to UNC as a gap. The converted
+executable spelling now independently requires an absolute local Disk prefix;
+review confirmed this removes the static blocker. MSVC xwin test-target check
+passes after correction. Native shell special-character execution and
+junction-to-UNC runtime coverage remain outstanding. Runtime override guard
+is independently committed as db56d70f. Fixture-only GIT_TRACE=1 now records
+receive-pack child dispatch in captured daemon stderr; the real host daemon
+Push regression passed 1/1 (/private/tmp/i300-daemon-dispatch-trace-test.log).
+Neither diagnostic nor cross-compilation proves Windows runtime correctness.
+
+
+2026-10-20 stage commits: db56d70f records the runtime environment guard;
+006812ae records identity-preserving Windows receiver executable spelling;
+159f98b4 records fixture-only receive-pack dispatch trace. Staged diffs were
+reviewed separately. Both governance validators pass with zero warnings.
+Native special-path coverage, Windows shell admission and daemon root cause
+remain open; no production gate or completion state changes.
