@@ -69,8 +69,13 @@ fn missing_components_and_cancelled_ancestors_remain_bound() {
     let temp = tempfile::tempdir().expect("fixture");
     let root = temp.path().canonicalize().expect("root");
     let mut budget = Budget::default();
-    let evidence = Resolution::capture(&root.join("absent/../checkout"), true, &mut budget)
-        .expect("missing checkout");
+    // Joining onto a Windows verbatim root would erase `absent/..` before
+    // the resolver sees it, defeating this identity-retention regression.
+    let mut spelling = root.as_os_str().to_owned();
+    spelling.push("/absent/../checkout".replace('/', std::path::MAIN_SEPARATOR_STR));
+    let path = PathBuf::from(spelling);
+    assert!(path.components().any(|part| part == Component::ParentDir));
+    let evidence = Resolution::capture(&path, true, &mut budget).expect("missing checkout");
     assert_eq!(evidence.resolved(), root.join("checkout"));
     evidence.revalidate().expect("unchanged");
     std::fs::create_dir(root.join("absent")).expect("replace absence");
