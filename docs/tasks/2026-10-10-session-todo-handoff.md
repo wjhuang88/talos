@@ -4867,3 +4867,22 @@ Host regression with --features git passed 1/1
 command ran zero relevant tests and is not validation evidence. Windows native
 timeout remains unresolved. Published e532e7a0 CI 39399935245 is still running;
 this diagnostic is a later local test-only change, not part of that CI head.
+
+
+2026-10-20 shell selection hardening checkpoint: local Push now queries the
+bound Git's shell selection after final receiver storage inspection, compares
+its spelling before capturing/executing a newly selected shell, then revalidates
+retained sender/receiver executable identities and the existing shell baseline.
+Changed selection refuses without reading new shell contents or rebinding.
+Independent review found no new authorization bypass and requested this later
+placement; the query-to-spawn race remains, so no OS-level confinement is claimed.
+The real Git selection regression passes 1/1
+(/private/tmp/i300-shell-selection-regression.log). Earlier local Push execution
+regression and MSVC xwin checking passed before the final placement adjustment;
+final-position regression passed 1/1 (session 72624,
+/private/tmp/i300-shell-final-position.log). Windows shell baseline
+and production Windows/Pull gates remain closed. This is an uncommitted stage,
+not T7 completion. Final independent static review found no blocking issue;
+final MSVC test-target xwin checking passed
+(/private/tmp/i300-shell-final-xwin.log), with seven existing warnings. Both
+governance validators passed with zero warnings. Ready for stage commit.

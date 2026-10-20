@@ -2001,3 +2001,23 @@ async fn push_discovery_binds_rewritten_destinations_and_requires_fresh_admissio
     assert!(output.result.is_error && output.result.content.contains("does not authorize"));
     assert!(!root.path().join(".git/index").exists());
 }
+
+#[tokio::test]
+async fn receiver_shell_selection_probe_rejects_stale_spelling() {
+    let sender = fixture();
+    let receiver = fixture();
+    let plan = AddPlan::prepare_push(
+        sender.path(),
+        &serde_json::json!({"remote": receiver.path()}),
+        ToolProvenance::Native,
+    )
+    .expect("plan");
+    let mut plan = discover_receiver_sender_approved(plan).await;
+    plan.revalidate_receiver_shell_selection().await.expect("same native selection");
+    // A stale selection must fail on spelling, before any attempt to capture
+    // this missing and unadmitted executable. No parent PATH is mutated.
+    plan.receiver_child_paths[0] = sender.path().join("unadmitted-missing-shell");
+    let error = plan.revalidate_receiver_shell_selection().await.expect_err("stale shell");
+    assert!(error.to_string().contains("Receiver shell selection changed after approval"));
+    assert!(!receiver.path().join(".git/refs/heads/approved").exists());
+}
