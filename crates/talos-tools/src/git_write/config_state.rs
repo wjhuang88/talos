@@ -1685,7 +1685,12 @@ impl ConfigState {
                     let target_path = repository.workdir.join(path);
                     let same = potential_path_prefix(&target_path, &resolved)
                         && potential_path_prefix(&resolved, &target_path);
-                    if (same && (*mode & 0o111 != 0 || *mode == 0o120000))
+                    // Git for Windows does not use the tree executable bit
+                    // to decide whether a checked-out hook can run. Match the
+                    // conservative existing-file hook admission rule above.
+                    let executable = *mode & 0o111 != 0
+                        || (cfg!(windows) && matches!(*mode, 0o100644 | 0o100755));
+                    if (same && (executable || *mode == 0o120000))
                         || (*mode != 0o040000
                             && !same
                             && potential_path_prefix(&target_path, &resolved))

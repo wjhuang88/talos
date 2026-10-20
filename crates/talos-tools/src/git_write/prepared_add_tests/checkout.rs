@@ -1326,6 +1326,10 @@ async fn checkout_target_executable_hook_refuses_before_mutation() {
             .expect("mode");
         }
         git(&["add", hook_name]);
+        // Windows hook execution does not depend on the tree executable bit.
+        // Keep it explicitly clear so target inspection must cover this case.
+        #[cfg(windows)]
+        git(&["update-index", "--chmod=-x", hook_name]);
         git(&["commit", "-m", "hook"]);
         git(&["checkout", "target"]);
         let index_before = std::fs::read(root.path().join(".git/index")).expect("index");

@@ -5900,3 +5900,20 @@ Receiver bootstrap follow-up: the focused test completed 1/1 successfully
 (`/private/tmp/i300-receiver-bootstrap-test.log`), committed in `9421da53`;
 session 88143 above is historical, not a live wait. Governance and collaboration
 claim validators both pass with zero warnings for this evidence checkpoint.
+
+2026-10-20 Windows target-hook authorization correction: Checkout target-tree
+inspection now treats ordinary Windows blobs (100644/100755) at effective hook
+paths as executable independently of tree executable bits, matching existing
+Windows hook capture. Previously a 100644 hook could be introduced by Checkout
+without this rejection. The regression explicitly clears its index executable
+bit on Windows. Directory and gitlink modes remain distinct. Focused regression
+passes 1/1 and Checkout selection passes 49/49 on macOS; Git-feature library
+Clippy with -D warnings and formatting pass. Windows MSVC test-target cargo xwin
+check passes with seven existing reduced-feature warnings. Logs:
+`/private/tmp/i300-target-hook-mode.log`, `/private/tmp/i300-target-hook-checkout.log`,
+`/private/tmp/i300-target-hook-clippy.log`, `/private/tmp/i300-target-hook-mode-xwin.log`.
+Independent static security review found no blocker and confirmed directory,
+gitlink, symlink and ancestor protection; native Windows evidence remains open.
+Initial linking failed for lack of space; previously authorized target/debug
+cleanup removed only examples outputs before successful rerun. Production
+Windows/Pull gates remain closed; this correction does not close T7.
