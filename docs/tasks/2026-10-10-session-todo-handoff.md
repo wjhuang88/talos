@@ -4823,3 +4823,24 @@ identity, rebase unstaged-change detection, receiver shell support, post-fetch
 handle lifetime and daemon timeout. The local include and handle-lifetime fixes
 still need native confirmation. Production Windows/Pull remain disabled; T7 and
 all subsequent handoff tasks remain open.
+
+
+2026-10-20 Checkout bounded-refusal checkpoint: rebased onto origin/main
+4e20ee95 without conflicts. Rebase fixture correction is now e479806e;
+include ancestor fix is 617661eb and content-handle fixture is cbc4eb72.
+Rebase execution now covers merge/apply/rebase-merges with core.autocrlf both
+true and false. checkout-index --index refreshes stat data after native checkout;
+the previous true-autocrlf failure reproduced locally before that correction.
+Host rebase suite passed 4/4 (/private/tmp/i300-rebase-suite.log).
+Checkout now refuses already-known deletion overlap with retained child metadata
+configuration before recursively inventorying that metadata. It adds no reads,
+keeps the eight-stage budget and retains the final alias-aware overlap check.
+Independent static review found no blocking issue. A deep metadata regression
+checks refusal without exhausting stages, preserving child HEAD, dirty file,
+parent index and the deep metadata file. Host Checkout suite passed 50/50
+(/private/tmp/i300-checkout-early-suite.log); MSVC cargo xwin test-target check
+passed (/private/tmp/i300-checkout-early-xwin.log), with seven existing warnings.
+The final extra metadata-preservation assertion is checked separately in
+/private/tmp/i300-checkout-early-final.log. Native Windows confirmation remains
+pending. Production Windows/Pull remain disabled; all T7/handoff residuals remain
+open. Receiver Windows shell support and daemon timeout are next investigations.

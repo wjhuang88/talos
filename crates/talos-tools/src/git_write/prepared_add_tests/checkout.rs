@@ -2413,6 +2413,11 @@ async fn checkout_tracked_file_to_gitlink_preserves_dirty_source() {
     git(&["-C", "file", "add", "local"]);
     git(&["-C", "file", "commit", "-m", "child"]);
     std::fs::write(root.path().join("file/local"), b"dirty child").expect("dirty child");
+    // A known configuration overlap must fail before recursively inventorying
+    // unrelated metadata, even when its depth exceeds the admission budget.
+    let deep_metadata = root.path().join("file/.git/fixture/a/b/c/d/e/f/g/h/i");
+    std::fs::create_dir_all(&deep_metadata).expect("deep child metadata");
+    std::fs::write(deep_metadata.join("retained"), b"retained").expect("metadata");
     let child_head = git(&["-C", "file", "rev-parse", "HEAD"]);
     let index_before = std::fs::read(root.path().join(".git/index")).expect("parent index");
     let plan = AddPlan::prepare_checkout(
@@ -2440,6 +2445,10 @@ async fn checkout_tracked_file_to_gitlink_preserves_dirty_source() {
     assert_eq!(
         std::fs::read(root.path().join(".git/index")).expect("preserved index"),
         index_before
+    );
+    assert_eq!(
+        std::fs::read(deep_metadata.join("retained")).expect("preserved metadata"),
+        b"retained"
     );
     std::fs::remove_dir_all(root.path().join("file")).expect("remove isolated fixture child");
     std::fs::create_dir(root.path().join("file")).expect("empty uninitialized directory");
