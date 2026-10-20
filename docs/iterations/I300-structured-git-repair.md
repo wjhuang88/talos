@@ -6203,8 +6203,9 @@ passes locally again. Logs: /private/tmp/i300-receiver-admission-fixtures-host.l
 exited 0 (/private/tmp/i300-admission-fixtures-xwin-final.log), retaining seven
 existing reduced-feature warnings. This is compilation, not native execution.
 
-Changes are split into 9db0891e (approval fixtures), ee220458 (Checkout hook
-fixtures) and d71727cd (Windows-only fixed-category Pull diagnostics).
+After rebase onto origin/main 1a469954, these stages are e55f6acb (approval
+fixtures), 59a18f38 (Checkout hook fixtures), 0fddbe18 (Windows-only fixed-category
+Pull diagnostics), and 7075aae2 (this evidence update).
 The root fixture performs the Windows program-binding and root-discovery halves
 exactly once; it does not re-enter the dispatcher after binding. Staged diffs
 were inspected. No production gate was enabled. Native CI failures and remaining
