@@ -230,8 +230,18 @@ jobs:
         run: |
           git version --build-options
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git --exec-path
+          $gitExecPath = git --exec-path
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Write-Host "Git exec-path: $gitExecPath"
+          foreach ($name in @('git.exe', 'git-receive-pack.exe', 'git-upload-pack.exe')) {
+            $candidate = Join-Path $gitExecPath $name
+            if (Test-Path -LiteralPath $candidate) {
+              Get-Item -LiteralPath $candidate -ErrorAction Stop |
+                Select-Object FullName, LinkType, Target
+            } else {
+              Write-Host "Git exec-path entry absent: $candidate"
+            }
+          }
           $transportShell = git var GIT_SHELL_PATH
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Write-Host "Git transport shell: $transportShell"
