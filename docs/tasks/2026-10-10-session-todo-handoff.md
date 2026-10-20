@@ -4496,3 +4496,14 @@ initialized-child Checkout, authorized recursive Pull/fetch/integration,
 independent delivery/security/API review, synchronized docs, and final merge and
 completion evidence. Windows production preparation and Pull remain disabled;
 T7 and subsequent serial tasks remain incomplete.
+
+Windows CI failure follow-up (2026-10-20): predecessor run 39352700931 for
+`3128117a` failed the Windows workspace test step and reached its 20-minute
+limit. Results included Agent 471/3, MCP 0/5, Runtime 70/2, and tools 858/32
+passed/failed. Cross-layer Agent/MCP/Runtime Git fixtures hit the explicit
+Windows process-tree supervision refusal; tools failures cover Windows
+path/configuration expectations, Checkout/Push admission fixtures, and Pull
+resolution/integration evidence. The Push fixture admission issue is addressed
+by `0cecd803`; exact-head CI run 39355259779 for `77a8cf84` is now running.
+This predecessor failure is diagnostic only: native Windows execution and the
+remaining T7 delivery gates are still open.
