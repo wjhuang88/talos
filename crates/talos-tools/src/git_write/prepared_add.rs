@@ -4951,6 +4951,20 @@ fn validate_receiver_shell_environment(
         } else {
             name.into_owned()
         };
+        // MSYS/Cygwin runtime options can start an external error debugger or
+        // change pathname/argument interpretation before the fixed shell
+        // command runs. Preserve the snapshot, but require separate authority
+        // rather than silently stripping these settings.
+        if cfg!(windows)
+            && matches!(
+                name.as_str(),
+                "MSYS" | "CYGWIN" | "CYGWIN_DEBUG" | "MSYS2_ARG_CONV_EXCL" | "MSYS2_ENV_CONV_EXCL"
+            )
+        {
+            return Err(GitToolError::InvalidInput(
+                "Local Git transport inherits unbound MSYS/Cygwin runtime configuration; use a separately authorized invocation".into(),
+            ));
+        }
         if matches!(
             name.as_str(),
             "BASH_ENV"
