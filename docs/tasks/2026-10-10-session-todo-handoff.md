@@ -4901,3 +4901,11 @@ regression was added after review; final locked MSVC compilation passes. Both
 governance validators pass with zero warnings. Remote run
 39401797353 remains live, not failed or restarted. No production activation,
 T7 completion or advancement of the later serial tasks is claimed.
+
+2026-10-20 verified stage: full standard preflight on c9167926 exited 0
+(session 49895; /private/tmp/i300-aux-parent-preflight.log), including workspace
+tests and both external Runtime SDK modes. Sandbox passed 48/48 including the
+previously intermittent early-exit case; its original root cause remains unknown.
+Fresh fetch found no main-only commits. Native run 39401797353 remains live and
+predates this fix. Windows shell support, native confirmation, production Pull,
+remaining Checkout behavior and final publication gates still prevent T7 closure.
