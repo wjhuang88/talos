@@ -69,9 +69,13 @@ adding an endpoint override or performing an official-host request. Existing tra
 independently test actual controlled sends; this stage does not claim new full-wire evidence.
 
 Bing Accept-Language, common/random UA and headers, charset behavior, proxy/source snapshots,
-probes/retries, parser-response binding, result admission, full service/protocol parity and
+probes/retries, official adapter integration, result admission, full service/protocol parity and
 D/privacy remain pending. These factories are insufficient for adapter activation. Official
 CLI/SDK/MCP/standalone roots, deadline/cancellation/router/rollback/default activation and release
 retain their gates. Response prerequisites: [DDG](SEARCH-001-C-DDG-RESPONSE-PARSER.md) and
 [Bing](SEARCH-001-C-BING-RESPONSE-PARSER.md). I293 stays Active/Claimed, Completion Pending;
 #643/#624 stay open. #705/#717/#735 retain independent ownership.
+
+The next [bound execution prerequisite](SEARCH-001-C-COMPATIBILITY-EXECUTION.md) retains this
+same owned request with protocol/query/count and consumes its controlled response through the
+matching parser. It remains dormant and does not complete official roots or activation gates.

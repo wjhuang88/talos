@@ -10,7 +10,7 @@
 | Source Issue | #643 |
 | Depends on | Accepted ADR-085; SEARCH-001-B / #642 complete in #656; NET-001 boundary coordination |
 | Claim State | Claimed |
-| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 merged TLS/CONNECT subset; #716 merged bounded form/diagnostic stage at `b5b8241e`; #732 merged owned payload at `8fa2a50`; #733 merged Lite/HTML parsing at `dea3edc`; #734 merged Instant Answer at `45cf9eb9`; #736 merged Bing parsing at `2b015a6b`; fixed request candidate delivery tracked from #643; full C/EP and default activation Pending |
+| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 merged TLS/CONNECT subset; #716 merged bounded form/diagnostic stage at `b5b8241e`; #732 merged owned payload at `8fa2a50`; #733 merged Lite/HTML parsing at `dea3edc`; #734 merged Instant Answer at `45cf9eb9`; #736 merged Bing parsing at `2b015a6b`; #737 merged fixed requests at `ae6a0791`; bound execution candidate tracked from #643; full C/EP and default activation Pending |
 | Completion | Pending |
 
 ## Collaboration Claim
@@ -26,7 +26,7 @@
 | Governance Claim PR | #712 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer accepted bounded production scope 2026-10-13; independent protected security/API contract review, exact-head CI, governance validators, Issue reconciliation and final CAS required for #712 merge. No release or native admission authorized. |
-| Last Updated | 2026-10-19 |
+| Last Updated | 2026-10-20 |
 | Handoff / Release Condition | Original #664 claim effective at `d801790454e252699684253166984662ea9dab6a`; expanded scope effective only after #712 accepted-contract merge. Start implementation from that merge or later main; activation requires ADR-090 transport/parity/D gates. |
 
 ## Scope
@@ -1388,3 +1388,126 @@ build. Shared Agent/account identity is not distinct-human approval. This prereq
 stable candidate Review; exact-local/remote protected review, native terminal CI and final CAS
 remain required. Actual candidate PR/head/tree will be indexed from #643; I293 remains Active/
 Claimed, Completion Pending, with full C/EP/parity/D/privacy/root/rollback/default activation gated.
+
+## Merged Fixed Requests / Dormant Bound Execution — 2026-10-19
+
+#737 mergedae6a0791c6317ff7e384295ac9af74a6571572a7, sourcehead271322c9/treeb10ae124.
+CI3249/run39189980467 attempt1 all6jobs SUCCESS. Windows tools522/0failed/0ignored/0filtered,
+macOS tools520/0/0/0 include all11new fixtures; original socket/SDK2modes/fullpreflight and later
+gates pass. Protected sourceapproval6258352299, terminal full-stage review/finalCAS6258556389
+and source delivery6258560230 record verified merged evidence. This backfills actual #737 as
+partial C evidence only; no historical failure or local incomplete journal is reclassified.
+
+Selection base: mainae6a0791c6317ff7e384295ac9af74a6571572a7. Effective I293/#712/ADR-090 claim
+verified before branch. Inventory: I293 Active continues bounded compatibility internalization;
+I294 Active retains D research; I300 Active retains Git/PERM-007-H; I302 Review retains #717;
+I277 Review retains deferred human/device validation; I249 Planned deferred, I164 Paused
+superseded. I301/I303/I304/I305 Complete/Closed; historical I146/I147/I150 and completed I162
+notes are not new nonterminal work. Open #705 retains diagnostic ownership. #735 drafthead
+9d5fd3bbc5dc07349c44f5a971bcfb59f5f5902c has120files across two pages, no search_backend/I293/
+SEARCH-C overlap. No owner takeover, new claim or approval of independent work.
+
+Runnable deliverable: private non-Clone PreparedCompatibilitySearch retaining protocol, original
+query, max and existing immutable request; consuming execute uses controlled transport then only
+the captured parser, with unconditional existing-budget checks before/after parsing. Unified
+redacted candidates remain untrusted; errors wrap existing closed content-free transport/DDG/
+Bing classes. Explicitly library-only: no official caller, new router/winner/result admission,
+default behavior, public API/backend/dependency/version/lock/permission change. Affected reference:
+SEARCH-001-C-COMPATIBILITY-EXECUTION.md, linked from request and controlled-transport references.
+
+Protected independent design preview APPROVE requires count validation before request prep,
+preserved original query, no replacement execute inputs, no new transport trait/destination seam,
+saved parse result before unconditional post-check and explicit synchronous non-preemption limit.
+Test-only relocation starts from the real fixed factory, revalidates an explicit loopback scope
+through the existing constructor and preserves method/path/query/body/type plus captured metadata.
+This proves controlled loopback dispatch into parsing, not official-host HTTPS or full parity.
+Private deterministic live-check injection and paused Tokio clock tests establish deadline
+ordering without relying on HTML parse duration or introducing a production clock override.
+
+Ten new synthetic tests cover four real request/response formats with count1/2, fixed wire bytes,
+captured query/fallback/count, wrong parser, status/challenge/empty/whole-response failures,
+unsafe unadmitted candidates, redaction, same-scope cross-invocation zero effects and shared
+pre/post deadline boundaries. No official provider request or live result fixture is acquired.
+The new orchestration is Talos-authored; existing parser/helper source and pinned full MIT
+provenance remain unchanged. Workspace maintenance removed the previous checkout/toolchain;
+official manifest-checksummed Rust1.99.0 was restored and executed for fresh validation.
+
+Focused tests, full locked release_preflight, network-test strict Clippy, package inclusion,
+protected exact-source/head review, native unfiltered CI and final CAS follow. Only the existing
+authorized local socket fixture may be filtered; no new skip/ignore/retry/threshold relaxation.
+Full C/EP/headers/UA/probe/retry/source/parity/D/privacy/result admission/official roots/router/
+health/cancellation/rollback/default activation remain Pending. I293 stays Active/Claimed,
+Completion Pending; #643/#624/#717 stay open, #729 stays closed, #705/#735 remain independent.
+
+The initial fresh focused command failed during dependency compilation, before test execution:
+icu_locale_core2.2.0 archive creation could not map a zero-length object. Read-only inspection
+confirmed icu_locale_core-d87cf6bcfd13873d codegen0 and autocfg-4891372e8b3278fb codegen2 objects
+were0bytes;28GiB free space was observed. The precise corruption cause is unknown. The command
+terminated with exit101; this is not a test pass/failure
+or a new source/dependency issue attribution. Recovery cleans only those two packages' build
+outputs and uses bounded CARGO_BUILD_JOBS=2, with source/lock/pin/assertions/test concurrency and
+CI coverage unchanged. The existing EVOLUTION lesson "Isolate and verify local build environments"
+applies: preserve the failed observation separately and repair artifacts instead of weakening
+acceptance. Fresh focused/full results below must independently pass; no native failure is repaired.
+
+That recovered build also exited101 before tests, now at jsonschema0.58.6 archive creation with
+the same zero-length object diagnostic. Lower build concurrency did not eliminate it; no precise
+cause or successful test outcome is inferred. The next recovery moves build output outside the
+workspace into an isolated temporary target, preserves compatible cached artifacts and cleans the
+failed package outputs. Repository source/lock/pin/test assertions/concurrency/CI remain unchanged.
+This is artifact/environment recovery, not rerunning a failed test to obtain a green result.
+The jsonschema codegen09 object was confirmed0bytes; cleanup removed20files/23.8MiB for that
+package. Installed libLLVM and librustc_driver SHA256 both match the official pinned archive,
+so no compiler-binary mismatch is established. The target is now outside the workspace, with
+an ignored compatibility symlink for existing build-script/SDK paths. This isolates artifact
+placement; it is not proof that workspace synchronization caused either prior failure.
+
+## Bound Execution Recovery Checkpoint — 2026-10-20
+
+After that artifact recovery, all10 new focused tests actually passed (0failed/0ignored,
+290filtered) and strict network test-target Clippy exited0. Independent working-source review
+found no blocking finding. The subsequent standard preflight lost its execution connection;
+both owner and independent read-only reviewer received409 environment_offline. No terminal
+receipt or completed preflight log was obtained. Its outcome remains unknown, not a pass or a
+test failure. Source Issue#643 checkpoint6263051529 preserves this boundary; no implementation
+commit, branch publication or PR was created for this stage.
+
+The execution environment is available again. All six local paths survive, with unchanged
+compatibility source blobc2bb701bcd8405cdaa907efed1e2c6c8c8686794 and test
+blob41bd59c8f22a72cb95fed055d420a13b1cc5d88e. The toolchain/cache and isolated physical target
+are absent; official manifest-checksummed Rust1.99.0 was restored and executed. The standard
+preflight is restarted with the same bounded build settings and sole authorized local socket
+filter; a new journal streams each line and records the terminal exit separately. This is
+recovery of an interrupted validation with unknown outcome, not a retry of a failed test.
+
+Fresh remote main remainsae6a0791c6317ff7e384295ac9af74a6571572a7. Independent draft#735 moved
+to b9c01b0d1ed1928d9a09d0db6efcb77f0d7a1bb7 (124files across two pages); diagnostic#705 moved
+to703cb39b2eb9d6f14f71d84afe5154e4f0d85ec2 (3files). Complete changed-path inventories contain
+no search_backend/I293/SEARCH-C overlap. Neither independent candidate is approved or taken over.
+Fresh full-preflight/SDK/package/governance and exact-head review/CI/CAS receipts remain required.
+
+The resumed standard locked release_preflight.sh now exits0 with both terminal markers:
+release preflight: passed and TALOS_PREFLIGHT_TERMINAL_EXIT=0. Workspace check, strict workspace
+Clippy, tests/doctests and independent Runtime SDK default/coding both pass. Tools530/0failed/
+0ignored/0filtered includes all10 new bound-execution tests. Only the previously authorized
+local runtime socket fixture is skipped; no new filter, ignore, threshold, warm-up or test retry
+is introduced. Remote native CI must still run unfiltered, including that socket fixture.
+SQLite17/delivery12, governance0warnings, claims0warnings, text-boundary, CI classifier and format
+checks pass. The streamed journal SHA256 is
+854753b3d1c89540fc09759181c5abfe9d492c1f5a798f5509953e94edf825aa.
+This new terminal success does not reclassify the interrupted old run or either compile failure.
+
+Locked offline package-list verification includes compatibility.rs, both compatibility fixture
+modules and the complete rust-websearch MIT notice. Scale494sources/31packages/4workflows remains
+high-risk/release-managed/on-demand. Independent refreshed working-source review APPROVE names
+the same base and both source blobs above; it is not exact-commit, publication or merge approval.
+The six-file staged diff contains only the bounded implementation, synthetic tests and owner/
+reference synchronization. Full C and every remaining activation gate stay Pending.
+
+Fresh network-feature test-target Clippy also exits0 with -D warnings, after the resumed full
+preflight. Final owner synchronization again passes governance (SQLite17/delivery12/0warnings)
+and claims0warnings. Format/whitespace and packaged provenance remain intact. This bounded
+library prerequisite enters stable-candidate Review; exact local/remote protected review,
+unfiltered native terminal CI and final fresh CAS are still required before merge. Actual PR/
+head/tree delivery will be indexed from #643. I293 itself remains Active/Claimed, Completion
+Pending; no parent completion, new provider admission, default activation or release is claimed.
