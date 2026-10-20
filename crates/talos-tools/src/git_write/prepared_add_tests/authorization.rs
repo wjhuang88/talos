@@ -204,15 +204,21 @@ async fn discovery_runner_does_not_connect_to_trace_socket() {
 async fn discovery_runner_suppresses_configured_trace_files() {
     let root = fixture();
     let home = tempfile::tempdir().expect("isolated home");
-    let mut config = String::from("[trace2]\n");
+    let config_path = home.path().join(".gitconfig");
     for (key, name) in [
         ("normalTarget", "normal"),
         ("eventTarget", "event"),
         ("perfTarget", "perf"),
     ] {
-        config.push_str(&format!(" {key} = {}\n", home.path().join(name).display()));
+        let output = std::process::Command::new("git")
+            .args(["config", "--file"])
+            .arg(&config_path)
+            .arg(format!("trace2.{key}"))
+            .arg(home.path().join(name))
+            .output()
+            .expect("configure trace target");
+        assert!(output.status.success(), "{output:?}");
     }
-    std::fs::write(home.path().join(".gitconfig"), config).expect("config");
     let plan = prepare(root.path());
     let mut environment = plan.environment.clone();
     environment.insert("HOME".into(), home.path().as_os_str().into());
