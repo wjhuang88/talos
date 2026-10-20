@@ -4698,3 +4698,90 @@ failure 63768. Focused final bootstrap fixture session 26686 also exited 0,
 1/1 (/private/tmp/i300-bootstrap-canonical-final.log). The canonical admitted
 gitdir and ordinary host Git cwd are now deliberately distinct in that test.
 Windows native confirmation remains required; no activation/completion claim.
+
+
+2026-10-20 hook-fixture follow-up: exact-head CI 39376337680 standard
+validation (macos-14, not Linux) failed with tools 962 passed / 1 failed:
+checkout_target_hook_missing_evidence_refuses_later_creation rejected repository
+metadata drift during sender discovery. Local pre-change focused rerun passes;
+the CI root cause is not established. The fixture commit now fixes
+maintenance.autoDetach=false and gc.autoDetach=false so asynchronous maintenance
+cannot outlive fixture setup; production revalidation is unchanged. A separate
+hook-frontier assertion verifies the fixture's late-hooks/post-checkout path is
+actually retained. Focused hooks pass 2/2; Git-feature tools library passes
+491/491 outside the sandbox (/private/tmp/i300-hook-fixture-full-tools-host.log).
+The sandbox run passed 490 and failed only ps process observation PermissionDenied.
+Formatting and diff whitespace pass. Git-feature all-target Clippy is live as
+session 23162 (/private/tmp/i300-hook-fixture-clippy.log); poll before restarting.
+Latest fetch has zero main-only commits, so no rebase was needed. Native Windows
+CI 39376337680 is still live in workspace tests; focused identity/process guards
+and direct walkthrough passed. This is not full native success or T7 completion.
+
+Hook-fixture validation update: session 23162 exited 0; Git-feature all-target
+Clippy with -D warnings passes. Full standard preflight is now live as session
+36418 (/private/tmp/i300-hook-fixture-preflight.log); poll before restarting.
+No final preflight result or native Windows success is inferred.
+
+
+2026-10-20 disk recovery checkpoint: preflight session 36418 exited 101
+during compilation with ENOSPC (wast, talos-permission and other dependencies),
+not a completed test result. After confirming no cargo/rustc/preflight process
+remained, removed only target/debug under the maintainer's existing rebuildable
+artifact cleanup authorization; available space recovered from 120 MiB to 11 GiB.
+Full standard preflight is now running outside the process-observation sandbox
+as session 70035, /private/tmp/i300-hook-fixture-preflight-host-lowdisk.log, with
+CARGO_INCREMENTAL=0, CARGO_BUILD_JOBS=1 and dev/test debug info disabled. Poll
+that session before restarting; no pass is claimed. Native Windows job
+118475251274 in CI 39376337680 remains in workspace tests at this checkpoint.
+Production Windows/Pull and all original T7/handoff completion gates remain open.
+
+
+Windows rebase diagnostic follow-up: added test-and-Windows-only fixed stderr
+category reporting plus output byte counts at integration failure. Raw output,
+paths and configuration values are never printed by this diagnostic; production
+behavior is unchanged. This is investigation support, not a rebase fix. The
+source edit occurred during preflight 70035; it cannot establish Windows test
+compilation or native execution for this edit. Fresh MSVC/native validation is
+required before publishing it.
+
+
+2026-10-20 native CI and admission-fixture checkpoint: exact-head CI for
+987015ead29fc14886eccebd3b0320c5b2ea8fa3 completed with failures: Windows tools
+891 passed / 10 failed; macOS tools 962 passed / 1 failed. Production Windows
+and Pull remain disabled. Windows failures still include receiver shell support,
+daemon timeout, rebase integration, child Checkout stage budget and identity
+fixture handling; this is not a completion claim.
+
+The Windows backlink approval fixture now retains its explicit Execute facet:
+local Read alone is automatically allowed and cannot be approved with approve_once.
+Receiver root/metadata tests now compare new permission facets against the
+previous approved frontier: only Read may be added; already admitted execution
+facets may remain. The root fixture completes Windows internal Git re-admission,
+and the rewritten-network-destination fixture completes the existing Push program
+binding stage before asserting mutation permissions and stale-proof rejection.
+Focused host receiver-root regression passes 1/1
+(/private/tmp/i300-root-discovery-fixture.log). Formatting and diff whitespace
+checks pass. Current Push batch and MSVC cargo xwin test-target check are pending;
+standard preflight 70035 remains live. These edits are uncommitted and require
+final verification, native Windows execution and appropriate stage review.
+
+
+2026-10-20 admission fixture stage validation: standard preflight 70035 exited 0
+with `release preflight: passed`, including locked workspace tests and both
+external Runtime SDK fixture modes
+(/private/tmp/i300-hook-fixture-preflight-host-lowdisk.log). Current receiver
+regressions pass 47/47 and Push regressions pass 6/6; the missing-hook fixture
+passes locally again. Logs: /private/tmp/i300-receiver-admission-fixtures-host.log,
+/private/tmp/i300-push-admission-fixtures-host.log and
+/private/tmp/i300-hook-missing-local.log. Final MSVC cargo xwin test-target check
+exited 0 (/private/tmp/i300-admission-fixtures-xwin-final.log), retaining seven
+existing reduced-feature warnings. This is compilation, not native execution.
+
+Changes are split into 9db0891e (approval fixtures), ee220458 (Checkout hook
+fixtures) and d71727cd (Windows-only fixed-category Pull diagnostics).
+The root fixture performs the Windows program-binding and root-discovery halves
+exactly once; it does not re-enter the dispatcher after binding. Staged diffs
+were inspected. No production gate was enabled. Native CI failures and remaining
+original T7 acceptance requirements remain open; the macOS CI drift cause is not
+proven by a locally passing fixture. Earlier pending/uncommitted checkpoints
+above are superseded only for these validation and commit facts.
