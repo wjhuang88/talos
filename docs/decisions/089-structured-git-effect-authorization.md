@@ -663,3 +663,18 @@ static review found no blocker. Windows-only tests cover case-insensitive
 refusal and unchanged environment snapshots; locked MSVC xwin checking passes,
 but native execution and the complete shell implementation remain outstanding.
 The production Windows structured-Git gate remains closed.
+
+
+Windows shell baseline candidate (2026-10-20): under the unchanged production
+Windows gate, prepared local Push accepts only the observed ucrt64 installation
+layout. The retained canonical Git target must end in
+ucrt64/libexec/git-core/git.exe on a local drive; the separately admitted
+canonical shell must equal that installation root's usr/bin/sh.exe. Comparison
+performs no new filesystem access and refuses unknown layouts and escaped
+canonical shell targets. Invocation spelling is never substituted for retained
+canonical evidence. Existing Read/Execute admission, identity retention and
+final shell rediscovery remain mandatory. Independent static review found no
+remaining blocker after correcting the rebound invocation/canonical distinction.
+MSVC xwin checking and the host Unix shell regression pass. This candidate does
+not prove DLL loading, MSYS startup effects or real Windows prepared Push;
+these runtime/trust limitations remain activation prerequisites.

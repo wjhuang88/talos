@@ -3211,6 +3211,11 @@ impl AddPlan {
             .iter()
             .find(|child| &child.spelling == path)
             .ok_or_else(|| GitToolError::InvalidInput("Receiver shell identity missing".into()))?;
+        #[cfg(windows)]
+        {
+            host_path::validate_receiver_shell(self.sender_program_target(), &evidence.canonical)
+        }
+        #[cfg(not(windows))]
         validate_receiver_shell_path(path, &evidence.canonical)
     }
 
@@ -4986,6 +4991,7 @@ fn validate_receiver_shell_environment(
 // Git invokes this shell as noninteractive `sh -c`, never as a login shell.
 // Other compiled shells may load unconditional startup files (for example
 // zshenv); their path/effect inventory requires separate support.
+#[cfg(not(windows))]
 fn validate_receiver_shell_path(path: &Path, canonical: &Path) -> Result<(), GitToolError> {
     let supported = (cfg!(target_os = "macos") && canonical == Path::new("/bin/sh"))
         || (cfg!(target_os = "linux")

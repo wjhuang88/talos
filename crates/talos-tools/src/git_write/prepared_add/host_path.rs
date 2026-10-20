@@ -4,6 +4,30 @@ use std::{borrow::Cow, path::Path};
 
 use super::GitToolError;
 
+/// Compare already admitted canonical executable paths; this performs no new
+/// filesystem reads. Unknown Git installations retain the separate-execution
+/// fallback until their runtime effects have been reviewed.
+#[cfg(windows)]
+pub(super) fn validate_receiver_shell(git: &Path, shell: &Path) -> Result<(), GitToolError> {
+    use std::path::{Component, Prefix};
+
+    let local = matches!(git.components().next(), Some(Component::Prefix(prefix))
+        if matches!(prefix.kind(), Prefix::Disk(_) | Prefix::VerbatimDisk(_)));
+    if local
+        && git.is_absolute()
+        && git.ends_with(r"ucrt64\libexec\git-core\git.exe")
+        && let Some(root) = git.ancestors().nth(4)
+        // Exact canonical comparison rejects an escaping shell junction;
+        // never canonicalize an unapproved expected path.
+        && shell == root.join(r"usr\bin\sh.exe")
+    {
+        return Ok(());
+    }
+    Err(GitToolError::InvalidInput(
+        "Receiver transport requires a separately bound shell in the supported Git for Windows installation".into(),
+    ))
+}
+
 /// Represent the bound Git executable for an MSYS shell without changing its
 /// file identity. Only the fixed git.exe leaf under a local drive is supported.
 #[cfg(windows)]
@@ -130,6 +154,36 @@ pub(super) fn directory_argument(path: &Path) -> Result<Cow<'_, Path>, GitToolEr
 #[cfg(all(test, windows))]
 mod tests {
     use super::*;
+
+    #[test]
+    fn receiver_shell_requires_exact_supported_installation() {
+        let git = Path::new(r"\\?\C:\Program Files\Git\ucrt64\libexec\git-core\git.exe");
+        let shell = Path::new(r"\\?\C:\Program Files\Git\usr\bin\sh.exe");
+        validate_receiver_shell(git, shell).expect("same installation");
+        // A rebound invocation spelling must not replace retained canonical
+        // evidence when deriving the installation root.
+        assert!(
+            validate_receiver_shell(
+                Path::new(r"C:\Program Files\Git\ucrt64\libexec\git-core\git.exe"),
+                shell,
+            )
+            .is_err()
+        );
+        for other in [
+            r"\\?\C:\Other Git\usr\bin\sh.exe",
+            r"\\?\C:\Program Files\Git\usr\bin\bash.exe",
+            r"\\?\D:\Program Files\Git\usr\bin\sh.exe",
+        ] {
+            assert!(validate_receiver_shell(git, Path::new(other)).is_err());
+        }
+        assert!(
+            validate_receiver_shell(Path::new(r"\\?\C:\Program Files\Git\cmd\git.exe"), shell,)
+                .is_err()
+        );
+        assert!(
+            validate_receiver_shell(Path::new(r"ucrt64\libexec\git-core\git.exe"), shell,).is_err()
+        );
+    }
 
     #[test]
     fn receiver_program_preserves_identity_and_rejects_unsupported_forms() {
