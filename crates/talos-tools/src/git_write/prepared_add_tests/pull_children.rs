@@ -15,7 +15,9 @@ fn child_backlink_alias_requires_bound_root_and_marker_reads() {
             ToolProvenance::Native,
         )
         .expect("plan");
-        plan.facets.clear();
+        // Keep an explicit approval requirement: workspace-local Read alone
+        // is automatically allowed, so proof() cannot approve a proposal.
+        plan.facets.retain(|facet| facet.nature == ToolNature::Execute);
         for (kind, path) in [
             ("root", root.path().to_owned()),
             ("marker", root.path().join(".git")),
