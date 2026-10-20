@@ -3,6 +3,10 @@
 
 use super::GitToolError;
 
+#[cfg(test)]
+#[path = "target_config_path_tests.rs"]
+mod path_tests;
+
 #[derive(Clone, Eq, PartialEq)]
 pub(super) struct Record {
     pub key: Vec<u8>,
@@ -353,6 +357,29 @@ fn bounded_match_mode(
     .map_err(|_| invalid_config())
 }
 
+// Git for Windows normalizes resolved paths to ordinary drive/UNC spellings
+// with forward slashes before matching. Only transform admitted path text;
+// backslashes in the configuration pattern retain their wildmatch meaning.
+fn gitdir_match_path(path: &std::path::Path) -> Result<String, GitToolError> {
+    let text = path.to_str().ok_or_else(invalid_config)?;
+    #[cfg(windows)]
+    {
+        use std::path::{Component, Prefix};
+        let text = match path.components().next() {
+            Some(Component::Prefix(prefix)) => match prefix.kind() {
+                Prefix::Disk(_) | Prefix::UNC(..) => text.to_owned(),
+                Prefix::VerbatimDisk(_) => text[4..].to_owned(),
+                Prefix::VerbatimUNC(..) => format!("//{}", &text[8..]),
+                _ => return Err(invalid_config()),
+            },
+            _ => return Err(invalid_config()),
+        };
+        Ok(text.replace('\\', "/"))
+    }
+    #[cfg(not(windows))]
+    Ok(text.to_owned())
+}
+
 /// Match only identity-bound, non-symlink paths. This function performs no IO.
 fn gitdir_matches(
     pattern: &[u8],
@@ -373,11 +400,7 @@ fn gitdir_matches(
         if !home.is_absolute() || home.as_os_str().len() > 4096 {
             return Err(invalid_config());
         }
-        let mut expanded = home
-            .to_str()
-            .ok_or_else(invalid_config)?
-            .as_bytes()
-            .to_vec();
+        let mut expanded = gitdir_match_path(home)?.into_bytes();
         expanded.extend_from_slice(&pattern[1..]);
         pattern = expanded;
     } else if pattern.starts_with(b"~") || pattern.starts_with(b"%(") {
@@ -389,11 +412,7 @@ fn gitdir_matches(
         // lexical `.`/duplicate separators as native realpath does here.
         let origin: std::path::PathBuf = origin.components().collect();
         let parent = origin.parent().ok_or_else(invalid_config)?;
-        let mut expanded = parent
-            .to_str()
-            .ok_or_else(invalid_config)?
-            .as_bytes()
-            .to_vec();
+        let mut expanded = gitdir_match_path(parent)?.into_bytes();
         if !expanded.ends_with(b"/") {
             expanded.push(b'/');
         }
@@ -409,7 +428,8 @@ fn gitdir_matches(
         pattern.extend_from_slice(b"**");
     }
     let gitdir: std::path::PathBuf = gitdir.components().collect();
-    let text = gitdir.to_str().ok_or_else(invalid_config)?.as_bytes();
+    let gitdir = gitdir_match_path(&gitdir)?;
+    let text = gitdir.as_bytes();
     if pattern.len() > 4096 || text.len() > 4096 {
         return Err(invalid_config());
     }
@@ -2290,11 +2310,7 @@ mod tests {
     #[test]
     fn gitdir_conditions_match_native_with_admitted_directory_identity() {
         let temporary = tempfile::tempdir().expect("fixture");
-        let root = temporary
-            .path()
-            .canonicalize()
-            .expect("root")
-            .join("[literal]");
+        let root = native_fixture_root(&temporary).join("[literal]");
         let repository = root.join("repo");
         std::fs::create_dir_all(&repository).expect("repository");
         let native = |args: &[&str]| {
