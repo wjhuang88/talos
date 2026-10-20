@@ -640,6 +640,18 @@ fn windows_auto_identity_receipt(receipt: String) {
 }
 
 '''
+    evaluation_helper += '''fn windows_auto_evaluation_unavailable_stage(reason: &str) -> &'static str {
+    match reason {
+        "workspace evidence capture timed out" => "eval_prod_reason_workspace_timeout",
+        "workspace evidence capture is busy" => "eval_prod_reason_workspace_busy",
+        "workspace evidence capture failed" => "eval_prod_reason_workspace_worker_failed",
+        "artifact capture deadline exceeded" => "eval_prod_reason_artifact_timeout",
+        "artifact capture already running" => "eval_prod_reason_artifact_busy",
+        _ => "eval_prod_reason_other",
+    }
+}
+
+'''
     host = replace_once(host, "fn windows_auto_host_stage(stage: &str) {", evaluation_helper + "fn windows_auto_host_stage(stage: &str) {")
     begin = host.index("    struct ObservedArtifactAssessor {")
     end = host.index("    async fn next_production_output(", begin)
@@ -674,12 +686,12 @@ fn windows_auto_identity_receipt(receipt: String) {
                             let workspace_result = source.workspace_revision_async().await;
                             windows_auto_evaluation_stage("eval_prod_revision_return");
                             let workspace = match workspace_result {''')
-    context = replace_once(context, "                                    return RuntimeOutput::EvaluationUnavailable { reason: error };", '                                    windows_auto_evaluation_stage("eval_prod_revision_unavailable");\n                                    return RuntimeOutput::EvaluationUnavailable { reason: error };')
+    context = replace_once(context, "                                    return RuntimeOutput::EvaluationUnavailable { reason: error };", '                                    windows_auto_evaluation_stage("eval_prod_revision_unavailable");\n                                    windows_auto_evaluation_stage(windows_auto_evaluation_unavailable_stage(&error));\n                                    return RuntimeOutput::EvaluationUnavailable { reason: error };')
     context = replace_once(context, "                                    return RuntimeOutput::EvaluationUnavailable { reason: error.to_string() };", '                                    windows_auto_evaluation_stage("eval_prod_context_unavailable");\n                                    return RuntimeOutput::EvaluationUnavailable { reason: error.to_string() };')
     evaluation = context + evaluation[context_end:]
     evaluation = replace_once(evaluation, "                                let snapshot = match if let Some(registry) = artifact_registry {", '                                windows_auto_evaluation_stage("eval_prod_capture_enter");\n                                let snapshot_result = if let Some(registry) = artifact_registry {')
     evaluation = replace_once(evaluation, "                                } {\n                                    Ok(snapshot) => snapshot,", '                                };\n                                windows_auto_evaluation_stage("eval_prod_capture_return");\n                                let snapshot = match snapshot_result {\n                                    Ok(snapshot) => snapshot,')
-    evaluation = replace_once(evaluation, "                                    Err(error) => return RuntimeOutput::EvaluationUnavailable { reason: error },\n                                };\n                                let mut result = service", '                                    Err(error) => { windows_auto_evaluation_stage("eval_prod_capture_unavailable"); return RuntimeOutput::EvaluationUnavailable { reason: error }; },\n                                };\n                                windows_auto_evaluation_stage("eval_prod_service_enter");\n                                let mut result = service')
+    evaluation = replace_once(evaluation, "                                    Err(error) => return RuntimeOutput::EvaluationUnavailable { reason: error },\n                                };\n                                let mut result = service", '                                    Err(error) => { windows_auto_evaluation_stage("eval_prod_capture_unavailable"); windows_auto_evaluation_stage(windows_auto_evaluation_unavailable_stage(&error)); return RuntimeOutput::EvaluationUnavailable { reason: error }; },\n                                };\n                                windows_auto_evaluation_stage("eval_prod_service_enter");\n                                let mut result = service')
     evaluation = replace_once(evaluation, "                                    .evaluate_snapshot(source.session_id(), context.claim(), &snapshot)\n                                    .await;", '''                                    .evaluate_snapshot(source.session_id(), context.claim(), &snapshot)
                                     .await;
                                 windows_auto_evaluation_stage(match &result {
@@ -994,8 +1006,11 @@ def main() -> int:
                       "revision_return", "revision_unavailable", "context_unavailable",
                       "capture_enter", "capture_return", "capture_unavailable", "service_enter",
                       "service_report", "service_failure", "assessor_enter", "assessor_notified",
-                      "assessor_gate_begin", "assessor_gate_timeout", "assessor_gate_satisfied"):
+                      "assessor_gate_begin", "assessor_gate_timeout", "assessor_gate_satisfied",
+                      "reason_workspace_timeout", "reason_workspace_busy", "reason_workspace_worker_failed",
+                      "reason_artifact_timeout", "reason_artifact_busy", "reason_other"):
             assert patched[HOST].count('"eval_prod_' + stage + '"') == 1
+        assert patched[HOST].count("windows_auto_evaluation_unavailable_stage(&error)") == 2
         assert patched[HOST].count('expect("actual observations reach assessor")') == originals[HOST].count('expect("actual observations reach assessor")') == 1
         assert "Duration::from_secs(10), entered.notified()" in patched[HOST]
         assert "WaitForSingleObject(process, 1_000)" in patched[BOUNDARY]

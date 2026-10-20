@@ -1298,3 +1298,39 @@ cleanup10s/tool120s. All earlier failures/Plugin unknowns and closed I301/I304/I
 #705 OPEN/UNMERGED; no merge/release or overall timeout-root closure authorization.
 Fresh projectgovernance FAILED1error/0warnings because missingcargo prevents SQLite metadata;
 delivery12fixtures passed. Retain this local environment failure explicitly.
+
+## 2026-10-20: successful stage probe and unavailable-reason follow-up
+
+CI3269/run39349316466 exact703cb39b2eb9d6f14f71d84afe5154e4f0d85ec2 attempt1
+completed all8jobs successfully: each diagnostic60processes/1110passed/0failed/0ignored,
+combined120/2220/0. Evidence/review comment6280904896 retains artifact hashes, restoration
+receipts and scenario attribution. Thirty assessor gates were satisfied, maximum72.9950ms;
+no evaluator failure reproduced. This does not replace CI3229's2218/2 or any earlier failure.
+
+Source audit at exact703 identifies a concrete pre-dispatch mechanism, not a demonstrated
+CI3229 cause. RuntimeEvaluationEvidenceSource::run_capture has an existing2s deadline;
+RuntimeArtifactEvidenceRegistry::capture_async has an existing5s deadline. Either can return
+an error before assessor entry. The host returns EvaluationUnavailable, while the fixture
+still waits on entered.notified() under its existing10s gate. A worker retains its shared
+capture permit until its closure exits, so subsequent capture can report busy. Service
+binding/observation validation can also reject before assessor dispatch; capture failure
+alone is not the only possible explanation. No lost-notification or OS cause is established.
+
+Next bounded hypothesis: a future gate failure may follow one of those explicit unavailable
+results, rather than a phase remaining pending for10s. Extend only the existing HOST overlay:
+after revision_unavailable or capture_unavailable, classify the unchanged error by five exact
+fixed strings (workspace timeout/busy/worker failure, artifact timeout/busy), otherwise other.
+Return only fixed stage literals; do not print error bodies, paths, IDs or content. Exact-string
+categories describe the returned reason, not an independent proof of its origin or OS cause.
+The existing phase marker precedes the reason marker, correlated by intact PID/thread/scenario
+sequence; absent/interleaved markers remain ambiguous. Successful-only runs cannot confirm
+this hypothesis. Existing service_failure still covers multiple pre/post-dispatch causes.
+
+No new Rust source overlay, worker, await, native API, timeout, assertion, error transformation,
+collector, selection, sampling or test process is added. Same six sources restored byte-exact;
+other five overlays remain identical to703. No deterministic fault injection or warmup. Python
+selftest passes; fresh exact-candidate review and native CI remain required. Preserve Rust1.99.0,
+dependencies/lockfile and every original deadline/assertion, including historical composite5s,
+assessor-entry10s, Auto15s, cleanup10s/tool120s and Plugin unknowns. #705 remains OPEN/UNMERGED.
+Current main2d7f4b36c17ae17f5f74d34b167987876db8add2 adds separate Search work since includeddea;
+no relevant probe source/dependency/workflow change. OpenGit#735 remains independently owned.
