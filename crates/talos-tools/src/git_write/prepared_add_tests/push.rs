@@ -1,3 +1,18 @@
+// Network Push reaches its mutation plan only after Windows internal Git has
+// received fresh admission. Local receivers retain their separate root stage.
+async fn finish_push_program_approved(mut plan: Box<AddPlan>) -> Box<AddPlan> {
+    if plan.phase == Phase::PushProgram {
+        let tokens = proof(&plan)
+            .consume_for_prepared(&plan.request(), &plan.identity)
+            .expect("Push program admission");
+        plan = plan.rebind_push_program(&tokens).await.expect("Push program binding");
+        plan.facets.append(&mut plan.sender_mutation_facets);
+        plan.phase = Phase::Mutation;
+        plan.identity = PreparedPlanIdentity::new();
+    }
+    plan
+}
+
 #[cfg(unix)]
 #[tokio::test]
 async fn prepared_local_push_runs_all_eight_admitted_stages() {
@@ -820,6 +835,7 @@ async fn prepared_push_transfers_objects_to_admitted_git_daemon() {
     assert!(denied.result.is_error);
     let plan = AddPlan::prepare_push(root.path(), &input, ToolProvenance::Native).expect("plan");
     let next = Box::new(plan).discover().await.expect("discovery");
+    let next = finish_push_program_approved(next).await;
     assert!(next.execute(Box::new(())).await.result.is_error);
     assert!(git(receiver.path(), &["for-each-ref"]).is_empty());
 
@@ -843,6 +859,7 @@ async fn prepared_push_transfers_objects_to_admitted_git_daemon() {
         let plan =
             AddPlan::prepare_push(root.path(), &input, ToolProvenance::Native).expect("plan");
         let next = Box::new(plan).discover().await.expect("discovery");
+        let next = finish_push_program_approved(next).await;
         let admission = proof(&next);
         // A hook appearing after approval must never run under Git's
         // executable permission, even though its inspection was admitted.
@@ -856,6 +873,7 @@ async fn prepared_push_transfers_objects_to_admitted_git_daemon() {
     }
     let plan = AddPlan::prepare_push(root.path(), &input, ToolProvenance::Native).expect("plan");
     let next = Box::new(plan).discover().await.expect("discovery");
+    let next = finish_push_program_approved(next).await;
     let admission = proof(&next);
     let output = next.execute(Box::new(admission)).await;
     assert!(!output.result.is_error, "{}", output.result.content);
@@ -874,6 +892,7 @@ async fn prepared_push_transfers_objects_to_admitted_git_daemon() {
     let plan =
         AddPlan::prepare_push(root.path(), &deletion, ToolProvenance::Native).expect("delete plan");
     let next = Box::new(plan).discover().await.expect("discovery");
+    let next = finish_push_program_approved(next).await;
     let admission = proof(&next);
     let output = next.execute(Box::new(admission)).await;
     assert!(output.result.is_error, "{}", output.result.content);
@@ -909,6 +928,7 @@ async fn prepared_push_transfers_objects_to_admitted_git_daemon() {
     let plan = AddPlan::prepare_push(root.path(), &input, ToolProvenance::Native)
         .expect("multi-target plan");
     let next = Box::new(plan).discover().await.expect("discovery");
+    let next = finish_push_program_approved(next).await;
     assert_eq!(next.push_destinations, [destination, missing]);
     let admission = proof(&next);
     let output = next.execute(Box::new(admission)).await;
@@ -1020,6 +1040,7 @@ async fn push_rejects_legacy_destination_inserted_after_discovery() {
         )
         .expect("plan");
         let next = Box::new(plan).discover().await.expect("discovery");
+        let next = finish_push_program_approved(next).await;
         let admission = proof(&next);
         let directory = root.path().join(".git").join(directory);
         std::fs::create_dir_all(&directory).expect("legacy directory");
@@ -1047,6 +1068,7 @@ async fn push_rejects_symbolic_and_detached_head_changes_after_discovery() {
             ToolProvenance::Native,
         ).expect("plan");
         let next = Box::new(plan).discover().await.expect("discovery");
+        let next = finish_push_program_approved(next).await;
         let admission = proof(&next);
         std::fs::write(root.path().join(".git/HEAD"), replacement).expect("replace HEAD");
         let output = next.execute(Box::new(admission)).await;
@@ -1066,6 +1088,7 @@ async fn push_rejects_sender_ref_changes_after_discovery() {
             AddPlan::prepare_push(root.path(), &serde_json::json!({}), ToolProvenance::Native)
                 .expect("plan");
         let next = Box::new(plan).discover().await.expect("discovery");
+        let next = finish_push_program_approved(next).await;
         assert!(next.revalidate().is_ok());
         let path = if packed {
             root.path().join(".git/packed-refs")
