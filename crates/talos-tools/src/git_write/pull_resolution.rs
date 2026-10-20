@@ -178,7 +178,16 @@ impl Resolution {
             match component {
                 Component::Prefix(_) | Component::RootDir => {
                     result.resolved.push(&part);
-                    if result.resolved.is_absolute() {
+                    // Verbatim disk prefixes have an implicit root in Rust,
+                    // but `\\?\C:` is not the complete filesystem root. Wait
+                    // for an explicit RootDir before inspecting its identity.
+                    let root_follows = pending.front().is_some_and(|(next, _)| {
+                        matches!(
+                            Path::new(next).components().next(),
+                            Some(Component::RootDir)
+                        )
+                    });
+                    if result.resolved.is_absolute() && !root_follows {
                         result.record(budget)?;
                     }
                 }
