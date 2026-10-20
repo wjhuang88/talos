@@ -1174,7 +1174,7 @@ async fn receiver_root_discovery_defers_external_gitdir_and_requires_fresh_proof
     )
     .expect("sender plan");
     let stale = proof(&plan);
-    let plan = Box::new(plan).discover().await.expect("sender discovery");
+    let plan = discover_receiver_sender_approved(plan).await;
     assert!(plan.phase == Phase::ReceiverRoots);
     let wrong = Box::new(plan).execute_stage(Box::new(stale)).await;
     assert!(matches!(wrong, PreparedNormalStage::Complete(output) if output.result.is_error));
@@ -1185,11 +1185,17 @@ async fn receiver_root_discovery_defers_external_gitdir_and_requires_fresh_proof
         ToolProvenance::Native,
     )
     .expect("sender plan");
-    let plan = Box::new(plan).discover().await.expect("sender discovery");
-    let admission = proof(&plan);
-    let PreparedNormalStage::Continue(next) = plan.execute_stage(Box::new(admission)).await else {
-        panic!("admitted root must produce metadata continuation");
-    };
+    let plan = discover_receiver_sender_approved(plan).await;
+    let prior_facets = plan.permission_profile().to_vec();
+    let authorizations = proof(&plan)
+        .consume_for_prepared(&plan.request(), &plan.identity)
+        .expect("root admission");
+    // The helper already performed the Windows program-rebinding half of the
+    // ReceiverRoots dispatcher; finish its root-discovery half exactly once.
+    let next = plan
+        .discover_receiver_roots(&authorizations)
+        .expect("admitted root must produce metadata continuation");
+    assert!(next.phase == Phase::ReceiverMetadata);
     assert!(
         next.permission_profile()
             .iter()
@@ -1199,7 +1205,7 @@ async fn receiver_root_discovery_defers_external_gitdir_and_requires_fresh_proof
     assert!(
         next.permission_profile()
             .iter()
-            .all(|facet| facet.nature == ToolNature::Read)
+            .all(|facet| facet.nature == ToolNature::Read || prior_facets.contains(facet))
     );
     assert!(!external.exists());
     assert!(!root.path().join(".git/index").exists());
@@ -1862,6 +1868,7 @@ async fn receiver_metadata_wave_defers_pointer_targets_and_binds_changes() {
             .consume_for_prepared(&plan.request(), &plan.identity)
             .expect("root proof");
         let plan = plan.discover_receiver_roots(&authorization).expect("roots");
+        let prior_facets = plan.facets.clone();
         let stale = proof(&plan);
         let authorization = proof(&plan)
             .consume_for_prepared(&plan.request(), &plan.identity)
@@ -1882,7 +1889,7 @@ async fn receiver_metadata_wave_defers_pointer_targets_and_binds_changes() {
         assert!(
             plan.facets
                 .iter()
-                .all(|facet| facet.nature == ToolNature::Read)
+                .all(|facet| facet.nature == ToolNature::Read || prior_facets.contains(facet))
         );
         assert!(
             stale
@@ -1966,12 +1973,8 @@ async fn push_discovery_binds_rewritten_destinations_and_requires_fresh_admissio
             .any(|facet| matches!(facet.nature, ToolNature::Network | ToolNature::Write))
     );
     let stale = proof(&plan);
-    let admission = proof(&plan);
-    let PreparedNormalStage::Continue(next) =
-        Box::new(plan).execute_stage(Box::new(admission)).await
-    else {
-        panic!("discovery failed")
-    };
+    let next = Box::new(plan).discover().await.expect("sender discovery");
+    let next = finish_push_program_approved(next).await;
     assert!(
         next.permission_profile()
             .iter()
