@@ -510,6 +510,43 @@ fn receiver_shell_startup_environment_refuses_without_mutating_parent_snapshot()
 }
 
 #[cfg(windows)]
+#[tokio::test]
+async fn receiver_windows_shell_noninteractive_command_does_not_source_home_startup() {
+    let home = tempfile::tempdir().expect("fixture home");
+    for file in [".profile", ".bash_profile", ".bash_login", ".bashrc"] {
+        std::fs::write(home.path().join(file), "printf unexpected > startup-ran\n")
+            .expect("startup sentinel");
+    }
+    let mut environment = execution_environment();
+    validate_receiver_shell_environment(&environment).expect("admitted startup environment");
+    environment.insert(OsString::from("HOME"), home.path().as_os_str().to_owned());
+    let git = resolve_git(&environment).expect("Git");
+    let discovery = tokio::process::Command::new(git)
+        .current_dir(home.path())
+        .env_clear()
+        .envs(&environment)
+        .args(["var", "GIT_SHELL_PATH"])
+        .kill_on_drop(true)
+        .output();
+    let discovery = tokio::time::timeout(std::time::Duration::from_secs(10), discovery)
+        .await.expect("discovery deadline").expect("shell discovery");
+    assert!(discovery.status.success());
+    let shell = String::from_utf8(discovery.stdout).expect("shell path");
+    let output = tokio::process::Command::new(shell.trim())
+        .current_dir(home.path())
+        .env_clear()
+        .envs(&environment)
+        .args(["-c", "for f in .profile .bash_profile .bash_login .bashrc; do test -f \"$HOME/$f\" || exit 1; done; printf '%s' \"$1\"", "fixed-command", "approved"])
+        .kill_on_drop(true)
+        .output();
+    let output = tokio::time::timeout(std::time::Duration::from_secs(10), output)
+        .await.expect("shell deadline").expect("shell execution");
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    assert_eq!(output.stdout, b"approved");
+    assert!(!home.path().join("startup-ran").exists());
+}
+
+#[cfg(windows)]
 #[test]
 fn receiver_shell_rejects_runtime_overrides_case_insensitively() {
     for name in [
