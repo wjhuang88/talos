@@ -5796,3 +5796,15 @@ authorized recursive Pull/fetch/integration path, then obtaining independent
 delivery/security/API review, fresh exact-head gates, synchronized user-facing
 docs and merge/completion evidence. Windows production preparation and
 production Pull remain closed; T7 and the serial handoff remain Active.
+
+Windows CI failure follow-up (2026-10-20): predecessor run 39352700931 for
+`3128117a` completed with the Windows workspace test step failing and then
+reaching its 20-minute limit. It recorded Agent 471/3, MCP 0/5, Runtime 70/2,
+and tools 858/32 passed/failed. Agent/MCP/Runtime Git integration fixtures hit
+the explicit Windows process-tree supervision refusal; the tools failures span
+Windows path/configuration expectations, Checkout and Push admission fixtures,
+and Pull resolution/integration evidence. These are diagnostic failures, not
+evidence that production Windows Git is enabled. The Push fixture admission
+failure is addressed in `0cecd803`; exact-head CI run 39355259779 for `77a8cf84`
+is now running and must determine which failures remain. T7 remains Active, and
+no Windows runtime or delivery gate is considered closed yet.
