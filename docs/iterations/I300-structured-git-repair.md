@@ -6098,3 +6098,29 @@ failure: tools 885 passed / 15 failed, with additional Agent/MCP/Runtime
 failures. Log: /private/tmp/i300-native-92494edf.log. This CI excludes local
 489d2fa5, 05783988 and the current receiver cleanup. Production Windows/Pull
 remain disabled and all original T7/handoff completion gates remain open.
+
+Receiver cleanup is committed as f68c2ce1. Preflight 63768 remains live; its
+production source is f68c2ce1, but the subsequent bootstrap fixture-only edit
+was made while workspace tests were running, so do not describe this run as
+final-source validation for that later edit. Next bootstrap fixture correction
+canonicalizes the admitted gitdir for Metadata/Common while keeping ordinary
+Windows spelling for host Git commands. The earlier focused variant passed
+1/1 (/private/tmp/i300-bootstrap-canonical.log); final host-cwd spelling and
+Windows validation remain pending. No new completion claim or activation.
+
+Preflight 63768 terminated with exit 101: tools 962 passed / 1 failed solely
+at the existing ps process-observation PermissionDenied sandbox boundary.
+This is not a production regression. A host-permission full preflight rerun
+was requested, log /private/tmp/i300-builtin-preflight-host.log; poll its
+returned session before restarting. The bootstrap fixture edit remains
+uncommitted and requires final focused/native checks.
+
+2026-10-20 receiver batch validation result: host-permission full standard
+preflight 47044 exited 0, ending `release preflight: passed` in
+/private/tmp/i300-builtin-preflight-host.log (locked workspace checks, Clippy,
+tests and both external Runtime SDK consumer modes). It ran after the final
+bootstrap fixture source was fixed and supersedes sandbox process-observation
+failure 63768. Focused final bootstrap fixture session 26686 also exited 0,
+1/1 (/private/tmp/i300-bootstrap-canonical-final.log). The canonical admitted
+gitdir and ordinary host Git cwd are now deliberately distinct in that test.
+Windows native confirmation remains required; no activation/completion claim.
