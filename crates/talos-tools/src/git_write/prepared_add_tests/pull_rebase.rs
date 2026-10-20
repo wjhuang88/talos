@@ -285,13 +285,17 @@ async fn pull_rebase_filter_refuses_without_running_helper() {
 
 #[tokio::test]
 async fn pull_rebase_executes_divergent_history_with_each_backend() {
-    for (backend, mode) in [
-        ("merge", super::super::pull_state::Rebase::On),
-        ("apply", super::super::pull_state::Rebase::On),
-        ("apply", super::super::pull_state::Rebase::Merges),
+    for (backend, mode, autocrlf) in [
+        ("merge", super::super::pull_state::Rebase::On, "false"),
+        ("merge", super::super::pull_state::Rebase::On, "true"),
+        ("apply", super::super::pull_state::Rebase::On, "false"),
+        ("apply", super::super::pull_state::Rebase::On, "true"),
+        ("apply", super::super::pull_state::Rebase::Merges, "false"),
+        ("apply", super::super::pull_state::Rebase::Merges, "true"),
     ] {
         let root = fixture();
         let git = |args: &[&str]| integration_git(root.path(), args);
+        git(&["config", "core.autocrlf", autocrlf]);
         git(&["config", "user.name", "Fixture"]);
         git(&["config", "user.email", "fixture@example.invalid"]);
         git(&["config", "rebase.backend", "apply"]);
@@ -305,16 +309,19 @@ async fn pull_rebase_executes_divergent_history_with_each_backend() {
         let target = git(&["rev-parse", "HEAD"]);
         // Even --force can retain a stat-clean file without applying checkout
         // conversion. Recreate it to obtain the native worktree representation.
+        // Update index stat data too: otherwise CRLF checkout can leave a
+        // stale size that makes rebase report unstaged changes.
         std::fs::remove_file(root.path().join("remote")).expect("recreate remote");
-        git(&["checkout-index", "--force", "--", "remote"]);
+        git(&["checkout-index", "--force", "--index", "--", "remote"]);
         let expected_remote = std::fs::read(root.path().join("remote")).expect("native remote");
         git(&["reset", "--hard", &base]);
         std::fs::write(root.path().join("local"), "local\n").expect("local");
         git(&["add", "local"]);
         git(&["commit", "-m", "local"]);
         std::fs::remove_file(root.path().join("local")).expect("recreate local");
-        git(&["checkout-index", "--force", "--", "local"]);
+        git(&["checkout-index", "--force", "--index", "--", "local"]);
         let expected_local = std::fs::read(root.path().join("local")).expect("native local");
+        assert!(git(&["diff-files", "--name-only"]).is_empty(), "fixture index differs: backend={backend}, autocrlf={autocrlf}");
         let original = git(&["rev-parse", "HEAD"]);
         let mut plan = integration_scope_fixture(root.path()).await;
         std::fs::write(
