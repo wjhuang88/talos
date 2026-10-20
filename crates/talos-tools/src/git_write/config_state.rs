@@ -1897,6 +1897,13 @@ pub(super) fn declared_include_paths(
             if path.is_absolute() {
                 result.insert(path);
             } else {
+                if path.has_root()
+                    || path
+                        .components()
+                        .any(|part| matches!(part, std::path::Component::Prefix(_)))
+                {
+                    return Err(unsupported("Include path has an ambiguous root or prefix"));
+                }
                 let origin = std::str::from_utf8(&origin[b"file:".len()..])
                     .map_err(|_| unsupported("Invalid include origin"))?;
                 let origin = PathBuf::from(origin);
@@ -1905,12 +1912,23 @@ pub(super) fn declared_include_paths(
                 } else {
                     workdir.join(origin)
                 };
-                result.insert(
-                    origin
-                        .parent()
-                        .ok_or_else(|| unsupported("Include origin has no parent"))?
-                        .join(path),
-                );
+                let parent = origin
+                    .parent()
+                    .ok_or_else(|| unsupported("Include origin has no parent"))?;
+                // PathBuf::push normalizes `..` on Windows verbatim roots.
+                // Keep Git's spelling so Sources can bind cancelled ancestors.
+                let mut spelling = parent.as_os_str().to_os_string();
+                let parent_text = parent.as_os_str().as_encoded_bytes();
+                if !(parent_text.ends_with(b"/") || cfg!(windows) && parent_text.ends_with(b"\\")) {
+                    spelling.push(std::path::MAIN_SEPARATOR_STR);
+                }
+                // Verbatim Windows paths only recognize backslashes during
+                // component traversal; Git accepts either separator.
+                #[cfg(windows)]
+                spelling.push(path.as_os_str().to_string_lossy().replace('/', "\\"));
+                #[cfg(not(windows))]
+                spelling.push(path.as_os_str());
+                result.insert(PathBuf::from(spelling));
             }
         }
     }

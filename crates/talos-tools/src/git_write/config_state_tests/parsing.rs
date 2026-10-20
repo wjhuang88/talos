@@ -15,14 +15,73 @@ fn include_traversal_preserves_spelling_without_relaxing_other_paths() {
             output.as_bytes(),
             std::path::Path::new("/repository"),
             &environment,
-        )
-        .expect("declaration only");
+        );
+        if cfg!(windows) && spelling.starts_with('/') {
+            assert!(paths.is_err(), "root-relative Windows include is ambiguous");
+            continue;
+        }
+        let paths = paths.expect("declaration only");
         let expected = if spelling.starts_with('/') {
             PathBuf::from(spelling)
         } else {
             PathBuf::from("/repository").join(spelling)
         };
         assert_eq!(paths, BTreeSet::from([expected]));
+    }
+}
+
+#[test]
+fn declared_relative_include_retains_cancelled_ancestor_on_canonical_root() {
+    let root = tempfile::tempdir().expect("fixture");
+    let canonical = root.path().canonicalize().expect("canonical root");
+    let origin = canonical.join("config");
+    std::fs::create_dir(canonical.join("traversal")).expect("ancestor");
+    let mut inputs = vec!["traversal/../target.conf"];
+    if cfg!(windows) {
+        inputs.push(r"traversal\..\target.conf");
+    }
+    for input in inputs {
+        let output = format!("file:{}\0include.path\n{input}\0", origin.display());
+        let paths = declared_include_paths(output.as_bytes(), &canonical, &BTreeMap::new())
+            .expect("include declarations");
+        assert_eq!(paths.len(), 1);
+        let path = paths.iter().next().expect("include");
+        let suffix = if cfg!(windows) { r"traversal\..\target.conf" } else { "traversal/../target.conf" };
+        assert!(path.as_os_str().to_string_lossy().ends_with(suffix));
+        assert!(path.components().any(|part| part == std::path::Component::ParentDir));
+        let spellings = auxiliary_spellings(path).expect("ancestor inventory");
+        assert!(spellings.contains(&canonical.join("traversal")));
+    }
+}
+
+#[cfg(windows)]
+#[test]
+fn declared_windows_include_paths_preserve_roots_and_reject_ambiguous_forms() {
+    let environment = BTreeMap::new();
+    let workdir = PathBuf::from(r"C:\work");
+    let source = r"C:\config";
+    let root_include = format!("file:C:\\config\0include.path\ntarget.conf\0");
+    assert_eq!(
+        declared_include_paths(root_include.as_bytes(), &workdir, &environment)
+            .expect("drive-root include"),
+        BTreeSet::from([PathBuf::from(r"C:\target.conf")])
+    );
+
+    for spelling in [r"\rooted.conf", "C:drive-relative.conf"] {
+        let output = format!("file:{source}\0include.path\n{spelling}\0");
+        assert!(
+            declared_include_paths(output.as_bytes(), &workdir, &environment).is_err(),
+            "ambiguous include spelling: {spelling:?}"
+        );
+    }
+
+    for spelling in [r"D:\outside\config", r"\\server\share\config"] {
+        let output = format!("file:C:\\repo\\config\0include.path\n{spelling}\0");
+        assert_eq!(
+            declared_include_paths(output.as_bytes(), &workdir, &environment)
+                .expect("absolute include"),
+            BTreeSet::from([PathBuf::from(spelling)])
+        );
     }
 }
 
