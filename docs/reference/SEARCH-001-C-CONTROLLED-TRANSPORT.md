@@ -207,3 +207,7 @@ remaining request/header/probe/retry/charset/root/D activation gates above.
 The [dormant fixed request factories](SEARCH-001-C-COMPATIBILITY-REQUESTS.md) now prepare the
 four fixed compatibility URL/method/ordered parameter shapes into the same owned object.
 They do not execute requests, bind parsers or complete headers/UA/parity/D/default activation.
+
+The following [bound execution prerequisite](SEARCH-001-C-COMPATIBILITY-EXECUTION.md) consumes
+fixed requests into their captured parser/query/count with existing pre/post deadline fences.
+Its controlled loopback fixtures do not establish official-host parity or default-root activation.
