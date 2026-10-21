@@ -13,7 +13,7 @@ use super::{
 };
 use thiserror::Error;
 
-const ORDER: [CompatibilityProtocol; 4] = [
+pub(super) const ORDER: [CompatibilityProtocol; 4] = [
     CompatibilityProtocol::Lite,
     CompatibilityProtocol::InstantAnswer,
     CompatibilityProtocol::Html,
@@ -160,4 +160,4 @@ fn may_continue(error: CompatibilityError) -> bool {
 }
 
 #[cfg(test)]
-mod tests;
+pub(super) mod tests;

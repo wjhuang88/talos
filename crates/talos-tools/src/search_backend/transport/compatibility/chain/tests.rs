@@ -58,7 +58,7 @@ fn empty(protocol: CompatibilityProtocol) -> String {
 
 // Reconstruct only under cfg(test), validating every relocated endpoint and preserving
 // frozen bytes/headers/protocol/query/count. Production exposes no destination override.
-fn relocate(
+pub(in crate::search_backend::transport::compatibility) fn relocate(
     mut chain: PreparedCompatibilityChain,
     server: &Server,
 ) -> (PreparedCompatibilityChain, ToolNetworkManifest) {

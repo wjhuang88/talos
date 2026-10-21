@@ -10,7 +10,7 @@
 | Source Issue | #643 |
 | Depends on | Accepted ADR-085; SEARCH-001-B / #642 complete in #656; NET-001 boundary coordination |
 | Claim State | Claimed |
-| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 merged TLS/CONNECT subset; #716 merged bounded form/diagnostic stage at `b5b8241e`; #732 merged owned payload at `8fa2a50`; #733 merged Lite/HTML parsing at `dea3edc`; #734 merged Instant Answer at `45cf9eb9`; #736 merged Bing parsing at `2b015a6b`; #737 merged fixed requests at `ae6a0791`; #738 merged bound execution at `2d7f4b36`; #739 merged fixed headers at `91c330ba`; #741 merged result admission at `4e20ee95`; fixed-source chain candidate tracked from #643; full C/EP and default activation Pending |
+| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 merged TLS/CONNECT subset; #716 merged bounded form/diagnostic stage at `b5b8241e`; #732 merged owned payload at `8fa2a50`; #733 merged Lite/HTML parsing at `dea3edc`; #734 merged Instant Answer at `45cf9eb9`; #736 merged Bing parsing at `2b015a6b`; #737 merged fixed requests at `ae6a0791`; #738 merged bound execution at `2d7f4b36`; #739 merged fixed headers at `91c330ba`; #741 merged result admission at `4e20ee95`; #742 merged fixed chain at `9f998392`; direct-plan binding candidate tracked from #643; full C/EP and default activation Pending |
 | Completion | Pending |
 
 ## Collaboration Claim
@@ -26,7 +26,7 @@
 | Governance Claim PR | #712 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer accepted bounded production scope 2026-10-13; independent protected security/API contract review, exact-head CI, governance validators, Issue reconciliation and final CAS required for #712 merge. No release or native admission authorized. |
-| Last Updated | 2026-10-20 |
+| Last Updated | 2026-10-21 |
 | Handoff / Release Condition | Original #664 claim effective at `d801790454e252699684253166984662ea9dab6a`; expanded scope effective only after #712 accepted-contract merge. Start implementation from that merge or later main; activation requires ADR-090 transport/parity/D gates. |
 
 ## Scope
@@ -1756,3 +1756,63 @@ governance/claims/format checks before publication; unchanged source validation 
 Restored-toolchain refresh subsequently exits0: SQLite17/delivery12, governance0warnings,
 claims0warnings, cargo fmt --all -- --check and diff whitespace PASS. Independent full staged-tree
 review96ce799a APPROVE has no blockers; exact committed head and remote gates follow.
+
+## Merged Fixed Chain / Dormant Direct Plan Binding — 2026-10-21
+
+#742 merged9f9983928b17a3fa2039ce08efd41989ff31fc1a, source1fdb717f/treecd701c9e.
+CI3290/run39457212458 attempt1 all6SUCCESS: Windows tools557/0failed/0ignored/0filtered,
+mac555/0/0/0 and all10new source-chain tests PASS on each. Actual original socket, SDK default/
+coding, standard preflight and every later native gate PASS; LinuxDesktop112/0/0/0. Protected
+source6295766323, terminal/freshCAS6296299300 and merged delivery6296316872 record this partial
+stage. Actual merge parent4e20ee95/treecd701c9e/main verified; local main fast-forwarded cleanly.
+
+Selection refresh: main9f998392 and effective#712 actor@wjhuang88/Work Slice unchanged. Current
+I293/I294/I300 Active retain C/D/Git; I277 Review retains deferred human/device validation and
+I302 Review retains#717. I249 Planned deferred; I164 Paused/superseded. I301/I303/I304/I305 stay
+Complete/Closed. Historical I146/I147/I150 notes do not reactivate those owners; TEMPLATE excluded.
+Open#735head7036ddce0b2ca575fa28e29e798bc95a10ea5674 and#705head5848f8992457c72e13a48b7c2791635b6326453e
+are unchanged from the complete125/4-file scope review with no search_backend/I293/SEARCH-C
+overlap. #705 stays open/unmerged, #729 closed; no unrelated task is taken over or approved.
+
+Runnable library-only deliverable: explicitly DirectCompatibilityConfiguration owns one immutable
+fixed4 scope; preparation clones that configuration scope into a fresh invocation manifest and
+retains it with the exact frozen chain and complete canonical Network/Domain profile. Borrowed
+accessors and consuming execution prevent callers from supplying a replacement transport/manifest.
+Externally supplied live authority and an existing Arc budget are reused unchanged; production
+SystemSearchDns is fixed. Test relocation/DNS injection remain cfg(test)-only. No authority is
+minted by the plan; no reprepare/header reroll/new clock/reset. Errors contain closed enums only.
+
+Protected design preview APPROVE requires deduplicated exact host facets, full port/method/path
+manifest retention, same configuration scope across queries with fresh invocation identity,
+mismatch/denial before DNS/send and actual wrapper execution/socket cleanup. Direct-only means
+no proxy/address exception/redirect or ambient configuration read, and cannot become an automatic
+fallback for unsupported configured proxies. This is private preparation/execution, not official
+PreparedNetworkToolInvocation/formatter/permission-lifecycle/root activation or full C acceptance.
+Affected refs: SEARCH-001-C-COMPATIBILITY-PLAN.md, fixed-chain and carrier-migration references.
+Toolchain/cache were again removed by environment maintenance; checksummed official1.99 restored.
+Local focused/strict Clippy/standard preflight, source review, stable candidate, native CI and final
+CAS follow. I293 remains Active/Claimed, Completion Pending; #643/#624 stay open. All full C/EP/
+parity/D/privacy/router/health/rollback/default activation/release gates remain effective.
+
+Fresh focused locked network transport validation exits0:107passed/0failed/0ignored/227filtered,
+plus existing separate child1passed/333filtered. All9new wrapper tests PASS on their first run.
+Strict network-test Clippy and full standard preflight remain in progress. Locked offline package
+listing includes plan.rs/plan/tests.rs and existing full MIT notice; scale502sources/31packages/
+4workflows retains high-risk/release-managed/on-demand. Independent protected working-source
+review APPROVE has no blockers: compatibilityc90ef9b7, chainaf63481f, chaintests9859cc2e,
+planf41ba010 and plantestseaa1073a. Shared identity is not distinct natural-person approval.
+
+Stable local convergence PASSED on pinned Rust1.99.0. Strict network-test Clippy exits0 and
+standard locked release_preflight.sh exits0 with actual passed/terminal0 markers. Workspace
+check/strict Clippy/tests/doctests and independent SDK default/coding both PASS. Tools564passed/
+0failed/0ignored/0filtered, all9new tests PASS. Only the existing authorized local runtime socket
+filter remains; exact-head native CI must execute that original fixture unfiltered. This plan
+stage had no source/test failure or retry; previous-stage fixture history above remains intact.
+Preflight journal SHA256:
+972fe82266dba86b2817784fffe7bd57a976c74527026f9d88733affe43cc1a8.
+Focused SHA2564c7704bbdace695bfcd70424846f52e366cf9a2a968d63783a0e39e3897759e6;
+strict network Clippy SHA256ac326313660a5088e35f94c3861cc4534ffccdc79b449356771e8b4f77283cc7.
+Governance SQLite17/delivery12/0warnings and claims0warnings passed in standard preflight.
+Frozen reviewed source blobs above remain unchanged. Final owner synchronization/staged review,
+exact-local publication review, remote exact-source review, terminal native CI and immediate
+fresh CAS follow. This is stage Review only; parent completion/default activation remain Pending.

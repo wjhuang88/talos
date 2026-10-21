@@ -79,3 +79,8 @@ D migration/terms/privacy review, MIT notice/per-file provenance and actual conn
 evidence. Never automatically call opaque/legacy execution after stale authority or denial.
 Reversal is controlled version/deployment revert or separately accepted migration. No E/F native
 admission, all-built-in Auto/H, I300 Git, generic NET retries, new crate/dependency or release.
+
+The [dormant direct plan](SEARCH-001-C-COMPATIBILITY-PLAN.md) binds the fixed source chain to
+one configuration-derived manifest and complete Domain facets. Scope identity is reused across
+queries; invocation IDs remain fresh. It consumes external authority and an existing budget
+without accepting a replacement transport. Official tool/root/lifecycle acceptance remains gated.
