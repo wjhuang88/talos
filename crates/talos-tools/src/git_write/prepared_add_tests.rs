@@ -30,12 +30,18 @@ pub(super) fn proof(plan: &AddPlan) -> AdmittedInvocation {
 // explicit worktree override. Neither changes relative fetch resource lookup.
 
 pub(crate) async fn execute_approved(plan: AddPlan) -> ToolExecutionOutput {
+    execute_approved_with_history(plan, talos_core::tool::PreparedStageHistory::default()).await
+}
+
+async fn execute_approved_with_history(
+    plan: AddPlan,
+    mut history: talos_core::tool::PreparedStageHistory,
+) -> ToolExecutionOutput {
     let name = plan.operation.name();
     let root = plan.workspace.clone();
     let input = plan.input.clone();
     let provenance = plan.provenance.clone();
     let mut operation: Box<dyn PreparedNormalToolInvocation> = Box::new(plan);
-    let mut history = talos_core::tool::PreparedStageHistory::default();
     let mut profiles = Vec::new();
     loop {
         profiles.push(format!("{:?}", operation.permission_profile()));
