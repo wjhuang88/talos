@@ -133,6 +133,8 @@ fn prepare(root: &Path) -> AddPlan {
 
 include!("prepared_add_tests/authorization.rs");
 
+include!("prepared_add_tests/staging.rs");
+
 include!("prepared_add_tests/checkout.rs");
 
 include!("prepared_add_tests/commit.rs");
