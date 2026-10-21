@@ -310,6 +310,7 @@ jobs:
             'git::git_write::prepared_add::tests::real_commit_preserves_index_semantics_and_all_excludes_untracked',
             'git::git_write::prepared_add::tests::commit_plan_binds_tracked_sources_and_rejects_add_proof',
             'git::git_write::prepared_add::tests::checkout_nonrecursive_gitlink_preserves_dirty_child_worktree',
+            'git::git_write::prepared_add::tests::prepared_push_transfers_objects_with_explicit_sideband_disabled',
             'git::git_write::prepared_add::tests::checkout_ref_movement_after_discovery_invalidates_plan'
           )
           $listed = @(cargo test -p talos-tools --features git --locked --lib -- --list)
