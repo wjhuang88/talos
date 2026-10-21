@@ -56,6 +56,8 @@ fn checkout_protected_paths_overlap_across_windows_prefix_spellings() {
     for (ordinary, verbatim) in [
         (r"C:\repo\settings", r"\\?\C:\repo\settings\rules"),
         (r"\\server\share\repo", r"\\?\UNC\server\share\repo\rules"),
+        (r"C:\Users\RUNNER~1\repo", r"\\?\C:\Users\runneradmin\repo\rules"),
+        (r"C:\Users\runneradmin\repo", r"\\?\C:\Users\RUNNER~1\repo\rules"),
     ] {
         assert!(potential_path_prefix(Path::new(ordinary), Path::new(verbatim)));
         let parent = Path::new(verbatim).parent().expect("parent");
@@ -64,4 +66,5 @@ fn checkout_protected_paths_overlap_across_windows_prefix_spellings() {
     assert!(!potential_path_prefix(Path::new(r"C:\repo"), Path::new(r"\\?\D:\repo\rules")));
     assert!(!potential_path_prefix(Path::new(r"\\server\share\repo"), Path::new(r"\\?\UNC\server\other\repo\rules")));
     assert!(!potential_path_prefix(Path::new(r"C:\repo"), Path::new(r"\\?\C:\repository\rules")));
+    assert!(!potential_path_prefix(Path::new(r"C:\Users\RUNNER~1\repo"), Path::new(r"\\?\C:\Users\runneradmin\other\rules")));
 }
