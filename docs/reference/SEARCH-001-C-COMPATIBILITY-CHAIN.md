@@ -67,3 +67,7 @@ SSRF authority. D/privacy/query exposure/result use, optional adapters, official
 standalone roots, router/health/hedging/cancellation/rollback/default activation and release retain
 their gates. I293 stays Active/Claimed, Completion Pending; #643/#624 stay open. Actual validation,
 protected reviews, immutable candidates and native terminal receipts are indexed in I293/#643.
+
+The [dormant direct plan](SEARCH-001-C-COMPATIBILITY-PLAN.md) retains this exact prepared chain
+with its configuration-derived manifest/profile. Dispatch builds transport from that retained
+manifest and reuses an injected existing budget; official permission/root integration remains gated.
