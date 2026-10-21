@@ -6838,3 +6838,17 @@ and MSVC cargo xwin test-target check exits 0
 warnings. Windows runtime execution is still unproven; this does not complete P3.
 Published cb424257 is being validated by CI 39578256961; this later coverage
 candidate stays local while that exact-head run is live.
+
+### 2026-10-21 Checkout ancestor rejection expectation
+
+The prior native Windows target-hook failure for ancestor drift already refused
+execution: the invocation-owned resolver rejected the replaced traversal directory
+before target-config byte evidence checking. The regression now accepts that
+earlier identity rejection only for ancestor drift, retaining success/error and
+unchanged HEAD/worktree assertions and the existing config/hook checks. Host
+selection passes 1/1 (/private/tmp/i300-checkout-ancestor-frontier-host.log).
+MSVC cargo xwin test-target checking exits 0 with the seven existing warnings
+(/private/tmp/i300-checkout-ancestor-frontier-xwin.log); its initial sandboxed
+attempt could not update the external cargo-xwin cache symlink, so validation
+was rerun with authorization. Native confirmation remains pending in the next
+stable candidate. P1–P5 and the full handoff remain open.

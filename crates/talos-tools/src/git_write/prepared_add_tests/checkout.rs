@@ -880,8 +880,14 @@ async fn checkout_target_hooks_wait_for_all_exact_read_tokens() {
                     output.result.content
                 );
                 if let Some(kind) = drift {
+                    // The invocation-owned resolver can detect a replaced
+                    // traversal ancestor before target-config byte evidence.
+                    let ancestor_identity_changed = kind == "ancestor"
+                        && output.result.content.contains(
+                            "Git path resolution changed, is unsupported, or exceeded its limit",
+                        );
                     assert!(
-                        output.result.content.contains(if kind != "hook" {
+                        ancestor_identity_changed || output.result.content.contains(if kind != "hook" {
                             "Target Git configuration sources changed"
                         } else if cfg!(windows) {
                             "Target checkout hook execution is not bound"
