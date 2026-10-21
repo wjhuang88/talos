@@ -1822,9 +1822,6 @@ fn new_gitlink_directory_binds_names_without_reading_descendants() {
 
 #[tokio::test]
 async fn checkout_new_gitlink_preserves_initialized_child() {
-    if cfg!(windows) {
-        return;
-    }
     for mode in [
         "native",
         "prepared",
@@ -1961,11 +1958,16 @@ async fn checkout_new_gitlink_preserves_initialized_child() {
                 &["config", "core.worktree", external.to_str().expect("path")],
             );
             // An include hides the raw startup target in merged output.
-            std::fs::write(
-                child.join(".git/override.conf"),
-                format!("[core]\nworktree={}\n", child.display()),
-            )
-            .expect("override");
+            git(
+                &child,
+                &[
+                    "config",
+                    "--file",
+                    ".git/override.conf",
+                    "core.worktree",
+                    child.to_str().expect("child path"),
+                ],
+            );
             git(&child, &["config", "include.path", "override.conf"]);
             let plan = AddPlan::prepare_checkout(
                 root.path(),

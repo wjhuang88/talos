@@ -6824,3 +6824,17 @@ forbidden; the authorized unsandboxed rerun exits 0. Final MSVC cargo xwin
 test-target checking exits 0 (/private/tmp/i300-windows-fixture-pack-xwin.log),
 with seven existing reduced-feature warnings. Native Windows confirmation,
 Push root cause, scoped security review and P1–P5 closure remain outstanding.
+
+### 2026-10-21 P3 Windows initialized-child coverage candidate
+
+Removed the unconditional Windows return from
+checkout_new_gitlink_preserves_initialized_child. The same native/prepared,
+external-worktree, linked-worktree, filter-denial, ancestor-refusal and raw-startup
+Read-denial matrix now executes on Windows instead of silently passing without
+coverage. Its override config uses Git's path quoting. Host selection passes
+1/1 across all nine modes (/private/tmp/i300-checkout-child-native-matrix-host.log)
+and MSVC cargo xwin test-target check exits 0
+(/private/tmp/i300-checkout-child-matrix-xwin.log), with existing reduced-feature
+warnings. Windows runtime execution is still unproven; this does not complete P3.
+Published cb424257 is being validated by CI 39578256961; this later coverage
+candidate stays local while that exact-head run is live.
