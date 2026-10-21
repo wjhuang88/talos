@@ -6767,3 +6767,17 @@ production deadline or authorization. Host locked git-only selection passes 1/1
 exited 0 in session 73497 with seven existing reduced-feature warnings; log
 /private/tmp/i300-daemon-native-baseline-xwin.log. Native
 Windows execution and the actual timeout cause remain unproven.
+
+2026-10-21 receiver absence audit: expanded the existing prepared receiver
+skiplist regression to capture an initially absent external file, admit the
+receiver auxiliary stage, then create that file before final revalidation.
+The receiver rejects the appearance, alongside its existing missing-Read and
+same-content replacement checks. Locked host git-only selection passes 1/1
+(/private/tmp/i300-receiver-absence-regression.log). MSVC cargo xwin test-target
+checking also passes with seven existing reduced-feature warnings
+(/private/tmp/i300-receiver-absence-xwin.log), and both governance validators
+pass with zero warnings. This test-only follow-up
+remains local while exact-head CI 39570564817 tests published 9f4f623a; macOS
+full CI and Linux Desktop passed, Windows workspace tests remain in progress
+at the latest confirmed observation. PR #735 description now reflects P1–P5
+and current evidence. Native Windows closure and all remaining packages stay open.
