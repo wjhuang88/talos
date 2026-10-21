@@ -6,7 +6,7 @@ use talos_permission::{
     PermissionSessionState,
 };
 
-fn proof(plan: &AddPlan) -> AdmittedInvocation {
+pub(super) fn proof(plan: &AddPlan) -> AdmittedInvocation {
     let state = PermissionSessionState::new(PermissionEngine::with_workspace_root(
         plan.workspace.clone(),
     ));

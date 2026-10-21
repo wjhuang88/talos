@@ -797,7 +797,8 @@ async fn discovery_defers_auxiliary_reads_until_separate_admission() {
     let root = fixture();
     let outside = tempfile::tempdir().expect("outside workspace");
     // A directory cannot be captured as an auxiliary file. Discovery must
-    // nevertheless complete because it has no authority to inspect it yet.
+    // nevertheless complete: metadata resolution is admitted, but directory
+    // contents are not. The next frontier names the resolved target.
     let status = std::process::Command::new("git")
         .args(["config", "core.attributesFile"])
         .arg(outside.path())
@@ -819,13 +820,41 @@ async fn discovery_defers_auxiliary_reads_until_separate_admission() {
             .expect("new identity")
             .same_plan(&identity)
     );
+    let resolved = outside.path().canonicalize().expect("resolved outside target");
     assert!(next.permission_profile().iter().any(|facet| {
         facet.nature == ToolNature::Read
             && facet.resource_kind == Some(ToolResourceKind::Path)
-            && facet.resource.as_deref() == outside.path().to_str()
+            && facet.resource.as_deref() == resolved.to_str()
     }));
     drop(next); // Refuse the second stage: no mutation occurs.
     assert!(!root.path().join(".git/index").exists());
+}
+
+#[tokio::test]
+async fn mutation_refuses_auxiliary_replacement_after_discovery() {
+    for existed in [false, true] {
+        let root = fixture();
+        let outside = tempfile::tempdir().expect("external attributes");
+        let source = outside.path().join("attributes");
+        if existed {
+            std::fs::write(&source, b"file -filter\n").expect("original attributes");
+        }
+        assert!(std::process::Command::new("git")
+            .args(["config", "core.attributesFile"])
+            .arg(&source)
+            .current_dir(root.path())
+            .status().expect("configure attributes").success());
+        let plan = Box::new(prepare(root.path())).discover().await.expect("discovery");
+        let admission = proof(&plan);
+        if existed {
+            std::fs::rename(&source, outside.path().join("retained"))
+                .expect("retain original inode");
+        }
+        std::fs::write(&source, b"file -filter\n").expect("new attributes inode");
+        let output = plan.execute(Box::new(admission)).await;
+        assert!(output.result.is_error, "existed={existed}");
+        assert!(!root.path().join(".git/index").exists());
+    }
 }
 
 #[tokio::test]

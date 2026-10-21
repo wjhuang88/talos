@@ -22,52 +22,50 @@ pub(super) struct ReceiverEffects {
 }
 
 impl ReceiverEffects {
-    /// Called only after every path has fresh Read admission. Unsupported hooks
-    /// are refused before any program is started; no hook is silently disabled.
-    pub(super) fn capture(
+    /// Validate operation effects against the identity-bound, separately
+    /// admitted snapshots retained by the invocation resolver.
+    pub(super) fn validate_admitted(
         &self,
-    ) -> Result<Vec<(PathBuf, snapshot::RegularEvidence)>, GitToolError> {
-        let mut budget = snapshot::Budget {
-            entries: 4096,
-            bytes: 4 * 1024 * 1024,
-        };
-        self.paths
-            .iter()
-            .map(|path| {
-                let evidence =
-                    snapshot::RegularEvidence::capture(path, &mut budget).map_err(|_| {
-                        unsupported("Receiver auxiliary evidence must be a bounded regular file")
-                    })?;
-                if self.hooks.contains(path)
-                    && let snapshot::Entry::File(permissions, _) = &evidence.entry
-                {
-                    #[cfg(unix)]
-                    let executable = {
-                        use std::os::unix::fs::PermissionsExt;
-                        permissions.mode() & 0o111 != 0
-                    };
-                    #[cfg(not(unix))]
-                    let executable = {
-                        let _ = permissions;
-                        true
-                    };
-                    if executable {
-                        return Err(unsupported(
-                            "Executable receiver hook effects are not supported by this plan",
-                        ));
-                    }
-                }
-                if self.alternates.contains(path)
-                    && let snapshot::Entry::File(_, bytes) = &evidence.entry
-                    && !bytes.is_empty()
-                {
+        auxiliary: &super::auxiliary_paths::AuxiliaryPaths,
+    ) -> Result<(), GitToolError> {
+        for path in &self.paths {
+            let evidence = auxiliary
+                .leaf_evidence(path)
+                .ok_or_else(|| unsupported("Receiver auxiliary resolution evidence is missing"))?;
+            if self.hooks.contains(path)
+                && let snapshot::Entry::File(permissions, _) = &evidence.entry
+            {
+                #[cfg(unix)]
+                let executable = {
+                    use std::os::unix::fs::PermissionsExt;
+                    permissions.mode() & 0o111 != 0
+                };
+                #[cfg(not(unix))]
+                let executable = {
+                    let _ = permissions;
+                    true
+                };
+                if executable {
                     return Err(unsupported(
-                        "Receiver object alternates require independent object-store discovery",
+                        "Executable receiver hook effects are not supported by this plan",
                     ));
                 }
-                Ok((path.clone(), evidence))
-            })
-            .collect()
+            }
+            if self.hooks.contains(path) && auxiliary.original_leaf_is_link(path) {
+                return Err(unsupported(
+                    "Receiver hook link execution is not supported by this plan",
+                ));
+            }
+            if self.alternates.contains(path)
+                && let snapshot::Entry::File(_, bytes) = &evidence.entry
+                && !bytes.is_empty()
+            {
+                return Err(unsupported(
+                    "Receiver object alternates require independent object-store discovery",
+                ));
+            }
+        }
+        Ok(())
     }
 }
 
@@ -479,6 +477,26 @@ impl ChildConfig {
         Ok(())
     }
 
+    /// Compare admitted resolved snapshots with the configuration discovery
+    /// bytes without reopening the original traversal spellings.
+    pub(super) fn validate_auxiliary_snapshot(
+        &self,
+        auxiliary: &super::auxiliary_paths::AuxiliaryPaths,
+    ) -> Result<(), GitToolError> {
+        for (path, expected) in &self.files {
+            if auxiliary
+                .leaf_evidence(path)
+                .map(|evidence| &evidence.entry)
+                != Some(expected)
+            {
+                return Err(unsupported(
+                    "Receiver configuration changed after discovery",
+                ));
+            }
+        }
+        Ok(())
+    }
+
     pub(super) fn revalidate(&self) -> Result<(), GitToolError> {
         let mut budget = snapshot::Budget {
             entries: 4096,
@@ -513,7 +531,7 @@ pub(super) struct ConfigState {
     pub auxiliary: BTreeSet<PathBuf>,
     /// Effective sources outside the target tree's ordinary attribute rules.
     pub stable_auxiliary: BTreeSet<PathBuf>,
-    hooks: Vec<PathBuf>,
+    pub(super) hooks: Vec<PathBuf>,
 }
 
 fn unsupported(reason: &str) -> GitToolError {
@@ -1664,6 +1682,7 @@ impl ConfigState {
         &self,
         roots: &[PathBuf],
         child_sources: &[PathBuf],
+        auxiliary: &super::auxiliary_paths::AuxiliaryPaths,
     ) -> Result<(), GitToolError> {
         for path in self
             .files
@@ -1673,7 +1692,10 @@ impl ConfigState {
             .chain(self.hooks.iter())
             .chain(child_sources.iter())
         {
-            for resolved in auxiliary_spellings(path)? {
+            for resolved in auxiliary
+                .related_paths_for(path)
+                .ok_or_else(|| unsupported("Checkout auxiliary resolution evidence missing"))?
+            {
                 if roots
                     .iter()
                     .any(|root| potential_path_prefix(root, &resolved))
@@ -1694,6 +1716,7 @@ impl ConfigState {
         repository: &RepositoryState,
         target: &super::checkout_state::TargetTree,
         target_sources: &[PathBuf],
+        auxiliary: &super::auxiliary_paths::AuxiliaryPaths,
     ) -> Result<(), GitToolError> {
         let affected = std::panic::catch_unwind(|| {
             let repo = super::discover_repo(&repository.workdir)?;
@@ -1747,7 +1770,10 @@ impl ConfigState {
             ))
         })?;
         for hook in &self.hooks {
-            for resolved in auxiliary_spellings(hook)? {
+            for resolved in auxiliary
+                .related_paths_for(hook)
+                .ok_or_else(|| unsupported("Checkout auxiliary resolution evidence missing"))?
+            {
                 for (path, (mode, _)) in &target.entries {
                     let target_path = repository.workdir.join(path);
                     let same = potential_path_prefix(&target_path, &resolved)
@@ -1773,7 +1799,10 @@ impl ConfigState {
         protected.extend(self.stable_auxiliary.iter().cloned());
         protected.extend(target_sources.iter().cloned());
         for path in protected {
-            for resolved in auxiliary_spellings(&path)? {
+            for resolved in auxiliary
+                .related_paths_for(&path)
+                .ok_or_else(|| unsupported("Checkout auxiliary resolution evidence missing"))?
+            {
                 if affected
                     .iter()
                     .any(|changed| potential_path_prefix(changed, &resolved))
@@ -1787,8 +1816,12 @@ impl ConfigState {
         Ok(())
     }
 
-    /// Called only after the continuation's explicit auxiliary Path Read admission.
-    pub fn capture_auxiliary(&self) -> Result<Vec<(PathBuf, snapshot::Entry)>, GitToolError> {
+    /// Legacy leaf-capture characterization. Runtime callers use AuxiliaryPaths
+    /// so component identity and exact target admission remain bound together.
+    #[cfg(test)]
+    pub fn capture_auxiliary(
+        &self,
+    ) -> Result<Vec<(PathBuf, snapshot::RegularEvidence)>, GitToolError> {
         for hook in &self.hooks {
             match std::fs::symlink_metadata(hook) {
                 Ok(metadata) => {
@@ -1817,14 +1850,48 @@ impl ConfigState {
         self.auxiliary
             .iter()
             .map(|path| {
-                let entry = snapshot::Entry::capture(path, &mut budget)
+                // Retain the admitted traversal spelling as the evidence key,
+                // but do not pass verbatim `..` to Win32 file APIs. Resolve
+                // cancelled ancestors through the filesystem, as in overlap
+                // inspection, rather than lexically dropping them.
+                #[cfg(windows)]
+                let resolved = windows_auxiliary_parents(path)?;
+                #[cfg(windows)]
+                let capture_path = resolved.as_path();
+                #[cfg(not(windows))]
+                let capture_path = path.as_path();
+                let evidence = snapshot::RegularEvidence::capture(capture_path, &mut budget)
                     .map_err(|_| unsupported("Git auxiliary file cannot be captured"))?;
-                if !matches!(entry, snapshot::Entry::File(..) | snapshot::Entry::Missing) {
-                    return Err(unsupported("Git auxiliary sources must be regular files"));
-                }
-                Ok((path.clone(), entry))
+                Ok((path.clone(), evidence))
             })
             .collect()
+    }
+
+    /// Reuse retained leaf identities and bytes rather than accepting a new
+    /// snapshot with identical contents after an auxiliary file was replaced.
+    /// Traversal-chain admission and identity are a separate caller obligation.
+    #[cfg(test)]
+    pub fn revalidate_auxiliary(
+        &self,
+        evidence: &[(PathBuf, snapshot::RegularEvidence)],
+    ) -> Result<(), GitToolError> {
+        if !self
+            .auxiliary
+            .iter()
+            .eq(evidence.iter().map(|(path, _)| path))
+        {
+            return Err(unsupported("Git auxiliary source set changed"));
+        }
+        for (path, expected) in evidence {
+            #[cfg(windows)]
+            let resolved = windows_auxiliary_parents(path)?;
+            #[cfg(windows)]
+            let path = &resolved;
+            expected
+                .revalidate(path)
+                .map_err(|_| unsupported("Git auxiliary sources changed during inspection"))?;
+        }
+        Ok(())
     }
 
     pub fn verify_host(&self, output: &[u8]) -> Result<(), GitToolError> {
@@ -2136,5 +2203,6 @@ mod tests {
     include!("config_state_tests/checkout.rs");
     include!("config_state_tests/receiver_push.rs");
     include!("config_state_tests/parsing.rs");
+    include!("config_state_tests/auxiliary.rs");
     include!("config_state_tests/pull.rs");
 }

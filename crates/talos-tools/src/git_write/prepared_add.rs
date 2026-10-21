@@ -30,7 +30,7 @@ mod pull_integration;
 mod pull_reconcile;
 
 struct ChildInspectionEvidence {
-    attributes: Vec<(PathBuf, snapshot::Entry)>,
+    attributes: Vec<PathBuf>,
     sources: Vec<(PathBuf, PathBuf, Vec<String>, Vec<snapshot::Entry>)>,
     status: Vec<(PathBuf, super::status_state::StatusState)>,
 }
@@ -153,20 +153,6 @@ impl ChildInspectionEvidence {
                 ));
             }
         }
-        let mut budget = snapshot::Budget {
-            entries: 4096,
-            bytes: 4 * 1024 * 1024,
-        };
-        for (path, expected) in &self.attributes {
-            let actual = snapshot::Entry::capture(path, &mut budget).map_err(|_| {
-                GitToolError::InvalidInput("Submodule attribute evidence unavailable".into())
-            })?;
-            if &actual != expected {
-                return Err(GitToolError::InvalidInput(
-                    "Submodule attributes changed after inspection".into(),
-                ));
-            }
-        }
         for (discovery, workdir, paths, expected) in &self.sources {
             let (current, nested) = tracked_commit_sources_at(discovery, workdir)?;
             if &current != paths
@@ -250,11 +236,12 @@ pub(super) struct AddPlan {
     receiver_siblings: Vec<super::receiver_state::Metadata>,
     receiver_configs: Vec<(PathBuf, super::config_state::ChildConfig)>,
     receiver_effects: Vec<super::config_state::ReceiverEffects>,
-    receiver_auxiliary: Vec<Vec<(PathBuf, snapshot::RegularEvidence)>>,
+    receiver_auxiliary: Vec<Vec<PathBuf>>,
     receiver_rebase: Vec<(PathBuf, bool, super::receiver_state::RebaseState)>,
     receiver_sibling_refs: Vec<(PathBuf, super::receiver_state::ReferenceTree)>,
     receiver_sibling_targets: Vec<super::receiver_state::SiblingTargets>,
     receiver_storage: Vec<super::receiver_storage::Storage>,
+    auxiliary_paths: Option<super::auxiliary_paths::AuxiliaryPaths>,
     sender_mutation_facets: Vec<ToolPermissionFacet>,
     checkout_target: Option<super::checkout_state::TargetTree>,
     checkout_guessed: bool,
@@ -330,6 +317,7 @@ pub(super) struct AddPlan {
     pull_config_source_paths: Vec<PathBuf>,
     child_locations: Vec<(PathBuf, super::repository_state::ChildLocation)>,
     child_attributes: std::collections::BTreeSet<PathBuf>,
+    child_attributes_discovered: bool,
 }
 
 // Retained by the consumed plan across discovery/continuation. Reserve worst-case
@@ -701,6 +689,18 @@ impl AddPlan {
         facets.push(ToolPermissionFacet::with_resource(
             ToolNature::Read, "git:configuration-chain", ToolResourceKind::Remote,
         ).with_description("discover Git system/global/include configuration internally; no general file access"));
+        if !matches!(operation, Operation::Pull(_)) {
+            facets.push(ToolPermissionFacet::with_resource(
+                ToolNature::Read,
+                "git:auxiliary-path-resolution",
+                ToolResourceKind::Remote,
+            ).with_description("resolve frozen local Git auxiliary paths; file contents require separate exact Read admission"));
+            facets.push(path_facet(
+                ToolNature::Read,
+                &repository.git_dir,
+                "source anchor for the fixed Git auxiliary path resolver",
+            )?);
+        }
         Ok(Self {
             phase: Phase::SenderConfiguration,
             command_budget: std::sync::Mutex::new(CommandBudget::default()),
@@ -724,6 +724,7 @@ impl AddPlan {
             receiver_sibling_refs: Vec::new(),
             receiver_sibling_targets: Vec::new(),
             receiver_storage: Vec::new(),
+            auxiliary_paths: None,
             sender_mutation_facets: Vec::new(),
             checkout_target: None,
             checkout_guessed: false,
@@ -796,6 +797,7 @@ impl AddPlan {
             pull_config_source_paths: Vec::new(),
             child_locations: Vec::new(),
             child_attributes: std::collections::BTreeSet::new(),
+            child_attributes_discovered: false,
         })
     }
 
@@ -894,7 +896,7 @@ impl AddPlan {
         {
             return self.request_sender_program().await;
         }
-        self.discover().await
+        self.discover_admitted(authorizations).await
     }
 
     fn add_push_program_admission(&mut self) -> Result<(), GitToolError> {
@@ -926,6 +928,16 @@ impl AddPlan {
             )
             .with_description("fresh internal Git configuration discovery before receiver reads"),
         );
+        self.facets.push(ToolPermissionFacet::with_resource(
+            ToolNature::Read,
+            "git:auxiliary-path-resolution",
+            ToolResourceKind::Remote,
+        ));
+        self.facets.push(path_facet(
+            ToolNature::Read,
+            &self.repository.git_dir,
+            "source anchor for the fixed Git auxiliary path resolver",
+        )?);
         Ok(())
     }
 
@@ -1056,7 +1068,10 @@ impl AddPlan {
         Ok(self)
     }
 
-    async fn discover(mut self: Box<Self>) -> Result<Box<Self>, GitToolError> {
+    async fn discover_admitted(
+        mut self: Box<Self>,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<Box<Self>, GitToolError> {
         self.revalidate()?;
         if matches!(
             &self.operation,
@@ -1445,34 +1460,33 @@ impl AddPlan {
         }
         // Capture and then inspect again: do not accept a mixed configuration snapshot.
         config.verify_host(&self.inspect_config().await?)?;
+        let mut auxiliary_sources = config.auxiliary.clone();
+        auxiliary_sources.extend(config.files.iter().map(|(path, _)| path.clone()));
+        auxiliary_sources.extend(self.child_attributes.iter().cloned());
+        auxiliary_sources.extend(
+            self.child_configs
+                .iter()
+                .flat_map(|(_, child)| child.files.iter().map(|(path, _)| path.clone())),
+        );
+        if let Some(paths) = &mut self.auxiliary_paths {
+            paths.extend(self.operation.name(), auxiliary_sources, authorizations)?;
+        } else {
+            self.auxiliary_paths = Some(super::auxiliary_paths::AuxiliaryPaths::resolve(
+                self.operation.name(),
+                &self.workspace,
+                &self.repository.git_dir,
+                auxiliary_sources,
+                authorizations,
+            )?);
+        }
         self.config = Some(config);
         self.revalidate()?;
         self.facets
             .retain(|facet| facet.resource.as_deref() != Some("git:configuration-chain"));
-        for (path, _) in &self
-            .config
+        self.auxiliary_paths
             .as_ref()
-            .ok_or_else(|| GitToolError::Git("missing configuration evidence".into()))?
-            .files
-        {
-            self.facets.push(path_facet(
-                ToolNature::Read,
-                path,
-                "Git configuration evidence",
-            )?);
-        }
-        for path in &self
-            .config
-            .as_ref()
-            .ok_or_else(|| GitToolError::Git("missing configuration evidence".into()))?
-            .auxiliary
-        {
-            self.facets.push(path_facet(
-                ToolNature::Read,
-                path,
-                "Git attributes, ignore and hook inspection",
-            )?);
-        }
+            .ok_or_else(|| GitToolError::Git("missing auxiliary path evidence".into()))?
+            .add_read_frontier(&mut self.facets)?;
         self.facets.push(path_facet(
             ToolNature::Write,
             &self.repository.git_dir,
@@ -1617,6 +1631,17 @@ impl AddPlan {
             self.add_push_program_admission()?;
         }
         Ok(self)
+    }
+
+    /// Direct discovery fixture for legacy unit tests. Production discovery
+    /// always receives tokens from the prepared-invocation admission fence.
+    #[cfg(test)]
+    async fn discover(self: Box<Self>) -> Result<Box<Self>, GitToolError> {
+        let proof = tests::proof(&self);
+        let authorizations = proof
+            .consume_for_prepared(&self.request(), &self.identity)
+            .map_err(|error| GitToolError::InvalidInput(error.to_string()))?;
+        self.discover_admitted(&authorizations).await
     }
 
     fn discover_new_gitlinks(
@@ -1985,8 +2010,9 @@ impl AddPlan {
                 .insert(location.common_dir.join("config"));
             self.child_attributes
                 .insert(location.git_dir.join("config.worktree"));
+            let effective_worktree = self.checkout_child_effective_worktree(workdir).to_owned();
             self.child_attributes.extend(config.attribute_paths(
-                self.checkout_child_effective_worktree(workdir),
+                &effective_worktree,
                 &location.common_dir,
                 &self.environment,
             )?);
@@ -2051,6 +2077,18 @@ impl AddPlan {
                 self.sender_mutation_facets.push(read);
             }
         }
+        let sources = self.child_attributes.iter().cloned().chain(
+            self.child_configs
+                .iter()
+                .flat_map(|(_, child)| child.files.iter().map(|(path, _)| path.clone())),
+        );
+        let auxiliary = self
+            .auxiliary_paths
+            .as_mut()
+            .ok_or_else(|| GitToolError::Git("Missing auxiliary path discovery evidence".into()))?;
+        auxiliary.extend(self.operation.name(), sources, authorizations)?;
+        auxiliary.add_read_frontier(&mut self.facets)?;
+        auxiliary.add_read_frontier(&mut self.sender_mutation_facets)?;
         self.facets.retain(|facet| {
             facet.nature == ToolNature::Read
                 && facet.resource.as_deref() != Some("git:configuration-chain")
@@ -2197,6 +2235,18 @@ impl AddPlan {
                 )?);
             }
             self.target_hook_paths = Some(paths);
+            // Target Sources keeps its own exact-frontier/link-refusal rules.
+            // Retain these newly known file spellings in the invocation-wide
+            // auxiliary chain as well, for final overlap and mutation checks.
+            let paths = sources
+                .captured_paths()
+                .cloned()
+                .chain(self.target_hook_paths.iter().flatten().cloned());
+            let auxiliary = self.auxiliary_paths.as_mut().ok_or_else(|| {
+                GitToolError::Git("Missing auxiliary path discovery evidence".into())
+            })?;
+            auxiliary.extend(self.operation.name(), paths, authorizations)?;
+            auxiliary.add_read_frontier(&mut self.facets)?;
             self.add_target_configuration_reads()?;
             self.identity = PreparedPlanIdentity::new();
             return Ok(self);
@@ -2673,14 +2723,9 @@ impl AddPlan {
                     }
                 }
             }
-            for path in &effects.paths {
-                self.facets.push(path_facet(
-                    ToolNature::Read,
-                    path,
-                    "receiver hook, fsck, worktree state and object-layout evidence; no helper execution",
-                )?);
-            }
-            self.receiver_effects.push(effects);
+            effects
+                .paths
+                .extend(config.files.iter().map(|(path, _)| path.clone()));
             for (path, _) in &config.files {
                 self.facets.push(path_facet(
                     ToolNature::Read,
@@ -2693,14 +2738,14 @@ impl AddPlan {
                 &metadata.canonical,
                 &self.environment,
             )? {
-                // Receiver include discovery has no staged traversal identities.
-                super::remote_state::validate_local_path_syntax(&path)?;
+                effects.paths.insert(path.clone());
                 self.facets.push(path_facet(
                     ToolNature::Read,
                     &path,
                     "receiver declared include dependency",
                 )?);
             }
+            self.receiver_effects.push(effects);
             self.receiver_configs
                 .push((metadata.canonical.clone(), config));
         }
@@ -2711,6 +2756,15 @@ impl AddPlan {
             facet.nature != ToolNature::Execute
                 && facet.resource.as_deref() != Some("git:configuration-chain")
         });
+        let receiver_sources = self
+            .receiver_effects
+            .iter()
+            .flat_map(|effects| effects.paths.iter().cloned());
+        let auxiliary = self.auxiliary_paths.as_mut().ok_or_else(|| {
+            GitToolError::InvalidInput("Missing invocation auxiliary path evidence".into())
+        })?;
+        auxiliary.extend(self.operation.name(), receiver_sources, authorizations)?;
+        auxiliary.add_read_frontier(&mut self.facets)?;
         self.identity = PreparedPlanIdentity::new();
         self.phase = Phase::ReceiverAuxiliary;
         Ok(self)
@@ -2771,22 +2825,32 @@ impl AddPlan {
         self.revalidate()?;
         self.revalidate_receiver_common(authorizations)?;
         self.revalidate_receiver_siblings(authorizations)?;
+        let hooks: Vec<_> = self
+            .config
+            .iter()
+            .flat_map(|config| config.hooks.iter().cloned())
+            .collect();
+        let auxiliary = self.auxiliary_paths.as_mut().ok_or_else(|| {
+            GitToolError::InvalidInput("Missing invocation auxiliary path evidence".into())
+        })?;
+        auxiliary.capture_admitted(authorizations, &hooks)?;
         for (_, config) in &self.receiver_configs {
-            config.revalidate()?;
+            config.validate_auxiliary_snapshot(auxiliary)?;
         }
         for (effects, common) in self.receiver_effects.iter().zip(&self.receiver_common) {
+            effects.validate_admitted(auxiliary)?;
             for path in &effects.paths {
-                self.receiver_read_path(path, authorizations)?;
-            }
-            let evidence = effects.capture()?;
-            for (path, entry) in &evidence {
+                let entry = auxiliary.leaf_evidence(path).ok_or_else(|| {
+                    GitToolError::InvalidInput("Receiver auxiliary evidence is missing".into())
+                })?;
                 if path == &common.canonical.join("HEAD")
                     && let snapshot::Entry::File(_, bytes) = &entry.entry
                 {
                     super::receiver_state::validate_symbolic_target(bytes)?;
                 }
             }
-            self.receiver_auxiliary.push(evidence);
+            self.receiver_auxiliary
+                .push(effects.paths.iter().cloned().collect());
         }
         self.require_receiver_reference_capability()?;
         let mut reference_budget = self.remaining_receiver_reference_budget()?;
@@ -2905,18 +2969,25 @@ impl AddPlan {
                 ));
             }
         }
+        let auxiliary = self.auxiliary_paths.as_ref().ok_or_else(|| {
+            GitToolError::InvalidInput("Missing invocation auxiliary path evidence".into())
+        })?;
+        auxiliary.revalidate(authorizations)?;
         for (_, config) in &self.receiver_configs {
-            config.revalidate()?;
+            config.validate_auxiliary_snapshot(auxiliary)?;
+        }
+        if self.receiver_effects.len() != self.receiver_auxiliary.len() {
+            return Err(GitToolError::InvalidInput(
+                "Receiver auxiliary source inventory is incomplete".into(),
+            ));
         }
         for (effects, expected) in self.receiver_effects.iter().zip(&self.receiver_auxiliary) {
-            for path in &effects.paths {
-                self.receiver_read_path(path, authorizations)?;
-            }
-            if &effects.capture()? != expected {
+            if &effects.paths.iter().cloned().collect::<Vec<_>>() != expected {
                 return Err(GitToolError::InvalidInput(
-                    "Receiver auxiliary evidence changed after admission".into(),
+                    "Receiver auxiliary source set changed after admission".into(),
                 ));
             }
+            effects.validate_admitted(auxiliary)?;
         }
         Ok(())
     }
@@ -3508,7 +3579,7 @@ impl AddPlan {
     }
 
     async fn execute_admitted(
-        &self,
+        &mut self,
         authorizations: &[talos_core::tool::ToolExecutionAuthorization],
     ) -> Result<String, GitToolError> {
         if self.phase != Phase::Mutation {
@@ -3552,6 +3623,20 @@ impl AddPlan {
             }
         }
         self.revalidate()?;
+        // Keep the shared evidence in the plan: receiver storage checks also
+        // revalidate it after the final sender probes.
+        let auxiliary = self.auxiliary_paths.as_mut().ok_or_else(|| {
+            GitToolError::InvalidInput("Missing admitted auxiliary path evidence".into())
+        })?;
+        let hooks = &self
+            .config
+            .as_ref()
+            .ok_or_else(|| GitToolError::InvalidInput("Missing Git configuration evidence".into()))?
+            .hooks;
+        auxiliary.capture_admitted(authorizations, hooks)?;
+        let auxiliary = self.auxiliary_paths.as_ref().ok_or_else(|| {
+            GitToolError::InvalidInput("Missing admitted auxiliary path evidence".into())
+        })?;
         let push_attributes = if matches!(self.operation, Operation::Push(_)) {
             Some(super::status_state::StatusState::capture_pack_attributes(
                 &self.repository.workdir,
@@ -3598,7 +3683,9 @@ impl AddPlan {
             Operation::Commit(_) | Operation::Checkout(_)
         ) {
             let children = self.capture_admitted_children()?;
-            let child_inspection = self.inspect_child_filters().await?;
+            let child_inspection = self
+                .inspect_child_filters(auxiliary, authorizations)
+                .await?;
             Some((children, child_inspection))
         } else {
             None
@@ -3627,7 +3714,12 @@ impl AddPlan {
                     .iter()
                     .map(|(path, _)| path.clone()),
             );
-            config.validate_checkout_target(&self.repository, target, &target_sources)?;
+            config.validate_checkout_target(
+                &self.repository,
+                target,
+                &target_sources,
+                auxiliary,
+            )?;
         }
         if let Some(inventory) = &self.checkout_deletion {
             if !inventory.complete()
@@ -3661,13 +3753,10 @@ impl AddPlan {
                     .map(|(path, _)| path.clone()),
             );
             if let Some((_, inspection)) = &child_evidence {
-                protected.extend(inspection.attributes.iter().filter_map(|(path, entry)| {
-                    (!matches!(entry, snapshot::Entry::Missing)).then_some(path.clone())
-                }));
+                protected.extend(inspection.attributes.iter().cloned());
             }
-            config.validate_checkout_deletions(&inventory.roots(), &protected)?;
+            config.validate_checkout_deletions(&inventory.roots(), &protected, auxiliary)?;
         }
-        let auxiliary = config.capture_auxiliary()?;
         let mut entries = Vec::new();
         for (path, source) in self.paths.iter().zip(&self.sources) {
             selected_leaves(Path::new(path), source, &mut entries)?;
@@ -3741,11 +3830,7 @@ impl AddPlan {
             }
         }
         self.revalidate()?;
-        if auxiliary != config.capture_auxiliary()? {
-            return Err(GitToolError::InvalidInput(
-                "Git auxiliary sources changed during inspection".into(),
-            ));
-        }
+        auxiliary.revalidate(authorizations)?;
         if let Some((children, child_inspection)) = &child_evidence {
             if children != &self.capture_admitted_children()? {
                 return Err(GitToolError::InvalidInput(
@@ -3893,6 +3978,10 @@ impl AddPlan {
             self.revalidate_receiver_roots(authorizations)?;
             self.validate_receiver_shell_baseline()?;
         }
+        // Receiver shell selection and Checkout target probes above can run
+        // after attribute inspection. Keep the original auxiliary evidence
+        // bound until all probes finish, immediately before mutation starts.
+        auxiliary.revalidate(authorizations)?;
         self.run_command(command, std::time::Duration::from_secs(300), 256 * 1024)
             .await.map_err(|error| {
                 if matches!(self.operation, Operation::Push(_)) {
@@ -3998,8 +4087,87 @@ impl AddPlan {
             .collect()
     }
 
-    async fn inspect_child_filters(&self) -> Result<ChildInspectionEvidence, GitToolError> {
-        let mut attribute_paths = self.child_attributes.clone();
+    fn discover_child_attribute_targets(
+        mut self: Box<Self>,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<Box<Self>, GitToolError> {
+        // Index contents select worktree rule paths. Admit every child index
+        // and worktree before reading any of them, then publish fresh resolved
+        // target Reads before capturing attribute bodies or running check-attr.
+        for ((workdir, _), (_, location)) in self.child_configs.iter().zip(&self.child_locations) {
+            for path in [
+                self.checkout_child_effective_worktree(workdir),
+                &location.git_dir,
+                &location.common_dir,
+            ] {
+                if !authorizations.iter().any(|token| {
+                    token.authorizes_path(
+                        self.operation.name(),
+                        ToolNature::Read,
+                        &self.workspace,
+                        path.to_str().unwrap_or_default(),
+                    )
+                }) {
+                    return Err(GitToolError::InvalidInput(
+                        "Child attribute discovery lacks metadata/index or worktree Read admission"
+                            .into(),
+                    ));
+                }
+            }
+        }
+        self.revalidate()?;
+        self.capture_admitted_children()?;
+        let mut sources = std::collections::BTreeSet::new();
+        for (workdir, _) in &self.child_configs {
+            let effective = self.checkout_child_effective_worktree(workdir);
+            let (paths, nested) = tracked_commit_sources_at(workdir, effective)?;
+            if !nested.is_empty() {
+                return Err(GitToolError::InvalidInput("Nested submodule status requires additional configuration discovery; use a separately authorized invocation".into()));
+            }
+            for path in paths {
+                let absolute = effective.join(path);
+                let mut ancestor = absolute.parent();
+                while let Some(directory) = ancestor {
+                    if !directory.starts_with(effective) {
+                        break;
+                    }
+                    sources.insert(directory.join(".gitattributes"));
+                    ancestor = directory.parent();
+                }
+            }
+        }
+        let auxiliary = self
+            .auxiliary_paths
+            .as_mut()
+            .ok_or_else(|| GitToolError::InvalidInput("Missing child auxiliary resolver".into()))?;
+        let new_sources = sources
+            .iter()
+            .any(|path| auxiliary.related_paths_for(path).is_none());
+        auxiliary.extend(self.operation.name(), sources, authorizations)?;
+        auxiliary.add_read_frontier(&mut self.facets)?;
+        self.child_attributes_discovered = true;
+        if new_sources {
+            self.identity = PreparedPlanIdentity::new();
+        }
+        Ok(self)
+    }
+
+    async fn inspect_child_filters(
+        &self,
+        auxiliary: &super::auxiliary_paths::AuxiliaryPaths,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<ChildInspectionEvidence, GitToolError> {
+        // External/configured sources already belong to the invocation-owned
+        // resolver. Never reopen their raw spellings through the worktree snapshot.
+        auxiliary.revalidate(authorizations)?;
+        for path in &self.child_attributes {
+            if auxiliary.leaf_evidence(path).is_none() {
+                return Err(GitToolError::InvalidInput(
+                    "Missing child auxiliary evidence".into(),
+                ));
+            }
+        }
+        let mut attribute_paths = std::collections::BTreeSet::new();
         let mut child_paths = Vec::new();
         let mut child_sources = Vec::new();
         let mut status = Vec::new();
@@ -4020,38 +4188,29 @@ impl AddPlan {
                     if !directory.starts_with(effective) {
                         break;
                     }
-                    attribute_paths.insert(directory.join(".gitattributes"));
+                    let path = directory.join(".gitattributes");
+                    if auxiliary.leaf_evidence(&path).is_none() {
+                        return Err(GitToolError::InvalidInput(
+                            "Child attribute source requires fresh target Read discovery".into(),
+                        ));
+                    }
+                    attribute_paths.insert(path);
                     ancestor = directory.parent();
                 }
             }
             child_sources.push(capture_tracked_sources(effective, &paths)?);
             child_paths.push(paths);
         }
-        // The continuation covers these external attribute paths. Snapshot all
-        // sources before check-attr; it must never execute a clean filter.
-        let capture = || {
-            let mut budget = snapshot::Budget {
-                entries: 4096,
-                bytes: 4 * 1024 * 1024,
-            };
-            attribute_paths
-                .iter()
-                .map(|path| {
-                    let entry = snapshot::Entry::capture(path, &mut budget).map_err(|_| {
-                        GitToolError::InvalidInput(
-                            "Submodule attribute evidence unavailable".into(),
-                        )
-                    })?;
-                    if !matches!(entry, snapshot::Entry::File(..) | snapshot::Entry::Missing) {
-                        return Err(GitToolError::InvalidInput(
-                            "Submodule attribute sources must be regular files".into(),
-                        ));
-                    }
-                    Ok(entry)
-                })
-                .collect::<Result<Vec<_>, GitToolError>>()
-        };
-        let attributes = capture()?;
+        // Bodies and identities are owned by the invocation resolver. Keep
+        // only its admitted entries here for Checkout deletion protection.
+        let attributes = attribute_paths
+            .into_iter()
+            .filter(|path| {
+                auxiliary
+                    .leaf_evidence(path)
+                    .is_some_and(|evidence| !matches!(evidence.entry, snapshot::Entry::Missing))
+            })
+            .collect();
         for (((workdir, config), (_, location)), paths) in self
             .child_configs
             .iter()
@@ -4090,14 +4249,10 @@ impl AddPlan {
                 }
             }
         }
-        if capture()? != attributes {
-            return Err(GitToolError::InvalidInput(
-                "Submodule attributes changed during inspection".into(),
-            ));
-        }
+        auxiliary.revalidate(authorizations)?;
         let evidence = ChildInspectionEvidence {
             status,
-            attributes: attribute_paths.into_iter().zip(attributes).collect(),
+            attributes,
             sources: self
                 .child_configs
                 .iter()
@@ -5197,7 +5352,7 @@ fn capture_program(path: &Path) -> Result<ProgramEvidence, GitToolError> {
     }
 }
 
-fn path_facet(
+pub(super) fn path_facet(
     nature: ToolNature,
     path: &Path,
     description: &str,
@@ -5298,7 +5453,9 @@ impl PreparedNormalToolInvocation for AddPlan {
         mut self: Box<Self>,
         admission: Box<dyn std::any::Any + Send>,
     ) -> PreparedNormalStage {
-        if self.phase == Phase::Mutation {
+        if self.phase == Phase::Mutation
+            && (self.child_configs.is_empty() || self.child_attributes_discovered)
+        {
             return PreparedNormalStage::Complete(self.execute(admission).await);
         }
         let Ok(proof) = admission.downcast::<AdmittedInvocation>() else {
@@ -5511,9 +5668,20 @@ impl PreparedNormalToolInvocation for AddPlan {
             }
             Phase::ReceiverAuxiliary => self.discover_receiver_auxiliary(&authorizations),
             Phase::ReceiverMutation => self.prepare_receiver_mutation(&authorizations),
-            Phase::Mutation => Err(GitToolError::InvalidInput(
-                "Invalid discovery dispatch".into(),
-            )),
+            Phase::Mutation => {
+                let previous = self.identity.clone();
+                match self.discover_child_attribute_targets(&authorizations) {
+                    Ok(mut plan) if plan.identity.same_plan(&previous) => {
+                        // No new source frontier: reuse this admission rather
+                        // than spending another stage on already-bound rules.
+                        return PreparedNormalStage::Complete(match plan.execute_admitted(&authorizations).await {
+                            Ok(content) => ToolExecutionOutput::success(content),
+                            Err(error) => ToolExecutionOutput::error(error.to_string()),
+                        });
+                    }
+                    result => result,
+                }
+            }
         };
         // Hook path discovery uses retained configuration only. Do it before
         // returning the next plan instead of spending an admission stage on
@@ -5537,7 +5705,7 @@ impl PreparedNormalToolInvocation for AddPlan {
     }
 
     async fn execute(
-        self: Box<Self>,
+        mut self: Box<Self>,
         admission: Box<dyn std::any::Any + Send>,
     ) -> ToolExecutionOutput {
         let Ok(proof) = admission.downcast::<AdmittedInvocation>() else {

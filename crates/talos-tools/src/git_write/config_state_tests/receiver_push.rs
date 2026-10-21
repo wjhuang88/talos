@@ -1,3 +1,45 @@
+fn capture_receiver_effects(
+    base: &std::path::Path,
+    effects: &ReceiverEffects,
+) -> Result<(), GitToolError> {
+    use talos_core::tool::{ToolAuthorizationScope, ToolExecutionAuthorization, ToolNature};
+    let mut tokens = vec![
+        ToolExecutionAuthorization::for_git_auxiliary_path_resolution(
+            "git_push",
+            ToolAuthorizationScope::Once,
+        ),
+        ToolExecutionAuthorization::for_path(
+            "git_push",
+            ToolNature::Read,
+            base,
+            base.to_str().expect("path"),
+            ToolAuthorizationScope::Once,
+        )
+        .expect("anchor"),
+    ];
+    let mut auxiliary = super::super::auxiliary_paths::AuxiliaryPaths::resolve(
+        "git_push",
+        base,
+        base,
+        effects.paths.iter().cloned(),
+        &tokens,
+    )?;
+    for target in auxiliary.targets() {
+        tokens.push(
+            ToolExecutionAuthorization::for_path(
+                "git_push",
+                ToolNature::Read,
+                base,
+                target.to_str().expect("path"),
+                ToolAuthorizationScope::Once,
+            )
+            .expect("read"),
+        );
+    }
+    auxiliary.capture_admitted(&tokens, &[])?;
+    effects.validate_admitted(&auxiliary)
+}
+
 #[test]
 fn receiver_effect_inventory_defers_reads_and_rejects_unbound_commands() {
     let root = tempfile::tempdir().expect("fixture");
@@ -22,7 +64,7 @@ fn receiver_effect_inventory_defers_reads_and_rejects_unbound_commands() {
     assert!(effects.paths.contains(&base.join("relative-skiplist")));
     assert!(!base.join("relative-hooks").exists());
     assert!(!base.join("relative-skiplist").exists());
-    effects.capture().expect("missing auxiliaries");
+    capture_receiver_effects(&base, &effects).expect("missing auxiliaries");
     for (key, value) in [
         ("hook.check.command", "command"),
         ("core.alternateRefsCommand", "command"),
@@ -71,18 +113,15 @@ fn receiver_auxiliary_capture_refuses_executable_hooks_and_object_alternates() {
     std::fs::create_dir(base.join("hooks")).expect("hooks");
     let hook = base.join("hooks/pre-receive");
     std::fs::write(&hook, "#!/bin/sh\nexit 0\n").expect("hook");
-    std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o755))
-        .expect("executable");
+    std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o755)).expect("executable");
     assert!(
-        effects
-            .capture()
+        capture_receiver_effects(&base, &effects)
             .expect_err("refuse hook")
             .to_string()
             .contains("Executable receiver hook")
     );
-    std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o644))
-        .expect("inactive hook");
-    effects.capture().expect("inactive hook allowed");
+    std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o644)).expect("inactive hook");
+    capture_receiver_effects(&base, &effects).expect("inactive hook allowed");
     std::fs::create_dir_all(base.join("objects/info")).expect("objects");
     std::fs::write(
         base.join("objects/info/alternates"),
@@ -90,8 +129,7 @@ fn receiver_auxiliary_capture_refuses_executable_hooks_and_object_alternates() {
     )
     .expect("alternates");
     assert!(
-        effects
-            .capture()
+        capture_receiver_effects(&base, &effects)
             .expect_err("refuse alternates")
             .to_string()
             .contains("object alternates")
@@ -101,12 +139,10 @@ fn receiver_auxiliary_capture_refuses_executable_hooks_and_object_alternates() {
 #[test]
 fn receiver_capture_rejects_relative_origin_before_snapshot() {
     let root = tempfile::tempdir().expect("fixture");
-    let error = ChildConfig::capture_receiver(
-        b"file:missing-relative\0core.bare\nfalse\0",
-        root.path(),
-    )
-    .err()
-    .expect("relative origin refusal");
+    let error =
+        ChildConfig::capture_receiver(b"file:missing-relative\0core.bare\nfalse\0", root.path())
+            .err()
+            .expect("relative origin refusal");
     assert!(error.to_string().contains("origin must be absolute"));
 }
 
@@ -139,9 +175,8 @@ fn push_recursion_uses_cross_key_declaration_order() {
     // Git aborts on an invalid early value even when a later key disables
     // recursion. Do not approve a plan by considering only the last value.
     for value in ["true", "yes", "1", "ON", "invalid"] {
-        let output = format!(
-            "file:a\0push.recursesubmodules\n{value}\0file:b\0submodule.recurse\nfalse\0"
-        );
+        let output =
+            format!("file:a\0push.recursesubmodules\n{value}\0file:b\0submodule.recurse\nfalse\0");
         assert!(
             push_recursion_enabled(output.as_bytes()).is_err(),
             "{value}"
@@ -180,9 +215,8 @@ fn push_helper_checks_preserve_disabled_settings_and_defer_hook_reads() {
             "file:{}\0{key}\n{value}\0",
             repository.common_dir.join("config").display()
         );
-        let mut config =
-            ConfigState::capture_host(output.as_bytes(), &repository, &environment)
-                .expect("config");
+        let mut config = ConfigState::capture_host(output.as_bytes(), &repository, &environment)
+            .expect("config");
         assert_eq!(
             config
                 .prepare_push(&repository, &environment, "origin",)

@@ -83,6 +83,28 @@ fn windows_auxiliary_parent_at_volume_root_stays_at_root() {
 
 #[cfg(windows)]
 #[test]
+fn auxiliary_capture_resolves_cancelled_parent_without_losing_evidence_key() {
+    let root = tempfile::tempdir().expect("fixture");
+    assert!(std::process::Command::new("git").arg("init").arg(root.path())
+        .output().expect("repository").status.success());
+    let canonical = root.path().canonicalize().expect("canonical fixture");
+    std::fs::create_dir(canonical.join("traversal")).expect("ancestor");
+    std::fs::write(canonical.join("target.conf"), b"retained bytes").expect("source");
+    let mut spelling = canonical.as_os_str().to_os_string();
+    spelling.push(r"\traversal\..\target.conf");
+    let spelling = PathBuf::from(spelling);
+    let repository = RepositoryState::capture(root.path()).expect("repository");
+    let mut config = ConfigState::capture_host(b"", &repository, &BTreeMap::new()).expect("config");
+    config.auxiliary = BTreeSet::from([spelling.clone()]);
+    let captured = config.capture_auxiliary().expect("resolved capture");
+    assert_eq!(captured[0].0, spelling);
+    assert!(matches!(&captured[0].1.entry, snapshot::Entry::File(_, bytes) if bytes == b"retained bytes"));
+    std::fs::remove_dir(canonical.join("traversal")).expect("remove ancestor");
+    assert!(config.capture_auxiliary().is_err(), "missing cancelled ancestor must not be folded");
+}
+
+#[cfg(windows)]
+#[test]
 fn declared_windows_include_paths_preserve_roots_and_reject_ambiguous_forms() {
     let environment = BTreeMap::new();
     let workdir = PathBuf::from(r"C:\work");
