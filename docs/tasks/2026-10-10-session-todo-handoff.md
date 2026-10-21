@@ -6,6 +6,16 @@ external consumers (`/private/tmp/i300-sideband-stage-preflight.log`). Native
 Windows validation of the reviewed six-commit batch remains pending. T7/P1–P5
 and every later queue item remain open; no production gate is enabled.
 
+CI 39625038593 update: Windows serial identity/process checks, including the
+explicit sideband-off real-transfer control, passed; the default workspace
+variant remains pending. macOS failed one Commit fixture on object-layout
+drift (1021 tools tests passed). Local `4da3b95b` waits for fixture maintenance
+before snapshots; the git-feature prepared-write selection passes 169/169
+outside the sandbox (`/private/tmp/i300-foreground-fixture-git-write-unsandboxed.log`).
+This is not full preflight or native validation of that fix. P4 independent
+assessment confirms existing immutable Execute facets suffice; selected-program
+discovery/evidence/admission remain to implement, without a new permission API.
+
 Local candidate `44f5a949` now passes the complete frozen locked standard release
 preflight, including workspace tests and both runtime external consumers. Log:
 `/private/tmp/i300-44f5a949-preflight.log`. The initialized-child Checkout discovery
