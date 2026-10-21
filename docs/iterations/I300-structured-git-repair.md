@@ -6962,3 +6962,18 @@ same seven existing reduced-feature warnings. Logs:
 The initial sandbox xwin attempt could not update its external clang-cl cache;
 the authorized rerun exited 0. Native Windows comparison remains the next causal
 experiment; do not infer the sender child-chain cause from host success.
+
+### 2026-10-21 Published diagnostic candidate validation
+
+Candidate `3b00e98e1849e122d7657090f43c98063245e025` is pushed to PR #735.
+Its complete local standard release preflight exited 0, including workspace tests,
+doctests and both external Runtime SDK fixture modes; retained log:
+`/private/tmp/i300-3b00e98e-preflight.log` (`release preflight: passed`).
+Exact-head CI run [39587933025](https://github.com/wjhuang88/talos/actions/runs/39587933025)
+is still running at this checkpoint. Windows workspace Check and Clippy passed;
+Desktop validation is running and native workspace tests remain pending. The macOS
+release-preflight step passed and CLI/TUI locale acceptance is running. Linux
+Desktop, Windows installer and remote Issue/owner reconciliation passed.
+These observations do not prove native Push success or close P1–P5. Continue
+observing this run rather than restarting it; production Windows and Pull gates
+remain disabled.

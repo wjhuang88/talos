@@ -1,5 +1,13 @@
 ## Current whole-task convergence — 2026-10-21
 
+Latest published validation: candidate `3b00e98e` passed complete local standard
+release preflight (`/private/tmp/i300-3b00e98e-preflight.log`). Exact-head CI
+[39587933025](https://github.com/wjhuang88/talos/actions/runs/39587933025) remains
+live: Windows Check/Clippy and macOS release-preflight passed; native Windows
+workspace tests are still pending. This supersedes earlier pending local-preflight
+notes for this candidate, not the open P1–P5 exits or the remaining serial queue.
+Production Windows/Pull remain disabled; T7 and the whole handoff are incomplete.
+
 Start here, then read the [I300 convergence packages](../iterations/I300-structured-git-repair.md#current-convergence-plan--2026-10-21).
 Historical checkpoints below remain evidence; the Goal Execution Ledger and original
 requirements remain preserved. This update changes scheduling clarity, not scope,
