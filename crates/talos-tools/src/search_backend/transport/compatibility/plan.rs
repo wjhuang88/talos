@@ -125,4 +125,4 @@ impl PreparedCompatibilityPlan {
 }
 
 #[cfg(test)]
-mod tests;
+pub(super) mod tests;

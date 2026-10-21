@@ -10,6 +10,7 @@
 mod admission;
 pub(in crate::search_backend) mod chain;
 pub(super) mod headers;
+pub(in crate::search_backend) mod invocation;
 pub(in crate::search_backend) mod plan;
 
 use crate::search_backend::{SearchBackendId, bing_parser, ddg_parser, instant_answer};

@@ -534,46 +534,72 @@ impl WebSearchTool {
         source: ResultSource,
         include_snippets: bool,
     ) -> String {
-        let source_label = match source {
-            ResultSource::DuckDuckGo => "DuckDuckGo",
-            ResultSource::Tavily => "Tavily",
-            ResultSource::SearXNG => "SearXNG",
-            ResultSource::Wikipedia => "Wikipedia (fallback)",
-        };
-
-        let mut output = format!(
-            "Searched: \"{query}\"\nSource: {source_label}\nResults: {}\n\n",
-            results.len()
-        );
-
-        for (i, result) in results.iter().enumerate() {
-            output.push_str(&format!("{}. {}\n", i + 1, result.title));
-            output.push_str(&format!("   {}\n", result.url));
-            if include_snippets && !result.snippet.is_empty() {
-                // Truncate long snippets at UTF-8 character boundary.
-                let snippet = if result.snippet.len() > 300 {
-                    let boundary = result
-                        .snippet
-                        .char_indices()
-                        .take_while(|(i, _)| *i < 300)
-                        .map(|(i, c)| i + c.len_utf8())
-                        .last()
-                        .unwrap_or(300);
-                    format!("{}…", &result.snippet[..boundary])
-                } else {
-                    result.snippet.clone()
-                };
-                output.push_str(&format!("   {snippet}\n"));
-            }
-            output.push('\n');
-        }
-
-        if results.is_empty() {
-            output.push_str("No results found.\n");
-        }
-
-        output
+        format_results(query, results, source, include_snippets)
     }
+}
+
+/// Pure display conversion for the dormant admitted compatibility path, not admission itself.
+pub(crate) fn format_compatibility_results(
+    query: &str,
+    results: Vec<SearchBackendResult>,
+    include_snippets: bool,
+) -> String {
+    let results: Vec<_> = results
+        .into_iter()
+        .map(|row| WebResult {
+            title: row.title,
+            url: row.url,
+            snippet: row.snippet,
+        })
+        .collect();
+    format_results(query, &results, ResultSource::DuckDuckGo, include_snippets)
+}
+
+fn format_results(
+    query: &str,
+    results: &[WebResult],
+    source: ResultSource,
+    include_snippets: bool,
+) -> String {
+    let source_label = match source {
+        ResultSource::DuckDuckGo => "DuckDuckGo",
+        ResultSource::Tavily => "Tavily",
+        ResultSource::SearXNG => "SearXNG",
+        ResultSource::Wikipedia => "Wikipedia (fallback)",
+    };
+
+    let mut output = format!(
+        "Searched: \"{query}\"\nSource: {source_label}\nResults: {}\n\n",
+        results.len()
+    );
+
+    for (i, result) in results.iter().enumerate() {
+        output.push_str(&format!("{}. {}\n", i + 1, result.title));
+        output.push_str(&format!("   {}\n", result.url));
+        if include_snippets && !result.snippet.is_empty() {
+            // Truncate long snippets at UTF-8 character boundary.
+            let snippet = if result.snippet.len() > 300 {
+                let boundary = result
+                    .snippet
+                    .char_indices()
+                    .take_while(|(i, _)| *i < 300)
+                    .map(|(i, c)| i + c.len_utf8())
+                    .last()
+                    .unwrap_or(300);
+                format!("{}…", &result.snippet[..boundary])
+            } else {
+                result.snippet.clone()
+            };
+            output.push_str(&format!("   {snippet}\n"));
+        }
+        output.push('\n');
+    }
+
+    if results.is_empty() {
+        output.push_str("No results found.\n");
+    }
+
+    output
 }
 
 impl Default for WebSearchTool {
@@ -681,6 +707,41 @@ impl AgentTool for WebSearchTool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn shared_compatibility_formatter_preserves_legacy_bytes_and_utf8_boundary() {
+        let snippet = format!("{}中文", "a".repeat(299));
+        let legacy = [WebResult {
+            title: "Title".into(),
+            url: "https://example.invalid/".into(),
+            snippet: snippet.clone(),
+        }];
+        let tool = WebSearchTool::new();
+        for include in [false, true] {
+            let rows = vec![SearchBackendResult {
+                backend: SearchBackendId::DuckDuckGo,
+                title: legacy[0].title.clone(),
+                url: legacy[0].url.clone(),
+                snippet: snippet.clone(),
+            }];
+            let output = format_compatibility_results("q\"中", rows, include);
+            assert_eq!(
+                output,
+                tool.format_results("q\"中", &legacy, ResultSource::DuckDuckGo, include)
+            );
+            let displayed = if include {
+                format!("   {}中…\n", "a".repeat(299))
+            } else {
+                String::new()
+            };
+            assert_eq!(
+                output,
+                format!(
+                    "Searched: \"q\"中\"\nSource: DuckDuckGo\nResults: 1\n\n1. Title\n   https://example.invalid/\n{displayed}\n"
+                )
+            );
+        }
+    }
 
     #[test]
     fn compatibility_json_fixtures_preserve_defaults_order_and_bounds() {

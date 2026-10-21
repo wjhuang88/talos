@@ -53,14 +53,15 @@ pub(super) struct TransportBudget {
     max_bytes: usize,
 }
 
-impl TransportBudget {
-    fn check_live(&self) -> Result<(), TransportError> {
-        if Instant::now() >= self.deadline {
-            Err(TransportError::Deadline)
-        } else {
-            Ok(())
-        }
-    }
+/// Validated execution policy, without a running clock or permission authority.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct TransportLimits {
+    duration: Duration,
+    max_requests: usize,
+    max_bytes: usize,
+}
+
+impl TransportLimits {
     pub(super) fn new(
         duration: Duration,
         max_requests: usize,
@@ -74,12 +75,37 @@ impl TransportBudget {
             return Err(TransportError::InvalidRequest);
         }
         Ok(Self {
-            deadline: Instant::now() + duration,
-            attempts: AtomicUsize::new(0),
-            bytes: AtomicUsize::new(0),
+            duration,
             max_requests,
             max_bytes,
         })
+    }
+
+    pub(super) fn start(self) -> TransportBudget {
+        TransportBudget {
+            deadline: Instant::now() + self.duration,
+            attempts: AtomicUsize::new(0),
+            bytes: AtomicUsize::new(0),
+            max_requests: self.max_requests,
+            max_bytes: self.max_bytes,
+        }
+    }
+}
+
+impl TransportBudget {
+    fn check_live(&self) -> Result<(), TransportError> {
+        if Instant::now() >= self.deadline {
+            Err(TransportError::Deadline)
+        } else {
+            Ok(())
+        }
+    }
+    pub(super) fn new(
+        duration: Duration,
+        max_requests: usize,
+        max_bytes: usize,
+    ) -> Result<Self, TransportError> {
+        Ok(TransportLimits::new(duration, max_requests, max_bytes)?.start())
     }
 
     fn reserve(
