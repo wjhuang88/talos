@@ -91,6 +91,119 @@ not evidence of P1 closure. Both governance validators pass with zero warnings, 
 and final independent static review found no remaining compiler-stage blocker.
 The full permission suite was rerun successfully after the whitespace fix.
 
+### P1 runtime integration checkpoint — 2026-10-21
+
+This checkpoint supersedes the earlier statements that the accepted auxiliary
+capability has no runtime consumer. Changes remain local and uncommitted; P1
+and I300 remain Active, with Windows production Git and production Pull disabled.
+
+Sender mutation now captures actual-target Read evidence through AuxiliaryPaths
+and revalidates it after probes immediately before mutation. Checkout target
+configuration/hooks and newly discovered child sources extend the retained resolver
+without resetting its budget. Checkout deletion and target overlap checks consume
+retained traversal paths instead of independently traversing the filesystem.
+Receiver auxiliary files, configuration origins and declared includes now join the
+same invocation resolver. Receiver hook/alternate-store checks consume its snapshots;
+configuration comparison uses retained discovery bytes rather than reopening raw
+spellings. Receiver storage checks retain access to that same evidence through final
+execution. These changes do not extend the separate Pull resolution authority.
+
+Validation: locked git-feature git_write tests pass 416/416 on the host after the
+receiver configuration migration (log /private/tmp/i300-p1-receiver-config.log).
+The preceding Checkout selection passed 50/50. One sandbox run denied process
+observation; the full suite was rerun outside the sandbox. A receiver hook diagnostic
+regression was corrected before the passing run. These results are not Windows
+runtime, full-workspace preflight, independent security review or merge evidence.
+The earlier cargo xwin check failed with disk exhaustion; authorized incremental
+cache cleanup freed space, but Windows checking has not yet been rerun.
+
+Follow-up validation: a direct prepared receiver skiplist regression passes
+(1/1, /private/tmp/i300-p1-receiver-regression.log), covering missing exact target
+Read and same-content inode replacement after capture. Authorized cleanup of
+rebuildable target/debug artifacts restored about 14 GiB free space. Pinned
+cargo xwin check -p talos-tools --features git --tests --target
+x86_64-pc-windows-msvc --locked now passes with incremental/debug information
+disabled (/private/tmp/i300-p1-shared-xwin.log). It reports existing unused-code
+warnings; it does not provide native Windows runtime evidence. Both governance
+validators passed with zero warnings at the preceding runtime checkpoint.
+
+Remaining P1: audit dynamic child attribute sources and all source-set/token
+frontiers; expand receiver traversal/continuation coverage beyond the direct
+skiplist regression; remove superseded capture code and dead methods; run permission and
+Windows checks plus independent boundary review. P2's native timeout cause and
+P3–P5 acceptance remain open. Do not infer package completion from test counts.
+
+P1 follow-up (2026-10-21): the completed host git_write run passes 417/417
+(/private/tmp/i300-p1-child-external-final.log). Dynamic child worktree
+`.gitattributes` still uses snapshot capture inside inspect_child_filters; it
+must migrate after child metadata/index admission, not by scanning the index
+early. The earlier early-scan attempt was withdrawn after its admission-order
+regression failed. No dynamic-source closure is claimed.
+Removed the unused resolver source-set helper and restricted legacy auxiliary
+leaf-capture characterization helpers to tests. Resolver regressions pass 6/6
+with the locked git-only feature selection
+(/private/tmp/i300-p1-resolver-cleanup.log), including a link redirected between
+Path approval and resolution: the old canonical-target grant is rejected and a
+fresh target grant succeeds. An initial assertion incorrectly assumed Path
+approval did not canonicalize links; inspection of authorization.rs corrected
+the test premise. This is uncommitted local evidence, not independent review,
+Windows runtime validation or P1 completion.
+
+P1 dynamic child attribute candidate (2026-10-21): mutation dispatch now checks
+all child worktree/gitdir/common Read grants before inspecting child indexes.
+Index-selected worktree attribute paths extend the invocation resolver and its
+shared budget; new sources return a fresh plan and exact resolved-target Read
+frontier before body capture or check-attr. Already-bound source sets reuse the
+current admission without adding a stage. Child inspection no longer captures
+or reopens dynamic attributes through raw snapshot paths; resolver evidence
+owns their identity and body revalidation. Protected Checkout paths retain only
+the admitted nonmissing attribute names. The eight-stage ceiling is unchanged;
+deep transition combinations still need P3 usability validation.
+
+The first full git-only host run passes 418/418
+(/private/tmp/i300-p1-child-continuation-host.log). Its sandbox predecessor had
+417 passes and one process-observation PermissionDenied, superseded by the host
+run. A separate real-child regression passes 1/1 and checks external target
+Read denial, fresh approval and same-content inode replacement refusal
+(/private/tmp/i300-p1-child-attribute-target.log). Permission tests pass all 148
+unit, 11 integration and one doc test (/private/tmp/i300-p1-child-permission.log).
+MSVC xwin checking passes with seven existing reduced-feature warnings
+(/private/tmp/i300-p1-child-continuation-xwin.log); the initial sandbox attempt
+could not update the cargo-xwin clang-cl cache link and was rerun with approved
+host permissions. A final full run after the no-new-source stage optimization
+passes 419/419 (/private/tmp/i300-p1-child-continuation-final.log). Final MSVC
+xwin checking also passes (/private/tmp/i300-p1-child-continuation-xwin-final.log),
+with seven existing warnings. Both governance validators pass with zero warnings
+(/private/tmp/i300-p1-child-governance.log and /private/tmp/i300-p1-child-claims.log).
+Independent boundary review, remaining receiver coverage, native
+Windows evidence and P1–P5 delivery gates remain open. Changes are uncommitted.
+
+Independent current-source static boundary review found no blocking defect in
+the dynamic-source admission, same-plan optimization, replacement checks or
+Checkout protection. It did not run tests or establish atomic TOCTOU/native
+Windows guarantees. All-target/all-feature talos-tools Clippy with locked
+dependencies and -D warnings passes (/private/tmp/i300-p1-child-clippy.log),
+after correcting seven int-plus-one/needless-borrow diagnostics in this local
+batch. Current-head workspace preflight and native Windows remain required.
+
+Stage checkpoint: admitted capability-token plumbing is committed separately as
+91155adf. Runtime integration is now committed as 710582ec. Standard
+release_preflight.sh session 46729 stopped at formatting differences before workspace tests
+(/private/tmp/i300-p1-runtime-preflight.log). After cargo fmt --all, a new
+standard run in session 9773 terminated with exit 101 during workspace test
+compilation because the disk was full
+(/private/tmp/i300-p1-runtime-preflight-final.log). This is not a passing
+workspace gate. After confirming no Cargo/rustc/preflight process was running,
+the previously authorized rebuildable target/debug artifacts were removed;
+available space recovered from 115 MiB to approximately 14 GiB. A fresh standard
+run in session 97575 used CARGO_INCREMENTAL=0, CARGO_PROFILE_DEV_DEBUG=0
+and CARGO_PROFILE_TEST_DEBUG=0. The preceding execution recorded terminal exit 0
+and `release preflight: passed`, including workspace tests and both runtime SDK
+fixtures. The resumed session handle is unavailable; this result is inherited
+terminal evidence, not the disk-failure log above. Staged review completed before
+710582ec. After rebase, rerun the full gate with a durable log for the new source.
+Native Windows and P1–P5 are still open.
+
 ### Finite delivery packages
 
 P2 diagnostic checkpoint (2026-10-21): the isolated Git-daemon Push fixture now
