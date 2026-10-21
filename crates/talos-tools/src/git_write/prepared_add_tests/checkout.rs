@@ -1965,6 +1965,10 @@ async fn checkout_new_gitlink_preserves_initialized_child() {
             } else {
                 outside.path().canonicalize().expect("canonical")
             };
+            if mode == "attributes-denied" {
+                std::fs::write(external.join(".gitattributes"), "tracked filter=unapproved\n")
+                    .expect("existing unapproved attributes");
+            }
             git(
                 &child,
                 &["config", "core.worktree", external.to_str().expect("path")],
