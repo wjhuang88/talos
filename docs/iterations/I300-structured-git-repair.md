@@ -7130,3 +7130,28 @@ preflight, native confirmation and all P1–P5 exits remain outstanding.
 CI 39625038593 is now terminal failure; Windows and macOS workspace jobs failed.
 Windows failure details still need analysis; serial sideband-off evidence remains
 valid only for that isolated control.
+
+## Terminal Windows comparison — 2026-10-22
+
+CI 39625038593 at published `dcc8c31e` is terminal failure. Retained native
+log: `/private/tmp/i300-dcc8c31e-windows.log`. The tools suite has 965 passes
+and one failure: the unchanged default daemon Push native full-transfer baseline
+exceeds ten seconds before Talos dispatch. The explicit repository-level
+`sendpack.sideband=false` variant passes both serial guard execution and the
+workspace suite. This reduces the earlier concurrency confound, but does not
+prove a general transport root cause or authorize a production override.
+The initialized-child Checkout tracking matrix passes in the native workspace
+suite; the earlier stage-limit/cleanup failure is not reproduced at this head.
+Agent has three failures, MCP five and Runtime two while production Windows
+structured Git remains deliberately disabled. These are unresolved delivery
+gates, not passing end-to-end evidence. All test targets finish by 15:50:39 UTC
+with four failed targets; the CI step remains alive until its 15:58:35 timeout.
+A surviving inherited process/stream is a hypothesis, not a proven leak.
+Next Windows work must settle the default native transport compatibility policy,
+verify baseline/receiver descendant cleanup on failure, then obtain independent
+activation review and real Agent/MCP/Runtime approval/denial evidence.
+
+Local `6af0042f` full standard locked preflight is running with durable log
+`/private/tmp/i300-6af0042f-preflight.log` (session 52479); no pass claimed.
+Fresh origin fetch succeeds and HEAD...origin/main is 353/0, so no rebase is
+needed at this checkpoint. P1–P5 and all later handoff queue items remain open.

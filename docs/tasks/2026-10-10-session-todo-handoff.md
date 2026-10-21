@@ -1,3 +1,16 @@
+## Current native CI update — 2026-10-22
+
+Terminal Windows run 39625038593 confirms the explicit sideband-off Push
+control passes both isolated and workspace execution; default native Git full
+Push times out before Talos dispatch. Checkout tracking matrix passes. Windows
+Agent/MCP/Runtime still fail under the closed production gate; activation is
+not delivered. The workspace command outlives finished targets until its step
+timeout; descendant/stream ownership remains to investigate. See I300 terminal
+comparison for retained evidence and bounded next actions. Local filter sentinel
+repair is committed as `6af0042f`, independently reviewed with 169/169 prepared
+write tests passing; complete new-head preflight remains running. No T7 or
+whole-handoff completion is claimed.
+
 ## Current whole-task convergence — 2026-10-21
 
 Published checkpoint: `dcc8c31e` is pushed to PR #735 after its frozen locked
