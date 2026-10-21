@@ -10,8 +10,12 @@ Current validation follow-up: local HEAD b2d7bcfa passes the full locked release
 preflight, including workspace tests and both runtime external fixtures. Published
 cb424257 CI has a macOS Commit metadata-drift failure (1020 tools tests pass,
 one fails); the same regression passes locally, so its cause remains open. Windows
-identity guard tests pass and workspace tests remain live. See the I300 latest
-checkpoint for retained logs. This evidence does not close T7 or enable later work.
+identity guard tests pass, but that run is now terminal failure: Windows tools
+961 passed / four failed, with further closed-production-gate failures and a
+workspace timeout. Local 29360388 adds conservative short-name overlap protection;
+host git_write passes 419/419 and MSVC xwin checks pass, pending native confirmation.
+The same-daemon native full-Push baseline also passes locally; Windows execution
+is still required. See I300 for retained logs. T7 and later work remain incomplete.
 
 The critical path is **common authorization boundary → Windows runtime closure →
 Checkout transitions → complete Pull → production acceptance and merge**. I300 owns

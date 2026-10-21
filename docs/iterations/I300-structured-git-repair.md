@@ -1,5 +1,13 @@
 ## Current convergence plan — 2026-10-21
 
+Latest evidence: published cb424257 CI is terminal failure, not a live wait.
+Local 29360388 contains the Windows short-name effect-overlap correction, with
+419/419 host Git regressions, Clippy and MSVC xwin checking passed. Native
+confirmation remains required. A same-daemon native full-Push baseline now
+passes on the host; it checks a separate nested receiver, leaving the Talos
+receiver empty for its mandatory actual transfer. This is diagnosis, not
+Windows/Pull activation or completion of any package.
+
 This is the current execution entrypoint. Earlier checkpoints are preserved evidence,
 not additional acceptance requirements. The published Scope And Acceptance remains
 binding. I300/T7 is **Active / Claimed**; Windows production Git and production Pull
@@ -6935,3 +6943,22 @@ pass, all-target Git Clippy passes with warnings denied, and MSVC cargo xwin
 test-target checking passes with seven existing reduced-feature warnings
 (/private/tmp/i300-short-alias-{host,frontier-host,clippy,xwin}.log).
 Fetch completed and origin/main has zero commits absent from this branch.
+
+### 2026-10-21 Native full-transfer diagnostic baseline
+
+The real daemon Push regression now performs a native full transfer to a separate
+nested bare receiver on the same daemon before exercising Talos. It checks the
+expected destination ref and verifies that the actual Talos receiver still has no
+refs. The existing owned pack-generation and mandatory structured object-transfer
+assertions remain. Unlike the dry-run baseline, this exercises native child/pipe
+packing; it does not establish behavior with the frozen environment or owned Job.
+Fixture-only tracing remains confined to fixed payloads. No production permissions,
+process ownership, deadlines or activation gates changed.
+
+Locked host selection passes 1/1 in 1.65 seconds; Git all-target Clippy with warnings
+denied, formatting and MSVC cargo xwin test-target checking pass. xwin reports the
+same seven existing reduced-feature warnings. Logs:
+/private/tmp/i300-native-full-push-baseline-{host,clippy,fmt,xwin}.log.
+The initial sandbox xwin attempt could not update its external clang-cl cache;
+the authorized rerun exited 0. Native Windows comparison remains the next causal
+experiment; do not infer the sender child-chain cause from host success.

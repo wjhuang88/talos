@@ -1031,6 +1031,52 @@ async fn prepared_push_transfers_objects_to_admitted_git_daemon() {
         !receiver.path().join("objects").join(&expected[..2]).join(&expected[2..]).exists(),
         "dry-run baseline must not transfer the fixture commit"
     );
+    // A dry-run does not launch pack-objects or transfer a pack. Verify the
+    // native Git child/pipe chain can complete against this exact daemon and
+    // Git build before testing the owned Windows Job supervisor. Keep this
+    // successful transfer isolated in a nested bare repository so the actual
+    // Talos target remains empty and must still receive its own pack.
+    let native_receiver = receiver.path().join("native-baseline.git");
+    std::fs::create_dir(&native_receiver).expect("native receiver directory");
+    git(&native_receiver, &["init", "--bare"]);
+    let native_destination = format!("{destination}/native-baseline.git");
+    let mut native_push = tokio::process::Command::new("git");
+    native_push
+        .current_dir(root.path())
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .env("GIT_TRACE", "1")
+        .env("GIT_TRACE_PACKET", "1")
+        .args([
+            "push",
+            "--no-verify",
+            &native_destination,
+            "HEAD:refs/heads/native-baseline",
+        ])
+        .stdin(std::process::Stdio::null())
+        .kill_on_drop(true);
+    let native_push = tokio::time::timeout(
+        std::time::Duration::from_secs(10),
+        native_push.output(),
+    )
+    .await
+    .unwrap_or_else(|_| {
+        panic!(
+            "native daemon full-push baseline deadline exceeded before Talos dispatch; daemon_log={}",
+            std::fs::read_to_string(daemon_log.path()).expect("daemon diagnostics")
+        )
+    })
+    .expect("native daemon full push");
+    assert!(
+        native_push.status.success(),
+        "native daemon full push failed before Talos dispatch: {}; daemon_log={}",
+        String::from_utf8_lossy(&native_push.stderr),
+        std::fs::read_to_string(daemon_log.path()).expect("daemon diagnostics")
+    );
+    assert_eq!(
+        git(&native_receiver, &["rev-parse", "refs/heads/native-baseline"]),
+        expected
+    );
+    assert!(git(receiver.path(), &["for-each-ref"]).is_empty());
     let input = serde_json::json!({"remote":destination,"branch":"HEAD:refs/heads/approved"});
     // Both stages reject absent proof before contacting the receiver.
     let plan = AddPlan::prepare_push(root.path(), &input, ToolProvenance::Native).expect("plan");
