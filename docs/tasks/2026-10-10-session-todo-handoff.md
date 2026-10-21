@@ -1,5 +1,11 @@
 ## Current whole-task convergence — 2026-10-21
 
+Published checkpoint: `dcc8c31e` is pushed to PR #735 after its frozen locked
+standard release preflight passed workspace tests, doctests and both Runtime
+external consumers (`/private/tmp/i300-sideband-stage-preflight.log`). Native
+Windows validation of the reviewed six-commit batch remains pending. T7/P1–P5
+and every later queue item remain open; no production gate is enabled.
+
 Local candidate `44f5a949` now passes the complete frozen locked standard release
 preflight, including workspace tests and both runtime external consumers. Log:
 `/private/tmp/i300-44f5a949-preflight.log`. The initialized-child Checkout discovery
