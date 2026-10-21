@@ -233,54 +233,79 @@ async fn pull_rebase_clean_probes_preserve_index_and_touch_semantics() {
 
 #[tokio::test]
 async fn pull_rebase_filter_refuses_without_running_helper() {
-    let root = fixture();
-    for args in [
-        vec!["config", "user.name", "Fixture"],
-        vec!["config", "user.email", "fixture@example.invalid"],
-        vec!["config", "commit.gpgSign", "false"],
-        vec!["add", "file"],
-        vec!["commit", "-m", "base"],
-        vec!["config", "pull.rebase", "true"],
-        vec!["config", "filter.probe.clean", "touch helper-ran; cat"],
-    ] {
-        let output = std::process::Command::new("git")
+    for driver in ["probe", "unset", "unspecified"] {
+        let root = fixture();
+        for args in [
+            vec!["config", "user.name", "Fixture"],
+            vec!["config", "user.email", "fixture@example.invalid"],
+            vec!["config", "commit.gpgSign", "false"],
+            vec!["add", "file"],
+            vec!["commit", "-m", "base"],
+            vec!["config", "pull.rebase", "true"],
+            vec![
+                "config",
+                &format!("filter.{driver}.clean"),
+                "touch helper-ran; cat",
+            ],
+        ] {
+            let output = std::process::Command::new("git")
+                .current_dir(root.path())
+                .args(args)
+                .output()
+                .expect("fixture Git");
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+        std::fs::write(
+            root.path().join(".gitattributes"),
+            format!("file filter={driver}\n"),
+        )
+        .expect("rules");
+        let native = std::process::Command::new("git")
             .current_dir(root.path())
-            .args(args)
+            .args(["hash-object", "--path=file", "file"])
             .output()
-            .expect("fixture Git");
-        assert!(
-            output.status.success(),
-            "{}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
-    std::fs::write(root.path().join(".gitattributes"), "file filter=probe\n").expect("rules");
-    let plan = AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
-        .expect("prepare");
-    let mut plan = Box::new(plan).discover().await.expect("configuration");
-    let mut refused = false;
-    for _ in 0..8 {
-        let admission = proof(&plan)
-            .consume_for_prepared(&plan.request(), &plan.identity)
-            .expect("fresh admission");
-        match plan.discover_pull_prefetch(&admission).await {
-            Ok(next) => {
-                assert!(
-                    next.phase != Phase::PullFetch,
-                    "filtered source reached fetch"
-                );
-                plan = next;
-            }
-            Err(error) => {
-                assert!(error.to_string().contains("configured filter"), "{error}");
-                refused = true;
-                break;
+            .expect("native filter probe");
+        assert!(native.status.success(), "{driver}: {native:?}");
+        assert!(root.path().join("helper-ran").exists(), "{driver}");
+        std::fs::remove_file(root.path().join("helper-ran")).expect("reset helper marker");
+        let index = std::fs::read(root.path().join(".git/index")).expect("initial index");
+        let plan =
+            AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+                .expect("prepare");
+        let mut plan = Box::new(plan).discover().await.expect("configuration");
+        let mut refused = false;
+        for _ in 0..8 {
+            let admission = proof(&plan)
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .expect("fresh admission");
+            match plan.discover_pull_prefetch(&admission).await {
+                Ok(next) => {
+                    assert!(
+                        next.phase != Phase::PullFetch,
+                        "filtered source reached fetch"
+                    );
+                    plan = next;
+                }
+                Err(error) => {
+                    assert!(error.to_string().contains("configured filter"), "{error}");
+                    refused = true;
+                    break;
+                }
             }
         }
+        assert!(refused, "{driver}");
+        assert_eq!(
+            std::fs::read(root.path().join(".git/index")).expect("final index"),
+            index,
+            "{driver}"
+        );
+        assert!(!root.path().join("helper-ran").exists());
+        assert!(!root.path().join(".git/FETCH_HEAD").exists());
     }
-    assert!(refused);
-    assert!(!root.path().join("helper-ran").exists());
-    assert!(!root.path().join(".git/FETCH_HEAD").exists());
 }
 
 #[tokio::test]

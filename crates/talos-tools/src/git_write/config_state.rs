@@ -222,6 +222,10 @@ fn ordered_records(output: &[u8]) -> Result<Vec<u8>, GitToolError> {
 }
 
 impl ChildConfig {
+    pub(super) fn filter_attribute_is_inert(&self, attribute: &[u8]) -> bool {
+        filter_attribute_is_inert(&self.values, attribute)
+    }
+
     pub(super) fn pull_hook_paths(
         &self,
         common: &std::path::Path,
@@ -534,6 +538,21 @@ pub(super) struct ConfigState {
     pub(super) hooks: Vec<PathBuf>,
 }
 
+// check-attr uses these same bytes for literal driver names and sentinel states.
+// Refuse ambiguous configured programs until their execution is separately admitted.
+fn filter_attribute_is_inert(values: &Values, attribute: &[u8]) -> bool {
+    matches!(attribute, b"unset" | b"unspecified")
+        && ![b"clean".as_slice(), b"smudge", b"process"]
+            .iter()
+            .any(|suffix| {
+                let key = [b"filter.".as_slice(), attribute, b".", suffix].concat();
+                values
+                    .get(&key)
+                    .and_then(|values| values.last())
+                    .is_some_and(|value| value.as_deref().is_none_or(|value| !value.is_empty()))
+            })
+}
+
 fn unsupported(reason: &str) -> GitToolError {
     GitToolError::InvalidInput(format!(
         "{reason}; use a separately authorized Git invocation"
@@ -787,6 +806,10 @@ fn auxiliary_spellings(path: &std::path::Path) -> Result<BTreeSet<PathBuf>, GitT
 }
 
 impl ConfigState {
+    pub(super) fn filter_attribute_is_inert(&self, attribute: &[u8]) -> bool {
+        filter_attribute_is_inert(&self.values, attribute)
+    }
+
     /// Predict tracking values from the invocation's retained configuration.
     /// The caller supplies a resolved branch reference, never a raw revision.
     /// These records describe writes to local config, not effective overrides.

@@ -234,3 +234,35 @@ fn git_boolean_matches_git_disabled_spellings() {
     assert!(git_boolean(None).expect("implicit true"));
     assert!(git_boolean(Some(b"maybe")).is_err());
 }
+
+#[test]
+fn filter_attribute_sentinels_reject_literal_driver_commands() {
+    for driver in [b"unset".as_slice(), b"unspecified"] {
+        assert!(filter_attribute_is_inert(&Values::new(), driver));
+        assert!(!filter_attribute_is_inert(&Values::new(), b"probe"));
+        for suffix in [b"clean".as_slice(), b"smudge", b"process"] {
+            let mut values = Values::new();
+            values.insert(
+                [b"filter.".as_slice(), driver, b".", suffix].concat(),
+                vec![Some(b"command".to_vec())],
+            );
+            assert!(
+                !filter_attribute_is_inert(&values, driver),
+                "driver={driver:?}, suffix={suffix:?}"
+            );
+        }
+    }
+
+    for configured in [
+        vec![Some(Vec::new())],
+        vec![Some(b"command".to_vec()), Some(Vec::new())],
+    ] {
+        let mut values = Values::new();
+        values.insert(b"filter.unset.clean".to_vec(), configured);
+        assert!(filter_attribute_is_inert(&values, b"unset"));
+    }
+
+    let mut valueless = Values::new();
+    valueless.insert(b"filter.unset.clean".to_vec(), vec![None]);
+    assert!(!filter_attribute_is_inert(&valueless, b"unset"));
+}
