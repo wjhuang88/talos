@@ -10,8 +10,43 @@ The critical path is **common authorization boundary → Windows runtime closure
 Checkout transitions → complete Pull → production acceptance and merge**. I300 owns
 the five finite packages, exit gates, fallback and human-decision triggers. A passing
 unit suite or inert preparation stage is progress but does not count as enabled behavior.
-Current code changes remain uncommitted pending the auxiliary identity/admission closure;
+The auxiliary identity/admission runtime stage is committed as 710582ec;
 the Windows daemon Push timeout still needs a causal native diagnosis.
+
+Latest local checkpoint (2026-10-21): P1 now connects sender, Checkout overlap,
+and receiver auxiliary/configuration evidence to the invocation-owned resolver.
+Locked host git_write tests pass 416/416; details and remaining call-site audit
+are in the I300 runtime integration checkpoint. Changes are uncommitted. Windows
+MSVC test-target xwin checking now passes after authorized target/debug cleanup;
+the receiver skiplist denial/replacement regression also passes. Native Windows
+runtime evidence remains outstanding. No package or later task was activated or
+marked complete by this checkpoint.
+
+Follow-up: the completed host git_write run passes 417/417; resolver tests pass
+6/6 including rejection of a stale canonical-target grant after link redirection.
+Unused resolver code was removed and legacy capture helpers are now test-only.
+Dynamic child `.gitattributes` discovery still needs a continuation after child
+index Read admission and before actual-target content reads. The I300 owner
+records logs and the corrected test premise. Changes remain local; T7 is Active.
+
+Dynamic-source follow-up: child index-selected attribute paths now extend the
+shared resolver only after child metadata/worktree Read admission. New sources
+publish a fresh actual-target Read frontier; already-bound sources consume no
+additional stage. Full initial host git-only tests pass 418/418, the external
+attribute denial/replacement regression passes 1/1, permission tests pass and
+MSVC xwin checking passes. Final optimized-dispatch rerun and boundary review
+remain required; see I300 for exact logs. This supersedes the preceding
+implementation-gap statement only, not the open P1 or whole-task status.
+
+Final optimized-dispatch follow-up: host git_write tests pass 419/419 and the
+MSVC xwin test-target check passes. Independent current-source static review
+found no blocking defect in the scoped dynamic admission/replacement boundary;
+it did not establish native Windows behavior or atomic filesystem guarantees.
+This supersedes the preceding pending-rerun/review statement. Workspace check
+and Clippy passed in preflight session 97575. The preceding execution recorded
+terminal exit 0 for the full preflight, workspace tests and both runtime SDK
+fixtures. Its handle is unavailable after resume; rerun after rebase with a durable
+log. Runtime stage 710582ec is committed after staged review; P1–P5 stay open.
 
 | Queue | Delivery boundary | Start/exit rule |
 |---|---|---|
@@ -4996,3 +5031,15 @@ Neither diagnostic nor cross-compilation proves Windows runtime correctness.
 reviewed separately. Both governance validators pass with zero warnings.
 Native special-path coverage, Windows shell admission and daemon root cause
 remain open; no production gate or completion state changes.
+
+2026-10-21 workspace validation recovery: the P1 standard preflight in session
+9773 terminated with disk exhaustion during workspace test compilation, not a
+passing gate. With no Cargo/rustc/preflight process running, previously approved
+target/debug cleanup recovered approximately 14 GiB free space while preserving
+source, Git data and Windows artifacts. The preceding execution recorded standard
+preflight session 97575 terminal exit 0 with incremental compilation and dev/test
+debug information disabled, including workspace tests and both runtime fixtures.
+The resumed handle is unavailable; do not confuse this with the earlier failed
+log. Runtime stage 710582ec is committed. Next preserve this documentation stage,
+rebase onto fetched origin/main, and run full preflight with a durable log.
+P1–P5 and the full handoff remain incomplete.
