@@ -408,6 +408,9 @@ async fn pull_integration_conflict_retains_user_state_and_reports_partial_effect
 fn integration_git(root: &Path, args: &[&str]) -> String {
     let output = std::process::Command::new("git")
         .current_dir(root)
+        // Fixture commits must finish maintenance before a prepared plan
+        // snapshots the object layout; keep maintenance enabled and foreground.
+        .args(["-c", "maintenance.autoDetach=false", "-c", "gc.autoDetach=false"])
         .args(["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid"])
         .args(args).output().expect("Git fixture");
     assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
