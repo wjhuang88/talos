@@ -518,6 +518,9 @@ async fn commit_all_deletes_replaced_tracked_file_and_refuses_nested_repository(
         let root = fixture();
         let git = |args: &[&str]| {
             let output = std::process::Command::new("git")
+                // Finish fixture maintenance before retaining object-layout
+                // evidence, matching the supervised production invocation.
+                .args(["-c", "maintenance.autoDetach=false", "-c", "gc.autoDetach=false"])
                 .args(args)
                 .current_dir(root.path())
                 .output()
