@@ -6871,3 +6871,14 @@ MSVC xwin test-target checking passes with seven existing warnings
 (/private/tmp/i300-checkout-ancestor-frontier-xwin.log). The native Windows job
 remains live; no replacement candidate was pushed. The macOS intermittent
 metadata refusal and Windows pack/child-chain diagnosis remain open in P1/P2.
+
+### 2026-10-21 Current-head full local preflight
+
+Pinned-toolchain locked release preflight at b2d7bcfa exits 0
+(/private/tmp/i300-b2d7bcfa-preflight.log), including workspace tests and both
+runtime external fixtures. The Commit replacement-directory regression passes
+in this full run; the earlier macOS CI refusal remains unexplained, not repaired
+by the diagnostic. Fetch completed; origin/main has no commits absent from HEAD.
+Native Windows CI job 119149158085 passed structured Git identity guard tests
+and remains live in workspace tests. No production activation or package exit
+is claimed; later local commits remain unpublished while this run is live.
