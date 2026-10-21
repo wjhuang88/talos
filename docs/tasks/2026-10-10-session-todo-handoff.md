@@ -6,6 +6,13 @@ requirements remain preserved. This update changes scheduling clarity, not scope
 authority, acceptance or the Standard work mode. C0 is complete; T7 is Active and all
 later items remain unactivated. No percentage or completion date is established.
 
+Current validation follow-up: local HEAD b2d7bcfa passes the full locked release
+preflight, including workspace tests and both runtime external fixtures. Published
+cb424257 CI has a macOS Commit metadata-drift failure (1020 tools tests pass,
+one fails); the same regression passes locally, so its cause remains open. Windows
+identity guard tests pass and workspace tests remain live. See the I300 latest
+checkpoint for retained logs. This evidence does not close T7 or enable later work.
+
 The critical path is **common authorization boundary → Windows runtime closure →
 Checkout transitions → complete Pull → production acceptance and merge**. I300 owns
 the five finite packages, exit gates, fallback and human-decision triggers. A passing
