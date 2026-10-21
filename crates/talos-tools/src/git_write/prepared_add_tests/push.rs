@@ -907,6 +907,15 @@ async fn receiver_reference_tree_refuses_exact_paths_without_closed_capability()
 
 #[tokio::test]
 async fn prepared_push_transfers_objects_to_admitted_git_daemon() {
+    push_transfers_objects_to_admitted_git_daemon(false).await;
+}
+
+#[tokio::test]
+async fn prepared_push_transfers_objects_with_explicit_sideband_disabled() {
+    push_transfers_objects_to_admitted_git_daemon(true).await;
+}
+
+async fn push_transfers_objects_to_admitted_git_daemon(disable_sideband: bool) {
     let root = fixture();
     let receiver = tempfile::tempdir().expect("receiver");
     let git = |cwd: &Path, args: &[&str]| {
@@ -925,6 +934,13 @@ async fn prepared_push_transfers_objects_to_admitted_git_daemon() {
             .trim()
             .to_owned()
     };
+    if disable_sideband {
+        // Explicit repository configuration, never a production override.
+        // Git for Windows documents git:// hangs with side-band enabled
+        // (git-for-windows/git#907). Keep the default case above as separate
+        // evidence so this control cannot conceal that compatibility failure.
+        git(root.path(), &["config", "sendpack.sideband", "false"]);
+    }
     git(receiver.path(), &["init", "--bare"]);
     std::fs::write(root.path().join("payload"), "approved object transfer\n").expect("payload");
     git(root.path(), &["add", "payload"]);

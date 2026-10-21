@@ -13,6 +13,13 @@ proven. This run does not validate the newer local candidate. The latest observe
 origin fetch required no rebase. Independent review, native
 confirmation and all open P1–P5 exits remain required; production gates stay closed.
 
+Follow-up: frozen `9bff4de3` full locked preflight passes after independently
+reviewed native diagnostic fingerprint refresh. A separate explicit side-band-off
+Push test now complements the unchanged default test; both pass on macOS and
+compile with cargo xwin. Git for Windows documents git:// side-band hangs, but
+whether that explains this runner remains unproven. Windows will run the control
+in isolation before the workspace suite; no production configuration override.
+
 Latest published validation: candidate `3b00e98e` passed complete local standard
 release preflight (`/private/tmp/i300-3b00e98e-preflight.log`). Exact-head CI
 [39587933025](https://github.com/wjhuang88/talos/actions/runs/39587933025) is terminal:

@@ -26,7 +26,19 @@ it is static evidence, not Windows runtime evidence. Full preflight at
 tests passed). The same reviewer independently confirmed that the diagnostic
 change alters no native acquisition/transfer/release/unsafe site or cleanup
 semantics, and verified the replacement fingerprint `0x34615160b23c4ee3` before
-its baseline refresh. Full validation must be repeated after this refresh.
+its baseline refresh. Frozen standard locked preflight at `9bff4de3` now exits
+0, including workspace tests and both Runtime consumers; log:
+`/private/tmp/i300-native-reviewed-preflight.log`.
+
+Windows Push control: current Git for Windows [known issues](https://github.com/git-for-windows/build-extra/blob/main/ReleaseNotes.md#known-issues)
+still documents indefinite git:// Push hangs and explicit `sendpack.sideband=false`
+as a workaround, with delayed/missing remote diagnostics. The exact native build
+`v2.56.0.windows.2` reads that option in `send-pack.c`. Added a second full-transfer
+fixture with this explicit repository setting; the original default-config
+fixture remains unchanged. Windows runs the control alone before the workspace
+suite to distinguish upstream transport behavior from concurrent-suite effects.
+Both variants pass on macOS, and MSVC xwin test checking passes. This neither
+proves the Windows cause nor changes production configuration or activation.
 
 Denial-fixture follow-up: the eleven-mode Checkout matrix also passes with a
 real child `.gitattributes` file naming an unapproved filter. Its resolver has
