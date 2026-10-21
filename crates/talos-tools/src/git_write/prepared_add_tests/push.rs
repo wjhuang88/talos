@@ -1525,7 +1525,7 @@ async fn receiver_external_hook_is_deferred_to_fresh_read_admission() {
 
 #[tokio::test]
 async fn receiver_skiplist_requires_target_read_and_retains_leaf_identity() {
-    for replace in [false, true] {
+    for (replace, initially_missing) in [(false, false), (true, false), (true, true)] {
         let sender = fixture();
         let receiver = fixture();
         let external = tempfile::tempdir().expect("external");
@@ -1534,7 +1534,9 @@ async fn receiver_skiplist_requires_target_read_and_retains_leaf_identity() {
             .canonicalize()
             .expect("canonical")
             .join("skiplist");
-        std::fs::write(&skiplist, b"# retained bytes\n").expect("skiplist");
+        if !initially_missing {
+            std::fs::write(&skiplist, b"# retained bytes\n").expect("skiplist");
+        }
         std::fs::write(
             receiver.path().join(".git/config"),
             format!(
@@ -1578,9 +1580,15 @@ async fn receiver_skiplist_requires_target_read_and_retains_leaf_identity() {
                 .expect("revalidation admission");
             plan.revalidate_receiver_auxiliary(&tokens)
                 .expect("unchanged");
-            std::fs::rename(&skiplist, external.path().join("retained")).expect("retain inode");
+            if !initially_missing {
+                std::fs::rename(&skiplist, external.path().join("retained"))
+                    .expect("retain inode");
+            }
             std::fs::write(&skiplist, b"# retained bytes\n").expect("same-content replacement");
-            assert!(plan.revalidate_receiver_auxiliary(&tokens).is_err());
+            assert!(
+                plan.revalidate_receiver_auxiliary(&tokens).is_err(),
+                "receiver must reject replacement or appearance after absence capture"
+            );
         } else {
             let without_read: Vec<_> = tokens
                 .into_iter()
