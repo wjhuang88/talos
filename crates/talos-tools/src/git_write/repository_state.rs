@@ -100,6 +100,29 @@ pub(super) struct RepositoryState {
 }
 
 impl RepositoryState {
+    #[cfg(test)]
+    pub(super) fn changed_fields(&self, current: &Self) -> Vec<&'static str> {
+        let mut changed = Vec::new();
+        macro_rules! compare {
+            ($($field:ident),+ $(,)?) => {$(
+                if self.$field != current.$field {
+                    changed.push(stringify!($field));
+                }
+            )+};
+        }
+        compare!(
+            workdir,
+            git_dir,
+            common_dir,
+            index,
+            identities,
+            entries,
+            object_layout,
+            references
+        );
+        changed
+    }
+
     /// Check retained location pointers before rediscovering a repository.
     /// A changed pointer must not cause reads from a newly selected root under
     /// the old root's admission. The caller also binds directory identities.

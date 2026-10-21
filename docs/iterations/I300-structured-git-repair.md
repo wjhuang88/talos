@@ -6852,3 +6852,22 @@ MSVC cargo xwin test-target checking exits 0 with the seven existing warnings
 attempt could not update the external cargo-xwin cache symlink, so validation
 was rerun with authorization. Native confirmation remains pending in the next
 stable candidate. P1–P5 and the full handoff remain open.
+
+### 2026-10-21 Exact-head macOS metadata refusal triage
+
+CI 39578256961's macOS job 119149158117 failed Release preflight: talos-tools
+1020 passed / 1 failed. The Commit replacement-directory success case was refused
+because RepositoryState changed after preparation (commit.rs:560). This is not
+a completed full-CI pass. The failed job log is retained at
+/private/tmp/i300-cb424257-macos.log. The same host test passes individually;
+the changed metadata field and cause are not yet established.
+
+Added test-build-only reporting of changed RepositoryState field names, without
+configuration values, file bodies or path output. Production rejection remains
+unchanged. Full host git_write tests pass 419/419 with this diagnostic
+(/private/tmp/i300-cb424257-host-diagnostic.log), after rerunning outside the
+sandbox because the first run's process observation was denied (418/419).
+MSVC xwin test-target checking passes with seven existing warnings
+(/private/tmp/i300-checkout-ancestor-frontier-xwin.log). The native Windows job
+remains live; no replacement candidate was pushed. The macOS intermittent
+metadata refusal and Windows pack/child-chain diagnosis remain open in P1/P2.
