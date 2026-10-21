@@ -1,12 +1,14 @@
 ## Current convergence plan — 2026-10-21
 
-Latest evidence: published cb424257 CI is terminal failure, not a live wait.
-Local 29360388 contains the Windows short-name effect-overlap correction, with
-419/419 host Git regressions, Clippy and MSVC xwin checking passed. Native
-confirmation remains required. A same-daemon native full-Push baseline now
-passes on the host; it checks a separate nested receiver, leaving the Talos
-receiver empty for its mandatory actual transfer. This is diagnosis, not
-Windows/Pull activation or completion of any package.
+Latest evidence: published `3b00e98e` passed complete local release preflight;
+exact-head CI 39587933025 is terminal failure on Windows (20-minute workspace
+test timeout), with macOS full validation passing. The native full-Push baseline
+times out before Talos dispatch, so Job supervision is not established as the
+cause. Initialized-child Checkout also hits the stage limit. Test-only follow-up
+preserves sender logs on timeout and reports Checkout mode and admission profiles.
+Host selections pass; native confirmation remains required. See the terminal
+comparison checkpoint below. This is diagnosis, not Windows/Pull activation or
+completion of any package.
 
 This is the current execution entrypoint. Earlier checkpoints are preserved evidence,
 not additional acceptance requirements. The published Scope And Acceptance remains
@@ -6977,3 +6979,39 @@ Desktop, Windows installer and remote Issue/owner reconciliation passed.
 These observations do not prove native Push success or close P1–P5. Continue
 observing this run rather than restarting it; production Windows and Pull gates
 remain disabled.
+
+### 2026-10-21 Native full-Push comparison result
+
+Run 39587933025 is terminal: macOS and the non-workspace platform jobs passed;
+Windows workspace testing timed out after 20 minutes. Retained full native log:
+`/private/tmp/i300-3b00e98e-windows.log`. The native full-Push baseline exceeded its
+10-second deadline before Talos dispatch. The receiver accepted its ref update
+and flush but no subsequent pack was observed. This reproduces the stall without
+Talos's frozen environment or owned Job; neither is established as the cause.
+The fixture then remained live past 60 seconds despite its panic, preventing a
+terminal tools summary. A local test-only follow-up uses file-backed native sender
+diagnostics instead of captured pipes: logs remain readable on timeout and native
+descendants cannot retain a Tokio output-reader pipe. Host selection passes 1/1
+in 1.70 seconds (`/private/tmp/i300-native-sender-file-host.log`). Native confirmation
+and the complete real Talos transfer assertions remain mandatory.
+
+The follow-up also passes formatting, Git all-target Clippy with warnings denied,
+and locked MSVC cargo xwin test-target checking (seven existing reduced-feature
+warnings). Logs: `/private/tmp/i300-native-sender-file-{clippy,xwin}.log`.
+
+The Checkout protected target-configuration fixture passed on Windows. A separate
+initialized-child Checkout fixture failed with `stage limit`; preserve the fixed
+eight-stage budget and investigate repeated admission stages instead of widening
+it. Agent (3), MCP (5) and Runtime (2) failures remain consistent with the closed
+production gate. There is no full tools pass or Windows activation evidence.
+
+Checkout diagnostic follow-up: the shared test dispatcher now retains each
+permission profile and prints the sequence only on stage-budget refusal. The
+initialized-child matrix reports its failing mode. Its nine-mode host selection
+passes 1/1 (3.68 seconds); the real daemon Push selection passes 1/1 (1.99 seconds).
+Formatting and whitespace checks pass. These fixture-only diagnostics preserve
+the eight-stage bound and production admission semantics; they do not repair or
+explain the Windows failure. Committed diagnostic stage: `57e11597`. Locked
+all-target Git Clippy passes with warnings denied; MSVC cargo xwin test-target
+checking passes with the seven existing reduced-feature warnings. Both governance
+validators are rerun for this documentation follow-up before publication.
