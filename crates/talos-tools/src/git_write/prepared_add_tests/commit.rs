@@ -89,7 +89,7 @@ fn retained_child_evidence_rejects_changes_after_inspection_returns() {
     assert!(output.status.success());
     let paths = vec!["file".to_owned()];
     let evidence = ChildInspectionEvidence {
-        attributes: vec![(root.path().join(".gitattributes"), snapshot::Entry::Missing)],
+        attributes: Vec::new(),
         status: Vec::new(),
         sources: vec![(
             root.path().to_owned(),
@@ -108,15 +108,6 @@ fn retained_child_evidence_rejects_changes_after_inspection_returns() {
             .contains("tracked sources")
     );
     std::fs::write(root.path().join("file"), "before").expect("restore");
-    std::fs::write(root.path().join(".gitattributes"), "file filter=late\n")
-        .expect("late attribute");
-    assert!(
-        evidence
-            .revalidate()
-            .expect_err("late attributes")
-            .to_string()
-            .contains("attributes changed")
-    );
 }
 
 #[test]
@@ -598,9 +589,9 @@ async fn child_filter_command_uses_effective_root_without_discovery_prefix() {
     std::fs::write(discovery.join(".gitattributes"), "tracked -filter\n")
         .expect("discovery attributes");
     let plan = prepare(root.path());
-    let command =
-        plan.child_filter_command(&discovery.join(".git"), root.path(), &["tracked".into()])
-            .expect("bound directory arguments");
+    let command = plan
+        .child_filter_command(&discovery.join(".git"), root.path(), &["tracked".into()])
+        .expect("bound directory arguments");
     let output = plan
         .run_command(command, std::time::Duration::from_secs(10), 4096)
         .await
@@ -974,5 +965,89 @@ async fn commit_discovery_defers_hooks_and_ignores_inactive_template_and_tag_sig
             .any(|facet| facet.resource.as_deref() == Some("/unavailable/unused-template"))
     );
     drop(next);
+    assert!(!root.path().join(".git/COMMIT_EDITMSG").exists());
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn dynamic_child_attribute_target_requires_fresh_read_and_retains_identity() {
+    use std::os::unix::fs::symlink;
+    let root = fixture();
+    let child = root.path().join("module");
+    std::fs::create_dir_all(child.join("nested")).expect("child");
+    let git = |cwd: &Path, args: &[&str]| {
+        let output = std::process::Command::new("git")
+            .args(args)
+            .current_dir(cwd)
+            .output()
+            .expect("fixture Git");
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    };
+    git(&child, &["init"]);
+    std::fs::write(child.join("nested/tracked"), "data").expect("tracked");
+    git(&child, &["add", "nested/tracked"]);
+    git(
+        root.path(),
+        &[
+            "update-index",
+            "--add",
+            "--cacheinfo",
+            "160000",
+            "1111111111111111111111111111111111111111",
+            "module",
+        ],
+    );
+    let outside = tempfile::tempdir().expect("external attributes");
+    let target = outside
+        .path()
+        .canonicalize()
+        .expect("external root")
+        .join("attributes");
+    std::fs::write(&target, "* -filter\n").expect("attributes");
+    let spelling = child.join("nested/.gitattributes");
+    symlink(&target, &spelling).expect("external attribute link");
+    let plan = discover_sender_approved(Box::new(
+        AddPlan::prepare_commit(
+            root.path(),
+            &serde_json::json!({"message":"parent"}),
+            ToolProvenance::Native,
+        )
+        .expect("plan"),
+    ))
+    .await
+    .expect("sender discovery");
+    let old = proof(&plan)
+        .consume_for_prepared(&plan.request(), &plan.identity)
+        .expect("index admission");
+    let mut plan = plan
+        .discover_child_attribute_targets(&old)
+        .expect("index-selected paths");
+    assert!(
+        plan.facets
+            .iter()
+            .any(|facet| facet.nature == ToolNature::Read
+                && facet.resource.as_deref() == target.to_str())
+    );
+    let auxiliary = plan.auxiliary_paths.as_mut().expect("resolver");
+    assert!(auxiliary.leaf_evidence(&spelling).is_none());
+    assert!(
+        auxiliary.capture_admitted(&old, &[]).is_err(),
+        "old frontier cannot read external attribute body"
+    );
+    let fresh = proof(&plan)
+        .consume_for_prepared(&plan.request(), &plan.identity)
+        .expect("target admission");
+    let auxiliary = plan.auxiliary_paths.as_mut().expect("resolver");
+    auxiliary
+        .capture_admitted(&fresh, &[])
+        .expect("approved bodies");
+    auxiliary.revalidate(&fresh).expect("unchanged");
+    std::fs::rename(&target, outside.path().join("retained")).expect("retain inode");
+    std::fs::write(&target, "* -filter\n").expect("same content replacement");
+    assert!(auxiliary.revalidate(&fresh).is_err());
     assert!(!root.path().join(".git/COMMIT_EDITMSG").exists());
 }

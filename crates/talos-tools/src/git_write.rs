@@ -65,6 +65,9 @@ mod pull_state;
 #[path = "git_write/pull_resolution.rs"]
 mod pull_resolution;
 
+#[path = "git_write/auxiliary_paths.rs"]
+mod auxiliary_paths;
+
 #[path = "git_write/pull_inventory.rs"]
 mod pull_inventory;
 

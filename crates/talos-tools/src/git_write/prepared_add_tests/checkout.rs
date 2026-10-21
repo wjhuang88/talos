@@ -320,10 +320,13 @@ async fn checkout_ref_movement_after_discovery_invalidates_plan() {
     let input = serde_json::json!({"branch":"target"});
     let mut history = talos_core::tool::PreparedStageHistory::default();
     let proof = loop {
-        assert!(history.record_profile(
-            next.plan_identity().expect("identity"),
-            next.permission_profile(),
-        ), "discovery stage budget");
+        assert!(
+            history.record_profile(
+                next.plan_identity().expect("identity"),
+                next.permission_profile(),
+            ),
+            "discovery stage budget"
+        );
         let request = PermissionRequest::native("git_checkout", next.permission_profile(), &input);
         let proposal = engine
             .propose(&request, &context, GrantScope::Once)
@@ -341,7 +344,11 @@ async fn checkout_ref_movement_after_discovery_invalidates_plan() {
             .expect("admit");
         // Configuration frontiers differ by platform. Reach the actual
         // mutation plan before changing its retained target reference.
-        if next.permission_profile().iter().any(|facet| facet.nature == ToolNature::Write) {
+        if next
+            .permission_profile()
+            .iter()
+            .any(|facet| facet.nature == ToolNature::Write)
+        {
             break admission;
         }
         match next.execute_stage(Box::new(admission)).await {
@@ -415,20 +422,43 @@ async fn checkout_protects_captured_target_only_config_from_tree_replacement() {
             .advance(|_| true, &plan.environment)
             .expect("capture absence");
     }
+    let mut plan = plan;
+    let tokens = proof(&plan)
+        .consume_for_prepared(&plan.request(), &plan.identity)
+        .expect("resolution admission");
+    plan.auxiliary_paths
+        .as_mut()
+        .expect("resolved sources")
+        .extend("git_checkout", sources.captured_paths().cloned(), &tokens)
+        .expect("retain target source resolution");
     let config = plan.config.as_ref().expect("config");
     let tree = plan.checkout_target.as_ref().expect("tree");
     config
-        .validate_checkout_target(&plan.repository, tree, &[])
+        .validate_checkout_target(
+            &plan.repository,
+            tree,
+            &[],
+            plan.auxiliary_paths.as_ref().expect("resolved sources"),
+        )
         .expect("ordinary added file");
     let protected = sources.captured_paths().cloned().collect::<Vec<_>>();
     assert!(
         config
-            .validate_checkout_target(&plan.repository, tree, &protected)
+            .validate_checkout_target(
+                &plan.repository,
+                tree,
+                &protected,
+                plan.auxiliary_paths.as_ref().expect("resolved sources")
+            )
             .is_err()
     );
     assert!(
         config
-            .validate_checkout_deletions(&[source], &protected)
+            .validate_checkout_deletions(
+                &[source],
+                &protected,
+                plan.auxiliary_paths.as_ref().expect("resolved sources")
+            )
             .is_err()
     );
     assert_eq!(git(&["rev-parse", "HEAD"]), base);
@@ -778,7 +808,9 @@ async fn checkout_target_hooks_wait_for_all_exact_read_tokens() {
         assert!(history.record_profile(&plan.identity, &plan.facets));
         let paths = plan.target_hook_paths.as_ref().expect("hook frontier");
         assert!(
-            paths.iter().any(|path| path == &plan.repository.workdir.join("late-hooks/post-checkout")),
+            paths
+                .iter()
+                .any(|path| path == &plan.repository.workdir.join("late-hooks/post-checkout")),
             "target hook fixture must bind its actual drift path: {paths:?}"
         );
         let omitted = paths[1].clone();
@@ -2193,7 +2225,7 @@ async fn checkout_new_gitlink_accepts_empty_directory_and_rejects_late_changes()
                         "{error}"
                     );
                 } else {
-                    let plan = plan
+                    let mut plan = plan
                         .discover_new_gitlinks(&tokens)
                         .expect("empty directory");
                     assert!(plan.phase == Phase::Mutation);
@@ -2240,8 +2272,7 @@ async fn checkout_new_gitlink_accepts_empty_directory_and_rejects_late_changes()
                 }
             }
         }
-        if matches!(change, "native" | "native-nonempty" | "none" | "nonempty")
-        {
+        if matches!(change, "native" | "native-nonempty" | "none" | "nonempty") {
             assert_eq!(git(&["branch", "--show-current"]), "linked");
             assert!(git(&["ls-files", "--stage", "child"]).starts_with("160000 "));
             if matches!(change, "nonempty" | "native-nonempty") {

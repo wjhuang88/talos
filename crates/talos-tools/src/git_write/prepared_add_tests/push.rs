@@ -7,7 +7,10 @@ async fn discover_receiver_sender_approved(plan: AddPlan) -> Box<AddPlan> {
         let tokens = proof(&plan)
             .consume_for_prepared(&plan.request(), &plan.identity)
             .expect("receiver sender program admission");
-        plan = plan.rebind_push_program(&tokens).await.expect("receiver sender binding");
+        plan = plan
+            .rebind_push_program(&tokens)
+            .await
+            .expect("receiver sender binding");
     }
     plan
 }
@@ -19,7 +22,10 @@ async fn finish_push_program_approved(mut plan: Box<AddPlan>) -> Box<AddPlan> {
         let tokens = proof(&plan)
             .consume_for_prepared(&plan.request(), &plan.identity)
             .expect("Push program admission");
-        plan = plan.rebind_push_program(&tokens).await.expect("Push program binding");
+        plan = plan
+            .rebind_push_program(&tokens)
+            .await
+            .expect("Push program binding");
         plan.facets.append(&mut plan.sender_mutation_facets);
         plan.phase = Phase::Mutation;
         plan.identity = PreparedPlanIdentity::new();
@@ -529,7 +535,9 @@ async fn receiver_windows_shell_noninteractive_command_does_not_source_home_star
         .kill_on_drop(true)
         .output();
     let discovery = tokio::time::timeout(std::time::Duration::from_secs(10), discovery)
-        .await.expect("discovery deadline").expect("shell discovery");
+        .await
+        .expect("discovery deadline")
+        .expect("shell discovery");
     assert!(discovery.status.success());
     let shell = String::from_utf8(discovery.stdout).expect("shell path");
     let output = tokio::process::Command::new(shell.trim())
@@ -540,8 +548,14 @@ async fn receiver_windows_shell_noninteractive_command_does_not_source_home_star
         .kill_on_drop(true)
         .output();
     let output = tokio::time::timeout(std::time::Duration::from_secs(10), output)
-        .await.expect("shell deadline").expect("shell execution");
-    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+        .await
+        .expect("shell deadline")
+        .expect("shell execution");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     assert_eq!(output.stdout, b"approved");
     assert!(!home.path().join("startup-ran").exists());
 }
@@ -550,7 +564,11 @@ async fn receiver_windows_shell_noninteractive_command_does_not_source_home_star
 #[test]
 fn receiver_shell_rejects_runtime_overrides_case_insensitively() {
     for name in [
-        "MSYS", "CYGWIN", "CYGWIN_DEBUG", "MSYS2_ARG_CONV_EXCL", "MSYS2_ENV_CONV_EXCL",
+        "MSYS",
+        "CYGWIN",
+        "CYGWIN_DEBUG",
+        "MSYS2_ARG_CONV_EXCL",
+        "MSYS2_ENV_CONV_EXCL",
     ] {
         for spelling in [name.to_owned(), name.to_ascii_lowercase()] {
             let environment = BTreeMap::from([(
@@ -665,22 +683,30 @@ async fn windows_receiver_command_executes_special_path_without_shell_injection(
     let program = directory.join("git.exe");
     // Use the native test executable so this checks shell dispatch without
     // copying a Git installation's runtime DLLs or changing machine state.
-    std::fs::hard_link(&executable, &program)
-        .expect("fixture executable");
+    std::fs::hard_link(&executable, &program).expect("fixture executable");
     let program = program.canonicalize().expect("canonical program");
     let expected = tokio::process::Command::new(&program)
         .current_dir(root.path())
         .env_clear()
         .envs(&environment)
         .args([
-            "-c", "maintenance.autoDetach=false", "-c", "gc.autoDetach=false", "receive-pack",
+            "-c",
+            "maintenance.autoDetach=false",
+            "-c",
+            "gc.autoDetach=false",
+            "receive-pack",
         ])
         .kill_on_drop(true)
         .output();
     let expected = tokio::time::timeout(std::time::Duration::from_secs(10), expected)
-        .await.expect("direct deadline").expect("direct execution");
+        .await
+        .expect("direct deadline")
+        .expect("direct execution");
     assert!(!expected.status.success());
-    assert!(!expected.stderr.is_empty(), "test harness rejects Git arguments");
+    assert!(
+        !expected.stderr.is_empty(),
+        "test harness rejects Git arguments"
+    );
     let git = resolve_git(&environment).expect("Git");
     let shell = tokio::process::Command::new(git)
         .current_dir(root.path())
@@ -690,7 +716,9 @@ async fn windows_receiver_command_executes_special_path_without_shell_injection(
         .kill_on_drop(true)
         .output();
     let shell = tokio::time::timeout(std::time::Duration::from_secs(10), shell)
-        .await.expect("discovery deadline").expect("shell discovery");
+        .await
+        .expect("discovery deadline")
+        .expect("shell discovery");
     assert!(shell.status.success());
     let shell = String::from_utf8(shell.stdout).expect("shell path");
     let actual = tokio::process::Command::new(shell.trim())
@@ -701,7 +729,9 @@ async fn windows_receiver_command_executes_special_path_without_shell_injection(
         .kill_on_drop(true)
         .output();
     let actual = tokio::time::timeout(std::time::Duration::from_secs(10), actual)
-        .await.expect("shell deadline").expect("shell execution");
+        .await
+        .expect("shell deadline")
+        .expect("shell execution");
     assert_eq!(actual.status.code(), expected.status.code());
     assert_eq!(actual.stdout, expected.stdout);
     assert_eq!(actual.stderr, expected.stderr);
@@ -756,7 +786,11 @@ async fn receiver_child_requires_read_admission_before_capture() {
     let Err(error) = plan.discover_receiver_roots(&tokens) else {
         panic!("unadmitted child cannot advance discovery");
     };
-    assert!(error.to_string().contains("Receiver Read authorization missing"));
+    assert!(
+        error
+            .to_string()
+            .contains("Receiver Read authorization missing")
+    );
 }
 
 #[cfg(unix)]
@@ -1270,12 +1304,18 @@ async fn local_push_receiver_requires_path_admission_without_receiver_reads() {
     assert!(next.permission_profile().iter().any(|facet| {
         facet.nature == ToolNature::Read && facet.resource.as_deref() == receiver.to_str()
     }));
-    assert!(!next.permission_profile().iter().any(|facet| matches!(
-        facet.nature,
-        ToolNature::Network | ToolNature::Write
-    )));
-    assert_eq!(next.permission_profile().iter().any(|facet|
-        facet.nature == ToolNature::Execute), cfg!(windows));
+    assert!(
+        !next
+            .permission_profile()
+            .iter()
+            .any(|facet| matches!(facet.nature, ToolNature::Network | ToolNature::Write))
+    );
+    assert_eq!(
+        next.permission_profile()
+            .iter()
+            .any(|facet| facet.nature == ToolNature::Execute),
+        cfg!(windows)
+    );
     assert!(!receiver.exists());
     assert!(!root.path().join(".git/index").exists());
 }
@@ -1440,6 +1480,83 @@ async fn receiver_external_hook_is_deferred_to_fresh_read_admission() {
     assert!(output.result.is_error && output.result.content.contains("Executable receiver hook"));
     assert!(!receiver.path().join(".git/index").exists());
     assert!(!sender.path().join(".git/index").exists());
+}
+
+#[tokio::test]
+async fn receiver_skiplist_requires_target_read_and_retains_leaf_identity() {
+    for replace in [false, true] {
+        let sender = fixture();
+        let receiver = fixture();
+        let external = tempfile::tempdir().expect("external");
+        let skiplist = external
+            .path()
+            .canonicalize()
+            .expect("canonical")
+            .join("skiplist");
+        std::fs::write(&skiplist, b"# retained bytes\n").expect("skiplist");
+        std::fs::write(
+            receiver.path().join(".git/config"),
+            format!(
+                "[core]\nrepositoryFormatVersion=0\nbare=false\n[receive.fsck]\nskipList={}\n",
+                skiplist.display()
+            ),
+        )
+        .expect("config");
+        let plan = AddPlan::prepare_push(
+            sender.path(),
+            &serde_json::json!({"remote":receiver.path()}),
+            ToolProvenance::Native,
+        )
+        .expect("plan");
+        let mut plan = discover_receiver_sender_approved(plan).await;
+        loop {
+            let tokens = proof(&plan)
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .expect("admission");
+            plan = match plan.phase {
+                Phase::ReceiverRoots => plan.discover_receiver_roots(&tokens).expect("roots"),
+                Phase::ReceiverMetadata => {
+                    plan.discover_receiver_metadata(&tokens).expect("metadata")
+                }
+                Phase::ReceiverCommon => plan.discover_receiver_common(&tokens).expect("common"),
+                Phase::ReceiverConfiguration => plan
+                    .discover_receiver_configuration(&tokens)
+                    .await
+                    .expect("configuration"),
+                Phase::ReceiverAuxiliary => break,
+                _ => panic!("unexpected receiver phase"),
+            };
+        }
+        let tokens = proof(&plan)
+            .consume_for_prepared(&plan.request(), &plan.identity)
+            .expect("auxiliary admission");
+        if replace {
+            let plan = plan.discover_receiver_auxiliary(&tokens).expect("capture");
+            let tokens = proof(&plan)
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .expect("revalidation admission");
+            plan.revalidate_receiver_auxiliary(&tokens)
+                .expect("unchanged");
+            std::fs::rename(&skiplist, external.path().join("retained")).expect("retain inode");
+            std::fs::write(&skiplist, b"# retained bytes\n").expect("same-content replacement");
+            assert!(plan.revalidate_receiver_auxiliary(&tokens).is_err());
+        } else {
+            let without_read: Vec<_> = tokens
+                .into_iter()
+                .filter(|token| {
+                    !token.authorizes_path(
+                        "git_push",
+                        ToolNature::Read,
+                        &plan.workspace,
+                        skiplist.to_str().expect("path"),
+                    )
+                })
+                .collect();
+            assert!(plan.discover_receiver_auxiliary(&without_read).is_err());
+        }
+        assert!(!receiver.path().join(".git/index").exists());
+        assert!(!sender.path().join(".git/index").exists());
+    }
 }
 
 #[tokio::test]
@@ -1911,7 +2028,7 @@ async fn receiver_layout_stages_accept_real_bare_normal_and_linked_repositories(
         assert!(plan.revalidate_receiver_auxiliary(&authorization).is_err());
         std::fs::remove_file(&hook).expect("restore missing auxiliary");
         let stale = proof(&plan);
-        let plan = plan
+        let mut plan = plan
             .prepare_receiver_mutation(&authorization)
             .expect("final plan");
         assert!(plan.phase == Phase::Mutation);
@@ -1924,7 +2041,7 @@ async fn receiver_layout_stages_accept_real_bare_normal_and_linked_repositories(
         let authorization = proof(&plan)
             .consume_for_prepared(&plan.request(), &plan.identity)
             .expect("fresh mutation admission");
-        let root = &plan.receiver_common[0].canonical;
+        let root = plan.receiver_common[0].canonical.clone();
         let without_write: Vec<_> = authorization
             .iter()
             .filter(|token| {
@@ -2128,11 +2245,20 @@ async fn receiver_shell_selection_probe_rejects_stale_spelling() {
     )
     .expect("plan");
     let mut plan = discover_receiver_sender_approved(plan).await;
-    plan.revalidate_receiver_shell_selection().await.expect("same native selection");
+    plan.revalidate_receiver_shell_selection()
+        .await
+        .expect("same native selection");
     // A stale selection must fail on spelling, before any attempt to capture
     // this missing and unadmitted executable. No parent PATH is mutated.
     plan.receiver_child_paths[0] = sender.path().join("unadmitted-missing-shell");
-    let error = plan.revalidate_receiver_shell_selection().await.expect_err("stale shell");
-    assert!(error.to_string().contains("Receiver shell selection changed after approval"));
+    let error = plan
+        .revalidate_receiver_shell_selection()
+        .await
+        .expect_err("stale shell");
+    assert!(
+        error
+            .to_string()
+            .contains("Receiver shell selection changed after approval")
+    );
     assert!(!receiver.path().join(".git/refs/heads/approved").exists());
 }

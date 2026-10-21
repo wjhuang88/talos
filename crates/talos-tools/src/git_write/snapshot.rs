@@ -60,7 +60,14 @@ impl LeafIdentity {
         let metadata = match std::fs::symlink_metadata(path) {
             Ok(metadata) if metadata.is_file() => metadata,
             Ok(_) => return Err(std::io::Error::other("Git evidence leaf is not regular")),
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(error)
+                if matches!(
+                    error.kind(),
+                    std::io::ErrorKind::NotFound | std::io::ErrorKind::NotADirectory
+                ) =>
+            {
+                return Ok(None);
+            }
             Err(error) => return Err(error),
         };
         #[cfg(unix)]
@@ -286,7 +293,14 @@ impl Entry {
         budget.entries = budget.entries.checked_sub(1).ok_or_else(invalid)?;
         let before = match std::fs::symlink_metadata(path) {
             Ok(metadata) => metadata,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Self::Missing),
+            Err(error)
+                if matches!(
+                    error.kind(),
+                    std::io::ErrorKind::NotFound | std::io::ErrorKind::NotADirectory
+                ) =>
+            {
+                return Ok(Self::Missing);
+            }
             Err(error) => return Err(error),
         };
         if !before.is_file() || before.len() > budget.bytes as u64 {
