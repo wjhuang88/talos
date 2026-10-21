@@ -651,14 +651,40 @@ fn windows_auxiliary_parents(path: &std::path::Path) -> Result<PathBuf, GitToolE
 // ambiguous non-ASCII components conservatively rather than assuming byte
 // equality proves disjoint effect scope.
 fn potential_path_prefix(prefix: &std::path::Path, path: &std::path::Path) -> bool {
+    let potentially_equal = |left: &OsStr, right: &OsStr| {
+        let left = left.as_encoded_bytes();
+        let right = right.as_encoded_bytes();
+        left.eq_ignore_ascii_case(right) || !left.is_ascii() || !right.is_ascii()
+    };
     let mut parts = path.components();
     prefix.components().all(|left| {
         let Some(right) = parts.next() else {
             return false;
         };
-        let left = left.as_os_str().as_encoded_bytes();
-        let right = right.as_os_str().as_encoded_bytes();
-        left.eq_ignore_ascii_case(right) || !left.is_ascii() || !right.is_ascii()
+        // canonicalize returns verbatim Windows prefixes, while Git reports
+        // ordinary drive/UNC paths. These spellings must overlap for effect
+        // protection; this comparison does not grant filesystem authority.
+        if let (std::path::Component::Prefix(left), std::path::Component::Prefix(right)) =
+            (left, right)
+        {
+            use std::path::Prefix;
+            match (left.kind(), right.kind()) {
+                (
+                    Prefix::Disk(left) | Prefix::VerbatimDisk(left),
+                    Prefix::Disk(right) | Prefix::VerbatimDisk(right),
+                ) => {
+                    return left.eq_ignore_ascii_case(&right);
+                }
+                (
+                    Prefix::UNC(ls, lh) | Prefix::VerbatimUNC(ls, lh),
+                    Prefix::UNC(rs, rh) | Prefix::VerbatimUNC(rs, rh),
+                ) => {
+                    return potentially_equal(ls, rs) && potentially_equal(lh, rh);
+                }
+                _ => {}
+            }
+        }
+        potentially_equal(left.as_os_str(), right.as_os_str())
     })
 }
 

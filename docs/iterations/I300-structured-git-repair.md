@@ -6781,3 +6781,24 @@ remains local while exact-head CI 39570564817 tests published 9f4f623a; macOS
 full CI and Linux Desktop passed, Windows workspace tests remain in progress
 at the latest confirmed observation. PR #735 description now reflects P1–P5
 and current evidence. Native Windows closure and all remaining packages stay open.
+
+### 2026-10-21 Windows native failure triage and Checkout prefix repair
+
+Published candidate 9f4f623a CI run 39570564817 completed with Windows workspace
+failure: talos-tools 945 passed / 19 failed. macOS full validation, Linux Desktop,
+and Issue reconciliation passed. Native daemon dry-run succeeds; structured Push
+sends its reference update but no pack header before timeout. Sender pack/child
+supervision remains under investigation, not established as repaired. Other
+failures cluster around Checkout source protection/path resolution, discovery
+frontier fixture assumptions, and Pull configured-filter execution admission.
+
+Local Checkout overlap repair handles ordinary versus verbatim Windows disk and
+UNC prefixes. Previously component byte comparison could treat a canonicalized
+worktree and Git-reported source as disjoint. This is conservative effect overlap
+checking, not a new path grant or canonical identity mechanism. A separate
+Windows unit regression covers matching prefixes and distinct drives, shares and
+directory names. Final host effective-configuration Checkout regression passes
+1/1 (/private/tmp/i300-checkout-prefix-host-final.log); cargo xwin MSVC test-target
+check exits 0 (/private/tmp/i300-checkout-prefix-xwin.log), with the existing seven
+reduced-feature warnings. Native Windows regression and security review remain
+required; this stage is not proof that the native CI failure is resolved. P1–P5 remain open; production Windows/Pull gates stay closed.
