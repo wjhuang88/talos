@@ -84,3 +84,8 @@ The [dormant direct plan](SEARCH-001-C-COMPATIBILITY-PLAN.md) binds the fixed so
 one configuration-derived manifest and complete Domain facets. Scope identity is reused across
 queries; invocation IDs remain fresh. It consumes external authority and an existing budget
 without accepting a replacement transport. Official tool/root/lifecycle acceptance remains gated.
+
+The [private compatibility trait bridge](SEARCH-001-C-COMPATIBILITY-INVOCATION.md) implements
+the existing core owned-execution trait and preserves successful output through a shared pure
+formatter. Its limits start one clock at dispatch, and real permission-state admission drives
+controlled HTTP fixtures. Official registered WebSearch/Agent/SDK/CLI/MCP paths remain unchanged.

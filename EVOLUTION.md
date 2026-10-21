@@ -69,7 +69,7 @@ repeating known mistakes.
 | 57 | Validation | 临时环境的全库 debug 产物可耗尽磁盘；本地降低调试信息，不修改源码或 CI | I294 |
 | 58 | Testing / PTY | 交互 deadline 必须覆盖 PTY 读写与清理，逐阶段诊断不能证明超时根因 | I291 / #590 |
 | 59 | Async tests | Candidate poll 可使取消就绪；在启动和成功出口重新检查控制信号 | I293 |
-| 60 | Validation | 隔离 checkout target 并串行执行全库验证；工具链登记不等于可执行 | I293 |
+| 60 | Validation | 隔离 checkout 与 SDK 显式 target，续接后核验实际路径；工具链登记不等于可执行 | I293 |
 | 61 | Network authority | Endpoint canonicalization must be tested against the actual HTTP URL representation, including mapped IPv6 | I293 / #713 |
 | 62 | Async / Transport | timeout_at alone is not a deadline fence for immediately Ready inner futures | I293 |
 | 63 | TLS fixtures | Callback observations are not physical connections; absent IP SNI is valid | I293 |
@@ -1131,6 +1131,14 @@ repeating known mistakes.
 - Prevention: Preserve observed failures separately from successful reruns; do not change test
   thresholds, assertions, repository toolchain pin or CI coverage to repair local artifacts.
 - Promoted to rule/check: none; local validation procedure within existing locked-build rules.
+
+2026-10-21 follow-up: the external SDK validator passes an explicit checkout `target` directory,
+so `CARGO_TARGET_DIR` alone did not isolate that build. After session restoration the expected
+link was a directory, and SDK archive creation observed a zero-byte cranelift object. The cause
+of that object's zero length is not established. Preserve the failed journal/object, quarantine
+only the generated target directory, restore the link to the isolated physical target, and assert
+both paths resolve identically before rerunning standard preflight. The local recovery driver now
+checks this link; do not change source, lockfiles, test thresholds or native CI to repair artifacts.
 
 ## 2026-10-10 - PTY readiness must not bypass acceptance deadlines
 

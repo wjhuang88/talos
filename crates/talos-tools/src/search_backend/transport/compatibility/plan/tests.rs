@@ -31,10 +31,10 @@ fn valid() -> String {
     )
 }
 
-struct Effects {
+pub(in crate::search_backend::transport::compatibility) struct Effects {
     manifest: ToolNetworkManifest,
     checks: AtomicUsize,
-    dns: AtomicUsize,
+    pub(in crate::search_backend::transport::compatibility) dns: AtomicUsize,
     allowed: usize,
 }
 
@@ -64,7 +64,7 @@ impl SearchDns for Effects {
 }
 
 // Only this cfg(test) module can relocate the fixed requests or inject DNS.
-fn controlled(
+pub(in crate::search_backend::transport::compatibility) fn controlled(
     mut plan: PreparedCompatibilityPlan,
     server: &Server,
     allowed: usize,

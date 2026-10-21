@@ -47,3 +47,7 @@ integration, proxy/redirect/probe/retry/source/charset/entropy parity, D/privacy
 router/health/hedging/cancellation/rollback/default activation and release retain their gates.
 No dependency, public API/model schema or permission policy changes. I293 Active/Claimed,
 Completion Pending; #643/#624 stay open, #705 stays open/unmerged.
+
+The [dormant core-trait bridge](SEARCH-001-C-COMPATIBILITY-INVOCATION.md) now retains this plan
+and display options and starts one validated execution budget at dispatch. Real permission-state/
+controlled HTTP fixtures cover that private bridge; official registered-tool/root integration remains gated.

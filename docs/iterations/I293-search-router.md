@@ -10,7 +10,7 @@
 | Source Issue | #643 |
 | Depends on | Accepted ADR-085; SEARCH-001-B / #642 complete in #656; NET-001 boundary coordination |
 | Claim State | Claimed |
-| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 merged TLS/CONNECT subset; #716 merged bounded form/diagnostic stage at `b5b8241e`; #732 merged owned payload at `8fa2a50`; #733 merged Lite/HTML parsing at `dea3edc`; #734 merged Instant Answer at `45cf9eb9`; #736 merged Bing parsing at `2b015a6b`; #737 merged fixed requests at `ae6a0791`; #738 merged bound execution at `2d7f4b36`; #739 merged fixed headers at `91c330ba`; #741 merged result admission at `4e20ee95`; #742 merged fixed chain at `9f998392`; direct-plan binding candidate tracked from #643; full C/EP and default activation Pending |
+| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 merged TLS/CONNECT subset; #716 merged bounded form/diagnostic stage at `b5b8241e`; #732 merged owned payload at `8fa2a50`; #733 merged Lite/HTML parsing at `dea3edc`; #734 merged Instant Answer at `45cf9eb9`; #736 merged Bing parsing at `2b015a6b`; #737 merged fixed requests at `ae6a0791`; #738 merged bound execution at `2d7f4b36`; #739 merged fixed headers at `91c330ba`; #741 merged result admission at `4e20ee95`; #742 merged fixed chain at `9f998392`; #743 merged direct plan at `181d7584`; prepared-invocation candidate tracked from #643; full C/EP and default activation Pending |
 | Completion | Pending |
 
 ## Collaboration Claim
@@ -1816,3 +1816,86 @@ Governance SQLite17/delivery12/0warnings and claims0warnings passed in standard 
 Frozen reviewed source blobs above remain unchanged. Final owner synchronization/staged review,
 exact-local publication review, remote exact-source review, terminal native CI and immediate
 fresh CAS follow. This is stage Review only; parent completion/default activation remain Pending.
+
+## Merged Direct Plan / Dormant Core-Trait Bridge — 2026-10-21
+
+#743 merged181d7584b1d571d2e898915741acb90e16721b0e, source280311a7/tree90cd6070.
+CI3292/run39525808164 attempt1 all6SUCCESS: mac tools564/0failed/0ignored/0filtered,
+Windows566/0/0/0 and all9new tests PASS on both. Original socket, SDKdefault/coding, fullpreflight
+and all later gates PASS; LinuxDesktop112/0/0/0. Protected source6305512030, terminal/freshCAS
+6306272569 and merged delivery6306282404 record this partial stage. Actual main/merge parent
+9f998392 and exact tree90cd6070 verified; local main fast-forwarded cleanly.
+
+Selection refresh: main181d7584, effective#712 actor@wjhuang88/Work Slice unchanged. I293/I294/I300
+Active retain C/D/Git; I277 Review retains deferred human/device validation and I302 Review retains
+#717. I249 Planned deferred, I164 Paused/superseded; I301/I303/I304/I305 Complete/Closed remain
+closed. Historical I146/I147/I150 notes do not reactivate owners; TEMPLATE excluded. Open#735
+head7036ddce0b2ca575fa28e29e798bc95a10ea5674 and#705head5848f8992457c72e13a48b7c2791635b6326453e
+remain unchanged from complete125/4-file overlap review. #705 stays open/unmerged, #729 closed;
+no unrelated owner is taken over or approved.
+
+Runnable private library deliverable: PreparedCompatibilityInvocation implements existing core
+PreparedNetworkToolInvocation, retaining the same owned direct plan, original bounded query and
+snippet option plus immutable validated limits. It accepts only external live authority at dispatch
+and creates one budget then, never during preparation/approval. TransportLimits extracts existing
+bounds validation without clock reads; old TransportBudget::new validation/start behavior remains.
+All sources share the same running budget. Final live fencing follows conversion/formatting.
+
+The legacy WebSearch formatter body is shared as a pure function, preserving all existing source
+labels/numbering/query/field/snippet/UTF-8 behavior. A crate-private compatibility conversion uses
+fixed DuckDuckGo family identity after admitted results; formatting itself grants no authority.
+Only successful established display contains query/results. Errors remain closed/content-free,
+Debug redacted and continuation parts empty. Registered WebSearch/official root paths are not activated.
+
+Protected design preview APPROVE requires unchanged limits, one dispatch clock, postformat fence,
+exact formatter bytes, real permission-state proposal/Once/Session/admit_network with actual
+controlled HTTP and Tokio clock resumed before socket setup. Test relocation/DNS remain cfg(test).
+No public API/model schema/dependency/permission-policy/default change or implicit proxy substitute.
+Affected refs: SEARCH-001-C-COMPATIBILITY-INVOCATION.md, direct-plan and carrier references.
+Toolchain/cache were again removed by environment maintenance; checksummed official1.99 restored.
+Focused formatter/transport, strict network-test Clippy, full standard preflight, exact-source
+review, stable candidate/native CI and final CAS follow. I293 remains Active/Claimed, Completion
+Pending; #643/#624 OPEN. Full C/EP/parity/D/privacy/roots/router/health/rollback/default/release gated.
+
+Initial local validation: formatter driver observed1pass/343filtered/exit0; its cold-build journal
+has an incomplete tail and is retained as partial, not terminal journal evidence. Focused transport
+116passed/0failed/0ignored/228filtered plus separate child1passed/343filtered exits0; strict
+network-test Clippy exits0. Initial standard preflight passed workspace check/Clippy/tests/doctests,
+tools574/0failed/0ignored/0filtered and all10new tests, including the independent golden formatter.
+It then FAILED in SDK compilation: cranelift-codegen0.135.3 archive creation saw a zero-length
+object. This is not a full-preflight pass. Failed invocation-preflight.log SHA256:
+415889d08e46eef17032667458e5057b87fdd758c623845f5bbdf066026829fa.
+
+Observed cause at the archive boundary: checkout target had reverted to a real directory while
+workspace builds used CARGO_TARGET_DIR outside checkout. SDK's explicit --target-dir used the
+checkout directory, containing cranelift_codegen-9cf89bebde0b79ba...cgu.00.rcgu.o at0bytes; disk had
+20GBfree. The underlying zeroing mechanism is unproven. Root omitted the post-restoration target
+link check. The generated612MB failed directory was moved intact to /tmp/talos-i293-sdk-failure.z72U7b;
+no source/lock/test was removed. Checkout target now links to /tmp/talos-i293-binding-target,
+and the recovery driver asserts exact link resolution before the same standard preflight.
+Existing EVOLUTION lesson60 was refined for explicit SDK target paths. Fresh preflight follows;
+initial failure stays preserved, no new skip, dependency, timeout or CI relaxation.
+
+After target isolation repair, fresh standard release_preflight.sh exits0 with actual passed and
+TALOS_PREFLIGHT_TERMINAL_EXIT=0 markers. Workspace check/strict Clippy/tests/doctests, tools574/
+0failed/0ignored/0filtered, all10new tests (9invocation+1formatter) and SDKdefault/coding PASS.
+The complete resumed journal independently records golden formatter success; the initial partial
+formatter journal is not substituted for it. Resumed preflight SHA256:
+21872d4bf91a0cc7aa9c66d795321d88ec1a6ac44c7bf6690746e220233058bc.
+Focused SHA25682fef15737901ef9b76ba165147e3705136b467cfd1a34bf6e520f6fdbd8ae0c;
+strict network-test Clippy SHA2566b2a2b95e17dac46e64250a50148d1c37ce3b0d7cf656e18f8c8e55bedd0ba64.
+Existing sole authorized local runtime socket filter remains; native CI must execute it unfiltered.
+Governance SQLite17/delivery12/0warnings and claims0warnings PASS. Locked offline package listing
+contains invocation modules and full MIT notice; scale504sources/31packages/4workflows retains
+high-risk/release-managed/on-demand. Protected working-source review APPROVE has no blockers,
+naming frozen blobs transportdd03d626, compatibilitybc0a4452, plan7ef723c0, plantestseba36c4a,
+invocation1e568c32, invocationtestsa9492784 and websearchf39658fa. All7 remain unchanged through
+the environment repair/revalidation. Shared identity is not natural-person approval. Final staged/
+exact-local review, stable publication, remote source/native terminal review and fresh CAS follow.
+This is stage Review only; I293 Active/Claimed, Completion Pending, all parent/activation gates intact.
+
+Publication scope refresh rechecked all125files of#735 and4files of#705 at the unchanged heads.
+The only common candidate path is EVOLUTION.md with#735: this stage edits validation lesson60,
+while I300 adds separate Git lessons/index entries and does not change that lesson. No shared
+implementation or lesson hunk exists. Under ADR-071 this disjoint documentation path is not a
+claim conflict or reason to absorb/rebase/approve#735. #705 has no common candidate paths.
