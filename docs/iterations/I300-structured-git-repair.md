@@ -1,5 +1,15 @@
 ## Current convergence plan — 2026-10-21
 
+Current local candidate: `44f5a949` consolidates initialized-child Checkout
+attribute path discovery without expanding the eight-stage budget. Its frozen
+locked standard release preflight exits 0, including workspace tests and both
+runtime external consumers (`/private/tmp/i300-44f5a949-preflight.log`). Git write
+regressions pass 419/419; MSVC xwin checking passes. Native CI 39602320153 still
+tests published `4febc27d`: macOS is successful; Windows workspace tests remain
+live. Do not treat that earlier-head run as validation of this Checkout candidate.
+Fresh fetch shows no missing origin/main commits. Independent boundary review,
+native confirmation and P1–P5 exits remain required.
+
 Latest evidence: published `3b00e98e` passed complete local release preflight;
 exact-head CI 39587933025 is terminal failure on Windows (20-minute workspace
 test timeout), with macOS full validation passing. The native full-Push baseline

@@ -1,5 +1,14 @@
 ## Current whole-task convergence — 2026-10-21
 
+Local candidate `44f5a949` now passes the complete frozen locked standard release
+preflight, including workspace tests and both runtime external consumers. Log:
+`/private/tmp/i300-44f5a949-preflight.log`. The initialized-child Checkout discovery
+stage consolidation also passes 419/419 Git write regressions and MSVC xwin
+test-target checking. Published `4febc27d` CI 39602320153 has passed macOS and
+remains live in Windows workspace tests; it does not validate the newer local
+candidate. Fresh origin fetch requires no rebase. Independent review, native
+confirmation and all open P1–P5 exits remain required; production gates stay closed.
+
 Latest published validation: candidate `3b00e98e` passed complete local standard
 release preflight (`/private/tmp/i300-3b00e98e-preflight.log`). Exact-head CI
 [39587933025](https://github.com/wjhuang88/talos/actions/runs/39587933025) is terminal:
