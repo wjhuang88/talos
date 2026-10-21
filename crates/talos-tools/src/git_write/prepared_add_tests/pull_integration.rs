@@ -174,11 +174,13 @@ async fn integration_scope_fixture(root: &Path) -> Box<AddPlan> {
 
 fn isolate_integration_fixture_filters(root: &Path) {
     // These integration fixtures exercise repository-local configuration,
-    // not optional host filter installations (e.g. a global Git LFS driver).
+    // not optional host filter installations (e.g. a system/global Git LFS
+    // driver). Query the effective chain: Git for Windows installs LFS in the
+    // system config, which a --global-only query misses. Preserve local values.
     let output = std::process::Command::new("git")
         .current_dir(root)
-        .args(["config", "--global", "--name-only", "--get-regexp", "^filter\\."])
-        .output().expect("global filter names");
+        .args(["config", "--includes", "--name-only", "--get-regexp", "^filter\\."])
+        .output().expect("effective filter names");
     assert!(output.status.success() || output.status.code() == Some(1));
     for key in String::from_utf8(output.stdout).expect("filter names").lines() {
         if [".clean", ".smudge", ".process"].iter().any(|suffix| key.ends_with(suffix))
