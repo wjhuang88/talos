@@ -36,12 +36,14 @@ pub(crate) async fn execute_approved(plan: AddPlan) -> ToolExecutionOutput {
     let provenance = plan.provenance.clone();
     let mut operation: Box<dyn PreparedNormalToolInvocation> = Box::new(plan);
     let mut history = talos_core::tool::PreparedStageHistory::default();
+    let mut profiles = Vec::new();
     loop {
+        profiles.push(format!("{:?}", operation.permission_profile()));
         if !history.record_profile(
             operation.plan_identity().expect("identity"),
             operation.permission_profile(),
         ) {
-            return ToolExecutionOutput::error("stage limit");
+            return ToolExecutionOutput::error(format!("stage limit: {profiles:#?}"));
         }
         let state =
             PermissionSessionState::new(PermissionEngine::with_workspace_root(root.clone()));
