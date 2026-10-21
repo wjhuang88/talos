@@ -4460,7 +4460,13 @@ impl AddPlan {
                 "Git executable changed after preparation; request a fresh authorization".into(),
             ));
         }
-        if RepositoryState::capture(&self.workspace)? != self.repository {
+        let current_repository = RepositoryState::capture(&self.workspace)?;
+        if current_repository != self.repository {
+            #[cfg(test)]
+            eprintln!(
+                "Git repository evidence changed: {:?}",
+                self.repository.changed_fields(&current_repository)
+            );
             return Err(GitToolError::InvalidInput(
                 "Git repository metadata changed after preparation; request a fresh authorization"
                     .into(),
