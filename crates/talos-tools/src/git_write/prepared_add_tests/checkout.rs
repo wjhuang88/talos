@@ -1838,6 +1838,8 @@ async fn checkout_new_gitlink_preserves_initialized_child() {
         "prepared-linked",
         "ancestor-refused",
         "raw-denied",
+        "index-denied",
+        "attributes-denied",
     ] {
         let root = fixture();
         let git = |cwd: &Path, args: &[&str]| {
@@ -1956,9 +1958,13 @@ async fn checkout_new_gitlink_preserves_initialized_child() {
                 );
             }
         }
-        if mode == "raw-denied" {
+        if matches!(mode, "raw-denied" | "index-denied" | "attributes-denied") {
             let outside = tempfile::tempdir().expect("raw external worktree");
-            let external = outside.path().canonicalize().expect("canonical");
+            let external = if mode == "attributes-denied" {
+                child.canonicalize().expect("child worktree")
+            } else {
+                outside.path().canonicalize().expect("canonical")
+            };
             git(
                 &child,
                 &["config", "core.worktree", external.to_str().expect("path")],
@@ -2016,12 +2022,40 @@ async fn checkout_new_gitlink_preserves_initialized_child() {
             let mut tokens = proof(&plan)
                 .consume_for_prepared(&plan.request(), &plan.identity)
                 .expect("worktree proof");
-            tokens.retain(|token| token.normalized_path() != external);
+            if mode == "attributes-denied" {
+                let mut plan = plan
+                    .discover_checkout_child_worktree(&tokens)
+                    .await
+                    .expect("index-selected attribute frontier");
+                let attribute = external.join(".gitattributes");
+                let auxiliary = plan.auxiliary_paths.as_ref().expect("resolver");
+                assert!(auxiliary.related_paths_for(&attribute).is_some());
+                assert!(auxiliary.leaf_evidence(&attribute).is_none());
+                let mut tokens = proof(&plan)
+                    .consume_for_prepared(&plan.request(), &plan.identity)
+                    .expect("mutation proof");
+                tokens.retain(|token| token.normalized_path() != attribute);
+                let error = plan
+                    .execute_admitted(&tokens)
+                    .await
+                    .expect_err("attribute content needs its own Read");
+                assert!(error.to_string().contains("auxiliary"), "{error}");
+                assert_eq!(git(root.path(), &["branch", "--show-current"]), "base");
+                assert_eq!(std::fs::read(child.join("sentinel")).expect("sentinel"), b"preserve");
+                assert_eq!(std::fs::read(child_gitdir.join("HEAD")).expect("HEAD"), head);
+                continue;
+            }
+            if mode == "raw-denied" {
+                tokens.retain(|token| token.normalized_path() != external);
+            } else {
+                let metadata = &plan.checkout_child_metadata[0].canonical;
+                tokens.retain(|token| token.normalized_path() != metadata);
+            }
             let error = plan
                 .discover_checkout_child_worktree(&tokens)
                 .await
                 .err()
-                .expect("raw target denied");
+                .expect("child Read denied");
             assert!(error.to_string().contains("Read"), "{error}");
             assert_eq!(git(root.path(), &["branch", "--show-current"]), "base");
             assert_eq!(
@@ -2038,7 +2072,17 @@ async fn checkout_new_gitlink_preserves_initialized_child() {
                 ToolProvenance::Native,
             )
             .expect("plan");
-            let output = execute_approved(plan).await;
+            let history = {
+                let mut history = talos_core::tool::PreparedStageHistory::default();
+                // Windows spends one additional stage binding its internal Git
+                // executable. Reserve that slot on the host too, so this matrix
+                // catches discovery chains that only fit the Unix budget.
+                if !cfg!(windows) {
+                    assert!(history.record(&PreparedPlanIdentity::new()));
+                }
+                history
+            };
+            let output = execute_approved_with_history(plan, history).await;
             if mode == "ancestor-refused" {
                 assert!(
                     output.result.is_error

@@ -7015,3 +7015,18 @@ explain the Windows failure. Committed diagnostic stage: `57e11597`. Locked
 all-target Git Clippy passes with warnings denied; MSVC cargo xwin test-target
 checking passes with the seven existing reduced-feature warnings. Both governance
 validators are rerun for this documentation follow-up before publication.
+Checkout stage consolidation candidate (2026-10-21): the admitted child-worktree
+stage now explicitly includes child HEAD/index/object Reads and discovers
+index-selected attribute paths there, publishing actual-target Reads before
+attribute bodies are captured. The eight-stage budget is unchanged. The fixture
+reserves the Windows executable-binding stage on hosts and covers eleven modes,
+including index-Read and attribute-content denial. A malformed denial fixture
+initially failed earlier metadata identity checks; corrected it to use a consistent
+worktree so the intended content boundary is actually exercised. Locked host
+checkout matrix passes 1/1; Git write regressions pass 419/419 with authorized
+process observation outside the sandbox; all-target Git Clippy passes with
+warnings denied; formatting and whitespace checks pass. The earlier dirty-tree
+full preflight is not exact-head evidence and failed a sandbox-denied ps call.
+Locked MSVC cargo xwin test-target checking also passes with the seven existing
+reduced-feature warnings. Native Windows confirmation, independent boundary review and final full preflight
+remain required. This candidate does not activate Windows or Pull or close P1–P5.

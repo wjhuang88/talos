@@ -1922,8 +1922,15 @@ impl AddPlan {
             self.facets.push(path_facet(
                 ToolNature::Read,
                 &worktree,
-                "new child effective worktree layout and subsequent status sources",
+                "new child effective worktree layout and index-selected attribute path discovery; no attribute contents",
             )?);
+            for path in [&metadata.canonical, &metadata.common_path] {
+                self.facets.push(path_facet(
+                    ToolNature::Read,
+                    path,
+                    "new child HEAD, index and object metadata for attribute path discovery; no mutation",
+                )?);
+            }
             for (path, _) in &config.files {
                 self.facets.push(path_facet(
                     ToolNature::Read,
@@ -2089,6 +2096,11 @@ impl AddPlan {
         auxiliary.extend(self.operation.name(), sources, authorizations)?;
         auxiliary.add_read_frontier(&mut self.facets)?;
         auxiliary.add_read_frontier(&mut self.sender_mutation_facets)?;
+        // This stage explicitly admits child metadata/index and worktree reads.
+        // Discover selected rule paths here, co-publishing their actual-target
+        // frontier with the other auxiliary sources. Bodies still wait for the
+        // next admission; mutation need not spend a stage discovering them.
+        self = self.discover_child_attribute_targets(authorizations)?;
         self.facets.retain(|facet| {
             facet.nature == ToolNature::Read
                 && facet.resource.as_deref() != Some("git:configuration-chain")
