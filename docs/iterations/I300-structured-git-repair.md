@@ -4,9 +4,17 @@ Current local candidate: `44f5a949` consolidates initialized-child Checkout
 attribute path discovery without expanding the eight-stage budget. Its frozen
 locked standard release preflight exits 0, including workspace tests and both
 runtime external consumers (`/private/tmp/i300-44f5a949-preflight.log`). Git write
-regressions pass 419/419; MSVC xwin checking passes. Native CI 39602320153 still
-tests published `4febc27d`: macOS is successful; Windows workspace tests remain
-live. Do not treat that earlier-head run as validation of this Checkout candidate.
+regressions pass 419/419; MSVC xwin checking passes. Native CI 39602320153 for
+published `4febc27d` is terminal: macOS passed; Windows workspace tests reached
+their 20-minute timeout. Native Push stalled after announcing pack-objects,
+before a child executable trace or pack delivery; this does not establish a
+Talos supervision cause. Checkout tracking additionally reported unconfirmed
+foreground cleanup (`guessed=false, mode=true, rebase=always`). The native log
+is `/private/tmp/i300-4febc27d-windows-full.log`. Local diagnostics now preserve
+Job termination error, each IO worker's closure confirmation and original
+execution outcome instead of collapsing them into one cleanup message. This
+does not relax cleanup or prove a fix. Do not treat the earlier-head run as
+validation of this Checkout candidate.
 Fresh fetch shows no missing origin/main commits. Independent boundary review,
 native confirmation and P1–P5 exits remain required.
 

@@ -4,9 +4,13 @@ Local candidate `44f5a949` now passes the complete frozen locked standard releas
 preflight, including workspace tests and both runtime external consumers. Log:
 `/private/tmp/i300-44f5a949-preflight.log`. The initialized-child Checkout discovery
 stage consolidation also passes 419/419 Git write regressions and MSVC xwin
-test-target checking. Published `4febc27d` CI 39602320153 has passed macOS and
-remains live in Windows workspace tests; it does not validate the newer local
-candidate. Fresh origin fetch requires no rebase. Independent review, native
+test-target checking. Published `4febc27d` CI 39602320153 is terminal: macOS passed;
+Windows workspace tests timed out after 20 minutes. Native Push stopped at the
+pack-objects child launch before Talos dispatch, and Checkout tracking reported
+unconfirmed foreground cleanup. Local diagnostics retain the Job error, IO
+closure confirmations and original execution outcome; the cause is not yet
+proven. This run does not validate the newer local candidate. The latest observed
+origin fetch required no rebase. Independent review, native
 confirmation and all open P1–P5 exits remain required; production gates stay closed.
 
 Latest published validation: candidate `3b00e98e` passed complete local standard

@@ -344,7 +344,7 @@ async fn supervise(
             stderr,
         })
     };
-    let result = tokio::select! {
+    let result: Result<Output, String> = tokio::select! {
         _ = &mut cancel => Err("Windows foreground execution cancelled".into()),
         result = tokio::time::timeout_at(deadline, collect) => result.unwrap_or_else(|_| Err("Windows foreground deadline exceeded".into())),
     };
@@ -356,7 +356,18 @@ async fn supervise(
     let stderr_closed = finish_io(&mut stderr, stderr_joined, cleanup_deadline).await;
     let writer_closed = finish_io(&mut writer, writer_joined, cleanup_deadline).await;
     if cleanup_error.is_some() || !stdout_closed || !stderr_closed || !writer_closed {
-        (Err("Windows foreground cleanup unconfirmed".into()), true)
+        // Preserve the failed boundary and execution outcome: an unconfirmed
+        // pipe worker and an unconfirmed Job need different investigations.
+        let execution = match &result {
+            Ok(output) => format!("exit={}", output.status),
+            Err(error) => error.clone(),
+        };
+        (
+            Err(format!(
+                "Windows foreground cleanup unconfirmed: job={cleanup_error:?}, stdout_closed={stdout_closed}, stderr_closed={stderr_closed}, stdin_closed={writer_closed}; execution={execution}"
+            )),
+            true,
+        )
     } else {
         (result, false)
     }
