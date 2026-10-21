@@ -5,8 +5,26 @@ standard release preflight exits 0, including workspace tests, doctests and both
 Runtime external consumers (`/private/tmp/i300-sideband-stage-preflight.log`).
 The six-commit batch includes the independently reviewed Checkout discovery,
 Windows cleanup diagnostics/inventory and explicit sideband-off control. Native
-Windows evidence for this head is still pending; all P1–P5 exits and production
-activation gates remain unchanged.
+Windows evidence for this head is still pending. CI 39625038593 macOS preflight
+failed one Commit fixture with `object_layout` drift (1021 tools tests passed);
+retained log: `/private/tmp/i300-dcc8c31e-macos.log`. The focused local rerun passes.
+The fixture now waits for foreground maintenance, matching the existing repository
+snapshot fixture; native confirmation is required before attributing the failure.
+All P1–P5 exits and production activation gates remain unchanged.
+
+Windows CI 39625038593 has passed the serial executable/path/process guard
+step, including the exact sideband-off real-transfer control (each command's
+exit code is checked); the unchanged default test is still pending in the
+workspace suite. This establishes the explicit configuration's native path,
+not the default transport cause, whole-suite success or production activation.
+
+P4 boundary assessment: independent reviewer `review_prepared` confirmed existing
+immutable profiles, PreparedPlanIdentity and consumed admission proofs can carry
+separate frozen-program Execute(Command) facets without a new permission API.
+They authorize user-level execution, not filesystem/network containment. Actual
+selected-command discovery, executable/configuration/environment/cwd evidence,
+fresh stage admission and final revalidation remain implementation requirements;
+the Git executable's grant cannot substitute for any selected program's grant.
 
 Current local candidate: `44f5a949` consolidates initialized-child Checkout
 attribute path discovery without expanding the eight-stage budget. Its frozen
