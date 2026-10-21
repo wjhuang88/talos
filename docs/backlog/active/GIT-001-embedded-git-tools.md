@@ -425,6 +425,22 @@ Sources: [registry](https://index.crates.io/3/g/gix),
 [upstream status](https://github.com/GitoxideLabs/gitoxide/blob/main/crate-status.md).
 No dependency upgrade or background monitoring service was introduced.
 
+Tracking recheck (2026-10-21): the live [sparse index](https://index.crates.io/3/g/gix)
+still reports non-yanked gix 0.89.0 / MSRV 1.88; Cargo.lock remains 0.87.1.
+The [0.89.0 release](https://github.com/GitoxideLabs/gitoxide/releases/tag/gix-v0.89.0)
+is dated 2026-10-08 and adds linked-worktree creation/removal, already tracked
+below; no newer top-level gix release was found in the registry. The immutable
+[upstream status at 59ba38b8](https://github.com/GitoxideLabs/gitoxide/blob/59ba38b89a4dcaa829f21db437306facbddd7ae7/crate-status.md)
+still leaves push protocol, rebase orchestration, Git-compatible hooks,
+switch/restore orchestration and persistent merge continuation/abort unchecked.
+It is development-tree evidence, not a released parity test. No new evidence
+supports removing host Git or assigning a removal date. Keep the operation-level
+replacement gates below; no upgrade or background monitor was introduced.
+Evidence retained in /private/tmp/i300-gix-index-20261021.jsonl,
+/private/tmp/i300-gix-status-20261021.md and
+/private/tmp/i300-gix-release-089-20261021.json. The crates.io HTTP API again
+returned 403; the version claim uses the successful sparse-index response.
+
 Tracking recheck (2026-10-14): the live crates.io sparse index still reports
 non-yanked stable gix 0.89.0 (MSRV 1.88), versus Cargo.lock 0.87.1. The crates.io
 HTTP API returned 403; version evidence comes from the successful sparse-index
