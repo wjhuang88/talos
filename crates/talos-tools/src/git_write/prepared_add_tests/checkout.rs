@@ -2075,7 +2075,7 @@ async fn checkout_new_gitlink_preserves_initialized_child() {
                 );
                 continue;
             }
-            assert!(!output.result.is_error, "{:?}", output.result);
+            assert!(!output.result.is_error, "mode={mode}: {:?}", output.result);
         }
         assert_eq!(git(root.path(), &["branch", "--show-current"]), "linked");
         assert_eq!(

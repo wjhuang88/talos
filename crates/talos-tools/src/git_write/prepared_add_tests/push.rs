@@ -1040,6 +1040,9 @@ async fn prepared_push_transfers_objects_to_admitted_git_daemon() {
     std::fs::create_dir(&native_receiver).expect("native receiver directory");
     git(&native_receiver, &["init", "--bare"]);
     let native_destination = format!("{destination}/native-baseline.git");
+    // File-backed diagnostics survive a deadline and cannot leave Tokio pipe
+    // readers waiting for an inherited handle in a native Git descendant.
+    let native_log = tempfile::NamedTempFile::new().expect("native sender log");
     let mut native_push = tokio::process::Command::new("git");
     native_push
         .current_dir(root.path())
@@ -1053,23 +1056,26 @@ async fn prepared_push_transfers_objects_to_admitted_git_daemon() {
             "HEAD:refs/heads/native-baseline",
         ])
         .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(native_log.reopen().expect("native sender log writer"))
         .kill_on_drop(true);
     let native_push = tokio::time::timeout(
         std::time::Duration::from_secs(10),
-        native_push.output(),
+        native_push.status(),
     )
     .await
     .unwrap_or_else(|_| {
         panic!(
-            "native daemon full-push baseline deadline exceeded before Talos dispatch; daemon_log={}",
+            "native daemon full-push baseline deadline exceeded before Talos dispatch; sender_log={}; daemon_log={}",
+            std::fs::read_to_string(native_log.path()).expect("native sender diagnostics"),
             std::fs::read_to_string(daemon_log.path()).expect("daemon diagnostics")
         )
     })
     .expect("native daemon full push");
     assert!(
-        native_push.status.success(),
+        native_push.success(),
         "native daemon full push failed before Talos dispatch: {}; daemon_log={}",
-        String::from_utf8_lossy(&native_push.stderr),
+        std::fs::read_to_string(native_log.path()).expect("native sender diagnostics"),
         std::fs::read_to_string(daemon_log.path()).expect("daemon diagnostics")
     );
     assert_eq!(
