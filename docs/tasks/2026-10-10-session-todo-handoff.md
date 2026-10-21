@@ -5069,3 +5069,12 @@ production deadline or authorization. Host locked git-only selection passes 1/1
 exited 0 in session 73497 with seven existing reduced-feature warnings; log
 /private/tmp/i300-daemon-native-baseline-xwin.log. Native
 Windows execution and the actual timeout cause remain unproven.
+
+2026-10-21 native CI follow-up: run 39570564817 is terminal failure on Windows
+(945 tools tests pass, 19 fail); macOS full checks, Linux Desktop and Issue
+reconciliation pass. I300 records the failure groups and local Checkout
+ordinary/verbatim prefix overlap repair. Host targeted regression and MSVC cargo
+xwin test-target check pass; native confirmation and review remain outstanding.
+Push is narrowed to the sender pack/child chain after successful protocol
+negotiation, without an established root cause. T7 and the whole handoff remain
+Active/incomplete; later queue items are unchanged.

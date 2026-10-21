@@ -47,3 +47,21 @@ fn auxiliary_evidence_cannot_be_reused_for_a_changed_source_set() {
     config.auxiliary.insert(root.path().join("second"));
     assert!(config.revalidate_auxiliary(&evidence).is_err());
 }
+
+#[cfg(windows)]
+#[test]
+fn checkout_protected_paths_overlap_across_windows_prefix_spellings() {
+    use std::path::Path;
+
+    for (ordinary, verbatim) in [
+        (r"C:\repo\settings", r"\\?\C:\repo\settings\rules"),
+        (r"\\server\share\repo", r"\\?\UNC\server\share\repo\rules"),
+    ] {
+        assert!(potential_path_prefix(Path::new(ordinary), Path::new(verbatim)));
+        let parent = Path::new(verbatim).parent().expect("parent");
+        assert!(potential_path_prefix(parent, Path::new(ordinary)));
+    }
+    assert!(!potential_path_prefix(Path::new(r"C:\repo"), Path::new(r"\\?\D:\repo\rules")));
+    assert!(!potential_path_prefix(Path::new(r"\\server\share\repo"), Path::new(r"\\?\UNC\server\other\repo\rules")));
+    assert!(!potential_path_prefix(Path::new(r"C:\repo"), Path::new(r"\\?\C:\repository\rules")));
+}
