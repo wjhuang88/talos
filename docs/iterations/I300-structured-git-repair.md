@@ -7102,3 +7102,31 @@ full preflight is not exact-head evidence and failed a sandbox-denied ps call.
 Locked MSVC cargo xwin test-target checking also passes with the seven existing
 reduced-feature warnings. Native Windows confirmation, independent boundary review and final full preflight
 remain required. This candidate does not activate Windows or Pull or close P1–P5.
+
+## Filter sentinel collision containment — 2026-10-21
+
+Native Git reproduces execution of literal `filter=unset` and
+`filter=unspecified` clean drivers while `check-attr -z` returns the same bytes
+as its sentinel states (fixture `/private/tmp/talos-filter-sentinel-rgor8mm2`).
+The local repair checks retained effective configuration before accepting either
+word as inert, in parent, target/index, child and Pull source inspections.
+The Pull refusal regression passes for probe/unset/unspecified without helper
+execution or FETCH_HEAD creation. Independent static security review found no blocking defect.
+This containment does not complete P4 selected-program authorization.
+
+The preceding frozen candidate's full locked standard release preflight has
+now passed (`/private/tmp/i300-4da3b95b-preflight.log`); it does not validate
+this newer filter repair. T7/P1–P5 and all later handoff items remain open.
+
+Filter repair validation follow-up (2026-10-22): prepared-write selection passes
+169/169 outside the sandbox (`/private/tmp/i300-filter-sentinel-unsandboxed.log`).
+The sandbox run had 168 passes and one EPERM process-observation failure, not a
+behavioral assertion failure. The native-control Pull regression proves each
+clean helper executes under native Git, then structured discovery refuses before
+helper execution/fetch and preserves the index. Configuration coverage also
+passes for clean/smudge/process, empty/final-empty and valueless definitions.
+Strict Git library Clippy and both governance validators pass. Full new-head
+preflight, native confirmation and all P1–P5 exits remain outstanding.
+CI 39625038593 is now terminal failure; Windows and macOS workspace jobs failed.
+Windows failure details still need analysis; serial sideband-off evidence remains
+valid only for that isolated control.

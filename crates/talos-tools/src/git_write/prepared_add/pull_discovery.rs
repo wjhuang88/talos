@@ -32,7 +32,10 @@ impl AddPlan {
                 {
                     if fields[0] != path.as_bytes()
                         || fields[1] != b"filter"
-                        || !matches!(fields[2], b"unspecified" | b"unset")
+                        || !self
+                            .config
+                            .as_ref()
+                            .is_some_and(|config| config.filter_attribute_is_inert(fields[2]))
                     {
                         return Err(GitToolError::InvalidInput("Pull tracked source uses a configured filter; requires separate authorization".into()));
                     }

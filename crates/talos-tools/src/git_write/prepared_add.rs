@@ -3798,7 +3798,7 @@ impl AddPlan {
             {
                 if fields[0] != expected.as_bytes()
                     || fields[1] != b"filter"
-                    || !matches!(fields[2], b"unspecified" | b"unset")
+                    || !config.filter_attribute_is_inert(fields[2])
                 {
                     return Err(GitToolError::InvalidInput("Selected Git sources use a configured filter; use a separately authorized Git invocation".into()));
                 }
@@ -3834,7 +3834,7 @@ impl AddPlan {
                 {
                     if fields[0] != path.as_bytes()
                         || fields[1] != b"filter"
-                        || !matches!(fields[2], b"unspecified" | b"unset")
+                        || !config.filter_attribute_is_inert(fields[2])
                     {
                         return Err(GitToolError::InvalidInput("Checkout target uses a configured filter; use a separately authorized invocation".into()));
                     }
@@ -4255,7 +4255,7 @@ impl AddPlan {
             {
                 if fields[0] != path.as_bytes()
                     || fields[1] != b"filter"
-                    || !matches!(fields[2], b"unspecified" | b"unset")
+                    || !config.filter_attribute_is_inert(fields[2])
                 {
                     return Err(GitToolError::InvalidInput("Submodule status uses a configured filter; use a separately authorized invocation".into()));
                 }
