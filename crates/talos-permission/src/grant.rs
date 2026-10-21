@@ -352,6 +352,18 @@ fn compile_facets(
                     .as_deref()
                     .is_some_and(|path| Path::new(path).is_absolute())
         });
+        let bound_git_read_path = request.facets().iter().any(|facet| {
+            facet.nature == ToolNature::Read
+                && facet.resource_kind == Some(ToolResourceKind::Path)
+                && facet.resource.as_deref().is_some_and(|path| {
+                    let path = Path::new(path);
+                    path.is_absolute()
+                        && matches!(
+                            path.file_name().and_then(std::ffi::OsStr::to_str),
+                            Some("git" | "git.exe")
+                        )
+                })
+        });
         let git_config_discovery = facet.nature == ToolNature::Read
             && resource_kind == ToolResourceKind::Remote
             && facet.resource.as_deref() == Some("git:configuration-chain")
@@ -367,7 +379,7 @@ fn compile_facets(
                 request.tool_name(),
                 "git_add" | "git_commit" | "git_checkout" | "git_push" | "git_pull"
             )
-            && bound_git_command
+            && (bound_git_command || bound_git_read_path)
             && request.facets().iter().any(|source| {
                 source.nature == ToolNature::Read
                     && source.resource_kind == Some(ToolResourceKind::Path)
