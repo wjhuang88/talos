@@ -1,5 +1,21 @@
 # SEARCH-001-C: Dormant Prepared Compatibility Invocation
 
+## Private Prepared-Only AgentTool Seam
+
+The private GuardedCompatibilitySearchTool is an explicit library-only constructor over the
+existing configuration and validated limits. It implements AgentTool's required prepared path,
+retains the web_search input schema/defaults/clamping and Network identity, and returns the same
+owned invocation from local parsing/preparation. Its description discloses the direct fixed-four
+subset. Preparation failures use only existing Invalid/Unavailable codes; it reads no environment
+keys or proxy defaults. All ordinary execute/authorized/output entrypoints fail with the fixed
+search_prepared_invocation_required code, even with Path authorizations. The generic Network
+facet is not sufficient authority; only the prepared object's complete manifest/profile is usable.
+
+No official WebSearchTool constructor, registration, Agent/CLI/SDK/MCP path or default is switched.
+Controlled fixtures exercise the same parsing/preparation code with real permission-state
+admission and cfg(test)-only HTTP relocation. This is private tool-seam evidence, not actual Agent
+loop/root integration, parity, proxy/D/privacy qualification or default activation.
+
 Private I293/#712/ADR-090 prerequisite based on #743/main181d7584. The direct-only owned plan
 now has an implementation of the existing core PreparedNetworkToolInvocation trait. This is a
 library-only bridge; WebSearchTool's registered preparation/legacy execution and official roots

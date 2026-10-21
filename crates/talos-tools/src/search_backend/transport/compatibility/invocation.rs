@@ -13,6 +13,8 @@ use super::{
 };
 use crate::search_backend::transport::TransportLimits;
 
+pub(in crate::search_backend) mod tool;
+
 /// Retains one frozen plan and display options; approval waiting starts no execution clock.
 pub(in crate::search_backend) struct PreparedCompatibilityInvocation {
     plan: PreparedCompatibilityPlan,
