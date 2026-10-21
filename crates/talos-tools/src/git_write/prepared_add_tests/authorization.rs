@@ -823,7 +823,12 @@ async fn discovery_defers_auxiliary_reads_until_separate_admission() {
     assert!(next.permission_profile().iter().any(|facet| {
         facet.nature == ToolNature::Read
             && facet.resource_kind == Some(ToolResourceKind::Path)
-            && facet.resource.as_deref() == resolved.to_str()
+            // The resolver preserves admitted Windows short-name spelling;
+            // verify the frontier names this directory rather than requiring
+            // canonicalize's different long-name/verbatim representation.
+            && facet.resource.as_deref().is_some_and(|resource| {
+                Path::new(resource).canonicalize().ok().as_ref() == Some(&resolved)
+            })
     }));
     drop(next); // Refuse the second stage: no mutation occurs.
     assert!(!root.path().join(".git/index").exists());

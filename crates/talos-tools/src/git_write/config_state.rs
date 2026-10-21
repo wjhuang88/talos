@@ -654,7 +654,15 @@ fn potential_path_prefix(prefix: &std::path::Path, path: &std::path::Path) -> bo
     let potentially_equal = |left: &OsStr, right: &OsStr| {
         let left = left.as_encoded_bytes();
         let right = right.as_encoded_bytes();
-        left.eq_ignore_ascii_case(right) || !left.is_ascii() || !right.is_ascii()
+        left.eq_ignore_ascii_case(right)
+            || !left.is_ascii()
+            || !right.is_ascii()
+            // The admitted resolver retains traversal spelling, including
+            // Windows 8.3 aliases, whereas repository roots may use long
+            // names. A tilde component is ambiguous without another metadata
+            // read. Conservatively protect possible overlap; never use this
+            // comparison to grant Read/Write authority.
+            || (cfg!(windows) && (left.contains(&b'~') || right.contains(&b'~')))
     };
     let mut parts = path.components();
     prefix.components().all(|left| {

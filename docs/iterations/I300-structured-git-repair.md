@@ -6894,3 +6894,44 @@ macOS CI refusal or establish a repair; cross-test interaction and native runner
 state remain untested hypotheses. Do not weaken RepositoryState comparison or
 retry refused mutations. The next stable CI candidate includes the existing
 field-name-only diagnostic to identify the changed evidence if it recurs.
+
+### 2026-10-21 Native candidate terminal evidence
+
+CI 39578256961 at cb424257 is terminal failure. Windows job 119149158085
+finished at 10:19:24 UTC; retained log:
+/private/tmp/i300-cb424257-windows.log. Tools improved to 961 passed / four
+failed. Remaining failures are effective-configuration Checkout overlap,
+target-hook ancestor diagnostic expectation (corrected locally), auxiliary
+Read-frontier path spelling, and real daemon Push. Agent (three), MCP (five)
+and Runtime (two) failures still reflect the deliberately closed production
+Windows gate; do not skip them or claim production activation.
+
+The real Push passed the owned `pack-objects --stdout --all` probe and its PACK
+assertion before timing out at the actual transfer assertion. Thus standalone
+pack generation with the frozen environment works. The receiver saw the ref
+update and flush but no pack header until sender cancellation after 300 seconds.
+Push child dispatch/pipe behavior remains unproven; this is not evidence to
+increase deadlines. The workspace step also hit its 20-minute limit.
+
+Checkout still switched branches while rewriting an effective include file.
+Treat this as an unresolved protected-boundary failure, not a stale assertion.
+Investigate retained path spellings versus repository canonical paths (including
+Windows short/long-name aliases); prefix-form handling alone did not close it.
+The auxiliary-frontier assertion compares canonicalize output with a resolver
+that preserves filesystem traversal spelling; verify the actual granted target
+before changing that assertion. P1–P5 remain open.
+
+The bounded correction conservatively treats Windows components containing `~`
+as potentially equal in effect-overlap checks, covering 8.3 aliases without
+additional pre-admission metadata reads. This may refuse unrelated ambiguous
+paths; it never grants authority. Added long/short-name and disjoint-suffix
+characterizations. The auxiliary frontier fixture now canonicalizes only its
+test-observed facet target to prove it identifies the external directory instead
+of requiring a particular spelling. Native confirmation and security review
+remain required; do not claim the Checkout failure repaired from compilation.
+Host git_write passes 419/419 after authorized process observation
+(/private/tmp/i300-short-alias-git-write.log); focused overlap and frontier tests
+pass, all-target Git Clippy passes with warnings denied, and MSVC cargo xwin
+test-target checking passes with seven existing reduced-feature warnings
+(/private/tmp/i300-short-alias-{host,frontier-host,clippy,xwin}.log).
+Fetch completed and origin/main has zero commits absent from this branch.
