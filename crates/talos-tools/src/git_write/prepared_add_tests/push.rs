@@ -1080,6 +1080,21 @@ async fn prepared_push_transfers_objects_to_admitted_git_daemon() {
     let plan = AddPlan::prepare_push(root.path(), &input, ToolProvenance::Native).expect("plan");
     let next = Box::new(plan).discover().await.expect("discovery");
     let next = finish_push_program_approved(next).await;
+    // Exercise real pack generation with the same bound executable, frozen
+    // environment and owned runner before send-pack starts its child/pipe
+    // chain. Unlike the native dry-run above, this computes the fixture pack,
+    // but returns it on stdout without writing objects or remote references.
+    let mut pack = tokio::process::Command::new(&next.program);
+    pack.current_dir(&next.repository.workdir)
+        .args(["pack-objects", "--stdout", "--all"])
+        .env_clear()
+        .envs(&next.environment);
+    let pack = next
+        .run_command(pack, std::time::Duration::from_secs(10), 256 * 1024)
+        .await
+        .expect("owned sender pack generation before Push child dispatch");
+    assert!(pack.starts_with(b"PACK"), "sender must generate a real pack");
+    assert!(git(receiver.path(), &["for-each-ref"]).is_empty());
     let admission = proof(&next);
     let output = next.execute(Box::new(admission)).await;
     assert!(
@@ -1537,14 +1552,15 @@ async fn receiver_skiplist_requires_target_read_and_retains_leaf_identity() {
         if !initially_missing {
             std::fs::write(&skiplist, b"# retained bytes\n").expect("skiplist");
         }
-        std::fs::write(
-            receiver.path().join(".git/config"),
-            format!(
-                "[core]\nrepositoryFormatVersion=0\nbare=false\n[receive.fsck]\nskipList={}\n",
-                skiplist.display()
-            ),
-        )
-        .expect("config");
+        // Let Git quote Windows backslashes instead of interpolating an
+        // unescaped native path into configuration syntax.
+        let configured = std::process::Command::new("git")
+            .current_dir(receiver.path())
+            .args(["config", "receive.fsck.skipList"])
+            .arg(&skiplist)
+            .output()
+            .expect("configure skiplist");
+        assert!(configured.status.success(), "{configured:?}");
         let plan = AddPlan::prepare_push(
             sender.path(),
             &serde_json::json!({"remote":receiver.path()}),

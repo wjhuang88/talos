@@ -808,12 +808,11 @@ async fn discovery_defers_auxiliary_reads_until_separate_admission() {
     assert!(status.success());
     let plan = prepare(root.path());
     let identity = plan.identity.clone();
-    let admission = proof(&plan);
-    let PreparedNormalStage::Continue(next) =
-        Box::new(plan).execute_stage(Box::new(admission)).await
-    else {
-        panic!("discovery must not read auxiliary directory");
-    };
+    // Windows may first require admission of Git's distinct internal binary.
+    // Admit only sender discovery frontiers, never the auxiliary content Read.
+    let next = discover_sender_approved(Box::new(plan))
+        .await
+        .expect("discovery must not read auxiliary directory");
     assert!(
         !next
             .plan_identity()

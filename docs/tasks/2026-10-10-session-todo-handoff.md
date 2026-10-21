@@ -5078,3 +5078,11 @@ xwin test-target check pass; native confirmation and review remain outstanding.
 Push is narrowed to the sender pack/child chain after successful protocol
 negotiation, without an established root cause. T7 and the whole handoff remain
 Active/incomplete; later queue items are unchanged.
+
+2026-10-21 concentrated Windows follow-up: corrected sender-frontier staging,
+escaped receiver skiplist configuration through Git, and included system config
+in Pull fixture filter isolation. Added a read-only owned pack-generation probe
+before the existing actual daemon transfer assertion. Host git_write passes
+419/419 after authorized process-observation access; final cargo xwin test-target
+checking passes. I300 retains logs and limitations. Production filter semantics
+and Windows/Pull gates are unchanged; native CI and all P1–P5 exits remain open.

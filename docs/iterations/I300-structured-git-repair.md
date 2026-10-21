@@ -6802,3 +6802,25 @@ directory names. Final host effective-configuration Checkout regression passes
 check exits 0 (/private/tmp/i300-checkout-prefix-xwin.log), with the existing seven
 reduced-feature warnings. Native Windows regression and security review remain
 required; this stage is not proof that the native CI failure is resolved. P1–P5 remain open; production Windows/Pull gates stay closed.
+
+### 2026-10-21 Windows fixture corrections and owned pack diagnostic
+
+Discovery auxiliary-read denial now follows every separately admitted sender
+executable frontier instead of assuming one discovery stage. Receiver skiplist
+configuration is written with Git's quoting rather than unescaped Windows paths.
+Pull integration fixtures isolate inherited executable filters from the effective
+system/global/include chain, preserving local values; the production filter
+execution refusal is unchanged and does not satisfy P4's full capability target.
+
+The daemon transfer test now computes a real pack on stdout through the same
+bound sender executable, frozen environment and owned runner before actual Push.
+This read-only ten-second probe separates standalone packing failures from the
+send-pack child/pipe chain; it does not replace the actual transfer assertion.
+Host native daemon/owned pack test passes 1/1; discovery and skiplist selections
+pass 1/1 each; Pull integration selection passes 12/12. Final host git_write suite
+passes 419/419 (/private/tmp/i300-windows-triage-git-write-host.log). Its first
+sandboxed attempt passed 418 and failed only because process observation was
+forbidden; the authorized unsandboxed rerun exits 0. Final MSVC cargo xwin
+test-target checking exits 0 (/private/tmp/i300-windows-fixture-pack-xwin.log),
+with seven existing reduced-feature warnings. Native Windows confirmation,
+Push root cause, scoped security review and P1–P5 closure remain outstanding.
