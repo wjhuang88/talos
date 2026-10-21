@@ -61,6 +61,7 @@ pub struct ToolExecutionAuthorization {
     nature: ToolNature,
     resource_kind: ToolResourceKind,
     normalized_resource: PathBuf,
+    named_capability: Option<String>,
     scope: ToolAuthorizationScope,
 }
 
@@ -83,8 +84,25 @@ impl ToolExecutionAuthorization {
             nature,
             resource_kind: ToolResourceKind::Path,
             normalized_resource: normalize_authorized_path(workspace_root, resource)?,
+            named_capability: None,
             scope,
         })
+    }
+
+    /// Creates the fixed auxiliary-path traversal capability after its named
+    /// Git facet has passed permission admission. This is not file Read access.
+    pub fn for_git_auxiliary_path_resolution(
+        tool_name: impl Into<String>,
+        scope: ToolAuthorizationScope,
+    ) -> Self {
+        Self {
+            tool_name: tool_name.into(),
+            nature: ToolNature::Read,
+            resource_kind: ToolResourceKind::Remote,
+            normalized_resource: PathBuf::new(),
+            named_capability: Some("git:auxiliary-path-resolution".into()),
+            scope,
+        }
     }
 
     /// Returns whether this authorization exactly covers a requested path and
@@ -101,6 +119,15 @@ impl ToolExecutionAuthorization {
             && self.resource_kind == ToolResourceKind::Path
             && normalize_authorized_path(workspace_root, resource)
                 .is_ok_and(|path| path == self.normalized_resource)
+    }
+
+    /// Returns whether this token carries the fixed auxiliary path resolver
+    /// capability for the admitted structured Git tool.
+    pub fn authorizes_git_auxiliary_path_resolution(&self, tool_name: &str) -> bool {
+        self.tool_name == tool_name
+            && self.nature == ToolNature::Read
+            && self.resource_kind == ToolResourceKind::Remote
+            && self.named_capability.as_deref() == Some("git:auxiliary-path-resolution")
     }
 
     /// Returns the normalized path carried by this authorization.

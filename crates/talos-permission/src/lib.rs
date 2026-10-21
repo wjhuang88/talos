@@ -100,6 +100,7 @@ use serde_json::Value;
 use std::path::{Path, PathBuf};
 use talos_core::tool::{
     ToolAuthorizationScope, ToolExecutionAuthorization, ToolNature, ToolPermissionFacet,
+    ToolResourceKind,
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -513,6 +514,15 @@ impl PermissionEngine {
         };
         let mut authorizations = Vec::new();
         for facet in profile {
+            if facet.nature == ToolNature::Read
+                && facet.resource_kind == Some(ToolResourceKind::Remote)
+                && facet.resource.as_deref() == Some("git:auxiliary-path-resolution")
+            {
+                authorizations.push(
+                    ToolExecutionAuthorization::for_git_auxiliary_path_resolution(tool_name, scope),
+                );
+                continue;
+            }
             if !facet_uses_path_resource(facet, input) {
                 continue;
             }
