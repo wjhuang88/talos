@@ -5043,3 +5043,29 @@ The resumed handle is unavailable; do not confuse this with the earlier failed
 log. Runtime stage 710582ec is committed. Next preserve this documentation stage,
 rebase onto fetched origin/main, and run full preflight with a durable log.
 P1–P5 and the full handoff remain incomplete.
+
+
+2026-10-21 rebase checkpoint: runtime stage 710582ec and documentation stage
+d0fe3164 were saved before rebasing all 327 local commits onto fetched
+origin/main 032cce61. Rebase completed without conflicts; their rewritten
+commits are 467e6475 (runtime) and 845d5017 (documentation); capability plumbing
+91155adf is now 3ac126ee. Earlier SHAs above describe pre-rebase history.
+Full standard preflight session 84127 exited 0 with incremental compilation
+and dev/test debug information disabled; durable log:
+/private/tmp/i300-p1-rebased-preflight-oct21.log. The log ends with `release preflight: passed` and both external runtime
+fixtures passed. This validates the rebased runtime candidate, preceding the
+subsequent daemon baseline test-only change. P1–P5 remain open and production Windows/Pull
+gates remain closed. Next after the gate: native Windows candidate validation
+and causal daemon Push diagnosis, then remaining Checkout/Pull acceptance.
+
+2026-10-21 native daemon baseline candidate: the existing real Push fixture now
+first runs a ten-second native Git push dry-run against the same receiver, with
+hooks bypassed only for that diagnostic and packet tracing confined to the fixed
+fixture. It verifies no receiver refs or fixture commit were transferred before
+continuing the original structured transfer. This separates a receiver/native
+protocol failure from a later supervised-dispatch failure without extending any
+production deadline or authorization. Host locked git-only selection passes 1/1
+(/private/tmp/i300-daemon-native-baseline-host.log); Windows MSVC cargo xwin check
+exited 0 in session 73497 with seven existing reduced-feature warnings; log
+/private/tmp/i300-daemon-native-baseline-xwin.log. Native
+Windows execution and the actual timeout cause remain unproven.

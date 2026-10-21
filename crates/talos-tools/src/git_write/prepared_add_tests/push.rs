@@ -990,6 +990,47 @@ async fn prepared_push_transfers_objects_to_admitted_git_daemon() {
         "git://127.0.0.1:{port}/{}",
         receiver.path().file_name().expect("name").to_string_lossy()
     );
+    // Establish the same receiver's native protocol baseline before exercising
+    // Talos supervision. Dry-run negotiates receive-pack without updating refs
+    // or sending the fixture objects; the structured call below must transfer.
+    let mut baseline = tokio::process::Command::new("git");
+    baseline
+        .current_dir(root.path())
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .env("GIT_TRACE", "1")
+        .env("GIT_TRACE_PACKET", "1")
+        .args([
+            "push",
+            "--dry-run",
+            "--no-verify",
+            &destination,
+            "HEAD:refs/heads/approved",
+        ])
+        .stdin(std::process::Stdio::null())
+        .kill_on_drop(true);
+    let baseline = tokio::time::timeout(
+        std::time::Duration::from_secs(10),
+        baseline.output(),
+    )
+    .await
+    .unwrap_or_else(|_| {
+        panic!(
+            "native daemon dry-run deadline exceeded before Talos dispatch; daemon_log={}",
+            std::fs::read_to_string(daemon_log.path()).expect("daemon diagnostics")
+        )
+    })
+    .expect("native daemon dry-run");
+    assert!(
+        baseline.status.success(),
+        "native daemon dry-run failed before Talos dispatch: {}; daemon_log={}",
+        String::from_utf8_lossy(&baseline.stderr),
+        std::fs::read_to_string(daemon_log.path()).expect("daemon diagnostics")
+    );
+    assert!(git(receiver.path(), &["for-each-ref"]).is_empty());
+    assert!(
+        !receiver.path().join("objects").join(&expected[..2]).join(&expected[2..]).exists(),
+        "dry-run baseline must not transfer the fixture commit"
+    );
     let input = serde_json::json!({"remote":destination,"branch":"HEAD:refs/heads/approved"});
     // Both stages reject absent proof before contacting the receiver.
     let plan = AddPlan::prepare_push(root.path(), &input, ToolProvenance::Native).expect("plan");
