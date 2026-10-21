@@ -6882,3 +6882,15 @@ by the diagnostic. Fetch completed; origin/main has no commits absent from HEAD.
 Native Windows CI job 119149158085 passed structured Git identity guard tests
 and remains live in workspace tests. No production activation or package exit
 is claimed; later local commits remain unpublished while this run is live.
+
+### 2026-10-21 Bounded metadata-refusal reproduction
+
+At 62f89dbc the Commit replacement-directory regression passes another locked
+Cargo selection, 30 sequential isolated executions, and 32 isolated executions
+with concurrency eight. Logs: /private/tmp/i300-commit-drift-repeat.log,
+/private/tmp/i300-commit-drift-30-runs.log, and
+/private/tmp/i300-commit-drift-32-concurrent.log. This does not reproduce the
+macOS CI refusal or establish a repair; cross-test interaction and native runner
+state remain untested hypotheses. Do not weaken RepositoryState comparison or
+retry refused mutations. The next stable CI candidate includes the existing
+field-name-only diagnostic to identify the changed evidence if it recurs.
