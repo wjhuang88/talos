@@ -2,11 +2,20 @@
 
 Latest published validation: candidate `3b00e98e` passed complete local standard
 release preflight (`/private/tmp/i300-3b00e98e-preflight.log`). Exact-head CI
-[39587933025](https://github.com/wjhuang88/talos/actions/runs/39587933025) remains
-live: Windows Check/Clippy and macOS release-preflight passed; native Windows
-workspace tests are still pending. This supersedes earlier pending local-preflight
-notes for this candidate, not the open P1–P5 exits or the remaining serial queue.
+[39587933025](https://github.com/wjhuang88/talos/actions/runs/39587933025) is terminal:
+macOS passed; Windows workspace tests hit their 20-minute timeout. The native
+full-Push baseline itself exceeded 10 seconds before Talos dispatch, so this
+failure does not isolate Talos Job supervision. Initialized-child Checkout also
+failed with `stage limit`; production-gated Agent/MCP/Runtime failures remain.
+Retained native log: `/private/tmp/i300-3b00e98e-windows.log`. This supersedes earlier
+live-run notes for this candidate, not the open P1–P5 exits or remaining queue.
 Production Windows/Pull remain disabled; T7 and the whole handoff are incomplete.
+
+Local diagnostic stage `57e11597` preserves native sender traces on timeout and
+prints Checkout mode/admission profiles on stage refusal. Host Push and the
+nine-mode initialized-child Checkout selections pass; Git Clippy and MSVC cargo
+xwin test-target checks pass. Native Windows results remain required; no runtime
+permission, timeout, stage-budget or activation change is included.
 
 Start here, then read the [I300 convergence packages](../iterations/I300-structured-git-repair.md#current-convergence-plan--2026-10-21).
 Historical checkpoints below remain evidence; the Goal Execution Ledger and original
