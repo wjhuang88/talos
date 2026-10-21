@@ -18,6 +18,16 @@ validation of this Checkout candidate.
 Fresh fetch shows no missing origin/main commits. Independent boundary review,
 native confirmation and P1–P5 exits remain required.
 
+Candidate review checkpoint: independent Agent `review_prepared` inspected
+`4febc27d..a1dbc22b` without blocking findings. This covers child Read/frontier
+retention, the real attribute-content denial fixture and diagnostic data scope;
+it is static evidence, not Windows runtime evidence. Full preflight at
+`a1dbc22b` stopped on two native inventory fingerprint checks (1019 other tools
+tests passed). The same reviewer independently confirmed that the diagnostic
+change alters no native acquisition/transfer/release/unsafe site or cleanup
+semantics, and verified the replacement fingerprint `0x34615160b23c4ee3` before
+its baseline refresh. Full validation must be repeated after this refresh.
+
 Denial-fixture follow-up: the eleven-mode Checkout matrix also passes with a
 real child `.gitattributes` file naming an unapproved filter. Its resolver has
 no leaf content evidence before the fresh Read frontier, and withholding that
