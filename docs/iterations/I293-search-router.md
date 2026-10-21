@@ -26,7 +26,7 @@
 | Governance Claim PR | #712 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer accepted bounded production scope 2026-10-13; independent protected security/API contract review, exact-head CI, governance validators, Issue reconciliation and final CAS required for #712 merge. No release or native admission authorized. |
-| Last Updated | 2026-10-21 |
+| Last Updated | 2026-10-22 |
 | Handoff / Release Condition | Original #664 claim effective at `d801790454e252699684253166984662ea9dab6a`; expanded scope effective only after #712 accepted-contract merge. Start implementation from that merge or later main; activation requires ADR-090 transport/parity/D gates. |
 
 ## Scope
@@ -1899,3 +1899,62 @@ The only common candidate path is EVOLUTION.md with#735: this stage edits valida
 while I300 adds separate Git lessons/index entries and does not change that lesson. No shared
 implementation or lesson hunk exists. Under ADR-071 this disjoint documentation path is not a
 claim conflict or reason to absorb/rebase/approve#735. #705 has no common candidate paths.
+
+## Merged Invocation / Dormant Prepared-Only Tool Seam — 2026-10-22
+
+#744 merged032cce61d0fccf1502fab41c692bb13ffa82e9ea, source3b138677/tree02d3a88d.
+CI3294/run39545150674 attempt1 all6SUCCESS: Windows576/mac574 tools, all10new tests,
+original mac socket regression, SDKdefault/coding, standard preflight/later gates and Linux112 PASS.
+Protected source6308193327, terminalfullstage6308417316 and merged delivery6308424907 record
+the partial stage. Actual merge parent181d7584/tree/main verified and local main synchronized cleanly.
+
+Selection baseline032cce61 retains effective#712/ADR090, actor@wjhuang88 and unchanged Work Slice.
+Inventory: I293/I294/I300 Active retain C/D/Git; I277 Review retains deferred human/device rows,
+I302 Review retains#717; I249 Planned deferred, I164 Paused/superseded. I301/I303/I304/I305 stay
+Complete/Closed. Historical I146/I147/I150 notes do not reactivate owners; TEMPLATE excluded.
+Open#735 advanced todcc8c31e9caa7e138b7a1a0d6fab5fd38e0ebc28; all130file entries refreshed,
+with no search_backend/web_search/I293/SEARCH-C implementation overlap. #7055848f899 remains
+unchanged/open/unmerged. Neither task is taken over or approved; their full candidate intersections
+will be rechecked before publication. No global Board/matrix change or new claim is required.
+
+Runnable library-only deliverable: private explicit GuardedCompatibilitySearchTool implements
+the existing AgentTool seam. Its constructor takes validated TransportLimits and creates one
+immutable DirectCompatibilityConfiguration; no Default, environment keys, proxy inference or
+optional-route selection. It retains web_search name, WebSearchInput schema/defaults/clamping,
+Network family/nature and query summary. Its description truthfully names the direct fixed-four
+compatibility subset. requires_network_invocation is true; parsing/preparation returns one owned
+invocation with complete manifest/profile and closed existing preparation errors. Every ordinary
+execute/authorized/output route terminates with a fixed denial, including supplied Path authority.
+The ordinary untyped facet cannot substitute for the prepared object's complete Domain profile.
+
+Protected design preview APPROVE requires unchanged schema/input semantics, exactly one prepared
+object, no serde/query/config diagnostics, unconditional legacy denial, redacted Debug and actual
+controlled HTTP through the same parsing/preparation code. Relocation/DNS remains cfg(test)-only.
+Official WebSearchTool, registry, Agent/CLI/SDK/MCP roots and defaults remain unchanged. This is
+not actual Agent/root EP acceptance, proxy qualification, parity/D/privacy or activation evidence.
+Affected reference: SEARCH-001-C-COMPATIBILITY-INVOCATION.md. Full C/EP/parity/D/privacy/roots/
+router/health/rollback/default/release gates remain pending; I293 Active/Claimed/Completion Pending.
+
+Environment refresh again found the pinned toolchain/cache and target absent. The existing
+checksummed official Rust1.99 restoration completed and actual rustc execution passed. Restore
+the isolated physical target link before validation; SDK explicit --target-dir must resolve to
+the same target as workspace commands. New source/validation/source review/native CI/final CAS
+remain to be completed locally before stable publication. No extra local/CI skip is authorized.
+
+Local guarded-tool convergence passes on the frozen source: focused transport122/0failed/
+0ignored/228filtered plus existing child1/349filtered, including all6new cases; strict network-test
+Clippy exits0. Standard locked Rust1.99 release_preflight.sh exits0 with actual passed/terminal
+markers: workspace check/Clippy/tests/doctests, tools580/0failed/0ignored/0filtered, all6new tests,
+both external SDK modes, SQLite17/delivery12, governance0warnings and claims0warnings PASS.
+Only the previously authorized runtime socket filter applies locally; native CI remains unfiltered.
+No initial failure occurred in this stage. Focused SHA256:
+9542aa369ae0498b3d833538a95bc961fc52b38ab31be6c96d42800471835573;
+network Clippy0acc7f6ad8478507b9dfa0aa886b30758005dcf0cfdb5f5f77a043c8752d3351;
+complete preflight3617b26b4cc4b87859587b28340123a26f636606478607d7a59fa2ceefccf691.
+Scale506sources/31packages/4workflows retains high-risk/release-managed/on-demand. Protected
+working-source review APPROVE has no blockers; frozen invocatione419c4c4/tool45229e4f/testsfa3806bb.
+This remains partial library-only evidence: actual Agent/root EP and activation are not claimed.
+Final staged/exact-local review, stable publication, remote source/native terminal review and fresh
+CAS follow. Shared-identity Agent review is not distinct natural-person approval; all parent gates
+remain effective. The six tests exercise the same private parsing/preparation helper used by
+AgentTool; cfg(test) relocation is not an official tool/Agent dispatch or production DNS override.
