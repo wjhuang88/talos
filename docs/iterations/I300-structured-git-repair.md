@@ -1,5 +1,13 @@
 ## Current convergence plan — 2026-10-21
 
+Published checkpoint: `dcc8c31e` is now pushed to PR #735. Its frozen locked
+standard release preflight exits 0, including workspace tests, doctests and both
+Runtime external consumers (`/private/tmp/i300-sideband-stage-preflight.log`).
+The six-commit batch includes the independently reviewed Checkout discovery,
+Windows cleanup diagnostics/inventory and explicit sideband-off control. Native
+Windows evidence for this head is still pending; all P1–P5 exits and production
+activation gates remain unchanged.
+
 Current local candidate: `44f5a949` consolidates initialized-child Checkout
 attribute path discovery without expanding the eight-stage budget. Its frozen
 locked standard release preflight exits 0, including workspace tests and both
