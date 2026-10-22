@@ -63,7 +63,7 @@ async fn pull_configuration_stage_requires_fresh_admission_without_mutation() {
     let root = fixture();
     let input = serde_json::json!({});
     let prepare = || {
-        AddPlan::prepare_pull(root.path(), &input, ToolProvenance::Native)
+        prepare_pull_fixture(root.path(), &input, ToolProvenance::Native)
             .expect("Pull preparation")
     };
     let plan = prepare();
@@ -111,6 +111,12 @@ async fn pull_configuration_stage_requires_fresh_admission_without_mutation() {
             .iter()
             .any(|facet| { facet.resource.as_deref() == Some("git:configuration-chain") })
     );
+    for hook in ["pre-merge-commit", "post-merge", "reference-transaction"] {
+        let path = root.path().canonicalize().expect("root").join(".git/hooks").join(hook);
+        assert!(next.permission_profile().iter().any(|facet| {
+            facet.nature == ToolNature::Read && facet.resource.as_deref() == path.to_str()
+        }), "missing whole-operation hook: {hook}");
+    }
     let PreparedNormalStage::Complete(replayed) =
         next.execute_stage(Box::new(old_stage_proof)).await
     else {
@@ -167,7 +173,7 @@ async fn pull_prefetch_rebase_distinguishes_missing_empty_and_staged_index() {
             assert!(output.status.success());
         }
         let plan =
-            AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+            prepare_pull_fixture(root.path(), &serde_json::json!({}), ToolProvenance::Native)
                 .expect("Pull");
         let plan = Box::new(plan).discover().await.expect("config");
         if state == "missing" {
@@ -217,7 +223,7 @@ async fn pull_prefetch_rejects_unmerged_index_without_fetch() {
         .write_all(format!("100644 {} 1\tfile\n", oid.trim()).as_bytes())
         .expect("conflict entry");
     assert!(index.wait().expect("index result").success());
-    let plan = AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+    let plan = prepare_pull_fixture(root.path(), &serde_json::json!({}), ToolProvenance::Native)
         .expect("Pull");
     let plan = Box::new(plan).discover().await.expect("config");
     // Exercise production inspection with a real conflict-stage index;
@@ -264,7 +270,7 @@ async fn pull_prefetch_retains_configured_remote_and_rejects_changed_reflog() {
     ] {
         git(&["config", key, value]);
     }
-    let plan = AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+    let plan = prepare_pull_fixture(root.path(), &serde_json::json!({}), ToolProvenance::Native)
         .expect("Pull");
     let plan = Box::new(plan).discover().await.expect("config");
     let admitted = proof(&plan);
@@ -390,7 +396,7 @@ async fn pull_bundle_source_refuses_before_native_prefetch_side_effects() {
 
     let before = RepositoryState::capture(prepared.path()).expect("before");
     let plan = Box::new(
-        AddPlan::prepare_pull(
+        prepare_pull_fixture(
             prepared.path(),
             &serde_json::json!({"remote": "origin"}),
             ToolProvenance::Native,
@@ -431,7 +437,7 @@ async fn pull_promisor_refuses_before_any_prefetch_probe() {
             .expect("config")
             .success()
     );
-    let plan = AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+    let plan = prepare_pull_fixture(root.path(), &serde_json::json!({}), ToolProvenance::Native)
         .expect("Pull");
     let plan = Box::new(plan).discover().await.expect("config");
     assert!(

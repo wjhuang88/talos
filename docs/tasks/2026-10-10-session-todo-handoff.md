@@ -5523,3 +5523,24 @@ passes 513/514 and fails the existing Push maintenance-cancellation fixture
 when spawning `ps` returns EPERM; the same full suite passes outside it. No
 assertion, deadline or production gate was changed. This evidence covers tools
 library regression only, not native Pull discovery or whole-handoff completion.
+
+## Whole-operation Pull hook frontier — 2026-10-22
+
+Sender configuration discovery now selects the current branch's pre-fetch Pull
+policy and publishes fetch plus integration hook candidates together, reusing
+existing external-program checks rather than predicting fetched commits. The
+remote resolver shares the same symbolic-branch probe. Tests cover case-sensitive
+branch override, apply-backend hooks, path-only discovery and early program refusal.
+Prepared fixtures mask unrelated inherited filters while preserving explicit local
+settings; filter/driver tests now assert refusal before fetch planning.
+
+Validation: native Pull tests 7/7; Pull-related tests 161/161; configuration frontier
+proof test 1/1; locked nonincremental Git-enabled tools Clippy lib/tests passes.
+Full tools library outside the sandbox passes 516/516 (1117.66 s), log
+`/private/tmp/i300-native-policy-full-unsandboxed.log`; unusually long duration
+has no confirmed cause. Initial sandbox run exposed host-filter fixture coupling
+and the known ps EPERM fixture limitation; these are not counted as green runs.
+Production still follows the old preparation route and native execution remains
+gated. Next: complete native parent/recursive/external scope discovery and connect
+its proof to execution, remove superseded scheduler, then original delivery gates.
+T7, T8 and the remaining handoff tasks stay incomplete.

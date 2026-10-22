@@ -123,7 +123,7 @@ async fn pull_rebase_clean_probes_preserve_index_and_touch_semantics() {
         }
         let index = std::fs::read(root.path().join(".git/index")).expect("index");
         let plan =
-            AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+            prepare_pull_fixture(root.path(), &serde_json::json!({}), ToolProvenance::Native)
                 .expect("prepare");
         let mut plan = Box::new(plan).discover().await.expect("configuration");
         let mut outcome = None;
@@ -274,30 +274,13 @@ async fn pull_rebase_filter_refuses_without_running_helper() {
         std::fs::remove_file(root.path().join("helper-ran")).expect("reset helper marker");
         let index = std::fs::read(root.path().join(".git/index")).expect("initial index");
         let plan =
-            AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+            prepare_pull_fixture(root.path(), &serde_json::json!({}), ToolProvenance::Native)
                 .expect("prepare");
-        let mut plan = Box::new(plan).discover().await.expect("configuration");
-        let mut refused = false;
-        for _ in 0..8 {
-            let admission = proof(&plan)
-                .consume_for_prepared(&plan.request(), &plan.identity)
-                .expect("fresh admission");
-            match plan.discover_pull_prefetch(&admission).await {
-                Ok(next) => {
-                    assert!(
-                        next.phase != Phase::PullFetch,
-                        "filtered source reached fetch"
-                    );
-                    plan = next;
-                }
-                Err(error) => {
-                    assert!(error.to_string().contains("configured filter"), "{error}");
-                    refused = true;
-                    break;
-                }
-            }
-        }
-        assert!(refused, "{driver}");
+        let error = match Box::new(plan).discover().await {
+            Ok(_) => panic!("filtered source reached fetch planning"),
+            Err(error) => error,
+        };
+        assert!(error.to_string().contains("configured filter"), "{error}");
         assert_eq!(
             std::fs::read(root.path().join(".git/index")).expect("final index"),
             index,

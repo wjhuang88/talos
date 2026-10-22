@@ -1149,7 +1149,12 @@ impl AddPlan {
                 super::validate_git_positional(remote)?;
             }
             config.verify_host(&self.inspect_config().await?)?;
-            self.pull_hook_paths = config.prepare_pull(&self.repository, &self.environment)?;
+            let branch = self.native_pull_branch().await?;
+            self.pull_hook_paths = config.prepare_native_pull(
+                &self.repository,
+                &self.environment,
+                branch.as_deref(),
+            )?;
             self.config = Some(config);
             self.revalidate()?;
             self.facets
@@ -1170,7 +1175,7 @@ impl AddPlan {
                 self.facets.push(path_facet(
                     ToolNature::Read,
                     path,
-                    "Pull fetch-triggered Git hook inspection",
+                    "Pull whole-operation Git hook inspection",
                 )?);
             }
             self.identity = PreparedPlanIdentity::new();

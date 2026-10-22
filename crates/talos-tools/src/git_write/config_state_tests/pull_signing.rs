@@ -1,23 +1,5 @@
 #[test]
 fn pull_integration_signing_requires_its_own_execution_admission() {
-    use super::super::pull_state::{FastForward, Integration, Rebase};
-
-    let merge = Integration::Merge {
-        heads: vec!["1".repeat(40)],
-        fast_forward: FastForward::Unspecified,
-        autostash: false,
-    };
-    let rebase = Integration::Rebase {
-        onto: "1".repeat(40),
-        upstream: "2".repeat(40),
-        mode: Rebase::On,
-        autostash: false,
-    };
-    let unborn = Integration::Unborn("1".repeat(40));
-    let reconcile = Integration::Reconcile {
-        original: "1".repeat(40),
-        current: "2".repeat(40),
-    };
     let mut config = ConfigState {
         values: Values::new(),
         ordered_output: Vec::new(),
@@ -40,20 +22,17 @@ fn pull_integration_signing_requires_its_own_execution_admission() {
             config.values.clear();
             config.values.insert(key.to_vec(), entries);
             assert_eq!(
-                config.validate_pull_integration_signing(&merge).is_err(),
+                config.validate_pull_integration_signing_mode(true, false).is_err(),
                 enabled
             );
             assert_eq!(
-                config.validate_pull_integration_signing(&rebase).is_err(),
+                config.validate_pull_integration_signing_mode(false, true).is_err(),
                 enabled && key == b"commit.gpgsign",
             );
             // read-tree/update-ref do not create or verify signed commits.
             config
-                .validate_pull_integration_signing(&unborn)
-                .expect("unborn");
-            config
-                .validate_pull_integration_signing(&reconcile)
-                .expect("reconcile");
+                .validate_pull_integration_signing_mode(false, false)
+                .expect("no commit creation or verification");
         }
         config.values.insert(
             key.to_vec(),
@@ -63,7 +42,7 @@ fn pull_integration_signing_requires_its_own_execution_admission() {
             ],
         );
         let error = config
-            .validate_pull_integration_signing(&merge)
+            .validate_pull_integration_signing_mode(true, false)
             .expect_err("invalid early value");
         assert!(!error.to_string().contains("invalid-secret-value"));
     }

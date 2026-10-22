@@ -98,7 +98,7 @@ async fn pull_postfetch_rebuilds_evidence_before_selecting_integration() {
         let target = std::str::from_utf8(&target).expect("object ID").trim();
         git(&["config", "submodule.child.active", "true"]);
         let mut plan = Box::new(
-            AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+            prepare_pull_fixture(root.path(), &serde_json::json!({}), ToolProvenance::Native)
                 .expect("Pull"),
         );
         let mut history = talos_core::tool::PreparedStageHistory::default();

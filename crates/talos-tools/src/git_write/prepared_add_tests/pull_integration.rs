@@ -158,7 +158,7 @@ async fn integration_scope_fixture(root: &Path) -> Box<AddPlan> {
         root.join(".git/FETCH_HEAD"),
         format!("{}\t\thttps://private.invalid/DO_NOT_DISCLOSE\n", "1".repeat(40)),
     ).expect("FETCH_HEAD");
-    let plan = AddPlan::prepare_pull(root, &serde_json::json!({}), ToolProvenance::Native)
+    let plan = prepare_pull_fixture(root, &serde_json::json!({}), ToolProvenance::Native)
         .expect("Pull");
     let mut plan = Box::new(plan).discover().await.expect("configuration");
     plan.pull_integration = Some(super::super::pull_state::Integration::Merge {
@@ -461,13 +461,8 @@ async fn pull_integration_attribute_programs_cannot_inherit_worktree_authority()
         git(&["reset", "--hard", &local]);
         std::fs::remove_file(root.path().join("helper-ran")).expect("remove native sentinel");
         git(&["config", key, program]);
-        let mut plan = integration_scope_fixture(root.path()).await;
-        plan.pull_integration = Some(super::super::pull_state::Integration::Merge {
-            heads: vec![target],
-            fast_forward: super::super::pull_state::FastForward::Allow,
-            autostash: false,
-        });
-        let error = match plan.discover_pull_integration_hooks() {
+        let plan = prepare_pull_fixture(root.path(), &serde_json::json!({}), ToolProvenance::Native).expect("Pull");
+        let error = match Box::new(plan).discover().await {
             Ok(_) => panic!("attribute program inherited worktree authority"),
             Err(error) => error.to_string(),
         };

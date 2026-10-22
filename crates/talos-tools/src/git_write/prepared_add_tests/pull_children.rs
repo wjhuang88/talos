@@ -9,7 +9,7 @@ fn child_backlink_alias_requires_bound_root_and_marker_reads() {
     let marker = conventional.join(".git");
     assert_ne!(marker, canonical.join(".git"));
     for omitted in [None, Some("root"), Some("marker")] {
-        let mut plan = AddPlan::prepare_pull(
+        let mut plan = prepare_pull_fixture(
             root.path(),
             &serde_json::json!({}),
             ToolProvenance::Native,
@@ -76,7 +76,7 @@ async fn pull_child_bootstrap_defers_worktree_and_retains_startup_evidence() {
     let location =
         super::super::repository_state::ChildLocation::capture(&gitdir).expect("location");
     let mut plan = Box::new(
-        AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+        prepare_pull_fixture(root.path(), &serde_json::json!({}), ToolProvenance::Native)
             .expect("prepare"),
     );
     plan.environment
@@ -152,7 +152,7 @@ async fn pull_initialized_current_child_suppresses_same_historical_name() {
                 .success()
         );
         let mut plan = Box::new(
-            AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+            prepare_pull_fixture(root.path(), &serde_json::json!({}), ToolProvenance::Native)
                 .expect("plan"),
         )
         .discover()
@@ -450,7 +450,7 @@ async fn pull_child_fetch_has_own_write_stage_and_rebuilds_graph() {
             );
         }
         let mut plan = Box::new(
-            AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+            prepare_pull_fixture(root.path(), &serde_json::json!({}), ToolProvenance::Native)
                 .expect("plan"),
         )
         .discover()
@@ -754,7 +754,7 @@ async fn pull_child_metadata_scope_batches_depth_and_requires_own_root() {
         std::fs::create_dir_all(deep.parent().expect("parent")).expect("deep refs");
         std::fs::write(&deep, format!("{}\n", "a".repeat(40))).expect("ref");
         let mut plan = Box::new(
-            AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+            prepare_pull_fixture(root.path(), &serde_json::json!({}), ToolProvenance::Native)
                 .expect("prepare"),
         )
         .discover()
@@ -893,7 +893,7 @@ fn pull_child_identity_defers_external_gitdir_and_common_targets() {
     )
     .expect("marker");
     let mut plan =
-        AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+        prepare_pull_fixture(root.path(), &serde_json::json!({}), ToolProvenance::Native)
             .expect("prepare");
     plan.phase = Phase::PullChildIdentity;
     plan.pull_changed_children.insert(
@@ -982,7 +982,7 @@ fn pull_historical_recursion_off_does_not_admit_child_paths() {
     use super::super::pull_children::{Activity, Changed, Recursion};
     let root = fixture();
     let mut plan =
-        AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+        prepare_pull_fixture(root.path(), &serde_json::json!({}), ToolProvenance::Native)
             .expect("Pull");
     let child = plan.repository.workdir.join("historical");
     plan.pull_changed_children.insert(
@@ -1028,7 +1028,7 @@ async fn pull_current_child_without_changes_requires_fresh_identity_admission() 
         .expect("initialize child");
     assert!(output.status.success(), "{output:?}");
     let mut plan = Box::new(
-        AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+        prepare_pull_fixture(root.path(), &serde_json::json!({}), ToolProvenance::Native)
             .expect("Pull"),
     )
     .discover()
@@ -1112,7 +1112,7 @@ async fn pull_child_attributes_require_fresh_exact_admission() {
     for denied in [true, false] {
         let root = fixture();
         let mut plan = Box::new(
-            AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+            prepare_pull_fixture(root.path(), &serde_json::json!({}), ToolProvenance::Native)
                 .expect("Pull"),
         )
         .discover()
@@ -1160,7 +1160,7 @@ async fn pull_current_modules_require_exact_read_before_capture() {
     let root = fixture();
     std::fs::write(root.path().join(".gitmodules"), b"not config").expect("unadmitted source");
     let mut plan = Box::new(
-        AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+        prepare_pull_fixture(root.path(), &serde_json::json!({}), ToolProvenance::Native)
             .expect("Pull"),
     )
     .discover()
@@ -1240,7 +1240,7 @@ async fn pull_child_batch_uses_owned_input_and_distinguishes_execution_failure()
         "unreferenced",
     ]);
     let mut plan =
-        AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+        prepare_pull_fixture(root.path(), &serde_json::json!({}), ToolProvenance::Native)
             .expect("plan");
     let path = root.path().canonicalize().expect("root");
     let gitdir = path.join(".git");
@@ -1288,7 +1288,7 @@ async fn pull_child_batch_uses_owned_input_and_distinguishes_execution_failure()
     // --all includes detached HEADs of other registered worktrees; no
     // branch ref is needed to make this previously orphaned commit reachable.
     git(&["worktree", "add", "--detach", "linked", &orphan]);
-    plan = AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+    plan = prepare_pull_fixture(root.path(), &serde_json::json!({}), ToolProvenance::Native)
         .expect("linked worktree plan");
     assert!(
         plan.pull_child_has_commits(&path, &gitdir, &path, std::slice::from_ref(&orphan))
@@ -1296,7 +1296,7 @@ async fn pull_child_batch_uses_owned_input_and_distinguishes_execution_failure()
             .expect("linked detached HEAD is reachable")
     );
     git(&["replace", "-f", &commit, &tree]);
-    plan = AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+    plan = prepare_pull_fixture(root.path(), &serde_json::json!({}), ToolProvenance::Native)
         .expect("replacement plan");
     let error = plan
         .pull_child_commit_objects(&path, &gitdir, &path, std::slice::from_ref(&commit))
@@ -1316,7 +1316,7 @@ async fn pull_child_batch_uses_owned_input_and_distinguishes_execution_failure()
         "tag",
     ]);
     let tag = git(&["rev-parse", "tagged"]);
-    plan = AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+    plan = prepare_pull_fixture(root.path(), &serde_json::json!({}), ToolProvenance::Native)
         .expect("tag plan");
     assert!(
         plan.pull_child_commit_objects(&path, &gitdir, &path, &[tag])

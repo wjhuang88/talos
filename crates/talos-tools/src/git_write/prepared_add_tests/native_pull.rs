@@ -7,7 +7,7 @@ use super::*;
 fn native_pull_plan_rejects_changed_operation_before_discovery() {
     let root = tempfile::tempdir().expect("fixture");
     git(root.path(), &["init", "-b", "main"]);
-    let mut plan = AddPlan::prepare_pull(
+    let mut plan = prepare_pull_fixture(
         root.path(),
         &serde_json::json!({"remote": "upstream"}),
         ToolProvenance::Native,
@@ -47,7 +47,7 @@ async fn native_pull_stage_refuses_missing_or_stale_admission_and_missing_scope(
         let root = tempfile::tempdir().expect("fixture");
         git(root.path(), &["init", "-b", "main"]);
         let mut plan =
-            AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+            prepare_pull_fixture(root.path(), &serde_json::json!({}), ToolProvenance::Native)
                 .expect("plan");
         plan.phase = Phase::PullNativeMutation;
         if matches!(
@@ -236,7 +236,7 @@ async fn native_pull_preserves_configured_integration(conflict: bool) {
         git(&local, &["config", key, value]);
     }
     super::isolate_integration_fixture_filters(&local);
-    let mut plan = AddPlan::prepare_pull(&local, &serde_json::json!({}), ToolProvenance::Native)
+    let mut plan = prepare_pull_fixture(&local, &serde_json::json!({}), ToolProvenance::Native)
         .expect("native plan");
     let config_output = plan
         .inspect_config()
