@@ -5611,6 +5611,11 @@ child remote/effect scope, aggregate budgets/final evidence checks, eight-stage
 convergence, review/platform acceptance and production activation. This does not
 complete T7 or change the native execution gates.
 
+Native child configuration source snapshots now share the operation-wide Pull
+budget across continuation clones. The cumulative-byte regression and locked
+configuration suite pass (37/37). I300 records remaining startup/output/transient
+accounting and native activation work; this does not complete T7.
+
 Native child configured destinations now publish selected-remote/URL-rewrite
 Network or local-source Read scope. Final configuration checks require child
 layout/startup/source grants and retained chain/destination evidence before fetch.

@@ -378,6 +378,20 @@ impl ChildConfig {
         Self::capture(output, gitdir)
     }
 
+    pub(super) fn capture_native_pull(
+        output: &[u8],
+        gitdir: &std::path::Path,
+        budget: &super::pull_inventory::ReferenceBudget,
+    ) -> Result<Self, GitToolError> {
+        let (_, origins) = parse_origins(output)?;
+        if origins.iter().any(|path| !path.is_absolute()) {
+            return Err(unsupported(
+                "Native Pull configuration origin must be absolute",
+            ));
+        }
+        Self::capture_with_budget(output, gitdir, Some(budget))
+    }
+
     pub(super) fn attribute_paths(
         &self,
         workdir: &std::path::Path,
@@ -419,6 +433,14 @@ impl ChildConfig {
     }
 
     pub(super) fn capture(output: &[u8], workdir: &std::path::Path) -> Result<Self, GitToolError> {
+        Self::capture_with_budget(output, workdir, None)
+    }
+
+    fn capture_with_budget(
+        output: &[u8],
+        workdir: &std::path::Path,
+        shared: Option<&super::pull_inventory::ReferenceBudget>,
+    ) -> Result<Self, GitToolError> {
         let (values, origins) = parse_origins(output)?;
         refuse_promisor_objects(&values)?;
         if let Some(value) = values
@@ -445,9 +467,13 @@ impl ChildConfig {
                 };
                 let identity = snapshot::PathIdentity::capture(&path)
                     .map_err(|_| unsupported("Submodule configuration identity unavailable"))?;
-                let entry = snapshot::Entry::capture_regular(&path, &mut budget).map_err(|_| {
-                    unsupported("Submodule configuration source cannot be captured")
-                })?;
+                let entry = if let Some(shared) = shared {
+                    shared.capture(&path)?.entry
+                } else {
+                    snapshot::Entry::capture_regular(&path, &mut budget).map_err(|_| {
+                        unsupported("Submodule configuration source cannot be captured")
+                    })?
+                };
                 if !matches!(entry, snapshot::Entry::File(..) | snapshot::Entry::Missing) {
                     return Err(unsupported(
                         "Submodule configuration sources must be regular files",
