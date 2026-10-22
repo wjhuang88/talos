@@ -5212,3 +5212,20 @@ full preflight is not exact-head evidence and failed a sandbox-denied ps call.
 Locked MSVC cargo xwin test-target checking also passes with the seven existing
 reduced-feature warnings. Native Windows confirmation, independent boundary review and final full preflight
 remain required. This candidate does not activate Windows or Pull or close P1–P5.
+
+2026-10-22 exact-input checkpoint: local native/prepared approval now calls the
+existing resolver execution-input seam instead of assessing display-only JSON.
+Human fallback retains the presentation projection. Create-only compatibility
+accepts absolute direct-child spelling but rejects parent traversal before path
+canonicalization. Regression coverage checks prepared proof consumption, no
+persistent grant, oversized actual content hidden by a short display summary,
+and absolute/traversal path handling. Locked Agent library tests pass 483/483
+(`/private/tmp/i300-exact-input-final-agent.log`). Independent static permission
+review found no blocking scope expansion; it confirms legacy resolver defaults retain
+their behavior and that the exact-input seam requires implementation-side redaction.
+Locked `cargo clippy -p talos-agent --lib --tests -- -D warnings` passes
+(`/private/tmp/i300-exact-input-clippy.log`); both governance validators pass with
+zero warnings (`/private/tmp/i300-exact-input-governance.log`,
+`/private/tmp/i300-exact-input-claims.log`). Implementation is committed as `32c1ec78`; this is an integration
+prerequisite, not effectful Auto approval or Pull activation. Full T1–T8 scope and
+remaining runtime gates persist.
