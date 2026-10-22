@@ -7,8 +7,8 @@
 use talos_config::{ProviderTimeoutConfig, ReasoningOptions};
 use talos_core::message::{AgentEvent, Message};
 use talos_core::provider::{
-    LanguageModel, ProviderError, ProviderInvocationEvent, ProviderInvocationStream,
-    ProviderProgress, ProviderResult, ToolDefinition,
+    DecisionRequestLimits, LanguageModel, ProviderError, ProviderInvocationEvent,
+    ProviderInvocationStream, ProviderProgress, ProviderResult, ToolDefinition,
 };
 use talos_core::tool::{CapabilityProbe, ProtocolCapabilities, ToolProtocol};
 use tokio::sync::mpsc;
@@ -21,6 +21,7 @@ use crate::openai_sse::InvocationSender;
 #[derive(Clone)]
 pub struct OpenAIResponsesProvider {
     client: OpenAIResponsesClient,
+    timeout_config: ProviderTimeoutConfig,
 }
 
 impl OpenAIResponsesProvider {
@@ -29,6 +30,7 @@ impl OpenAIResponsesProvider {
     pub fn new(api_key: impl Into<String>, model: impl Into<String>) -> Self {
         Self {
             client: OpenAIResponsesClient::new(api_key, model),
+            timeout_config: ProviderTimeoutConfig::default(),
         }
     }
 
@@ -60,6 +62,7 @@ impl OpenAIResponsesProvider {
     /// Configure dispatch/retry/stream timeouts.
     #[must_use]
     pub fn with_timeout_config(mut self, config: ProviderTimeoutConfig) -> Self {
+        self.timeout_config = config.clone();
         self.client = self.client.with_timeout_config(config);
         self
     }
@@ -93,9 +96,32 @@ impl OpenAIResponsesProvider {
         let source = self
             .semantic_stream(messages, tools, protocol, progress_tx)
             .await?;
+        Self::bridge_legacy(source)
+    }
+
+    fn bridge_legacy(
+        source: mpsc::Receiver<crate::openai_responses_sse::ResponsesStreamOutput>,
+    ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
         let (tx, rx) = mpsc::channel(32);
         tokio::spawn(forward_response_stream(source, InvocationSender::Legacy(tx)));
         Ok(rx)
+    }
+
+    async fn isolated_decision(
+        &self,
+        messages: &[Message],
+        limits: DecisionRequestLimits,
+    ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
+        crate::validate_decision_messages(messages, limits)?;
+        let mut timeout = self.timeout_config.clone();
+        timeout.max_attempts = limits.max_retries.min(timeout.max_attempts);
+        let isolated = self
+            .client
+            .clone()
+            .with_reasoning(None, Some(limits.max_output_tokens))
+            .with_timeout_config(timeout);
+        let source = isolated.stream(messages, &[], None).await?;
+        Self::bridge_legacy(source)
     }
 }
 
@@ -167,6 +193,24 @@ impl LanguageModel for OpenAIResponsesProvider {
         ));
         Ok(ProviderInvocationStream::original(rx))
     }
+
+    async fn stream_decision(
+        &self,
+        messages: &[Message],
+        limits: DecisionRequestLimits,
+    ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
+        self.isolated_decision(messages, limits).await
+    }
+
+    async fn stream_auto_review(
+        &self,
+        messages: &[Message],
+        limits: DecisionRequestLimits,
+    ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
+        // Responses models do not need the Chat-only GLM compatibility shaping. Keep Auto isolated
+        // and tool-free with the same hard output/retry bounds as every other decision request.
+        self.isolated_decision(messages, limits).await
+    }
 }
 
 #[cfg(test)]
@@ -201,5 +245,16 @@ mod tests {
                 .expect_err("non-native protocol must fail before dispatch");
             assert!(matches!(error, ProviderError::InvalidResponse(_)));
         }
+    }
+
+    #[tokio::test]
+    async fn invalid_decision_request_fails_before_network_dispatch() {
+        let provider = OpenAIResponsesProvider::new("sk-test", "gpt-test");
+        let limits = DecisionRequestLimits {
+            max_output_tokens: 0,
+            max_retries: 0,
+        };
+        assert!(provider.stream_decision(&[], limits).await.is_err());
+        assert!(provider.stream_auto_review(&[], limits).await.is_err());
     }
 }
