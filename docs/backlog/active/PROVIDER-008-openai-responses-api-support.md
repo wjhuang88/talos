@@ -8,7 +8,7 @@
 
 Children:
 
-- [PROVIDER-008-A](PROVIDER-008-A-openai-responses-protocol.md): protocol architecture (enum/factory dispatch/model-level protocol/catalog signals) + OpenAI Responses adapter (ADR-093); I306 / governance claim #747 proposed, ineffective until merge.
+- [PROVIDER-008-A](PROVIDER-008-A-openai-responses-protocol.md) / [#748](https://github.com/wjhuang88/talos/issues/748): protocol architecture (enum/factory dispatch/model-level protocol/catalog signals) + OpenAI Responses adapter (ADR-093); I306 / governance claim #747 proposed, ineffective until merge.
 - PROVIDER-008-B: Google Gemini `generateContent` (AI Studio + Vertex auth boundary decision) — unclaimed.
 - PROVIDER-008-C: Azure OpenAI transport conventions + per-model shape routing — unclaimed.
 - PROVIDER-008-D: Amazon Bedrock Converse + SigV4 credential decision — unclaimed.
@@ -20,7 +20,7 @@ Children:
 | Claim State | Unclaimed |
 | Responsible Actor | Not assigned |
 | Executing Agent | Not assigned |
-| Work Slice | Parent epic remains unclaimed; child A is separately proposed in #747. |
+| Work Slice | Parent epic remains unclaimed; child A (#748) is separately proposed in #747. |
 | Claimed At | Not applicable |
 | Source Issue | #724 |
 | Governance Claim PR | Not applicable |
@@ -28,7 +28,7 @@ Children:
 | Authorization Evidence | Not applicable |
 | Implementation PR | Not started |
 | Last Updated | 2026-10-22 |
-| Handoff / Release Condition | Child Stories are independently claimed. #747 proposes only PROVIDER-008-A; B/C/D stay unclaimed. |
+| Handoff / Release Condition | Child Stories are independently claimed. #747 proposes only PROVIDER-008-A/#748; B/C/D stay unclaimed. |
 
 ## Identity / Goal / Value
 
@@ -52,8 +52,8 @@ knowledge to verify per provider, never name-based guessing for gateways.
 
 ## Scope
 
-Per [#724](https://github.com/wjhuang88/talos/issues/724) (authoritative detail; children own
-implementation):
+Per [#724](https://github.com/wjhuang88/talos/issues/724) (authoritative epic detail; child #748 owns
+A implementation):
 
 - One adapter module group per wire family (request build + stream parse + family specifics),
   reusing HTTP/auth/timeout/retry/`ProviderProgress`.
@@ -81,11 +81,11 @@ requested.
 ## Dependencies / Decision Links
 
 ADR-093 is the umbrella + Responses contract. #747 proposes its acceptance together with
-PROVIDER-008-A / I306 claim+activation; this parent remains unclaimed. Interacts with
+PROVIDER-008-A / #748 / I306 claim+activation; this parent remains unclaimed. Interacts with
 ADR-013/021/022/023/045/048/050/051/062/075, MODEL-011, MODEL-014 (unclaimed), PROVIDER-004.
 Sibling family claims must add their own ADRs and re-run overlap preflight.
 
-## Acceptance (summary; Given/When/Then detail in #724)
+## Acceptance (summary; Given/When/Then detail in #724/#748)
 
 - Confirmed-support default: built-in `openai` without explicit protocol uses Responses and is
   revertible via explicit `protocol = "openai-chat"`; unconfirmed gateways stay on `openai-chat`.
@@ -106,7 +106,7 @@ and return to the backlog.
 
 ## Required Reads
 
-- Issue #724 (full implementation steps, risks, acceptance).
+- Issue #724 (epic) and #748 (child A implementation requirement).
 - `docs/decisions/034-reasoning-thinking-boundary.md`, `013-provider-config-schema-boundary.md`,
   `021-tool-call-protocol-architecture.md`, `062-typed-provider-retry-progress.md`.
 - `crates/talos-provider/src/openai*.rs`, `crates/talos-config/src/{types,endpoint,config,model}.rs`,
@@ -126,7 +126,9 @@ PROVIDER-008-A contract; PROVIDER-008-B/C/D require their own child ADRs at clai
 
 ## Child A Selection — 2026-10-22
 
-Maintainer requested implementation of #724. Governance-only #747 creates PROVIDER-008-A / I306,
-proposes ADR-093 acceptance, and claims only the protocol-architecture + OpenAI Responses slice.
-The parent stays Refinement / Unclaimed and siblings B/C/D stay unclaimed. #747 has no effect until
-its finalized exact head reaches main; implementation must start from that merge or later.
+Maintainer requested implementation of #724. Child requirement #748 was created for PROVIDER-008-A
+so the parent epic retains a single Source Issue/owner relationship. Governance-only #747 creates
+PROVIDER-008-A / I306, proposes ADR-093 acceptance, and claims only protocol architecture + OpenAI
+Responses. The parent stays Refinement / Unclaimed and siblings B/C/D stay unclaimed. #747 has no
+effect until its finalized exact head reaches main; implementation must start from that merge or
+later.
