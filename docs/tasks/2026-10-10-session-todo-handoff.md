@@ -5429,3 +5429,63 @@ mutation, or complete the operation-level effect profile. Next: prepare the
 whole worktree/metadata/recursive scope and consume its proof before invoking
 this retained command; then remove superseded scheduler code. Production Pull
 and Windows remain closed, T7 and subsequent handoff tasks remain open.
+
+## Native Pull final-stage fixture checkpoint — 2026-10-22
+
+The uncommitted native execution stage now consumes the exact prepared proof
+before running the retained command, checks parent scope capabilities and root
+admissions, and preserves conflict/partial effects without retry/reset/abort.
+It remains unreachable from production discovery and explicitly production-gated;
+manual final-stage fixtures do not prove complete scope discovery or activation.
+The fixture originally changed the retained environment after preparation and
+therefore failed revalidation before execution. Repository-local identity,
+hook/signing and host-filter isolation now precede preparation; production
+environment revalidation is unchanged. The four native Pull tests pass, and the
+locked Git-enabled tools library passes 513/513 outside the sandbox
+(`/private/tmp/i300-native-stage-tools-unsandboxed.log`). The sandbox run passed
+512 and hit the existing Push process-observation EPERM. Formatting and diff
+checks pass. Static review found no reachable production bypass, but activation
+still requires binding actual upstream/remotes to admitted network destinations,
+complete recursive/external-effect discovery, and fresh runtime/security gates.
+Production Pull/Windows remain closed; T7, T8 and the full handoff remain open.
+
+Follow-up: added a final-stage denial regression for absent proof, stale plan
+identity and missing scope; all three refuse before FETCH_HEAD exists. The next
+five-test run passed these denials and rebase/conflict checks, but the unchanged
+recursive owned-runner baseline timed out both inside and outside the sandbox
+(`/private/tmp/i300-native-stage-denials.log`,
+`/private/tmp/i300-native-stage-denials-unsandboxed.log`). This supersedes any
+assumption of a clean latest focused run; the earlier 513/513 result predates
+this added test. A reviewer independently started a concurrent full tools run;
+its terminal result and possible contention must be checked before another run.
+Disk observation was 226 MiB free. No timeout increase, activation or completion
+is claimed. Resolve this runtime instability before committing the stage.
+
+Runtime follow-up: reviewer session 97282 is terminal (reported exit 0,
+513/513, 426.71 s); no concurrent reviewer tests remain. After that termination,
+the recursive baseline alone passes in 1.04 s
+(`/private/tmp/i300-recursive-isolated.log`), and all five native Pull tests pass
+serially in 1.85 s (`/private/tmp/i300-native-stage-serial.log`). This supports
+resource contention as a possibility, not an established root cause. The timeout
+failures remain recorded; no production deadline was increased. Next work is
+native operation scope discovery and destination binding, not old staged Pull
+prediction. Current final-stage changes remain uncommitted and production-gated.
+
+Native destination binding follow-up: the gated final executor now requires
+retained configuration evidence, probes full symbolic HEAD (without ambiguous
+short-ref formatting), resolves explicit/default remote using retained ordered
+configuration, validates transport settings and compares resolved destinations
+with the admitted list before native Pull. Revalidation brackets the probe.
+The fixture retains captured config rather than only manually supplying a URL;
+a mismatched destination regression refuses before FETCH_HEAD exists. Five
+focused native tests pass serially (`/private/tmp/i300-native-destination.log`,
+1.92 s). This does not complete recursive/external-effect discovery or activate
+production Pull. The new destination check still needs independent review and
+broader current-source validation before a stable stage commit.
+
+Stage validation update: current tools library is 514/514; independent static
+review of destination/proof/config binding found no blocking issue within the
+closed production gate. Locked nonincremental tools Clippy passes after moving
+the existing command test module below its implementation. No new permission
+contract or production activation follows from this review. Recursive/external
+scope discovery and original delivery gates remain open.

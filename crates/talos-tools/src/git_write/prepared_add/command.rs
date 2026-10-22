@@ -11,36 +11,6 @@ pub(super) struct FrozenCommand {
     environment: BTreeMap<OsString, OsString>,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn frozen_values_survive_source_changes() {
-        let root = tempfile::tempdir().expect("fixture");
-        let program = root.path().join("git");
-        let mut arguments = vec![OsString::from("pull"), OsString::from("upstream")];
-        let mut environment = BTreeMap::from([(OsString::from("BOUND"), OsString::from("before"))]);
-        let frozen = FrozenCommand::new(&program, root.path(), &arguments, &environment)
-            .expect("frozen command");
-        arguments[1] = "other".into();
-        environment.insert("BOUND".into(), "after".into());
-
-        let command = frozen.command();
-        let command = command.as_std();
-        assert_eq!(command.get_program(), program);
-        assert_eq!(command.get_current_dir(), Some(root.path()));
-        assert_eq!(command.get_args().collect::<Vec<_>>(), ["pull", "upstream"]);
-        assert_eq!(
-            command.get_envs().collect::<Vec<_>>(),
-            [(
-                std::ffi::OsStr::new("BOUND"),
-                Some(std::ffi::OsStr::new("before"))
-            )],
-        );
-    }
-}
-
 impl FrozenCommand {
     /// Keep Git's native upstream selection, integration and recursion policy.
     /// This describes the future operation; it confers no execution authority.
@@ -101,5 +71,35 @@ impl FrozenCommand {
             .env_clear()
             .envs(&self.environment);
         command
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn frozen_values_survive_source_changes() {
+        let root = tempfile::tempdir().expect("fixture");
+        let program = root.path().join("git");
+        let mut arguments = vec![OsString::from("pull"), OsString::from("upstream")];
+        let mut environment = BTreeMap::from([(OsString::from("BOUND"), OsString::from("before"))]);
+        let frozen = FrozenCommand::new(&program, root.path(), &arguments, &environment)
+            .expect("frozen command");
+        arguments[1] = "other".into();
+        environment.insert("BOUND".into(), "after".into());
+
+        let command = frozen.command();
+        let command = command.as_std();
+        assert_eq!(command.get_program(), program);
+        assert_eq!(command.get_current_dir(), Some(root.path()));
+        assert_eq!(command.get_args().collect::<Vec<_>>(), ["pull", "upstream"]);
+        assert_eq!(
+            command.get_envs().collect::<Vec<_>>(),
+            [(
+                std::ffi::OsStr::new("BOUND"),
+                Some(std::ffi::OsStr::new("before"))
+            )],
+        );
     }
 }

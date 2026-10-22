@@ -7395,3 +7395,35 @@ file transport for its local sources; it does not activate production local
 transport, prepared Pull, or effectful Auto. The native command/scope replacement
 and all runtime/security gates remain open. Origin fetch succeeds and the current
 branch has no origin/main-only commits, so this checkpoint requires no rebase.
+
+## Native Pull final execution seam — 2026-10-22
+
+The current uncommitted seam consumes the exact one-use prepared proof, checks
+parent worktree/metadata capabilities and exact roots, and invokes the retained
+native command through the existing owned executor. Before execution it resolves
+full symbolic HEAD and retained ordered configuration into the selected remote
+and URL list; mismatched admitted destinations refuse without FETCH_HEAD.
+Configured rebase and retained merge-conflict effects pass through this final
+stage. Production discovery cannot enter this phase and its production gate
+remains closed pending complete recursive/external-effect scope discovery.
+This is not full discovery-chain, recursive approval or production evidence.
+
+Locked Git-enabled tools library passes 514/514 outside the sandbox
+(`/private/tmp/i300-native-destination-tools.log`, 35.31 s); five native tests
+pass serially (`/private/tmp/i300-native-destination.log`). Earlier recursive
+fixture timeout failures remain in the handoff; after concurrent reviewer tests
+terminated, the isolated recursive test and serial group passed. Resource
+contention remains a hypothesis. No deadline was increased. Clippy initially
+failed with ENOSPC; previously authorized incremental-cache cleanup reclaimed
+1.6 GiB, and the nonincremental retry is pending. Independent static review of
+this updated destination binding is pending. T7 and all later handoff work remain
+open; no production activation or completion is claimed.
+
+Updated stage validation: nonincremental locked tools Git library/test Clippy
+passes (`/private/tmp/i300-native-stage-clippy.log`). Its first successful-space
+attempt exposed `items_after_test_module` in the retained command module;
+relocating that existing test module to the end fixes the warning without
+behavior changes. Independent static review found no blocking issue in the
+gated execution/destination seam. It explicitly does not approve production
+activation and retains recursive/helper/external-scope and non-atomic filesystem
+TOCTOU limitations. No feature completion or Windows runtime result is claimed.
