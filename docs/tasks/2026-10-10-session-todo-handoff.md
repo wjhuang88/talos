@@ -5628,3 +5628,9 @@ preserving its per-child cap; continuations revalidate retained startup evidence
 Native Pull tests 17/17, inventory tests 46/46, the new cumulative/local-limit
 regression and tools Clippy pass. I300 retains all native effect/scope, output
 accounting, real stage-budget and platform/review/activation residuals.
+
+Native child destination selection now includes separately admitted, bounded
+legacy remotes/branches files and Git's no-network URL resolution, with final
+source/config revalidation. Native regressions 18/18, Clippy and cargo xwin
+MSVC Git/tests check pass; I300 owns evidence and remaining effects, real stage
+budget, review and activation gates. T7 remains incomplete.

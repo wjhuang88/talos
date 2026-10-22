@@ -247,6 +247,11 @@ impl AddPlan {
             self.identity = PreparedPlanIdentity::new();
             return Ok(self);
         }
+        if !self.discover_native_pull_remotes(authorizations).await? {
+            self.phase = Phase::PullNativePreparation;
+            self.identity = PreparedPlanIdentity::new();
+            return Ok(self);
+        }
         let (remote, destinations) = self.resolve_native_pull_destination().await?;
         self.pull_remote = Some(remote);
         self.pull_destinations = destinations;

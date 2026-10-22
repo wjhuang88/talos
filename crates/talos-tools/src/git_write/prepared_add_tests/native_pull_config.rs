@@ -12,6 +12,11 @@ async fn native_pull_child_destinations_and_final_configuration_checks_are_bound
         "missing-destination",
         "missing-startup",
         "local",
+        "legacy",
+        "branches",
+        "legacy-drift",
+        "missing-legacy",
+        "legacy-created",
     ] {
         let root = tempfile::tempdir().expect("fixture");
         git(root.path(), &["init", "-b", "main"]);
@@ -48,6 +53,35 @@ async fn native_pull_child_destinations_and_final_configuration_checks_are_bound
         std::fs::write(&source, format!(
             "[branch \"main\"]\nremote = upstream\n[remote \"origin\"]\nurl = git://example.invalid/decoy\n[remote \"upstream\"]\nurl = {destination}\n[url \"git://example.invalid/rewritten/\"]\ninsteadOf = alias:\n",
         )).expect("include");
+        if scenario == "unchanged" {
+            std::fs::create_dir(module.join("remotes")).expect("legacy directory");
+            std::fs::write(
+                module.join("remotes/upstream"),
+                "URL: git://example.invalid/ignored\n",
+            )
+            .expect("shadowed legacy source");
+        }
+        if matches!(
+            scenario,
+            "legacy" | "branches" | "legacy-drift" | "missing-legacy"
+        ) {
+            std::fs::write(&source, "[branch \"main\"]\nremote = upstream\n[url \"git://example.invalid/rewritten/\"]\ninsteadOf = alias:\n").expect("legacy-only config");
+            let folder = if scenario == "branches" {
+                "branches"
+            } else {
+                "remotes"
+            };
+            std::fs::create_dir(module.join(folder)).expect("legacy directory");
+            std::fs::write(
+                module.join(folder).join("upstream"),
+                if scenario == "branches" {
+                    "alias:child#topic\n"
+                } else {
+                    "URL: alias:child\nPull: refs/heads/*:refs/remotes/upstream/*\n"
+                },
+            )
+            .expect("legacy source");
+        }
         let mut plan = Box::new(
             prepare_pull_fixture(root.path(), &serde_json::json!({}), ToolProvenance::Native)
                 .expect("plan"),
@@ -93,6 +127,22 @@ async fn native_pull_child_destinations_and_final_configuration_checks_are_bound
             );
         }
         match scenario {
+            "legacy-created" => {
+                std::fs::create_dir(module.join("remotes")).expect("new legacy directory");
+                std::fs::write(
+                    module.join("remotes/upstream"),
+                    "URL: git://example.invalid/new\n",
+                )
+                .expect("new source");
+            }
+            "legacy-drift" => std::fs::write(
+                module.join("remotes/upstream"),
+                "URL: git://example.invalid/changed\n",
+            )
+            .expect("legacy drift"),
+            "missing-legacy" => plan.facets.retain(|facet| {
+                facet.resource.as_deref() != module.join("remotes/upstream").to_str()
+            }),
             "include-drift" => std::fs::write(
                 &source,
                 "[remote \"upstream\"]\nurl = git://example.invalid/changed\n",
@@ -115,7 +165,7 @@ async fn native_pull_child_destinations_and_final_configuration_checks_are_bound
         let tokens = proof(&plan)
             .consume_for_prepared(&plan.request(), &plan.identity)
             .expect("proof");
-        if matches!(scenario, "unchanged" | "local") {
+        if matches!(scenario, "unchanged" | "local" | "legacy" | "branches") {
             plan.validate_native_pull_configurations(&tokens)
                 .await
                 .expect("unchanged child scope");
@@ -131,6 +181,9 @@ async fn native_pull_child_destinations_and_final_configuration_checks_are_bound
                 "missing-chain" => "discovery authority missing",
                 "missing-destination" => "destination differs",
                 "missing-startup" => "separate Read admission",
+                "missing-legacy" => "separate Read admission",
+                "legacy-drift" => "legacy remote source changed",
+                "legacy-created" => "inventory changed",
                 _ => unreachable!(),
             };
             assert!(error.contains(expected), "{scenario}: {error}");

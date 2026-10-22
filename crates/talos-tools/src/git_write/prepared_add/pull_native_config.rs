@@ -65,16 +65,22 @@ impl AddPlan {
                     )?);
                 }
             }
-            self.facets
-                .extend(self.native_pull_child_remote_facets(root, &config)?);
+            let remote = config.fetch_remote(self.native_pull_metadata[root].branch()?)?;
+            for path in self.native_pull_remote_sources(root, &remote)? {
+                self.facets.push(path_facet(
+                    ToolNature::Read,
+                    &path,
+                    "native Pull child legacy remote source; contents deferred",
+                )?);
+            }
             self.native_pull_configs.insert(root.clone(), config);
             discovered = true;
         }
         Ok(!discovered)
     }
 
-    // Pure scope derivation from frozen config/HEAD; never contacts the source.
-    fn native_pull_child_remote_facets(
+    // Scope derivation from frozen native URL selection; never contacts the source.
+    pub(super) fn native_pull_child_remote_facets(
         &self,
         gitdir: &Path,
         config: &super::super::config_state::ChildConfig,
@@ -84,24 +90,29 @@ impl AddPlan {
         })?;
         let remote = config.fetch_remote(metadata.branch()?)?;
         config.prepare_pull_transport(&remote)?;
-        let mut facets = Vec::new();
-        for destination in config.fetch_destinations(&remote)? {
-            if let Some(path) = super::super::remote_state::local_destination(&destination, gitdir)?
-            {
-                facets.push(path_facet(
-                    ToolNature::Read,
-                    &path,
-                    "native Pull child configured local source; source contents deferred",
-                )?);
-            } else {
-                facets.push(ToolPermissionFacet::with_resource(
-                    ToolNature::Network,
-                    destination,
-                    ToolResourceKind::Remote,
-                ));
-            }
-        }
-        Ok(facets)
+        let destination = &self
+            .native_pull_remotes
+            .get(gitdir)
+            .ok_or_else(|| {
+                GitToolError::InvalidInput("Native Pull child remote evidence missing".into())
+            })?
+            .destination;
+        let facet = if let Some(path) =
+            super::super::remote_state::local_destination(destination, gitdir)?
+        {
+            path_facet(
+                ToolNature::Read,
+                &path,
+                "native Pull child configured local source; source contents deferred",
+            )?
+        } else {
+            ToolPermissionFacet::with_resource(
+                ToolNature::Network,
+                destination.clone(),
+                ToolResourceKind::Remote,
+            )
+        };
+        Ok(vec![facet])
     }
 
     // Called only after consuming the exact plan proof. All source grants are
@@ -169,6 +180,9 @@ impl AddPlan {
             config.revalidate()?;
             config.verify_host(&self.inspect_receiver_config_at(root).await?)?;
             config.revalidate()?;
+            let remote = config.fetch_remote(self.native_pull_metadata[root].branch()?)?;
+            self.validate_native_pull_remote(root, &remote, authorizations)
+                .await?;
             for required in self.native_pull_child_remote_facets(root, config)? {
                 if !self.facets.iter().any(|facet| {
                     facet.nature == required.nature

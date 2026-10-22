@@ -7662,3 +7662,26 @@ passes, inventory tests pass 46/46, and tools lib/tests Clippy -D warnings passe
 Logs: /private/tmp/i300-startup-budget-{tests,inventory,clippy}.log. This closes
 startup source snapshot accounting only, not retained host-output/transient
 accounting or the remaining native effect/scope and activation gates. T7 stays open.
+
+Native child legacy destination checkpoint (2026-10-22): exact selected
+common/remotes/<remote> and common/branches/<remote> Read requests are batched
+with config sources. Their bounded regular-file/missing evidence is retained
+under the shared Pull budget. Git's read-only ls-remote --get-url selects the
+actual rewritten destination without contacting it; that destination joins the
+final mutation request. Source/config evidence is checked around resolution and
+again before execution. Existing linked legacy sources refuse pending distinct
+target admission. Git 2.54 probes and regressions cover remotes/branches URL
+selection, configuration URL precedence, rewrite order, changed/created sources
+and missing source grants. Native regressions pass 18/18, tools lib/tests Clippy
+-D warnings passes, and locked cargo xwin MSVC Git/tests check passes (seven
+existing reduced-feature warnings). Logs: /private/tmp/i300-native-legacy-tests.log,
+/private/tmp/i300-native-legacy-clippy.log and /private/tmp/i300-native-legacy-xwin.log.
+No native Windows runtime or full current-stage workspace result is claimed.
+Discovery batches preserve the existing scope-test bound; this does not prove
+the real dispatcher eight-stage budget. Child local-source effects, update
+hooks/auxiliary/worktree mapping, remaining resource accounting, independent
+review and activation gates remain. Both native execution guards stay in place.
+Full locked Git-enabled tools library tests pass 532/532 outside the sandbox
+(/private/tmp/i300-native-legacy-tools-unsandboxed.log). The sandboxed run passed
+531 with only the existing Push process-observation EPERM failure. Both governance
+validators pass with zero warnings. Staged diff was reviewed before commit.
