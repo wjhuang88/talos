@@ -28,6 +28,8 @@ mod pull_children;
 mod pull_discovery;
 #[path = "prepared_add/pull_integration.rs"]
 mod pull_integration;
+#[path = "prepared_add/pull_native.rs"]
+mod pull_native;
 #[path = "prepared_add/pull_reconcile.rs"]
 mod pull_reconcile;
 
@@ -218,6 +220,7 @@ enum Phase {
     PullChildFetch,
     PullIntegration,
     PullIntegrationMutation,
+    PullNativeMutation,
 }
 
 pub(super) struct AddPlan {
@@ -5521,6 +5524,12 @@ impl PreparedNormalToolInvocation for AddPlan {
             ));
         };
         let result = match self.phase {
+            Phase::PullNativeMutation => {
+                return PreparedNormalStage::Complete(match self.execute_native_pull(&authorizations).await {
+                    Ok(content) => ToolExecutionOutput::success(content),
+                    Err(error) => ToolExecutionOutput::error(error.to_string()),
+                });
+            }
             Phase::CheckoutNewGitlinks => self.discover_new_gitlinks(&authorizations),
             Phase::CheckoutChildMarkers => self.discover_checkout_child_markers(&authorizations),
             Phase::CheckoutChildMetadata => self.discover_checkout_child_metadata(&authorizations),

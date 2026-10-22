@@ -1,5 +1,5 @@
 //! Native whole-operation baselines for replacing the staged Pull scheduler.
-//! These exercise the owned runner, not prepared Pull authorization/activation.
+//! Final-stage admission and owned-runner baselines, not discovery/activation.
 
 use super::*;
 
@@ -32,6 +32,43 @@ fn native_pull_plan_rejects_changed_operation_before_discovery() {
             .iter()
             .any(|facet| matches!(facet.nature, ToolNature::Write | ToolNature::Network))
     );
+}
+
+#[tokio::test]
+async fn native_pull_stage_refuses_missing_or_stale_admission_and_missing_scope() {
+    for scenario in ["missing-proof", "stale-proof", "missing-scope"] {
+        let root = tempfile::tempdir().expect("fixture");
+        git(root.path(), &["init", "-b", "main"]);
+        let mut plan =
+            AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+                .expect("plan");
+        plan.phase = Phase::PullNativeMutation;
+        let admission: Box<dyn std::any::Any + Send> = if scenario == "missing-proof" {
+            Box::new(())
+        } else {
+            let admission = proof(&plan);
+            if scenario == "stale-proof" {
+                plan.identity = PreparedPlanIdentity::new();
+            }
+            Box::new(admission)
+        };
+        let PreparedNormalStage::Complete(output) = Box::new(plan).execute_stage(admission).await
+        else {
+            panic!("denial must complete without discovery")
+        };
+        assert!(output.result.is_error, "{scenario}");
+        let expected = match scenario {
+            "missing-proof" => "requires its admitted proof",
+            "stale-proof" => "does not authorize this plan",
+            _ => "scope capability missing",
+        };
+        assert!(
+            output.result.content.contains(expected),
+            "{scenario}: {:?}",
+            output.result
+        );
+        assert!(!root.path().join(".git/FETCH_HEAD").exists());
+    }
 }
 
 fn git(cwd: &Path, args: &[&str]) -> Vec<u8> {
@@ -97,40 +134,124 @@ async fn native_pull_preserves_configured_integration(conflict: bool) {
     git(&source, &["commit", "-am", "remote"]);
     let remote = git(&source, &["rev-parse", "HEAD"]);
 
-    let plan = prepare(&local);
-    let mut environment = plan.environment.clone();
-    environment.insert("GIT_CONFIG_NOSYSTEM".into(), "1".into());
-    environment.insert(
-        "GIT_CONFIG_GLOBAL".into(),
-        root.path().join("absent-global-config").into_os_string(),
-    );
-    environment.insert("GIT_COMMITTER_NAME".into(), "Native Pull fixture".into());
-    environment.insert(
-        "GIT_COMMITTER_EMAIL".into(),
-        "fixture@example.invalid".into(),
-    );
-    fixture_config(
-        &mut environment,
-        &[("core.hooksPath", ""), ("commit.gpgSign", "false")],
-    );
-    let frozen = command::FrozenCommand::pull(
-        &plan.program,
-        &local,
-        &GitPullInput { remote: None },
-        &environment,
-    )
-    .expect("freeze native Pull");
-    let output = plan
-        .run_command_output(
-            frozen.command(),
-            std::time::Duration::from_secs(20),
-            1024 * 1024,
-        )
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("port");
+    let port = listener.local_addr().expect("address").port();
+    drop(listener);
+    let log = tempfile::NamedTempFile::new().expect("daemon log");
+    let mut daemon_command = tokio::process::Command::new("git");
+    daemon_command
+        .args([
+            "daemon",
+            "--reuseaddr",
+            "--listen=127.0.0.1",
+            "--export-all",
+        ])
+        .arg(format!("--port={port}"))
+        .arg(format!("--base-path={}", daemon_fixture_path(root.path())))
+        .arg(daemon_fixture_path(&source))
+        .kill_on_drop(true)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(log.reopen().expect("log"));
+    let mut daemon = native_process::NativeProcess::spawn(&mut daemon_command, &log)
         .await
-        .expect("supervised native Pull");
+        .expect("daemon");
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            if std::net::TcpStream::connect(("127.0.0.1", port)).is_ok() {
+                break;
+            }
+            assert!(daemon.is_running().expect("daemon state"));
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("daemon ready");
+    let destination = format!("git://127.0.0.1:{port}/source");
+    git(&local, &["remote", "set-url", "upstream", &destination]);
+    // Keep the exact process environment captured by production preparation.
+    // Fixture isolation belongs in repository config, before identity capture.
+    for (key, value) in [
+        ("user.name", "Native Pull fixture"),
+        ("user.email", "fixture@example.invalid"),
+        ("core.hooksPath", ""),
+        ("commit.gpgSign", "false"),
+    ] {
+        git(&local, &["config", key, value]);
+    }
+    super::isolate_integration_fixture_filters(&local);
+    let mut plan = AddPlan::prepare_pull(&local, &serde_json::json!({}), ToolProvenance::Native)
+        .expect("native plan");
+    let config_output = plan
+        .inspect_config()
+        .await
+        .expect("fixture config inspection");
+    plan.config = Some(
+        super::super::super::config_state::ConfigState::capture_host(
+            &config_output,
+            &plan.repository,
+            &plan.environment,
+        )
+        .expect("fixture configuration evidence"),
+    );
+    plan.pull_remote = Some("upstream".into());
+    // Final-stage fixture: discovery is tested separately and remains a gate.
+    plan.facets
+        .retain(|facet| facet.nature == ToolNature::Execute);
+    for nature in [ToolNature::Read, ToolNature::Write] {
+        for root in [
+            &plan.repository.workdir,
+            &plan.repository.git_dir,
+            &plan.repository.common_dir,
+        ] {
+            plan.facets
+                .push(path_facet(nature, root, "native Pull fixture scope").expect("scope"));
+        }
+        for capability in [
+            "git:pull-integration-worktree",
+            "git:pull-repository-metadata",
+        ] {
+            plan.facets.push(ToolPermissionFacet::with_resource(
+                nature,
+                capability,
+                ToolResourceKind::Remote,
+            ));
+        }
+    }
+    plan.facets.push(ToolPermissionFacet::with_resource(
+        ToolNature::Network,
+        &destination,
+        ToolResourceKind::Remote,
+    ));
+    // Even a separately approved-looking destination cannot substitute for
+    // the remote resolved by native Pull's retained config and current branch.
+    plan.pull_destinations = vec!["git://different.invalid/source".into()];
+    assert!(plan.validate_native_pull_destination().await.is_err());
+    assert!(!local.join(".git/FETCH_HEAD").exists());
+    plan.pull_destinations = vec![destination];
+    plan.pull_transport_supported = true;
+    plan.phase = Phase::PullNativeMutation;
+    plan.identity = PreparedPlanIdentity::new();
+    let stale = proof(&plan);
+    plan.identity = PreparedPlanIdentity::new();
+    // A proof from an identical-looking earlier plan cannot authorize execution.
+    let admitted = proof(&plan);
+    assert!(
+        stale
+            .consume_for_prepared(&plan.request(), &plan.identity)
+            .is_err()
+    );
+    let PreparedNormalStage::Complete(output) =
+        Box::new(plan).execute_stage(Box::new(admitted)).await
+    else {
+        panic!("native Pull must complete in one execution stage")
+    };
+    daemon.stop().await.expect("daemon cleanup");
+    assert_eq!(output.result.is_error, conflict, "{:?}", output.result);
     assert_eq!(git(&local, &["rev-parse", "upstream/main"]), remote);
     if conflict {
-        assert!(!output.status.success(), "{output:?}");
+        assert!(output.result.is_error, "{:?}", output.result);
+        assert!(output.result.content.contains("partial effects may remain"));
         assert_eq!(git(&local, &["rev-parse", "HEAD"]), before);
         assert_eq!(git(&local, &["rev-parse", "MERGE_HEAD"]), remote);
         assert!(!git(&local, &["ls-files", "--unmerged"]).is_empty());
@@ -140,7 +261,7 @@ async fn native_pull_preserves_configured_integration(conflict: bool) {
                 .contains("<<<<<<<")
         );
     } else {
-        assert!(output.status.success(), "{output:?}");
+        assert!(!output.result.is_error, "{:?}", output.result);
         assert_ne!(git(&local, &["rev-parse", "HEAD"]), before);
         assert_eq!(git(&local, &["rev-parse", "HEAD^"]), remote);
         assert_eq!(
