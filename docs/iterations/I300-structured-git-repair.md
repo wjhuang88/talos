@@ -7512,3 +7512,17 @@ New tests are separate files. Independent security review remains a delivery gat
 Next: bind each discovered child's startup/config/include chain, remote and
 possible worktree scope, then activate SenderConfiguration routing and remove
 superseded scheduling after replacement validation. All original exits remain.
+
+Native stored-child metadata checkpoint (2026-10-22): fixed layout discovery now
+requests `gitdir` as well as HEAD/commondir/config sources, waits for the complete
+frontier, then retains Metadata identity/pointer evidence. External common/marker
+targets are published without opening them; pointer drift invalidates the plan.
+Native tests pass 11/11 (1.58 s), locked Git-enabled tools Clippy lib/tests with
+`-D warnings`, formatting and whitespace checks pass. Logs:
+`/private/tmp/i300-native-metadata-tests.log` and
+`/private/tmp/i300-native-metadata-clippy.log`. Child config-chain, remote and
+worktree binding and production activation remain incomplete; no delivery claim.
+Pull regression also passes 168/168 (22.12 s,
+`/private/tmp/i300-native-metadata-pull.log`); both governance validators pass
+with 0 warnings (`/private/tmp/i300-native-metadata-governance.log` and
+`/private/tmp/i300-native-metadata-claims.log`).

@@ -5579,3 +5579,9 @@ regression 167/167 and tools Clippy/format pass. Sender routing is unchanged;
 child config/remotes/worktrees remain the next implementation step, and the new
 executor refuses discovered children until that admission exists. See I300 owner
 for logs; production activation, independent review and original gates stay open.
+
+Stored-child fixed metadata now waits for exact pointer admission (including
+`gitdir`), retains identity evidence, and publishes external targets without
+opening them. Pointer-drift regression added; native tests 11/11 and locked
+Git-enabled tools Clippy pass. See I300 metadata checkpoint for evidence.
+Next remains child config-chain/remote/worktree binding and production activation.
