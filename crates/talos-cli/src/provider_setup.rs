@@ -90,6 +90,12 @@ pub(crate) fn build_provider(
                             messages,
                         )
                     }
+                    ProviderProtocol::OpenAIResponses => serde_json::json!({
+                        "error": "openai-responses protocol is staged but not yet activated in the CLI provider factory",
+                    }),
+                    _ => serde_json::json!({
+                        "error": "unsupported provider protocol in this Talos build",
+                    }),
                 };
                 serde_json::to_string(&snapshot).unwrap_or_else(|_| snapshot.to_string())
             }),
@@ -124,6 +130,10 @@ pub(crate) fn build_provider(
             provider = provider.with_timeout_config(provider_config.timeout.clone());
             Arc::new(provider)
         }
+        ProviderProtocol::OpenAIResponses => {
+            panic!("openai-responses protocol is staged but not yet activated in the CLI provider factory")
+        }
+        _ => panic!("unsupported provider protocol in this Talos build"),
     }
 }
 
