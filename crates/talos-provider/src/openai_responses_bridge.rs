@@ -69,10 +69,8 @@ mod tests {
         drop(source_tx);
 
         let mut stream = ProviderInvocationStream::original(target_rx);
-        let Some(ProviderInvocationEvent::Legacy(AgentEvent::TurnEnd {
-            stop_reason,
-            usage,
-        })) = stream.recv().await
+        let Some(ProviderInvocationEvent::Legacy(AgentEvent::TurnEnd { stop_reason, usage })) =
+            stream.recv().await
         else {
             panic!("expected forwarded turn end");
         };
@@ -106,9 +104,7 @@ mod tests {
 
         let mut stream = ProviderInvocationStream::original(target_rx);
         let Some(ProviderInvocationEvent::Legacy(AgentEvent::ToolCall {
-            call,
-            provenance,
-            ..
+            call, provenance, ..
         })) = stream.recv().await
         else {
             panic!("expected native tool call");

@@ -244,9 +244,7 @@ fn non_empty_content(content: &str, fallback: &str) -> String {
 mod tests {
     use super::*;
     use crate::openai_responses_reasoning::encode_completed_reasoning_item;
-    use talos_core::message::{
-        AssistantReasoning, ContentDigest, MessageToolResult, ToolCall,
-    };
+    use talos_core::message::{AssistantReasoning, ContentDigest, MessageToolResult, ToolCall};
 
     fn tool_definition() -> ToolDefinition {
         ToolDefinition::new(

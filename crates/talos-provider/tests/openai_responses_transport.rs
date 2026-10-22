@@ -4,7 +4,7 @@
 mod openai_responses_reasoning;
 #[path = "../src/openai_responses_sse.rs"]
 mod openai_responses_sse;
-#[path = "../src/stream_utf8.rs"]
-mod stream_utf8;
 #[path = "../src/openai_responses_transport.rs"]
 mod openai_responses_transport;
+#[path = "../src/stream_utf8.rs"]
+mod stream_utf8;

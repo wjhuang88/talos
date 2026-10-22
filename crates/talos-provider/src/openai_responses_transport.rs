@@ -105,7 +105,9 @@ impl ResponsesSseDecoder {
 
         let event: Value = match serde_json::from_str(&data) {
             Ok(event) => event,
-            Err(_) => return self.fail("OpenAI Responses stream contained invalid JSON event data"),
+            Err(_) => {
+                return self.fail("OpenAI Responses stream contained invalid JSON event data");
+            }
         };
         self.state.apply(&event)
     }
@@ -227,9 +229,11 @@ mod tests {
 
         let events = agents(outputs);
         assert!(matches!(events.first(), Some(AgentEvent::TurnStart)));
-        assert!(events.iter().any(
-            |event| matches!(event, AgentEvent::TextDelta { delta } if delta == "你🙂")
-        ));
+        assert!(
+            events
+                .iter()
+                .any(|event| matches!(event, AgentEvent::TextDelta { delta } if delta == "你🙂"))
+        );
         assert!(events.iter().any(|event| matches!(
             event,
             AgentEvent::TurnEnd {
@@ -257,9 +261,11 @@ mod tests {
         let mut decoder = ResponsesSseDecoder::new();
         let first = agents(decoder.push(b"data: {not-json}\n\n"));
         assert!(matches!(first.as_slice(), [AgentEvent::Error { .. }]));
-        assert!(decoder
-            .push(b"data: {\"type\":\"response.completed\",\"response\":{}}\n\n")
-            .is_empty());
+        assert!(
+            decoder
+                .push(b"data: {\"type\":\"response.completed\",\"response\":{}}\n\n")
+                .is_empty()
+        );
         assert!(decoder.finish().is_empty());
     }
 

@@ -103,7 +103,10 @@ impl OpenAIResponsesProvider {
         source: mpsc::Receiver<crate::openai_responses_sse::ResponsesStreamOutput>,
     ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
         let (tx, rx) = mpsc::channel(32);
-        tokio::spawn(forward_response_stream(source, InvocationSender::Legacy(tx)));
+        tokio::spawn(forward_response_stream(
+            source,
+            InvocationSender::Legacy(tx),
+        ));
         Ok(rx)
     }
 
@@ -227,7 +230,10 @@ mod tests {
                 compatibility: false,
             })
         );
-        assert_eq!(provider.protocol_capabilities().select(), ToolProtocol::Native);
+        assert_eq!(
+            provider.protocol_capabilities().select(),
+            ToolProtocol::Native
+        );
     }
 
     #[tokio::test]

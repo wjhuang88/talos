@@ -124,13 +124,8 @@ mod tests {
 
     #[test]
     fn confirmed_provider_default_precedes_global_fallback() {
-        let resolved = resolve_protocol(
-            None,
-            None,
-            None,
-            Some(Protocol::Anthropic),
-            Protocol::Chat,
-        );
+        let resolved =
+            resolve_protocol(None, None, None, Some(Protocol::Anthropic), Protocol::Chat);
         assert_eq!(resolved.protocol, Protocol::Anthropic);
         assert_eq!(resolved.source, ProtocolResolutionSource::Default);
     }
@@ -151,13 +146,8 @@ mod tests {
             Some(Protocol::Responses),
             Protocol::Chat,
         );
-        let unset = resolve_protocol(
-            None,
-            None,
-            None,
-            Some(Protocol::Responses),
-            Protocol::Chat,
-        );
+        let unset =
+            resolve_protocol(None, None, None, Some(Protocol::Responses), Protocol::Chat);
         assert_eq!(explicit.protocol, Protocol::Chat);
         assert_eq!(explicit.source, ProtocolResolutionSource::Configured);
         assert_eq!(unset.protocol, Protocol::Responses);

@@ -113,9 +113,8 @@ impl ResponsesStreamState {
         }
 
         let Some(item_id) = item_identity(event, item) else {
-            return self.terminal_error(
-                "OpenAI Responses function call started without an item id",
-            );
+            return self
+                .terminal_error("OpenAI Responses function call started without an item id");
         };
         let pending = self.function_calls.entry(item_id).or_default();
         update_function_call(pending, item);
@@ -130,9 +129,7 @@ impl ResponsesStreamState {
 
     fn function_arguments_delta(&mut self, event: &Value) -> Vec<ResponsesStreamOutput> {
         let Some(item_id) = event.get("item_id").and_then(Value::as_str) else {
-            return self.terminal_error(
-                "OpenAI Responses function argument delta missing item_id",
-            );
+            return self.terminal_error("OpenAI Responses function argument delta missing item_id");
         };
         let Some(delta) = event.get("delta").and_then(Value::as_str) else {
             return self.terminal_error("OpenAI Responses function argument delta missing delta");
@@ -147,9 +144,8 @@ impl ResponsesStreamState {
 
     fn function_arguments_done(&mut self, event: &Value) -> Vec<ResponsesStreamOutput> {
         let Some(item_id) = event.get("item_id").and_then(Value::as_str) else {
-            return self.terminal_error(
-                "OpenAI Responses function arguments completion missing item_id",
-            );
+            return self
+                .terminal_error("OpenAI Responses function arguments completion missing item_id");
         };
         let Some(arguments) = event.get("arguments").and_then(Value::as_str) else {
             return self.terminal_error(
@@ -180,9 +176,8 @@ impl ResponsesStreamState {
 
     fn function_call_done(&mut self, event: &Value, item: &Value) -> Vec<ResponsesStreamOutput> {
         let Some(item_id) = item_identity(event, item) else {
-            return self.terminal_error(
-                "OpenAI Responses function call completed without an item id",
-            );
+            return self
+                .terminal_error("OpenAI Responses function call completed without an item id");
         };
 
         let (call_id, name, arguments, emitted) = {
@@ -224,15 +219,14 @@ impl ResponsesStreamState {
             Ok(Some(envelope)) => envelope,
             Ok(None) => return,
             Err(message) => {
-                tracing::warn!(reason = message, "dropping non-replayable Responses reasoning item");
+                tracing::warn!(
+                    reason = message,
+                    "dropping non-replayable Responses reasoning item"
+                );
                 return;
             }
         };
-        if self
-            .reasoning_bytes
-            .saturating_add(envelope.len())
-            > MAX_REASONING_RESPONSE_BYTES
-        {
+        if self.reasoning_bytes.saturating_add(envelope.len()) > MAX_REASONING_RESPONSE_BYTES {
             tracing::warn!(
                 limit = MAX_REASONING_RESPONSE_BYTES,
                 "dropping Responses reasoning item after replay size limit"
@@ -273,7 +267,11 @@ impl ResponsesStreamState {
         self.terminal_error(format!("OpenAI Responses response.incomplete: {detail}"))
     }
 
-    fn finish_success(&mut self, stop_reason: StopReason, usage: Usage) -> Vec<ResponsesStreamOutput> {
+    fn finish_success(
+        &mut self,
+        stop_reason: StopReason,
+        usage: Usage,
+    ) -> Vec<ResponsesStreamOutput> {
         let mut outputs = Vec::with_capacity(2);
         if !self.reasoning_blocks.is_empty() {
             outputs.push(agent(AgentEvent::ReasoningComplete {
@@ -292,7 +290,12 @@ impl ResponsesStreamState {
 
     fn top_level_error(&mut self, event: &Value) -> Vec<ResponsesStreamOutput> {
         let message = nested_error_message(event)
-            .or_else(|| event.get("message").and_then(Value::as_str).map(str::to_string))
+            .or_else(|| {
+                event
+                    .get("message")
+                    .and_then(Value::as_str)
+                    .map(str::to_string)
+            })
             .unwrap_or_else(|| "unknown streaming error".to_string());
         self.terminal_error(format!("OpenAI Responses error: {message}"))
     }
@@ -360,12 +363,8 @@ fn update_function_call(pending: &mut PendingFunctionCall, item: &Value) {
 
 fn response_usage(response: &Value) -> Usage {
     let usage = response.get("usage").unwrap_or(&Value::Null);
-    let input_details = usage
-        .get("input_tokens_details")
-        .unwrap_or(&Value::Null);
-    let output_details = usage
-        .get("output_tokens_details")
-        .unwrap_or(&Value::Null);
+    let input_details = usage.get("input_tokens_details").unwrap_or(&Value::Null);
+    let output_details = usage.get("output_tokens_details").unwrap_or(&Value::Null);
 
     Usage {
         input_tokens: u32_field(usage, "input_tokens"),
@@ -437,12 +436,14 @@ mod tests {
             }))),
             AgentEvent::ThinkingDelta { delta } if delta == "checking"
         ));
-        assert!(state
-            .apply(&json!({
-                "type": "response.reasoning_text.delta",
-                "delta": "private chain of thought"
-            }))
-            .is_empty());
+        assert!(
+            state
+                .apply(&json!({
+                    "type": "response.reasoning_text.delta",
+                    "delta": "private chain of thought"
+                }))
+                .is_empty()
+        );
     }
 
     #[test]
@@ -452,9 +453,7 @@ mod tests {
             single_agent(state.apply(&json!({"type": "response.created"}))),
             AgentEvent::TurnStart
         ));
-        assert!(state
-            .apply(&json!({"type": "response.created"}))
-            .is_empty());
+        assert!(state.apply(&json!({"type": "response.created"})).is_empty());
     }
 
     #[test]
@@ -471,20 +470,24 @@ mod tests {
             }
         })));
         assert!(matches!(started, AgentEvent::ToolCallStarted { name } if name == "lookup"));
-        assert!(state
-            .apply(&json!({
-                "type": "response.function_call_arguments.delta",
-                "item_id": "fc_item_1",
-                "delta": "{ \"key\" :"
-            }))
-            .is_empty());
-        assert!(state
-            .apply(&json!({
-                "type": "response.function_call_arguments.done",
-                "item_id": "fc_item_1",
-                "arguments": "{ \"key\" : \"value\" }"
-            }))
-            .is_empty());
+        assert!(
+            state
+                .apply(&json!({
+                    "type": "response.function_call_arguments.delta",
+                    "item_id": "fc_item_1",
+                    "delta": "{ \"key\" :"
+                }))
+                .is_empty()
+        );
+        assert!(
+            state
+                .apply(&json!({
+                    "type": "response.function_call_arguments.done",
+                    "item_id": "fc_item_1",
+                    "arguments": "{ \"key\" : \"value\" }"
+                }))
+                .is_empty()
+        );
         assert_eq!(
             state.apply(&json!({
                 "type": "response.output_item.done",
@@ -507,28 +510,32 @@ mod tests {
     #[test]
     fn completed_reasoning_is_buffered_and_emitted_once_before_turn_end() {
         let mut state = ResponsesStreamState::new();
-        assert!(state
-            .apply(&json!({
-                "type": "response.output_item.added",
-                "item": {
-                    "id": "rs_1",
-                    "type": "reasoning",
-                    "summary": [],
-                    "encrypted_content": "partial-secret"
-                }
-            }))
-            .is_empty());
-        assert!(state
-            .apply(&json!({
-                "type": "response.output_item.done",
-                "item": {
-                    "id": "rs_1",
-                    "type": "reasoning",
-                    "summary": [{"type": "summary_text", "text": "safe summary"}],
-                    "encrypted_content": "complete-secret"
-                }
-            }))
-            .is_empty());
+        assert!(
+            state
+                .apply(&json!({
+                    "type": "response.output_item.added",
+                    "item": {
+                        "id": "rs_1",
+                        "type": "reasoning",
+                        "summary": [],
+                        "encrypted_content": "partial-secret"
+                    }
+                }))
+                .is_empty()
+        );
+        assert!(
+            state
+                .apply(&json!({
+                    "type": "response.output_item.done",
+                    "item": {
+                        "id": "rs_1",
+                        "type": "reasoning",
+                        "summary": [{"type": "summary_text", "text": "safe summary"}],
+                        "encrypted_content": "complete-secret"
+                    }
+                }))
+                .is_empty()
+        );
 
         let outputs = state.apply(&json!({
             "type": "response.completed",
@@ -557,17 +564,18 @@ mod tests {
     fn completed_event_maps_usage_and_tool_stop_reason() {
         let mut state = ResponsesStreamState::new();
         assert!(matches!(
-            state.apply(&json!({
-                "type": "response.output_item.done",
-                "item": {
-                    "id": "fc_1",
-                    "type": "function_call",
-                    "call_id": "call_1",
-                    "name": "lookup",
-                    "arguments": "{}"
-                }
-            }))
-            .as_slice(),
+            state
+                .apply(&json!({
+                    "type": "response.output_item.done",
+                    "item": {
+                        "id": "fc_1",
+                        "type": "function_call",
+                        "call_id": "call_1",
+                        "name": "lookup",
+                        "arguments": "{}"
+                    }
+                }))
+                .as_slice(),
             [ResponsesStreamOutput::FunctionCall { .. }]
         ));
         let end = single_agent(state.apply(&json!({
@@ -617,9 +625,11 @@ mod tests {
     #[test]
     fn unknown_events_are_ignored_and_eof_without_terminal_is_error() {
         let mut state = ResponsesStreamState::new();
-        assert!(state
-            .apply(&json!({"type": "response.future_event", "value": 1}))
-            .is_empty());
+        assert!(
+            state
+                .apply(&json!({"type": "response.future_event", "value": 1}))
+                .is_empty()
+        );
         assert!(matches!(
             single_agent(state.finish_eof()),
             AgentEvent::Error { message } if message.contains("before a terminal event")
@@ -649,9 +659,11 @@ mod tests {
                 AgentEvent::Error { .. }
             ));
             assert!(state.finish_eof().is_empty());
-            assert!(state
-                .apply(&json!({"type": "response.output_text.delta", "delta": "late"}))
-                .is_empty());
+            assert!(
+                state
+                    .apply(&json!({"type": "response.output_text.delta", "delta": "late"}))
+                    .is_empty()
+            );
         }
     }
 
@@ -671,24 +683,28 @@ mod tests {
             }))),
             AgentEvent::Error { message } if message.contains("function arguments JSON")
         ));
-        assert!(state
-            .apply(&json!({"type": "response.completed", "response": {}}))
-            .is_empty());
+        assert!(
+            state
+                .apply(&json!({"type": "response.completed", "response": {}}))
+                .is_empty()
+        );
     }
 
     #[test]
     fn malformed_reasoning_metadata_is_dropped_without_failing_visible_output() {
         let mut state = ResponsesStreamState::new();
-        assert!(state
-            .apply(&json!({
-                "type": "response.output_item.done",
-                "item": {
-                    "type": "reasoning",
-                    "summary": [],
-                    "encrypted_content": "ciphertext-without-id"
-                }
-            }))
-            .is_empty());
+        assert!(
+            state
+                .apply(&json!({
+                    "type": "response.output_item.done",
+                    "item": {
+                        "type": "reasoning",
+                        "summary": [],
+                        "encrypted_content": "ciphertext-without-id"
+                    }
+                }))
+                .is_empty()
+        );
         let outputs = state.apply(&json!({
             "type": "response.completed",
             "response": {"usage": {}}

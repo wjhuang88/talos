@@ -16,7 +16,9 @@ pub(crate) const MAX_REASONING_RESPONSE_BYTES: usize = 8 * 1024 * 1024;
 ///
 /// `Ok(None)` means the item has no encrypted state and therefore carries nothing Talos can replay
 /// statelessly. The returned string never contains optional raw reasoning `content`.
-pub(crate) fn encode_completed_reasoning_item(item: &Value) -> Result<Option<String>, &'static str> {
+pub(crate) fn encode_completed_reasoning_item(
+    item: &Value,
+) -> Result<Option<String>, &'static str> {
     if item.get("type").and_then(Value::as_str) != Some("reasoning") {
         return Err("not a Responses reasoning item");
     }

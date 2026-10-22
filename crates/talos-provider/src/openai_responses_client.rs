@@ -337,10 +337,18 @@ mod tests {
             }),
         };
 
-        let same = replay_safe_messages("gateway-a", "same-model", true, std::slice::from_ref(&message));
+        let same = replay_safe_messages(
+            "gateway-a",
+            "same-model",
+            true,
+            std::slice::from_ref(&message),
+        );
         assert!(matches!(
             &same[0],
-            Message::Assistant { reasoning: Some(_), .. }
+            Message::Assistant {
+                reasoning: Some(_),
+                ..
+            }
         ));
         let other_provider = replay_safe_messages(
             "gateway-b",
@@ -350,7 +358,10 @@ mod tests {
         );
         assert!(matches!(
             &other_provider[0],
-            Message::Assistant { reasoning: None, .. }
+            Message::Assistant {
+                reasoning: None,
+                ..
+            }
         ));
         let other_model = replay_safe_messages(
             "gateway-a",
@@ -360,7 +371,10 @@ mod tests {
         );
         assert!(matches!(
             &other_model[0],
-            Message::Assistant { reasoning: None, .. }
+            Message::Assistant {
+                reasoning: None,
+                ..
+            }
         ));
         let disabled = replay_safe_messages(
             "gateway-a",
@@ -370,7 +384,10 @@ mod tests {
         );
         assert!(matches!(
             &disabled[0],
-            Message::Assistant { reasoning: None, .. }
+            Message::Assistant {
+                reasoning: None,
+                ..
+            }
         ));
     }
 
@@ -393,10 +410,8 @@ mod tests {
     #[test]
     fn same_protocol_server_errors_remain_eligible_for_bounded_retry() {
         let client = OpenAIResponsesClient::new("sk-test", "gpt-test");
-        let error = responses_status_to_error(
-            reqwest::StatusCode::SERVICE_UNAVAILABLE,
-            "temporary".into(),
-        );
+        let error =
+            responses_status_to_error(reqwest::StatusCode::SERVICE_UNAVAILABLE, "temporary".into());
         assert!(matches!(
             client.retry_decision(&error, 0),
             RetryDecision::Retry { .. }
