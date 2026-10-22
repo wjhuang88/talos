@@ -3,7 +3,7 @@
 use super::*;
 
 #[tokio::test]
-async fn native_pull_scope_discovers_stored_modules_without_reading_configuration() {
+async fn native_pull_scope_discovers_stored_modules_without_expanding_configuration() {
     for stored in [false, true] {
         let root = tempfile::tempdir().expect("fixture");
         git(root.path(), &["init", "-b", "main"]);
@@ -20,9 +20,12 @@ async fn native_pull_scope_discovers_stored_modules_without_reading_configuratio
         if stored {
             std::fs::create_dir_all(&module).expect("stored module");
             std::fs::write(module.join("HEAD"), "ref: refs/heads/main\n").expect("HEAD");
-            // Config is deliberately not a file. Discovering this candidate
-            // must only publish its Read request, never parse/open its contents.
-            std::fs::create_dir(module.join("config")).expect("unread config");
+            // Startup parsing must not expand includes. This directory would
+            // make include-expanded discovery fail if attempted at this stage.
+            std::fs::create_dir(module.join("unread-include")).expect("unread include");
+            std::fs::write(module.join("config"),
+                "[core]\nrepositoryformatversion = 0\nworktree = ../../../absent-worktree\n[include]\npath = unread-include\n",
+            ).expect("startup config");
         }
         let mut plan = Box::new(
             prepare_pull_fixture(root.path(), &serde_json::json!({}), ToolProvenance::Native)
@@ -69,6 +72,12 @@ async fn native_pull_scope_discovers_stored_modules_without_reading_configuratio
         if stored {
             assert_eq!(roots, vec![module.as_path()]);
             assert!(plan.native_pull_metadata.contains_key(&module));
+            assert!(plan.pull_child_startup.contains_key(&module));
+            assert!(
+                plan.pull_child_startup[&module]
+                    .targets
+                    .contains(&module.join("../../../absent-worktree"))
+            );
             assert!(plan.facets.iter().any(|facet| {
                 facet.nature == ToolNature::Read
                     && facet.resource.as_deref() == module.join("gitdir").to_str()
@@ -95,6 +104,54 @@ async fn native_pull_scope_discovers_stored_modules_without_reading_configuratio
         }
         assert!(!root.path().join(".git/FETCH_HEAD").exists());
     }
+}
+
+#[tokio::test]
+async fn native_pull_scope_rejects_startup_configuration_drift() {
+    let root = tempfile::tempdir().expect("fixture");
+    git(root.path(), &["init", "-b", "main"]);
+    git(root.path(), &["config", "core.hooksPath", ""]);
+    git(
+        root.path(),
+        &["remote", "add", "origin", "git://example.invalid/source"],
+    );
+    let module = root
+        .path()
+        .canonicalize()
+        .expect("root")
+        .join(".git/modules/child");
+    std::fs::create_dir_all(&module).expect("module");
+    std::fs::write(module.join("HEAD"), "ref: refs/heads/main\n").expect("HEAD");
+    let config = module.join("config");
+    std::fs::write(&config, "[core]\nrepositoryformatversion = 0\n").expect("config");
+    let mut plan = Box::new(
+        prepare_pull_fixture(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+            .expect("plan"),
+    )
+    .discover()
+    .await
+    .expect("sender");
+    plan.phase = Phase::PullNativePreparation;
+    for _ in 0..8 {
+        if plan.phase != Phase::PullNativePreparation {
+            break;
+        }
+        let tokens = proof(&plan)
+            .consume_for_prepared(&plan.request(), &plan.identity)
+            .expect("proof");
+        plan = plan
+            .discover_native_pull_scope(&tokens)
+            .await
+            .expect("scope");
+    }
+    assert!(plan.pull_child_startup.contains_key(&module));
+    std::fs::write(
+        &config,
+        "[core]\nrepositoryformatversion = 0\nworktree = elsewhere\n",
+    )
+    .expect("drift");
+    assert!(plan.revalidate().is_err());
+    assert!(!root.path().join(".git/FETCH_HEAD").exists());
 }
 
 #[tokio::test]

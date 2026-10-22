@@ -98,6 +98,24 @@ impl AddPlan {
         for root in roots {
             self.child_read(&root, authorizations)?;
             let metadata = super::super::receiver_state::Metadata::capture(&root, &root)?;
+            // Ordinary stored modules keep startup sources in this already
+            // admitted root. Linked/common-directory targets need their own
+            // resolution and admission before startup bytes may be captured.
+            if metadata.common_path == root {
+                let startup = super::super::config_state::ChildStartupLayout::capture(
+                    &root,
+                    &root,
+                    metadata.has_common(),
+                )?;
+                for target in &startup.targets {
+                    self.facets.push(path_facet(
+                        ToolNature::Read,
+                        target,
+                        "native Pull child raw startup worktree; resolution deferred",
+                    )?);
+                }
+                self.pull_child_startup.insert(root.clone(), startup);
+            }
             for path in std::iter::once(metadata.common_path.clone())
                 .chain(std::iter::once(metadata.common_path.join("config")))
                 .chain(metadata.worktree_marker.iter().cloned())

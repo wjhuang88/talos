@@ -7526,3 +7526,13 @@ Pull regression also passes 168/168 (22.12 s,
 `/private/tmp/i300-native-metadata-pull.log`); both governance validators pass
 with 0 warnings (`/private/tmp/i300-native-metadata-governance.log` and
 `/private/tmp/i300-native-metadata-claims.log`).
+
+Native startup follow-up: ordinary stored modules now retain the existing
+ChildStartupLayout snapshot after exact config-source admission, publishing raw
+core.worktree targets without resolving/opening them or expanding includes.
+Tests cover unread include targets and startup-byte drift. Native tests 12/12;
+Pull regression 169/169 (22.28 s); locked Git-enabled tools Clippy lib/tests with
+`-D warnings` passes. Logs: `/private/tmp/i300-native-startup-tests.log`,
+`/private/tmp/i300-native-startup-pull.log`, `/private/tmp/i300-native-startup-clippy.log`.
+Linked/common targets still require resolution/admission before their startup
+capture. Config-chain/remotes/worktree binding and production activation remain open.
