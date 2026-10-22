@@ -36,7 +36,7 @@ fn production_windows_preparation_stays_closed_before_repository_discovery() {
             panic!("{} enabled production preparation", tool.name());
         };
         assert!(
-            error.contains("Windows Job integration is not yet available"),
+            error.contains("disabled pending native acceptance of Job-supervised execution"),
             "{}: {error}",
             tool.name()
         );
