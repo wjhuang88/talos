@@ -32,6 +32,8 @@ mod pull_integration;
 mod pull_native;
 #[path = "prepared_add/pull_native_config.rs"]
 mod pull_native_config;
+#[path = "prepared_add/pull_native_remote.rs"]
+mod pull_native_remote;
 #[path = "prepared_add/pull_native_scope.rs"]
 mod pull_native_scope;
 #[path = "prepared_add/pull_reconcile.rs"]
@@ -276,6 +278,7 @@ pub(super) struct AddPlan {
     native_pull_modules: Option<super::pull_inventory::Inventory>,
     native_pull_metadata: BTreeMap<PathBuf, super::receiver_state::Metadata>,
     native_pull_configs: BTreeMap<PathBuf, super::config_state::ChildConfig>,
+    native_pull_remotes: BTreeMap<PathBuf, pull_native_remote::RemoteEvidence>,
     pull_before: Option<super::pull_state::BeforeFetch>,
     pull_evidence: Option<super::pull_state::PullEvidence>,
     pull_sources: Option<PullSources>,
@@ -789,6 +792,7 @@ impl AddPlan {
             native_pull_modules: None,
             native_pull_metadata: BTreeMap::new(),
             native_pull_configs: BTreeMap::new(),
+            native_pull_remotes: BTreeMap::new(),
             pull_inventory: None,
             pull_reference_budget: super::pull_inventory::ReferenceBudget::default(),
             pull_integration: None,
