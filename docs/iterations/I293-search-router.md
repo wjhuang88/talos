@@ -10,7 +10,7 @@
 | Source Issue | #643 |
 | Depends on | Accepted ADR-085; SEARCH-001-B / #642 complete in #656; NET-001 boundary coordination |
 | Claim State | Claimed |
-| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 merged TLS/CONNECT subset; #716 merged bounded form/diagnostic stage at `b5b8241e`; #732 merged owned payload at `8fa2a50`; #733 merged Lite/HTML parsing at `dea3edc`; #734 merged Instant Answer at `45cf9eb9`; #736 merged Bing parsing at `2b015a6b`; #737 merged fixed requests at `ae6a0791`; #738 merged bound execution at `2d7f4b36`; #739 merged fixed headers at `91c330ba`; #741 merged result admission at `4e20ee95`; #742 merged fixed chain at `9f998392`; #743 merged direct plan at `181d7584`; #744 merged prepared invocation at `032cce61`; #745 merged private tool at `ba93193f`; #746 merged DNS failover at `0caaf832`; typed-refusal candidate tracked from #643; full C/EP and default activation Pending |
+| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 merged TLS/CONNECT subset; #716 merged bounded form/diagnostic stage at `b5b8241e`; #732 merged owned payload at `8fa2a50`; #733 merged Lite/HTML parsing at `dea3edc`; #734 merged Instant Answer at `45cf9eb9`; #736 merged Bing parsing at `2b015a6b`; #737 merged fixed requests at `ae6a0791`; #738 merged bound execution at `2d7f4b36`; #739 merged fixed headers at `91c330ba`; #741 merged result admission at `4e20ee95`; #742 merged fixed chain at `9f998392`; #743 merged direct plan at `181d7584`; #744 merged prepared invocation at `032cce61`; #745 merged private tool at `ba93193f`; #746 merged DNS failover at `0caaf832`; typed-refusal candidate #750; full C/EP and default activation Pending |
 | Completion | Pending |
 
 ## Collaboration Claim
@@ -2119,3 +2119,24 @@ Journal SHA256:
 - focused: `ba3303cf211cd37c0155df3385e94436499d838757ead5af067b76efe22fb037`
 - network-clippy: `d038af2eb1ece14943ec38ac0a612d7b320e60c616d2369c2fc0c7382daab78a`
 - preflight: `9d13c35c38c7ecdc7db67691e31138358ff63879e6152c2e96b1963c58273f28`
+
+Publication/integration checkpoint — 2026-10-22: maintainer explicitly authorized publishing
+local281514e7 to wjhuang88/talos, creating a PR and merging only after CI/review pass. Git CLI
+had no credentials; connected GitHub publication produced6cacba66 with identical source tree
+3479966ad8821cb41e04c7df53665b0f8c5ac75b and parent0caaf832. Independent exact-remote review
+verified all10paths and approved publication only. PR#750 / CI3336 run39808091501 first attempt
+failed Remote issue / owner reconciliation job119926609124: missing open Issue#748 in the
+candidate's old reconciliation matrix. This is a real retained failure, not a Rust test failure.
+Main already contains the correction in docs-only #747 at4722fee8. Integrate that existing
+target-branch governance tree, without editing its Provider scope or changing any search Rust
+blob. Other original platform jobs retain their own outcomes; do not reinterpret the first run
+as green. The stable integrated candidate requires fresh exact-head CI/review, not an unchanged
+rerun. Local source tests remain evidence for unchanged Rust; merged documentation/claims
+validators are rerun. I293/#643/#624 remain incomplete/open and default search remains unchanged.
+
+Integrated documentation checks: claims PASS0warnings, text boundary23/0errors and whitespace
+PASS; exact comparison confirms all Rust/manifests/lock/toolchain/scripts/workflows unchanged
+from local281514e7. Fresh governance cannot complete because the local Rust/Cargo/cache was
+removed again; SQLite metadata gate reports missing cargo (exit1). No fresh integrated local
+full preflight/format pass is claimed. Earlier complete source-tree validation is retained,
+while the integrated exact-head native CI must supply governance and all runtime evidence.

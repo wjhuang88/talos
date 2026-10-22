@@ -77,9 +77,15 @@
 | [#729](https://github.com/wjhuang88/talos/issues/729) | known Windows returned-resource cleanup acceptance | [TEST-004](../backlog/active/TEST-004-windows-known-resource-acceptance.md) | Complete / Closed | #716 merged `b5b8241e`; owner Completion Commit plus CI3221/review/CAS. #729 closes only after closeout main merge; #717 residual open. |
 | [#717](https://github.com/wjhuang88/talos/issues/717) | Test-only current-process handle evidence | [TEST-003](../backlog/active/TEST-003-windows-owned-handle-evidence.md) | Review / Claimed | #718 effective f4313237; #716 mergedb5b8241e, CI3221 known-resource gate passed. I305 closes only narrowed criterion; prior+3/unknown/native lifetime residual remains open. |
 | [#719](https://github.com/wjhuang88/talos/issues/719) | Embedded Skill Level 1/2 progressive disclosure | [SKILL-006](../backlog/active/SKILL-006-embedded-skill-progressive-disclosure.md) | Complete / Closed | #721 merged as 6d72975e; closeout records Completion Commit. |
-| [#724](https://github.com/wjhuang88/talos/issues/724) | Complete wire-protocol family coverage (Responses, Gemini, Azure, Bedrock) | [PROVIDER-008](../backlog/active/PROVIDER-008-openai-responses-api-support.md) | Refinement / Unclaimed | Intake only; ADR-093 amended as umbrella + Responses contract; no claim, iteration or implementation. |
+| [#724](https://github.com/wjhuang88/talos/issues/724) | Complete wire-protocol family coverage (Responses, Gemini, Azure, Bedrock) | [PROVIDER-008](../backlog/active/PROVIDER-008-openai-responses-api-support.md) | Refinement / Unclaimed | Parent epic remains unclaimed; child A/#748 is proposed separately in governance PR #747. |
+| [#748](https://github.com/wjhuang88/talos/issues/748) | Protocol architecture + OpenAI Responses adapter | [PROVIDER-008-A](../backlog/active/PROVIDER-008-A-openai-responses-protocol.md) | Active / Claimed (proposed; ineffective until #747 merges) | Child A of #724; governance-only #747 establishes the claim/activation. Production implementation starts only after that merge. |
 
 ## Synchronization Notes
+
+2026-10-22: Added #748 against PROVIDER-008-A after splitting child A from parent #724 so the parent
+retains its own Source Issue/owner relationship. Governance-only #747 proposes the child claim and
+activation; the parent remains Refinement / Unclaimed and implementation remains unauthorized until
+#747 reaches main.
 
 2026-09-30: Added #623 against its existing INTEGRATION-002 intake owner, and #624/#625 against
 SEARCH-001/SEARCH-001-A created by merged architecture-intake PR #626. SEARCH-001-A/I288 claim became effective through #627 merge `6f651a28`; architecture review is now active,
