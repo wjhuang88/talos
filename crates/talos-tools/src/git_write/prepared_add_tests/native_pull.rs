@@ -42,6 +42,7 @@ async fn native_pull_stage_refuses_missing_or_stale_admission_and_missing_scope(
         "missing-scope",
         "missing-root",
         "missing-network",
+        "missing-execute",
     ] {
         let root = tempfile::tempdir().expect("fixture");
         git(root.path(), &["init", "-b", "main"]);
@@ -49,23 +50,54 @@ async fn native_pull_stage_refuses_missing_or_stale_admission_and_missing_scope(
             AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
                 .expect("plan");
         plan.phase = Phase::PullNativeMutation;
-        if matches!(scenario, "missing-root" | "missing-network") {
+        if matches!(
+            scenario,
+            "missing-root" | "missing-network" | "missing-execute"
+        ) {
             plan.pull_destinations = vec!["git://example.invalid/source".into()];
             plan.facets
                 .extend(plan.native_pull_parent_facets().expect("parent scope"));
-            let removed = if scenario == "missing-root" {
-                plan.facets.iter().position(|facet| {
-                    facet.nature == ToolNature::Write
-                        && facet.resource_kind == Some(ToolResourceKind::Path)
-                        && facet.resource.as_deref() == plan.repository.workdir.to_str()
-                })
-            } else {
+            if scenario == "missing-execute" {
                 plan.facets
-                    .iter()
-                    .position(|facet| facet.nature == ToolNature::Network)
+                    .retain(|facet| facet.nature != ToolNature::Execute);
+            } else {
+                let removed = if scenario == "missing-root" {
+                    plan.facets.iter().position(|facet| {
+                        facet.nature == ToolNature::Write
+                            && facet.resource_kind == Some(ToolResourceKind::Path)
+                            && facet.resource.as_deref() == plan.repository.workdir.to_str()
+                    })
+                } else {
+                    plan.facets
+                        .iter()
+                        .position(|facet| facet.nature == ToolNature::Network)
+                }
+                .expect("required facet");
+                plan.facets.remove(removed);
             }
-            .expect("required facet");
-            plan.facets.remove(removed);
+        }
+        if scenario == "missing-execute" {
+            // Admission already refuses command-less profiles. Keep the
+            // executor's own scope invariant defensive as well, before probes.
+            let state = PermissionSessionState::new(PermissionEngine::with_workspace_root(
+                plan.workspace.clone(),
+            ));
+            let context = PermissionContext::new(
+                PermissionMode::Interactive,
+                InteractionCapability::Available,
+            );
+            assert!(
+                state
+                    .propose(&plan.request(), &context, GrantScope::Once)
+                    .is_err()
+            );
+            let error = plan
+                .execute_native_pull(&[])
+                .await
+                .expect_err("missing Execute");
+            assert!(error.to_string().contains("scope capability missing"));
+            assert!(!root.path().join(".git/FETCH_HEAD").exists());
+            continue;
         }
         let admission: Box<dyn std::any::Any + Send> = if scenario == "missing-proof" {
             Box::new(())
