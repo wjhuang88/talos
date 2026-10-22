@@ -5349,3 +5349,19 @@ seven existing reduced-feature dead-code warnings remain. This is compile eviden
 not native Windows runtime validation. The MCP daemon fixture still uses direct
 child cleanup and remains follow-up work. No production Pull activation or T7
 completion is claimed.
+
+
+## Native recursive Pull baseline — 2026-10-22
+
+The owned-runner native Pull baseline now covers `submodule.recurse=true`:
+one native `git pull` fetches and integrates the parent and updates the initialized
+child to the recorded new commit, without Talos scheduling child fetch commands.
+Local native baseline tests pass 3/3 (configured upstream/rebase, merge conflict,
+and configured recursion). Locked MSVC `cargo xwin check` passes with the same
+seven reduced-feature warnings (`/private/tmp/i300-native-recursion-xwin.log`);
+the first sandbox attempt could not update cargo-xwin's clang-cl cache symlink
+and the authorized outside-sandbox retry passed. This fixture explicitly admits
+file transport for its local sources; it does not activate production local
+transport, prepared Pull, or effectful Auto. The native command/scope replacement
+and all runtime/security gates remain open. Origin fetch succeeds and the current
+branch has no origin/main-only commits, so this checkpoint requires no rebase.
