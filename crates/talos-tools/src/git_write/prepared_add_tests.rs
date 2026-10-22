@@ -99,6 +99,16 @@ async fn discover_sender_approved(mut plan: Box<AddPlan>) -> Result<Box<AddPlan>
     }
 }
 
+// Preserve explicit fixture settings while masking unrelated host filter programs.
+fn prepare_pull_fixture(
+    root: &Path,
+    input: &Value,
+    provenance: ToolProvenance,
+) -> Result<AddPlan, GitToolError> {
+    isolate_integration_fixture_filters(root);
+    AddPlan::prepare_pull(root, input, provenance)
+}
+
 fn fixture() -> tempfile::TempDir {
     let root = tempfile::tempdir().expect("fixture");
     let output = std::process::Command::new("git")
@@ -107,6 +117,7 @@ fn fixture() -> tempfile::TempDir {
         .output()
         .expect("Git fixture");
     assert!(output.status.success());
+    isolate_integration_fixture_filters(root.path());
     std::fs::write(root.path().join("file"), "before").expect("file");
     root
 }

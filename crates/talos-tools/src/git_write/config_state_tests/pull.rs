@@ -118,3 +118,55 @@ fn pull_diff_order_file_resolves_relative_paths_under_workdir() {
             .is_err()
     );
 }
+
+#[test]
+fn native_pull_discovers_policy_hooks_before_fetch_without_reading_candidates() {
+    let root = tempfile::tempdir().expect("fixture");
+    assert!(std::process::Command::new("git").args(["init"]).current_dir(root.path())
+        .output().expect("git").status.success());
+    let repository = RepositoryState::capture(root.path()).expect("repository");
+    let capture = |records: &str| {
+        let source = repository.common_dir.join("config");
+        let output = records.split_terminator('\0')
+            .map(|record| format!("file:{}\0{record}\0", source.display()))
+            .collect::<String>();
+        ConfigState::capture_host(output.as_bytes(), &repository, &BTreeMap::new()).expect("config")
+    };
+    // A directory at a hook filename would fail a content read. Discovery only
+    // publishes paths; even these invalid candidates must await Read admission.
+    let hooks = repository.workdir.join("candidate-hooks");
+    std::fs::create_dir_all(hooks.join("pre-rebase")).expect("candidate");
+    let records = "core.hookspath\ncandidate-hooks\0pull.rebase\nfalse\0branch.Topic.rebase\ntrue\0rebase.backend\napply\0";
+    let paths = capture(records).prepare_native_pull(&repository, &BTreeMap::new(), Some("Topic")).expect("rebase frontier");
+    for name in ["pre-rebase", "applypatch-msg", "pre-applypatch", "post-applypatch", "reference-transaction"] {
+        assert!(paths.contains(&hooks.join(name)), "{name}");
+    }
+    assert!(!paths.contains(&hooks.join("pre-merge-commit")));
+    let paths = capture(records).prepare_native_pull(&repository, &BTreeMap::new(), Some("topic")).expect("merge frontier");
+    assert!(paths.contains(&hooks.join("pre-merge-commit")));
+    assert!(!paths.contains(&hooks.join("pre-rebase")));
+    assert!(!repository.git_dir.join("FETCH_HEAD").exists());
+}
+
+#[test]
+fn native_pull_rejects_unapproved_program_effects_before_fetch() {
+    let root = tempfile::tempdir().expect("fixture");
+    assert!(std::process::Command::new("git").args(["init"]).current_dir(root.path())
+        .output().expect("git").status.success());
+    let repository = RepositoryState::capture(root.path()).expect("repository");
+    for records in [
+        "pull.rebase\ninteractive\0",
+        "pull.rebase\ntrue\0rebase.instructionformat\n%nexec command\0",
+        "filter.fixture.process\ncommand\0",
+        "merge.fixture.driver\ncommand\0",
+        "commit.gpgsign\ntrue\0",
+    ] {
+        let source = repository.common_dir.join("config");
+        let output = records.split_terminator('\0')
+            .map(|record| format!("file:{}\0{record}\0", source.display()))
+            .collect::<String>();
+        let mut config = ConfigState::capture_host(output.as_bytes(), &repository, &BTreeMap::new()).expect("config");
+        assert!(config.prepare_native_pull(&repository, &BTreeMap::new(), None).is_err(), "{records}");
+        assert!(!repository.git_dir.join("FETCH_HEAD").exists());
+    }
+}

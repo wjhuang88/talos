@@ -16,7 +16,7 @@ async fn pull_fetch_refuses_executable_reference_transaction_hook() {
     std::fs::write(&hook, "#!/bin/sh\ntouch hook-ran\n").expect("hook");
     std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o755)).expect("hook mode");
     let mut plan = Box::new(
-        AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+        prepare_pull_fixture(root.path(), &serde_json::json!({}), ToolProvenance::Native)
             .expect("Pull"),
     )
     .discover()
@@ -134,7 +134,7 @@ async fn pull_network_fetch_continuation_requires_fresh_admission() {
             &["config", &format!("branch.{branch}.merge"), &remote_branch],
         );
         let mut plan = Box::new(
-            AddPlan::prepare_pull(local.path(), &serde_json::json!({}), ToolProvenance::Native)
+            prepare_pull_fixture(local.path(), &serde_json::json!({}), ToolProvenance::Native)
                 .expect("plan"),
         )
         .discover()
@@ -230,7 +230,7 @@ async fn pull_failed_parent_fetch_reports_possible_partial_effects() {
         .expect("configure remote");
     assert!(output.status.success());
     let mut plan = Box::new(
-        AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+        prepare_pull_fixture(root.path(), &serde_json::json!({}), ToolProvenance::Native)
             .expect("Pull"),
     )
     .discover()
@@ -292,7 +292,7 @@ async fn pull_unsupported_transport_is_shown_but_never_dispatched() {
         .expect("fixture Git");
     assert!(output.status.success());
     let mut plan = Box::new(
-        AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+        prepare_pull_fixture(root.path(), &serde_json::json!({}), ToolProvenance::Native)
             .expect("Pull"),
     )
     .discover()
@@ -332,7 +332,7 @@ async fn pull_rejects_legacy_destinations_before_configuration_and_after_fetch_p
             let root = fixture();
             let input = serde_json::json!({"remote":"origin"});
             let mut plan = Box::new(
-                AddPlan::prepare_pull(root.path(), &input, ToolProvenance::Native)
+                prepare_pull_fixture(root.path(), &input, ToolProvenance::Native)
                     .expect("Pull plan"),
             );
             if after_planning {
@@ -375,7 +375,7 @@ async fn pull_fetch_requires_every_metadata_write_admission_before_dispatch() {
         let root = fixture();
         let input = serde_json::json!({});
         let mut plan = Box::new(
-            AddPlan::prepare_pull(root.path(), &input, ToolProvenance::Native).expect("Pull"),
+            prepare_pull_fixture(root.path(), &input, ToolProvenance::Native).expect("Pull"),
         )
         .discover()
         .await

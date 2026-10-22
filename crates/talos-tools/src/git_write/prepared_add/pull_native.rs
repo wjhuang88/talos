@@ -62,6 +62,24 @@ impl AddPlan {
         let config = self.config.as_ref().ok_or_else(|| {
             GitToolError::InvalidInput("Native Pull configuration evidence missing".into())
         })?;
+        let branch = self.native_pull_branch().await?;
+        let remote = super::super::pull_state::fetch_remote(
+            &config.pull_records()?,
+            branch.as_deref(),
+            input.remote.as_deref(),
+        )?;
+        config.prepare_pull_transport(&remote)?;
+        let destinations = super::super::remote_state::destinations(
+            &config.pull_remote_records()?,
+            &remote,
+            false,
+        )?;
+        self.revalidate()?;
+        Ok((remote, destinations))
+    }
+
+    // Full symbolic branch used by both pre-fetch policy and destination discovery.
+    pub(super) async fn native_pull_branch(&self) -> Result<Option<String>, GitToolError> {
         let head = self
             .pull_probe(vec!["symbolic-ref".into(), "--quiet".into(), "HEAD".into()])
             .await?;
@@ -74,7 +92,8 @@ impl AddPlan {
                     .filter(|text| !text.is_empty() && !text.contains(['\n', '\r']))
                     .ok_or_else(|| {
                         GitToolError::InvalidInput("Native Pull branch evidence invalid".into())
-                    })?,
+                    })?
+                    .to_owned(),
             ),
             Some(1) if head.stdout.is_empty() && head.stderr.is_empty() => None,
             _ => {
@@ -83,19 +102,7 @@ impl AddPlan {
                 ));
             }
         };
-        let remote = super::super::pull_state::fetch_remote(
-            &config.pull_records()?,
-            branch,
-            input.remote.as_deref(),
-        )?;
-        config.prepare_pull_transport(&remote)?;
-        let destinations = super::super::remote_state::destinations(
-            &config.pull_remote_records()?,
-            &remote,
-            false,
-        )?;
-        self.revalidate()?;
-        Ok((remote, destinations))
+        Ok(branch)
     }
 
     pub(super) async fn validate_native_pull_destination(&self) -> Result<(), GitToolError> {

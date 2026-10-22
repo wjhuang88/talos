@@ -1233,6 +1233,14 @@ struct Policy {
     autostash: bool,
 }
 
+/// Select integration policy before fetching, without predicting fetched commits.
+pub(super) fn native_rebase_mode(
+    config: &[u8],
+    branch: Option<&str>,
+) -> Result<Rebase, GitToolError> {
+    Ok(Policy::capture(config, branch)?.rebase)
+}
+
 impl Policy {
     // Input is the admitted host configuration list, without origin fields.
     // Keep subsection case and duplicate declaration order via the common parser.

@@ -1366,6 +1366,49 @@ impl ConfigState {
         branch: Option<&str>,
     ) -> Result<Vec<PathBuf>, GitToolError> {
         use super::pull_state::Integration;
+        let merge = matches!(integration, Integration::Merge { .. });
+        let rebase = match integration {
+            Integration::Rebase { mode, .. } => Some(mode),
+            _ => None,
+        };
+        self.pull_operation_hook_paths(repository, environment, merge, rebase, branch)
+    }
+
+    /// Discover the native operation's hook frontier from pre-fetch policy only.
+    /// No hook contents, fetched identities or integration outcome are needed.
+    pub(super) fn prepare_native_pull(
+        &mut self,
+        repository: &RepositoryState,
+        environment: &BTreeMap<OsString, OsString>,
+        branch: Option<&str>,
+    ) -> Result<Vec<PathBuf>, GitToolError> {
+        let mode = super::pull_state::native_rebase_mode(&self.pull_records()?, branch)?;
+        let merge = mode == super::pull_state::Rebase::Off;
+        let mut paths = self.pull_operation_hook_paths(
+            repository,
+            environment,
+            merge,
+            (!merge).then_some(&mode),
+            branch,
+        )?;
+        paths.extend(self.prepare_pull(repository, environment)?);
+        paths.sort();
+        paths.dedup();
+        self.auxiliary.extend(paths.iter().cloned());
+        self.hooks.extend(paths.iter().cloned());
+        self.hooks.sort();
+        self.hooks.dedup();
+        Ok(paths)
+    }
+
+    fn pull_operation_hook_paths(
+        &self,
+        repository: &RepositoryState,
+        environment: &BTreeMap<OsString, OsString>,
+        merge: bool,
+        rebase: Option<&super::pull_state::Rebase>,
+        branch: Option<&str>,
+    ) -> Result<Vec<PathBuf>, GitToolError> {
         // Current-worktree attributes cannot predict attributes introduced by
         // the fetched tree or by replayed commits. A worktree write grant does
         // not authorize configured programs selected by those new attributes.
@@ -1374,10 +1417,8 @@ impl ConfigState {
                 && [b".clean".as_slice(), b".smudge", b".process"]
                     .iter()
                     .any(|suffix| key.ends_with(suffix));
-            let driver = matches!(
-                integration,
-                Integration::Merge { .. } | Integration::Rebase { .. }
-            ) && key.starts_with(b"merge.")
+            let driver = (merge || rebase.is_some())
+                && key.starts_with(b"merge.")
                 && key.ends_with(b".driver");
             if (filter || driver)
                 && values
@@ -1391,23 +1432,17 @@ impl ConfigState {
                 }));
             }
         }
-        if matches!(
-            integration,
-            Integration::Rebase {
-                mode: super::pull_state::Rebase::Interactive,
-                ..
-            }
-        ) {
+        if rebase == Some(&super::pull_state::Rebase::Interactive) {
             return Err(unsupported(
                 "Interactive Pull rebase requires separate sequence editor execution authorization",
             ));
         }
-        self.validate_pull_integration_signing(integration)?;
+        self.validate_pull_integration_signing_mode(merge, rebase.is_some())?;
         // The sequencer expands this format into its executable todo list.
         // In particular, %nexec can launch a command even for noninteractive
         // rebase. Worktree scope does not authorize those commands. Empty
         // formats retain Git's default; custom formats need effect discovery.
-        if matches!(integration, Integration::Rebase { .. })
+        if rebase.is_some()
             && self
                 .values
                 .get(b"rebase.instructionformat".as_slice())
@@ -1418,7 +1453,7 @@ impl ConfigState {
                 "Custom rebase instruction format requires separate executable-todo effect authorization",
             ));
         }
-        if matches!(integration, Integration::Merge { .. }) {
+        if merge {
             self.validate_pull_merge_strategy()?;
             self.validate_pull_merge_options(branch)?;
         }
@@ -1429,8 +1464,8 @@ impl ConfigState {
         } else {
             repository.workdir.join(directory)
         };
-        let names: &[&str] = match integration {
-            Integration::Merge { .. } => &[
+        let names: &[&str] = match (merge, rebase.is_some()) {
+            (true, _) => &[
                 "pre-merge-commit",
                 "prepare-commit-msg",
                 "commit-msg",
@@ -1440,7 +1475,7 @@ impl ConfigState {
                 "reference-transaction",
                 "pre-auto-gc",
             ],
-            Integration::Rebase { .. } => &[
+            (_, true) => &[
                 "pre-rebase",
                 "prepare-commit-msg",
                 "commit-msg",
@@ -1451,25 +1486,18 @@ impl ConfigState {
                 "reference-transaction",
                 "pre-auto-gc",
             ],
-            Integration::Unborn(_) | Integration::Reconcile { .. } => {
-                &["reference-transaction", "post-index-change"]
-            }
+            _ => &["reference-transaction", "post-index-change"],
         };
         let mut paths: Vec<_> = names.iter().map(|name| directory.join(name)).collect();
         // Plain rebase honors rebase.backend=apply and invokes git-am.
         // --rebase-merges selects the merge backend regardless of this setting.
-        if matches!(
-            integration,
-            Integration::Rebase {
-                mode: super::pull_state::Rebase::On,
-                ..
-            }
-        ) && self
-            .values
-            .get(b"rebase.backend".as_slice())
-            .and_then(|values| values.last())
-            .and_then(|value| value.as_deref())
-            == Some(b"apply")
+        if rebase == Some(&super::pull_state::Rebase::On)
+            && self
+                .values
+                .get(b"rebase.backend".as_slice())
+                .and_then(|values| values.last())
+                .and_then(|value| value.as_deref())
+                == Some(b"apply")
         {
             paths.extend(
                 ["applypatch-msg", "pre-applypatch", "post-applypatch"]
@@ -1484,15 +1512,15 @@ impl ConfigState {
     // exists. Worktree scope approval does not authorize that execution.
     // Branch merge options and other external effects need their own checks;
     // this is deliberately not a complete integration execution validator.
-    fn validate_pull_integration_signing(
+    fn validate_pull_integration_signing_mode(
         &self,
-        integration: &super::pull_state::Integration,
+        merge: bool,
+        rebase: bool,
     ) -> Result<(), GitToolError> {
-        use super::pull_state::Integration;
-        let keys: &[&[u8]] = match integration {
-            Integration::Merge { .. } => &[b"commit.gpgsign", b"merge.verifysignatures"],
-            Integration::Rebase { .. } => &[b"commit.gpgsign"],
-            Integration::Unborn(_) | Integration::Reconcile { .. } => &[],
+        let keys: &[&[u8]] = match (merge, rebase) {
+            (true, _) => &[b"commit.gpgsign", b"merge.verifysignatures"],
+            (_, true) => &[b"commit.gpgsign"],
+            _ => &[],
         };
         for key in keys {
             let mut enabled = false;

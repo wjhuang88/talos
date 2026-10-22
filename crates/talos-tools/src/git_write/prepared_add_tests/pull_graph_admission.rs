@@ -120,7 +120,7 @@ async fn pull_config_admission_cannot_authorize_graph_probes() {
     };
     assert!(denied.result.is_error);
 
-    let plan = AddPlan::prepare_pull(root.path(), &input, ToolProvenance::Native).expect("Pull");
+    let plan = prepare_pull_fixture(root.path(), &input, ToolProvenance::Native).expect("Pull");
     let old_proof = proof(&plan);
     let plan = Box::new(plan).discover().await.expect("configuration");
     let PreparedNormalStage::Complete(output) = plan.execute_stage(Box::new(old_proof)).await
@@ -129,7 +129,7 @@ async fn pull_config_admission_cannot_authorize_graph_probes() {
     };
     assert!(output.result.is_error && output.result.content.contains("does not authorize"));
 
-    let plan = AddPlan::prepare_pull(root.path(), &input, ToolProvenance::Native).expect("Pull");
+    let plan = prepare_pull_fixture(root.path(), &input, ToolProvenance::Native).expect("Pull");
     let mut history = talos_core::tool::PreparedStageHistory::default();
     assert!(history.record_profile(&plan.identity, &plan.facets));
     let mut plan = Box::new(plan).discover().await.expect("config");
@@ -226,7 +226,7 @@ async fn pull_sparse_index_requires_object_discovery_before_source_capture() {
             .iter()
             .any(|entry| entry.mode.bits() == 0o040000)
     );
-    let plan = AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+    let plan = prepare_pull_fixture(root.path(), &serde_json::json!({}), ToolProvenance::Native)
         .expect("Pull");
     let mut history = talos_core::tool::PreparedStageHistory::default();
     assert!(history.record_profile(&plan.identity, &plan.facets));
@@ -314,7 +314,7 @@ async fn pull_sparse_index_requires_object_discovery_before_source_capture() {
 #[tokio::test]
 async fn pull_graph_read_requires_closed_capability_after_configuration() {
     let root = fixture();
-    let plan = AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+    let plan = prepare_pull_fixture(root.path(), &serde_json::json!({}), ToolProvenance::Native)
         .expect("Pull");
     let mut plan = Box::new(plan).discover().await.expect("configuration");
     plan.facets
@@ -337,7 +337,7 @@ async fn pull_graph_read_requires_closed_capability_after_configuration() {
 async fn pull_unapproved_resolution_does_not_inspect_missing_external_target() {
     let root = fixture();
     let mut plan = Box::new(
-        AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+        prepare_pull_fixture(root.path(), &serde_json::json!({}), ToolProvenance::Native)
             .expect("Pull"),
     )
     .discover()
@@ -382,7 +382,7 @@ async fn pull_unapproved_resolution_does_not_inspect_missing_external_target() {
 async fn pull_parent_linked_targets_require_fresh_exact_admission() {
     let root = fixture();
     let mut plan = Box::new(
-        AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+        prepare_pull_fixture(root.path(), &serde_json::json!({}), ToolProvenance::Native)
             .expect("Pull"),
     )
     .discover()
@@ -486,7 +486,7 @@ async fn pull_tracking_inventory_uses_shared_stage_budget() {
     git(&["update-ref", "refs/heads/a/b/c/d/e/f/g/h/i/j/deep", "HEAD"]);
     let absent_tracking_log = root.path().join(".git/logs/refs/remotes/origin/Topic");
     std::fs::remove_file(&absent_tracking_log).expect("absent tracking reflog");
-    let plan = AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+    let plan = prepare_pull_fixture(root.path(), &serde_json::json!({}), ToolProvenance::Native)
         .expect("Pull");
     let mut history = talos_core::tool::PreparedStageHistory::default();
     assert!(history.record_profile(&plan.identity, &plan.facets));
