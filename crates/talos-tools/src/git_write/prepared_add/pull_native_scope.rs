@@ -66,14 +66,49 @@ impl AddPlan {
         }
         // These roots are candidates, not yet validated repositories. Exact
         // config/metadata admission must precede child configuration discovery.
-        for root in modules.stored_module_roots() {
-            for leaf in ["HEAD", "commondir", "config", "config.worktree"] {
+        let roots = modules
+            .stored_module_roots()
+            .map(Path::to_owned)
+            .collect::<Vec<_>>();
+        let mut metadata_ready = true;
+        for root in &roots {
+            for leaf in ["HEAD", "commondir", "gitdir", "config", "config.worktree"] {
+                let path = root.join(leaf);
+                metadata_ready &= admitted(&path);
+                if !self.facets.iter().any(|facet| {
+                    facet.nature == ToolNature::Read && facet.resource.as_deref() == path.to_str()
+                }) {
+                    self.facets.push(path_facet(
+                        ToolNature::Read,
+                        &path,
+                        "native Pull stored child fixed configuration/layout frontier",
+                    )?);
+                }
+            }
+        }
+        if !metadata_ready {
+            self.phase = Phase::PullNativePreparation;
+            self.identity = PreparedPlanIdentity::new();
+            return Ok(self);
+        }
+        // Metadata::capture reads all three fixed pointers. Check the complete
+        // frontier first; a parent metadata grant cannot admit these contents.
+        // Pointer targets remain declarations: publishing them does not open
+        // an external common directory or worktree marker.
+        for root in roots {
+            self.child_read(&root, authorizations)?;
+            let metadata = super::super::receiver_state::Metadata::capture(&root, &root)?;
+            for path in std::iter::once(metadata.common_path.clone())
+                .chain(std::iter::once(metadata.common_path.join("config")))
+                .chain(metadata.worktree_marker.iter().cloned())
+            {
                 self.facets.push(path_facet(
                     ToolNature::Read,
-                    &root.join(leaf),
-                    "native Pull stored child fixed configuration/layout frontier",
+                    &path,
+                    "native Pull child layout target; contents require fresh admission",
                 )?);
             }
+            self.native_pull_metadata.insert(root, metadata);
         }
         let (remote, destinations) = self.resolve_native_pull_destination().await?;
         self.pull_remote = Some(remote);

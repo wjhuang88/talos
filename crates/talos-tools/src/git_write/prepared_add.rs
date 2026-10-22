@@ -272,6 +272,7 @@ pub(super) struct AddPlan {
     target_hook_evidence: Vec<(PathBuf, snapshot::RegularEvidence)>,
     native_pull_command: Option<command::FrozenCommand>,
     native_pull_modules: Option<super::pull_inventory::Inventory>,
+    native_pull_metadata: BTreeMap<PathBuf, super::receiver_state::Metadata>,
     pull_before: Option<super::pull_state::BeforeFetch>,
     pull_evidence: Option<super::pull_state::PullEvidence>,
     pull_sources: Option<PullSources>,
@@ -783,6 +784,7 @@ impl AddPlan {
             pull_hook_evidence: Vec::new(),
             pull_graph_paths: None,
             native_pull_modules: None,
+            native_pull_metadata: BTreeMap::new(),
             pull_inventory: None,
             pull_reference_budget: super::pull_inventory::ReferenceBudget::default(),
             pull_integration: None,
@@ -4626,6 +4628,9 @@ impl AddPlan {
         }
         if let Some(inventory) = &self.native_pull_modules {
             inventory.revalidate()?;
+        }
+        for metadata in self.native_pull_metadata.values() {
+            metadata.revalidate(&metadata.canonical)?;
         }
         if self.phase == Phase::PullFetch
             && (self.pull_before.is_none() || self.pull_remote.is_none())
