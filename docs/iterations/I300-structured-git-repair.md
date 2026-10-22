@@ -7704,3 +7704,33 @@ execution guards remain; T7 and the full handoff are incomplete.
 Full locked Git-enabled tools library regression passes 532/532 outside the
 sandbox (/private/tmp/i300-child-fetch-hooks-tools.log). No new full workspace
 preflight or native Windows runtime result is claimed for this checkpoint.
+
+Native dispatcher convergence audit (2026-10-22; decision pending): the stored
+child startup fixture currently needs nine native preparation continuations,
+plus initial sender discovery and final execution: eleven stages in total.
+The previous `waves < 10` assertion did not cover the core eight-stage budget.
+The fixture now also routes through execute_approved_with_history using the
+actual PreparedStageHistory, including sender discovery, and requires explicit
+stage-limit refusal without FETCH_HEAD creation. This is a characterization of
+an unresolved delivery blocker, not successful dispatcher convergence.
+
+Concrete proposed convergence change: add a closed, read-only stored-module
+inventory authority bound to the separately approved parent common/modules
+root. It permits only bounded directory names and entry identity/type metadata
+under that root (including nested module namespaces), with no symlink following,
+configuration/HEAD/object/ref contents, worktree reads, execution, network or
+writes. Reuse Inventory::stored_modules and its shared ReferenceBudget; retain
+the existing 4096-entry/4 MiB invocation allowance and refuse exhaustion.
+Every discovered repository still needs its individual fixed-source/config,
+metadata and worktree admission before use. This permits identity-only inventory
+to converge within one admitted stage, replacing the depth-dependent rounds;
+it does not raise MAX_PREPARED_STAGES or broaden ordinary Path Read. Expected
+savings for this fixture are three stages (eleven to eight), to be proven by
+changing the dispatcher regression to reach the final guarded executor after
+implementation. More complicated external layouts can still exhaust the budget
+and must refuse. Maintainer acceptance of this specific new scope is pending;
+no capability or production activation is introduced by this audit.
+Audit validation: the focused dispatcher-budget characterization passes using
+core PreparedStageHistory (/private/tmp/i300-native-stage-budget.log); tools
+lib/tests Clippy and both governance validators pass. The existing preparation
+fixture is deliberately still expected to refuse at the dispatcher stage limit.

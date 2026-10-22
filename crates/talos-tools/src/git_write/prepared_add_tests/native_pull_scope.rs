@@ -75,6 +75,23 @@ async fn native_pull_scope_admits_startup_before_discovering_configuration() {
         let roots = inventory.stored_module_roots().collect::<Vec<_>>();
         assert_eq!(roots.len(), usize::from(stored));
         if stored {
+            // Include sender discovery and final execution in the real core
+            // budget. The manual scope loop above is not delivery evidence.
+            let initial =
+                prepare_pull_fixture(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+                    .expect("dispatcher fixture");
+            let mut history = talos_core::tool::PreparedStageHistory::default();
+            assert!(history.record_profile(&initial.identity, &initial.facets));
+            let mut dispatched = Box::new(initial).discover().await.expect("sender");
+            dispatched.phase = Phase::PullNativePreparation;
+            let result = execute_approved_with_history(*dispatched, history).await;
+            assert!(result.result.is_error);
+            assert!(
+                result.result.content.contains("stage limit"),
+                "{:?}",
+                result.result
+            );
+            assert!(!module.join("FETCH_HEAD").exists());
             assert_eq!(roots, vec![module.as_path()]);
             assert!(plan.native_pull_metadata.contains_key(&module));
             assert!(plan.pull_child_startup.contains_key(&module));
