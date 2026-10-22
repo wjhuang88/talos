@@ -14,13 +14,24 @@ The workspace step remains alive after the visible test summaries and reaches
 its 20-minute timeout; the cause of that residual wait is not proven. Retained
 native log: `/private/tmp/i300-97498fe9-windows.log`.
 
-Next P2 experiment: isolate the post-summary workspace wait from default native
-Push's transport hang, using bounded process/handle diagnostics rather than
-raising deadlines or silently overriding production Git configuration. P4 must
-replace the superseded staged Pull with native whole-operation execution; T8
-must remove category-wide Auto refusal through the shared assessor, retaining
-explicit Deny and human-only policy. All P1–P5 and later handoff exits remain
-open. This is terminal evidence, not a completion claim.
+Windows follow-up instrumentation for P2 (implementation committed locally;
+exact-head validation pending): workspace CI now takes bounded one-minute
+snapshots of at most 256 processes, recording name, PID/parent, handle/thread
+counts and creation time. Queries time out after five seconds; command lines,
+environment values and paths are not captured. The observer is stopped in a
+`finally` block and failed CI uploads its snapshot. PowerShell AST parsing and
+`git diff --check` pass; independent review found no blocking issue. Native
+Windows evidence is still required. The test deadline and Cargo exit status are
+unchanged.
+
+Next P2 action: inspect the exact-head snapshot to determine whether the
+post-summary wait is a live process or inherited output handle, separately from
+the default Push transport hang. Do not raise deadlines or silently override
+production Git configuration. P4 must replace the superseded staged Pull with
+native whole-operation execution; T8 must remove category-wide Auto refusal
+through the shared assessor, retaining explicit Deny and human-only policy. All
+P1–P5 and later handoff exits remain open. This is terminal evidence, not a
+completion claim.
 
 ## Current-head full validation — 2026-10-22
 
