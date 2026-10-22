@@ -60,7 +60,7 @@ replacement resource, altered operation, policy rule, sandbox fallback or persis
 `AllowOnce` is valid only for the exact request digest, policy revision, mode generation and
 session, and is consumed once. Any Deny or hard-boundary result is terminal before the model seam.
 
-### 2. First implementation maximum authority
+### 2. Initial implementation maximum authority (ADR-064 v1)
 
 The first implementation may assess only an Ask composed entirely of workspace-local `Write`
 facets for creation of one new structured text file by an explicitly allowlisted native Talos
@@ -224,12 +224,16 @@ the adversarial and conformance fixtures specified by the threat matrix.
 
 ## Consequences
 
-- The product default can be “on” while actual authority remains narrow, typed and fail-closed.
+- At initial ADR-064 v1, the product default could be “on” while actual
+  authority remained narrow, typed and fail-closed.
 - Governed unattended creation of new text files under a typed managed-workspace lease can avoid
   repeated human prompts without coupling third-party SDK hosts to Talos governance documents.
 - Editing existing files remains human-mediated until a portable atomic compare-and-write boundary
   is separately accepted.
-- General shell, network, external-path and arbitrary-workspace Ask outcomes still require a human.
+- Under the initial v1 implementation, general shell, network, external-path
+  and arbitrary-workspace Ask outcomes required a human. The 2026-10-22
+  amendment below supersedes that category-wide restriction for eligible future
+  operations.
 - The separate evaluator adds latency and provider cost; bounded timeout/circuit behavior makes that
   visible and reversible.
 - PERM-006-A/B/C remains on the critical path; this decision removes policy ambiguity but does not
@@ -241,7 +245,10 @@ Disable or supersede this decision if adversarial testing shows scope enlargemen
 result replay, policy bypass, cross-surface divergence, unacceptable false approval, or inability
 to distinguish user/parallel-session changes. Any proposal to admit modification, Execute,
 Network, external paths, sandbox fallback, persistent grants or unmanaged workspaces requires a
-fresh decision and independent security review.
+reviewed decision amendment and independent security review. The 2026-10-22 amendment below
+accepts invocation-local Network/Write/Execute model decisions when operation-specific trusted
+eligibility and scope checks pass; it does not accept persistent grants, sandbox fallback or
+unknown/unbound effects.
 
 ## 2026-09-20 Accepted Auto Review Timing Amendment
 
@@ -263,3 +270,42 @@ Local evidence motivating this amendment: session `75ed4f7e-dff6-43b3-a24b-51242
 timed out after 8003 ms against an 8000 ms budget, with 1961 reasoning bytes and 16 text bytes,
 below its 16384-byte budget. This establishes a deadline failure, not a model safety rejection.
 Local corrective implementation and tests are not a merged-delivery or live acceptance claim.
+
+## 2026-10-22 Maintainer Amendment: Effectful Auto Decisions
+
+The maintainer clarified that Auto's intended outcome includes model-assisted
+**one-time approval** of suitable network, mutation and execution requests. The
+presence of these effect classes alone must not mechanically force a human
+checkpoint. A model response that only explains an operation while every
+effectful request still requires human approval does not meet the Auto goal.
+
+The earlier first-implementation ceiling in this ADR remains an accurate record
+of the accepted 2026-08-22 implementation boundary, but is superseded for future
+Auto work by this amendment. PERM-007-H owns implementation and must reconcile
+PERM-007-G and the present typed creation-only path before changing code. An
+eligible decision remains `AllowOnce` for one exact request; it creates no
+persistent grant and does not let the model alter the operation, targets,
+facets, mode, or policy. Deterministic Deny, explicit human-only decisions,
+unknown/unbound targets, missing intent, inadequate effect evidence, unsafe
+execution configuration, model uncertainty, malformed output, timeout and
+provider failure remain non-overridable. Such cases use the existing human or
+headless-Deny fallback.
+
+The v1 atomic no-clobber and proposed compare-and-write requirements describe
+that file-tool implementation, not a prerequisite to simulate arbitrary native
+commands. Native Git remains responsible for its own locking and conflict
+behavior; Auto assesses and authorizes the operation, without promising atomic
+rollback or absence of concurrent repository changes.
+
+Eligibility must be derived by trusted code for each registered operation and
+include the exact normalized invocation, bounded user intent, declared effects,
+target/resource identities, and evidence freshness. The model judges the
+operation and impact together; it is not required to enumerate Git's future
+conflict files, renames or replay results. For Git Pull, the user-approved
+contract is one native Git operation with an operation-level permission scope;
+the Git process reports runtime conflicts and partial failure. The concrete
+effect schema, redaction, request binding, prompt-injection tests and supported
+resource boundaries require PERM-007-H implementation and independent
+permission/security review before rollout. This amendment accepts the product
+direction; it does not claim that the expanded policy is implemented or waive
+that review.

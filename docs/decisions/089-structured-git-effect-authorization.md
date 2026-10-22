@@ -638,6 +638,15 @@ runtime gates. Acceptance records the design decision only. Remove prediction
 logic made obsolete by this scope while retaining analysis needed to discover
 external effects; do not maintain competing authorization modes.
 
+The integration request is one operation-level decision point. Auto may assess
+and approve that exact invocation once under ADR-064's 2026-10-22 amendment;
+otherwise the existing human approval path decides it. Present the frozen
+operation and fetched identities before execution; do not require advance
+enumeration of conflict paths, renames or replay results. If Git returns
+conflicts or partial effects, report them and leave resolution to the user.
+Explicitly denied or separately constrained effects remain denied or require
+their own approval; model approval cannot widen the displayed invocation scope.
+
 ### Recursive child fetch extension (accepted 2026-10-16)
 
 Native Git 2.54 source inspection and an isolated fixture confirmed that the

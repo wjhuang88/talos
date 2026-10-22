@@ -22,6 +22,24 @@ unenforceable effect boundary, or a hard safety constraint.
 
 ## Current Evidence
 
+### Maintainer clarification — 2026-10-22
+
+Auto must perform model-assisted safety assessment **and actual invocation-local
+approval**, including operations with Network, Write and Execute effects. These
+effect classes alone must not force human approval. The existing read-only-first
+implementation is historical containment, not the desired final acceptance.
+Assess the concrete operation, user intent, destinations and impact together;
+escalate concrete unresolved risks, missing intent or assessment failure to the
+human. Explicit Deny and user-selected mandatory-human checkpoints remain binding.
+
+Pull is the concrete motivating case: preserve native Git command behavior and
+review the operation as a whole, rather than exhaustively predicting Git's
+internal file changes. An advisory-only model response followed unconditionally
+by human approval does not satisfy this requirement. Reconcile ADR-064/070/089
+and PERM-007-G as part of delivery; do not treat their initial implementation
+restrictions as grounds to reject this accepted requirement. This clarification
+records the target, not evidence that the policy or runtime has been implemented.
+
 `talos-agent/src/auto_resolver.rs::project_auto_request` currently dispatches only
 to `eligible`, `eligible_exec` and `eligible_bash`. The first permits a narrow
 native `write` text-create case. Therefore Auto is not exclusively scripts today,
@@ -73,8 +91,12 @@ All built-ins enter the coverage inventory; permanently excluding higher-risk
 families simply to claim universal coverage is not acceptable.
 
 Existing per-operation mandatory-human policies require an explicit reviewed
-policy decision before model-assisted allowance can replace them. Record the
-concrete policy/API delta after investigation, not a speculative blanket waiver.
+policy decision before model-assisted allowance can replace them. ADR-064's
+2026-10-22 maintainer amendment already accepts invocation-local model approval
+for suitable Network, Write and Execute requests; PERM-007-H must implement
+and independently review the concrete typed boundaries rather than repeat the
+old category-wide refusal. Preserve explicit Deny, explicit human-only choices,
+and human fallback for concrete uncertainty or inadequate evidence.
 MCP/plugin tools are not automatically included by this native-tool request.
 No release, new dependency, new unsafe code or arbitrary permanent grant is
 authorized by this intake. The complete handoff retains this added deliverable.
