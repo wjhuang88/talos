@@ -459,8 +459,13 @@ impl PermissionPipeline {
                     ))
                     .catch_unwind()
                 } else {
-                    std::panic::AssertUnwindSafe(resolver.resolve_with_auto_assessment(
+                    // Automatic assessors receive the exact normalized input as private
+                    // assessment material. Human-facing fallbacks retain the separate safe
+                    // presentation request above. Resolvers must project and redact before
+                    // forwarding any assessment to a model.
+                    std::panic::AssertUnwindSafe(resolver.resolve_with_execution_input(
                         approval,
+                        input,
                         remaining,
                         auto_assessment_allowed,
                         user_intent,
@@ -578,6 +583,10 @@ pub fn headless_pipeline(engine: talos_permission::PermissionEngine) -> Permissi
         None,
     )
 }
+
+#[cfg(test)]
+#[path = "permission_pipeline/execution_input_tests.rs"]
+mod execution_input_tests;
 
 #[cfg(test)]
 mod tests {

@@ -571,8 +571,8 @@ fn generic_shell_request_contains_exact_command_and_syntax_context() {
     let lease = ManagedWorkspaceLease::for_permission_session(root.path(), state.clone())
         .expect("permission-bound lease");
     let request = shell_approval_request(root.path(), &state, "ls -la");
-    let projected = eligible_bash(&request, &lease, Some("inspect the workspace"))
-        .expect("shell is eligible");
+    let projected =
+        eligible_bash(&request, &lease, Some("inspect the workspace")).expect("shell is eligible");
     let context = projected.context.as_ref().expect("shell context");
     assert_eq!(context.shell.command, "ls -la");
     assert!(!context.shell.syntax.has_control_syntax);
@@ -600,8 +600,8 @@ fn shell_assessment_uses_permission_session_identity_not_runtime_identity() {
         PermissionEngine::with_workspace_root(root.path().to_path_buf()),
     ));
     let request = shell_approval_request(root.path(), &state, "pwd");
-    let runtime_bound = ManagedWorkspaceLease::new(root.path(), "runtime-session")
-        .expect("runtime-bound lease");
+    let runtime_bound =
+        ManagedWorkspaceLease::new(root.path(), "runtime-session").expect("runtime-bound lease");
     assert!(
         eligible_bash(&request, &runtime_bound, Some("show the working directory")).is_none(),
         "an unrelated runtime id must not authorize a permission request"
@@ -854,10 +854,8 @@ async fn permission_session_rotation_resets_locale_before_observation_or_assessm
             resolver.last_report().expect("report").reason,
             "human_required"
         );
-        resolver.observe_user_messages_for_session(
-            &new_id,
-            &["このファイルを確認してください".into()],
-        );
+        resolver
+            .observe_user_messages_for_session(&new_id, &["このファイルを確認してください".into()]);
         resolver.observe_user_messages_for_session(&old_id, &["请继续检查文件".into()]);
         assert_eq!(
             resolver.locale.lock().expect("locale").selected.as_str(),
@@ -918,10 +916,8 @@ fn durable_history_reopen_seeds_locale_without_persisting_derived_state() {
         resolver.locale.lock().expect("locale").selected.as_str(),
         "zh"
     );
-    resolver.observe_user_messages_for_session(
-        "foreign",
-        &["このファイルを確認してください".into()],
-    );
+    resolver
+        .observe_user_messages_for_session("foreign", &["このファイルを確認してください".into()]);
     assert_eq!(
         resolver.locale.lock().expect("locale").selected.as_str(),
         "zh"
@@ -938,8 +934,7 @@ async fn provider_receives_complete_script_snapshot() {
         ManagedWorkspaceLease::new(root.path(), state.session_id().expect("id").stable_id())
             .expect("lease");
     let request = shell_approval_request(root.path(), &state, "bash check.sh");
-    let projected =
-        eligible_bash(&request, &lease, Some("inspect workspace")).expect("projection");
+    let projected = eligible_bash(&request, &lease, Some("inspect workspace")).expect("projection");
     let assessor = ProviderAutoPermissionAssessor::new(Arc::new(ScriptInspectingModel));
     let result = assessor
         .assess_with_script_evidence(
@@ -967,10 +962,10 @@ fn shell_classifier_digest_binds_bounded_user_intent() {
     )
     .expect("lease");
     let request = shell_approval_request(root.path(), &state, "ls -la");
-    let first = eligible_bash(&request, &lease, Some("inspect the workspace"))
-        .expect("shell is eligible");
-    let second = eligible_bash(&request, &lease, Some("delete generated files"))
-        .expect("shell is eligible");
+    let first =
+        eligible_bash(&request, &lease, Some("inspect the workspace")).expect("shell is eligible");
+    let second =
+        eligible_bash(&request, &lease, Some("delete generated files")).expect("shell is eligible");
     assert_ne!(first.request_digest, second.request_digest);
     assert_eq!(
         second
@@ -992,12 +987,8 @@ fn shell_classifier_does_not_use_command_name_allowlist() {
         state.session_id().expect("session id").stable_id(),
     )
     .expect("lease");
-    let request = shell_approval_request_with_class(
-        root.path(),
-        &state,
-        "python --version",
-        "complex_shell",
-    );
+    let request =
+        shell_approval_request_with_class(root.path(), &state, "python --version", "complex_shell");
     assert!(eligible_bash(&request, &lease, Some("show the interpreter version")).is_some());
 }
 
@@ -1013,12 +1004,8 @@ fn shell_classifier_never_assesses_a_truncated_command() {
     )
     .expect("lease");
     let command = format!("printf {}", "x".repeat(MAX_SHELL_COMMAND_BYTES));
-    let request = shell_approval_request_with_class(
-        root.path(),
-        &state,
-        command.as_str(),
-        "complex_shell",
-    );
+    let request =
+        shell_approval_request_with_class(root.path(), &state, command.as_str(), "complex_shell");
 
     assert!(eligible_bash(&request, &lease, Some("inspect the workspace")).is_none());
 }
@@ -1611,8 +1598,7 @@ fn human_explanation_filters_sensitive_controls_and_limits() {
     assert!(explanation.contains("permission rule"));
     assert!(explanation.contains("generated targets disposable"));
     response.effect_summary = Some("token=must-not-display".into());
-    response.decision_points =
-        vec!["\u{1b}[2J".into(), "x".repeat(257), "api_key=secret".into()];
+    response.decision_points = vec!["\u{1b}[2J".into(), "x".repeat(257), "api_key=secret".into()];
     let explanation = human_review_explanation(&response, false, "en-US");
     assert!(!explanation.contains("must-not-display"));
     assert!(!explanation.contains('\u{1b}'));
@@ -2400,4 +2386,31 @@ async fn shell_composition_allows_bounded_read_only_only() {
             "unsafe composed shell request must remain human-owned: {command}"
         );
     }
+}
+
+#[test]
+fn exact_write_path_accepts_absolute_child_without_erasing_traversal() {
+    let root = tempfile::tempdir().expect("root");
+    let state = PermissionSessionState::new(PermissionEngine::with_workspace_root(
+        root.path().to_owned(),
+    ));
+    let lease =
+        ManagedWorkspaceLease::new(root.path(), state.session_id().expect("id").stable_id())
+            .expect("lease")
+            .with_atomic_create_capability(Arc::new(TestCapability));
+    let mut request = approval_request(root.path(), &state, "new.txt");
+    assert!(eligible(&request, &lease).is_some());
+    request.arguments["path"] = serde_json::json!(root.path().join("new.txt"));
+    let projected = eligible(&request, &lease).expect("absolute direct child");
+    assert_eq!(projected.target_label, "new.txt");
+    std::fs::create_dir(root.path().join("nested")).expect("nested");
+    for path in [
+        root.path().join("nested/../new.txt"),
+        root.path().join("nested/new.txt"),
+    ] {
+        request.arguments["path"] = serde_json::json!(path);
+        assert!(eligible(&request, &lease).is_none());
+    }
+    request.arguments["path"] = serde_json::json!("nested/../new.txt");
+    assert!(eligible(&request, &lease).is_none());
 }
