@@ -2,9 +2,11 @@
 
 ## Status
 
-Proposed — contract for claiming PROVIDER-008-A / #724. Ineffective until an accepted claim merges;
-it authorizes no implementation by itself. It supersedes the ADR-034 deferral
-("The Responses API is a separate future decision") only for the boundaries defined here.
+Accepted — PROVIDER-008-A / I306 contract, proposed atomically by governance PR #747 on 2026-10-22.
+The decision becomes effective only when that exact reviewed claim/activation reaches `main`; before
+merge, the branch status is proposal state only and authorizes no implementation. It supersedes the
+ADR-034 deferral ("The Responses API is a separate future decision") only for the boundaries defined
+here.
 
 **Scope amendment (2026-10-20):** #724 expanded to complete wire-protocol family coverage
 (OpenAI Responses, Google Gemini, Azure OpenAI, Amazon Bedrock; grouped by wire format). Sections
@@ -82,11 +84,16 @@ Tool calls map to Responses `function_call`/`function_call_output` items bound b
 `ProviderProgress` and retry boundaries match ADR-062, including no whole-stream retry after
 output began. Image parts and one-shot continuation follow ADR-050/051. Bounded decision calls
 follow ADR-075. MODEL-011 (active probe) and MODEL-014 (capability inference, branch-only) remain
-separate scopes; overlap must be re-verified at claim time.
+separate scopes; overlap was re-verified during the #747 claim preflight and remains excluded from
+I306.
 
 ## Consequences
 
 Confirmed-support users default to a new request path — a visible behavior change that must be
 documented, reversible via explicit protocol, and covered by provenance display. The public enum
-change gates a pre-1.0 minor release. Implementation requires child-Story decomposition, recorded
-stream fixtures, proptest coverage, and independent review for the provider/security boundary.
+change gates a pre-1.0 minor release. PROVIDER-008-A / I306 owns implementation under this contract;
+Gemini, Azure and Bedrock still require separately claimed child Stories and child ADRs.
+
+Implementation requires recorded stream fixtures, proptest coverage, exact-head CI and independent
+provider/API review. #747 is governance only: no production implementation is authorized until its
+Accepted/Claimed/Active records become target-branch truth.
