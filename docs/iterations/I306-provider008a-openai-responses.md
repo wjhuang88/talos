@@ -1,6 +1,6 @@
 # Iteration I306: Protocol Architecture And OpenAI Responses
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-10-22
 > Planned objective: establish model-level wire-protocol resolution and deliver a complete OpenAI Responses adapter under ADR-093.
 > Baseline rule: preserve this bounded child-A scope; Gemini, Azure or Bedrock use separate owners/iterations.
@@ -10,32 +10,32 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | GPT-5.6 Sol / talos开发 session |
 | Work Slice | PROVIDER-008-A protocol architecture plus OpenAI Responses only; no Gemini/Azure/Bedrock implementation. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-10-22 |
 | Source Issue | #724 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #747 |
 | Implementation PR | Not started |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Draft governance-only proposal; exact-head claim/activation is ineffective until merged to main. |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Maintainer requested implementation in the 2026-10-22 talos开发 session. Governance-only #747 must pass exact-head applicable CI, both governance validators, provider/API technical review and merge-time CAS before this claim is effective. |
 | Last Updated | 2026-10-22 |
-| Handoff / Release Condition | Activate only with accepted ADR-093 and effective PROVIDER-008-A claim. Complete only with existing implementation commit evidence. |
+| Handoff / Release Condition | Activates only when #747 merges with accepted ADR-093. Complete only with existing implementation commit evidence; siblings B-D remain separate. |
 
 ## Published Baseline
 
-Selected [PROVIDER-008-A](../backlog/active/PROVIDER-008-A-openai-responses-protocol.md), proposed
-child of PROVIDER-008 / #724. ADR-093 is the governing protocol/public-API decision and must become
-Accepted atomically with activation.
+Selected [PROVIDER-008-A](../backlog/active/PROVIDER-008-A-openai-responses-protocol.md), bounded
+child of PROVIDER-008 / #724. ADR-093 is the governing protocol/public-API decision and is accepted
+atomically in governance PR #747.
 
 ### Selection Inventory And Disposition
 
 Selection main: `0caaf83241b8f94cba0cbdca66e3e166068f024d`.
 
 - Issue #724 and all current comments re-read; parent PROVIDER-008 remains Refinement / Unclaimed.
-- No open PR found for #724 / PROVIDER-008 / OpenAI Responses and no matching `724`/`provider`
-  implementation branch found.
+- Before #747 was opened, no open PR existed for #724 / PROVIDER-008 / OpenAI Responses and no
+  matching `724`/`provider` implementation branch was found.
 - I293 and I294 retain Search work; I300 retains structured Git scope; I302 retains Windows resource
   attribution Review; I305 is Complete/Closed. None owns provider wire-protocol expansion.
 - PROVIDER-007/I297 is Complete/Closed and changes retry defaults only; it is not reopened.
@@ -102,9 +102,11 @@ than weakening terminal/error or provenance requirements.
 
 ## Activation Record
 
-2026-10-22: governance-only draft prepared. No production code, implementation tests, generated
-catalog, dependency or config behavior changed. Claim/Active state, accepted ADR and implementation
-authority remain pending until the finalized governance PR reaches main.
+2026-10-22: #747 is the governance-only atomic claim/activation proposal. The record in this branch is
+Active / Claimed and ADR-093 is Accepted, but none of those states is effective until the finalized
+exact head merges to main. No production code, implementation tests, generated catalog, dependency or
+config behavior changed in the governance candidate. Implementation must start from the #747 merge or
+a later main commit.
 
 ## Completion / Residuals
 
