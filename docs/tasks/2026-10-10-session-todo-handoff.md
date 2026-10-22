@@ -5561,3 +5561,12 @@ tools Clippy lib/tests passes. Removed the
 unused fetch-only config wrapper. Logs: `/private/tmp/i300-native-hook-admission-tests.log`
 and `/private/tmp/i300-native-hook-admission-clippy.log`. The main native scope
 discovery/activation work remains open; this does not claim T7 delivery.
+
+Native recursive-scope evidence (2026-10-22): Git 2.54.0 native Pull fetches
+stored deinitialized modules and repopulates their worktrees when upstream
+advances the gitlink. The next scope-discovery implementation must include those
+stored repositories/remotes and worktree targets, not only populated children.
+Separate runner regression covers both cases; native tests pass 9/9 (5.11 s),
+locked Git-enabled tools Clippy lib/tests and formatting pass. See I300 owner for
+logs and the corrected initial test assumption. Production activation and the
+whole handoff remain incomplete.

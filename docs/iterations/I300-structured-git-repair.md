@@ -7474,3 +7474,17 @@ in a separate file. Focused locked native tests pass 8/8; Git-enabled tools
 Clippy lib/tests passes with `-D warnings`; Pull regression passes 162/162
 (`/private/tmp/i300-native-hook-admission-pull.log`, 70.52 s). Production activation, recursive scope
 discovery, independent review and original delivery gates remain outstanding.
+
+Native recursion scope verification (2026-10-22, Git 2.54.0): a deinitialized
+submodule still has its stored repository fetched by recursive native Pull;
+when the fetched parent advances the gitlink, native Pull also repopulates the
+child worktree. Discovery must inventory retained module repositories, their
+configuration/remotes and possible worktree targets, not only current populated
+`.git` markers. The owned-runner regression now checks both populated and
+deinitialized cases in a separate recursion test file. An initial assertion that
+deinitialized worktrees remain absent failed and was corrected to Git's observed
+behavior; no production behavior or permission was relaxed. Native tests pass
+9/9 (5.11 s), locked Git-enabled tools Clippy lib/tests and formatting pass.
+Logs: `/private/tmp/i300-native-stored-recursion.log` and
+`/private/tmp/i300-native-stored-recursion-clippy.log`. These runner tests do not
+prove prepared recursive admission; native discovery/activation remains open.
