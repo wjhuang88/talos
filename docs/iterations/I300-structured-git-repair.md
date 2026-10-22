@@ -7276,3 +7276,27 @@ The sideband-off control passes, but does not establish a universal transport
 fix or authorize a production override. Earlier Windows CI failures also
 contained the pre-existing production refusal; they cannot be used as evidence
 that the successful path was previously delivered.
+
+
+## Owned Pull daemon fixtures — 2026-10-22
+
+CI 39724001119 at `06c1ebef` is terminal failure. Windows retained logs
+(`/private/tmp/i300-06c1ebef-windows.log` and artifact
+`/private/tmp/i300-06c1ebef-artifact/windows-workspace-processes.jsonl`)
+show Cargo and test processes absent in samples 15–19, while three orphan
+Git/git-daemon chains remain. This excludes ongoing compilation as the reason
+for that post-summary wait; inherited-handle ownership and the exact leak source
+remain unproven. Windows Agent/MCP/Runtime production gates and the native default
+Push transfer timeout remain unresolved.
+
+The two tools Pull daemon fixtures now reuse the existing test-only owned
+NativeProcess launcher, null stdin and record diagnostics. They stop through the
+owner instead of killing only the direct child. Both affected tests pass locally;
+Git-enabled tools library passes 510/510 outside the sandbox
+(`/private/tmp/i300-daemon-owned-tools.log`). The sandbox run has 509 passes and
+one process-observation EPERM in the existing local Push test. Locked MSVC
+`cargo xwin check -p talos-tools --features git --tests` and formatting pass;
+seven existing reduced-feature dead-code warnings remain. This is compile evidence,
+not native Windows runtime validation. The MCP daemon fixture still uses direct
+child cleanup and remains follow-up work. No production Pull activation or T7
+completion is claimed.
