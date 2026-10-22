@@ -148,6 +148,9 @@ include!("prepared_add_tests/pull_rebase.rs");
 
 include!("prepared_add_tests/pull_children.rs");
 
+#[path = "prepared_add_tests/native_process.rs"]
+mod native_process;
+
 include!("prepared_add_tests/push.rs");
 
 include!("prepared_add_tests/sender_program.rs");
