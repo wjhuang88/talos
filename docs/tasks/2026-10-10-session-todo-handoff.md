@@ -1,5 +1,14 @@
 ## Current native CI update — 2026-10-22
 
+Latest maintainer direction (2026-10-22): Auto is responsible for model-assisted
+safety assessment and actual one-time approval, including networking, mutation
+and execution. Do not reject eligibility solely by these effect categories or
+substitute advisory-only review. Pull must retain a native Git/Bash-like experience
+with whole-operation review, not exhaustive effect prediction. PERM-007-H records
+the corrected acceptance; the prior read-only policy and staged Pull design need
+explicit reconciliation. This is an accepted requirement, not implemented behavior.
+The full handoff remains active; no later queue deliverable is waived.
+
 Terminal Windows run 39625038593 confirms the explicit sideband-off Push
 control passes both isolated and workspace execution; default native Git full
 Push times out before Talos dispatch. Checkout tracking matrix passes. Windows
@@ -8,8 +17,22 @@ not delivered. The workspace command outlives finished targets until its step
 timeout; descendant/stream ownership remains to investigate. See I300 terminal
 comparison for retained evidence and bounded next actions. Local filter sentinel
 repair is committed as `6af0042f`, independently reviewed with 169/169 prepared
-write tests passing; complete new-head preflight remains running. No T7 or
+write tests passing; complete new-head preflight has now passed (exit 0,
+`/private/tmp/i300-6af0042f-preflight.log`). This predates the fixture IO change
+below and is not native Windows evidence. No T7 or
 whole-handoff completion is claimed.
+
+Fixture IO follow-up: daemon stdin is now null and native dry-run diagnostics
+use a temporary file. Unix writes directly to it; Windows drains the existing
+Job launcher's pipes, so completion still depends on inherited pipe EOF. Both default and
+sideband-off transfer tests pass locally (2/2). This does not close descendant
+ownership: timeout/panic still needs whole-tree termination and bounded cleanup
+confirmation, independently of the structured foreground executor under test.
+The full Git-enabled tools library passes 508/508 outside the sandbox
+(`/private/tmp/i300-native-fixture-tools-tests-unsandboxed.log`), and the MSVC
+`cargo xwin check` for the Git-enabled test target passes
+(`/private/tmp/i300-native-fixture-xwin.log`). These are fixture and compile
+evidence only; native Windows execution remains outstanding.
 
 ## Current whole-task convergence — 2026-10-21
 
@@ -141,6 +164,17 @@ implementation stream. Resolve design/permission questions before each slice rat
 building a speculative framework for the whole queue. Cross-cutting machinery is reused
 only where concrete callers justify it. gix release tracking stays in GIT-001 and is not
 a prerequisite for T7; replacement requires capability evidence, not a predicted date.
+
+Pull convergence clarification (2026-10-22): use the accepted dedicated integration
+worktree scope as the single operation-level decision point. Show the frozen
+post-fetch merge/rebase operation, fetched identities and approved worktree/metadata
+roots. Auto may assess and approve this exact invocation once; Network and Write
+effects alone do not force a human checkpoint. Do not implement exhaustive
+pre-execution prediction of conflicts, renames or replay outputs. Execute native Git,
+report conflicts and partial effects, and leave resolution to the user. Hooks, filters,
+merge drivers, editors, external metadata and outside-root paths remain separately
+authorized or are denied when they cannot be bound. T7 owns execution and identity
+binding; T8/PERM-007-H owns shared effectful Auto eligibility and approval.
 
 At package boundaries: local convergence, logical commits, fetch/rebase when needed,
 current-head checks and independent review, stable-candidate CI, then gated merge where

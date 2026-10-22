@@ -353,6 +353,30 @@ stage or merge it on the strength of one passing sub-suite. If a safe subset is 
 separating, first inventory its dependencies and review scope; no blind cherry-picking.
 An intermediate merge never closes remaining I300 acceptance rows.
 
+### Maintainer Pull/Auto acceptance amendment — 2026-10-22
+
+The maintainer confirmed the intended experience is a native Git Pull whose
+whole operation is assessed by the model and can receive invocation-local Auto
+approval. Network and mutation effects are not category-level reasons to refuse
+Auto. Keep the originally published P4 row above as historical baseline; this
+addendum is its accepted clarification. Do not make Talos predict every future
+conflict file, rename or replay result. Execute the approved Git operation,
+report Git's conflicts and partial effects, and leave resolution to the user.
+
+Convergence impact: preserve the prepared invocation's immutable operation and
+identity binding, but move the permission decision toward the single visible Git
+operation and the whole repository scopes required for its native behavior.
+T7 owns native execution, truthful failure/cancellation and exact invocation
+binding. T8/PERM-007-H owns the shared model eligibility and one-time Auto grant
+for effectful built-ins, including Git Pull; T7 must not build a parallel
+Git-specific model reviewer. Existing `git:pull-integration-worktree` acceptance
+remains useful as a bound dynamic worktree scope. Per-stage prediction and
+staged recursive reimplementation are not acceptance goals; retain discovery
+only where it is needed to bind declared targets or prevent a known escape.
+ADR-064 and ADR-089 record the authorization and Git contracts. Production
+activation still requires the existing independent review, platform/runtime
+evidence and exact-head delivery gates.
+
 Report: production capability enabled, package exits passed, named blockers, next
 experiment/decision and evidence head. Do not estimate completion from commits, lines
 or test totals. No date estimate is justified until P1's authority and P2's timeout
@@ -7151,7 +7175,49 @@ Next Windows work must settle the default native transport compatibility policy,
 verify baseline/receiver descendant cleanup on failure, then obtain independent
 activation review and real Agent/MCP/Runtime approval/denial evidence.
 
-Local `6af0042f` full standard locked preflight is running with durable log
-`/private/tmp/i300-6af0042f-preflight.log` (session 52479); no pass claimed.
+Local `6af0042f` full standard locked preflight exited 0; durable log
+`/private/tmp/i300-6af0042f-preflight.log` ends with `release preflight: passed`.
 Fresh origin fetch succeeds and HEAD...origin/main is 353/0, so no rebase is
 needed at this checkpoint. P1–P5 and all later handoff queue items remain open.
+
+## Native fixture IO follow-up — 2026-10-22
+
+The daemon now receives null stdin. On Unix, native dry-run uses file-backed
+diagnostics with null stdout, matching the full-transfer baseline. On Windows,
+the reused background launcher drains pipes to the diagnostics file; completion
+still depends on inherited pipe EOF. Diagnostics survive timeout. The Windows
+fixture shares the Job launch primitive with production but not the foreground
+executor; it is no longer an unsupervised native control. Its hardening and IO
+changes cannot establish the cause of an earlier unsupervised timeout.
+Locked git-feature transfer tests pass 2/2 locally and the full
+Git-enabled tools library passes 508/508 outside the sandbox
+(`/private/tmp/i300-native-fixture-tools-tests-unsandboxed.log`). The MSVC
+`cargo xwin check` for the Git-enabled test target also passes
+(`/private/tmp/i300-native-fixture-xwin.log`). Default sideband acceptance and
+production configuration are unchanged. The full standard preflight for the
+fixture candidate exited 0 in session 82509; the retained log
+`/private/tmp/i300-native-fixture-preflight-unsandboxed.log` ends with
+`release preflight: passed`. This precedes the subsequent diagnostic wording
+correction and does not supply native Windows runtime evidence.
+The Windows test fixture now reuses the existing assigned
+before-resume Job owner for daemon and native sender descendants; direct-child
+kill-on-drop remains insufficient on Unix and panic cleanup still has no bounded
+confirmation. Native Windows execution, the Windows step-timeout cause and a
+production runtime fix are not claimed.
+
+## Windows issue provenance — 2026-10-22
+
+The Windows production refusal was introduced within this T7 effort on
+2026-10-18, before the current fixture work. It is a containment gate pending
+native Job supervision acceptance, not evidence of a pre-T7 product limitation.
+The inspected origin/main implementation still calls native `git pull` without
+this new gate; therefore the branch's unavailable Windows path is a delivery
+regression relative to that source baseline. That comparison does not prove
+the old path met process-tree ownership requirements. The default Git for
+Windows full-Push timeout was observed in both retained runs 39587933025 and
+39625038593 before structured dispatch. It is not established that this transport
+failure was introduced by Talos, nor is the latter run the first observation.
+The sideband-off control passes, but does not establish a universal transport
+fix or authorize a production override. Earlier Windows CI failures also
+contained the pre-existing production refusal; they cannot be used as evidence
+that the successful path was previously delivered.
