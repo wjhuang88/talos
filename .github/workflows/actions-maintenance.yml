@@ -43,18 +43,50 @@ jobs:
             dry_run="${INPUT_DRY_RUN:-true}"
           fi
 
+          retry_api() {
+            local attempt=1
+            local max_attempts=5
+            local delay=2
+
+            while ! "$@"; do
+              if (( attempt >= max_attempts )); then
+                echo "GitHub API command failed after ${attempt} attempts: $*" >&2
+                return 1
+              fi
+
+              attempt=$((attempt + 1))
+              echo "GitHub API command failed; retry ${attempt}/${max_attempts} after ${delay}s: $*" >&2
+              sleep "${delay}"
+              delay=$((delay * 2))
+            done
+          }
+
           referenced_runs="$(mktemp)"
           grep -RhoE 'actions/runs/[0-9]+' \
             docs README.md README.zh-CN.md AGENTS.md .github 2>/dev/null \
             | sed 's#actions/runs/##' \
             | sort -u > "${referenced_runs}" || true
 
-          # The Actions API returns runs newest-first. That lets us identify old
-          # non-success CI runs that have already been superseded by a newer run
-          # for the same PR (or, as a fallback, the same event + branch).
+          # Build a stable inventory before deleting anything. Fetch each page
+          # independently so a transient 5xx response only retries that page.
           run_inventory="$(mktemp)"
-          gh api --paginate "/repos/${GITHUB_REPOSITORY}/actions/runs?per_page=100" \
-            --jq '.workflow_runs[] | [
+          page=1
+          while :; do
+            page_json="$(mktemp)"
+
+            fetch_inventory_page() {
+              gh api "/repos/${GITHUB_REPOSITORY}/actions/runs?per_page=100&page=${page}" > "${page_json}"
+            }
+
+            retry_api fetch_inventory_page
+
+            page_count="$(jq '.workflow_runs | length' "${page_json}")"
+            if [[ "${page_count}" == "0" ]]; then
+              rm -f "${page_json}"
+              break
+            fi
+
+            jq -r '.workflow_runs[] | [
               .id,
               .name,
               .path,
@@ -64,8 +96,16 @@ jobs:
               .created_at,
               (.head_branch // ""),
               ((.pull_requests[0].number // "") | tostring)
-            ] | @tsv' \
-            > "${run_inventory}"
+            ] | @tsv' "${page_json}" >> "${run_inventory}"
+
+            rm -f "${page_json}"
+            page=$((page + 1))
+          done
+
+          delete_run() {
+            local run_id="$1"
+            gh api --method DELETE "/repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}"
+          }
 
           declare -A newest_ci_stream_run=()
 
@@ -138,7 +178,7 @@ jobs:
                   echo "would delete superseded CI run ${run_id}: ${conclusion} (${stream_key}, ${created_at})"
                 else
                   echo "delete superseded CI run ${run_id}: ${conclusion} (${stream_key}, ${created_at})"
-                  gh api --method DELETE "/repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}"
+                  retry_api delete_run "${run_id}"
                   deleted=$((deleted + 1))
                   deleted_superseded_ci=$((deleted_superseded_ci + 1))
                 fi
@@ -151,7 +191,7 @@ jobs:
                   echo "would delete retired workflow run ${run_id}: ${workflow_name} (${workflow_path}, ${created_at})"
                 else
                   echo "delete retired workflow run ${run_id}: ${workflow_name} (${workflow_path}, ${created_at})"
-                  gh api --method DELETE "/repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}"
+                  retry_api delete_run "${run_id}"
                   deleted=$((deleted + 1))
                   deleted_retired=$((deleted_retired + 1))
                 fi
