@@ -1,3 +1,23 @@
+## Native Pull runner baseline — 2026-10-22
+
+Added a separate `prepared_add_tests/native_pull.rs` module with two real native
+Pull baselines through the existing owned foreground runner. With no explicit
+remote, Git selects the configured `upstream` remote and honors `pull.rebase`;
+conflicting merge returns failure while retaining fetched refs, MERGE_HEAD and
+unmerged index/worktree entries. These are runner/native behavior baselines,
+not prepared approval-to-execution or production activation evidence.
+
+Validation: locked Git-enabled tools library passes 510/510 outside the sandbox
+(`/private/tmp/i300-native-pull-baseline-tools-unsandboxed.log`). The sandboxed
+run passed 509 and failed only the existing Push process-observation fixture
+with EPERM. Locked MSVC `cargo xwin check -p talos-tools --features git --tests
+--target x86_64-pc-windows-msvc` passes with seven existing reduced-feature
+warnings (`/private/tmp/i300-native-pull-baseline-xwin.log`); this is compilation,
+not native Windows execution. Native whole-operation preparation/admission,
+recursion scope, production replacement and all P1–P5 exits remain open.
+The accepted native amendment supersedes older references below to a required
+post-fetch integration approval; do not rebuild that superseded scheduler.
+
 ## Exact-head CI result — 2026-10-22
 
 Run [39718108787](https://github.com/wjhuang88/talos/actions/runs/39718108787)
