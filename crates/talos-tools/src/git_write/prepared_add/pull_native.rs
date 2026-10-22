@@ -39,6 +39,13 @@ impl AddPlan {
                 ToolResourceKind::Remote,
             ));
         }
+        facets.push(ToolPermissionFacet::with_resource(
+            ToolNature::Execute,
+            self.program.to_str().ok_or_else(|| {
+                GitToolError::InvalidInput("Git program path is not UTF-8".into())
+            })?,
+            ToolResourceKind::Command,
+        ));
         Ok(facets)
     }
 
