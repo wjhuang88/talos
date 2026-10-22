@@ -54,11 +54,16 @@ history/TLOG, so session restore, compaction and forking stay consistent.
 
 ### 4. Reasoning replay and confidentiality
 
-With `store: false`, encrypted reasoning content is requested via
-`include: ["reasoning.encrypted_content"]` and replayed only when `assistant_reasoning.model ==
-model` (existing rule); otherwise it is dropped. Encrypted blobs are opaque, size-bounded,
-never rendered in UI, logs, or debug snapshots (same class as ADR-023/045 masking), and never
-persisted in readable form.
+With `store: false`, current OpenAI Responses semantics return reasoning items with opaque
+`encrypted_content` by default. Talos must preserve that stateless output when replay is enabled;
+the legacy `include: ["reasoning.encrypted_content"]` request value may be emitted only as a
+compatibility aid for older compatible implementations and must not be treated as a required modern
+OpenAI parameter. Replay occurs only when `assistant_reasoning.model == model` (existing rule);
+otherwise encrypted reasoning is dropped.
+
+Encrypted blobs are opaque, size-bounded, never rendered in UI, logs, or debug snapshots (same class
+as ADR-023/045 masking), and never persisted in readable form. Reasoning summaries are a separate,
+explicitly requested display-safe output and must not be confused with encrypted reasoning state.
 
 ### 5. Catalog and matching
 
@@ -97,3 +102,14 @@ Gemini, Azure and Bedrock still require separately claimed child Stories and chi
 Implementation requires recorded stream fixtures, proptest coverage, exact-head CI and independent
 provider/API review. #747 is governance only: no production implementation is authorized until its
 Accepted/Claimed/Active records become target-branch truth.
+
+## Current API Verification — 2026-10-22
+
+Before implementation, the OpenAI developer documentation was re-checked against the 2026-10-20
+intake assumptions. Current stateless Responses documentation says `store: false` output reasoning
+items include `encrypted_content` by default and retains `reasoning.encrypted_content` in `include`
+only for compatibility. Current function-calling documentation still binds `function_call_output` to
+the originating `function_call` with `call_id`, and current streaming guidance identifies
+`response.created`, `response.output_text.delta`, `response.completed` and `error` as core text
+lifecycle events. I306 tests must use recorded fixtures representative of the current API rather than
+freezing older documentation examples.
