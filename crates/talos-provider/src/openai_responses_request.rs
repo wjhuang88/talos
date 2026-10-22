@@ -49,10 +49,7 @@ pub(crate) fn build_request_body(
             }
             Message::Multimodal { parts } => {
                 pending_tool_call_ids.clear();
-                let mut content = parts
-                    .iter()
-                    .map(response_input_part)
-                    .collect::<Vec<_>>();
+                let mut content = parts.iter().map(response_input_part).collect::<Vec<_>>();
                 if content.is_empty() {
                     content.push(json!({"type": "input_text", "text": EMPTY_INPUT_MESSAGE}));
                 }
@@ -138,6 +135,7 @@ pub(crate) fn build_request_body(
                         "name": tool.name,
                         "description": tool.description,
                         "parameters": tool.parameters,
+                        "strict": false,
                     })
                 })
                 .collect(),
@@ -172,8 +170,8 @@ fn response_input_part(part: &ContentPart) -> Value {
             content_digest,
             ..
         } => {
-            let Some(bytes) = crate::image_io::read_image_with_toctou_guard(path, content_digest)
-                .into_bytes()
+            let Some(bytes) =
+                crate::image_io::read_image_with_toctou_guard(path, content_digest).into_bytes()
             else {
                 return json!({
                     "type": "input_text",
@@ -201,7 +199,10 @@ fn text_message_item(role: &str, text: String) -> Value {
     })
 }
 
-fn matched_following_tool_result_ids(messages: &[Message], assistant_idx: usize) -> HashSet<String> {
+fn matched_following_tool_result_ids(
+    messages: &[Message],
+    assistant_idx: usize,
+) -> HashSet<String> {
     let mut matched = HashSet::new();
     for message in messages.iter().skip(assistant_idx + 1) {
         match message {
@@ -326,6 +327,7 @@ mod tests {
         assert_eq!(tools.len(), 1);
         assert_eq!(tools[0]["type"], "function");
         assert_eq!(tools[0]["name"], "lookup");
+        assert_eq!(tools[0]["strict"], false);
         assert!(tools[0].get("function").is_none());
 
         let input = body["input"].as_array().expect("input array");
