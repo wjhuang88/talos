@@ -59,3 +59,57 @@ fn stored_module_inventory_shares_the_invocation_budget() {
     assert!(inventory.advance(|_| true).is_err());
     assert!(Inventory::stored_modules(&root, budget).is_err());
 }
+
+#[test]
+fn startup_target_rejects_missing_checkout_resolution_and_shares_budget() {
+    let temp = tempfile::tempdir().expect("fixture");
+    let root = temp.path().canonicalize().expect("root");
+    let budget = ReferenceBudget::default();
+    let mut inventory = Inventory::stored_modules(&root, budget.clone()).expect("inventory");
+    let target = root.join("missing");
+    inventory.worktree_targets.insert(target.clone(), None);
+    inventory
+        .resolve_worktree_targets()
+        .expect("checkout may be absent");
+    let before = *budget.0.lock().expect("budget");
+    assert!(
+        inventory
+            .retain_startup_worktree_target(&target)
+            .expect("startup")
+    );
+    assert!(inventory.resolve_worktree_targets().is_err());
+    let after = *budget.0.lock().expect("budget");
+    assert!(after.0 < before.0 && after.1 < before.1);
+    assert!(
+        !inventory
+            .retain_startup_worktree_target(&target)
+            .expect("dedup")
+    );
+    assert_eq!(*budget.0.lock().expect("budget"), after);
+}
+
+#[cfg(unix)]
+#[test]
+fn startup_target_preserves_filesystem_order_and_link_identity() {
+    let temp = tempfile::tempdir().expect("fixture");
+    let root = temp.path().canonicalize().expect("root");
+    std::fs::create_dir_all(root.join("actual/nested")).expect("actual");
+    std::fs::create_dir(root.join("actual/checkout")).expect("checkout");
+    std::fs::create_dir(root.join("checkout")).expect("lexical decoy");
+    std::os::unix::fs::symlink("actual/nested", root.join("link")).expect("link");
+    let raw = root.join("link/../checkout");
+    let mut inventory =
+        Inventory::stored_modules(&root, ReferenceBudget::default()).expect("inventory");
+    inventory
+        .retain_startup_worktree_target(&raw)
+        .expect("freeze");
+    assert_eq!(inventory.resolved_startup_worktrees().count(), 0);
+    inventory.resolve_worktree_targets().expect("resolve");
+    assert_eq!(
+        inventory.resolved_startup_worktrees().collect::<Vec<_>>(),
+        vec![root.join("actual/checkout").as_path()]
+    );
+    std::fs::remove_file(root.join("link")).expect("replace link");
+    std::os::unix::fs::symlink("actual", root.join("link")).expect("replacement");
+    assert!(inventory.revalidate().is_err());
+}

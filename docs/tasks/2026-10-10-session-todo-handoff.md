@@ -5592,3 +5592,14 @@ the remaining linked/common-target and activation work.
 External child common targets now reuse the bounded Pull pointer resolver, then
 require fresh actual-target/config Read approval before startup capture. Pull
 regression 170/170 passes; I300 records the fixture and remaining delivery gates.
+Common-directory stage committed as `0cf0468a`. The maintainer accepted startup
+core.worktree resolution under ADR-089; local implementation uses bounded path
+resolution followed by exact target Read admission. Pull tests 173/173, scope 5/5
+and tools Clippy pass. I300 owns evidence and residuals: child config/effect binding,
+eight-stage convergence, review, platform acceptance and production activation.
+Full preflight failed from disk exhaustion; authorized target/debug cleanup recovered
+about 20 GiB. A compact-debug retry encountered the sandbox ps restriction;
+full unsandboxed preflight then exited 0, including workspace tests and SDK fixture.
+Evidence: `/private/tmp/i300-startup-resolution-preflight-native.log`.
+Windows CI separately fails at the activation gate and native Git daemon Push
+baseline timeout before Talos dispatch. T7 and the original handoff remain incomplete.

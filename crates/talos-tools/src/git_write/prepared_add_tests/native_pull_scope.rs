@@ -19,12 +19,14 @@ async fn native_pull_scope_discovers_stored_modules_without_expanding_configurat
             .join(".git/modules/group/child");
         if stored {
             std::fs::create_dir_all(&module).expect("stored module");
+            std::fs::create_dir(root.path().join(".git/startup-worktree"))
+                .expect("startup worktree");
             std::fs::write(module.join("HEAD"), "ref: refs/heads/main\n").expect("HEAD");
             // Startup parsing must not expand includes. This directory would
             // make include-expanded discovery fail if attempted at this stage.
             std::fs::create_dir(module.join("unread-include")).expect("unread include");
             std::fs::write(module.join("config"),
-                "[core]\nrepositoryformatversion = 0\nworktree = ../../../absent-worktree\n[include]\npath = unread-include\n",
+                "[core]\nrepositoryformatversion = 0\nworktree = ../../../startup-worktree\n[include]\npath = unread-include\n",
             ).expect("startup config");
         }
         let mut plan = Box::new(
@@ -56,7 +58,7 @@ async fn native_pull_scope_discovers_stored_modules_without_expanding_configurat
                 .await
                 .expect("native scope");
             waves += 1;
-            assert!(waves < 8, "scope discovery did not converge");
+            assert!(waves < 10, "scope discovery did not converge");
             assert!(!root.path().join(".git/FETCH_HEAD").exists());
         }
         assert!(plan.phase == Phase::PullNativeMutation);
@@ -76,7 +78,7 @@ async fn native_pull_scope_discovers_stored_modules_without_expanding_configurat
             assert!(
                 plan.pull_child_startup[&module]
                     .targets
-                    .contains(&module.join("../../../absent-worktree"))
+                    .contains(&module.join("../../../startup-worktree"))
             );
             assert!(plan.facets.iter().any(|facet| {
                 facet.nature == ToolNature::Read
@@ -319,4 +321,98 @@ async fn external_common_scope(deny_config: bool) {
     )
     .expect("configuration drift");
     assert!(plan.revalidate().is_err());
+}
+
+#[tokio::test]
+async fn native_pull_scope_startup_requires_resolution_then_exact_target_admission() {
+    for missing in [false, true] {
+        let root = tempfile::tempdir().expect("fixture");
+        git(root.path(), &["init", "-b", "main"]);
+        git(root.path(), &["config", "core.hooksPath", ""]);
+        git(
+            root.path(),
+            &["remote", "add", "origin", "git://example.invalid/source"],
+        );
+        let root_path = root.path().canonicalize().expect("root");
+        let module = root_path.join(".git/modules/child");
+        let target = root_path.join("checkout");
+        std::fs::create_dir_all(&module).expect("module");
+        if !missing {
+            std::fs::create_dir(&target).expect("checkout");
+        }
+        std::fs::write(module.join("HEAD"), "ref: refs/heads/main\n").expect("HEAD");
+        std::fs::write(
+            module.join("config"),
+            "[core]\nrepositoryformatversion = 0\nworktree = ../../../checkout\n",
+        )
+        .expect("config");
+        let mut plan = Box::new(
+            prepare_pull_fixture(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+                .expect("plan"),
+        )
+        .discover()
+        .await
+        .expect("sender");
+        plan.phase = Phase::PullNativePreparation;
+        let mut saw_resolution = false;
+        for _ in 0..10 {
+            if plan
+                .facets
+                .iter()
+                .any(|facet| facet.resource.as_deref() == Some("git:pull-worktree-resolution"))
+            {
+                saw_resolution = true;
+                assert!(
+                    !plan
+                        .facets
+                        .iter()
+                        .any(|facet| facet.resource.as_deref() == target.to_str())
+                );
+                break;
+            }
+            let tokens = proof(&plan)
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .expect("proof");
+            plan = plan
+                .discover_native_pull_scope(&tokens)
+                .await
+                .expect("discovery");
+        }
+        assert!(saw_resolution);
+        assert_eq!(
+            plan.native_pull_modules
+                .as_ref()
+                .expect("modules")
+                .resolved_startup_worktrees()
+                .count(),
+            0
+        );
+        let tokens = proof(&plan)
+            .consume_for_prepared(&plan.request(), &plan.identity)
+            .expect("resolution proof");
+        let next = plan.discover_native_pull_scope(&tokens).await;
+        if missing {
+            assert!(next.is_err(), "missing startup target must refuse");
+        } else {
+            let mut plan = next.expect("resolved frontier");
+            assert!(plan.phase == Phase::PullNativePreparation);
+            assert!(
+                plan.facets
+                    .iter()
+                    .any(|facet| facet.nature == ToolNature::Read
+                        && facet.resource.as_deref() == target.to_str())
+            );
+            plan.facets
+                .retain(|facet| facet.resource.as_deref() != target.to_str());
+            let tokens = proof(&plan)
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .expect("without target grant");
+            let error = match plan.discover_native_pull_scope(&tokens).await {
+                Ok(_) => panic!("unadmitted startup target advanced"),
+                Err(error) => error,
+            };
+            assert!(error.to_string().contains("separate Read admission"));
+        }
+        assert!(!root.path().join(".git/FETCH_HEAD").exists());
+    }
 }
