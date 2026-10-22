@@ -51,8 +51,9 @@ protocol provenance, while preserving old explicit protocol behavior.
 - Map Responses input/output/tool/reasoning/usage semantics into existing Talos provider events and
   retry/progress boundaries.
 - Keep requests stateless: `store: false`; never use `previous_response_id`.
-- Request encrypted reasoning replay when applicable, treat blobs as confidential opaque data, and
-  replay only under the existing same-model rule.
+- Preserve current stateless Responses `encrypted_content` reasoning items when replay is applicable;
+  legacy `include = ["reasoning.encrypted_content"]` is compatibility-only, not a required modern
+  OpenAI request field. Replay remains subject to the existing same-model rule.
 - Return a clear unsupported-protocol error with an explicit `protocol = "openai-chat"` escape hatch;
   never retry across protocols.
 - Surface effective protocol and source in model-selection/debug surfaces covered by #724.
@@ -138,3 +139,12 @@ so siblings B-D remain independently schedulable.
 No implementation code, test, dependency, generated catalog or production configuration is part of
 #747. This Claimed/Active record is only a proposal until the finalized exact head reaches main under
 `docs/sop/AGENT-COLLABORATION.md`; implementation starts from that merge or a later main commit.
+
+## Current OpenAI Contract Check — 2026-10-22
+
+The OpenAI developer documentation was re-checked before implementation. Current stateless Responses
+behavior returns reasoning `encrypted_content` by default with `store: false`; the legacy include
+value remains compatibility-only. Function-call results remain `function_call_output` items bound by
+`call_id`, and the core streaming lifecycle still includes `response.created`,
+`response.output_text.delta`, `response.completed` and `error`. Recorded fixtures and implementation
+must follow the current API contract rather than older examples.
