@@ -131,7 +131,9 @@ pub(crate) fn build_provider(
             Arc::new(provider)
         }
         ProviderProtocol::OpenAIResponses => {
-            panic!("openai-responses protocol is staged but not yet activated in the CLI provider factory")
+            panic!(
+                "openai-responses protocol is staged but not yet activated in the CLI provider factory"
+            )
         }
         _ => panic!("unsupported provider protocol in this Talos build"),
     }
