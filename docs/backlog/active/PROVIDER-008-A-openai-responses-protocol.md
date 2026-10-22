@@ -1,6 +1,6 @@
 # PROVIDER-008-A: Protocol Architecture And OpenAI Responses
 
-**Status**: Proposed / Unclaimed; selected for I306
+**Status**: Active / Claimed; selected for I306
 **Type**: Provider / Config / Model-Catalog Story
 **Parent Epic**: [PROVIDER-008](PROVIDER-008-openai-responses-api-support.md) / [Issue #724](https://github.com/wjhuang88/talos/issues/724)
 **Source Issue**: [#724](https://github.com/wjhuang88/talos/issues/724)
@@ -10,18 +10,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | GPT-5.6 Sol / talos开发 session |
 | Work Slice | PROVIDER-008-A protocol architecture plus OpenAI Responses only; Gemini, Azure and Bedrock remain separate children. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-10-22 |
 | Source Issue | #724 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Draft governance-only proposal; ineffective until finalized exact-head claim/activation merges to main. |
+| Governance Claim PR | #747 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Maintainer requested implementation in the 2026-10-22 talos开发 session. Governance-only #747 must pass exact-head applicable CI, both governance validators, provider/API technical review and merge-time CAS before this claim is effective. |
 | Implementation PR | Not started |
 | Last Updated | 2026-10-22 |
-| Handoff / Release Condition | Claim and activate I306 under accepted ADR-093 before implementation. Sibling families remain unclaimed. |
+| Handoff / Release Condition | Claim activates only when #747 reaches main with accepted ADR-093. Sibling families remain unclaimed; Complete requires existing implementation commit evidence. |
 
 ## Goal
 
@@ -68,7 +68,7 @@ protocol provenance, while preserving old explicit protocol behavior.
 
 ## Dependencies / Decision Links
 
-- ADR-093 must become Accepted atomically with this claim/activation.
+- ADR-093 becomes Accepted atomically with this claim/activation in #747.
 - Preserve ADR-013 provider schema, ADR-021 native tool protocol, ADR-034 reasoning model identity,
   ADR-050/051 image continuation, ADR-062 typed retry progress and ADR-075 bounded decision calls.
 - PROVIDER-004 tool-call identity behavior must not regress.
@@ -124,10 +124,10 @@ Realtime/Assistants/Batch and active probing remain backlog-only unless separate
 ## Preflight — 2026-10-22
 
 Target main at selection: `0caaf83241b8f94cba0cbdca66e3e166068f024d`.
-Issue #724 and all three comments were re-read. No open PR matched #724 / PROVIDER-008 / OpenAI
-Responses; no matching `724` or `provider` implementation branch was found. PROVIDER-008 remains
-Refinement / Unclaimed; ADR-093 remains Proposed. MODEL-014 remains Refinement / Unclaimed and does
-not authorize overlapping capability inference.
+Issue #724 and all three comments were re-read. Before #747 was opened, no open PR matched #724 /
+PROVIDER-008 / OpenAI Responses and no matching `724` or `provider` implementation branch was found.
+PROVIDER-008 remains Refinement / Unclaimed at the epic level; MODEL-014 remains Refinement /
+Unclaimed and does not authorize overlapping capability inference.
 
 Relevant current iteration disposition from target-branch Board/owners: I293/I294 retain independent
 Search ownership; I300's structured Git claim remains separate; I302 remains Review on Windows
@@ -136,5 +136,5 @@ active provider-protocol implementation owner was found. This Story deliberately
 so siblings B-D remain independently schedulable.
 
 No implementation code, test, dependency, generated catalog or production configuration is part of
-the governance proposal. The claim becomes effective only after the finalized governance PR reaches
-main under `docs/sop/AGENT-COLLABORATION.md`.
+#747. This Claimed/Active record is only a proposal until the finalized exact head reaches main under
+`docs/sop/AGENT-COLLABORATION.md`; implementation starts from that merge or a later main commit.
