@@ -7453,3 +7453,11 @@ new test lint. This remains a test of the shared discovery primitive, not the
 production discovery route. Next: invoke this resolver from a dedicated native
 scope-discovery phase after SenderConfiguration, then gather recursive repository
 and external-effect scope before replacing the old Pull scheduler.
+
+Current-source verification at `fc1342d9`: locked, nonincremental Git-enabled
+tools library tests pass 514/514 outside the sandbox (130.88 s;
+`/private/tmp/i300-native-current-tools-unsandboxed.log`). The sandboxed run
+passes 513/514 and fails the existing Push maintenance-cancellation fixture
+when spawning `ps` returns EPERM; the same full suite passes outside it. No
+assertion, deadline or production gate was changed. This evidence covers tools
+library regression only, not native Pull discovery or whole-handoff completion.
