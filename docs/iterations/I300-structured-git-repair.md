@@ -1,3 +1,27 @@
+## Rebase and Windows observer evidence — 2026-10-22
+
+Fetched origin and rebased the clean implementation branch onto `0caaf832`
+(search typed-DNS failure continuation, #746). All 370 local commits replayed
+without conflict; the resulting implementation head is `10bf250d`. This rewrites
+local implementation SHAs; earlier checkpoint SHAs remain historical evidence.
+No remote history was rewritten and no post-rebase test result is claimed here.
+
+Downloaded run 39724001119's Windows failure artifact at old head `06c1ebef` to
+`/private/tmp/i300-ci-39724001119`. Samples 15–19 (05:08:49–05:12:49 UTC) contain
+no Cargo/test process, but retain three git.exe/git-daemon.exe pairs: 8012/8956,
+5552/1772 and 3556/1428. The test log reaches Cargo's final four-target failure
+summary. This supports a surviving-descendant/output-pipeline explanation for
+the post-summary wait; it does not prove which process owns an inherited handle.
+The bounded observer can omit processes beyond its 256-entry limit.
+
+Crucially, this run predates the tools native-fixture and MCP daemon-supervision
+changes now present locally. Do not repeat cleanup patches solely from this old
+failure: obtain native current-head evidence for those fixes. The separate native
+default sideband Push timeout still occurs in the old run and is not resolved by
+daemon cleanup. Production Pull/Windows gates, P1–P5 and T8 remain open. Continue
+native whole-operation Pull authorization/execution locally before publishing a
+stable candidate; do not use remote CI as an edit-by-edit loop.
+
 ## Retained native Pull command checkpoint — 2026-10-22
 
 Pull preparation now retains a native command (fixed foreground maintenance,
