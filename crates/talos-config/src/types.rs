@@ -27,6 +27,7 @@ pub use talos_core::model::ReasoningEffort;
 /// Wire protocol used to talk to a provider.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
+#[non_exhaustive]
 pub enum ProviderProtocol {
     /// Anthropic Messages API.
     #[serde(rename = "anthropic-messages")]
@@ -35,6 +36,9 @@ pub enum ProviderProtocol {
     #[default]
     #[serde(rename = "openai-chat")]
     OpenAIChat,
+    /// OpenAI Responses API.
+    #[serde(rename = "openai-responses")]
+    OpenAIResponses,
 }
 
 /// Per-model runtime limits and capability overrides.
