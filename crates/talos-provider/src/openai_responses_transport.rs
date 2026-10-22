@@ -123,9 +123,8 @@ impl ResponsesSseDecoder {
 
 /// Parse one live Responses HTTP body with first-packet and idle timeouts.
 ///
-/// This deliberately returns semantic outputs, rather than erasing encrypted reasoning into the
-/// legacy `AgentEvent` channel. The final provider adapter can therefore persist opaque reasoning
-/// before projecting display-safe events.
+/// Semantic outputs stay typed until the provider adapter projects native calls through the shared
+/// invocation-integrity path and forwards ordinary [`AgentEvent`] values.
 pub(crate) async fn parse_response_stream(
     response: reqwest::Response,
     tx: mpsc::Sender<ResponsesStreamOutput>,
@@ -204,7 +203,7 @@ mod tests {
             .into_iter()
             .filter_map(|output| match output {
                 ResponsesStreamOutput::Agent(event) => Some(event),
-                ResponsesStreamOutput::EncryptedReasoning { .. } => None,
+                ResponsesStreamOutput::FunctionCall { .. } => None,
             })
             .collect()
     }

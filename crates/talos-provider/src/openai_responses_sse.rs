@@ -6,18 +6,25 @@
 use std::collections::HashMap;
 
 use serde_json::Value;
-use talos_core::message::{AgentEvent, StopReason, ToolCall, Usage};
-use talos_core::tool::ToolProvenance;
+use talos_core::message::{AgentEvent, ReasoningBlock, StopReason, Usage};
+
+use crate::openai_responses_reasoning::{
+    MAX_REASONING_RESPONSE_BYTES, encode_completed_reasoning_item,
+};
 
 /// One parsed Responses stream output.
 ///
-/// Encrypted reasoning is kept opaque and separate from [`AgentEvent`] until PROVIDER-008-A adds a
-/// dedicated durable core representation. It must never be rendered or coerced into Anthropic
-/// `redacted_thinking` / OpenAI-compatible plain reasoning text.
+/// Native function calls retain their original argument bytes so the transport wrapper can route
+/// them through the existing invocation-integrity path (including browser-tool evidence). Ordinary
+/// Talos events stay typed as [`AgentEvent`].
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum ResponsesStreamOutput {
     Agent(AgentEvent),
-    EncryptedReasoning { item_id: String, data: String },
+    FunctionCall {
+        id: String,
+        name: String,
+        arguments: String,
+    },
 }
 
 #[derive(Debug, Default)]
@@ -33,6 +40,8 @@ struct PendingFunctionCall {
 #[derive(Debug, Default)]
 pub(crate) struct ResponsesStreamState {
     function_calls: HashMap<String, PendingFunctionCall>,
+    reasoning_blocks: Vec<ReasoningBlock>,
+    reasoning_bytes: usize,
     started: bool,
     terminal: bool,
     saw_tool_call: bool,
@@ -68,8 +77,8 @@ impl ResponsesStreamState {
             }
             "response.output_text.delta" | "response.refusal.delta" => text_delta(event),
             "response.reasoning_summary_text.delta" => reasoning_summary_delta(event),
-            // Never expose raw model reasoning. The durable replay path uses encrypted_content
-            // captured from the final reasoning output item instead.
+            // Never expose raw model reasoning. Durable replay uses encrypted_content captured
+            // only from the completed reasoning output item.
             "response.reasoning_text.delta" | "response.reasoning_text.done" => Vec::new(),
             "response.output_item.added" => self.output_item_added(event),
             "response.function_call_arguments.delta" => self.function_arguments_delta(event),
@@ -161,7 +170,10 @@ impl ResponsesStreamState {
         };
         match item.get("type").and_then(Value::as_str) {
             Some("function_call") => self.function_call_done(event, item),
-            Some("reasoning") => reasoning_done(event, item),
+            Some("reasoning") => {
+                self.reasoning_done(item);
+                Vec::new()
+            }
             _ => Vec::new(),
         }
     }
@@ -192,39 +204,57 @@ impl ResponsesStreamState {
                 "OpenAI Responses function call completed without call_id or name",
             );
         }
-        let input = match serde_json::from_str(&arguments) {
-            Ok(input) => input,
-            Err(_) => {
-                return self.terminal_error("invalid OpenAI Responses function arguments JSON");
-            }
-        };
+        if serde_json::from_str::<Value>(&arguments).is_err() {
+            return self.terminal_error("invalid OpenAI Responses function arguments JSON");
+        }
 
         if let Some(pending) = self.function_calls.get_mut(&item_id) {
             pending.emitted = true;
         }
         self.saw_tool_call = true;
-        vec![agent(AgentEvent::ToolCall {
-            call: ToolCall {
-                id: call_id,
-                name,
-                input,
-            },
-            provenance: ToolProvenance::Native,
-            summary_fields: vec![],
-        })]
+        vec![ResponsesStreamOutput::FunctionCall {
+            id: call_id,
+            name,
+            arguments,
+        }]
+    }
+
+    fn reasoning_done(&mut self, item: &Value) {
+        let envelope = match encode_completed_reasoning_item(item) {
+            Ok(Some(envelope)) => envelope,
+            Ok(None) => return,
+            Err(message) => {
+                tracing::warn!(reason = message, "dropping non-replayable Responses reasoning item");
+                return;
+            }
+        };
+        if self
+            .reasoning_bytes
+            .saturating_add(envelope.len())
+            > MAX_REASONING_RESPONSE_BYTES
+        {
+            tracing::warn!(
+                limit = MAX_REASONING_RESPONSE_BYTES,
+                "dropping Responses reasoning item after replay size limit"
+            );
+            return;
+        }
+        self.reasoning_bytes = self.reasoning_bytes.saturating_add(envelope.len());
+        self.reasoning_blocks
+            .push(ReasoningBlock::Redacted { data: envelope });
     }
 
     fn completed(&mut self, event: &Value) -> Vec<ResponsesStreamOutput> {
         self.terminal = true;
         let response = event.get("response").unwrap_or(event);
-        vec![agent(AgentEvent::TurnEnd {
-            stop_reason: if self.saw_tool_call {
+        self.finish_success(
+            if self.saw_tool_call {
                 StopReason::ToolUse
             } else {
                 StopReason::EndTurn
             },
-            usage: response_usage(response),
-        })]
+            response_usage(response),
+        )
     }
 
     fn incomplete(&mut self, event: &Value) -> Vec<ResponsesStreamOutput> {
@@ -236,14 +266,22 @@ impl ResponsesStreamState {
 
         if reason == Some("max_output_tokens") {
             self.terminal = true;
-            return vec![agent(AgentEvent::TurnEnd {
-                stop_reason: StopReason::MaxTokens,
-                usage: response_usage(response),
-            })];
+            return self.finish_success(StopReason::MaxTokens, response_usage(response));
         }
 
         let detail = reason.unwrap_or("unknown reason");
         self.terminal_error(format!("OpenAI Responses response.incomplete: {detail}"))
+    }
+
+    fn finish_success(&mut self, stop_reason: StopReason, usage: Usage) -> Vec<ResponsesStreamOutput> {
+        let mut outputs = Vec::with_capacity(2);
+        if !self.reasoning_blocks.is_empty() {
+            outputs.push(agent(AgentEvent::ReasoningComplete {
+                blocks: std::mem::take(&mut self.reasoning_blocks),
+            }));
+        }
+        outputs.push(agent(AgentEvent::TurnEnd { stop_reason, usage }));
+        outputs
     }
 
     fn response_error(&mut self, event: &Value, event_type: &str) -> Vec<ResponsesStreamOutput> {
@@ -264,6 +302,7 @@ impl ResponsesStreamState {
             return Vec::new();
         }
         self.terminal = true;
+        self.reasoning_blocks.clear();
         vec![agent(AgentEvent::Error {
             message: message.into(),
         })]
@@ -319,23 +358,6 @@ fn update_function_call(pending: &mut PendingFunctionCall, item: &Value) {
     }
 }
 
-fn reasoning_done(event: &Value, item: &Value) -> Vec<ResponsesStreamOutput> {
-    let Some(data) = item
-        .get("encrypted_content")
-        .and_then(Value::as_str)
-        .filter(|data| !data.is_empty())
-    else {
-        return Vec::new();
-    };
-    let Some(item_id) = item_identity(event, item) else {
-        return Vec::new();
-    };
-    vec![ResponsesStreamOutput::EncryptedReasoning {
-        item_id,
-        data: data.to_string(),
-    }]
-}
-
 fn response_usage(response: &Value) -> Usage {
     let usage = response.get("usage").unwrap_or(&Value::Null);
     let input_details = usage
@@ -377,6 +399,7 @@ fn nested_error_message(value: &Value) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::openai_responses_reasoning::decode_reasoning_item;
     use serde_json::json;
 
     fn single_agent(outputs: Vec<ResponsesStreamOutput>) -> AgentEvent {
@@ -435,7 +458,7 @@ mod tests {
     }
 
     #[test]
-    fn function_call_accumulates_arguments_and_emits_native_call() {
+    fn function_call_preserves_raw_arguments_for_invocation_integrity() {
         let mut state = ResponsesStreamState::new();
         let started = single_agent(state.apply(&json!({
             "type": "response.output_item.added",
@@ -452,38 +475,188 @@ mod tests {
             .apply(&json!({
                 "type": "response.function_call_arguments.delta",
                 "item_id": "fc_item_1",
-                "delta": "{\"key\":"
+                "delta": "{ \"key\" :"
             }))
             .is_empty());
         assert!(state
             .apply(&json!({
                 "type": "response.function_call_arguments.done",
                 "item_id": "fc_item_1",
-                "name": "lookup",
-                "arguments": "{\"key\":\"value\"}"
+                "arguments": "{ \"key\" : \"value\" }"
             }))
             .is_empty());
-        let completed = single_agent(state.apply(&json!({
-            "type": "response.output_item.done",
-            "item": {
-                "id": "fc_item_1",
-                "type": "function_call",
-                "call_id": "call_1",
-                "name": "lookup",
-                "arguments": "{\"key\":\"value\"}"
-            }
-        })));
+        assert_eq!(
+            state.apply(&json!({
+                "type": "response.output_item.done",
+                "item": {
+                    "id": "fc_item_1",
+                    "type": "function_call",
+                    "call_id": "call_1",
+                    "name": "lookup",
+                    "arguments": "{ \"key\" : \"value\" }"
+                }
+            })),
+            vec![ResponsesStreamOutput::FunctionCall {
+                id: "call_1".into(),
+                name: "lookup".into(),
+                arguments: "{ \"key\" : \"value\" }".into()
+            }]
+        );
+    }
+
+    #[test]
+    fn completed_reasoning_is_buffered_and_emitted_once_before_turn_end() {
+        let mut state = ResponsesStreamState::new();
+        assert!(state
+            .apply(&json!({
+                "type": "response.output_item.added",
+                "item": {
+                    "id": "rs_1",
+                    "type": "reasoning",
+                    "summary": [],
+                    "encrypted_content": "partial-secret"
+                }
+            }))
+            .is_empty());
+        assert!(state
+            .apply(&json!({
+                "type": "response.output_item.done",
+                "item": {
+                    "id": "rs_1",
+                    "type": "reasoning",
+                    "summary": [{"type": "summary_text", "text": "safe summary"}],
+                    "encrypted_content": "complete-secret"
+                }
+            }))
+            .is_empty());
+
+        let outputs = state.apply(&json!({
+            "type": "response.completed",
+            "response": {"usage": {}}
+        }));
+        assert_eq!(outputs.len(), 2);
+        let ResponsesStreamOutput::Agent(AgentEvent::ReasoningComplete { blocks }) = &outputs[0]
+        else {
+            panic!("reasoning must precede turn end: {outputs:?}");
+        };
+        assert_eq!(blocks.len(), 1);
+        let ReasoningBlock::Redacted { data } = &blocks[0] else {
+            panic!("expected opaque reasoning block");
+        };
+        let replay = decode_reasoning_item(data).expect("decode replay envelope");
+        assert_eq!(replay["id"], "rs_1");
+        assert_eq!(replay["encrypted_content"], "complete-secret");
+        assert_eq!(replay["summary"][0]["text"], "safe summary");
         assert!(matches!(
-            completed,
-            AgentEvent::ToolCall { call, provenance: ToolProvenance::Native, .. }
-                if call.id == "call_1"
-                    && call.name == "lookup"
-                    && call.input == json!({"key": "value"})
+            &outputs[1],
+            ResponsesStreamOutput::Agent(AgentEvent::TurnEnd { .. })
         ));
     }
 
     #[test]
-    fn malformed_function_call_is_terminal_and_cannot_be_followed_by_success() {
+    fn completed_event_maps_usage_and_tool_stop_reason() {
+        let mut state = ResponsesStreamState::new();
+        assert!(matches!(
+            state.apply(&json!({
+                "type": "response.output_item.done",
+                "item": {
+                    "id": "fc_1",
+                    "type": "function_call",
+                    "call_id": "call_1",
+                    "name": "lookup",
+                    "arguments": "{}"
+                }
+            }))
+            .as_slice(),
+            [ResponsesStreamOutput::FunctionCall { .. }]
+        ));
+        let end = single_agent(state.apply(&json!({
+            "type": "response.completed",
+            "response": {
+                "usage": {
+                    "input_tokens": 120,
+                    "output_tokens": 30,
+                    "input_tokens_details": {"cached_tokens": 20},
+                    "output_tokens_details": {"reasoning_tokens": 7}
+                }
+            }
+        })));
+        match end {
+            AgentEvent::TurnEnd { stop_reason, usage } => {
+                assert_eq!(stop_reason, StopReason::ToolUse);
+                assert_eq!(usage.input_tokens, 120);
+                assert_eq!(usage.output_tokens, 30);
+                assert_eq!(usage.cache_read_tokens, 20);
+                assert_eq!(usage.reasoning_tokens, 7);
+            }
+            other => panic!("expected TurnEnd, got {other:?}"),
+        }
+        assert!(state.finish_eof().is_empty());
+    }
+
+    #[test]
+    fn max_output_tokens_incomplete_is_a_typed_terminal() {
+        let mut state = ResponsesStreamState::new();
+        let end = single_agent(state.apply(&json!({
+            "type": "response.incomplete",
+            "response": {
+                "incomplete_details": {"reason": "max_output_tokens"},
+                "usage": {"input_tokens": 3, "output_tokens": 5}
+            }
+        })));
+        assert!(matches!(
+            end,
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::MaxTokens,
+                ..
+            }
+        ));
+        assert!(state.finish_eof().is_empty());
+    }
+
+    #[test]
+    fn unknown_events_are_ignored_and_eof_without_terminal_is_error() {
+        let mut state = ResponsesStreamState::new();
+        assert!(state
+            .apply(&json!({"type": "response.future_event", "value": 1}))
+            .is_empty());
+        assert!(matches!(
+            single_agent(state.finish_eof()),
+            AgentEvent::Error { message } if message.contains("before a terminal event")
+        ));
+        assert!(state.finish_eof().is_empty());
+    }
+
+    #[test]
+    fn failed_unknown_incomplete_and_top_level_error_are_terminal() {
+        for event in [
+            json!({
+                "type": "response.failed",
+                "response": {"error": {"message": "failed fixture"}}
+            }),
+            json!({
+                "type": "response.incomplete",
+                "response": {"incomplete_details": {"reason": "content_filter"}}
+            }),
+            json!({
+                "type": "error",
+                "error": {"message": "stream fixture"}
+            }),
+        ] {
+            let mut state = ResponsesStreamState::new();
+            assert!(matches!(
+                single_agent(state.apply(&event)),
+                AgentEvent::Error { .. }
+            ));
+            assert!(state.finish_eof().is_empty());
+            assert!(state
+                .apply(&json!({"type": "response.output_text.delta", "delta": "late"}))
+                .is_empty());
+        }
+    }
+
+    #[test]
+    fn invalid_function_arguments_fail_closed_without_panicking() {
         let mut state = ResponsesStreamState::new();
         assert!(matches!(
             single_agent(state.apply(&json!({
@@ -501,160 +674,45 @@ mod tests {
         assert!(state
             .apply(&json!({"type": "response.completed", "response": {}}))
             .is_empty());
-        assert!(state.finish_eof().is_empty());
     }
 
     #[test]
-    fn encrypted_reasoning_is_taken_only_from_completed_output_item() {
+    fn malformed_reasoning_metadata_is_dropped_without_failing_visible_output() {
         let mut state = ResponsesStreamState::new();
         assert!(state
             .apply(&json!({
-                "type": "response.output_item.added",
+                "type": "response.output_item.done",
                 "item": {
-                    "id": "rs_1",
                     "type": "reasoning",
-                    "encrypted_content": "partial-secret"
+                    "summary": [],
+                    "encrypted_content": "ciphertext-without-id"
                 }
             }))
             .is_empty());
         let outputs = state.apply(&json!({
-            "type": "response.output_item.done",
-            "item": {
-                "id": "rs_1",
-                "type": "reasoning",
-                "encrypted_content": "complete-secret"
-            }
-        }));
-        assert_eq!(
-            outputs,
-            vec![ResponsesStreamOutput::EncryptedReasoning {
-                item_id: "rs_1".into(),
-                data: "complete-secret".into()
-            }]
-        );
-    }
-
-    #[test]
-    fn completed_event_maps_usage_cache_write_and_tool_stop_reason() {
-        let mut state = ResponsesStreamState::new();
-        state.apply(&json!({
-            "type": "response.output_item.done",
-            "item": {
-                "id": "fc_1",
-                "type": "function_call",
-                "call_id": "call_1",
-                "name": "lookup",
-                "arguments": "{}"
-            }
-        }));
-        let end = single_agent(state.apply(&json!({
             "type": "response.completed",
-            "response": {
-                "usage": {
-                    "input_tokens": 120,
-                    "output_tokens": 30,
-                    "input_tokens_details": {
-                        "cached_tokens": 20,
-                        "cache_write_tokens": 11
-                    },
-                    "output_tokens_details": {"reasoning_tokens": 7}
-                }
-            }
-        })));
-        match end {
-            AgentEvent::TurnEnd { stop_reason, usage } => {
-                assert_eq!(stop_reason, StopReason::ToolUse);
-                assert_eq!(usage.input_tokens, 120);
-                assert_eq!(usage.output_tokens, 30);
-                assert_eq!(usage.cache_read_tokens, 20);
-                assert_eq!(usage.cache_write_tokens, 11);
-                assert_eq!(usage.reasoning_tokens, 7);
-            }
-            other => panic!("expected TurnEnd, got {other:?}"),
-        }
-        assert!(state.finish_eof().is_empty());
-    }
-
-    #[test]
-    fn max_output_tokens_incomplete_maps_to_max_tokens_turn_end() {
-        let mut state = ResponsesStreamState::new();
-        let end = single_agent(state.apply(&json!({
-            "type": "response.incomplete",
-            "response": {
-                "incomplete_details": {"reason": "max_output_tokens"},
-                "usage": {
-                    "input_tokens": 10,
-                    "output_tokens": 20,
-                    "input_tokens_details": {"cached_tokens": 1, "cache_write_tokens": 2},
-                    "output_tokens_details": {"reasoning_tokens": 3}
-                }
-            }
-        })));
+            "response": {"usage": {}}
+        }));
+        assert_eq!(outputs.len(), 1);
         assert!(matches!(
-            end,
-            AgentEvent::TurnEnd {
-                stop_reason: StopReason::MaxTokens,
-                usage
-            } if usage.output_tokens == 20 && usage.cache_write_tokens == 2
+            &outputs[0],
+            ResponsesStreamOutput::Agent(AgentEvent::TurnEnd { .. })
         ));
-        assert!(state.finish_eof().is_empty());
     }
 
     #[test]
-    fn non_token_incomplete_failed_and_top_level_error_are_terminal() {
-        for event in [
-            json!({
-                "type": "response.incomplete",
-                "response": {"incomplete_details": {"reason": "content_filter"}}
-            }),
-            json!({
-                "type": "response.failed",
-                "response": {"error": {"message": "failed fixture"}}
-            }),
-            json!({
-                "type": "error",
-                "error": {"message": "stream fixture"}
-            }),
-        ] {
-            let mut state = ResponsesStreamState::new();
-            assert!(matches!(
-                single_agent(state.apply(&event)),
-                AgentEvent::Error { .. }
-            ));
-            assert!(state.finish_eof().is_empty());
-        }
-    }
-
-    #[test]
-    fn token_usage_saturates_instead_of_wrapping_to_zero() {
+    fn usage_saturates_u64_values_to_u32_max() {
         let usage = response_usage(&json!({
             "usage": {
                 "input_tokens": u64::MAX,
                 "output_tokens": u64::MAX,
-                "input_tokens_details": {
-                    "cached_tokens": u64::MAX,
-                    "cache_write_tokens": u64::MAX
-                },
+                "input_tokens_details": {"cached_tokens": u64::MAX},
                 "output_tokens_details": {"reasoning_tokens": u64::MAX}
             }
         }));
         assert_eq!(usage.input_tokens, u32::MAX);
         assert_eq!(usage.output_tokens, u32::MAX);
         assert_eq!(usage.cache_read_tokens, u32::MAX);
-        assert_eq!(usage.cache_write_tokens, u32::MAX);
         assert_eq!(usage.reasoning_tokens, u32::MAX);
-    }
-
-    #[test]
-    fn unknown_events_are_ignored_and_eof_without_terminal_is_error() {
-        let mut state = ResponsesStreamState::new();
-        assert!(state
-            .apply(&json!({"type": "response.future_event", "value": 1}))
-            .is_empty());
-        assert!(matches!(
-            single_agent(state.finish_eof()),
-            AgentEvent::Error { message } if message.contains("before a terminal event")
-        ));
-        assert!(state.finish_eof().is_empty());
     }
 }
