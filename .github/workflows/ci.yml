@@ -443,8 +443,31 @@ jobs:
             Write-Host ('I302_INSTALLED_MODULE ' + ($record | ConvertTo-Json -Compress))
           }
           # Preserve panic diagnostics even if a later test hangs until the step timeout.
-          cargo test --workspace --locked --no-fail-fast -- --nocapture 2>&1 | Tee-Object -FilePath windows-workspace-tests.log
-          $testExit = $LASTEXITCODE
+          # I300: distinguish live Cargo/test processes from inherited output handles
+          # after Cargo prints its final summary. No command lines or environment values.
+          $processLog = Join-Path $PWD 'windows-workspace-processes.jsonl'
+          $observer = Start-Job -ArgumentList $processLog -ScriptBlock {
+            param($logPath)
+            for ($sample = 0; $sample -lt 20; $sample++) {
+              try {
+                $processes = @(Get-CimInstance Win32_Process -OperationTimeoutSec 5 |
+                  Select-Object -First 256 Name, ProcessId, ParentProcessId, HandleCount, ThreadCount, CreationDate)
+                @{ utc = [DateTime]::UtcNow.ToString('o'); sample = $sample; processes = $processes } |
+                  ConvertTo-Json -Depth 4 -Compress | Add-Content -LiteralPath $logPath
+              } catch {
+                @{ utc = [DateTime]::UtcNow.ToString('o'); sample = $sample; status = 'observation_failed' } |
+                  ConvertTo-Json -Compress | Add-Content -LiteralPath $logPath
+              }
+              Start-Sleep -Seconds 60
+            }
+          }
+          try {
+            cargo test --workspace --locked --no-fail-fast -- --nocapture 2>&1 | Tee-Object -FilePath windows-workspace-tests.log
+            $testExit = $LASTEXITCODE
+          } finally {
+            Stop-Job -Job $observer -ErrorAction SilentlyContinue
+            Remove-Job -Job $observer -Force -ErrorAction SilentlyContinue
+          }
           if ($testExit -ne 0) {
             Write-Host "=== Windows workspace failure summary ==="
             Select-String -Path windows-workspace-tests.log -Pattern "FAILED|failures:|test result: FAILED|error: test failed|panicked at" -Context 3,8 |
@@ -464,6 +487,7 @@ jobs:
           path: |
             windows-workspace-failures.log
             windows-workspace-tests.log
+            windows-workspace-processes.jsonl
           if-no-files-found: warn
           retention-days: 3
 
