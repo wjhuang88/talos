@@ -123,7 +123,7 @@ impl AddPlan {
                     ToolNature::Read,
                     "git:pull-worktree-resolution",
                     ToolResourceKind::Remote,
-                ).with_description("resolve retained child commondir pointers, including external component metadata; no target contents"));
+                ).with_description("resolve frozen child commondir and startup core.worktree paths, including external component metadata; no target contents"));
             }
             if new_targets || !resolution_admitted {
                 self.phase = Phase::PullNativePreparation;
@@ -138,6 +138,13 @@ impl AddPlan {
                                 "native Pull resolved child common configuration; contents deferred")?);
                         }
                     }
+                }
+                for target in modules.resolved_startup_worktrees() {
+                    self.facets.push(path_facet(
+                        ToolNature::Read,
+                        target,
+                        "native Pull resolved startup worktree; entry requires fresh Read admission",
+                    )?);
                 }
                 self.phase = Phase::PullNativePreparation;
                 self.identity = PreparedPlanIdentity::new();
@@ -168,18 +175,47 @@ impl AddPlan {
             self.child_read(common, authorizations)?;
             self.child_read(&common.join("config"), authorizations)?;
         }
+        let mut new_startup_targets = false;
         for (root, common, has_common) in common_roots {
             let startup = super::super::config_state::ChildStartupLayout::capture(
                 &root, &common, has_common,
             )?;
             for target in &startup.targets {
-                self.facets.push(path_facet(
-                    ToolNature::Read,
-                    target,
-                    "native Pull child raw startup worktree; resolution deferred",
-                )?);
+                new_startup_targets |= self
+                    .native_pull_modules
+                    .as_mut()
+                    .ok_or_else(|| {
+                        GitToolError::InvalidInput("Native Pull module inventory missing".into())
+                    })?
+                    .retain_startup_worktree_target(target)?;
             }
             self.pull_child_startup.insert(root, startup);
+        }
+        if new_startup_targets {
+            if !Self::pull_resolution_admitted(&self.facets) {
+                self.facets.push(ToolPermissionFacet::with_resource(
+                    ToolNature::Read,
+                    "git:pull-worktree-resolution",
+                    ToolResourceKind::Remote,
+                ).with_description("resolve frozen child startup core.worktree paths, including external component metadata; no target contents"));
+            }
+            self.phase = Phase::PullNativePreparation;
+            self.identity = PreparedPlanIdentity::new();
+            return Ok(self);
+        }
+        for target in self
+            .native_pull_modules
+            .as_ref()
+            .ok_or_else(|| {
+                GitToolError::InvalidInput("Native Pull module inventory missing".into())
+            })?
+            .resolved_startup_worktrees()
+        {
+            if self.child_read(target, authorizations)? != target {
+                return Err(GitToolError::InvalidInput(
+                    "Native Pull startup worktree differs from actual target admission".into(),
+                ));
+            }
         }
         let (remote, destinations) = self.resolve_native_pull_destination().await?;
         self.pull_remote = Some(remote);

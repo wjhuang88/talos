@@ -427,6 +427,35 @@ waive the denial, drift, cumulative-budget, target-admission or independent
 security-review gates above. Production Pull remains disabled until its full
 delivery gates pass.
 
+### Accepted native Pull startup worktree resolution extension (2026-10-22)
+
+Status: Accepted by explicit maintainer reply “接受扩展，保留原生启动行为”.
+Implementation and production activation remain subject to the gates below. A local Git 2.54.0
+experiment confirms that `git --git-dir <child> config --show-origin --null
+--list --includes`, invoked from the child gitdir, attempts to enter the startup
+`core.worktree` directory before returning configuration. A missing directory
+causes `cannot chdir`, even though the requested command is read-only. Overriding
+`--work-tree` avoids this startup behavior and is not native startup evidence.
+
+Extend only `git:pull-worktree-resolution` to a child startup `core.worktree`
+declaration frozen from separately admitted fixed config/config.worktree bytes.
+Relative values are anchored to that child's gitdir; absolute local values remain
+absolute. Resolve in filesystem component order, retain the original spelling and
+ancestor/link identities, and require an existing directory for this startup
+target. Do not apply the checkout-backlink missing-suffix exception. Preserve the
+existing shared invocation 4096-entry/4-MiB and per-source 64-link limits; this
+extension grants no additional allowance.
+
+Publish the actual directory as a fresh exact Read frontier before a configuration
+probe can enter it. Later worktree effects require their own explicit operation
+scope and Write admission. The extension grants no content reads, enumeration,
+execution, network access or writes, and does not expand generic Path permissions.
+Changed startup bytes or path-chain identities invalidate the plan. Denial,
+filesystem-order versus lexical-order targets, target replacement, shared budget
+and real prepared-stage evidence are required before production activation, with
+independent security review. This acceptance extends the formerly
+gitdir/commondir-only capability solely within the scope above.
+
 ### Foreground maintenance accepted (2026-10-12)
 
 The maintainer accepted explicit `maintenance.autoDetach=false` and

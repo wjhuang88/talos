@@ -98,6 +98,7 @@ pub(super) struct Inventory {
     references: Vec<(PathBuf, super::snapshot::RegularEvidence)>,
     worktree_targets: BTreeMap<PathBuf, Option<super::pull_resolution::Resolution>>,
     worktree_common_targets: BTreeSet<PathBuf>,
+    startup_worktree_targets: BTreeSet<PathBuf>,
     worktree_reference_roots: BTreeSet<PathBuf>,
 }
 
@@ -207,6 +208,7 @@ impl Inventory {
             references: Vec::new(),
             worktree_targets: BTreeMap::new(),
             worktree_common_targets: BTreeSet::new(),
+            startup_worktree_targets: BTreeSet::new(),
             worktree_reference_roots: BTreeSet::new(),
         }
     }
@@ -513,6 +515,32 @@ impl Inventory {
         Some(self.worktree_targets.get(target)?.as_ref()?.resolved())
     }
 
+    /// Freeze a startup core.worktree declaration without resolving it. Unlike
+    /// checkout backlinks, Git startup requires this directory to exist.
+    pub(super) fn retain_startup_worktree_target(
+        &mut self,
+        target: &Path,
+    ) -> Result<bool, GitToolError> {
+        if self.startup_worktree_targets.contains(target) {
+            return Ok(false);
+        }
+        self.reference_budget.retain_path(target)?;
+        self.startup_worktree_targets.insert(target.to_owned());
+        // A previous checkout-backlink resolution may allow a missing suffix.
+        // Startup needs a fresh strict resolution even for the same spelling.
+        self.worktree_targets.insert(target.to_owned(), None);
+        Ok(true)
+    }
+
+    pub(super) fn resolved_startup_worktrees(&self) -> impl Iterator<Item = &Path> {
+        self.startup_worktree_targets.iter().filter_map(|path| {
+            self.worktree_targets
+                .get(path)?
+                .as_ref()
+                .map(|target| target.resolved())
+        })
+    }
+
     /// Caller must consume a current prepared proof covering the dedicated
     /// resolution capability before entering. No target content is read here.
     pub(super) fn resolve_worktree_targets(&mut self) -> Result<bool, GitToolError> {
@@ -520,10 +548,11 @@ impl Inventory {
         let mut discovered = false;
         for (path, target) in &mut self.worktree_targets {
             if target.is_none() {
-                *target = Some(
-                    self.reference_budget
-                        .resolve(path, !self.worktree_common_targets.contains(path))?,
-                );
+                *target = Some(self.reference_budget.resolve(
+                    path,
+                    !self.worktree_common_targets.contains(path)
+                        && !self.startup_worktree_targets.contains(path),
+                )?);
                 discovered = true;
             }
         }

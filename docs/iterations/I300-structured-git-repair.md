@@ -7555,3 +7555,39 @@ whitespace and both governance validators pass. Logs:
 `4722fee8`, already an ancestor; no new rebase is needed at this checkpoint.
 Full include-expanded configuration/remotes/worktree binding, independent review
 and production activation remain outstanding.
+
+Native startup worktree resolution checkpoint (2026-10-22): the maintainer
+explicitly accepted ADR-089's bounded extension (“接受扩展，保留原生启动行为”).
+A local Git 2.54.0 experiment confirms read-only config discovery enters fixed
+core.worktree before returning config; missing components fail with cannot chdir.
+Raw startup declarations now use the dedicated resolver/shared invocation budget,
+then a fresh actual-directory Read frontier. Existing-directory semantics apply
+even to a spelling previously resolved as a potentially absent checkout backlink.
+Tests cover filesystem-order/link drift, cumulative budget, missing startup target
+and denied exact target without FETCH_HEAD effects. Pull regression 173/173
+(23.78 s), focused scope 5/5 (1.23 s), Git-enabled tools Clippy lib/tests
+`-D warnings` pass. Logs: `/private/tmp/i300-startup-resolution-pull.log`,
+`/private/tmp/i300-startup-resolution-scope.log`,
+`/private/tmp/i300-startup-resolution-clippy.log`.
+Full preflight first exited 101 from disk exhaustion during workspace compilation
+(`/private/tmp/i300-startup-resolution-preflight.log`). Prior authorized target/debug
+cleanup recovered about 20 GiB; retry uses DEV/TEST DEBUG=0, CARGO_INCREMENTAL=0,
+and unchanged locked preflight checks. Retry log:
+`/private/tmp/i300-startup-resolution-preflight-compact.log`; this retry reached
+1055/1056 tools tests, failing only process observation denied by the macOS sandbox.
+A subsequent unsandboxed full preflight exited 0, including the eight-stage Push
+case, workspace tests/doctests and external Runtime SDK fixture. Evidence:
+`/private/tmp/i300-startup-resolution-preflight-native.log`. The earlier isolated
+Push command matched zero tests due to a short `--exact` filter and is not evidence.
+The direct fixture exceeded its former fewer-than-eight-wave assertion (new local
+bound: fewer than ten). Production's eight-stage budget still needs batching and
+real dispatcher evidence. Child config/effect binding, worktree mapping, review,
+Windows acceptance and activation remain open; production Pull stays disabled.
+Previous common-directory stage remains committed as `0cf0468a`.
+
+Windows CI run 39724001119 (older remote candidate) fails Agent/Runtime/MCP real-Git
+tests at the explicit Windows activation gate, and the daemon Push fixture's native
+Git baseline times out before Talos dispatch (10-second deadline, cleanup confirmed,
+Git 2.56.0.windows.2). The workflow later reports its 20-minute step timeout.
+Evidence: `/private/tmp/i300-windows-ci-failure.log`. Neither cause is fixed here;
+permission waiting alone does not explain these failures.
