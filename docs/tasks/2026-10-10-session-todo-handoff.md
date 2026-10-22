@@ -1,3 +1,15 @@
+## Windows preparation diagnostic correction — 2026-10-22
+
+The production gate now accurately reports that Windows Job-supervised execution
+awaits native acceptance, rather than claiming the Job integration is absent.
+Unsupported platforms retain a separate unsupported-supervision diagnostic.
+The Windows integration regression checks the corrected reason; gate conditions
+and execution authority are unchanged. Locked `cargo xwin check -p talos-tools
+--features git --test windows_git_preparation_gate --target
+x86_64-pc-windows-msvc` passes (seven existing reduced-feature warnings), retained
+in `/private/tmp/i300-windows-gate-diagnostic-xwin.log`; formatting and whitespace
+checks pass. This is compile evidence only, not native Windows acceptance.
+
 ## Native Pull contract reconciliation — 2026-10-22
 
 ADR-089's native whole-operation amendment now explicitly supersedes the old

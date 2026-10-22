@@ -447,7 +447,7 @@ impl AddPlan {
         {
             let _ = (command, deadline, limit, input);
             Err(GitToolError::InvalidInput(
-                "Structured Git requires process-tree supervision; Windows Job integration is not yet available".into(),
+                "Structured Git process-tree supervision is unsupported on this platform".into(),
             ))
         }
     }
@@ -549,7 +549,12 @@ impl AddPlan {
         // in isolated fixtures; this is not a feature or runtime opt-in.
         if !cfg!(any(unix, all(test, windows))) {
             return Err(GitToolError::InvalidInput(
-                "Structured Git requires process-tree supervision; Windows Job integration is not yet available".into(),
+                if cfg!(windows) {
+                    "Structured Git on Windows is disabled pending native acceptance of Job-supervised execution"
+                } else {
+                    "Structured Git process-tree supervision is unsupported on this platform"
+                }
+                .into(),
             ));
         }
         let environment = execution_environment();
