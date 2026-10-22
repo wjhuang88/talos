@@ -57,32 +57,37 @@ async fn native_pull_preserves_configured_integration(conflict: bool) {
     let remote = git(&source, &["rev-parse", "HEAD"]);
 
     let plan = prepare(&local);
-    let mut command = tokio::process::Command::new(&plan.program);
-    command
-        .current_dir(&local)
-        .env_clear()
-        .envs(&plan.environment)
-        .env("GIT_CONFIG_NOSYSTEM", "1")
-        .env(
-            "GIT_CONFIG_GLOBAL",
-            root.path().join("absent-global-config"),
-        )
-        .env("GIT_COMMITTER_NAME", "Native Pull fixture")
-        .env("GIT_COMMITTER_EMAIL", "fixture@example.invalid")
-        .args([
-            "-c",
-            "maintenance.autoDetach=false",
-            "-c",
-            "gc.autoDetach=false",
-            "-c",
-            "core.hooksPath=",
-            "-c",
-            "commit.gpgSign=false",
-            "--no-pager",
-            "pull",
-        ]);
+    let mut environment = plan.environment.clone();
+    environment.insert("GIT_CONFIG_NOSYSTEM".into(), "1".into());
+    environment.insert(
+        "GIT_CONFIG_GLOBAL".into(),
+        root.path().join("absent-global-config").into_os_string(),
+    );
+    environment.insert("GIT_COMMITTER_NAME".into(), "Native Pull fixture".into());
+    environment.insert(
+        "GIT_COMMITTER_EMAIL".into(),
+        "fixture@example.invalid".into(),
+    );
+    let arguments = [
+        "-c",
+        "maintenance.autoDetach=false",
+        "-c",
+        "gc.autoDetach=false",
+        "-c",
+        "core.hooksPath=",
+        "-c",
+        "commit.gpgSign=false",
+        "--no-pager",
+        "pull",
+    ];
+    let frozen = command::FrozenCommand::new(&plan.program, &local, arguments, &environment)
+        .expect("freeze native Pull");
     let output = plan
-        .run_command_output(command, std::time::Duration::from_secs(20), 1024 * 1024)
+        .run_command_output(
+            frozen.command(),
+            std::time::Duration::from_secs(20),
+            1024 * 1024,
+        )
         .await
         .expect("supervised native Pull");
     assert_eq!(git(&local, &["rev-parse", "upstream/main"]), remote);
@@ -166,30 +171,32 @@ async fn native_pull_owned_runner_preserves_configured_submodule_recursion() {
     git(&parent, &["commit", "-am", "parent update"]);
 
     let plan = prepare(&local);
-    let mut command = tokio::process::Command::new(&plan.program);
-    command
-        .current_dir(&local)
-        .env_clear()
-        .envs(&plan.environment)
-        .env("GIT_CONFIG_NOSYSTEM", "1")
-        .env(
-            "GIT_CONFIG_GLOBAL",
-            root.path().join("absent-global-config"),
-        )
-        .args([
-            "-c",
-            "maintenance.autoDetach=false",
-            "-c",
-            "gc.autoDetach=false",
-            "-c",
-            "core.hooksPath=",
-            "-c",
-            "protocol.file.allow=always",
-            "--no-pager",
-            "pull",
-        ]);
+    let mut environment = plan.environment.clone();
+    environment.insert("GIT_CONFIG_NOSYSTEM".into(), "1".into());
+    environment.insert(
+        "GIT_CONFIG_GLOBAL".into(),
+        root.path().join("absent-global-config").into_os_string(),
+    );
+    let arguments = [
+        "-c",
+        "maintenance.autoDetach=false",
+        "-c",
+        "gc.autoDetach=false",
+        "-c",
+        "core.hooksPath=",
+        "-c",
+        "protocol.file.allow=always",
+        "--no-pager",
+        "pull",
+    ];
+    let frozen = command::FrozenCommand::new(&plan.program, &local, arguments, &environment)
+        .expect("freeze native Pull");
     let output = plan
-        .run_command_output(command, std::time::Duration::from_secs(20), 1024 * 1024)
+        .run_command_output(
+            frozen.command(),
+            std::time::Duration::from_secs(20),
+            1024 * 1024,
+        )
         .await
         .expect("supervised recursive native Pull");
     assert!(output.status.success(), "{output:?}");

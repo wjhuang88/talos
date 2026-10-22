@@ -18,6 +18,8 @@ use super::{
     capture_add_sources, literal_add_paths, repository_state::RepositoryState, snapshot,
 };
 
+#[path = "prepared_add/command.rs"]
+mod command;
 #[path = "prepared_add/host_path.rs"]
 mod host_path;
 #[path = "prepared_add/pull_children.rs"]
@@ -3976,12 +3978,13 @@ impl AddPlan {
                 }
             }
         }
-        let mut command = tokio::process::Command::new(&self.program);
-        command
-            .current_dir(&self.repository.workdir)
-            .args(&args)
-            .env_clear()
-            .envs(&self.environment);
+        let command = command::FrozenCommand::new(
+            &self.program,
+            &self.repository.workdir,
+            &args,
+            &self.environment,
+        )?
+        .command();
         if !self.receiver_roots.is_empty()
             && self.inspect_receiver_storage(authorizations)? != self.receiver_storage
         {
@@ -5437,10 +5440,10 @@ fn pull_fetch_command(
             "Pull fetch command inputs are not bound absolute values".into(),
         ));
     }
-    let mut command = tokio::process::Command::new(program);
-    command
-        .current_dir(workdir)
-        .args([
+    Ok(command::FrozenCommand::new(
+        program,
+        workdir,
+        [
             "-c",
             "maintenance.autoDetach=false",
             "-c",
@@ -5451,10 +5454,10 @@ fn pull_fetch_command(
             "--update-head-ok",
             "--",
             remote,
-        ])
-        .env_clear()
-        .envs(environment);
-    Ok(command)
+        ],
+        environment,
+    )?
+    .command())
 }
 
 #[async_trait]
