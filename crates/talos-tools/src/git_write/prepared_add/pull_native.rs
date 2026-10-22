@@ -44,7 +44,9 @@ impl AddPlan {
 
     // Resolve against retained, revalidated configuration and the current HEAD.
     // This is a local scalar probe, never a transport or fetch invocation.
-    pub(super) async fn validate_native_pull_destination(&self) -> Result<(), GitToolError> {
+    pub(super) async fn resolve_native_pull_destination(
+        &self,
+    ) -> Result<(String, Vec<String>), GitToolError> {
         let Operation::Pull(input) = &self.operation else {
             return Err(GitToolError::InvalidInput(
                 "Native Pull operation missing".into(),
@@ -85,6 +87,12 @@ impl AddPlan {
             &remote,
             false,
         )?;
+        self.revalidate()?;
+        Ok((remote, destinations))
+    }
+
+    pub(super) async fn validate_native_pull_destination(&self) -> Result<(), GitToolError> {
+        let (remote, destinations) = self.resolve_native_pull_destination().await?;
         if self.pull_remote.as_deref() != Some(remote.as_str())
             || destinations != self.pull_destinations
         {

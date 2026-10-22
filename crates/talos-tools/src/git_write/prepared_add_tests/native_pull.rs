@@ -218,11 +218,18 @@ async fn native_pull_preserves_configured_integration(conflict: bool) {
         )
         .expect("fixture configuration evidence"),
     );
-    plan.pull_remote = Some("upstream".into());
+    let (resolved_remote, resolved_destinations) = plan
+        .resolve_native_pull_destination()
+        .await
+        .expect("native destination discovery");
+    assert_eq!(resolved_remote, "upstream");
+    assert_eq!(resolved_destinations, std::slice::from_ref(&destination));
+    assert!(!local.join(".git/FETCH_HEAD").exists());
+    plan.pull_remote = Some(resolved_remote);
     // Final-stage fixture: discovery is tested separately and remains a gate.
     plan.facets
         .retain(|facet| facet.nature == ToolNature::Execute);
-    plan.pull_destinations = vec![destination.clone()];
+    plan.pull_destinations = resolved_destinations.clone();
     plan.facets
         .extend(plan.native_pull_parent_facets().expect("parent scope"));
     // Even a separately approved-looking destination cannot substitute for
@@ -230,7 +237,7 @@ async fn native_pull_preserves_configured_integration(conflict: bool) {
     plan.pull_destinations = vec!["git://different.invalid/source".into()];
     assert!(plan.validate_native_pull_destination().await.is_err());
     assert!(!local.join(".git/FETCH_HEAD").exists());
-    plan.pull_destinations = vec![destination];
+    plan.pull_destinations = resolved_destinations;
     plan.pull_transport_supported = true;
     plan.phase = Phase::PullNativeMutation;
     plan.identity = PreparedPlanIdentity::new();
