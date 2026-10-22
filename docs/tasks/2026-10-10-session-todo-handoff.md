@@ -1,3 +1,17 @@
+## MCP daemon supervision checkpoint — 2026-10-22
+
+The MCP fixture now uses the existing supervised background launcher and an
+independent cleanup task, covering caller cancellation and preserving original
+test panics. Locked Git transport tests pass 8/8, full locked MCP tests pass
+(`/private/tmp/i300-mcp-cleanup-full.log`), and MSVC `cargo xwin check --locked
+-p talos-mcp --tests --target x86_64-pc-windows-msvc` passes. Independent review
+found no remaining fixture blocker. Cancellation regression proves listener
+closure; runtime-wide shutdown is not an asynchronous cleanup guarantee.
+No production permission or Windows gate changed. Next: replace the superseded
+Pull scheduler with frozen whole-native-command approval/execution, then verify
+Agent/MCP/Runtime denial, replay, cancellation and native Windows behavior.
+All P1–P5, T7 completion and subsequent handoff tasks remain open.
+
 ## Native Pull runner baseline — 2026-10-22
 
 Added a separate `prepared_add_tests/native_pull.rs` module with two real native

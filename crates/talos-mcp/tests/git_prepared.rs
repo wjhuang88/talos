@@ -1,3 +1,6 @@
+#[path = "support/git_daemon.rs"]
+mod git_daemon;
+
 use rmcp::ServiceExt;
 use serde_json::{Value, json};
 use std::sync::Arc;
@@ -438,7 +441,7 @@ async fn real_push_transport_network_denial_never_connects_or_replays() {
 
 #[tokio::test]
 async fn real_push_transport_success_and_replay_preserve_remote_head() {
-    tokio::time::timeout(Duration::from_secs(30), async {
+    async {
         let root = tempfile::tempdir().expect("workspace");
         let receiver = tempfile::tempdir().expect("receiver");
         let git = |cwd: &std::path::Path, args: &[&str]| {
@@ -456,19 +459,7 @@ async fn real_push_transport_success_and_replay_preserve_remote_head() {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("port");
         let port = listener.local_addr().expect("address").port();
         drop(listener);
-        let mut daemon = tokio::process::Command::new("git")
-            .args(["daemon", "--reuseaddr", "--listen=127.0.0.1", "--export-all", "--enable=receive-pack"])
-            .arg(format!("--port={port}"))
-            .arg(format!("--base-path={}", receiver.path().parent().expect("parent").display()))
-            .arg(receiver.path()).kill_on_drop(true)
-            .stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null()).spawn().expect("daemon");
-        tokio::time::timeout(Duration::from_secs(5), async {
-            loop {
-                if std::net::TcpStream::connect_timeout(&([127,0,0,1], port).into(), Duration::from_millis(20)).is_ok() { break; }
-                assert!(daemon.try_wait().expect("state").is_none());
-                tokio::time::sleep(Duration::from_millis(10)).await;
-            }
-        }).await.expect("daemon ready");
+        git_daemon::with_daemon(receiver.path(), port, async {
         let remote = format!("git://127.0.0.1:{port}/{}", receiver.path().file_name().expect("name").to_string_lossy());
         let mut engine = PermissionEngine::empty();
         engine.set_workspace_root(root.path().into());
@@ -507,9 +498,8 @@ async fn real_push_transport_success_and_replay_preserve_remote_head() {
         }
         drop(read); drop(write);
         task.await.expect("joined");
-        daemon.kill().await.expect("stop daemon");
-        daemon.wait().await.expect("join daemon");
-    }).await.expect("deadline");
+        }).await;
+    }.await;
 }
 
 #[cfg(unix)]

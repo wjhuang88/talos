@@ -1,3 +1,23 @@
+## MCP daemon supervision checkpoint — 2026-10-22
+
+The MCP Git transport fixture now uses the existing background launcher with
+Unix process-group / Windows Job ownership. An independent cleanup task owns
+termination and event draining; dropping the calling future triggers cleanup.
+Test panic propagation waits for cleanup and preserves the original payload.
+Separate fixture regressions cover panic and cancellation (the latter proves
+listener closure, not a complete process-tree receipt). Runtime-wide shutdown
+still cannot guarantee completion of asynchronous Unix fixture cleanup.
+
+Validation: `cargo test --locked -p talos-mcp --test git_prepared` passes 8/8;
+`cargo test --locked -p talos-mcp` passes
+(`/private/tmp/i300-mcp-cleanup-full.log`).
+`cargo xwin check --locked -p talos-mcp --tests --target
+x86_64-pc-windows-msvc` passes; this is compilation, not Windows execution.
+Independent continuation review found no remaining blocker in the fixture.
+Production permissions and gates are unchanged. Native whole-operation Pull
+preparation/execution, Windows native acceptance, P1–P5 delivery and T8 remain
+open; I300/T7 stays Active.
+
 ## Native Pull runner baseline — 2026-10-22
 
 Added a separate `prepared_add_tests/native_pull.rs` module with two real native
