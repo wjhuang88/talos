@@ -10,7 +10,7 @@
 | Source Issue | #643 |
 | Depends on | Accepted ADR-085; SEARCH-001-B / #642 complete in #656; NET-001 boundary coordination |
 | Claim State | Claimed |
-| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 merged TLS/CONNECT subset; #716 merged bounded form/diagnostic stage at `b5b8241e`; #732 merged owned payload at `8fa2a50`; #733 merged Lite/HTML parsing at `dea3edc`; #734 merged Instant Answer at `45cf9eb9`; #736 merged Bing parsing at `2b015a6b`; #737 merged fixed requests at `ae6a0791`; #738 merged bound execution at `2d7f4b36`; #739 merged fixed headers at `91c330ba`; #741 merged result admission at `4e20ee95`; #742 merged fixed chain at `9f998392`; #743 merged direct plan at `181d7584`; prepared-invocation candidate tracked from #643; full C/EP and default activation Pending |
+| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 merged TLS/CONNECT subset; #716 merged bounded form/diagnostic stage at `b5b8241e`; #732 merged owned payload at `8fa2a50`; #733 merged Lite/HTML parsing at `dea3edc`; #734 merged Instant Answer at `45cf9eb9`; #736 merged Bing parsing at `2b015a6b`; #737 merged fixed requests at `ae6a0791`; #738 merged bound execution at `2d7f4b36`; #739 merged fixed headers at `91c330ba`; #741 merged result admission at `4e20ee95`; #742 merged fixed chain at `9f998392`; #743 merged direct plan at `181d7584`; #744 merged prepared invocation at `032cce61`; #745 merged private tool at `ba93193f`; #746 merged DNS failover at `0caaf832`; typed-refusal candidate tracked from #643; full C/EP and default activation Pending |
 | Completion | Pending |
 
 ## Collaboration Claim
@@ -19,7 +19,7 @@
 |---|---|
 | Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
-| Executing Agent | GPT-6 Sol / talos开发 session |
+| Executing Agent | Codex (GPT-6) / SEARCH-001 continuation of talos开发 session |
 | Work Slice | SEARCH-001-C SearchRouter; search-specific core/permission/Agent prepared invocation and endpoint authority; controlled existing-protocol compatibility internalization and optional-adapter transport; CLI/SDK/MCP dispositions, migration and validation under ADR-085/090 |
 | Claimed At | 2026-10-06 |
 | Source Issue | #643 |
@@ -2019,3 +2019,103 @@ Affected references include SEARCH-001-C-COMPATIBILITY-EXECUTION.md as well as t
 Final staged/exact-local review, stable publication, remote source/native terminal review and
 fresh CAS follow. Shared-identity Agent review is not distinct natural-person approval. This
 remains dormant private evidence; full C/EP and every activation/parent gate above remain pending.
+
+## Merged DNS Stage / Typed Connection Refusal — 2026-10-22
+
+#746 merged0caaf83241b8f94cba0cbdca66e3e166068f024d, sourcea91ae48c/tree27bcda44.
+CI3303/run39716689331 attempt1 retained its cancelled Windows job119620412685: every validation
+step passed (tools588/all6new/governance/claims/CLI), then cache tar/zstd was cancelled at the
+45minute job ceiling. Timing strongly matches that ceiling; the explicit cancellation cause and
+cache speed cause remain unproven. The other5 jobs succeeded, including mac586/original socket/
+both SDK modes/standard preflight/later gates and Linux112. Protected infra review authorized one
+bounded unchanged-job recovery, not retry-to-green. Windows119642614740 succeeded; attempt2
+terminalSUCCESS contains that new execution and5 carried attempt1 successes, not6 reruns.
+Source6331930776, infra6332861643, recovery6333440129, terminal6334145875 and delivery6334255250
+record the exact-source gates. Merge parentba93193f/tree/main verified. Temporary local execution
+loss prevented immediate synchronization; this turn recovered execution, fast-forwarded local main
+to0caaf832 and verified clean status before creating the current implementation branch.
+
+Selection retains effective#712/ADR090, actor@wjhuang88 and unchanged Work Slice. I293/I294/I300
+remain Active C/D/Git; I277 Review retains deferred human/device rows; I302 Review retains#717.
+I249 Planned deferred and I164 Paused/superseded remain unchanged. I301/I303/I304/I305 remain
+Complete/Closed; historical I146/I147/I150 and TEMPLATE do not activate work. Open#73506c1ebef
+full136files and#7055848f899 full4files retain independent ownership and no selected-path overlap.
+Refresh full scopes and intersections again before publication/final CAS; neither is absorbed.
+
+Runnable private deliverable: separate only connection-stage refusal from coarse Request. Actual
+reqwest execute errors require both is_connect() and a typed std::io::ErrorKind::ConnectionRefused
+within8 source entries. The whole classifier is panic-guarded, retains no dependency error, and
+unknown/depth-exhausted/panicking classification remains Request. Builder/body errors remain
+Request; no Display/raw OS-code inference, TLS/protocol/reset/read continuation or proxy fallback.
+Official pinned reqwest0.13.4 src/error.rs confirms is_connect() also covers connector errors
+which can include TLS, hence the additional exact typed I/O gate. Talos bounds its own traversal,
+not reqwest's internal traversal or synchronous execution. Independent design preview APPROVE
+requires precisely this narrow split, not a general network-availability classifier.
+
+The frozen chain now continues only on Dns/ConnectionRefused and existing semantic cases. No
+source replay, new endpoint, authority facet removal, counter/deadline reset or default activation.
+Five new actual-socket cases cover HTTP/HTTPS refusal with closed static error, first refusal then
+next admitted winner, all4 refused sources with finite counters, spent request budget before the
+next lookup, and truncated response body remaining terminal Request. Existing real whole-plan
+Once admission and cfg(test)-only relocation/resolver helpers are reused. Ephemeral port release
+has an unavoidable reuse race: an unexpected actual error fails, never skips or counts equivalent.
+These fixtures are not provider/regional/proxy or official-root qualification.
+
+Hard constraints: no dependency/lock/public API/model schema/permission/default changes, new skip,
+warmup or threshold relaxation. Soft choice: narrow current-direct-connector typed evidence rather
+than a speculative general classifier; replace only after separately reviewed typed evidence and
+cross-platform fixtures. Checksummed Rust1.99 restoration and actual rustc verification completed;
+workspace target resolves to the same isolated physical target used by SDK --target-dir. Local
+focused/strict network Clippy/standard locked preflight and independent source review are running;
+no pass is claimed yet. Stable publication, native exact-head terminal review and fresh CAS remain
+gates. Affected references: SEARCH-001-C-COMPATIBILITY-CHAIN.md and COMPATIBILITY-EXECUTION.md.
+I293 remains Active/Claimed/Completion Pending; #643/#624 stay OPEN. Full C/EP/parity/proxy/D/
+privacy/official roots/router/health/cancellation/rollback/default activation/release remain gated.
+
+Read-only protected working-source review APPROVE found no source/security blocker. It confirms
+all5cases exercise actual transport and existing certificate/protocol regressions retain Request.
+Precision limit: the shared transport can also classify a refused explicitly configured proxy
+connection; these direct compatibility fixtures prove neither proxy attribution nor parity. The
+chain reference records that limit. Frozen source blobs: transportc3b5b761, chaina47220e7,
+chaintestse6382d8b, dnstestsb9648c37, connectfb741c1f and connectiontests79411333. Full open-PR
+scope refresh again found#735136files/#7054files, no selected-path overlap. Shared-identity Agent
+review is not distinct natural-person approval; exact-local/publication/native gates remain pending.
+
+Initial local focused compilation exited101 on6 E0616 private Server.port accesses in the new
+chain fixtures; no test executed and Clippy/preflight did not start. Retain the complete failed
+journal as connection-refusal-initial-compile-failed.log. Correct the fixtures to derive the port
+from the existing server URL interface, without expanding visibility or changing production code.
+Fresh full local convergence follows this actual source correction; no unchanged-test retry.
+
+Resume checkpoint — 2026-10-22: the six private-field accesses are already corrected to
+derive ports through Server::url(). Existing retained journals showed focused transport133/0
+and strict network-test Clippy exit0 on the corrected source; the preflight journal had no
+terminal marker. On resume the physical /tmp target was absent and was recreated. Fresh
+validation is blocked while restoring dependencies: online Cargo reports proxy connection
+failures to static.crates.io; offline verification exits101 because addr2line0.26.1 is absent.
+Do not treat the earlier partial preflight or the dependency-restoration attempt as a pass.
+The initial E0616 journal remains retained. No stable candidate was published or merged.
+Next: restore fixed dependencies, complete fresh focused/strict Clippy/standard preflight,
+then update evidence and perform exact-source review/publication/native CI gates.
+
+Fresh local convergence completed after dependency service recovery. Corrected focused transport
+tests passed133/0failed/0ignored/228filtered plus existing child1/360filtered. All five new
+actual-socket cases passed. Strict network-test Clippy exited0. Standard locked pinned Rust1.99
+release_preflight.sh exited0 with terminal passed marker: workspace check/Clippy/tests/doctests,
+tools591/0failed/0ignored, both external runtime SDK modes, SQLite17, delivery12, governance
+and claims0warnings. Only the pre-existing authorized local runtime socket test filter applied;
+no added skip, threshold change or dependency/lock modification. Native original socket coverage
+is still required. Preserve initial E0616 failure and dependency-restoration failures as historical
+failures; later passes do not erase them. Independent read-only corrected-source review APPROVE
+found no blocker and verified the direct/proxy attribution limits. Shared-identity Agent review is
+not distinct natural-person approval. Executing Agent metadata corrected to this Codex session.
+
+Fresh remote inventory: #73506c1ebef (136files), #7055848f899 (4files), neither intersects this
+10-path candidate. Main advanced through docs-only Provider claim #747 to4722fee8; I306/#748
+retains independent Provider ownership, with no search implementation/claim overlap. This
+candidate remains based on0caaf832; publication/native terminal review and fresh merge CAS follow.
+I293 remains Active/Claimed/Completion Pending; no default activation or release is claimed.
+Journal SHA256:
+- focused: `ba3303cf211cd37c0155df3385e94436499d838757ead5af067b76efe22fb037`
+- network-clippy: `d038af2eb1ece14943ec38ac0a612d7b320e60c616d2369c2fc0c7382daab78a`
+- preflight: `9d13c35c38c7ecdc7db67691e31138358ff63879e6152c2e96b1963c58273f28`
