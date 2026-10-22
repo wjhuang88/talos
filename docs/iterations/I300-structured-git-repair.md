@@ -1,3 +1,20 @@
+## Frozen Git command checkpoint — 2026-10-22
+
+Extracted a private retained command value (executable, argv, cwd, environment)
+used by the existing mutation/fetch constructors and native Pull runner fixtures.
+No environment values are formatted or exposed; command construction explicitly
+clears inherited environment. A source-mutation regression checks retained values.
+The 173 prepared Git tests pass outside the sandbox; the sandbox run passed 172
+and failed the existing Push process-observation test with EPERM. The three native
+Pull baselines pass. Formatting and diff checks pass. Independent static review
+found no authorization bypass, environment disclosure or execution regression.
+This is a construction seam, not native Pull admission: the command is not yet
+retained across the whole-operation approval. Next: bind that command and complete
+repository/recursive effects to the prepared proof, then replace the obsolete
+staged scheduler. Production Pull and Windows activation remain closed; T7 and
+the full handoff remain incomplete. No workspace-wide or Windows runtime result
+is claimed for this checkpoint.
+
 ## MCP daemon supervision checkpoint — 2026-10-22
 
 The MCP Git transport fixture now uses the existing background launcher with
