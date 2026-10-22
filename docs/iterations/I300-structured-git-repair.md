@@ -1,3 +1,21 @@
+## Retained native Pull command checkpoint — 2026-10-22
+
+Pull preparation now retains a native command (fixed foreground maintenance,
+`--no-pager pull`, optional `-- remote`, cwd, executable and environment) before
+configuration discovery. Revalidation compares all retained command values;
+missing/changed commands refuse. An omitted remote remains omitted so Git owns
+upstream selection. No environment/configuration values are displayed. The
+native rebase/conflict/recursion fixtures now use this production constructor,
+with fixture-only isolation settings supplied in their retained environment.
+A regression rejects a changed remote before discovery and confirms no initial
+Network/Write grant. Locked Git-enabled tools library passes 513/513 outside
+the sandbox; independent static review found no new bypass or behavior regression.
+This does not replace executable/config/repository evidence, authorize native
+mutation, or complete the operation-level effect profile. Next: prepare the
+whole worktree/metadata/recursive scope and consume its proof before invoking
+this retained command; then remove superseded scheduler code. Production Pull
+and Windows remain closed, T7 and subsequent handoff tasks remain open.
+
 ## Frozen Git command checkpoint — 2026-10-22
 
 Extracted a private retained command value (executable, argv, cwd, environment)

@@ -264,6 +264,7 @@ pub(super) struct AddPlan {
     target_config_roots: Vec<PathBuf>,
     target_hook_paths: Option<Vec<PathBuf>>,
     target_hook_evidence: Vec<(PathBuf, snapshot::RegularEvidence)>,
+    native_pull_command: Option<command::FrozenCommand>,
     pull_before: Option<super::pull_state::BeforeFetch>,
     pull_evidence: Option<super::pull_state::PullEvidence>,
     pull_sources: Option<PullSources>,
@@ -708,6 +709,15 @@ impl AddPlan {
                 "source anchor for the fixed Git auxiliary path resolver",
             )?);
         }
+        let native_pull_command = match &operation {
+            Operation::Pull(pull) => Some(command::FrozenCommand::pull(
+                &program,
+                &repository.workdir,
+                pull,
+                &environment,
+            )?),
+            _ => None,
+        };
         Ok(Self {
             phase: Phase::SenderConfiguration,
             command_budget: std::sync::Mutex::new(CommandBudget::default()),
@@ -752,6 +762,7 @@ impl AddPlan {
             target_config_roots: Vec::new(),
             target_hook_paths: None,
             target_hook_evidence: Vec::new(),
+            native_pull_command,
             pull_before: None,
             pull_evidence: None,
             pull_sources: None,
@@ -4316,6 +4327,21 @@ impl AddPlan {
     }
 
     fn revalidate(&self) -> Result<(), GitToolError> {
+        if let Operation::Pull(pull) = &self.operation {
+            let expected = command::FrozenCommand::pull(
+                &self.program,
+                &self.repository.workdir,
+                pull,
+                &self.environment,
+            )?;
+            if self.native_pull_command.as_ref() != Some(&expected) {
+                return Err(GitToolError::InvalidInput(
+                    "Native Pull command changed after preparation; request a fresh authorization"
+                        .into(),
+                ));
+            }
+        }
+
         if let Some(binding) = &self.sender_program_binding
             && (self.program.canonicalize().ok().as_ref() != Some(&binding.canonical)
                 || binding.spelling.canonicalize().ok().as_ref() != Some(&binding.canonical)

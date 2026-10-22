@@ -3,6 +3,37 @@
 
 use super::*;
 
+#[test]
+fn native_pull_plan_rejects_changed_operation_before_discovery() {
+    let root = tempfile::tempdir().expect("fixture");
+    git(root.path(), &["init", "-b", "main"]);
+    let mut plan = AddPlan::prepare_pull(
+        root.path(),
+        &serde_json::json!({"remote": "upstream"}),
+        ToolProvenance::Native,
+    )
+    .expect("Pull plan");
+    plan.revalidate().expect("unchanged plan");
+    let command = plan
+        .native_pull_command
+        .as_ref()
+        .expect("retained command")
+        .command();
+    let arguments = command.as_std().get_args().collect::<Vec<_>>();
+    assert_eq!(arguments[5..], ["pull", "--", "upstream"]);
+    plan.operation = Operation::Pull(GitPullInput {
+        remote: Some("other".into()),
+    });
+    assert!(plan.revalidate().is_err());
+    // Discovery never receives the worktree/metadata mutation or network scope.
+    assert!(
+        !plan
+            .facets
+            .iter()
+            .any(|facet| matches!(facet.nature, ToolNature::Write | ToolNature::Network))
+    );
+}
+
 fn git(cwd: &Path, args: &[&str]) -> Vec<u8> {
     let output = std::process::Command::new("git")
         .current_dir(cwd)
@@ -18,6 +49,16 @@ fn git(cwd: &Path, args: &[&str]) -> Vec<u8> {
         .expect("native Git fixture");
     assert!(output.status.success(), "{args:?}: {output:?}");
     output.stdout
+}
+
+// Fixture-only config overrides travel through the retained environment,
+// including to recursive Git children; the production argv stays unchanged.
+fn fixture_config(environment: &mut BTreeMap<OsString, OsString>, values: &[(&str, &str)]) {
+    environment.insert("GIT_CONFIG_COUNT".into(), values.len().to_string().into());
+    for (index, (key, value)) in values.iter().enumerate() {
+        environment.insert(format!("GIT_CONFIG_KEY_{index}").into(), (*key).into());
+        environment.insert(format!("GIT_CONFIG_VALUE_{index}").into(), (*value).into());
+    }
 }
 
 async fn native_pull_preserves_configured_integration(conflict: bool) {
@@ -68,20 +109,17 @@ async fn native_pull_preserves_configured_integration(conflict: bool) {
         "GIT_COMMITTER_EMAIL".into(),
         "fixture@example.invalid".into(),
     );
-    let arguments = [
-        "-c",
-        "maintenance.autoDetach=false",
-        "-c",
-        "gc.autoDetach=false",
-        "-c",
-        "core.hooksPath=",
-        "-c",
-        "commit.gpgSign=false",
-        "--no-pager",
-        "pull",
-    ];
-    let frozen = command::FrozenCommand::new(&plan.program, &local, arguments, &environment)
-        .expect("freeze native Pull");
+    fixture_config(
+        &mut environment,
+        &[("core.hooksPath", ""), ("commit.gpgSign", "false")],
+    );
+    let frozen = command::FrozenCommand::pull(
+        &plan.program,
+        &local,
+        &GitPullInput { remote: None },
+        &environment,
+    )
+    .expect("freeze native Pull");
     let output = plan
         .run_command_output(
             frozen.command(),
@@ -177,20 +215,17 @@ async fn native_pull_owned_runner_preserves_configured_submodule_recursion() {
         "GIT_CONFIG_GLOBAL".into(),
         root.path().join("absent-global-config").into_os_string(),
     );
-    let arguments = [
-        "-c",
-        "maintenance.autoDetach=false",
-        "-c",
-        "gc.autoDetach=false",
-        "-c",
-        "core.hooksPath=",
-        "-c",
-        "protocol.file.allow=always",
-        "--no-pager",
-        "pull",
-    ];
-    let frozen = command::FrozenCommand::new(&plan.program, &local, arguments, &environment)
-        .expect("freeze native Pull");
+    fixture_config(
+        &mut environment,
+        &[("core.hooksPath", ""), ("protocol.file.allow", "always")],
+    );
+    let frozen = command::FrozenCommand::pull(
+        &plan.program,
+        &local,
+        &GitPullInput { remote: None },
+        &environment,
+    )
+    .expect("freeze native Pull");
     let output = plan
         .run_command_output(
             frozen.command(),
