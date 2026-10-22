@@ -961,7 +961,8 @@ async fn push_transfers_objects_to_admitted_git_daemon(disable_sideband: bool) {
     let port = listener.local_addr().expect("address").port();
     drop(listener);
     let daemon_log = tempfile::NamedTempFile::new().expect("daemon log");
-    let mut daemon = tokio::process::Command::new("git")
+    let mut daemon_command = tokio::process::Command::new("git");
+    daemon_command
         // Fixture-only traces distinguish child dispatch from protocol progress.
         // This isolated receiver contains only the fixed test payload, and the
         // trace is printed only on failure; production trace policy is unchanged.
@@ -982,9 +983,11 @@ async fn push_transfers_objects_to_admitted_git_daemon(disable_sideband: bool) {
         ))
         .arg(daemon_fixture_path(receiver.path()))
         .kill_on_drop(true)
+        .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
-        .stderr(daemon_log.reopen().expect("daemon log writer"))
-        .spawn()
+        .stderr(daemon_log.reopen().expect("daemon log writer"));
+    let mut daemon = native_process::NativeProcess::spawn(&mut daemon_command, &daemon_log)
+        .await
         .expect("daemon");
     tokio::time::timeout(std::time::Duration::from_secs(5), async {
         loop {
@@ -996,7 +999,7 @@ async fn push_transfers_objects_to_admitted_git_daemon(disable_sideband: bool) {
             {
                 break;
             }
-            assert!(daemon.try_wait().expect("daemon state").is_none());
+            assert!(daemon.is_running().expect("daemon state"));
             tokio::time::sleep(std::time::Duration::from_millis(10)).await;
         }
     })
@@ -1009,6 +1012,7 @@ async fn push_transfers_objects_to_admitted_git_daemon(disable_sideband: bool) {
     // Establish the same receiver's native protocol baseline before exercising
     // Talos supervision. Dry-run negotiates receive-pack without updating refs
     // or sending the fixture objects; the structured call below must transfer.
+    let baseline_log = tempfile::NamedTempFile::new().expect("native dry-run log");
     let mut baseline = tokio::process::Command::new("git");
     baseline
         .current_dir(root.path())
@@ -1023,41 +1027,53 @@ async fn push_transfers_objects_to_admitted_git_daemon(disable_sideband: bool) {
             "HEAD:refs/heads/approved",
         ])
         .stdin(std::process::Stdio::null())
+        // Descendants may inherit handles even after the direct child exits.
+        // Unix writes directly to the file. The Windows fixture owner drains
+        // pipes into the file and terminates its Job on a deadline.
+        .stdout(std::process::Stdio::null())
+        .stderr(baseline_log.reopen().expect("native dry-run log writer"))
         .kill_on_drop(true);
-    let baseline = tokio::time::timeout(
-        std::time::Duration::from_secs(10),
-        baseline.output(),
-    )
-    .await
-    .unwrap_or_else(|_| {
+    let mut baseline = native_process::NativeProcess::spawn(&mut baseline, &baseline_log)
+        .await
+        .expect("native dry-run launch");
+    let baseline = baseline
+        .wait_with_deadline(std::time::Duration::from_secs(10))
+        .await
+        .unwrap_or_else(|error| {
         panic!(
-            "native daemon dry-run deadline exceeded before Talos dispatch; daemon_log={}",
+            "native daemon dry-run failed before Talos dispatch: {error}; sender_log={}; daemon_log={}",
+            std::fs::read_to_string(baseline_log.path()).expect("native dry-run diagnostics"),
             std::fs::read_to_string(daemon_log.path()).expect("daemon diagnostics")
         )
-    })
-    .expect("native daemon dry-run");
+    });
     assert!(
-        baseline.status.success(),
+        baseline,
         "native daemon dry-run failed before Talos dispatch: {}; daemon_log={}",
-        String::from_utf8_lossy(&baseline.stderr),
+        std::fs::read_to_string(baseline_log.path()).expect("native dry-run diagnostics"),
         std::fs::read_to_string(daemon_log.path()).expect("daemon diagnostics")
     );
     assert!(git(receiver.path(), &["for-each-ref"]).is_empty());
     assert!(
-        !receiver.path().join("objects").join(&expected[..2]).join(&expected[2..]).exists(),
+        !receiver
+            .path()
+            .join("objects")
+            .join(&expected[..2])
+            .join(&expected[2..])
+            .exists(),
         "dry-run baseline must not transfer the fixture commit"
     );
     // A dry-run does not launch pack-objects or transfer a pack. Verify the
     // native Git child/pipe chain can complete against this exact daemon and
-    // Git build before testing the owned Windows Job supervisor. Keep this
+    // Git build before structured dispatch. On Windows both paths share the
+    // Job launch primitive, so this is not an unsupervised control. Keep this
     // successful transfer isolated in a nested bare repository so the actual
     // Talos target remains empty and must still receive its own pack.
     let native_receiver = receiver.path().join("native-baseline.git");
     std::fs::create_dir(&native_receiver).expect("native receiver directory");
     git(&native_receiver, &["init", "--bare"]);
     let native_destination = format!("{destination}/native-baseline.git");
-    // File-backed diagnostics survive a deadline and cannot leave Tokio pipe
-    // readers waiting for an inherited handle in a native Git descendant.
+    // Diagnostics survive a deadline. Windows still uses the background
+    // launcher's pipes internally; its Job owns their inheriting descendants.
     let native_log = tempfile::NamedTempFile::new().expect("native sender log");
     let mut native_push = tokio::process::Command::new("git");
     native_push
@@ -1075,27 +1091,30 @@ async fn push_transfers_objects_to_admitted_git_daemon(disable_sideband: bool) {
         .stdout(std::process::Stdio::null())
         .stderr(native_log.reopen().expect("native sender log writer"))
         .kill_on_drop(true);
-    let native_push = tokio::time::timeout(
-        std::time::Duration::from_secs(10),
-        native_push.status(),
-    )
-    .await
-    .unwrap_or_else(|_| {
+    let mut native_push = native_process::NativeProcess::spawn(&mut native_push, &native_log)
+        .await
+        .expect("native full-push launch");
+    let native_push = native_push
+        .wait_with_deadline(std::time::Duration::from_secs(10))
+        .await
+        .unwrap_or_else(|error| {
         panic!(
-            "native daemon full-push baseline deadline exceeded before Talos dispatch; sender_log={}; daemon_log={}",
+            "native daemon full-push baseline failed before Talos dispatch: {error}; sender_log={}; daemon_log={}",
             std::fs::read_to_string(native_log.path()).expect("native sender diagnostics"),
             std::fs::read_to_string(daemon_log.path()).expect("daemon diagnostics")
         )
-    })
-    .expect("native daemon full push");
+    });
     assert!(
-        native_push.success(),
+        native_push,
         "native daemon full push failed before Talos dispatch: {}; daemon_log={}",
         std::fs::read_to_string(native_log.path()).expect("native sender diagnostics"),
         std::fs::read_to_string(daemon_log.path()).expect("daemon diagnostics")
     );
     assert_eq!(
-        git(&native_receiver, &["rev-parse", "refs/heads/native-baseline"]),
+        git(
+            &native_receiver,
+            &["rev-parse", "refs/heads/native-baseline"]
+        ),
         expected
     );
     assert!(git(receiver.path(), &["for-each-ref"]).is_empty());
@@ -1161,7 +1180,10 @@ async fn push_transfers_objects_to_admitted_git_daemon(disable_sideband: bool) {
         .run_command(pack, std::time::Duration::from_secs(10), 256 * 1024)
         .await
         .expect("owned sender pack generation before Push child dispatch");
-    assert!(pack.starts_with(b"PACK"), "sender must generate a real pack");
+    assert!(
+        pack.starts_with(b"PACK"),
+        "sender must generate a real pack"
+    );
     assert!(git(receiver.path(), &["for-each-ref"]).is_empty());
     let admission = proof(&next);
     let output = next.execute(Box::new(admission)).await;
@@ -1169,7 +1191,7 @@ async fn push_transfers_objects_to_admitted_git_daemon(disable_sideband: bool) {
         !output.result.is_error,
         "{}; daemon_state={:?}; receiver_ref_written={}; daemon_log={}",
         output.result.content,
-        daemon.try_wait().expect("daemon state"),
+        daemon.is_running().expect("daemon state"),
         receiver.path().join("refs/heads/approved").exists(),
         std::fs::read_to_string(daemon_log.path()).expect("daemon diagnostics")
     );
@@ -1321,8 +1343,10 @@ async fn push_transfers_objects_to_admitted_git_daemon(disable_sideband: bool) {
             );
         }
     }
-    daemon.kill().await.expect("stop daemon");
-    daemon.wait().await.expect("join daemon");
+    daemon
+        .stop()
+        .await
+        .expect("stop daemon tree and drain diagnostics");
 }
 
 #[tokio::test]
