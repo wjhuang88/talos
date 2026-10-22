@@ -3,6 +3,7 @@
 
 use super::*;
 
+#[derive(PartialEq, Eq)]
 pub(super) struct FrozenCommand {
     program: PathBuf,
     workdir: PathBuf,
@@ -41,6 +42,32 @@ mod tests {
 }
 
 impl FrozenCommand {
+    /// Keep Git's native upstream selection, integration and recursion policy.
+    /// This describes the future operation; it confers no execution authority.
+    pub(super) fn pull(
+        program: &Path,
+        workdir: &Path,
+        input: &GitPullInput,
+        environment: &BTreeMap<OsString, OsString>,
+    ) -> Result<Self, GitToolError> {
+        let mut arguments: Vec<OsString> = [
+            "-c",
+            "maintenance.autoDetach=false",
+            "-c",
+            "gc.autoDetach=false",
+            "--no-pager",
+            "pull",
+        ]
+        .into_iter()
+        .map(OsString::from)
+        .collect();
+        if let Some(remote) = &input.remote {
+            super::super::validate_git_positional(remote)?;
+            arguments.extend([OsString::from("--"), OsString::from(remote)]);
+        }
+        Self::new(program, workdir, arguments, environment)
+    }
+
     pub(super) fn new(
         program: &Path,
         workdir: &Path,
