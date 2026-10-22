@@ -5634,3 +5634,10 @@ legacy remotes/branches files and Git's no-network URL resolution, with final
 source/config revalidation. Native regressions 18/18, Clippy and cargo xwin
 MSVC Git/tests check pass; I300 owns evidence and remaining effects, real stage
 budget, review and activation gates. T7 remains incomplete.
+
+Native child fetch-hook discovery now reuses bounded auxiliary path resolution
+and separate actual-target Read admission. Final checks rederive the frozen
+frontier and reject hook creation, missing target grants and removed evidence.
+Native regressions 18/18 and tools Clippy pass; I300 owns logs and all remaining
+recursive-update/local-source, dispatch-budget, review/platform/activation gates.
+This is a preparation checkpoint, not T7 completion.

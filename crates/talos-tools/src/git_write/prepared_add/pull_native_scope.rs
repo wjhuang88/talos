@@ -11,6 +11,23 @@ impl AddPlan {
         authorizations: &[talos_core::tool::ToolExecutionAuthorization],
     ) -> Result<Box<Self>, GitToolError> {
         self.revalidate()?;
+        if !self.facets.iter().any(|facet| {
+            facet.nature == ToolNature::Read
+                && facet.resource_kind == Some(ToolResourceKind::Remote)
+                && facet.resource.as_deref() == Some("git:auxiliary-path-resolution")
+        }) {
+            self.facets.push(ToolPermissionFacet::with_resource(
+                ToolNature::Read,
+                "git:auxiliary-path-resolution",
+                ToolResourceKind::Remote,
+            ).with_description("resolve frozen native Pull child hook paths; contents require exact Read admission"));
+            self.facets.push(path_facet(
+                ToolNature::Read,
+                &self.repository.git_dir,
+                "source anchor for native Pull child hook resolution",
+            )?);
+        }
+
         self.require_pull_parent_metadata(authorizations)?;
         self.pull_hook_evidence = self.capture_native_pull_hooks(authorizations).await?;
         let mut inventory = self.pull_inventory.take().ok_or_else(|| {
