@@ -3,7 +3,7 @@
 use super::*;
 
 #[tokio::test]
-async fn native_pull_scope_discovers_stored_modules_without_expanding_configuration() {
+async fn native_pull_scope_admits_startup_before_discovering_configuration() {
     for stored in [false, true] {
         let root = tempfile::tempdir().expect("fixture");
         git(root.path(), &["init", "-b", "main"]);
@@ -19,14 +19,17 @@ async fn native_pull_scope_discovers_stored_modules_without_expanding_configurat
             .join(".git/modules/group/child");
         if stored {
             std::fs::create_dir_all(&module).expect("stored module");
+            git(&module, &["init", "--bare"]);
             std::fs::create_dir(root.path().join(".git/startup-worktree"))
                 .expect("startup worktree");
             std::fs::write(module.join("HEAD"), "ref: refs/heads/main\n").expect("HEAD");
-            // Startup parsing must not expand includes. This directory would
-            // make include-expanded discovery fail if attempted at this stage.
-            std::fs::create_dir(module.join("unread-include")).expect("unread include");
+            std::fs::write(
+                module.join("child-include"),
+                "[remote \"origin\"]\nurl = git://example.invalid/child\n",
+            )
+            .expect("child include");
             std::fs::write(module.join("config"),
-                "[core]\nrepositoryformatversion = 0\nworktree = ../../../startup-worktree\n[include]\npath = unread-include\n",
+                "[core]\nrepositoryformatversion = 0\nworktree = ../../../startup-worktree\n[include]\npath = child-include\n",
             ).expect("startup config");
         }
         let mut plan = Box::new(
@@ -75,6 +78,7 @@ async fn native_pull_scope_discovers_stored_modules_without_expanding_configurat
             assert_eq!(roots, vec![module.as_path()]);
             assert!(plan.native_pull_metadata.contains_key(&module));
             assert!(plan.pull_child_startup.contains_key(&module));
+            assert!(plan.native_pull_configs.contains_key(&module));
             assert!(
                 plan.pull_child_startup[&module]
                     .targets
@@ -123,6 +127,7 @@ async fn native_pull_scope_rejects_startup_configuration_drift() {
         .expect("root")
         .join(".git/modules/child");
     std::fs::create_dir_all(&module).expect("module");
+    git(&module, &["init", "--bare"]);
     std::fs::write(module.join("HEAD"), "ref: refs/heads/main\n").expect("HEAD");
     let config = module.join("config");
     std::fs::write(&config, "[core]\nrepositoryformatversion = 0\n").expect("config");
@@ -171,6 +176,7 @@ async fn native_pull_scope_retains_child_pointer_identity_without_opening_target
         .expect("root")
         .join(".git/modules/child");
     std::fs::create_dir_all(&module).expect("module");
+    git(&module, &["init", "--bare"]);
     std::fs::write(module.join("HEAD"), "ref: refs/heads/main\n").expect("HEAD");
     let unopened = root.path().join("absent-common");
     std::fs::write(module.join("commondir"), unopened.to_str().expect("path")).expect("pointer");
@@ -224,6 +230,7 @@ async fn external_common_scope(deny_config: bool) {
         .expect("root")
         .join(".git/modules/child");
     std::fs::create_dir_all(&module).expect("module");
+    git(&module, &["init", "--bare"]);
     std::fs::write(module.join("HEAD"), "ref: refs/heads/main\n").expect("HEAD");
     #[cfg(unix)]
     let declared = {
@@ -243,6 +250,7 @@ async fn external_common_scope(deny_config: bool) {
         declared.to_str().expect("common path"),
     )
     .expect("commondir");
+    git(common.path(), &["init", "--bare"]);
     std::fs::write(
         common.path().join("config"),
         "[core]\nrepositoryformatversion = 0\n",
@@ -337,6 +345,7 @@ async fn native_pull_scope_startup_requires_resolution_then_exact_target_admissi
         let module = root_path.join(".git/modules/child");
         let target = root_path.join("checkout");
         std::fs::create_dir_all(&module).expect("module");
+        git(&module, &["init", "--bare"]);
         if !missing {
             std::fs::create_dir(&target).expect("checkout");
         }

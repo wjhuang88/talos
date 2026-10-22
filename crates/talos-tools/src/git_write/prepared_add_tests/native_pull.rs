@@ -12,6 +12,9 @@ mod recursion;
 #[path = "native_pull_scope.rs"]
 mod scope;
 
+#[path = "native_pull_config.rs"]
+mod config;
+
 #[test]
 fn native_pull_plan_rejects_changed_operation_before_discovery() {
     let root = tempfile::tempdir().expect("fixture");
