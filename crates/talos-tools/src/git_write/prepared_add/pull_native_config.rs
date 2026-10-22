@@ -1,6 +1,7 @@
 //! Retained native Pull child configuration and destination evidence.
 
 use super::*;
+use std::collections::BTreeSet;
 
 impl AddPlan {
     // The named discovery authority permits Git's normal include-chain read,
@@ -73,8 +74,56 @@ impl AddPlan {
                     "native Pull child legacy remote source; contents deferred",
                 )?);
             }
+            let metadata = &self.native_pull_metadata[root];
+            let common = if metadata.common_path == *root {
+                root.as_path()
+            } else {
+                self.native_pull_modules
+                    .as_ref()
+                    .and_then(|modules| modules.resolved_common_target(&metadata.common_path))
+                    .ok_or_else(|| {
+                        GitToolError::InvalidInput(
+                            "Native Pull child common target unresolved".into(),
+                        )
+                    })?
+            };
+            let hooks = config.pull_hook_paths(common, root, &self.environment)?;
+            if let Some(auxiliary) = self.auxiliary_paths.as_mut() {
+                auxiliary.extend(self.operation.name(), hooks.iter().cloned(), authorizations)?;
+            } else {
+                self.auxiliary_paths =
+                    Some(super::super::auxiliary_paths::AuxiliaryPaths::resolve(
+                        self.operation.name(),
+                        &self.workspace,
+                        &self.repository.git_dir,
+                        hooks.iter().cloned(),
+                        authorizations,
+                    )?);
+            }
+            self.auxiliary_paths
+                .as_ref()
+                .ok_or_else(|| {
+                    GitToolError::InvalidInput("Native Pull auxiliary evidence missing".into())
+                })?
+                .add_read_frontier(&mut self.facets)?;
+            self.native_pull_fetch_hooks.extend(hooks);
             self.native_pull_configs.insert(root.clone(), config);
             discovered = true;
+        }
+        if !discovered {
+            self.auxiliary_paths
+                .as_mut()
+                .ok_or_else(|| {
+                    GitToolError::InvalidInput("Native Pull auxiliary evidence missing".into())
+                })?
+                .capture_admitted(
+                    authorizations,
+                    &self
+                        .native_pull_fetch_hooks
+                        .iter()
+                        .cloned()
+                        .collect::<Vec<_>>(),
+                )?;
         }
         Ok(!discovered)
     }
@@ -127,6 +176,7 @@ impl AddPlan {
                 "Native Pull child configuration evidence incomplete".into(),
             ));
         }
+        let mut expected_fetch_hooks = BTreeSet::new();
         // Ordinary config setup enters startup worktrees and follows fixed
         // commondir pointers. Recheck these target grants before its probe.
         if !self.native_pull_metadata.is_empty() {
@@ -151,6 +201,11 @@ impl AddPlan {
                 };
                 self.child_read(common, authorizations)?;
                 self.child_read(&common.join("config"), authorizations)?;
+                expected_fetch_hooks.extend(self.native_pull_configs[root].pull_hook_paths(
+                    common,
+                    root,
+                    &self.environment,
+                )?);
             }
             for target in modules.resolved_startup_worktrees() {
                 if self.child_read(target, authorizations)? != target {
@@ -163,6 +218,24 @@ impl AddPlan {
         for config in self.native_pull_configs.values() {
             for (path, _) in &config.files {
                 self.child_read(path, authorizations)?;
+            }
+        }
+        if expected_fetch_hooks != self.native_pull_fetch_hooks {
+            return Err(GitToolError::InvalidInput(
+                "Native Pull child fetch hook frontier changed".into(),
+            ));
+        }
+        if !self.native_pull_configs.is_empty() {
+            let auxiliary = self.auxiliary_paths.as_ref().ok_or_else(|| {
+                GitToolError::InvalidInput("Native Pull auxiliary evidence missing".into())
+            })?;
+            auxiliary.revalidate(authorizations)?;
+            for hook in &self.native_pull_fetch_hooks {
+                if auxiliary.leaf_evidence(hook).is_none() {
+                    return Err(GitToolError::InvalidInput(
+                        "Native Pull child fetch hook evidence missing".into(),
+                    ));
+                }
             }
         }
         if !self.native_pull_configs.is_empty()

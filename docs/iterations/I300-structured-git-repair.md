@@ -7685,3 +7685,22 @@ Full locked Git-enabled tools library tests pass 532/532 outside the sandbox
 (/private/tmp/i300-native-legacy-tools-unsandboxed.log). The sandboxed run passed
 531 with only the existing Push process-observation EPERM failure. Both governance
 validators pass with zero warnings. Staged diff was reviewed before commit.
+
+Native child fetch-hook checkpoint (2026-10-22): native scope requests the existing
+bounded auxiliary-path resolver capability alongside earlier inventory admission.
+Child reference-transaction/pre-auto-gc paths reuse AuxiliaryPaths, retain exact
+resolved-target Read evidence, and share its invocation budget. Final validation
+rederives the hook frontier from frozen child configuration and refuses missing
+frontier entries, changed/created leaves or missing target grants. The resolver
+is initialized for native Pull rather than assuming the non-Pull discovery path
+has run. Native regressions pass 18/18, including three added mutation/denial
+scenarios; tools lib/tests Clippy -D warnings passes. Logs:
+/private/tmp/i300-child-fetch-hooks-tests.log and
+/private/tmp/i300-child-fetch-hooks-clippy.log. This covers fetch hooks only:
+recursive update hooks/auxiliary/worktree effects, child local sources, real
+eight-stage dispatch convergence, remaining resource accounting, security review,
+Windows runtime acceptance and production activation remain open. Existing native
+execution guards remain; T7 and the full handoff are incomplete.
+Full locked Git-enabled tools library regression passes 532/532 outside the
+sandbox (/private/tmp/i300-child-fetch-hooks-tools.log). No new full workspace
+preflight or native Windows runtime result is claimed for this checkpoint.

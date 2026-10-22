@@ -17,6 +17,9 @@ async fn native_pull_child_destinations_and_final_configuration_checks_are_bound
         "legacy-drift",
         "missing-legacy",
         "legacy-created",
+        "hook-created",
+        "missing-hook",
+        "missing-hook-frontier",
     ] {
         let root = tempfile::tempdir().expect("fixture");
         git(root.path(), &["init", "-b", "main"]);
@@ -126,7 +129,15 @@ async fn native_pull_child_destinations_and_final_configuration_checks_are_bound
                         && facet.resource.as_deref() == Some(network))
             );
         }
+        let hook = module.join("hooks/reference-transaction");
         match scenario {
+            "hook-created" => std::fs::write(&hook, "new hook").expect("new hook"),
+            "missing-hook" => plan
+                .facets
+                .retain(|facet| facet.resource.as_deref() != hook.to_str()),
+            "missing-hook-frontier" => {
+                plan.native_pull_fetch_hooks.clear();
+            }
             "legacy-created" => {
                 std::fs::create_dir(module.join("remotes")).expect("new legacy directory");
                 std::fs::write(
@@ -184,6 +195,9 @@ async fn native_pull_child_destinations_and_final_configuration_checks_are_bound
                 "missing-legacy" => "separate Read admission",
                 "legacy-drift" => "legacy remote source changed",
                 "legacy-created" => "inventory changed",
+                "hook-created" => "path resolution changed",
+                "missing-hook" => "auxiliary path",
+                "missing-hook-frontier" => "hook frontier changed",
                 _ => unreachable!(),
             };
             assert!(error.contains(expected), "{scenario}: {error}");
