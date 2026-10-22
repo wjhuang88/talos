@@ -15,32 +15,33 @@
 | Executing Agent | GPT-5.6 Sol / talos开发 session |
 | Work Slice | PROVIDER-008-A protocol architecture plus OpenAI Responses only; no Gemini/Azure/Bedrock implementation. |
 | Claimed At | 2026-10-22 |
-| Source Issue | #724 |
+| Source Issue | #748 |
 | Governance Claim PR | #747 |
 | Implementation PR | Not started |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Maintainer requested implementation in the 2026-10-22 talos开发 session. Governance-only #747 must pass exact-head applicable CI, both governance validators, provider/API technical review and merge-time CAS before this claim is effective. |
+| Authorization Evidence | Maintainer requested implementation of parent #724 in the 2026-10-22 talos开发 session; child #748 records the bounded implementation requirement. Governance-only #747 must pass exact-head applicable CI, both governance validators, provider/API technical review and merge-time CAS before this claim is effective. |
 | Last Updated | 2026-10-22 |
 | Handoff / Release Condition | Activates only when #747 merges with accepted ADR-093. Complete only with existing implementation commit evidence; siblings B-D remain separate. |
 
 ## Published Baseline
 
 Selected [PROVIDER-008-A](../backlog/active/PROVIDER-008-A-openai-responses-protocol.md), bounded
-child of PROVIDER-008 / #724. ADR-093 is the governing protocol/public-API decision and is accepted
-atomically in governance PR #747.
+child of PROVIDER-008 / parent #724, with child requirement #748. ADR-093 is the governing
+protocol/public-API decision and is accepted atomically in governance PR #747.
 
 ### Selection Inventory And Disposition
 
 Selection main: `0caaf83241b8f94cba0cbdca66e3e166068f024d`.
 
-- Issue #724 and all current comments re-read; parent PROVIDER-008 remains Refinement / Unclaimed.
+- Parent #724 and all then-current comments re-read; parent PROVIDER-008 remains Refinement / Unclaimed.
+- Child requirement #748 was created during claim preparation so the parent epic and child owner do not share one Source Issue.
 - Before #747 was opened, no open PR existed for #724 / PROVIDER-008 / OpenAI Responses and no
   matching `724`/`provider` implementation branch was found.
 - I293 and I294 retain Search work; I300 retains structured Git scope; I302 retains Windows resource
   attribution Review; I305 is Complete/Closed. None owns provider wire-protocol expansion.
 - PROVIDER-007/I297 is Complete/Closed and changes retry defaults only; it is not reopened.
 - MODEL-014 is Refinement / Unclaimed and remains separate. I306 may add protocol metadata required
-  by #724 but may not absorb general model capability/variant inference.
+  by #724/#748 but may not absorb general model capability/variant inference.
 - Sibling PROVIDER-008-B/C/D are deliberately not claimed.
 
 No different active/review/planned/blocked owner found with the same work slice. If target-branch
@@ -57,7 +58,7 @@ steal scope.
 4. Implement the dedicated stateless OpenAI Responses request and streaming adapter, including native
    tool calls/results, images, reasoning summaries/encrypted replay handling, usage and terminal/error
    semantics.
-5. Expose effective protocol/source on the #724 model/debug surfaces and document the confirmed-
+5. Expose effective protocol/source on the #724/#748 model/debug surfaces and document the confirmed-
    support default plus explicit `openai-chat` rollback.
 
 ### Non-Goals
@@ -76,7 +77,7 @@ Acceptance is the PROVIDER-008-A owner acceptance in full. In particular:
 - complete `/responses` text/image/tool/reasoning/usage round works without server session state;
 - unknown stream events never panic and non-terminal EOF is an error;
 - protocol rejection is actionable and never triggers cross-protocol retry;
-- old config behavior and serialization remain covered by tests.
+- old configs round-trip and retain behavior except the documented confirmed-support default change.
 
 ### Planned Validation
 
@@ -102,11 +103,11 @@ than weakening terminal/error or provenance requirements.
 
 ## Activation Record
 
-2026-10-22: #747 is the governance-only atomic claim/activation proposal. The record in this branch is
-Active / Claimed and ADR-093 is Accepted, but none of those states is effective until the finalized
-exact head merges to main. No production code, implementation tests, generated catalog, dependency or
-config behavior changed in the governance candidate. Implementation must start from the #747 merge or
-a later main commit.
+2026-10-22: #747 is the governance-only atomic claim/activation proposal for child #748 under parent
+#724. The record in this branch is Active / Claimed and ADR-093 is Accepted, but none of those states
+is effective until the finalized exact head merges to main. No production code, implementation tests,
+generated catalog, dependency or config behavior changed in the governance candidate. Implementation
+must start from the #747 merge or a later main commit.
 
 ## Completion / Residuals
 
