@@ -1,9 +1,5 @@
 //! Standalone contract tests for the OpenAI Responses public provider seam before crate export.
 
-#[path = "../src/anthropic_stream.rs"]
-mod anthropic_stream;
-#[path = "../src/browser_text_arguments.rs"]
-mod browser_text_arguments;
 #[path = "../src/image_io.rs"]
 mod image_io;
 #[path = "../src/openai_responses.rs"]
@@ -20,9 +16,29 @@ mod openai_responses_request;
 mod openai_responses_sse;
 #[path = "../src/openai_responses_transport.rs"]
 mod openai_responses_transport;
-#[path = "../src/openai_sse.rs"]
+#[path = "support/openai_responses_invocation_sender.rs"]
 mod openai_sse;
 #[path = "../src/retry.rs"]
 mod retry;
 #[path = "../src/stream_utf8.rs"]
 mod stream_utf8;
+
+fn validate_decision_messages(
+    messages: &[talos_core::message::Message],
+    limits: talos_core::provider::DecisionRequestLimits,
+) -> talos_core::provider::ProviderResult<()> {
+    if limits.max_output_tokens == 0
+        || messages.iter().any(|message| {
+            !matches!(
+                message,
+                talos_core::message::Message::System { .. }
+                    | talos_core::message::Message::User { .. }
+            )
+        })
+    {
+        return Err(talos_core::provider::ProviderError::InvalidResponse(
+            "invalid isolated decision request".into(),
+        ));
+    }
+    Ok(())
+}
