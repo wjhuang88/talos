@@ -83,7 +83,9 @@ async fn pull_network_fetch_continuation_requires_fresh_admission() {
     let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("port");
     let port = listener.local_addr().expect("address").port();
     drop(listener);
-    let mut daemon = tokio::process::Command::new("git")
+    let daemon_log = tempfile::NamedTempFile::new().expect("daemon log");
+    let mut daemon_command = tokio::process::Command::new("git");
+    daemon_command
         .args([
             "daemon",
             "--reuseaddr",
@@ -97,16 +99,18 @@ async fn pull_network_fetch_continuation_requires_fresh_admission() {
         ))
         .arg(daemon_fixture_path(remote.path()))
         .kill_on_drop(true)
+        .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .spawn()
+        .stderr(daemon_log.reopen().expect("daemon log writer"));
+    let mut daemon = native_process::NativeProcess::spawn(&mut daemon_command, &daemon_log)
+        .await
         .expect("daemon");
     tokio::time::timeout(std::time::Duration::from_secs(5), async {
         loop {
             if std::net::TcpStream::connect(("127.0.0.1", port)).is_ok() {
                 break;
             }
-            assert!(daemon.try_wait().expect("daemon state").is_none());
+            assert!(daemon.is_running().expect("daemon state"));
             tokio::time::sleep(std::time::Duration::from_millis(10)).await;
         }
     })
@@ -211,8 +215,7 @@ async fn pull_network_fetch_continuation_requires_fresh_admission() {
         );
         assert!(!local.path().join(".git/index").exists());
     }
-    daemon.kill().await.expect("stop daemon");
-    daemon.wait().await.expect("reap daemon");
+    daemon.stop().await.expect("stop daemon process tree");
 }
 
 #[tokio::test]

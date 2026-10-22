@@ -345,7 +345,9 @@ async fn pull_child_fetch_has_own_write_stage_and_rebuilds_graph() {
     let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("port");
     let port = listener.local_addr().expect("address").port();
     drop(listener);
-    let mut daemon = tokio::process::Command::new("git")
+    let daemon_log = tempfile::NamedTempFile::new().expect("daemon log");
+    let mut daemon_command = tokio::process::Command::new("git");
+    daemon_command
         .args([
             "daemon",
             "--reuseaddr",
@@ -356,16 +358,18 @@ async fn pull_child_fetch_has_own_write_stage_and_rebuilds_graph() {
         .arg(format!("--base-path={}", daemon_fixture_path(remote.path())))
         .arg(daemon_fixture_path(remote.path()))
         .kill_on_drop(true)
+        .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .spawn()
+        .stderr(daemon_log.reopen().expect("daemon log writer"));
+    let mut daemon = native_process::NativeProcess::spawn(&mut daemon_command, &daemon_log)
+        .await
         .expect("daemon");
     tokio::time::timeout(std::time::Duration::from_secs(5), async {
         loop {
             if std::net::TcpStream::connect(("127.0.0.1", port)).is_ok() {
                 break;
             }
-            assert!(daemon.try_wait().expect("state").is_none());
+            assert!(daemon.is_running().expect("state"));
             tokio::time::sleep(std::time::Duration::from_millis(10)).await;
         }
     })
@@ -653,8 +657,7 @@ async fn pull_child_fetch_has_own_write_stage_and_rebuilds_graph() {
         }
         assert!(plan.phase == Phase::PullIntegration);
     }
-    daemon.kill().await.expect("stop");
-    daemon.wait().await.expect("reap");
+    daemon.stop().await.expect("stop daemon process tree");
 }
 
 #[tokio::test]
