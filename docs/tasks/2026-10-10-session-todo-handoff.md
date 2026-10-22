@@ -5501,3 +5501,17 @@ locked tools Git library/test Clippy and diff whitespace checks pass. Real
 configuration-to-native scope discovery, recursive/external boundaries and the
 original delivery gates remain unfinished. Next: connect the native discovery
 route after SenderConfiguration without reusing post-fetch outcome prediction.
+
+## Native Pull destination discovery reuse — 2026-10-22
+
+The final executor and preparation fixture now share a side-effect-free parent
+remote resolver. It uses retained ordered config and the current full symbolic
+branch, validates transport configuration, returns the selected remote and all
+resolved URLs, and revalidates repository/config evidence. The fixture asserts
+this resolves `upstream` from config without creating FETCH_HEAD, then retains
+the resolved values in its final-stage scope. Focused locked tests pass 5/5
+(1.97 s); locked nonincremental Git-enabled tools Clippy passes after fixing one
+new test lint. This remains a test of the shared discovery primitive, not the
+production discovery route. Next: invoke this resolver from a dedicated native
+scope-discovery phase after SenderConfiguration, then gather recursive repository
+and external-effect scope before replacing the old Pull scheduler.
