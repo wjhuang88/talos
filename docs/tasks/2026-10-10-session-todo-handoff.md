@@ -1,3 +1,27 @@
+## Exact-head CI result — 2026-10-22
+
+Run [39718108787](https://github.com/wjhuang88/talos/actions/runs/39718108787)
+at `97498fe9995b597423fa6b975cd0ed09fc495448` is terminal failure.
+macOS full validation, Linux Desktop, installer and remote-owner checks pass.
+Windows tools report 973 passed / one failed: default git:// Push's native
+baseline times out before Talos dispatch, after announcing pack-objects. The
+fixture now confirms process-tree cleanup on that timeout; the explicit
+`sendpack.sideband=false` transfer control passes. Checkout tracking mode matrix
+and foreground Job/IO timeout cleanup pass. These results narrow remaining
+failures; they do not establish default Push support or production activation.
+Windows Agent/MCP/Runtime still fail at the deliberately closed production gate.
+The workspace step remains alive after the visible test summaries and reaches
+its 20-minute timeout; the cause of that residual wait is not proven. Retained
+native log: `/private/tmp/i300-97498fe9-windows.log`.
+
+Next P2 experiment: isolate the post-summary workspace wait from default native
+Push's transport hang, using bounded process/handle diagnostics rather than
+raising deadlines or silently overriding production Git configuration. P4 must
+replace the superseded staged Pull with native whole-operation execution; T8
+must remove category-wide Auto refusal through the shared assessor, retaining
+explicit Deny and human-only policy. All P1–P5 and later handoff exits remain
+open. This is terminal evidence, not a completion claim.
+
 ## Current-head full validation — 2026-10-22
 
 Standard `./scripts/release_preflight.sh` at `83f4ce69` passes outside the
