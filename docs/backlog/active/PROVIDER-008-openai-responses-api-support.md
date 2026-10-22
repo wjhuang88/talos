@@ -1,17 +1,17 @@
 # PROVIDER-008: Complete Wire-Protocol Family Coverage And Protocol Mode Configuration
 
-**Status**: Refinement / Unclaimed
+**Status**: Refinement / Unclaimed (child A claim/activation proposed in #747)
 **Type**: Provider / Config / Model-Catalog Epic (child Stories decompose at claim time)
 **Parent Epic**: None
 **Source Issue**: [#724](https://github.com/wjhuang88/talos/issues/724)
 **Selected Iteration**: None
 
-Suggested children (each independently claimable, with its own ADR):
+Children:
 
-- PROVIDER-008-A: protocol architecture (enum/factory dispatch/model-level protocol/catalog signals) + OpenAI Responses adapter (ADR-093).
-- PROVIDER-008-B: Google Gemini `generateContent` (AI Studio + Vertex auth boundary decision).
-- PROVIDER-008-C: Azure OpenAI transport conventions + per-model shape routing.
-- PROVIDER-008-D: Amazon Bedrock Converse + SigV4 credential decision.
+- [PROVIDER-008-A](PROVIDER-008-A-openai-responses-protocol.md): protocol architecture (enum/factory dispatch/model-level protocol/catalog signals) + OpenAI Responses adapter (ADR-093); I306 / governance claim #747 proposed, ineffective until merge.
+- PROVIDER-008-B: Google Gemini `generateContent` (AI Studio + Vertex auth boundary decision) — unclaimed.
+- PROVIDER-008-C: Azure OpenAI transport conventions + per-model shape routing — unclaimed.
+- PROVIDER-008-D: Amazon Bedrock Converse + SigV4 credential decision — unclaimed.
 
 ## Collaboration Claim
 
@@ -20,15 +20,15 @@ Suggested children (each independently claimable, with its own ADR):
 | Claim State | Unclaimed |
 | Responsible Actor | Not assigned |
 | Executing Agent | Not assigned |
-| Work Slice | Not assigned |
+| Work Slice | Parent epic remains unclaimed; child A is separately proposed in #747. |
 | Claimed At | Not applicable |
 | Source Issue | #724 |
 | Governance Claim PR | Not applicable |
 | Authorization Mode | Not applicable |
 | Authorization Evidence | Not applicable |
 | Implementation PR | Not started |
-| Last Updated | 2026-10-15 |
-| Handoff / Release Condition | Intake only: no claim, no activation, no implementation authority. Claiming follows AGENT-COLLABORATION preflight and the accepted ADR-093. |
+| Last Updated | 2026-10-22 |
+| Handoff / Release Condition | Child Stories are independently claimed. #747 proposes only PROVIDER-008-A; B/C/D stay unclaimed. |
 
 ## Identity / Goal / Value
 
@@ -80,10 +80,10 @@ requested.
 
 ## Dependencies / Decision Links
 
-Requires a new ADR-093 (Responses protocol boundary, confirmed-support default, public-enum
-`#[non_exhaustive]` migration, catalog signal mapping, reasoning replay policy) superseding the
-ADR-034 deferral. Interacts with ADR-013/021/022/023/045/048/050/051/062/075, MODEL-011,
-MODEL-014 (branch-only), PROVIDER-004; the claiming PR must re-verify overlap.
+ADR-093 is the umbrella + Responses contract. #747 proposes its acceptance together with
+PROVIDER-008-A / I306 claim+activation; this parent remains unclaimed. Interacts with
+ADR-013/021/022/023/045/048/050/051/062/075, MODEL-011, MODEL-014 (unclaimed), PROVIDER-004.
+Sibling family claims must add their own ADRs and re-run overlap preflight.
 
 ## Acceptance (summary; Given/When/Then detail in #724)
 
@@ -114,9 +114,8 @@ and return to the backlog.
 
 ## Intake Checkpoint — 2026-10-15
 
-Registered from maintainer request with #724 as the external requirement record. No claim, no
-iteration, no implementation. Claiming requires: accepted ADR-093, child-Story decomposition,
-preflight inventory, and an atomic claim+activation PR per AGENT-COLLABORATION.
+Registered from maintainer request with #724 as the external requirement record. No parent-epic
+claim or implementation. Claiming follows child decomposition and AGENT-COLLABORATION.
 
 ## Scope Expansion — 2026-10-20
 
@@ -124,4 +123,10 @@ Maintainer expanded #724 from Responses-only to complete wire-family coverage (G
 Azure OpenAI, Amazon Bedrock; grouped by wire format per models.dev inventory). ADR-093 is
 amended to carry the family-agnostic umbrella principles while remaining the
 PROVIDER-008-A contract; PROVIDER-008-B/C/D require their own child ADRs at claim time.
-This owner stays Unclaimed; no child is activated.
+
+## Child A Selection — 2026-10-22
+
+Maintainer requested implementation of #724. Governance-only #747 creates PROVIDER-008-A / I306,
+proposes ADR-093 acceptance, and claims only the protocol-architecture + OpenAI Responses slice.
+The parent stays Refinement / Unclaimed and siblings B/C/D stay unclaimed. #747 has no effect until
+its finalized exact head reaches main; implementation must start from that merge or later.
