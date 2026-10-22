@@ -7536,3 +7536,22 @@ Pull regression 169/169 (22.28 s); locked Git-enabled tools Clippy lib/tests wit
 `/private/tmp/i300-native-startup-pull.log`, `/private/tmp/i300-native-startup-clippy.log`.
 Linked/common targets still require resolution/admission before their startup
 capture. Config-chain/remotes/worktree binding and production activation remain open.
+
+Native child common-target checkpoint: admitted commondir declarations now feed
+the existing Pull pointer resolver and shared invocation budget. A fresh plan
+precedes resolution, and another exact resolved-directory/config frontier precedes
+startup capture. Ordinary and external-common startup capture share one path;
+raw common spellings no longer enter ordinary Path admission. Separate fixture
+scenarios cover an external symlink chain, omitted config admission, retained
+startup-byte drift and no FETCH_HEAD effects. Pull regression passes 170/170
+(21.63 s, `/private/tmp/i300-native-common-pull.log`); focused scope tests 4/4.
+Initial fixture used an interleaved parent traversal rejected by the existing
+strict pointer parser; the fixture was corrected without widening that parser.
+Locked Git-enabled tools Clippy lib/tests with `-D warnings`, formatting,
+whitespace and both governance validators pass. Logs:
+`/private/tmp/i300-native-common-clippy.log`,
+`/private/tmp/i300-native-common-governance.log`,
+`/private/tmp/i300-native-common-claims.log`. Fetch confirms origin/main remains
+`4722fee8`, already an ancestor; no new rebase is needed at this checkpoint.
+Full include-expanded configuration/remotes/worktree binding, independent review
+and production activation remain outstanding.
