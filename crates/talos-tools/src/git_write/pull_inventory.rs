@@ -55,6 +55,11 @@ impl ReferenceBudget {
         Ok(())
     }
 
+    /// Charge a retained native URL result against the invocation-wide allowance.
+    pub(super) fn retain_remote_destination(&self, destination: &str) -> Result<(), GitToolError> {
+        self.retain_path_bytes(destination.len())
+    }
+
     fn resolve(
         &self,
         path: &Path,

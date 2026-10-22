@@ -20,6 +20,7 @@ async fn native_pull_child_destinations_and_final_configuration_checks_are_bound
         "hook-created",
         "missing-hook",
         "missing-hook-frontier",
+        "remote-budget",
     ] {
         let root = tempfile::tempdir().expect("fixture");
         git(root.path(), &["init", "-b", "main"]);
@@ -106,6 +107,24 @@ async fn native_pull_child_destinations_and_final_configuration_checks_are_bound
                 .expect("scope");
         }
         assert!(plan.phase == Phase::PullNativeMutation);
+        if scenario == "remote-budget" {
+            plan.native_pull_remotes.clear();
+            // Leave exactly enough entries for the two absent legacy source
+            // files. Retaining the resolved URL must use the same allowance.
+            let budget = super::super::super::super::pull_inventory::ReferenceBudget::default();
+            budget
+                .retain_configuration_output(&vec![0; 4094 * 2])
+                .expect("reserve other retained records");
+            plan.pull_reference_budget = budget.clone();
+            let tokens = proof(&plan)
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .expect("proof");
+            assert!(plan.discover_native_pull_remotes(&tokens).await.is_err());
+            assert!(plan.native_pull_remotes.is_empty());
+            assert!(!root.path().join(".git/FETCH_HEAD").exists());
+            assert!(!module.join("FETCH_HEAD").exists());
+            continue;
+        }
         let network = "git://example.invalid/rewritten/child";
         assert!(
             !plan
