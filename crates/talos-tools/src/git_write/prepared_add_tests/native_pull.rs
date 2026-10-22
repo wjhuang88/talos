@@ -36,13 +36,37 @@ fn native_pull_plan_rejects_changed_operation_before_discovery() {
 
 #[tokio::test]
 async fn native_pull_stage_refuses_missing_or_stale_admission_and_missing_scope() {
-    for scenario in ["missing-proof", "stale-proof", "missing-scope"] {
+    for scenario in [
+        "missing-proof",
+        "stale-proof",
+        "missing-scope",
+        "missing-root",
+        "missing-network",
+    ] {
         let root = tempfile::tempdir().expect("fixture");
         git(root.path(), &["init", "-b", "main"]);
         let mut plan =
             AddPlan::prepare_pull(root.path(), &serde_json::json!({}), ToolProvenance::Native)
                 .expect("plan");
         plan.phase = Phase::PullNativeMutation;
+        if matches!(scenario, "missing-root" | "missing-network") {
+            plan.pull_destinations = vec!["git://example.invalid/source".into()];
+            plan.facets
+                .extend(plan.native_pull_parent_facets().expect("parent scope"));
+            let removed = if scenario == "missing-root" {
+                plan.facets.iter().position(|facet| {
+                    facet.nature == ToolNature::Write
+                        && facet.resource_kind == Some(ToolResourceKind::Path)
+                        && facet.resource.as_deref() == plan.repository.workdir.to_str()
+                })
+            } else {
+                plan.facets
+                    .iter()
+                    .position(|facet| facet.nature == ToolNature::Network)
+            }
+            .expect("required facet");
+            plan.facets.remove(removed);
+        }
         let admission: Box<dyn std::any::Any + Send> = if scenario == "missing-proof" {
             Box::new(())
         } else {
@@ -198,31 +222,9 @@ async fn native_pull_preserves_configured_integration(conflict: bool) {
     // Final-stage fixture: discovery is tested separately and remains a gate.
     plan.facets
         .retain(|facet| facet.nature == ToolNature::Execute);
-    for nature in [ToolNature::Read, ToolNature::Write] {
-        for root in [
-            &plan.repository.workdir,
-            &plan.repository.git_dir,
-            &plan.repository.common_dir,
-        ] {
-            plan.facets
-                .push(path_facet(nature, root, "native Pull fixture scope").expect("scope"));
-        }
-        for capability in [
-            "git:pull-integration-worktree",
-            "git:pull-repository-metadata",
-        ] {
-            plan.facets.push(ToolPermissionFacet::with_resource(
-                nature,
-                capability,
-                ToolResourceKind::Remote,
-            ));
-        }
-    }
-    plan.facets.push(ToolPermissionFacet::with_resource(
-        ToolNature::Network,
-        &destination,
-        ToolResourceKind::Remote,
-    ));
+    plan.pull_destinations = vec![destination.clone()];
+    plan.facets
+        .extend(plan.native_pull_parent_facets().expect("parent scope"));
     // Even a separately approved-looking destination cannot substitute for
     // the remote resolved by native Pull's retained config and current branch.
     plan.pull_destinations = vec!["git://different.invalid/source".into()];

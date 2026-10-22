@@ -5489,3 +5489,15 @@ closed production gate. Locked nonincremental tools Clippy passes after moving
 the existing command test module below its implementation. No new permission
 contract or production activation follows from this review. Recursive/external
 scope discovery and original delivery gates remain open.
+
+## Native parent scope follow-up — 2026-10-22
+
+Final-stage implementation is committed as `0c3ff79b`; no production activation
+or completion is claimed. The next uncommitted change centralizes parent root,
+capability and destination facets and validates their presence before execution.
+Fixtures reuse this builder; missing worktree Write and Network facets refuse
+before FETCH_HEAD. Locked native Pull tests pass 5/5 (2.09 s), nonincremental
+locked tools Git library/test Clippy and diff whitespace checks pass. Real
+configuration-to-native scope discovery, recursive/external boundaries and the
+original delivery gates remain unfinished. Next: connect the native discovery
+route after SenderConfiguration without reusing post-fetch outcome prediction.

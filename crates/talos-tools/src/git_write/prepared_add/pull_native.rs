@@ -3,6 +3,45 @@
 use super::*;
 
 impl AddPlan {
+    // Shared by scope publication and execution checks. This describes only
+    // the parent scope; recursive/external evidence is a separate prerequisite.
+    pub(super) fn native_pull_parent_facets(
+        &self,
+    ) -> Result<Vec<ToolPermissionFacet>, GitToolError> {
+        let mut facets = Vec::new();
+        for nature in [ToolNature::Read, ToolNature::Write] {
+            for root in [
+                &self.repository.workdir,
+                &self.repository.git_dir,
+                &self.repository.common_dir,
+            ] {
+                facets.push(path_facet(
+                    nature,
+                    root,
+                    "native Pull parent operation scope",
+                )?);
+            }
+            for capability in [
+                "git:pull-integration-worktree",
+                "git:pull-repository-metadata",
+            ] {
+                facets.push(ToolPermissionFacet::with_resource(
+                    nature,
+                    capability,
+                    ToolResourceKind::Remote,
+                ));
+            }
+        }
+        for destination in &self.pull_destinations {
+            facets.push(ToolPermissionFacet::with_resource(
+                ToolNature::Network,
+                destination,
+                ToolResourceKind::Remote,
+            ));
+        }
+        Ok(facets)
+    }
+
     // Resolve against retained, revalidated configuration and the current HEAD.
     // This is a local scalar probe, never a transport or fetch invocation.
     pub(super) async fn validate_native_pull_destination(&self) -> Result<(), GitToolError> {
@@ -69,21 +108,18 @@ impl AddPlan {
                 "Native Pull stage missing".into(),
             ));
         }
-        for nature in [ToolNature::Read, ToolNature::Write] {
-            for capability in [
-                "git:pull-integration-worktree",
-                "git:pull-repository-metadata",
-            ] {
-                if !self.facets.iter().any(|facet| {
-                    facet.nature == nature
-                        && facet.resource_kind == Some(ToolResourceKind::Remote)
-                        && facet.resource.as_deref() == Some(capability)
-                }) {
-                    return Err(GitToolError::InvalidInput(
-                        "Native Pull scope capability missing".into(),
-                    ));
-                }
+        for required in self.native_pull_parent_facets()? {
+            if !self.facets.iter().any(|facet| {
+                facet.nature == required.nature
+                    && facet.resource_kind == required.resource_kind
+                    && facet.resource == required.resource
+            }) {
+                return Err(GitToolError::InvalidInput(
+                    "Native Pull scope capability missing".into(),
+                ));
             }
+        }
+        for nature in [ToolNature::Read, ToolNature::Write] {
             for root in [
                 &self.repository.workdir,
                 &self.repository.git_dir,
@@ -103,16 +139,7 @@ impl AddPlan {
                 }
             }
         }
-        if !self.pull_transport_supported
-            || self.pull_destinations.is_empty()
-            || self.pull_destinations.iter().any(|destination| {
-                !self.facets.iter().any(|facet| {
-                    facet.nature == ToolNature::Network
-                        && facet.resource_kind == Some(ToolResourceKind::Remote)
-                        && facet.resource.as_deref() == Some(destination)
-                })
-            })
-        {
+        if !self.pull_transport_supported || self.pull_destinations.is_empty() {
             return Err(GitToolError::InvalidInput(
                 "Native Pull transport scope is incomplete".into(),
             ));
