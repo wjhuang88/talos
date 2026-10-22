@@ -192,8 +192,15 @@ impl AddPlan {
         }
         let mut new_startup_targets = false;
         for (root, common, has_common) in common_roots {
-            let startup = super::super::config_state::ChildStartupLayout::capture(
-                &root, &common, has_common,
+            if let Some(startup) = self.pull_child_startup.get(&root) {
+                startup.revalidate()?;
+                continue;
+            }
+            let startup = super::super::config_state::ChildStartupLayout::capture_native_pull(
+                &root,
+                &common,
+                has_common,
+                &self.pull_reference_budget,
             )?;
             for target in &startup.targets {
                 new_startup_targets |= self
