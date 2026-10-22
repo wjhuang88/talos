@@ -1441,9 +1441,19 @@ fn eligible(
     }
     let path = request.arguments.get("path")?.as_str()?;
     let path = Path::new(path);
-    if path.is_absolute()
-        || path.components().count() != 1
-        || !path
+    // Accept an absolute spelling of the same direct workspace child, but do
+    // not let canonicalization erase traversal or broaden the v1 create scope.
+    if path
+        .components()
+        .any(|part| matches!(part, std::path::Component::ParentDir))
+        || (!path.is_absolute() && path.components().count() != 1)
+    {
+        return None;
+    }
+    let target_label = lease.relative_label(path)?;
+    let relative_path = Path::new(&target_label);
+    if relative_path.components().count() != 1
+        || !relative_path
             .components()
             .all(|component| matches!(component, std::path::Component::Normal(_)))
     {
@@ -1452,7 +1462,7 @@ fn eligible(
     if !lease.matches_session(&request.binding.session_id) {
         return None;
     }
-    let extension = path.extension()?.to_str()?.to_ascii_lowercase();
+    let extension = relative_path.extension()?.to_str()?.to_ascii_lowercase();
     if !matches!(
         extension.as_str(),
         "txt" | "md" | "markdown" | "json" | "toml" | "yaml" | "yml"
@@ -1466,7 +1476,7 @@ fn eligible(
     if !lease.allows(path) {
         return None;
     }
-    let target_label = lease.relative_label(path)?;
+    let input_digest = argument_digest("write", &[target_label.as_str()], ".");
     let mut result = ProjectedAutoRequest {
         request: AutoPermissionRequest {
             schema_version: AUTO_EVALUATOR_SCHEMA_VERSION,
@@ -1479,7 +1489,7 @@ fn eligible(
                 extension,
                 bytes: content.len(),
                 lines: content.lines().count().max(1),
-                argument_digest: argument_digest("write", &[path.to_string_lossy().as_ref()], "."),
+                argument_digest: input_digest,
             },
             session_binding: session_binding(&request.binding.session_id),
             revisions: request.binding.revisions,
