@@ -5662,3 +5662,10 @@ reserve cumulative budget before retention; an empty-source regression proves
 output alone can exhaust the shared allowance across continuations. Native Pull
 20/20 and Clippy pass. I300 retains remaining memory-accounting and delivery
 gates; the requested directory-inventory authority is still awaiting a reply.
+
+Configuration-output fix ebfcf053 passed full standard preflight outside the
+sandbox and was rebased onto origin/main 213c35d8 without business-code changes.
+Native child retained remote URLs now share the source/output allowance; the
+budget-exhaustion regression fails before the fix and native tests pass 20/20
+afterward. I300 owns logs and remaining accounting, effect, stage-budget and
+activation gates. T7 and the full T1–T8 handoff remain incomplete.

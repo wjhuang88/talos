@@ -7782,3 +7782,20 @@ transient subprocess buffers or remote-output accounting. The existing native
 activation guards, stage-budget decision and other T7 residuals remain open.
 The configuration suite passes 41/41 and both governance validators pass with
 zero warnings (/private/tmp/i300-native-output-budget-{config,governance,claims}.log).
+
+Retained-output validation and synchronization (2026-10-23): full standard
+preflight passed outside the sandbox, including locked workspace tests and SDK
+fixtures (/private/tmp/i300-output-budget-preflight-native.log). The sandboxed
+attempt failed only at the Push process-observation test with EPERM. The fix is
+ebfcf053 after rebasing onto origin/main 213c35d8; tree comparison with the
+pre-rebase implementation shows only the incoming Actions maintenance workflow.
+
+Native child remote-output checkpoint (2026-10-23): retained resolved URL bytes
+and one entry now consume the same invocation budget as legacy source snapshots.
+A regression leaves exactly two entries for absent remotes/branches sources and
+proves the next URL cannot be retained; neither repository gets FETCH_HEAD. The
+regression fails before the fix and native Pull tests pass 20/20 afterward;
+formatting passes. Logs: /private/tmp/i300-remote-budget-{before,tests}.log.
+This accounts for retained URL payload only, not permission-facet copies or
+transient process buffers. Stage convergence, local-source/recursive effects,
+platform/review gates and production activation remain incomplete.

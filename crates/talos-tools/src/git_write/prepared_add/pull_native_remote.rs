@@ -140,6 +140,8 @@ impl AddPlan {
                 files.push((path, evidence, identity));
             }
             let destination = self.inspect_native_pull_remote(&root, &remote).await?;
+            self.pull_reference_budget
+                .retain_remote_destination(&destination)?;
             self.native_pull_configs[&root].revalidate()?;
             let evidence = RemoteEvidence { files, destination };
             evidence.revalidate()?;
