@@ -1,3 +1,18 @@
+## Rebase / Windows CI evidence — 2026-10-22
+
+Clean branch rebased without conflict onto origin/main `0caaf832` (#746);
+implementation head after replay is `10bf250d`. No remote history rewritten.
+Old Windows run 39724001119 (`06c1ebef`) observer samples 15–19 show three
+git.exe/git-daemon.exe pairs still present after Cargo/test processes disappear;
+the log reaches Cargo's final four-target failure summary. This narrows the
+post-summary wait to a surviving-descendant/pipeline hypothesis, not a proven
+handle owner. Artifact: `/private/tmp/i300-ci-39724001119`.
+That run predates the tools/MCP fixture supervision fixes already in this branch;
+validate those at a stable current head rather than duplicating cleanup patches.
+Native default sideband Push remains unresolved. No post-rebase tests or native
+Windows success claimed; T7/P1–P5/T8 and the original handoff remain incomplete.
+Next implementation priority remains native whole-Pull approval and execution.
+
 ## MCP daemon supervision checkpoint — 2026-10-22
 
 The MCP fixture now uses the existing supervised background launcher and an
