@@ -7591,3 +7591,22 @@ Git baseline times out before Talos dispatch (10-second deadline, cleanup confir
 Git 2.56.0.windows.2). The workflow later reports its 20-minute step timeout.
 Evidence: `/private/tmp/i300-windows-ci-failure.log`. Neither cause is fixed here;
 permission waiting alone does not explain these failures.
+
+Native child configuration-chain checkpoint (2026-10-22): stored-child native
+startup admission now precedes the ordinary system/global/include probe, reusing
+ChildConfig and the existing supervised configuration command. The named discovery
+request is batched with fixed-file admission; a newly requested capability cannot
+be consumed in the same invocation. Discovery retains original source bytes and
+identities, publishes exact Read sources, and requires all retained source tokens
+before revalidation or another host probe. Changed includes refuse; configuration
+values are withheld. Tests are split into native_pull_config.rs and cover missing
+chain/source grants, include drift, fresh source admission and no FETCH_HEAD effect.
+Pull regressions pass 174/174 and Git-enabled tools Clippy passes with -D warnings.
+Logs: /private/tmp/i300-native-child-chain-pull.log and
+/private/tmp/i300-native-child-chain-clippy.log. No new contract decision.
+This is preparation evidence only: the recursive execution guard and production
+activation guard remain. Next: bind child remote/effect scopes, aggregate config
+budgets and final retained-source revalidation; converge the real eight-stage
+dispatcher, complete independent review/platform acceptance and activate native
+Pull. The direct scope fixture retains its prior fewer-than-ten bound; the
+production eight-stage limit is unchanged. T7/I300 and the full handoff remain open.

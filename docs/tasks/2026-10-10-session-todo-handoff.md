@@ -5603,3 +5603,10 @@ full unsandboxed preflight then exited 0, including workspace tests and SDK fixt
 Evidence: `/private/tmp/i300-startup-resolution-preflight-native.log`.
 Windows CI separately fails at the activation gate and native Git daemon Push
 baseline timeout before Talos dispatch. T7 and the original handoff remain incomplete.
+
+Native Pull child configuration-chain discovery now retains include evidence and
+requires fresh exact source Read admission before use; changed includes refuse.
+Pull regression 174/174 and tools Clippy pass. I300 owns logs and residuals:
+child remote/effect scope, aggregate budgets/final evidence checks, eight-stage
+convergence, review/platform acceptance and production activation. This does not
+complete T7 or change the native execution gates.

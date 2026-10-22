@@ -70,6 +70,21 @@ impl AddPlan {
             .stored_module_roots()
             .map(Path::to_owned)
             .collect::<Vec<_>>();
+        // Batch the chain request with the fixed-file frontier. It is consumed
+        // only after startup targets have independently resolved and been readmitted.
+        let request_chain = !roots.is_empty()
+            && !self.facets.iter().any(|facet| {
+                facet.nature == ToolNature::Read
+                    && facet.resource_kind == Some(ToolResourceKind::Remote)
+                    && facet.resource.as_deref() == Some("git:configuration-chain")
+            });
+        if request_chain {
+            self.facets.push(ToolPermissionFacet::with_resource(
+                ToolNature::Read,
+                "git:configuration-chain",
+                ToolResourceKind::Remote,
+            ));
+        }
         let mut metadata_ready = true;
         for root in &roots {
             for leaf in ["HEAD", "commondir", "gitdir", "config", "config.worktree"] {
@@ -86,7 +101,7 @@ impl AddPlan {
                 }
             }
         }
-        if !metadata_ready {
+        if !metadata_ready || request_chain {
             self.phase = Phase::PullNativePreparation;
             self.identity = PreparedPlanIdentity::new();
             return Ok(self);
@@ -217,6 +232,14 @@ impl AddPlan {
                 ));
             }
         }
+        if !self
+            .discover_native_pull_configurations(authorizations)
+            .await?
+        {
+            self.phase = Phase::PullNativePreparation;
+            self.identity = PreparedPlanIdentity::new();
+            return Ok(self);
+        }
         let (remote, destinations) = self.resolve_native_pull_destination().await?;
         self.pull_remote = Some(remote);
         self.pull_destinations = destinations;
@@ -226,5 +249,69 @@ impl AddPlan {
         self.identity = PreparedPlanIdentity::new();
         self.revalidate()?;
         Ok(self)
+    }
+
+    // The named discovery authority permits Git's normal include-chain read,
+    // not subsequent use of those files without their own exact Read proof.
+    // Keep original evidence: a changed chain must never replace the approved one.
+    async fn discover_native_pull_configurations(
+        &mut self,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<bool, GitToolError> {
+        if self.native_pull_metadata.is_empty() {
+            return Ok(true);
+        }
+        if !self.facets.iter().any(|facet| {
+            facet.nature == ToolNature::Read
+                && facet.resource_kind == Some(ToolResourceKind::Remote)
+                && facet.resource.as_deref() == Some("git:configuration-chain")
+        }) {
+            self.facets.push(ToolPermissionFacet::with_resource(
+                ToolNature::Read,
+                "git:configuration-chain",
+                ToolResourceKind::Remote,
+            ).with_description("discover native Pull child system/global/include configuration chains; values withheld"));
+            return Ok(false);
+        }
+        // Check every retained source before any revalidation or host probe.
+        for config in self.native_pull_configs.values() {
+            for (path, _) in &config.files {
+                self.child_read(path, authorizations)?;
+            }
+        }
+        for config in self.native_pull_configs.values() {
+            config.revalidate()?;
+        }
+        let mut discovered = false;
+        for root in self.native_pull_metadata.keys() {
+            let output = self.inspect_receiver_config_at(root).await?;
+            if let Some(config) = self.native_pull_configs.get(root) {
+                config.verify_host(&output)?;
+                continue;
+            }
+            let config = super::super::config_state::ChildConfig::capture_receiver(&output, root)?;
+            if output != self.inspect_receiver_config_at(root).await? {
+                return Err(GitToolError::InvalidInput(
+                    "Native Pull child configuration changed during discovery; values withheld"
+                        .into(),
+                ));
+            }
+            for (path, _) in &config.files {
+                if !self.facets.iter().any(|facet| {
+                    facet.nature == ToolNature::Read
+                        && facet.resource_kind == Some(ToolResourceKind::Path)
+                        && facet.resource.as_deref() == path.to_str()
+                }) {
+                    self.facets.push(path_facet(
+                        ToolNature::Read,
+                        path,
+                        "native Pull child configuration-chain source; use requires fresh Read admission",
+                    )?);
+                }
+            }
+            self.native_pull_configs.insert(root.clone(), config);
+            discovered = true;
+        }
+        Ok(!discovered)
     }
 }
