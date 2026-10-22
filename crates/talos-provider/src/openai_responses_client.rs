@@ -2,7 +2,7 @@
 //!
 //! This is intentionally not yet a public `LanguageModel` adapter. It owns request dispatch,
 //! same-protocol retry, typed progress, and handoff to the Responses SSE transport while preserving
-//! opaque encrypted-reasoning outputs for the later durable replay bridge.
+//! opaque reasoning replay only for the same configured provider/model identity.
 
 use std::time::Duration;
 
@@ -23,6 +23,7 @@ pub(crate) const RESPONSES_PATH: &str = "/responses";
 #[derive(Clone)]
 pub(crate) struct OpenAIResponsesClient {
     api_key: String,
+    provider_key: String,
     model: String,
     base_url: String,
     client: Client,
@@ -35,6 +36,7 @@ impl OpenAIResponsesClient {
     pub(crate) fn new(api_key: impl Into<String>, model: impl Into<String>) -> Self {
         Self {
             api_key: api_key.into(),
+            provider_key: "openai".into(),
             model: model.into(),
             base_url: OPENAI_RESPONSES_API_URL.into(),
             client: Client::new(),
@@ -42,6 +44,13 @@ impl OpenAIResponsesClient {
             output_limit: None,
             timeout_config: ProviderTimeoutConfig::default(),
         }
+    }
+
+    /// Stamp the config provider identity used by ADR-034 reasoning replay checks.
+    #[must_use]
+    pub(crate) fn with_provider_key(mut self, provider_key: impl Into<String>) -> Self {
+        self.provider_key = provider_key.into();
+        self
     }
 
     #[must_use]
@@ -83,9 +92,14 @@ impl OpenAIResponsesClient {
         tools: &[ToolDefinition],
         progress_tx: Option<&mpsc::UnboundedSender<ProviderProgress>>,
     ) -> ProviderResult<mpsc::Receiver<ResponsesStreamOutput>> {
+        let replay = self
+            .reasoning
+            .as_ref()
+            .is_none_or(|reasoning| reasoning.replay);
+        let messages = replay_safe_messages(&self.provider_key, &self.model, replay, messages);
         let body = build_request_body(
             &self.model,
-            messages,
+            &messages,
             tools,
             self.reasoning.as_ref(),
             self.output_limit,
@@ -235,6 +249,35 @@ impl OpenAIResponsesClient {
     }
 }
 
+fn replay_safe_messages(
+    provider_key: &str,
+    model: &str,
+    replay: bool,
+    messages: &[Message],
+) -> Vec<Message> {
+    messages
+        .iter()
+        .cloned()
+        .map(|message| match message {
+            Message::Assistant {
+                content,
+                tool_calls,
+                reasoning,
+            } => {
+                let reasoning = reasoning.filter(|reasoning| {
+                    replay && reasoning.provider == provider_key && reasoning.model == model
+                });
+                Message::Assistant {
+                    content,
+                    tool_calls,
+                    reasoning,
+                }
+            }
+            message => message,
+        })
+        .collect()
+}
+
 fn emit_progress(
     progress_tx: Option<&mpsc::UnboundedSender<ProviderProgress>>,
     progress: ProviderProgress,
@@ -262,6 +305,7 @@ fn responses_status_to_error(status: reqwest::StatusCode, body: String) -> Provi
 #[cfg(test)]
 mod tests {
     use super::*;
+    use talos_core::message::{AssistantReasoning, ReasoningBlock};
 
     #[test]
     fn endpoint_appends_responses_once() {
@@ -277,6 +321,57 @@ mod tests {
             explicit.endpoint_url(),
             "https://gateway.example/v1/responses"
         );
+    }
+
+    #[test]
+    fn replay_history_requires_same_provider_and_model() {
+        let message = Message::Assistant {
+            content: String::new(),
+            tool_calls: vec![],
+            reasoning: Some(AssistantReasoning {
+                provider: "gateway-a".into(),
+                model: "same-model".into(),
+                blocks: vec![ReasoningBlock::Redacted {
+                    data: "opaque".into(),
+                }],
+            }),
+        };
+
+        let same = replay_safe_messages("gateway-a", "same-model", true, std::slice::from_ref(&message));
+        assert!(matches!(
+            &same[0],
+            Message::Assistant { reasoning: Some(_), .. }
+        ));
+        let other_provider = replay_safe_messages(
+            "gateway-b",
+            "same-model",
+            true,
+            std::slice::from_ref(&message),
+        );
+        assert!(matches!(
+            &other_provider[0],
+            Message::Assistant { reasoning: None, .. }
+        ));
+        let other_model = replay_safe_messages(
+            "gateway-a",
+            "other-model",
+            true,
+            std::slice::from_ref(&message),
+        );
+        assert!(matches!(
+            &other_model[0],
+            Message::Assistant { reasoning: None, .. }
+        ));
+        let disabled = replay_safe_messages(
+            "gateway-a",
+            "same-model",
+            false,
+            std::slice::from_ref(&message),
+        );
+        assert!(matches!(
+            &disabled[0],
+            Message::Assistant { reasoning: None, .. }
+        ));
     }
 
     #[test]
