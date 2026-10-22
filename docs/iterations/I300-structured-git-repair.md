@@ -7764,3 +7764,21 @@ Linked-root checkpoint additionally passes inventory regression 46/46, tools
 lib/tests Clippy -D warnings and both governance validators (zero warnings).
 Logs: /private/tmp/i300-linked-modules-{inventory,clippy,governance,claims}.log.
 No full workspace or Windows runtime validation is claimed for this correction.
+
+Native child retained-output budget checkpoint (2026-10-23): before parsing or
+copying a newly retained native child configuration output, ReferenceBudget now
+reserves three times its raw stream length for ordered bytes, parsed key/value
+payload and retained origin paths, plus its record count against the shared
+entry allowance. Each of those three payload representations is bounded by the
+raw origin stream. Source snapshots keep their separate charges in the same
+invocation budget; continuation clones cannot restore it. A regression uses
+empty source files and large reported values: two captures fit, a third through
+a clone refuses solely from cumulative output reservation. Oversized malformed
+output refuses before parsing or source access. Native Pull tests pass 20/20
+and tools lib/tests Clippy -D warnings passes. Logs:
+/private/tmp/i300-native-output-budget-{tests,clippy}.log. This bounds those
+retained payloads only, not allocator overhead, every path/identity handle,
+transient subprocess buffers or remote-output accounting. The existing native
+activation guards, stage-budget decision and other T7 residuals remain open.
+The configuration suite passes 41/41 and both governance validators pass with
+zero warnings (/private/tmp/i300-native-output-budget-{config,governance,claims}.log).

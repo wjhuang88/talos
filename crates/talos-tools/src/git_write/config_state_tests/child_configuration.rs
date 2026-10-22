@@ -288,3 +288,35 @@ fn native_pull_child_configs_share_budget_across_cloned_continuations() {
             .is_err()
     );
 }
+
+#[test]
+fn native_pull_retained_host_output_shares_the_source_budget() {
+    let root = tempfile::tempdir().expect("fixture");
+    let path = root.path().join("config");
+    std::fs::write(&path, "").expect("empty source");
+    // The source itself is empty: exhaustion must come from retained output,
+    // including its ordered bytes, parsed values and origin representations.
+    let output = format!(
+        "file:{}\0remote.origin.url\n{}\0",
+        path.display(),
+        "x".repeat(512 * 1024),
+    );
+    let budget = super::super::pull_inventory::ReferenceBudget::default();
+    let continuation = budget.clone();
+    for _ in 0..2 {
+        ChildConfig::capture_native_pull(output.as_bytes(), root.path(), &budget)
+            .expect("retained output fits");
+    }
+    assert!(
+        ChildConfig::capture_native_pull(output.as_bytes(), root.path(), &continuation).is_err()
+    );
+    // Oversized output is rejected before parsing or trying to open its origin.
+    let oversized = vec![b'x'; 2 * 1024 * 1024];
+    assert!(
+        ChildConfig::capture_native_pull(
+            &oversized,
+            root.path(),
+            &super::super::pull_inventory::ReferenceBudget::default(),
+        ).is_err()
+    );
+}

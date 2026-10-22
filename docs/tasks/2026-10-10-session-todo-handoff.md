@@ -5656,3 +5656,9 @@ private child selection and main-child exclusion; native tests pass 19/19.
 I300 also tracks newly released gix 0.90.0 and its relevant URL/layout/attribute
 APIs; no upgrade or complete host-Git replacement is claimed. The pending
 inventory authority proposal uses the corrected gitdir/modules root.
+
+Native child configuration output and its parsed/origin payload copies now
+reserve cumulative budget before retention; an empty-source regression proves
+output alone can exhaust the shared allowance across continuations. Native Pull
+20/20 and Clippy pass. I300 retains remaining memory-accounting and delivery
+gates; the requested directory-inventory authority is still awaiting a reply.
