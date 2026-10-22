@@ -1338,24 +1338,6 @@ impl ConfigState {
         Ok(())
     }
 
-    /// Resolve fetch-triggered hooks without inspecting them before Read admission.
-    pub(super) fn prepare_pull(
-        &mut self,
-        repository: &RepositoryState,
-        environment: &BTreeMap<OsString, OsString>,
-    ) -> Result<Vec<PathBuf>, GitToolError> {
-        validate_fetch_external_effects(&self.values)?;
-        let paths = fetch_hook_paths(
-            &self.values,
-            &repository.common_dir,
-            &repository.workdir,
-            environment,
-        )?;
-        self.auxiliary.extend(paths.iter().cloned());
-        self.hooks.extend(paths.iter().cloned());
-        Ok(paths)
-    }
-
     /// Resolve integration hook candidates without reading or executing them.
     /// Fetch admission does not cover this separately admitted frontier.
     pub(super) fn pull_integration_hook_paths(
@@ -1382,6 +1364,21 @@ impl ConfigState {
         environment: &BTreeMap<OsString, OsString>,
         branch: Option<&str>,
     ) -> Result<Vec<PathBuf>, GitToolError> {
+        let paths = self.native_pull_hook_paths(repository, environment, branch)?;
+        self.auxiliary.extend(paths.iter().cloned());
+        self.hooks.extend(paths.iter().cloned());
+        self.hooks.sort();
+        self.hooks.dedup();
+        Ok(paths)
+    }
+
+    /// Recompute the complete native frontier without reading hook contents.
+    pub(super) fn native_pull_hook_paths(
+        &self,
+        repository: &RepositoryState,
+        environment: &BTreeMap<OsString, OsString>,
+        branch: Option<&str>,
+    ) -> Result<Vec<PathBuf>, GitToolError> {
         let mode = super::pull_state::native_rebase_mode(&self.pull_records()?, branch)?;
         let merge = mode == super::pull_state::Rebase::Off;
         let mut paths = self.pull_operation_hook_paths(
@@ -1391,13 +1388,15 @@ impl ConfigState {
             (!merge).then_some(&mode),
             branch,
         )?;
-        paths.extend(self.prepare_pull(repository, environment)?);
+        validate_fetch_external_effects(&self.values)?;
+        paths.extend(fetch_hook_paths(
+            &self.values,
+            &repository.common_dir,
+            &repository.workdir,
+            environment,
+        )?);
         paths.sort();
         paths.dedup();
-        self.auxiliary.extend(paths.iter().cloned());
-        self.hooks.extend(paths.iter().cloned());
-        self.hooks.sort();
-        self.hooks.dedup();
         Ok(paths)
     }
 
@@ -1583,7 +1582,7 @@ impl ConfigState {
         Ok(())
     }
 
-    /// Capture fetch-triggered hooks only after their exact paths were admitted.
+    /// Capture Pull hooks only after their exact paths were admitted.
     pub(super) fn capture_pull_hooks(
         paths: &[PathBuf],
     ) -> Result<Vec<(PathBuf, snapshot::RegularEvidence)>, GitToolError> {

@@ -5537,10 +5537,27 @@ settings; filter/driver tests now assert refusal before fetch planning.
 Validation: native Pull tests 7/7; Pull-related tests 161/161; configuration frontier
 proof test 1/1; locked nonincremental Git-enabled tools Clippy lib/tests passes.
 Full tools library outside the sandbox passes 516/516 (1117.66 s), log
-`/private/tmp/i300-native-policy-full-unsandboxed.log`; unusually long duration
-has no confirmed cause. Initial sandbox run exposed host-filter fixture coupling
+`/private/tmp/i300-native-policy-full-unsandboxed.log`. The session included waits
+for execution authorization; elapsed wall time is not performance-regression
+evidence, and the exact portion included in the test-reported duration is unverified.
+Initial sandbox run exposed host-filter fixture coupling
 and the known ps EPERM fixture limitation; these are not counted as green runs.
 Production still follows the old preparation route and native execution remains
 gated. Next: complete native parent/recursive/external scope discovery and connect
 its proof to execution, remove superseded scheduler, then original delivery gates.
 T7, T8 and the remaining handoff tasks stay incomplete.
+
+Follow-up verification: governance session 64511 exited 0. Project governance and
+Collaboration Claim validation both passed with 0 warnings (logs
+`/private/tmp/i300-native-policy-governance.log` and
+`/private/tmp/i300-native-policy-claims.log`). These checks do not establish native
+Pull activation or whole-handoff completion.
+
+Native hook admission follow-up (2026-10-22): execution recomputes the full hook
+frontier and verifies exact Read grants before inspecting it. Separate tests cover
+missing grants, omitted candidates, executable hooks and post-discovery changes;
+native tests pass 8/8, Pull regression passes 162/162 (70.52 s), and Git-enabled
+tools Clippy lib/tests passes. Removed the
+unused fetch-only config wrapper. Logs: `/private/tmp/i300-native-hook-admission-tests.log`
+and `/private/tmp/i300-native-hook-admission-clippy.log`. The main native scope
+discovery/activation work remains open; this does not claim T7 delivery.

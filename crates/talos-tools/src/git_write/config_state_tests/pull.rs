@@ -27,7 +27,7 @@ fn pull_helper_checks_follow_maintenance_and_selected_remote() {
     ] {
         let mut config = capture(records);
         config
-            .prepare_pull(&repository, &BTreeMap::new())
+            .prepare_native_pull(&repository, &BTreeMap::new(), None)
             .expect("disabled maintenance keeps external settings inactive");
     }
     for records in [
@@ -38,7 +38,7 @@ fn pull_helper_checks_follow_maintenance_and_selected_remote() {
     ] {
         let mut config = capture(records);
         assert!(
-            config.prepare_pull(&repository, &BTreeMap::new()).is_err(),
+            config.prepare_native_pull(&repository, &BTreeMap::new(), None).is_err(),
             "{records}"
         );
     }
@@ -58,7 +58,7 @@ fn pull_helper_checks_follow_maintenance_and_selected_remote() {
     ] {
         assert!(
             capture(records)
-                .prepare_pull(&repository, &BTreeMap::new())
+                .prepare_native_pull(&repository, &BTreeMap::new(), None)
                 .is_err(),
             "{records}"
         );
@@ -68,7 +68,7 @@ fn pull_helper_checks_follow_maintenance_and_selected_remote() {
         "fetch.bundleURI\n/outside.bundle\0fetch.bundleURI\n\0",
     ] {
         capture(records)
-            .prepare_pull(&repository, &BTreeMap::new())
+            .prepare_native_pull(&repository, &BTreeMap::new(), None)
             .expect("empty final bundle URI disables retrieval");
     }
 }

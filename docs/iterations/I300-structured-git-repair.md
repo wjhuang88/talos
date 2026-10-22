@@ -7461,3 +7461,16 @@ passes 513/514 and fails the existing Push maintenance-cancellation fixture
 when spawning `ps` returns EPERM; the same full suite passes outside it. No
 assertion, deadline or production gate was changed. This evidence covers tools
 library regression only, not native Pull discovery or whole-handoff completion.
+
+## Native hook admission boundary — 2026-10-22
+
+Native execution now recomputes the complete pre-fetch hook frontier and requires
+an exact Read token for every candidate before capturing hook evidence. Omitted
+paths, executable hooks and changed evidence fail before native Pull starts.
+The configured-rebase/conflict final-stage fixtures now include these real hook
+Read facets. Removed the unused fetch-only configuration preparation wrapper;
+its tests exercise whole-operation preparation instead. New admission tests live
+in a separate file. Focused locked native tests pass 8/8; Git-enabled tools
+Clippy lib/tests passes with `-D warnings`; Pull regression passes 162/162
+(`/private/tmp/i300-native-hook-admission-pull.log`, 70.52 s). Production activation, recursive scope
+discovery, independent review and original delivery gates remain outstanding.
