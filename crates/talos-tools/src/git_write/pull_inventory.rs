@@ -89,6 +89,7 @@ impl ReferenceBudget {
 
 #[derive(Debug)]
 pub(super) struct Inventory {
+    stored_modules_only: bool,
     reference_budget: ReferenceBudget,
     pending: Vec<PathBuf>,
     visited: BTreeMap<PathBuf, Option<PathIdentity>>,
@@ -188,7 +189,16 @@ impl Inventory {
         }
         pending.sort();
         pending.dedup();
-        Ok(Self {
+        Ok(Self::from_pending(pending, reference_budget, false))
+    }
+
+    fn from_pending(
+        pending: Vec<PathBuf>,
+        reference_budget: ReferenceBudget,
+        stored_modules_only: bool,
+    ) -> Self {
+        Self {
+            stored_modules_only,
             reference_budget,
             pending,
             visited: BTreeMap::new(),
@@ -198,6 +208,34 @@ impl Inventory {
             worktree_targets: BTreeMap::new(),
             worktree_common_targets: BTreeSet::new(),
             worktree_reference_roots: BTreeSet::new(),
+        }
+    }
+
+    // Names and identities only. Repository contents are deliberately not
+    // traversed: discovering a module never admits its config, objects or refs.
+    pub(super) fn stored_modules(
+        common: &Path,
+        reference_budget: ReferenceBudget,
+    ) -> Result<Self, GitToolError> {
+        reference_budget.retain_child_name(common, std::ffi::OsStr::new("modules"))?;
+        Ok(Self::from_pending(
+            vec![common.join("modules")],
+            reference_budget,
+            true,
+        ))
+    }
+
+    pub(super) fn stored_module_roots(&self) -> impl Iterator<Item = &Path> {
+        self.directories.iter().filter_map(|(path, entries)| {
+            let head = entries
+                .iter()
+                .find(|entry| entry.file_name().is_some_and(|name| name == "HEAD"));
+            (self.stored_modules_only
+                && head.is_some_and(|head| {
+                    self.visited.get(head).is_some_and(Option::is_some)
+                        && !self.directories.contains_key(head)
+                }))
+            .then_some(path.as_path())
         })
     }
 
@@ -568,6 +606,15 @@ impl Inventory {
         self.revalidate()
     }
 
+    fn retain_frontier(&self, path: &Path, next: &mut Vec<PathBuf>) -> Result<(), GitToolError> {
+        if self.visited.len() + self.pending.len() + next.len() >= 4096 {
+            return Err(invalid());
+        }
+        self.reference_budget.retain_path(path)?;
+        next.push(path.to_owned());
+        Ok(())
+    }
+
     pub(super) fn advance(&mut self, admitted: impl Fn(&Path) -> bool) -> Result<(), GitToolError> {
         // Check every resource before metadata access, including previously
         // visited entries used for revalidation. Never traverse an unapproved
@@ -586,17 +633,40 @@ impl Inventory {
                     .is_dir()
             {
                 let entries = children(path, &self.reference_budget)?;
+                let marker = self
+                    .stored_modules_only
+                    .then(|| {
+                        entries
+                            .iter()
+                            .find(|entry| entry.file_name().is_some_and(|name| name == "HEAD"))
+                    })
+                    .flatten();
                 for child in &entries {
-                    if self.visited.len() + self.pending.len() + next.len() >= 4096 {
-                        return Err(invalid());
+                    // Inspect a possible HEAD's type under its own admission
+                    // before deciding this is a repository. A namespace can
+                    // legitimately contain a module whose name is HEAD.
+                    if marker.is_some_and(|head| head != child) {
+                        continue;
                     }
-                    // Only directory-entry names are consumed here. Child
-                    // identity and type wait for the next exact-path admission.
-                    self.reference_budget.retain_path(child)?;
-                    next.push(child.clone());
+                    self.retain_frontier(child, &mut next)?;
                 }
                 self.reference_budget.retain_path(path)?;
                 self.directories.insert(path.clone(), entries);
+            }
+            if self.stored_modules_only
+                && path.file_name().is_some_and(|name| name == "HEAD")
+                && let Some(entries) = path
+                    .parent()
+                    .and_then(|parent| self.directories.get(parent))
+            {
+                let namespace = self.directories.contains_key(path);
+                for child in entries {
+                    if child != path
+                        && (namespace || child.file_name().is_some_and(|name| name == "modules"))
+                    {
+                        self.retain_frontier(child, &mut next)?;
+                    }
+                }
             }
             revalidate_identity(path, before.as_ref())?;
             self.visited.insert(path.clone(), before);
@@ -685,3 +755,7 @@ mod tests;
 #[cfg(test)]
 #[path = "pull_directory_budget_tests.rs"]
 mod directory_budget_tests;
+
+#[cfg(test)]
+#[path = "pull_module_inventory_tests.rs"]
+mod module_tests;

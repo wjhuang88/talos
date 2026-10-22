@@ -5570,3 +5570,12 @@ Separate runner regression covers both cases; native tests pass 9/9 (5.11 s),
 locked Git-enabled tools Clippy lib/tests and formatting pass. See I300 owner for
 logs and the corrected initial test assumption. Production activation and the
 whole handoff remain incomplete.
+
+Native scope preparation now has a dispatcher entry and bounded stored-module
+identity discovery, reusing parent metadata/external-frontier checks. Separate
+tests cover admission, retained namespaces/nested modules, HEAD-name collisions,
+redirect refusal and shared budgets. Native tests 10/10, module tests 3/3, Pull
+regression 167/167 and tools Clippy/format pass. Sender routing is unchanged;
+child config/remotes/worktrees remain the next implementation step, and the new
+executor refuses discovered children until that admission exists. See I300 owner
+for logs; production activation, independent review and original gates stay open.
