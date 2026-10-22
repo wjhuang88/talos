@@ -42,6 +42,19 @@ impl ReferenceBudget {
         Ok(())
     }
 
+    /// Reserve retained host output and its parsed copies before allocating them.
+    pub(super) fn retain_configuration_output(&self, output: &[u8]) -> Result<(), GitToolError> {
+        // Ordered bytes, parsed key/value bytes and retained origin paths each
+        // fit within the raw origin stream. Charge all three representations.
+        let bytes = output.len().checked_mul(3).ok_or_else(invalid)?;
+        let records = output.iter().filter(|byte| **byte == 0).count().div_ceil(2);
+        let mut remaining = self.0.lock().map_err(|_| invalid())?;
+        let entries = remaining.0.checked_sub(records).ok_or_else(invalid)?;
+        let bytes = remaining.1.checked_sub(bytes).ok_or_else(invalid)?;
+        *remaining = (entries, bytes);
+        Ok(())
+    }
+
     fn resolve(
         &self,
         path: &Path,

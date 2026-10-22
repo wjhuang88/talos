@@ -404,6 +404,7 @@ impl ChildConfig {
         gitdir: &std::path::Path,
         budget: &super::pull_inventory::ReferenceBudget,
     ) -> Result<Self, GitToolError> {
+        budget.retain_configuration_output(output)?;
         let (_, origins) = parse_origins(output)?;
         if origins.iter().any(|path| !path.is_absolute()) {
             return Err(unsupported(
