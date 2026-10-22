@@ -146,8 +146,7 @@ mod tests {
             Some(Protocol::Responses),
             Protocol::Chat,
         );
-        let unset =
-            resolve_protocol(None, None, None, Some(Protocol::Responses), Protocol::Chat);
+        let unset = resolve_protocol(None, None, None, Some(Protocol::Responses), Protocol::Chat);
         assert_eq!(explicit.protocol, Protocol::Chat);
         assert_eq!(explicit.source, ProtocolResolutionSource::Configured);
         assert_eq!(unset.protocol, Protocol::Responses);
