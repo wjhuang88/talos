@@ -1,3 +1,16 @@
+## Native Pull contract reconciliation — 2026-10-22
+
+ADR-089's native whole-operation amendment now explicitly supersedes the old
+parent/child fetch scheduler and separate integration sequencing. Native Pull
+must consume an immutable whole-operation approval, preserve explicit Deny and
+human-only policy, and retain authorized scope, identity and process supervision.
+This is contract reconciliation only: replacement of the staged implementation,
+shared effectful Auto execution, native Windows evidence and T7 closure remain
+unfinished. No production gate is enabled and no handoff task is completed.
+Validation: `scripts/validate_project_governance.sh .` and
+`bash scripts/validate_collaboration_claims.sh .` pass with zero warnings;
+`git diff --check` passes. These checks validate documentation, not execution.
+
 ## Current native CI update — 2026-10-22
 
 Latest maintainer direction (2026-10-22): Auto is responsible for model-assisted
