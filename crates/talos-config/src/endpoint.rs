@@ -13,7 +13,9 @@ pub struct NormalizedProviderEndpoint {
 ///
 /// OpenAI-compatible providers expect a gateway root because the OpenAI adapter
 /// appends `/chat/completions`. Anthropic-compatible providers expect the full
-/// `/messages` endpoint.
+/// `/messages` endpoint. Endpoint shape is intentionally conservative: a generic
+/// OpenAI-compatible root remains `openai-chat`; Responses is selected only by
+/// explicit or confirmed catalog/provider evidence, never by URL guessing.
 #[must_use]
 pub fn normalize_provider_endpoint(url: &str) -> NormalizedProviderEndpoint {
     let trimmed = url.trim().trim_end_matches('/');
@@ -79,9 +81,10 @@ pub fn validate_provider_name(name: &str) -> Result<(), String> {
 pub fn validate_provider_protocol(protocol: &str) -> Result<ProviderProtocol, String> {
     match protocol {
         "openai-chat" => Ok(ProviderProtocol::OpenAIChat),
+        "openai-responses" => Ok(ProviderProtocol::OpenAIResponses),
         "anthropic-messages" => Ok(ProviderProtocol::AnthropicMessages),
         other => Err(format!(
-            "Unknown protocol '{other}'. Allowed: openai-chat, anthropic-messages."
+            "Unknown protocol '{other}'. Allowed: openai-chat, openai-responses, anthropic-messages."
         )),
     }
 }
@@ -196,6 +199,10 @@ mod tests {
         assert_eq!(
             validate_provider_protocol("openai-chat").expect("operation should succeed"),
             ProviderProtocol::OpenAIChat
+        );
+        assert_eq!(
+            validate_provider_protocol("openai-responses").expect("operation should succeed"),
+            ProviderProtocol::OpenAIResponses
         );
         assert_eq!(
             validate_provider_protocol("anthropic-messages").expect("operation should succeed"),
