@@ -5641,3 +5641,11 @@ frontier and reject hook creation, missing target grants and removed evidence.
 Native regressions 18/18 and tools Clippy pass; I300 owns logs and all remaining
 recursive-update/local-source, dispatch-budget, review/platform/activation gates.
 This is a preparation checkpoint, not T7 completion.
+
+A real core-stage-budget audit now exposes a T7 blocker: the simple stored-child
+startup case requires eleven total stages, while PreparedStageHistory permits
+eight. The regression includes sender discovery and verifies stage-limit refusal
+without fetch effects. I300 records a pending bounded identity-only stored-module
+inventory scope proposal to eliminate depth-dependent approval rounds; no new
+authority or activation is enabled. Manual scope-loop success is not dispatcher
+convergence evidence.
