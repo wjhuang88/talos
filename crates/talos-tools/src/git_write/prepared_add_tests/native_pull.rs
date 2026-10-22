@@ -120,3 +120,86 @@ async fn native_pull_owned_runner_uses_upstream_and_configured_rebase() {
 async fn native_pull_owned_runner_retains_fetch_and_conflict_effects() {
     native_pull_preserves_configured_integration(true).await;
 }
+
+#[tokio::test]
+async fn native_pull_owned_runner_preserves_configured_submodule_recursion() {
+    let root = tempfile::tempdir().expect("fixture");
+    let child = root.path().join("child");
+    let parent = root.path().join("parent");
+    let local = root.path().join("local");
+    for path in [&child, &parent] {
+        std::fs::create_dir(path).expect("repository");
+        git(path, &["init", "-b", "main"]);
+    }
+    std::fs::write(child.join("file"), "before\n").expect("child file");
+    git(&child, &["add", "file"]);
+    git(&child, &["commit", "-m", "child base"]);
+    git(
+        &parent,
+        &[
+            "-c",
+            "protocol.file.allow=always",
+            "submodule",
+            "add",
+            child.to_str().expect("child path"),
+            "nested",
+        ],
+    );
+    git(&parent, &["commit", "-am", "parent base"]);
+    git(
+        root.path(),
+        &[
+            "-c",
+            "protocol.file.allow=always",
+            "clone",
+            "--recurse-submodules",
+            parent.to_str().expect("parent path"),
+            local.to_str().expect("local path"),
+        ],
+    );
+    git(&local, &["config", "submodule.recurse", "true"]);
+    std::fs::write(child.join("file"), "after\n").expect("child change");
+    git(&child, &["commit", "-am", "child update"]);
+    let expected = git(&child, &["rev-parse", "HEAD"]);
+    git(&parent.join("nested"), &["fetch"]);
+    git(&parent.join("nested"), &["checkout", "origin/main"]);
+    git(&parent, &["commit", "-am", "parent update"]);
+
+    let plan = prepare(&local);
+    let mut command = tokio::process::Command::new(&plan.program);
+    command
+        .current_dir(&local)
+        .env_clear()
+        .envs(&plan.environment)
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .env(
+            "GIT_CONFIG_GLOBAL",
+            root.path().join("absent-global-config"),
+        )
+        .args([
+            "-c",
+            "maintenance.autoDetach=false",
+            "-c",
+            "gc.autoDetach=false",
+            "-c",
+            "core.hooksPath=",
+            "-c",
+            "protocol.file.allow=always",
+            "--no-pager",
+            "pull",
+        ]);
+    let output = plan
+        .run_command_output(command, std::time::Duration::from_secs(20), 1024 * 1024)
+        .await
+        .expect("supervised recursive native Pull");
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(git(&local.join("nested"), &["rev-parse", "HEAD"]), expected);
+    assert_eq!(
+        std::fs::read(local.join("nested/file")).expect("updated child"),
+        b"after\n"
+    );
+    assert_eq!(
+        git(&local, &["rev-parse", "HEAD"]),
+        git(&parent, &["rev-parse", "HEAD"])
+    );
+}
