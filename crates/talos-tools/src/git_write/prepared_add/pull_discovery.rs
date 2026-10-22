@@ -186,11 +186,10 @@ impl AddPlan {
         Ok(!pending)
     }
 
-    pub(super) async fn discover_pull_prefetch(
-        mut self: Box<Self>,
+    pub(super) fn require_pull_parent_metadata(
+        &self,
         authorizations: &[talos_core::tool::ToolExecutionAuthorization],
-    ) -> Result<Box<Self>, GitToolError> {
-        self.revalidate()?;
+    ) -> Result<(), GitToolError> {
         // execute_stage consumed the immutable profile proof before entering
         // discovery. The closed capability additionally requires each retained
         // metadata root's exact Read token; it never covers worktree sources.
@@ -215,6 +214,15 @@ impl AddPlan {
                 "Pull graph discovery lacks dedicated metadata Read admission".into(),
             ));
         }
+        Ok(())
+    }
+
+    pub(super) async fn discover_pull_prefetch(
+        mut self: Box<Self>,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<Box<Self>, GitToolError> {
+        self.revalidate()?;
+        self.require_pull_parent_metadata(authorizations)?;
         let metadata_roots = [
             self.repository.git_dir.clone(),
             self.repository.common_dir.clone(),

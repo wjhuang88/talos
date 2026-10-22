@@ -212,6 +212,13 @@ impl AddPlan {
                 "Native Pull transport scope is incomplete".into(),
             ));
         }
+        if self.native_pull_modules.as_ref().is_some_and(|modules| {
+            !modules.complete() || modules.stored_module_roots().next().is_some()
+        }) {
+            return Err(GitToolError::InvalidInput(
+                "Native Pull recursive repository configuration admission is incomplete; no Pull started".into(),
+            ));
+        }
         self.validate_native_pull_destination().await?;
         self.capture_native_pull_hooks(authorizations).await?;
         // The phase is deliberately unreachable from production discovery until

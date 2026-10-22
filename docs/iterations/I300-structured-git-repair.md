@@ -7488,3 +7488,27 @@ behavior; no production behavior or permission was relaxed. Native tests pass
 Logs: `/private/tmp/i300-native-stored-recursion.log` and
 `/private/tmp/i300-native-stored-recursion-clippy.log`. These runner tests do not
 prove prepared recursive admission; native discovery/activation remains open.
+
+Native scope-discovery stage (2026-10-22): added a prepared-stage dispatcher
+entry that reuses parent metadata/external-frontier admission and gathers stored
+module candidates under fresh exact Read frontiers. The existing bounded
+inventory now has a names/identity-only module mode: it distinguishes a regular
+HEAD marker from a module named HEAD, descends namespaces/nested modules, and
+does not traverse child config/objects/refs. It shares the invocation allowance,
+retains directory identity/name evidence and refuses redirected namespaces.
+Final scope publication retains the resolved parent destination and exposes
+child fixed config/layout Read requests. Child configuration/remotes/worktree
+admission is not yet implemented by this new stage: final execution explicitly
+refuses discovered children. Sender routing and the production gate remain
+unchanged; fixtures explicitly select the native preparation stage. No native
+production activation or recursive prepared-execution claim is made.
+
+Validation: native tests 10/10 (5.43 s), module inventory tests 3/3, Pull regression
+167/167 (70.42 s), locked Git-enabled tools Clippy lib/tests and formatting pass.
+Logs: `/private/tmp/i300-native-scope-tests.log`,
+`/private/tmp/i300-native-module-inventory-tests.log`,
+`/private/tmp/i300-native-scope-pull.log`, `/private/tmp/i300-native-scope-clippy.log`.
+New tests are separate files. Independent security review remains a delivery gate.
+Next: bind each discovered child's startup/config/include chain, remote and
+possible worktree scope, then activate SenderConfiguration routing and remove
+superseded scheduling after replacement validation. All original exits remain.

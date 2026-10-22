@@ -30,6 +30,8 @@ mod pull_discovery;
 mod pull_integration;
 #[path = "prepared_add/pull_native.rs"]
 mod pull_native;
+#[path = "prepared_add/pull_native_scope.rs"]
+mod pull_native_scope;
 #[path = "prepared_add/pull_reconcile.rs"]
 mod pull_reconcile;
 
@@ -220,6 +222,7 @@ enum Phase {
     PullChildFetch,
     PullIntegration,
     PullIntegrationMutation,
+    PullNativePreparation,
     PullNativeMutation,
 }
 
@@ -268,6 +271,7 @@ pub(super) struct AddPlan {
     target_hook_paths: Option<Vec<PathBuf>>,
     target_hook_evidence: Vec<(PathBuf, snapshot::RegularEvidence)>,
     native_pull_command: Option<command::FrozenCommand>,
+    native_pull_modules: Option<super::pull_inventory::Inventory>,
     pull_before: Option<super::pull_state::BeforeFetch>,
     pull_evidence: Option<super::pull_state::PullEvidence>,
     pull_sources: Option<PullSources>,
@@ -778,6 +782,7 @@ impl AddPlan {
             pull_hook_paths: Vec::new(),
             pull_hook_evidence: Vec::new(),
             pull_graph_paths: None,
+            native_pull_modules: None,
             pull_inventory: None,
             pull_reference_budget: super::pull_inventory::ReferenceBudget::default(),
             pull_integration: None,
@@ -4619,6 +4624,9 @@ impl AddPlan {
         if let Some(inventory) = &self.pull_inventory {
             inventory.revalidate()?;
         }
+        if let Some(inventory) = &self.native_pull_modules {
+            inventory.revalidate()?;
+        }
         if self.phase == Phase::PullFetch
             && (self.pull_before.is_none() || self.pull_remote.is_none())
         {
@@ -5529,6 +5537,7 @@ impl PreparedNormalToolInvocation for AddPlan {
             ));
         };
         let result = match self.phase {
+            Phase::PullNativePreparation => self.discover_native_pull_scope(&authorizations).await,
             Phase::PullNativeMutation => {
                 return PreparedNormalStage::Complete(match self.execute_native_pull(&authorizations).await {
                     Ok(content) => ToolExecutionOutput::success(content),
