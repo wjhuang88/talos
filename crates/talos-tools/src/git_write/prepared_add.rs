@@ -30,6 +30,8 @@ mod pull_discovery;
 mod pull_integration;
 #[path = "prepared_add/pull_native.rs"]
 mod pull_native;
+#[path = "prepared_add/pull_native_config.rs"]
+mod pull_native_config;
 #[path = "prepared_add/pull_native_scope.rs"]
 mod pull_native_scope;
 #[path = "prepared_add/pull_reconcile.rs"]

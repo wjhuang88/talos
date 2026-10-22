@@ -5610,3 +5610,10 @@ Pull regression 174/174 and tools Clippy pass. I300 owns logs and residuals:
 child remote/effect scope, aggregate budgets/final evidence checks, eight-stage
 convergence, review/platform acceptance and production activation. This does not
 complete T7 or change the native execution gates.
+
+Native child configured destinations now publish selected-remote/URL-rewrite
+Network or local-source Read scope. Final configuration checks require child
+layout/startup/source grants and retained chain/destination evidence before fetch.
+Both activation guards remain; I300 records incomplete transport/recursive scope,
+aggregate budgets, stage convergence and platform/review gates. Previous config
+chain stage 615b7b8a passed full standard preflight. T7 remains incomplete.

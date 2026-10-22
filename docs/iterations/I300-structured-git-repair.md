@@ -7610,3 +7610,33 @@ budgets and final retained-source revalidation; converge the real eight-stage
 dispatcher, complete independent review/platform acceptance and activate native
 Pull. The direct scope fixture retains its prior fewer-than-ten bound; the
 production eight-stage limit is unchanged. T7/I300 and the full handoff remain open.
+
+Native child destination/final-evidence checkpoint (2026-10-22): child config
+logic is isolated in pull_native_config.rs. Frozen config and HEAD now derive
+the selected child remote, ordered URL rewrites and local-source versus Network
+facets, batched with source admission. Final native execution checks fixed child
+layout, resolved common/startup target and source Read tokens before the normal
+configuration probe, verifies the original chain and source bytes, and re-derives
+required destination facets. Missing startup/source/chain/destination grants and
+include drift refuse before fetch. Relative local child sources remain anchored
+to gitdir, matching the existing native-fetch fixture and a Git 2.54 local probe.
+The configuration-only destination derivation is not complete transport admission:
+legacy remote files, local-source metadata, external helper/configuration effects
+and recursive update/worktree scope remain activation prerequisites. Both native
+execution guards remain; this does not claim native Pull production delivery.
+The preceding chain stage is committed as 615b7b8a; its full standard preflight
+passed (/private/tmp/i300-native-child-chain-preflight.log). Current remote main
+is 4722fee8, fetched successfully; origin/main...HEAD is 0/386 before this stage.
+No rebase is necessary. Aggregate child config/startup budgets and real eight-stage
+convergence remain explicit next work, followed by independent review, exact-head
+CI and native Windows runtime acceptance. T7/I300 and T1–T8 closure stay open.
+Validation for this checkpoint: locked Pull tests 175/175 and tools lib/tests
+Clippy -D warnings pass (/private/tmp/i300-native-child-remote-pull.log and
+/private/tmp/i300-native-child-remote-clippy.log). Locked MSVC cargo xwin check
+with Git/tests passes with the seven existing reduced-feature warnings
+(/private/tmp/i300-native-child-remote-xwin.log); sandbox cache write EPERM was
+resolved by rerunning with escalation. This is cross-compilation only.
+Full locked Git-enabled tools library tests pass 530/530 outside the sandbox
+(/private/tmp/i300-native-child-remote-tools.log); governance and collaboration
+claim validators pass with zero warnings. No current-stage workspace-wide or
+native Windows runtime result is claimed.

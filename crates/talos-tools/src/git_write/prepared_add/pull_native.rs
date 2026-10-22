@@ -212,6 +212,8 @@ impl AddPlan {
                 "Native Pull transport scope is incomplete".into(),
             ));
         }
+        self.validate_native_pull_configurations(authorizations)
+            .await?;
         if self.native_pull_modules.as_ref().is_some_and(|modules| {
             !modules.complete() || modules.stored_module_roots().next().is_some()
         }) {
