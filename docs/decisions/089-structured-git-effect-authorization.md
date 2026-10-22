@@ -602,7 +602,51 @@ Acceptance alone does not enable fetch or claim Pull delivery. The implementatio
 must replace the layer-by-layer production inventory with admitted bounded
 evidence under this dedicated scope rather than retain two contradictory modes.
 
-### Pull integration worktree scope (accepted 2026-10-19)
+### Native whole-operation Pull amendment (accepted 2026-10-22)
+
+The maintainer subsequently required the experience of invoking Git in Bash:
+review the concrete native Pull as a whole, allow the model to make an actual
+invocation-local approval under ADR-064, and let Git perform its own fetch,
+integration and configured recursion. This amendment takes precedence over the
+separate-fetch/integration sequencing and recursive-child scheduler below.
+Those sections remain historical evidence of the earlier accepted design;
+they are not additional prerequisites to implement that scheduler.
+
+The prepared request must bind the native executable, exact arguments, working
+directory, retained environment/configuration evidence and repository identity
+to the consumed approval proof. Display the operation's network and read/write/
+execute effects and the complete authorized worktree/metadata scopes. Review
+and authorization happen before the native mutation, rather than approving
+fetch and predicting every subsequent conflict, rename or replay result.
+Post-fetch commit identities are not available before native Pull starts: do
+not invent them or require a second integration plan inside the same command.
+Retain the pre-execution identity evidence and report the actual result.
+
+Native recursion does not implicitly grant access to arbitrary child roots or
+remotes. The operation-level request must represent its authorized recursive
+scope; effects outside that scope retain independent authorization or cause an
+explicit refusal. Do not recreate Git's recursive scheduler to claim native
+parity. Hooks, filters, helpers and repository-external effects retain their
+existing authorization boundaries. Model approval cannot override explicit
+Deny or human-only policy, and uncertainty or assessor failure falls back to
+the human approval path. No persistent grant results from model AllowOnce.
+
+Reuse the immutable prepared proof and existing supervised process executor;
+retain foreground maintenance, Trace2 suppression, output/deadline bounds,
+cancellation cleanup and truthful partial-failure reporting. Do not retry,
+reset, abort or resolve conflicts automatically. Remove obsolete Pull-only
+staging/prediction code after its replacement is verified; preserve helpers
+still required by other Git operations. T7 owns native execution and identity;
+PERM-007-H owns the shared effectful Auto assessor, without a Git-only reviewer.
+
+Production activation still requires approval-to-execution and denial tests,
+native parity including configured recursion and conflicts, identity mutation,
+partial failure and cancellation coverage, independent security review, and
+the applicable Agent/MCP and native Windows delivery gates. This amendment
+accepts the implementation direction; it does not assert those gates pass or
+enable the currently disabled production Pull path.
+
+### Pull integration worktree scope (accepted 2026-10-19; sequencing superseded)
 
 The maintainer accepted a dedicated one-Pull-integration worktree scope instead
 of requiring an exhaustive prediction of conflict files, renames and interactive
@@ -647,7 +691,7 @@ conflicts or partial effects, report them and leave resolution to the user.
 Explicitly denied or separately constrained effects remain denied or require
 their own approval; model approval cannot widen the displayed invocation scope.
 
-### Recursive child fetch extension (accepted 2026-10-16)
+### Recursive child fetch extension (accepted 2026-10-16; superseded)
 
 Native Git 2.54 source inspection and an isolated fixture confirmed that the
 default `on-demand` parent fetch starts child-repository Git processes and may
