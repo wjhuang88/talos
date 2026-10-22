@@ -3,7 +3,7 @@
 **Status**: Active / Claimed; selected for I306
 **Type**: Provider / Config / Model-Catalog Story
 **Parent Epic**: [PROVIDER-008](PROVIDER-008-openai-responses-api-support.md) / [Issue #724](https://github.com/wjhuang88/talos/issues/724)
-**Source Issue**: [#724](https://github.com/wjhuang88/talos/issues/724)
+**Source Issue**: [#748](https://github.com/wjhuang88/talos/issues/748)
 **Selected Iteration**: [I306](../../iterations/I306-provider008a-openai-responses.md)
 
 ## Collaboration Claim
@@ -15,10 +15,10 @@
 | Executing Agent | GPT-5.6 Sol / talos开发 session |
 | Work Slice | PROVIDER-008-A protocol architecture plus OpenAI Responses only; Gemini, Azure and Bedrock remain separate children. |
 | Claimed At | 2026-10-22 |
-| Source Issue | #724 |
+| Source Issue | #748 |
 | Governance Claim PR | #747 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Maintainer requested implementation in the 2026-10-22 talos开发 session. Governance-only #747 must pass exact-head applicable CI, both governance validators, provider/API technical review and merge-time CAS before this claim is effective. |
+| Authorization Evidence | Maintainer requested implementation of parent #724 in the 2026-10-22 talos开发 session; child requirement #748 records this bounded slice. Governance-only #747 must pass exact-head applicable CI, both governance validators, provider/API technical review and merge-time CAS before this claim is effective. |
 | Implementation PR | Not started |
 | Last Updated | 2026-10-22 |
 | Handoff / Release Condition | Claim activates only when #747 reaches main with accepted ADR-093. Sibling families remain unclaimed; Complete requires existing implementation commit evidence. |
@@ -56,7 +56,7 @@ protocol provenance, while preserving old explicit protocol behavior.
   OpenAI request field. Replay remains subject to the existing same-model rule.
 - Return a clear unsupported-protocol error with an explicit `protocol = "openai-chat"` escape hatch;
   never retry across protocols.
-- Surface effective protocol and source in model-selection/debug surfaces covered by #724.
+- Surface effective protocol and source in model-selection/debug surfaces covered by #724/#748.
 
 ## Non-Goals
 
@@ -74,7 +74,7 @@ protocol provenance, while preserving old explicit protocol behavior.
   ADR-050/051 image continuation, ADR-062 typed retry progress and ADR-075 bounded decision calls.
 - PROVIDER-004 tool-call identity behavior must not regress.
 - MODEL-014 is Refinement / Unclaimed and remains a separate owner; this Story may only add protocol
-  metadata required by #724, not general capability inference.
+  metadata required by #724/#748, not general capability inference.
 
 ## Acceptance
 
@@ -125,10 +125,12 @@ Realtime/Assistants/Batch and active probing remain backlog-only unless separate
 ## Preflight — 2026-10-22
 
 Target main at selection: `0caaf83241b8f94cba0cbdca66e3e166068f024d`.
-Issue #724 and all three comments were re-read. Before #747 was opened, no open PR matched #724 /
-PROVIDER-008 / OpenAI Responses and no matching `724` or `provider` implementation branch was found.
-PROVIDER-008 remains Refinement / Unclaimed at the epic level; MODEL-014 remains Refinement /
-Unclaimed and does not authorize overlapping capability inference.
+Parent issue #724 and all then-current comments were re-read. Before #747 was opened, no open PR
+matched #724 / PROVIDER-008 / OpenAI Responses and no matching `724` or `provider` implementation
+branch was found. During claim preparation the bounded child requirement was split into #748 so the
+parent epic and child owner do not share one Source Issue. PROVIDER-008 remains Refinement / Unclaimed
+at the epic level; MODEL-014 remains Refinement / Unclaimed and does not authorize overlapping
+capability inference.
 
 Relevant current iteration disposition from target-branch Board/owners: I293/I294 retain independent
 Search ownership; I300's structured Git claim remains separate; I302 remains Review on Windows
