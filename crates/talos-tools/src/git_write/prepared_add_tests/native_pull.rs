@@ -3,6 +3,9 @@
 
 use super::*;
 
+#[path = "native_pull_hooks.rs"]
+mod hooks;
+
 #[test]
 fn native_pull_plan_rejects_changed_operation_before_discovery() {
     let root = tempfile::tempdir().expect("fixture");
@@ -264,6 +267,17 @@ async fn native_pull_preserves_configured_integration(conflict: bool) {
     plan.pull_destinations = resolved_destinations.clone();
     plan.facets
         .extend(plan.native_pull_parent_facets().expect("parent scope"));
+    let branch = plan.native_pull_branch().await.expect("branch");
+    plan.pull_hook_paths = plan
+        .config
+        .as_ref()
+        .expect("config")
+        .native_pull_hook_paths(&plan.repository, &plan.environment, branch.as_deref())
+        .expect("whole-operation hook frontier");
+    for path in &plan.pull_hook_paths {
+        plan.facets
+            .push(path_facet(ToolNature::Read, path, "native hook evidence").expect("hook Read"));
+    }
     // Even a separately approved-looking destination cannot substitute for
     // the remote resolved by native Pull's retained config and current branch.
     plan.pull_destinations = vec!["git://different.invalid/source".into()];

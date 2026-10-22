@@ -117,6 +117,52 @@ impl AddPlan {
         self.revalidate()
     }
 
+    // Parent root admission cannot substitute for exact hook Read admission.
+    // Re-derive the frontier so an omitted candidate cannot hide executable
+    // effects from the final operation profile.
+    pub(super) async fn capture_native_pull_hooks(
+        &self,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<Vec<(PathBuf, snapshot::RegularEvidence)>, GitToolError> {
+        self.revalidate()?;
+        let config = self.config.as_ref().ok_or_else(|| {
+            GitToolError::InvalidInput("Native Pull configuration evidence missing".into())
+        })?;
+        let branch = self.native_pull_branch().await?;
+        let paths = config.native_pull_hook_paths(
+            &self.repository,
+            &self.environment,
+            branch.as_deref(),
+        )?;
+        if paths != self.pull_hook_paths {
+            return Err(GitToolError::InvalidInput(
+                "Native Pull hook frontier differs from admitted scope; no Pull started".into(),
+            ));
+        }
+        for path in &paths {
+            if !authorizations.iter().any(|token| {
+                token.authorizes_path(
+                    "git_pull",
+                    ToolNature::Read,
+                    &self.workspace,
+                    path.to_str().unwrap_or_default(),
+                )
+            }) {
+                return Err(GitToolError::InvalidInput(
+                    "Native Pull hook lacks exact Read admission; no Pull started".into(),
+                ));
+            }
+        }
+        let evidence = super::super::config_state::ConfigState::capture_pull_hooks(&paths)?;
+        if !self.pull_hook_evidence.is_empty() && evidence != self.pull_hook_evidence {
+            return Err(GitToolError::InvalidInput(
+                "Native Pull hook evidence changed after discovery; no Pull started".into(),
+            ));
+        }
+        self.revalidate()?;
+        Ok(evidence)
+    }
+
     // Only the stage dispatcher calls this after consuming this exact plan's
     // one-use proof. Path tokens alone cannot confer the named recursive scopes.
     pub(super) async fn execute_native_pull(
@@ -167,6 +213,7 @@ impl AddPlan {
             ));
         }
         self.validate_native_pull_destination().await?;
+        self.capture_native_pull_hooks(authorizations).await?;
         // The phase is deliberately unreachable from production discovery until
         // native recursive/external-effect scope discovery and activation tests
         // replace the old scheduler. Do not promote a fetch-only plan here.
