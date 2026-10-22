@@ -147,6 +147,11 @@ pub(crate) fn configured_provider(config: &Config) -> Result<Arc<dyn LanguageMod
             provider = provider.with_timeout_config(provider_config.timeout);
             Ok(maybe_inject_provider(Arc::new(provider)))
         }
+        ProviderProtocol::OpenAIResponses => Err(
+            "openai-responses protocol is staged but not yet wired into the Desktop provider factory"
+                .into(),
+        ),
+        _ => Err("unsupported provider protocol in this Talos build".into()),
     }
 }
 
