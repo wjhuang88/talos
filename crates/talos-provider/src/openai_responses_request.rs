@@ -9,8 +9,10 @@ use std::collections::HashSet;
 use base64::Engine;
 use serde_json::{Value, json};
 use talos_config::{ReasoningEffort, ReasoningOptions};
-use talos_core::message::{ContentPart, Message};
+use talos_core::message::{ContentPart, Message, ReasoningBlock};
 use talos_core::provider::ToolDefinition;
+
+use crate::openai_responses_reasoning::decode_reasoning_item;
 
 pub(crate) const EMPTY_INPUT_MESSAGE: &str = "(silence)";
 pub(crate) const EMPTY_ASSISTANT_MESSAGE: &str = "(no response)";
@@ -62,10 +64,24 @@ pub(crate) fn build_request_body(
             Message::Assistant {
                 content,
                 tool_calls,
-                reasoning: _,
+                reasoning,
             } => {
                 let matched_tool_call_ids = matched_following_tool_result_ids(messages, idx);
                 pending_tool_call_ids.clear();
+
+                let mut replayed_reasoning = false;
+                if let Some(assistant_reasoning) = reasoning
+                    && assistant_reasoning.model == model
+                {
+                    for block in &assistant_reasoning.blocks {
+                        if let ReasoningBlock::Redacted { data } = block
+                            && let Some(item) = decode_reasoning_item(data)
+                        {
+                            input.push(item);
+                            replayed_reasoning = true;
+                        }
+                    }
+                }
 
                 if !content.trim().is_empty() {
                     input.push(text_message_item("assistant", content.clone()));
@@ -84,17 +100,15 @@ pub(crate) fn build_request_body(
                     }));
                 }
 
-                if content.trim().is_empty() && pending_tool_call_ids.is_empty() {
+                if content.trim().is_empty()
+                    && pending_tool_call_ids.is_empty()
+                    && !replayed_reasoning
+                {
                     input.push(text_message_item(
                         "assistant",
                         EMPTY_ASSISTANT_MESSAGE.to_string(),
                     ));
                 }
-
-                // PROVIDER-008-A deliberately does not coerce existing Chat-style Plain reasoning
-                // into a Responses reasoning item. Opaque encrypted reasoning replay gets its own
-                // typed core representation before adapter activation so no private state is lost or
-                // accidentally rendered as text.
             }
             Message::Tool { result } => {
                 if !pending_tool_call_ids.remove(&result.tool_use_id) {
@@ -148,7 +162,10 @@ pub(crate) fn build_request_body(
             ReasoningEffort::Medium => "medium",
             ReasoningEffort::High => "high",
         };
-        body["reasoning"] = json!({"effort": effort});
+        body["reasoning"] = json!({
+            "effort": effort,
+            "summary": "auto",
+        });
     }
 
     if let Some(output_limit) = output_limit {
@@ -226,7 +243,10 @@ fn non_empty_content(content: &str, fallback: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use talos_core::message::{ContentDigest, MessageToolResult, ToolCall};
+    use crate::openai_responses_reasoning::encode_completed_reasoning_item;
+    use talos_core::message::{
+        AssistantReasoning, ContentDigest, MessageToolResult, ToolCall,
+    };
 
     fn tool_definition() -> ToolDefinition {
         ToolDefinition::new(
@@ -341,6 +361,80 @@ mod tests {
     }
 
     #[test]
+    fn encrypted_reasoning_replays_as_full_item_before_tool_call() {
+        let envelope = encode_completed_reasoning_item(&json!({
+            "type": "reasoning",
+            "id": "rs_1",
+            "summary": [{"type": "summary_text", "text": "safe summary"}],
+            "encrypted_content": "ciphertext"
+        }))
+        .expect("valid reasoning item")
+        .expect("encrypted envelope");
+        let body = build_request_body(
+            "gpt-test",
+            &[
+                Message::Assistant {
+                    content: String::new(),
+                    tool_calls: vec![ToolCall {
+                        id: "call-1".into(),
+                        name: "lookup".into(),
+                        input: json!({"key": "value"}),
+                    }],
+                    reasoning: Some(AssistantReasoning {
+                        provider: "openai".into(),
+                        model: "gpt-test".into(),
+                        blocks: vec![ReasoningBlock::Redacted { data: envelope }],
+                    }),
+                },
+                Message::Tool {
+                    result: MessageToolResult {
+                        tool_use_id: "call-1".into(),
+                        content: "found".into(),
+                        is_error: false,
+                    },
+                },
+            ],
+            &[],
+            None,
+            None,
+        );
+
+        let input = body["input"].as_array().expect("input array");
+        assert_eq!(input.len(), 3);
+        assert_eq!(input[0]["type"], "reasoning");
+        assert_eq!(input[0]["id"], "rs_1");
+        assert_eq!(input[0]["summary"][0]["text"], "safe summary");
+        assert_eq!(input[0]["encrypted_content"], "ciphertext");
+        assert_eq!(input[1]["type"], "function_call");
+        assert_eq!(input[2]["type"], "function_call_output");
+    }
+
+    #[test]
+    fn reasoning_replay_requires_same_model_and_owned_envelope() {
+        let body = build_request_body(
+            "gpt-test",
+            &[Message::Assistant {
+                content: String::new(),
+                tool_calls: vec![],
+                reasoning: Some(AssistantReasoning {
+                    provider: "openai".into(),
+                    model: "different-model".into(),
+                    blocks: vec![ReasoningBlock::Redacted {
+                        data: "foreign-ciphertext".into(),
+                    }],
+                }),
+            }],
+            &[],
+            None,
+            None,
+        );
+        let input = body["input"].as_array().expect("input array");
+        assert_eq!(input.len(), 1);
+        assert_eq!(input[0]["role"], "assistant");
+        assert_eq!(input[0]["content"][0]["text"], EMPTY_ASSISTANT_MESSAGE);
+    }
+
+    #[test]
     fn unmatched_calls_and_orphan_results_are_not_replayed() {
         let body = build_request_body(
             "gpt-test",
@@ -396,6 +490,7 @@ mod tests {
         );
 
         assert_eq!(body["reasoning"]["effort"], "high");
+        assert_eq!(body["reasoning"]["summary"], "auto");
         assert_eq!(body["max_output_tokens"], 8192);
         assert!(body.get("reasoning_effort").is_none());
         assert!(body.get("max_completion_tokens").is_none());

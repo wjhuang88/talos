@@ -4,5 +4,7 @@
 
 #[path = "../src/image_io.rs"]
 mod image_io;
+#[path = "../src/openai_responses_reasoning.rs"]
+mod openai_responses_reasoning;
 #[path = "../src/openai_responses_request.rs"]
 mod openai_responses_request;
