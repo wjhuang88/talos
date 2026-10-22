@@ -5585,3 +5585,7 @@ Stored-child fixed metadata now waits for exact pointer admission (including
 opening them. Pointer-drift regression added; native tests 11/11 and locked
 Git-enabled tools Clippy pass. See I300 metadata checkpoint for evidence.
 Next remains child config-chain/remote/worktree binding and production activation.
+Ordinary stored-child startup snapshots now reuse ChildStartupLayout; include
+targets and declared worktrees stay unopened, and changed config bytes refuse.
+Native tests 12/12, Pull regression 169/169 and Clippy pass; I300 owns logs and
+the remaining linked/common-target and activation work.
