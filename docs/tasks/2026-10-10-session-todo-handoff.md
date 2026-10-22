@@ -5649,3 +5649,10 @@ without fetch effects. I300 records a pending bounded identity-only stored-modul
 inventory scope proposal to eliminate depth-dependent approval rounds; no new
 authority or activation is enabled. Manual scope-loop success is not dispatcher
 convergence evidence.
+
+Linked-worktree native Pull now inventories its private gitdir/modules instead
+of the main worktree common/modules. A red-before/green-after regression checks
+private child selection and main-child exclusion; native tests pass 19/19.
+I300 also tracks newly released gix 0.90.0 and its relevant URL/layout/attribute
+APIs; no upgrade or complete host-Git replacement is claimed. The pending
+inventory authority proposal uses the corrected gitdir/modules root.

@@ -7715,7 +7715,7 @@ stage-limit refusal without FETCH_HEAD creation. This is a characterization of
 an unresolved delivery blocker, not successful dispatcher convergence.
 
 Concrete proposed convergence change: add a closed, read-only stored-module
-inventory authority bound to the separately approved parent common/modules
+inventory authority bound to the separately approved current-worktree gitdir/modules
 root. It permits only bounded directory names and entry identity/type metadata
 under that root (including nested module namespaces), with no symlink following,
 configuration/HEAD/object/ref contents, worktree reads, execution, network or
@@ -7734,3 +7734,33 @@ Audit validation: the focused dispatcher-budget characterization passes using
 core PreparedStageHistory (/private/tmp/i300-native-stage-budget.log); tools
 lib/tests Clippy and both governance validators pass. The existing preparation
 fixture is deliberately still expected to refuse at the dispatcher stage limit.
+
+Linked-worktree module-root correction (2026-10-23): a native Git disposable
+fixture confirms initialized linked-worktree submodules live under its private
+.git/worktrees/<id>/modules, independently of main .git/modules. The new scope
+regression failed against the previous common-dir inventory selection (missing
+private child) and passes after selecting repository.git_dir. It also verifies
+the main-worktree decoy is not retained and neither child gets FETCH_HEAD.
+Native Pull tests pass 19/19 (/private/tmp/i300-linked-modules-tests.log); the
+pre-fix failure is /private/tmp/i300-linked-modules-before.log. The pending
+identity-only inventory proposal above is corrected to gitdir/modules; its
+permissions and limits are unchanged, and acceptance is still pending. This
+path fix does not enable production Pull or claim dispatcher convergence.
+
+Standing gix tracking (2026-10-23): GitHub now publishes gix-v0.90.0, released
+2026-10-22T14:01:21Z, distinct from the gitoxide CLI v0.61.0. Release notes add
+Submodule::resolved_url(), selected global attribute paths, worktree locking,
+Remote::default_branch(), absolute repository paths without reload, and separated
+linked-worktree registration/checkout. They also fix private linked-worktree
+submodule selection, clone reference parity and replacement-ref/commit-graph
+handling. These overlap our URL/layout/auxiliary-path needs; the linked-root
+correction above was independently checked against installed Git. Cargo.lock
+remains at gix 0.87.1. This is release-note tracking, not an API/source migration
+or full semantic audit: no complete native Pull/rebase/recursive update/Push
+replacement or host-Git removal date is established. No dependency was changed.
+Source: https://github.com/GitoxideLabs/gitoxide/releases/tag/gix-v0.90.0 .
+Retained API response: /private/tmp/i300-gix-0.90-release.json.
+Linked-root checkpoint additionally passes inventory regression 46/46, tools
+lib/tests Clippy -D warnings and both governance validators (zero warnings).
+Logs: /private/tmp/i300-linked-modules-{inventory,clippy,governance,claims}.log.
+No full workspace or Windows runtime validation is claimed for this correction.
