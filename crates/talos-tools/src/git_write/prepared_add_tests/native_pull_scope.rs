@@ -442,3 +442,74 @@ async fn native_pull_scope_startup_requires_resolution_then_exact_target_admissi
         assert!(!root.path().join(".git/FETCH_HEAD").exists());
     }
 }
+
+#[tokio::test]
+async fn native_pull_scope_uses_linked_worktree_private_modules() {
+    let root = tempfile::tempdir().expect("fixture");
+    git(root.path(), &["init", "-b", "main"]);
+    git(root.path(), &["config", "core.hooksPath", ""]);
+    git(
+        root.path(),
+        &[
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit",
+            "--allow-empty",
+            "-m",
+            "initial",
+        ],
+    );
+    git(
+        root.path(),
+        &["remote", "add", "origin", "git://example.invalid/parent"],
+    );
+    let linked = root.path().join("linked");
+    git(
+        root.path(),
+        &[
+            "worktree",
+            "add",
+            "-b",
+            "linked",
+            linked.to_str().expect("path"),
+        ],
+    );
+    let canonical = root.path().canonicalize().expect("root");
+    let private = canonical.join(".git/worktrees/linked/modules/child");
+    let main = canonical.join(".git/modules/decoy");
+    for module in [&private, &main] {
+        std::fs::create_dir_all(module).expect("module");
+        git(module, &["init", "--bare", "-b", "main"]);
+        git(
+            module,
+            &["remote", "add", "origin", "git://example.invalid/child"],
+        );
+    }
+    let mut plan = Box::new(
+        prepare_pull_fixture(&linked, &serde_json::json!({}), ToolProvenance::Native)
+            .expect("plan"),
+    )
+    .discover()
+    .await
+    .expect("sender");
+    plan.phase = Phase::PullNativePreparation;
+    for _ in 0..16 {
+        if plan.phase != Phase::PullNativePreparation {
+            break;
+        }
+        let tokens = proof(&plan)
+            .consume_for_prepared(&plan.request(), &plan.identity)
+            .expect("admission");
+        plan = plan
+            .discover_native_pull_scope(&tokens)
+            .await
+            .expect("scope");
+    }
+    assert!(plan.phase == Phase::PullNativeMutation);
+    assert!(plan.native_pull_metadata.contains_key(&private));
+    assert!(!plan.native_pull_metadata.contains_key(&main));
+    assert!(!private.join("FETCH_HEAD").exists());
+    assert!(!main.join("FETCH_HEAD").exists());
+}

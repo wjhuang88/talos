@@ -43,7 +43,7 @@ impl AddPlan {
         if self.native_pull_modules.is_none() {
             self.native_pull_modules =
                 Some(super::super::pull_inventory::Inventory::stored_modules(
-                    &self.repository.common_dir,
+                    &self.repository.git_dir,
                     self.pull_reference_budget.clone(),
                 )?);
         }

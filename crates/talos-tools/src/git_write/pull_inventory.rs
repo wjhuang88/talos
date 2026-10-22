@@ -237,12 +237,14 @@ impl Inventory {
     // Names and identities only. Repository contents are deliberately not
     // traversed: discovering a module never admits its config, objects or refs.
     pub(super) fn stored_modules(
-        common: &Path,
+        gitdir: &Path,
         reference_budget: ReferenceBudget,
     ) -> Result<Self, GitToolError> {
-        reference_budget.retain_child_name(common, std::ffi::OsStr::new("modules"))?;
+        // Linked worktrees own private submodules; common_dir would select
+        // another worktree's repositories instead.
+        reference_budget.retain_child_name(gitdir, std::ffi::OsStr::new("modules"))?;
         Ok(Self::from_pending(
-            vec![common.join("modules")],
+            vec![gitdir.join("modules")],
             reference_budget,
             true,
         ))
