@@ -1958,3 +1958,64 @@ Final staged/exact-local review, stable publication, remote source/native termin
 CAS follow. Shared-identity Agent review is not distinct natural-person approval; all parent gates
 remain effective. The six tests exercise the same private parsing/preparation helper used by
 AgentTool; cfg(test) relocation is not an official tool/Agent dispatch or production DNS override.
+
+## Merged Private Tool / DNS-Only Distinct-Source Failover — 2026-10-22
+
+#745 mergedba93193f79f0c5c1b6005d7027b19128b722ec9b, source6735732f/tree7d7c99f5.
+CI3301/run39636840910 attempt1 all6SUCCESS: mac580/Windows582 tools, all6new cases, original
+socket regression, both SDK modes, standard preflight/later gates and LinuxDesktop112 PASS.
+Protected source6321313249, terminalfullstage6322089330 and merged delivery6322104287 record
+the library-only stage; merge parent032cce61/tree/main verified and local main synchronized cleanly.
+
+Selection baselineba93193f retains effective#712/ADR090, actor@wjhuang88 and unchanged Work Slice.
+Inventory dispositions remain: I293/I294/I300 Active retain C/D/Git; I277 Review retains deferred
+human/device rows, I302 Review retains#717; I249 Planned deferred; I164 Paused/superseded.
+I301/I303/I304/I305 Complete/Closed are not reopened. Historical I146/I147/I150 notes and TEMPLATE
+do not activate work. Open#735dcc8c31e full130files and#7055848f899 full4files refreshed; neither
+intersects search_backend/I293/SEARCH-C. Full candidate intersections remain a publication/CAS
+gate. Neither unrelated task is absorbed or approved; #705 remains OPEN/unmerged.
+
+Runnable private deliverable: after typed TransportError::Dns only, the immutable source chain
+may try its next already prepared source. It consumes each source once under the same manifest,
+live authority, request/body counters and deadline. All other transport variants, including coarse
+Request, remain terminal, as do existing parser/admission safety failures. The initial proposal
+considered Request too, but source inspection shows it merges TLS/configuration/protocol/read
+failures; protected design review requires DNS-only continuation and a separate reviewed split
+before any broader policy. This is distinct-source failover, not replay, retry/backoff or NET policy.
+
+Six controlled tests use distinct synthetic source hostnames, validating cfg(test) relocation,
+real whole-plan Once admission, an injected resolver and actual reqwest/loopback HTTP. They
+cover first DNS failure then a later admitted winner, exactly four DNS failures without HTTP,
+revocation/request-budget/address boundaries, expiry before another lookup, mixed semantic/DNS
+failures with cumulative counters, and an actual HTTP protocol failure that remains terminal.
+Failed DNS may expose the hostname, but sends no query-bearing HTTP. Denied address evidence
+counts the completed lookup honestly. No DNS-laboratory, provider/regional or official-root
+claim follows. Existing authority/drop/deadline/response tests remain intact.
+
+Toolchain/cache and isolated physical target were absent again; checksummed pinned Rust1.99
+restored, actual rustc verified, and the existing target symlink's physical destination recreated.
+Focused/strict network Clippy/standard locked preflight, source/evidence review, stable publication,
+native terminal CI and fresh CAS follow. No dependency/lock/public API/schema/permission/default
+change, new skip or threshold relaxation. Affected reference: SEARCH-001-C-COMPATIBILITY-CHAIN.md.
+I293 Active/Claimed/Completion Pending and#643/#624 OPEN. Full C/EP/parity/proxy/D/privacy/
+officialroots/router/health/rollback/default activation/release gates remain pending.
+
+DNS-only local convergence passes on frozen source: focused transport128/0failed/0ignored/
+228filtered plus existing child1/355filtered; all6new tests PASS. Strict network-test Clippy
+exits0. Standard locked Rust1.99 release_preflight.sh exits0 with actual passed/terminal markers:
+workspace check/Clippy/tests/doctests, tools586/0failed/0ignored/0filtered, all6new cases and both
+external SDK modes PASS; SQLite17/delivery12/governance0warnings/claims0warnings PASS. Only the
+existing authorized local runtime socket filter applies; native CI remains unfiltered. No failed
+Rust validation occurred in this stage. Complete journal SHA256:
+cac4a58e587ab994aab13882c4eb1f55757efc7908d5307444df5dd775dc43f7;
+focused448fcc1524cb091ecf4e1e9827423880382a8124924e6de80053542445e92c03;
+strict Clippye572703b72ccb232bcb5dcf44cc0bd034d7a9e6b4cd00d3443732e5e93c0cc04.
+Scale507sources/31packages/4workflows retains high-risk/release-managed/on-demand. Initial
+working-source review requested a correction to the execution reference's stale semantic-only
+chain wording; it now distinguishes single-source return from DNS/semantic owning-chain policy.
+The corrected six-path working candidate is APPROVE, no source/security blocker; frozen blobs
+chain4ca546c9, chaintestsc9f0a920 and dnstests4f9ae475 remain unchanged through validation.
+Affected references include SEARCH-001-C-COMPATIBILITY-EXECUTION.md as well as the chain contract.
+Final staged/exact-local review, stable publication, remote source/native terminal review and
+fresh CAS follow. Shared-identity Agent review is not distinct natural-person approval. This
+remains dormant private evidence; full C/EP and every activation/parent gate above remain pending.

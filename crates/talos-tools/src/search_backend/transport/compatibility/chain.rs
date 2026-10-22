@@ -95,7 +95,7 @@ impl PreparedCompatibilityChain {
         transport: &SearchTransport,
     ) -> Result<AdmittedCompatibilityResults, CompatibilityChainError> {
         // Sentinels cannot escape: exhaustion is reached only after all four slots
-        // are replaced with observed semantic failures in the fixed order.
+        // are replaced with observed DNS or semantic failures in the fixed order.
         let mut failures = [CompatibilityError::Transport(TransportError::InvalidRequest); 4];
         for (index, source) in self.sources.into_iter().enumerate() {
             let protocol = source.protocol;
@@ -132,7 +132,6 @@ fn may_continue(error: CompatibilityError) -> bool {
             TransportError::InvalidRequest
             | TransportError::Unauthorized
             | TransportError::UnsupportedProxy
-            | TransportError::Dns
             | TransportError::Address
             | TransportError::Redirect
             | TransportError::RequestLimit
@@ -140,6 +139,9 @@ fn may_continue(error: CompatibilityError) -> bool {
             | TransportError::ResponseEncoding
             | TransportError::Deadline
             | TransportError::Request => false,
+            // A resolver failure starts no HTTP request. Try only the next already
+            // prepared source, under the same authority and enclosing budget.
+            TransportError::Dns => true,
         },
         CompatibilityError::Ddg(error) => match error {
             DdgParseError::Empty | DdgParseError::Status | DdgParseError::Challenge => true,

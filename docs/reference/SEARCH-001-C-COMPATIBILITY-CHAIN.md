@@ -24,7 +24,7 @@ must contain at least one admitted display URL; HTTP/parsing completion alone ca
 
 | Error family | Continue to the next declared source | Terminal whole-chain errors |
 |---|---|---|
-| Transport | None | Every variant, including DNS/request failure, authorization/address/redirect denial and shared limits/deadline |
+| Transport | Dns only | Every other variant, including Request, authorization/address/redirect denial and shared limits/deadline |
 | DDG parser | Empty, Status, Challenge | Limit, Encoding, Parse |
 | Bing parser | Empty, Status, RateLimited, Challenge | Limit, Encoding, Parse |
 | Result admission | Empty, Invalid | Limit, Identity, Parse |
@@ -35,7 +35,17 @@ terminal. No error is reclassified using text. Terminal errors retain protocol a
 exhaustion retains exactly4 actual errors in fixed order. Both Display strings are static, Debug
 contains only enums, and no query/URL/body/dependency diagnostic is stored in outcomes or health.
 This adds no health state. Internal exhaustion placeholders cannot escape before all4slots are
-overwritten by observed semantic failures.
+overwritten by observed DNS or semantic failures.
+
+Typed resolver failure can proceed only to the next already prepared source. It does not retry
+the failed source, add a destination, discard a facet or refresh any counter/deadline. A failed
+resolution sends no HTTP query; its hostname lookup may already have occurred. Current Request
+coarsens client construction, TLS verification, protocol/send and body-read failures, so it remains
+terminal rather than being guessed to mean ordinary unavailability. Empty, oversized or forbidden
+resolved-address sets remain Address failures; resolver timeout remains the enclosing Deadline.
+Each later source still passes live authority before DNS and before send. Revocation after a DNS
+failure, spent request reservations and expiry therefore stop further work. A forbidden address
+is counted as a completed lookup and terminates without a send or another lookup.
 
 The same transport performs live authority, invocation, DNS/address, proxy/TLS, redirect and
 request/body checks for every actual hop. Budget checks precede each source and follow every
@@ -57,7 +67,8 @@ documented). Chain ownership/safety/budget/result logic and synthetic fixtures a
 
 Upstream also rate-limits, probes/caches reachability, retries some network failures, draws UA at
 client construction, and conditionally tries configured SearXNG. This chain omits those behaviors;
-it performs4 upfront entropy draws, including unused sources, and terminates on transport errors.
+it performs4 upfront entropy draws, including unused sources, and terminates on all transport
+errors except typed DNS failure.
 It is only a traditional sequential fixed4 subset, not full source/retry/probe/entropy timing/
 charset/proxy/service parity. It is one compatibility family, never4 native independent routes.
 No live official-host search, result fetch or regional/provider qualification occurs.

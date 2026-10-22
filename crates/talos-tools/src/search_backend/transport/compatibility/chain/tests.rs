@@ -59,14 +59,27 @@ fn empty(protocol: CompatibilityProtocol) -> String {
 // Reconstruct only under cfg(test), validating every relocated endpoint and preserving
 // frozen bytes/headers/protocol/query/count. Production exposes no destination override.
 pub(in crate::search_backend::transport::compatibility) fn relocate(
+    chain: PreparedCompatibilityChain,
+    server: &Server,
+) -> (PreparedCompatibilityChain, ToolNetworkManifest) {
+    relocate_with_hosts(chain, server, false)
+}
+
+fn relocate_with_hosts(
     mut chain: PreparedCompatibilityChain,
     server: &Server,
+    distinct: bool,
 ) -> (PreparedCompatibilityChain, ToolNetworkManifest) {
     let urls: Vec<_> = chain
         .sources
         .iter()
-        .map(|source| {
+        .enumerate()
+        .map(|(index, source)| {
             let mut url = server.url(source.request.url.path());
+            if distinct {
+                url.set_host(Some(&format!("source-{index}.invalid")))
+                    .expect("synthetic host");
+            }
             url.set_query(source.request.url.query());
             url
         })
@@ -236,7 +249,10 @@ fn frozen_chain_owns_four_headers_query_and_count_and_stops_capture_on_error() {
 }
 
 #[test]
-fn continuation_table_has_no_transport_bound_encoding_identity_or_parse_escape() {
+fn continuation_table_allows_only_dns_and_semantic_failures() {
+    assert!(may_continue(CompatibilityError::Transport(
+        TransportError::Dns
+    )));
     for error in [
         DdgParseError::Empty,
         DdgParseError::Status,
@@ -259,7 +275,6 @@ fn continuation_table_has_no_transport_bound_encoding_identity_or_parse_escape()
         TransportError::InvalidRequest,
         TransportError::Unauthorized,
         TransportError::UnsupportedProxy,
-        TransportError::Dns,
         TransportError::Address,
         TransportError::Redirect,
         TransportError::RequestLimit,
@@ -292,6 +307,8 @@ fn continuation_table_has_no_transport_bound_encoding_identity_or_parse_escape()
         assert!(!may_continue(CompatibilityError::Admission(error)));
     }
 }
+
+mod dns_tests;
 
 #[tokio::test]
 async fn each_winner_position_preserves_frozen_wire_order_and_starts_no_later_source() {
