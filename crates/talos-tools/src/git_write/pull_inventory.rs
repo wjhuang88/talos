@@ -493,6 +493,26 @@ impl Inventory {
         !self.worktree_targets.is_empty()
     }
 
+    /// Register a commondir declaration retained from an individually admitted
+    /// child metadata file. This freezes text only; resolution needs the named
+    /// Pull pointer-resolution admission, and contents need a later target grant.
+    pub(super) fn retain_common_target(&mut self, target: &Path) -> Result<bool, GitToolError> {
+        if self.worktree_common_targets.contains(target) {
+            return Ok(false);
+        }
+        self.reference_budget.retain_path(target)?;
+        self.worktree_common_targets.insert(target.to_owned());
+        self.worktree_targets.insert(target.to_owned(), None);
+        Ok(true)
+    }
+
+    pub(super) fn resolved_common_target(&self, target: &Path) -> Option<&Path> {
+        self.worktree_common_targets
+            .contains(target)
+            .then_some(())?;
+        Some(self.worktree_targets.get(target)?.as_ref()?.resolved())
+    }
+
     /// Caller must consume a current prepared proof covering the dedicated
     /// resolution capability before entering. No target content is read here.
     pub(super) fn resolve_worktree_targets(&mut self) -> Result<bool, GitToolError> {

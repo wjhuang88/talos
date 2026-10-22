@@ -98,35 +98,88 @@ impl AddPlan {
         for root in roots {
             self.child_read(&root, authorizations)?;
             let metadata = super::super::receiver_state::Metadata::capture(&root, &root)?;
-            // Ordinary stored modules keep startup sources in this already
-            // admitted root. Linked/common-directory targets need their own
-            // resolution and admission before startup bytes may be captured.
-            if metadata.common_path == root {
-                let startup = super::super::config_state::ChildStartupLayout::capture(
-                    &root,
-                    &root,
-                    metadata.has_common(),
-                )?;
-                for target in &startup.targets {
-                    self.facets.push(path_facet(
-                        ToolNature::Read,
-                        target,
-                        "native Pull child raw startup worktree; resolution deferred",
-                    )?);
-                }
-                self.pull_child_startup.insert(root.clone(), startup);
-            }
-            for path in std::iter::once(metadata.common_path.clone())
-                .chain(std::iter::once(metadata.common_path.join("config")))
-                .chain(metadata.worktree_marker.iter().cloned())
-            {
+            if let Some(path) = &metadata.worktree_marker {
                 self.facets.push(path_facet(
                     ToolNature::Read,
-                    &path,
+                    path,
                     "native Pull child layout target; contents require fresh admission",
                 )?);
             }
             self.native_pull_metadata.insert(root, metadata);
+        }
+        let modules = self.native_pull_modules.as_mut().ok_or_else(|| {
+            GitToolError::InvalidInput("Native Pull module inventory missing".into())
+        })?;
+        let mut new_targets = false;
+        for (root, metadata) in &self.native_pull_metadata {
+            if metadata.common_path != *root {
+                new_targets |= modules.retain_common_target(&metadata.common_path)?;
+            }
+        }
+        if modules.has_worktree_targets() {
+            let resolution_admitted = Self::pull_resolution_admitted(&self.facets);
+            if !resolution_admitted {
+                self.facets.push(ToolPermissionFacet::with_resource(
+                    ToolNature::Read,
+                    "git:pull-worktree-resolution",
+                    ToolResourceKind::Remote,
+                ).with_description("resolve retained child commondir pointers, including external component metadata; no target contents"));
+            }
+            if new_targets || !resolution_admitted {
+                self.phase = Phase::PullNativePreparation;
+                self.identity = PreparedPlanIdentity::new();
+                return Ok(self);
+            }
+            if modules.resolve_worktree_targets()? {
+                for metadata in self.native_pull_metadata.values() {
+                    if let Some(common) = modules.resolved_common_target(&metadata.common_path) {
+                        for path in [common.to_owned(), common.join("config")] {
+                            self.facets.push(path_facet(ToolNature::Read, &path,
+                                "native Pull resolved child common configuration; contents deferred")?);
+                        }
+                    }
+                }
+                self.phase = Phase::PullNativePreparation;
+                self.identity = PreparedPlanIdentity::new();
+                return Ok(self);
+            }
+        }
+        // Check the entire resolved frontier before reading any startup
+        // source. Raw pointer spelling tokens cannot substitute here.
+        let common_roots = self
+            .native_pull_metadata
+            .iter()
+            .map(|(root, metadata)| {
+                let common = if metadata.common_path == *root {
+                    root.as_path()
+                } else {
+                    modules
+                        .resolved_common_target(&metadata.common_path)
+                        .ok_or_else(|| {
+                            GitToolError::InvalidInput(
+                                "Native Pull child common target unresolved".into(),
+                            )
+                        })?
+                };
+                Ok((root.clone(), common.to_owned(), metadata.has_common()))
+            })
+            .collect::<Result<Vec<_>, GitToolError>>()?;
+        for (_, common, _) in &common_roots {
+            self.child_read(common, authorizations)?;
+            self.child_read(&common.join("config"), authorizations)?;
+        }
+        for (root, common, has_common) in common_roots {
+            let startup = super::super::config_state::ChildStartupLayout::capture(
+                &root, &common, has_common,
+            )?;
+            for target in &startup.targets {
+                self.facets.push(path_facet(
+                    ToolNature::Read,
+                    target,
+                    "native Pull child raw startup worktree; resolution deferred",
+                )?);
+            }
+            self.pull_child_startup.insert(root, startup);
         }
         let (remote, destinations) = self.resolve_native_pull_destination().await?;
         self.pull_remote = Some(remote);

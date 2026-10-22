@@ -5589,3 +5589,6 @@ Ordinary stored-child startup snapshots now reuse ChildStartupLayout; include
 targets and declared worktrees stay unopened, and changed config bytes refuse.
 Native tests 12/12, Pull regression 169/169 and Clippy pass; I300 owns logs and
 the remaining linked/common-target and activation work.
+External child common targets now reuse the bounded Pull pointer resolver, then
+require fresh actual-target/config Read approval before startup capture. Pull
+regression 170/170 passes; I300 records the fixture and remaining delivery gates.
