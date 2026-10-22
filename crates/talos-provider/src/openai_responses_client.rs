@@ -1,0 +1,310 @@
+//! OpenAI Responses HTTP client boundary.
+//!
+//! This is intentionally not yet a public `LanguageModel` adapter. It owns request dispatch,
+//! same-protocol retry, typed progress, and handoff to the Responses SSE transport while preserving
+//! opaque encrypted-reasoning outputs for the later durable replay bridge.
+
+use std::time::Duration;
+
+use reqwest::Client;
+use serde_json::Value;
+use talos_config::{ProviderTimeoutConfig, ReasoningOptions};
+use talos_core::message::Message;
+use talos_core::provider::{ProviderError, ProviderProgress, ProviderResult, ToolDefinition};
+use tokio::sync::mpsc;
+
+use crate::openai_responses_request::build_request_body;
+use crate::openai_responses_sse::ResponsesStreamOutput;
+use crate::retry::{RetryDecision, classify_retry_with_backoff};
+
+pub(crate) const OPENAI_RESPONSES_API_URL: &str = "https://api.openai.com/v1";
+pub(crate) const RESPONSES_PATH: &str = "/responses";
+
+#[derive(Clone)]
+pub(crate) struct OpenAIResponsesClient {
+    api_key: String,
+    model: String,
+    base_url: String,
+    client: Client,
+    reasoning: Option<ReasoningOptions>,
+    output_limit: Option<u32>,
+    timeout_config: ProviderTimeoutConfig,
+}
+
+impl OpenAIResponsesClient {
+    pub(crate) fn new(api_key: impl Into<String>, model: impl Into<String>) -> Self {
+        Self {
+            api_key: api_key.into(),
+            model: model.into(),
+            base_url: OPENAI_RESPONSES_API_URL.into(),
+            client: Client::new(),
+            reasoning: None,
+            output_limit: None,
+            timeout_config: ProviderTimeoutConfig::default(),
+        }
+    }
+
+    #[must_use]
+    pub(crate) fn with_base_url(mut self, base_url: impl Into<String>) -> Self {
+        self.base_url = base_url.into();
+        self
+    }
+
+    #[must_use]
+    pub(crate) fn with_reasoning(
+        mut self,
+        reasoning: Option<ReasoningOptions>,
+        output_limit: Option<u32>,
+    ) -> Self {
+        self.reasoning = reasoning;
+        self.output_limit = output_limit;
+        self
+    }
+
+    #[must_use]
+    pub(crate) fn with_timeout_config(mut self, config: ProviderTimeoutConfig) -> Self {
+        self.timeout_config = config;
+        self
+    }
+
+    #[must_use]
+    pub(crate) fn endpoint_url(&self) -> String {
+        let base = self.base_url.trim().trim_end_matches('/');
+        if base.to_ascii_lowercase().ends_with(RESPONSES_PATH) {
+            base.to_string()
+        } else {
+            format!("{base}{RESPONSES_PATH}")
+        }
+    }
+
+    pub(crate) async fn stream(
+        &self,
+        messages: &[Message],
+        tools: &[ToolDefinition],
+        progress_tx: Option<&mpsc::UnboundedSender<ProviderProgress>>,
+    ) -> ProviderResult<mpsc::Receiver<ResponsesStreamOutput>> {
+        let body = build_request_body(
+            &self.model,
+            messages,
+            tools,
+            self.reasoning.as_ref(),
+            self.output_limit,
+        );
+        let response = self.send_request(&body, progress_tx).await?;
+        let (tx, rx) = mpsc::channel(32);
+        tokio::spawn(crate::openai_responses_transport::parse_response_stream(
+            response,
+            tx,
+            Duration::from_secs(self.timeout_config.first_packet_timeout_secs),
+            Duration::from_secs(self.timeout_config.stream_idle_timeout_secs),
+        ));
+        Ok(rx)
+    }
+
+    pub(crate) async fn send_request(
+        &self,
+        body: &Value,
+        progress_tx: Option<&mpsc::UnboundedSender<ProviderProgress>>,
+    ) -> ProviderResult<reqwest::Response> {
+        let max_attempts = self.timeout_config.max_attempts;
+        let dispatch_timeout = Duration::from_secs(self.timeout_config.dispatch_timeout_secs);
+        let mut attempt = 0u32;
+
+        loop {
+            emit_progress(
+                progress_tx,
+                if attempt == 0 {
+                    ProviderProgress::InitialDispatch {
+                        attempt,
+                        max_attempts,
+                    }
+                } else {
+                    ProviderProgress::RetryDispatch {
+                        attempt,
+                        max_attempts,
+                    }
+                },
+            );
+
+            let request = self
+                .client
+                .post(self.endpoint_url())
+                .header("Authorization", format!("Bearer {}", self.api_key))
+                .header("Content-Type", "application/json")
+                .json(body)
+                .send();
+
+            let response = match tokio::time::timeout(dispatch_timeout, request).await {
+                Ok(result) => result,
+                Err(_) => {
+                    let error = ProviderError::NetworkError(format!(
+                        "request dispatch timeout: no response headers within {}s",
+                        self.timeout_config.dispatch_timeout_secs
+                    ));
+                    match self.retry_decision(&error, attempt) {
+                        RetryDecision::Retry {
+                            attempt: next_attempt,
+                            delay_ms,
+                        } => {
+                            emit_progress(
+                                progress_tx,
+                                ProviderProgress::ScheduledBackoff {
+                                    attempt: next_attempt,
+                                    max_attempts,
+                                    delay_ms,
+                                },
+                            );
+                            tokio::time::sleep(Duration::from_millis(delay_ms)).await;
+                            attempt = next_attempt;
+                            continue;
+                        }
+                        RetryDecision::DoNotRetry => return Err(error),
+                    }
+                }
+            };
+
+            match response {
+                Ok(response) if response.status().is_success() => {
+                    emit_progress(
+                        progress_tx,
+                        ProviderProgress::FirstPacketWait {
+                            attempt,
+                            max_attempts,
+                        },
+                    );
+                    return Ok(response);
+                }
+                Ok(response) => {
+                    let status = response.status();
+                    let body = response.text().await.unwrap_or_default();
+                    let error = responses_status_to_error(status, body);
+                    match self.retry_decision(&error, attempt) {
+                        RetryDecision::Retry {
+                            attempt: next_attempt,
+                            delay_ms,
+                        } => {
+                            emit_progress(
+                                progress_tx,
+                                ProviderProgress::ScheduledBackoff {
+                                    attempt: next_attempt,
+                                    max_attempts,
+                                    delay_ms,
+                                },
+                            );
+                            tokio::time::sleep(Duration::from_millis(delay_ms)).await;
+                            attempt = next_attempt;
+                            continue;
+                        }
+                        RetryDecision::DoNotRetry => return Err(error),
+                    }
+                }
+                Err(error) => {
+                    let error = ProviderError::NetworkError(error.to_string());
+                    match self.retry_decision(&error, attempt) {
+                        RetryDecision::Retry {
+                            attempt: next_attempt,
+                            delay_ms,
+                        } => {
+                            emit_progress(
+                                progress_tx,
+                                ProviderProgress::ScheduledBackoff {
+                                    attempt: next_attempt,
+                                    max_attempts,
+                                    delay_ms,
+                                },
+                            );
+                            tokio::time::sleep(Duration::from_millis(delay_ms)).await;
+                            attempt = next_attempt;
+                            continue;
+                        }
+                        RetryDecision::DoNotRetry => return Err(error),
+                    }
+                }
+            }
+        }
+    }
+
+    fn retry_decision(&self, error: &ProviderError, attempt: u32) -> RetryDecision {
+        classify_retry_with_backoff(
+            error,
+            attempt,
+            self.timeout_config.max_attempts,
+            self.timeout_config.backoff_base_ms,
+            self.timeout_config.backoff_max_ms,
+        )
+    }
+}
+
+fn emit_progress(
+    progress_tx: Option<&mpsc::UnboundedSender<ProviderProgress>>,
+    progress: ProviderProgress,
+) {
+    if let Some(progress_tx) = progress_tx {
+        let _ = progress_tx.send(progress);
+    }
+}
+
+fn responses_status_to_error(status: reqwest::StatusCode, body: String) -> ProviderError {
+    match status.as_u16() {
+        401 | 403 => ProviderError::AuthenticationFailed(body),
+        404 | 405 => ProviderError::InvalidResponse(format!(
+            "OpenAI Responses endpoint is unavailable ({status}); this gateway may not support \
+             /responses. Set protocol = \"openai-chat\" explicitly to use Chat Completions."
+        )),
+        408 | 409 | 425 | 429 => ProviderError::RateLimited(body),
+        code if code >= 500 => ProviderError::ServerError(body),
+        _ => ProviderError::InvalidResponse(format!(
+            "OpenAI Responses request rejected with status {status}: {body}"
+        )),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn endpoint_appends_responses_once() {
+        let default_client = OpenAIResponsesClient::new("sk-test", "gpt-test");
+        assert_eq!(
+            default_client.endpoint_url(),
+            "https://api.openai.com/v1/responses"
+        );
+
+        let explicit = OpenAIResponsesClient::new("sk-test", "gpt-test")
+            .with_base_url("https://gateway.example/v1/responses/");
+        assert_eq!(
+            explicit.endpoint_url(),
+            "https://gateway.example/v1/responses"
+        );
+    }
+
+    #[test]
+    fn unsupported_endpoint_error_is_actionable_and_not_retryable() {
+        let error = responses_status_to_error(reqwest::StatusCode::NOT_FOUND, "not found".into());
+        assert!(matches!(
+            &error,
+            ProviderError::InvalidResponse(message)
+                if message.contains("protocol = \"openai-chat\"")
+                    && message.contains("/responses")
+        ));
+        let client = OpenAIResponsesClient::new("sk-test", "gpt-test");
+        assert!(matches!(
+            client.retry_decision(&error, 0),
+            RetryDecision::DoNotRetry
+        ));
+    }
+
+    #[test]
+    fn same_protocol_server_errors_remain_eligible_for_bounded_retry() {
+        let client = OpenAIResponsesClient::new("sk-test", "gpt-test");
+        let error = responses_status_to_error(
+            reqwest::StatusCode::SERVICE_UNAVAILABLE,
+            "temporary".into(),
+        );
+        assert!(matches!(
+            client.retry_decision(&error, 0),
+            RetryDecision::Retry { .. }
+        ));
+    }
+}
