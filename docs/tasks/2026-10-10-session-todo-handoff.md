@@ -1,3 +1,19 @@
+## Current-head full validation — 2026-10-22
+
+Standard `./scripts/release_preflight.sh` at `83f4ce69` passes outside the
+workspace sandbox with the pinned toolchain, locked workspace check, Clippy,
+tests and runtime SDK fixture. Log:
+`/private/tmp/i300-83f4ce69-preflight-unsandboxed.log`.
+The sandboxed attempt failed only at the local Push process-observation fixture
+with OS `Operation not permitted` (1029 tools tests passed, one failed).
+The correctly Git-enabled isolated test passes outside the sandbox (1/1), then
+the full standard preflight passes. An initial isolated invocation without the
+Git feature ran zero tests and is not evidence. Logs:
+`/private/tmp/i300-83f4ce69-preflight.log` and
+`/private/tmp/i300-preflight-push-failure-repro.log`.
+This establishes current local validation, not native Windows acceptance,
+effectful Auto delivery, production Pull activation or T7 completion.
+
 ## Windows preparation diagnostic correction — 2026-10-22
 
 The production gate now accurately reports that Windows Job-supervised execution
