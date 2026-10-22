@@ -94,17 +94,41 @@ impl ChildStartupLayout {
         common: &std::path::Path,
         has_common: bool,
     ) -> Result<Self, GitToolError> {
+        Self::capture_with_budget(gitdir, common, has_common, None)
+    }
+
+    pub(super) fn capture_native_pull(
+        gitdir: &std::path::Path,
+        common: &std::path::Path,
+        has_common: bool,
+        shared: &super::pull_inventory::ReferenceBudget,
+    ) -> Result<Self, GitToolError> {
+        Self::capture_with_budget(gitdir, common, has_common, Some(shared))
+    }
+
+    fn capture_with_budget(
+        gitdir: &std::path::Path,
+        common: &std::path::Path,
+        has_common: bool,
+        shared: Option<&super::pull_inventory::ReferenceBudget>,
+    ) -> Result<Self, GitToolError> {
         let mut budget = snapshot::Budget {
             entries: 2,
             bytes: 256 * 1024,
         };
+        let mut capture = |path: &std::path::Path| {
+            if let Some(shared) = shared {
+                shared.capture_with_budget(path, &mut budget)
+            } else {
+                snapshot::RegularEvidence::capture(path, &mut budget).map_err(|_| {
+                    unsupported("Child startup configuration must be bounded regular files")
+                })
+            }
+        };
         let mut files = Vec::new();
         let mut targets = BTreeSet::new();
         let common_config = common.join("config");
-        let evidence =
-            snapshot::RegularEvidence::capture(&common_config, &mut budget).map_err(|_| {
-                unsupported("Child startup configuration must be bounded regular files")
-            })?;
+        let evidence = capture(&common_config)?;
         let mut layout = startup_values(&evidence.entry)?;
         files.push((common_config, evidence));
         // Git startup ignores all layout settings when repositoryFormatVersion
@@ -112,10 +136,7 @@ impl ChildStartupLayout {
         if layout.version {
             if layout.worktree_config {
                 let path = gitdir.join("config.worktree");
-                let evidence =
-                    snapshot::RegularEvidence::capture(&path, &mut budget).map_err(|_| {
-                        unsupported("Child worktree configuration must be a bounded regular file")
-                    })?;
+                let evidence = capture(&path)?;
                 let worktree = startup_values(&evidence.entry)?;
                 if worktree.bare.is_some() {
                     layout.bare = worktree.bare;

@@ -7650,3 +7650,15 @@ allowance. Locked configuration tests pass 37/37. This bounds source snapshots
 only: startup evidence, retained discovery output and transient allocations are
 not claimed fully accounted. Native activation guards and all other residuals
 above remain; T7/I300 is incomplete.
+
+Native startup source budget checkpoint (2026-10-22): startup config/config.worktree
+capture now charges both the per-child 2-entry/256 KiB allowance and the shared
+Pull reference allowance. Existing startup evidence is revalidated on native
+preparation continuations instead of being replaced and charged again. The
+regression admits sixteen near-256 KiB child sources, refuses the seventeenth
+across shared-budget clones, and separately refuses a source above the local
+limit. Locked native Pull regressions pass 17/17, the new budget regression
+passes, inventory tests pass 46/46, and tools lib/tests Clippy -D warnings passes.
+Logs: /private/tmp/i300-startup-budget-{tests,inventory,clippy}.log. This closes
+startup source snapshot accounting only, not retained host-output/transient
+accounting or the remaining native effect/scope and activation gates. T7 stays open.

@@ -70,19 +70,40 @@ impl ReferenceBudget {
         path: &Path,
         max_bytes: usize,
     ) -> Result<super::snapshot::RegularEvidence, GitToolError> {
+        self.capture_with_budget(
+            path,
+            &mut super::snapshot::Budget {
+                entries: usize::MAX,
+                bytes: max_bytes,
+            },
+        )
+    }
+
+    pub(super) fn capture_with_budget(
+        &self,
+        path: &Path,
+        local: &mut super::snapshot::Budget,
+    ) -> Result<super::snapshot::RegularEvidence, GitToolError> {
         let mut remaining = self.0.lock().map_err(|_| invalid())?;
-        let available_bytes = remaining.1.min(max_bytes);
+        let available_entries = remaining.0.min(local.entries);
+        let available_bytes = remaining.1.min(local.bytes);
         let mut allowance = super::snapshot::Budget {
-            entries: remaining.0,
+            entries: available_entries,
             bytes: available_bytes,
         };
         let result = super::snapshot::RegularEvidence::capture(path, &mut allowance);
         // Failed captures also consume any work already charged. A continuation
         // or replacement inventory must never restore the invocation allowance.
-        remaining.0 = allowance.entries;
-        remaining.1 -= available_bytes
+        let entries = available_entries
+            .checked_sub(allowance.entries)
+            .ok_or_else(invalid)?;
+        let bytes = available_bytes
             .checked_sub(allowance.bytes)
             .ok_or_else(invalid)?;
+        remaining.0 -= entries;
+        remaining.1 -= bytes;
+        local.entries -= entries;
+        local.bytes -= bytes;
         result.map_err(|_| invalid())
     }
 }

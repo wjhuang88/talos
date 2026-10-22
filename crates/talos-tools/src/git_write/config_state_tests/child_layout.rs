@@ -144,3 +144,25 @@ fn child_startup_layout_retains_raw_target_hidden_by_include() {
         super::ChildStartupLayout::capture(&gitdir, &gitdir, false).expect("enabled layout");
     assert_eq!(enabled.targets, BTreeSet::from([gitdir.join("../another")]));
 }
+
+#[test]
+fn native_pull_startup_sources_obey_local_and_shared_limits() {
+    let root = tempfile::tempdir().expect("fixture");
+    let shared = super::super::pull_inventory::ReferenceBudget::default();
+    let mut bytes = vec![b' '; 256 * 1024 - 1];
+    bytes[0] = b'#';
+    for index in 0..17 {
+        let dir = root.path().join(index.to_string());
+        std::fs::create_dir(&dir).expect("child");
+        std::fs::write(dir.join("config"), &bytes).expect("source");
+        let result = ChildStartupLayout::capture_native_pull(&dir, &dir, false, &shared.clone());
+        assert_eq!(result.is_ok(), index < 16, "child {index}");
+    }
+    let dir = root.path().join("oversized");
+    std::fs::create_dir(&dir).expect("child");
+    bytes.resize(256 * 1024 + 1, b' ');
+    std::fs::write(dir.join("config"), bytes).expect("oversized source");
+    assert!(ChildStartupLayout::capture_native_pull(
+        &dir, &dir, false, &super::super::pull_inventory::ReferenceBudget::default(),
+    ).is_err());
+}

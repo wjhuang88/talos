@@ -5622,3 +5622,9 @@ layout/startup/source grants and retained chain/destination evidence before fetc
 Both activation guards remain; I300 records incomplete transport/recursive scope,
 aggregate budgets, stage convergence and platform/review gates. Previous config
 chain stage 615b7b8a passed full standard preflight. T7 remains incomplete.
+
+Native startup source capture now shares the cumulative reference budget while
+preserving its per-child cap; continuations revalidate retained startup evidence.
+Native Pull tests 17/17, inventory tests 46/46, the new cumulative/local-limit
+regression and tools Clippy pass. I300 retains all native effect/scope, output
+accounting, real stage-budget and platform/review/activation residuals.
