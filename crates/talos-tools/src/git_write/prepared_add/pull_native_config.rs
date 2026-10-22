@@ -41,7 +41,11 @@ impl AddPlan {
                 config.verify_host(&output)?;
                 continue;
             }
-            let config = super::super::config_state::ChildConfig::capture_receiver(&output, root)?;
+            let config = super::super::config_state::ChildConfig::capture_native_pull(
+                &output,
+                root,
+                &self.pull_reference_budget,
+            )?;
             if output != self.inspect_receiver_config_at(root).await? {
                 return Err(GitToolError::InvalidInput(
                     "Native Pull child configuration changed during discovery; values withheld"

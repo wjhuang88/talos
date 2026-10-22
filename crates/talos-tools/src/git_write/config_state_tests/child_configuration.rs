@@ -257,3 +257,34 @@ fn child_configuration_rejects_identical_file_replacement() {
             .contains("path identity")
     );
 }
+
+#[test]
+fn native_pull_child_configs_share_budget_across_cloned_continuations() {
+    let root = tempfile::tempdir().expect("fixture");
+    let budget = super::super::pull_inventory::ReferenceBudget::default();
+    let continuation = budget.clone();
+    for name in ["first", "second"] {
+        std::fs::write(root.path().join(name), vec![b' '; 2 * 1024 * 1024 + 1])
+            .expect("config source");
+    }
+    let output = |name: &str| {
+        format!(
+            "file:{}\0remote.origin.url\ngit://example.invalid/repo\0",
+            root.path().join(name).display()
+        )
+    };
+    ChildConfig::capture_native_pull(output("first").as_bytes(), root.path(), &budget)
+        .expect("first child fits");
+    assert!(
+        ChildConfig::capture_native_pull(
+            output("second").as_bytes(),
+            root.path(),
+            &continuation,
+        )
+        .is_err()
+    );
+    assert!(
+        ChildConfig::capture_native_pull(output("first").as_bytes(), root.path(), &budget)
+            .is_err()
+    );
+}

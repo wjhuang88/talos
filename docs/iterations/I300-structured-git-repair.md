@@ -7640,3 +7640,13 @@ Full locked Git-enabled tools library tests pass 530/530 outside the sandbox
 (/private/tmp/i300-native-child-remote-tools.log); governance and collaboration
 claim validators pass with zero warnings. No current-stage workspace-wide or
 native Windows runtime result is claimed.
+
+Native child configuration snapshot budget checkpoint (2026-10-22): source
+file capture now consumes the existing operation-wide Pull ReferenceBudget;
+continuation clones share the same allowance instead of resetting it per child.
+A regression captures one source slightly above 2 MiB, refuses a second under
+the cumulative 4 MiB limit, and confirms a subsequent capture cannot reset the
+allowance. Locked configuration tests pass 37/37. This bounds source snapshots
+only: startup evidence, retained discovery output and transient allocations are
+not claimed fully accounted. Native activation guards and all other residuals
+above remain; T7/I300 is incomplete.
