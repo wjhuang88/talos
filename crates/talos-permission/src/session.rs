@@ -721,6 +721,11 @@ fn approve_session_locked(
     context: &PermissionContext,
     source: GrantSource,
 ) -> Result<PendingInvocation, GrantError> {
+    if crate::native_pull_command::requested(request.facets()) {
+        // Command authority is always invocation-local, including when a host
+        // chooses its generic "always approve" response. Its preview says Once.
+        return approve_once_locked(state, proposal, request, context);
+    }
     validate_proposal(state, &proposal, request, context)?;
     let id = GrantId::new();
     let next_store = next_generation(state.revisions.store)?;
@@ -852,7 +857,7 @@ impl AdmittedInvocation {
         self,
         request: &PermissionRequest<'_>,
     ) -> Result<Vec<ToolExecutionAuthorization>, GrantError> {
-        if self.plan_identity.is_some() {
+        if self.plan_identity.is_some() || crate::native_pull_command::requested(request.facets()) {
             return Err(GrantError::AdmissionInvalidated);
         }
         self.consume(request)
@@ -936,13 +941,14 @@ fn evaluate_locked(
     }
     let (facets, _) = compiled_identity(request, state.engine.workspace_root())?;
     if let Some(grant) = state.grants.iter().find(|grant| {
-        grant_matches(
-            grant,
-            request.tool_name(),
-            request.provenance(),
-            &facets,
-            request.network_manifest().map(|m| m.scope()),
-        )
+        !crate::native_pull_command::requested(request.facets())
+            && grant_matches(
+                grant,
+                request.tool_name(),
+                request.provenance(),
+                &facets,
+                request.network_manifest().map(|m| m.scope()),
+            )
     }) {
         let id = grant.id;
         let source = grant.source;

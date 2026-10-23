@@ -281,7 +281,14 @@ pub(crate) fn compile_proposal(
     let facets = compile_facets(request, workspace_root, true)?;
     let fingerprint = fingerprint_request(request, &facets);
     let preview = GrantPreview {
-        scope,
+        // The existing Ask carrier includes both proposal slots. Even its
+        // Session slot advertises only Once for native command authority;
+        // committing it is downgraded to an invocation without storing a grant.
+        scope: if crate::native_pull_command::requested(request.facets()) {
+            GrantScope::Once
+        } else {
+            scope
+        },
         network_scope: request
             .network_manifest()
             .map(|m| Box::new(m.scope().clone())),
@@ -327,6 +334,12 @@ fn compile_facets(
     validate_network_profile(request)?;
     let mut compiled = Vec::with_capacity(request.facets().len());
     for (index, facet) in request.facets().iter().enumerate() {
+        if facet.resource.as_deref().map(str::trim) == Some(crate::native_pull_command::CAPABILITY)
+            && (facet.nature != ToolNature::Execute
+                || facet.resource_kind != Some(ToolResourceKind::Remote))
+        {
+            return Err(GrantError::MissingResource(index));
+        }
         let consequential = matches!(
             facet.nature,
             ToolNature::Write | ToolNature::Execute | ToolNature::Network
@@ -352,6 +365,24 @@ fn compile_facets(
                     .as_deref()
                     .is_some_and(|path| Path::new(path).is_absolute())
         });
+        let pull_command = facet.nature == ToolNature::Execute
+            && resource_kind == ToolResourceKind::Remote
+            && facet.resource.as_deref() == Some(crate::native_pull_command::CAPABILITY)
+            && request.tool_name() == "git_pull"
+            && bound_git_command
+            && request.facets().iter().any(|root| {
+                root.nature == ToolNature::Read
+                    && root.resource_kind == Some(ToolResourceKind::Path)
+                    && root
+                        .resource
+                        .as_deref()
+                        .is_some_and(|path| Path::new(path).is_absolute())
+            });
+        if facet.resource.as_deref().map(str::trim) == Some(crate::native_pull_command::CAPABILITY)
+            && !pull_command
+        {
+            return Err(GrantError::MissingResource(index));
+        }
         let bound_git_read_path = request.facets().iter().any(|facet| {
             facet.nature == ToolNature::Read
                 && facet.resource_kind == Some(ToolResourceKind::Path)
@@ -490,6 +521,7 @@ fn compile_facets(
                         .is_some_and(|path| Path::new(path).is_absolute())
             });
         if !supported_resource_pair(facet.nature, resource_kind)
+            && !pull_command
             && !git_config_discovery
             && !auxiliary_resolution
             && !receiver_reference_tree

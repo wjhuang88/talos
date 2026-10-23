@@ -589,6 +589,10 @@ pub fn headless_pipeline(engine: talos_permission::PermissionEngine) -> Permissi
 mod execution_input_tests;
 
 #[cfg(test)]
+#[path = "permission_pipeline/native_pull_command_tests.rs"]
+mod native_pull_command_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::auto_resolver::{
