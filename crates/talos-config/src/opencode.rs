@@ -219,7 +219,7 @@ mod tests {
         assert_eq!(providers.len(), 1);
 
         let minimal = providers.get("minimal").expect("operation should succeed");
-        assert_eq!(minimal.protocol, ProviderProtocol::OpenAIChat);
+        assert_eq!(minimal.protocol, ProviderProtocol::Unspecified);
         assert!(minimal.base_url.is_none());
         assert!(minimal.models.is_empty());
     }
