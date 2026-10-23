@@ -712,6 +712,45 @@ the applicable Agent/MCP and native Windows delivery gates. This amendment
 accepts the implementation direction; it does not assert those gates pass or
 enable the currently disabled production Pull path.
 
+### Native Pull concrete-command authorization (accepted 2026-10-23)
+
+The maintainer explicitly accepted the command-granularity alternative in
+`docs/proposals/i300-native-pull-command-authorization.md`. This supersedes the
+complete-effects requirement above **for final native Pull execution only**,
+including independent final grants for recursive roots, remote destinations,
+hooks, filters and configured helpers. Bounded discovery retains its existing
+read limits and external-target admission rules; this decision does not expand
+read authority during preparation.
+
+Final authority covers one frozen native Git command and its ordinary transitive
+configured-helper effects, at the same granularity as a concrete Bash command.
+Known paths, destinations and helpers are review evidence, not an exhaustive
+manifest or an enforceable filesystem/network confinement promise. Approval
+must disclose that distinction without exposing credentials. Bind executable,
+exact argv, cwd, retained environment/configuration evidence and repository
+identity to an immutable, invocation-local, one-use execution proof.
+
+Explicit Deny and human-only policy remain authoritative. Before issuing the
+proof, the shared permission pipeline must check compatibility with active
+policy. If a finer-grained Deny cannot be honored for transitive effects,
+refuse this route; human approval cannot override Deny. An unenforceable
+human-only restriction must never silently become model authority. Auto uses
+the shared assessor; uncertainty or assessor failure goes to the human.
+
+Reuse process supervision, foreground maintenance, Trace2 suppression,
+deadlines, output limits, cancellation cleanup and truthful partial-effect
+reporting. Do not automatically retry, reset or repair conflicts. This is not
+a persistent grant to Git or helpers, and does not change Add, Commit, Checkout,
+Push or generic Path permissions. Remove obsolete Pull-only prediction and
+recursive scheduling only after the replacement passes acceptance.
+
+Acceptance authorizes implementation, not production activation. Typed proof,
+policy-compatibility tests, stale/replay and changed identity/configuration
+checks, native recursion/helpers, conflicts, cancellation and partial failure
+must pass across Tools/Agent/MCP/Runtime. Independent security review,
+current-head CI and native Windows runtime evidence remain required; cargo
+xwin compilation alone is not Windows runtime evidence. T7/T8 remain open.
+
 ### Pull integration worktree scope (accepted 2026-10-19; sequencing superseded)
 
 The maintainer accepted a dedicated one-Pull-integration worktree scope instead
