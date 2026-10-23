@@ -381,19 +381,64 @@ impl AddPlan {
                     "git:pull-worktree-resolution",
                     ToolResourceKind::Remote,
                 ).with_description("resolve frozen child startup core.worktree paths, including external component metadata; no target contents"));
+                self.phase = Phase::PullNativePreparation;
+                self.identity = PreparedPlanIdentity::new();
+                return Ok(self);
             }
-            self.phase = Phase::PullNativePreparation;
-            self.identity = PreparedPlanIdentity::new();
-            return Ok(self);
+            // The consumed initial profile already admits fixed pointer
+            // resolution. Contained startup directories remain internal
+            // discovery; external actual targets still need a fresh frontier.
+            let modules = self.native_pull_modules.as_mut().ok_or_else(|| {
+                GitToolError::InvalidInput("Native Pull module inventory missing".into())
+            })?;
+            modules.resolve_worktree_targets()?;
+            for target in modules.resolved_startup_worktrees() {
+                self.facets.push(path_facet(
+                    ToolNature::Read,
+                    target,
+                    "native Pull resolved startup worktree; external entry requires fresh Read admission",
+                )?);
+            }
         }
-        for target in self
+        let startup_worktrees = self
             .native_pull_modules
             .as_ref()
             .ok_or_else(|| {
                 GitToolError::InvalidInput("Native Pull module inventory missing".into())
             })?
             .resolved_startup_worktrees()
-        {
+            .map(Path::to_owned)
+            .collect::<Vec<_>>();
+        for target in &startup_worktrees {
+            if bounded_modules
+                && target.starts_with(&self.repository.workdir)
+                && authorizations.iter().any(|token| {
+                    token.authorizes_path(
+                        "git_pull",
+                        ToolNature::Read,
+                        &self.workspace,
+                        self.repository.workdir.to_str().unwrap_or_default(),
+                    )
+                })
+            {
+                // Resolution retains and revalidates the actual target's
+                // identity. The dedicated discovery capability plus displayed
+                // parent root admits this contained directory, not Path Read
+                // alone. Final execution still checks the exact target facet.
+                continue;
+            }
+            if !authorizations.iter().any(|token| {
+                token.authorizes_path(
+                    "git_pull",
+                    ToolNature::Read,
+                    &self.workspace,
+                    target.to_str().unwrap_or_default(),
+                )
+            }) {
+                self.phase = Phase::PullNativePreparation;
+                self.identity = PreparedPlanIdentity::new();
+                return Ok(self);
+            }
             if self.child_read(target, authorizations)? != target {
                 return Err(GitToolError::InvalidInput(
                     "Native Pull startup worktree differs from actual target admission".into(),

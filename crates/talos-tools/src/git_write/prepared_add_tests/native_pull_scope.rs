@@ -449,6 +449,14 @@ async fn native_pull_scope_startup_requires_resolution_then_exact_target_admissi
         .await
         .expect("sender");
         plan.phase = Phase::PullNativePreparation;
+        // Exercise the compatibility path without the initial dedicated
+        // resolution grant or contained-discovery authority.
+        plan.facets.retain(|facet| {
+            !matches!(
+                facet.resource.as_deref(),
+                Some("git:pull-worktree-resolution" | "git:pull-bounded-discovery")
+            )
+        });
         let mut saw_resolution = false;
         for _ in 0..10 {
             if plan
@@ -502,11 +510,17 @@ async fn native_pull_scope_startup_requires_resolution_then_exact_target_admissi
             let tokens = proof(&plan)
                 .consume_for_prepared(&plan.request(), &plan.identity)
                 .expect("without target grant");
-            let error = match plan.discover_native_pull_scope(&tokens).await {
-                Ok(_) => panic!("unadmitted startup target advanced"),
-                Err(error) => error,
-            };
-            assert!(error.to_string().contains("separate Read admission"));
+            let plan = plan
+                .discover_native_pull_scope(&tokens)
+                .await
+                .expect("read frontier");
+            assert!(plan.phase == Phase::PullNativePreparation);
+            assert!(
+                !plan
+                    .facets
+                    .iter()
+                    .any(|facet| matches!(facet.nature, ToolNature::Write | ToolNature::Network))
+            );
         }
         assert!(!root.path().join(".git/FETCH_HEAD").exists());
     }
