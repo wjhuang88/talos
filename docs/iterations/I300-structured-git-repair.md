@@ -7841,3 +7841,36 @@ Remote PR #735 remains at 06c1ebef with terminal Windows failure in run
 39724001119; those remote results do not validate this local head. No native
 Windows acceptance, review sign-off, production Pull activation or T7 completion
 is claimed. The bounded stored-module inventory decision remains unanswered.
+
+Upload-pack scope control (2026-10-23): the Unix source-effect baseline now
+compares identical uploadpack.packObjectsHook values in isolated global versus
+source-local configuration. Git 2.54.0 executes the global hook and fails after
+the source marker, but ignores the source-local hook and completes Pull with
+the updated destination file and no marker. Focused test passes
+(/private/tmp/i300-uploadpack-scope-control.log). Source-effect discovery must
+preserve protected configuration scope; rejecting solely on the merged key's
+presence would incorrectly reject the local-only control. This does not prove
+all upload-pack effects or Windows behavior, and no production gate changes.
+
+Scope-control full-preflight attempt (2026-10-23) did not complete: tools test
+checkout_new_gitlink_preserves_initialized_child remained live for several
+minutes after the other visible tools results. The confirmed test process was
+terminated with SIGTERM; Cargo exited 101. Log:
+/private/tmp/i300-uploadpack-scope-preflight.log. Process observation also found
+multiple orphaned git-daemon processes, including recent ones; ownership and
+causal relationship to the hang are unproven, and none were cleaned up. The
+checkout fixture contains a raw blocking Command::output helper without a
+deadline. Diagnose and bound this test before claiming this checkpoint's full
+validation; the earlier source-classification preflight remains historical
+passing evidence, not a pass for these uncommitted scope-control changes.
+
+Hang isolation follow-up (2026-10-23): the unchanged checkout case passes alone
+in 5.11 seconds (/private/tmp/i300-checkout-hang-isolated.log), and the complete
+Git-enabled tools library passes 536/536 in 46.60 seconds outside the sandbox
+(/private/tmp/i300-checkout-hang-git-suite.log). Neither reproduces the full
+workspace hang. Raw Command::output is a timeout-risk observation, not an
+established cause; no speculative executor fix or orphan cleanup was applied.
+The previous instruction to diagnose/bound the fixture does not constitute a
+confirmed diagnosis. Next reproduction must capture the live test's child
+processes and wait location before termination; a fresh complete preflight is
+still required, and these narrower passes do not supersede its failed attempt.

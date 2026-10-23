@@ -5,6 +5,12 @@ use super::*;
 #[cfg(unix)]
 #[tokio::test]
 async fn native_pull_local_source_can_execute_upload_pack_configuration() {
+    local_source_upload_pack_configuration(true).await;
+    local_source_upload_pack_configuration(false).await;
+}
+
+#[cfg(unix)]
+async fn local_source_upload_pack_configuration(protected_global: bool) {
     let root = tempfile::tempdir().expect("fixture");
     let source = root.path().join("source");
     let local = root.path().join("local");
@@ -28,9 +34,23 @@ async fn native_pull_local_source_can_execute_upload_pack_configuration() {
     let global = root.path().join("global-config");
     std::fs::write(
         &global,
-        "[uploadpack]\npackObjectsHook = printf observed > upload-pack-effect; exit 73;\n",
+        if protected_global {
+            "[uploadpack]\npackObjectsHook = printf observed > upload-pack-effect; exit 73;\n"
+        } else {
+            ""
+        },
     )
     .expect("global configuration");
+    if !protected_global {
+        git(
+            &source,
+            &[
+                "config",
+                "uploadpack.packObjectsHook",
+                "printf observed > upload-pack-effect; exit 73;",
+            ],
+        );
+    }
     let mut environment = plan.environment.clone();
     environment.insert("GIT_CONFIG_NOSYSTEM".into(), "1".into());
     environment.insert("GIT_CONFIG_GLOBAL".into(), global.into_os_string());
@@ -53,6 +73,15 @@ async fn native_pull_local_source_can_execute_upload_pack_configuration() {
         )
         .await
         .expect("supervised native Pull");
+    if !protected_global {
+        assert!(output.status.success(), "{output:?}");
+        assert!(!source.join(".git/upload-pack-effect").exists());
+        assert_eq!(
+            std::fs::read(local.join("file")).expect("updated file"),
+            b"after\n"
+        );
+        return;
+    }
     assert!(!output.status.success());
     assert_eq!(
         std::fs::read(source.join(".git/upload-pack-effect")).expect("source-side effect"),
