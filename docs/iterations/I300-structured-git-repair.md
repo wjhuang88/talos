@@ -8412,3 +8412,40 @@ independent security review/current-head CI/native Windows acceptance before
 production activation. The old scheduler is currently retained, not presented
 as the final architecture. No T7/P1–P5/T8 completion is claimed. Origin was
 fetched and origin/main is already an ancestor; no rebase was necessary.
+
+
+Command-route recursion/cancellation follow-up (2026-10-23): the actual prepared
+authorization route now has real-Git evidence for both initialized and
+deinitialized recursive submodules, including child checkout hooks. The Unix
+command cancellation regression waits for a configured post-merge hook, cancels
+the caller, awaits the existing supervisor cleanup receipt, and proves a delayed
+descendant cannot write after release. Already completed integration remains.
+The discovery stage no longer applies the superseded blanket legacy-remote
+refusal; absent final command proof still prevents dispatch. Strict legacy
+scheduler tests retain their old refusal until that scheduler is deleted.
+
+Six focused native-command tests pass. MSVC cargo-xwin test compilation passes
+with seven existing reduced-feature warnings. The first full standard preflight
+failed one unrelated search connection-refusal budget assertion (1088 tools
+tests passed); its isolated repro passed. A full retry passed that assertion but
+stalled in the legacy native-Pull child-configuration matrix. macOS thread
+sampling showed synchronous `std::process::Command::spawn` blocked in `read`,
+before the supervised execution deadline; the test process was terminated and
+the retry exited 101. Root cause is not established. Evidence:
+`/private/tmp/i300-command-route-preflight.log`,
+`/private/tmp/i300-search-budget-repro.log`,
+`/private/tmp/i300-command-route-preflight-retry.log`, and
+`/private/tmp/i300-preflight-hang.sample.txt`. A fresh complete standard preflight
+exited 101 at `/private/tmp/i300-command-route-preflight-recovery.log`: 1088 tools
+tests passed, the other real connection-refusal test failed with terminal
+`Transport(Request)`, and the legacy Pull matrix passed. A candidate test-only
+bound/non-listening TCP socket reservation timed out on macOS and was reverted;
+no search implementation or fixture change remains. Port reuse is a hypothesis,
+not an established cause. Keep this stage local and do not merge or activate
+until full validation is green. Track the startup stall
+under I300 process-supervision acceptance; do not treat removal of the legacy
+test as proof that the shared spawn boundary is fixed.
+No Windows runtime or production activation claim follows from
+cross-compilation. Residual: delete superseded Pull scheduler/prediction, retain
+shared Checkout/Push helpers, complete cross-surface evidence and independent
+security/current-head CI/native Windows acceptance. T7 and T1–T8 remain open.
