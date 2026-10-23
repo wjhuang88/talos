@@ -4,6 +4,8 @@
 //! independent from any one wire family and lets PROVIDER-008-A add future protocol variants without
 //! re-encoding the decision tree in CLI/Desktop call sites.
 
+use crate::ProviderProtocol;
+
 /// Provenance for one effective provider protocol.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProtocolResolutionSource {
@@ -20,6 +22,33 @@ pub enum ProtocolResolutionSource {
 pub struct ProtocolResolution<T> {
     pub protocol: T,
     pub source: ProtocolResolutionSource,
+}
+
+/// Maps the explicit model-level transport metadata emitted by models.dev to a Talos wire family.
+///
+/// This intentionally accepts only confirmed signals. `provider.shape` is authoritative when
+/// present. Without a shape, only exact AI SDK package identifiers whose default transport is known
+/// are accepted. In particular, package-name substrings and endpoint URLs are not used here, so an
+/// arbitrary OpenAI-compatible gateway cannot accidentally opt into Responses.
+#[must_use]
+pub fn infer_models_dev_model_protocol(
+    npm_package: Option<&str>,
+    shape: Option<&str>,
+) -> Option<ProviderProtocol> {
+    if let Some(shape) = shape {
+        return match shape.trim() {
+            "responses" => Some(ProviderProtocol::OpenAIResponses),
+            "completions" => Some(ProviderProtocol::OpenAIChat),
+            _ => None,
+        };
+    }
+
+    match npm_package.map(str::trim) {
+        Some("@ai-sdk/anthropic") => Some(ProviderProtocol::AnthropicMessages),
+        Some("@ai-sdk/openai") => Some(ProviderProtocol::OpenAIResponses),
+        Some("@ai-sdk/openai-compatible") => Some(ProviderProtocol::OpenAIChat),
+        _ => None,
+    }
 }
 
 /// Resolves the effective protocol using ADR-093 / PROVIDER-008-A precedence.
@@ -151,5 +180,45 @@ mod tests {
         assert_eq!(explicit.source, ProtocolResolutionSource::Configured);
         assert_eq!(unset.protocol, Protocol::Responses);
         assert_eq!(unset.source, ProtocolResolutionSource::Default);
+    }
+
+    #[test]
+    fn models_dev_shape_is_authoritative() {
+        assert_eq!(
+            infer_models_dev_model_protocol(Some("@ai-sdk/openai"), Some("completions")),
+            Some(ProviderProtocol::OpenAIChat)
+        );
+        assert_eq!(
+            infer_models_dev_model_protocol(Some("@ai-sdk/openai-compatible"), Some("responses")),
+            Some(ProviderProtocol::OpenAIResponses)
+        );
+    }
+
+    #[test]
+    fn models_dev_known_sdk_defaults_are_exact() {
+        assert_eq!(
+            infer_models_dev_model_protocol(Some("@ai-sdk/openai"), None),
+            Some(ProviderProtocol::OpenAIResponses)
+        );
+        assert_eq!(
+            infer_models_dev_model_protocol(Some("@ai-sdk/anthropic"), None),
+            Some(ProviderProtocol::AnthropicMessages)
+        );
+        assert_eq!(
+            infer_models_dev_model_protocol(Some("@ai-sdk/openai-compatible"), None),
+            Some(ProviderProtocol::OpenAIChat)
+        );
+        assert_eq!(
+            infer_models_dev_model_protocol(Some("@vendor/openai"), None),
+            None
+        );
+    }
+
+    #[test]
+    fn models_dev_unknown_shape_fails_closed() {
+        assert_eq!(
+            infer_models_dev_model_protocol(Some("@ai-sdk/openai"), Some("future-shape")),
+            None
+        );
     }
 }
