@@ -197,6 +197,28 @@ impl AuxiliaryPaths {
         authorizations: &[ToolExecutionAuthorization],
         hooks: &[PathBuf],
     ) -> Result<(), GitToolError> {
+        self.capture_with_budget(authorizations, hooks, None)
+    }
+
+    /// Native Pull shares its invocation evidence allowance across child hooks.
+    pub(super) fn capture_native_pull(
+        &mut self,
+        authorizations: &[ToolExecutionAuthorization],
+        hooks: &[PathBuf],
+        shared: &super::pull_inventory::ReferenceBudget,
+    ) -> Result<(), GitToolError> {
+        if self.tool != "git_pull" {
+            return Err(invalid());
+        }
+        self.capture_with_budget(authorizations, hooks, Some(shared))
+    }
+
+    fn capture_with_budget(
+        &mut self,
+        authorizations: &[ToolExecutionAuthorization],
+        hooks: &[PathBuf],
+        shared: Option<&super::pull_inventory::ReferenceBudget>,
+    ) -> Result<(), GitToolError> {
         if !authorizations
             .iter()
             .any(|token| token.authorizes_git_auxiliary_path_resolution(&self.tool))
@@ -222,13 +244,16 @@ impl AuxiliaryPaths {
                 entries: self.budget.entries,
                 bytes: self.budget.bytes,
             };
-            let evidence =
+            let evidence = if let Some(shared) = shared {
+                shared.capture_with_budget(source.resolution.resolved(), &mut allowance)
+            } else {
                 snapshot::RegularEvidence::capture(source.resolution.resolved(), &mut allowance)
-                    .map_err(|_| invalid())?;
+                    .map_err(|_| invalid())
+            };
             let entries = self.budget.entries - allowance.entries;
             let bytes = self.budget.bytes - allowance.bytes;
             self.budget.charge(entries, bytes)?;
-            source.leaf = Some(evidence);
+            source.leaf = Some(evidence?);
         }
         for hook in hooks {
             let evidence = self.leaf_evidence(hook).ok_or_else(invalid)?;

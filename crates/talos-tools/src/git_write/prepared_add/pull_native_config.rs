@@ -148,13 +148,14 @@ impl AddPlan {
                 .ok_or_else(|| {
                     GitToolError::InvalidInput("Native Pull auxiliary evidence missing".into())
                 })?
-                .capture_admitted(
+                .capture_native_pull(
                     authorizations,
                     &self
                         .native_pull_fetch_hooks
                         .iter()
                         .cloned()
                         .collect::<Vec<_>>(),
+                    &self.pull_reference_budget,
                 )?;
         }
         Ok(admitted)

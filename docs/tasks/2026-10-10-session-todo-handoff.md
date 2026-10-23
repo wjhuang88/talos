@@ -5787,3 +5787,9 @@ Contained-config implementation faed8061 passes complete frozen standard
 preflight, including both external Runtime SDK consumers, and cargo xwin MSVC
 checking. I300 retains logs and remaining review/native Windows/production
 requirements. This local validation does not close T7 or subsequent tasks.
+
+Native child hook content capture now consumes the shared Pull evidence budget
+in addition to its local auxiliary limit; the cross-source exhaustion regression
+passes. Native Pull 25/25, auxiliary tests 7/7 and Git-enabled Clippy pass. I300
+records evidence and accounting limits. Discovery consolidation, recursive
+execution effects and production/platform acceptance remain unfinished.
