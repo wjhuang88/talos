@@ -8575,3 +8575,14 @@ workspace tests, both governance validators and external runtime SDK fixtures.
 Log: /private/tmp/i300-current-candidate-preflight-authorized.log. This supersedes
 the running state above, not the native Windows or activation gaps. Fresh fetch
 found zero origin/main-only commits; no additional rebase was needed.
+
+Windows CI inventory correction (2026-10-23): run 39935313756 at
+0106a2204 failed before workspace tests because the required-regression list
+still named two tests retired with the old Pull scheduler. Remove the orphaned
+auxiliary-spelling helper entry and replace the old child-bootstrap entry with
+the frozen-invocation substitution and configuration-drift regressions. Both
+replacement tests pass locally (2/2), log
+/private/tmp/i300-ci-native-command-regressions.log. Existing executable/path
+identity and process-supervision entries remain. This fixes the CI inventory,
+not the unresolved native Windows Push/runtime evidence; a fresh native run is
+required. Production gates and all T7 acceptance remain unchanged.

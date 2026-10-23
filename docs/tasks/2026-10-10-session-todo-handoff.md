@@ -1,3 +1,12 @@
+## Windows CI inventory correction — 2026-10-23
+
+Run 39935313756 at 0106a2204 stopped before Windows workspace tests because
+the required-regression list retained two deleted scheduler-era test names.
+The workflow now removes the orphaned helper entry and requires the new frozen
+invocation/configuration-drift regressions; both pass locally (2/2). I300 records
+the log and unchanged native Windows/runtime residuals. This is a CI inventory
+fix, not Windows acceptance or T7 completion.
+
 ## Activation dependency finding — 2026-10-23
 
 Independent review of implementation `496893c25` did not approve activation:
