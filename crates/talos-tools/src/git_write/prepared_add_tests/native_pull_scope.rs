@@ -129,6 +129,47 @@ async fn native_pull_scope_admits_startup_before_discovering_configuration() {
                 facet.nature == ToolNature::Read
                     && facet.resource.as_deref() == module.join("config").to_str()
             }));
+            for target in [
+                module.clone(),
+                root.path()
+                    .join(".git/startup-worktree")
+                    .canonicalize()
+                    .expect("startup"),
+            ] {
+                for nature in [ToolNature::Read, ToolNature::Write] {
+                    assert!(
+                        plan.facets.iter().any(|facet| {
+                            facet.nature == nature
+                                && facet.resource_kind == Some(ToolResourceKind::Path)
+                                && facet.resource.as_deref() == target.to_str()
+                        }),
+                        "missing {nature:?} for {}",
+                        target.display()
+                    );
+                }
+                let position = plan
+                    .facets
+                    .iter()
+                    .position(|facet| {
+                        facet.nature == ToolNature::Write
+                            && facet.resource.as_deref() == target.to_str()
+                    })
+                    .expect("child write facet");
+                let removed = plan.facets.remove(position);
+                let tokens = proof(&plan)
+                    .consume_for_prepared(&plan.request(), &plan.identity)
+                    .expect("incomplete scope proof");
+                let error = plan
+                    .execute_native_pull(&tokens)
+                    .await
+                    .expect_err("omitted child root");
+                assert!(
+                    error.to_string().contains("scope capability missing"),
+                    "{error}"
+                );
+                plan.facets.insert(position, removed);
+                assert!(!module.join("FETCH_HEAD").exists());
+            }
             let admitted = proof(&plan);
             let PreparedNormalStage::Complete(output) =
                 plan.execute_stage(Box::new(admitted)).await
@@ -355,6 +396,14 @@ async fn external_common_scope(deny_config: bool) {
     assert!(plan.pull_child_startup.contains_key(&module));
     assert!(fresh_target_frontier);
     let common = common.path().canonicalize().expect("canonical common");
+    assert!(
+        plan.facets.iter().any(|facet| {
+            facet.nature == ToolNature::Write
+                && facet.resource_kind == Some(ToolResourceKind::Path)
+                && facet.resource.as_deref() == common.to_str()
+        }),
+        "external common root must be explicitly published for mutation"
+    );
     assert!(plan.facets.iter().any(|facet| {
         facet.nature == ToolNature::Read
             && facet.resource.as_deref() == common.join("config").to_str()

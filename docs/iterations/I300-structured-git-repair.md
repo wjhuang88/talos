@@ -8182,3 +8182,25 @@ Log: /private/tmp/i300-scoped-discovery-preflight.log. This is local stage
 validation, not remote exact-head CI, independent security review, native Windows
 runtime acceptance or activation. Simplified discovery orchestration and complete
 recursive mutation/executable effects remain open; T7 and T1–T8 remain incomplete.
+
+Known recursive root publication checkpoint (2026-10-23): final native Pull
+profiles now include Read/Write for every retained stored-module gitdir, resolved
+common root and resolved startup worktree, alongside parent scope. Root derivation
+requires complete inventory, resolved layout targets and retained child config
+and startup evidence. The execution entry re-derives the same root set, checks
+the complete profile before any configuration probe and requires fresh exact
+path tokens for all published roots. Roots are deduplicated; existing named
+metadata/worktree capabilities remain required. Tests omit each child gitdir
+and startup-worktree Write facet and prove rejection before FETCH_HEAD creation;
+the linked-common fixture checks explicit external-common mutation publication.
+The missing-startup regression now fails earlier at the complete-profile check.
+Pull selection passes 190/190, Git-enabled lib/tests Clippy passes with warnings
+denied, and cargo xwin locked MSVC test-target checking passes (seven existing
+reduced-feature warnings; cache EPERM required an authorized retry). Logs:
+/private/tmp/i300-known-roots-{pull,clippy,xwin}.log. This publishes known bound
+roots, not proof that all recursive checkout targets or external executable
+effects are covered. Both recursive execution and production activation guards
+remain. Simplified orchestration, local-source protected execution, selected
+integration programs, P1 accounting, independent review and native Windows
+acceptance remain open. No T7 completion or full-preflight claim is made for
+this newer implementation.

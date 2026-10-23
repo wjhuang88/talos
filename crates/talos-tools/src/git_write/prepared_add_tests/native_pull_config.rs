@@ -353,7 +353,7 @@ async fn native_pull_child_destinations_and_final_configuration_checks_are_bound
                 "missing-source" => "separate Read admission",
                 "missing-chain" => "discovery authority missing",
                 "missing-destination" => "destination differs",
-                "missing-startup" => "separate Read admission",
+                "missing-startup" => "scope capability missing",
                 "missing-legacy" | "legacy-drift" => "auxiliary path",
                 "legacy-created" => "inventory changed",
                 "hook-created" => "path resolution changed",
