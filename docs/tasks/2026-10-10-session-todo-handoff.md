@@ -5669,3 +5669,14 @@ Native child retained remote URLs now share the source/output allowance; the
 budget-exhaustion regression fails before the fix and native tests pass 20/20
 afterward. I300 owns logs and remaining accounting, effect, stage-budget and
 activation gates. T7 and the full T1–T8 handoff remain incomplete.
+
+Local-source transport evidence: a supervised native Pull executes a protected
+global uploadpack.packObjectsHook in the source gitdir; the fixture records its
+write and failed Pull with an unchanged destination worktree. Native Pull tests
+pass 21/21 (/private/tmp/i300-local-source-native-tests.log). I300 records the
+command-scope negative experiment and remaining source configuration/execution
+admission. This runner baseline does not authorize or activate production Pull.
+
+Native parent/child destination classification now shares one helper: local
+sources publish Read Path, network sources publish Network Remote. Native tests
+pass 22/22; source-side configuration/effects and activation remain incomplete.

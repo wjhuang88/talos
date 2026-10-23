@@ -7799,3 +7799,32 @@ formatting passes. Logs: /private/tmp/i300-remote-budget-{before,tests}.log.
 This accounts for retained URL payload only, not permission-facet copies or
 transient process buffers. Stage convergence, local-source/recursive effects,
 platform/review gates and production activation remain incomplete.
+
+Local-source native effect experiment (2026-10-23): a supervised real native
+Pull using a local source executes uploadpack.packObjectsHook from an isolated
+global configuration file. The fixture observes a source-gitdir marker and
+nonzero Pull exit while the destination worktree stays unchanged. The equivalent
+command-scope setting did not trigger the hook in the initial experiment; do not
+assume command-scope inheritance to upload-pack. Focused Unix baseline passes
+(/private/tmp/i300-local-upload-pack.log). This is runner-level evidence only,
+not admitted production local-source support or Windows acceptance. Local source
+Read alone cannot represent this external program/write effect; global source
+configuration and upload-pack effects must be represented before activation.
+Baseline validation: native Pull tests 21/21, Git-enabled tools lib/tests Clippy
+with -D warnings, and both governance validators pass (zero warnings). The
+baseline remains Unix-only and no fresh full-workspace pass is claimed for it.
+Source-admission convergence must cover both parent and children: currently
+native_pull_parent_facets emits Network for every destination, whereas child
+facets classify local paths. Reuse local_destination for consistent scope
+classification, then bind source layout/configuration and actual upload-pack
+effects before enabling local execution. Merely changing the facet type is not
+local-source delivery. The existing production and recursive-child guards stay.
+
+Parent/child source classification checkpoint (2026-10-23): both native scope
+builders now use native_pull_source_facet, retaining local_destination syntax
+validation. Parent relative local URLs produce Read Path rooted at its workdir;
+children retain their gitdir execution base. Network URLs remain Network Remote.
+A missing local-source fixture verifies classification succeeds without requiring
+source existence and publishes no Network facet. Native Pull tests pass 22/22
+(/private/tmp/i300-parent-source-tests.log). No source metadata/configuration
+authorization or production activation is implied by classification alone.

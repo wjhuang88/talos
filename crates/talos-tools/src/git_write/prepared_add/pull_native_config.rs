@@ -146,22 +146,7 @@ impl AddPlan {
                 GitToolError::InvalidInput("Native Pull child remote evidence missing".into())
             })?
             .destination;
-        let facet = if let Some(path) =
-            super::super::remote_state::local_destination(destination, gitdir)?
-        {
-            path_facet(
-                ToolNature::Read,
-                &path,
-                "native Pull child configured local source; source contents deferred",
-            )?
-        } else {
-            ToolPermissionFacet::with_resource(
-                ToolNature::Network,
-                destination.clone(),
-                ToolResourceKind::Remote,
-            )
-        };
-        Ok(vec![facet])
+        Ok(vec![Self::native_pull_source_facet(destination, gitdir)?])
     }
 
     // Called only after consuming the exact plan proof. All source grants are

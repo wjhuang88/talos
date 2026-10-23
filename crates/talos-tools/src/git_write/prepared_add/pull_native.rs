@@ -3,6 +3,27 @@
 use super::*;
 
 impl AddPlan {
+    pub(super) fn native_pull_source_facet(
+        destination: &str,
+        execution_dir: &Path,
+    ) -> Result<ToolPermissionFacet, GitToolError> {
+        if let Some(path) =
+            super::super::remote_state::local_destination(destination, execution_dir)?
+        {
+            path_facet(
+                ToolNature::Read,
+                &path,
+                "native Pull configured local source; source contents and effects deferred",
+            )
+        } else {
+            Ok(ToolPermissionFacet::with_resource(
+                ToolNature::Network,
+                destination,
+                ToolResourceKind::Remote,
+            ))
+        }
+    }
+
     // Shared by scope publication and execution checks. This describes only
     // the parent scope; recursive/external evidence is a separate prerequisite.
     pub(super) fn native_pull_parent_facets(
@@ -33,11 +54,10 @@ impl AddPlan {
             }
         }
         for destination in &self.pull_destinations {
-            facets.push(ToolPermissionFacet::with_resource(
-                ToolNature::Network,
+            facets.push(Self::native_pull_source_facet(
                 destination,
-                ToolResourceKind::Remote,
-            ));
+                &self.repository.workdir,
+            )?);
         }
         facets.push(ToolPermissionFacet::with_resource(
             ToolNature::Execute,
