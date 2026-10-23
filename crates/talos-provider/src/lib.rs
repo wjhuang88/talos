@@ -18,12 +18,21 @@ pub mod mock;
 pub mod openai;
 mod openai_request;
 mod openai_sse;
+mod openai_responses_bridge;
+mod openai_responses_client;
+pub mod openai_responses;
+mod openai_responses_reasoning;
+mod openai_responses_request;
+mod openai_responses_sse;
+mod openai_responses_transport;
 pub mod retry;
 mod stream_utf8;
 
 mod anthropic_request;
 mod anthropic_stream;
 mod browser_text_arguments;
+
+pub use openai_responses::OpenAIResponsesProvider;
 
 use std::time::Duration;
 
