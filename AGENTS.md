@@ -55,6 +55,11 @@ These are immutable facts that every change must respect:
   pushback without new evidence, over-specific weak-evidence claims, and post-hoc reasoning.
   When they appear, cut unsupported specifics, mark uncertainty, or say you do not know.
 - If you held a position for consistency rather than evidence, revise openly and state what changed.
+- **Implementation claims require implementation.** Comments, TODOs, design notes, explanations,
+  fallback promises and future plans do not implement a requirement. Anything not implemented now
+  remains unimplemented; report partial coverage and unavailable behavior explicitly. Do not mark
+  it delivered or close acceptance through wording. Complete the accepted scope, or obtain an
+  explicit scope decision and track the remaining work honestly.
 
 ### Think Before Coding
 
@@ -62,6 +67,12 @@ These are immutable facts that every change must respect:
 - If multiple interpretations exist, present them. Do not pick silently.
 - If a simpler approach exists, say so. Push back when warranted.
 - Classify constraints: Hard (immutable), Soft (negotiable), Assumption (unvalidated).
+- **Research before compounding uncertainty.** When repeated attempts fail, platform behavior is
+  unclear, or a design grows disproportionately complex, search upstream documentation, source,
+  issues and comparable implementations before adding more custom machinery. Prefer primary
+  sources; record relevant links, versions, applicable constraints and why the approach fits.
+  A similar issue is a lead, not proof of the same cause. Validate borrowed ideas with a minimal
+  reproduction or focused test, respect licensing, and never include secrets in search queries.
 
 ### Simplicity First
 
