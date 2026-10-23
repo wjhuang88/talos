@@ -20,6 +20,101 @@ fn read(tool: &str, workspace: &Path, target: &Path) -> ToolExecutionAuthorizati
 }
 
 #[test]
+fn native_pull_scope_captures_contained_content_without_exact_leaf_read() {
+    let workspace = tempfile::tempdir().expect("workspace");
+    let root = workspace.path().canonicalize().expect("root");
+    let anchor = root.join(".git");
+    let module = anchor.join("modules/child");
+    std::fs::create_dir_all(&module).expect("module");
+    let source = module.join("hook");
+    std::fs::write(&source, b"retained contents").expect("source");
+    let mut authority = vec![capability("git_pull"), read("git_pull", &root, &anchor)];
+    let mut paths =
+        AuxiliaryPaths::resolve("git_pull", &root, &anchor, [source.clone()], &authority)
+            .expect("metadata-only resolution");
+    let roots = [module];
+    let shared = super::super::pull_inventory::ReferenceBudget::default();
+    assert!(
+        paths
+            .capture_native_pull(&authority, &[], &shared, &roots)
+            .is_err()
+    );
+    authority.push(ToolExecutionAuthorization::for_git_pull_bounded_discovery(
+        ToolAuthorizationScope::Once,
+    ));
+    paths
+        .capture_native_pull(&authority, &[], &shared, &roots)
+        .expect("scoped content");
+    assert!(paths.leaf_evidence(&source).is_some());
+    paths
+        .revalidate_native_pull(&authority, &roots)
+        .expect("scoped revalidation");
+    assert!(
+        paths.revalidate(&authority).is_err(),
+        "ordinary validation remains exact"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn native_pull_scope_refuses_linked_auxiliary_content_without_target_read() {
+    use std::os::unix::fs::symlink;
+    let workspace = tempfile::tempdir().expect("workspace");
+    let outside = tempfile::tempdir().expect("outside");
+    let root = workspace.path().canonicalize().expect("root");
+    let anchor = root.join(".git");
+    let module = anchor.join("modules/child");
+    std::fs::create_dir_all(&module).expect("module");
+    let external = outside.path().canonicalize().expect("external");
+    std::fs::write(external.join("hook"), b"hook contents").expect("external hook");
+    std::fs::write(module.join("local-hook"), b"hook contents").expect("local hook");
+    symlink(&external, module.join("outside")).expect("external ancestor link");
+    symlink(&module, module.join("inside")).expect("same-root ancestor link");
+    let authority = vec![
+        capability("git_pull"),
+        read("git_pull", &root, &anchor),
+        ToolExecutionAuthorization::for_git_pull_bounded_discovery(ToolAuthorizationScope::Once),
+    ];
+    for (spelling, target) in [
+        (module.join("outside/hook"), external.join("hook")),
+        (module.join("inside/local-hook"), module.join("local-hook")),
+    ] {
+        let mut paths = AuxiliaryPaths::resolve("git_pull", &root, &anchor, [spelling], &authority)
+            .expect("metadata-only resolution");
+        let roots = [module.clone()];
+        assert!(!paths.native_pull_target_read(&target, &authority, &roots));
+        assert!(
+            paths
+                .capture_native_pull(
+                    &authority,
+                    &[],
+                    &super::super::pull_inventory::ReferenceBudget::default(),
+                    &roots,
+                )
+                .is_err()
+        );
+        assert!(paths.sources.iter().all(|source| source.leaf.is_none()));
+        let mut admitted = authority.clone();
+        admitted.extend(
+            paths
+                .related_paths()
+                .map(|path| read("git_pull", &root, path)),
+        );
+        paths
+            .capture_native_pull(
+                &admitted,
+                &[],
+                &super::super::pull_inventory::ReferenceBudget::default(),
+                &roots,
+            )
+            .expect("separate target read");
+        paths
+            .revalidate_native_pull(&admitted, &roots)
+            .expect("retained target");
+    }
+}
+
+#[test]
 fn resolution_requires_capability_before_traversal_and_target_read_before_content() {
     let workspace = tempfile::tempdir().expect("workspace");
     let root = workspace
@@ -251,12 +346,12 @@ fn native_pull_auxiliary_content_shares_budget_across_discovery_sources() {
         let mut paths =
             AuxiliaryPaths::resolve("git_pull", &root, &anchor, [source.clone()], &authority)
                 .expect("resolution");
-        let result = paths.capture_native_pull(&authority, &[], &shared.clone());
+        let result = paths.capture_native_pull(&authority, &[], &shared.clone(), &[]);
         assert_eq!(result.is_ok(), succeeds);
         assert_eq!(paths.leaf_evidence(&source).is_some(), succeeds);
         if succeeds {
             paths
-                .capture_native_pull(&authority, &[], &shared)
+                .capture_native_pull(&authority, &[], &shared, &[])
                 .expect("retained evidence is not recaptured");
         }
     }

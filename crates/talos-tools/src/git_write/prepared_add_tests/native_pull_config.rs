@@ -8,6 +8,7 @@ async fn native_pull_child_destinations_and_final_configuration_checks_are_bound
         "unchanged",
         "bounded-fixed",
         "bounded-config",
+        "bounded-hook",
         "include-drift",
         "missing-source",
         "missing-chain",
@@ -204,12 +205,13 @@ async fn native_pull_child_destinations_and_final_configuration_checks_are_bound
             for missing in [&hook] {
                 let mut incomplete = tokens.clone();
                 incomplete.retain(|token| {
-                    !token.authorizes_path(
-                        "git_pull",
-                        ToolNature::Read,
-                        &plan.workspace,
-                        missing.to_str().expect("path"),
-                    )
+                    !token.authorizes_git_pull_bounded_discovery()
+                        && !token.authorizes_path(
+                            "git_pull",
+                            ToolNature::Read,
+                            &plan.workspace,
+                            missing.to_str().expect("path"),
+                        )
                 });
                 plan.native_pull_configs.clear();
                 assert!(
@@ -238,9 +240,13 @@ async fn native_pull_child_destinations_and_final_configuration_checks_are_bound
                     .retain(|facet| facet.resource.as_deref() != source.to_str());
             }
             "hook-created" => std::fs::write(&hook, "new hook").expect("new hook"),
-            "missing-hook" => plan
+            "bounded-hook" => plan
                 .facets
                 .retain(|facet| facet.resource.as_deref() != hook.to_str()),
+            "missing-hook" => plan.facets.retain(|facet| {
+                facet.resource.as_deref() != hook.to_str()
+                    && facet.resource.as_deref() != Some("git:pull-bounded-discovery")
+            }),
             "missing-hook-frontier" => {
                 plan.native_pull_fetch_hooks.clear();
             }
@@ -282,7 +288,7 @@ async fn native_pull_child_destinations_and_final_configuration_checks_are_bound
         let tokens = proof(&plan)
             .consume_for_prepared(&plan.request(), &plan.identity)
             .expect("proof");
-        if scenario == "bounded-config" {
+        if matches!(scenario, "bounded-config" | "bounded-hook") {
             let mut exact_only = tokens.clone();
             exact_only.retain(|token| !token.authorizes_git_pull_bounded_discovery());
             plan.native_pull_configs.clear();
@@ -290,18 +296,24 @@ async fn native_pull_child_destinations_and_final_configuration_checks_are_bound
                 !plan
                     .discover_native_pull_configurations(&exact_only)
                     .await
-                    .expect("root Path Read alone cannot admit nested configuration")
+                    .expect("root Path Read alone cannot admit nested evidence")
             );
             plan.native_pull_configs.clear();
             assert!(
                 plan.discover_native_pull_configurations(&tokens)
                     .await
-                    .expect("bounded in-root configuration needs no continuation")
+                    .expect("bounded in-root evidence needs no continuation")
             );
         }
         if matches!(
             scenario,
-            "unchanged" | "bounded-fixed" | "bounded-config" | "local" | "legacy" | "branches"
+            "unchanged"
+                | "bounded-fixed"
+                | "bounded-config"
+                | "bounded-hook"
+                | "local"
+                | "legacy"
+                | "branches"
         ) {
             plan.validate_native_pull_configurations(&tokens)
                 .await

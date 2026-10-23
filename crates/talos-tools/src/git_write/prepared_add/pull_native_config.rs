@@ -4,6 +4,14 @@ use super::*;
 use std::collections::BTreeSet;
 
 impl AddPlan {
+    fn native_pull_auxiliary_roots(&self) -> Result<Vec<PathBuf>, GitToolError> {
+        let Some(modules) = &self.native_pull_modules else {
+            return Ok(Vec::new());
+        };
+        modules.revalidate()?;
+        Ok(modules.stored_module_roots().map(Path::to_owned).collect())
+    }
+
     // The named discovery authority permits Git's normal include-chain read,
     // not subsequent use of those files without their own exact Read proof.
     // Keep original evidence: a changed chain must never replace the approved one.
@@ -115,6 +123,7 @@ impl AddPlan {
         // published source and resolved auxiliary target. Otherwise return the
         // frontier without capturing unapproved auxiliary contents or executing Pull.
         let mut admitted = true;
+        let auxiliary_roots = self.native_pull_auxiliary_roots()?;
         if discovered {
             for config in self.native_pull_configs.values() {
                 for (path, _) in &config.files {
@@ -131,14 +140,15 @@ impl AddPlan {
             }
             if let Some(auxiliary) = &self.auxiliary_paths {
                 admitted &= auxiliary.targets().all(|path| {
-                    authorizations.iter().any(|token| {
-                        token.authorizes_path(
-                            "git_pull",
-                            ToolNature::Read,
-                            &self.workspace,
-                            path.to_str().unwrap_or_default(),
-                        )
-                    })
+                    auxiliary.native_pull_target_read(path, authorizations, &auxiliary_roots)
+                        || authorizations.iter().any(|token| {
+                            token.authorizes_path(
+                                "git_pull",
+                                ToolNature::Read,
+                                &self.workspace,
+                                path.to_str().unwrap_or_default(),
+                            )
+                        })
                 });
             }
         }
@@ -156,6 +166,7 @@ impl AddPlan {
                         .cloned()
                         .collect::<Vec<_>>(),
                     &self.pull_reference_budget,
+                    &auxiliary_roots,
                 )?;
         }
         Ok(admitted)
@@ -247,7 +258,8 @@ impl AddPlan {
             let auxiliary = self.auxiliary_paths.as_ref().ok_or_else(|| {
                 GitToolError::InvalidInput("Native Pull auxiliary evidence missing".into())
             })?;
-            auxiliary.revalidate(authorizations)?;
+            auxiliary
+                .revalidate_native_pull(authorizations, &self.native_pull_auxiliary_roots()?)?;
             for hook in &self.native_pull_fetch_hooks {
                 if auxiliary.leaf_evidence(hook).is_none() {
                     return Err(GitToolError::InvalidInput(
