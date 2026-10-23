@@ -2,6 +2,33 @@ use super::*;
 use talos_core::tool::ToolPermissionFacet;
 
 #[test]
+fn bounded_discovery_token_is_dedicated_and_never_a_path_grant() {
+    let root = std::env::current_dir().expect("workspace");
+    let engine = crate::PermissionEngine::with_workspace_root(root.clone());
+    let facet = ToolPermissionFacet::with_resource(
+        ToolNature::Read,
+        "git:pull-bounded-discovery",
+        ToolResourceKind::Remote,
+    );
+    for tool in ["git_pull", "git_push", "read_file"] {
+        let tokens = engine
+            .execution_authorizations(
+                tool,
+                std::slice::from_ref(&facet),
+                &serde_json::json!({}),
+                talos_core::tool::ToolAuthorizationScope::Once,
+            )
+            .expect("tokens");
+        assert_eq!(tokens.len(), usize::from(tool == "git_pull"));
+        if let Some(token) = tokens.first() {
+            assert!(token.authorizes_git_pull_bounded_discovery());
+            assert!(!token.authorizes_path("git_pull", ToolNature::Read, &root, "."));
+            assert!(!token.authorizes_git_auxiliary_path_resolution("git_pull"));
+        }
+    }
+}
+
+#[test]
 fn bounded_pull_discovery_is_closed_and_requires_read_root_and_command() {
     let root = std::env::current_dir().expect("workspace");
     let input = serde_json::json!({"remote": "origin"});

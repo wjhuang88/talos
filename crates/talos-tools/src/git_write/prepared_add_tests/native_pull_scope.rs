@@ -536,7 +536,7 @@ async fn native_pull_scope_uses_linked_worktree_private_modules() {
 
 #[tokio::test]
 async fn native_pull_module_names_are_batched_only_under_dedicated_scope() {
-    for bounded in [false, true] {
+    for (bounded, retain_token) in [(false, true), (true, false), (true, true)] {
         let root = tempfile::tempdir().expect("fixture");
         git(root.path(), &["init", "-b", "main"]);
         git(root.path(), &["config", "core.hooksPath", ""]);
@@ -560,16 +560,19 @@ async fn native_pull_module_names_are_batched_only_under_dedicated_scope() {
                 .retain(|facet| facet.resource.as_deref() != Some("git:pull-bounded-discovery"));
         }
         for _ in 0..8 {
-            let tokens = proof(&plan)
+            let mut tokens = proof(&plan)
                 .consume_for_prepared(&plan.request(), &plan.identity)
                 .expect("admission");
+            if !retain_token {
+                tokens.retain(|token| !token.authorizes_git_pull_bounded_discovery());
+            }
             plan = plan
                 .discover_native_pull_scope(&tokens)
                 .await
                 .expect("scope");
             if let Some(modules) = &plan.native_pull_modules {
-                assert_eq!(modules.complete(), bounded);
-                if bounded {
+                assert_eq!(modules.complete(), bounded && retain_token);
+                if bounded && retain_token {
                     assert_eq!(modules.stored_module_roots().count(), 1);
                     // Enumeration authority does not bypass the still-exact
                     // content frontier during this orchestration migration.

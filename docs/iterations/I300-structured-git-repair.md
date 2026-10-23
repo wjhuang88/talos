@@ -8002,3 +8002,24 @@ CARGO_PROFILE_DEV_DEBUG=0 and CARGO_PROFILE_TEST_DEBUG=0 to reduce rebuild stora
 no test, feature or locked dependency gate is removed. Retry log:
 /private/tmp/i300-bounded-modules-preflight-compact.log. Check its live process
 and terminal result on resume before restarting or claiming validation.
+
+Dedicated discovery token checkpoint (2026-10-23): permission admission now
+mints a `git_pull`-only bounded-discovery execution token. Native module-name
+traversal requires that token in addition to the consumed immutable profile,
+exact gitdir Read and retained root identity. Removing only the token stops
+traversal; it grants neither generic Path Read nor auxiliary resolution.
+Native Pull regressions pass 24/24; log:
+/private/tmp/i300-bounded-discovery-token-suite.log.
+
+The earlier compact preflight was invalidated by editing source during its
+build (new permission code observed an older core artifact). Subsequent fixed
+source validation first hit sandbox EPERM in process observation; an authorized
+unsandboxed run then hit six Agent session timeouts. The isolated session group
+passed 37/37. A fresh complete unsandboxed standard preflight subsequently exited
+0, including workspace tests and both external Runtime SDK fixture modes:
+/private/tmp/i300-bounded-discovery-token-preflight-unsandboxed.log. No timeout
+was increased and no test was skipped. This does not establish the timeout
+root cause or replace independent security/Windows review. Keep source fixed
+through the terminal result of future preflights. Bounded content discovery,
+complete recursive effects and production activation remain open; T7 is not
+complete.

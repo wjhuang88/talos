@@ -18,14 +18,17 @@ impl AddPlan {
             facet.nature == ToolNature::Read
                 && facet.resource_kind == Some(ToolResourceKind::Remote)
                 && facet.resource.as_deref() == Some("git:pull-bounded-discovery")
-        }) && authorizations.iter().any(|token| {
-            token.authorizes_path(
-                "git_pull",
-                ToolNature::Read,
-                &self.workspace,
-                self.repository.git_dir.to_str().unwrap_or_default(),
-            )
-        });
+        }) && authorizations
+            .iter()
+            .any(|token| token.authorizes_git_pull_bounded_discovery())
+            && authorizations.iter().any(|token| {
+                token.authorizes_path(
+                    "git_pull",
+                    ToolNature::Read,
+                    &self.workspace,
+                    self.repository.git_dir.to_str().unwrap_or_default(),
+                )
+            });
         if !self.facets.iter().any(|facet| {
             facet.nature == ToolNature::Read
                 && facet.resource_kind == Some(ToolResourceKind::Remote)
