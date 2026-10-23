@@ -30,8 +30,16 @@ repository mutation plan. Configuration values remain internal. Unsupported
 filters/hooks/fsmonitor and object-alternate/split-index layouts refuse with an
 explicit separately authorized fallback; there is no silent helper bypass.
 Ordinary custom Git installations require support for the fixed attribute-path
-queries. Remaining write tools and production cancellation/shutdown ownership are
-still open; see the [migration inventory](../../reference/I300-GIT-AUTHORIZATION-MIGRATION.md).
+queries. The unpublished candidate also implements prepared Commit,
+nonrecursive Checkout, limited Push and native Pull. Pull retains separate
+configuration discovery, followed by one whole-command authorization; dedicated
+Auto review can approve the final command, while explicit Deny and human-only
+policies remain authoritative. This grants transitive command effects rather
+than per-path/endpoint confinement, and failures may leave partial effects.
+Unix process-group and Windows Job supervision are connected; affected MSVC
+test targets cross-compile with cargo xwin. Native Windows execution, exact-head
+CI and the complete acceptance mapping remain open; see the
+[migration inventory](../../reference/I300-GIT-AUTHORIZATION-MIGRATION.md).
 
 Local diff repairs compare HEAD/index for staged changes and index/worktree for
 unstaged changes, preserve additions/deletions/binary/mode/symlink distinctions,

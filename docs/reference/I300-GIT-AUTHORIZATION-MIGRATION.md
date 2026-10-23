@@ -18,6 +18,26 @@ prepared authorization remain refused. Final security acceptance is open. T7 is
 Active, not delivered or complete.
 Earlier checkpoints below are historical and do not override this boundary.
 
+## Native Pull acceptance evidence — 2026-10-24
+
+This maps the current candidate, not completed acceptance. Local test results
+do not establish native Windows execution or live-model assessment quality.
+
+| Requirement | Implemented evidence | Remaining validation / coverage |
+| --- | --- | --- |
+| Real Auto allow, explicit Deny, human-only, assessor failure | `crates/talos-runtime/tests/i300_native_pull.rs` runs all four through Runtime, Agent and supervised Git, checking repository effects and review/approval counts | Native Windows and exact-head CI |
+| MCP production admission and effects | `crates/talos-mcp/tests/git_pull_prepared.rs` checks real fetch, Deny without fetch and duplicate request-ID refusal | Request-ID refusal is not proof replay; full failure matrix is not established at MCP |
+| Missing/stale/incomplete authority and frozen invocation | Tools `prepared_add_tests/native_pull.rs` and `prepared_add_tests/pull_command.rs` reject missing proof, plan/facet mismatch and argv/environment/cwd/program substitution before fetch | These Tools checks do not establish every cross-entry stale/replay case |
+| Configuration drift, configured hook, conflict partial effects | Tools `prepared_add_tests/pull_command.rs` checks drift refusal, approved hook execution, cancellation and retained conflict state | Unix hook cancellation does not prove Windows descendant cleanup |
+| Initialized/deinitialized recursive Pull | Tools `prepared_add_tests/native_pull_recursion.rs` exercises the command-authority path | Helper runner baselines alone do not establish prepared authorization; cross-entry recursive/helper coverage remains open |
+| One-use admission and conservative fallback | Agent prepared-command and permission-session tests cover exact-plan binding, admission consumption and legacy Auto downgrade | Synthetic assessor scenarios do not substitute for actual Git effects |
+| Windows production execution | Production gate removed; affected MSVC test targets compile using cargo xwin and CI includes production Add/Pull tests | Native Windows run, including existing Push daemon regression, remains required |
+
+The original same-family Add/Commit/Checkout/Push, two-file index-preservation,
+diff fidelity, cancellation, documentation and final review/merge requirements
+remain in the I300 owner. This table neither closes them nor waives missing
+cross-entry failure coverage.
+
 Checkout new gitlink update (2026-10-15; unpublished): existing ordinary
 empty directories, and on Unix bounded nonempty directories without Git metadata
 names or protected HFS/NTFS aliases, can become uninitialized gitlinks. A separate

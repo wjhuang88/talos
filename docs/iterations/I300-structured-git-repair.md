@@ -1,3 +1,15 @@
+## Post-rebase candidate checkpoint — 2026-10-24
+
+Implementation head `1c6e040f9` is rebased onto origin/main `d5e0d0627`.
+The post-rebase standard locked preflight passes (exit 0;
+`/private/tmp/i300-native-postrebase-preflight.log`), including workspace tests,
+Clippy and external SDK fixtures. Chinese README and GIT-001 now describe the
+actual unpublished production Pull/Windows candidate rather than removed gates.
+The migration inventory maps real execution, synthetic and runner-only evidence
+and explicitly lists cross-entry failure-coverage gaps. Native Windows,
+exact-head remote CI, full acceptance and final independent merge approval
+remain open. T7 is Active; all T1–T8 requirements remain unchanged.
+
 ## Candidate validation — 2026-10-24
 
 The frozen candidate's standard locked release preflight passed (exit 0,
