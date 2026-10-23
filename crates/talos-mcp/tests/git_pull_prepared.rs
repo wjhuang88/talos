@@ -22,13 +22,15 @@ fn git(root: &Path, args: &[&str]) -> Vec<u8> {
 #[tokio::test]
 async fn native_pull_mcp_command_allows_real_fetch_and_denies_or_rejects_replay() {
     tokio::time::timeout(Duration::from_secs(30), async {
-        for denied in [true, false] {
+        for (denied, conflict) in [(true, false), (false, false), (false, true)] {
             let root = tempfile::tempdir().expect("workspace");
             git(root.path(), &["init", "-b", "main"]);
             for (key, value) in [
                 ("user.name", "Fixture"),
                 ("user.email", "fixture@example.invalid"),
                 ("commit.gpgSign", "false"),
+                ("core.autocrlf", "false"),
+                ("pull.rebase", "false"),
                 ("remote.origin.url", "."),
                 ("remote.origin.fetch", "+refs/heads/*:refs/remotes/origin/*"),
                 ("branch.main.remote", "origin"),
@@ -37,6 +39,21 @@ async fn native_pull_mcp_command_allows_real_fetch_and_denies_or_rejects_replay(
                 git(root.path(), &["config", key, value]);
             }
             git(root.path(), &["commit", "--allow-empty", "-m", "base"]);
+            if conflict {
+                std::fs::write(root.path().join("shared.txt"), "base\n").expect("base file");
+                git(root.path(), &["add", "shared.txt"]);
+                git(root.path(), &["commit", "-m", "shared base"]);
+                git(root.path(), &["checkout", "-b", "upstream"]);
+                std::fs::write(root.path().join("shared.txt"), "upstream\n").expect("upstream");
+                git(root.path(), &["commit", "-am", "upstream change"]);
+                git(root.path(), &["checkout", "main"]);
+                std::fs::write(root.path().join("shared.txt"), "local\n").expect("local");
+                git(root.path(), &["commit", "-am", "local change"]);
+                git(
+                    root.path(),
+                    &["config", "branch.main.merge", "refs/heads/upstream"],
+                );
+            }
             let head = git(root.path(), &["rev-parse", "HEAD"]);
             let config = std::fs::read(root.path().join(".git/config")).expect("config");
             let mut engine = PermissionEngine::empty();
@@ -139,6 +156,21 @@ async fn native_pull_mcp_command_allows_real_fetch_and_denies_or_rejects_replay(
                             .contains("permission denied"),
                         "{response}"
                     );
+                } else if conflict {
+                    assert_eq!(response["result"]["isError"], true, "{response}");
+                    let upstream = git(root.path(), &["rev-parse", "upstream"]);
+                    let fetched = std::fs::read_to_string(root.path().join(".git/FETCH_HEAD"))
+                        .expect("failed integration retains fetch effects");
+                    assert!(fetched.contains(std::str::from_utf8(&upstream).expect("OID").trim()));
+                    assert_eq!(
+                        std::fs::read(root.path().join(".git/MERGE_HEAD")).expect("merge state"),
+                        upstream
+                    );
+                    let unmerged = git(root.path(), &["ls-files", "--unmerged"]);
+                    assert!(!unmerged.is_empty(), "conflict index must remain");
+                    let content = std::fs::read_to_string(root.path().join("shared.txt"))
+                        .expect("conflicted worktree");
+                    assert!(content.contains("<<<<<<<") && content.contains(">>>>>>>"));
                 } else {
                     assert_eq!(response["result"]["isError"], false, "{response}");
                     let fetched = std::fs::read_to_string(root.path().join(".git/FETCH_HEAD"))
