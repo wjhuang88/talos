@@ -5693,3 +5693,21 @@ ignored source-local hook configuration. Full standard preflight retry passes
 run hung in a checkout test and was terminated; isolated checkout and the full
 536-test Git suite pass, and the hang cause remains unproven. I300 owns the
 recurrence evidence. No production Pull or Windows runtime completion is claimed.
+
+Maintainer-directed convergence: use bounded discovery followed by one complete
+native Pull execution approval, not per-directory approval as the normal flow.
+ADR-089 records the accepted direction and a concrete expanded discovery-read
+scope awaiting acceptance; the earlier identity-only inventory proposal is
+superseded only if that scope is accepted. Implementation order is permission
+compilation/bound root evidence, internal in-scope discovery traversal, then
+one immutable execution plan; out-of-scope resources remain fresh continuations.
+Acceptance must exercise real PreparedStageHistory and native execution, not
+only a manual discovery loop or reduced phase count. Existing local layout
+retention correction and its single-marker-publication regression pass native
+tests 22/22 and both governance validators. Logs:
+/private/tmp/i300-layout-final-tests.log and
+/private/tmp/i300-simplified-discovery-{governance,claims}.log.
+The new discovery capability and production Pull remain unenabled.
+Full standard preflight subsequently exits 0 with `release preflight: passed`
+(/private/tmp/i300-layout-retention-preflight.log); this is checkpoint evidence,
+not acceptance of the proposed capability or completion of T7.
