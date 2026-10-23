@@ -633,6 +633,11 @@ impl AddPlan {
             if matches!(operation, Operation::Pull(_)) {
                 facets.push(ToolPermissionFacet::with_resource(
                     ToolNature::Read,
+                    "git:pull-bounded-discovery",
+                    ToolResourceKind::Remote,
+                ).with_description("bounded native Pull discovery within displayed repository roots; 4096 entries / 4 MiB shared; no writes, hooks or network"));
+                facets.push(ToolPermissionFacet::with_resource(
+                    ToolNature::Read,
                     "git:pull-repository-metadata",
                     ToolResourceKind::Remote,
                 ));

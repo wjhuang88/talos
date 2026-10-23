@@ -5727,3 +5727,11 @@ coverage. Next: bind identities/fixed inspection commands/shared budgets in the
 prepared consumer and replace per-directory continuations with internal in-scope
 traversal, then verify discovery/execution history. This acceptance does not
 activate production Native Pull or close T7; I300 retains all remaining gates.
+
+Bounded module-name traversal now consumes the accepted dedicated scope and
+advances internal directory frontiers without new approvals; the exact-only
+negative fixture still stops. Native Pull tests pass 24/24. The existing real
+stage-history case now reaches the incomplete-recursion gate instead of the
+stage limit, with no Pull started. I300 owns evidence and remaining work: replace
+fixed-content continuations, finish complete execution effects, validate and
+review before production activation. T7 and the full handoff remain incomplete.
