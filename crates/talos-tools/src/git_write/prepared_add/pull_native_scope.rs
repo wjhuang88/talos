@@ -17,7 +17,7 @@ impl AddPlan {
     // Only fixed layout/configuration leaves of retained stored-module roots.
     // This is not a general descendant-read predicate. Inventory revalidates
     // every retained ancestor and refuses linked directory entries.
-    fn native_pull_module_read(
+    pub(super) fn native_pull_module_read(
         &self,
         path: &Path,
         authorizations: &[talos_core::tool::ToolExecutionAuthorization],

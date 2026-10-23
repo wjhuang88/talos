@@ -5760,3 +5760,10 @@ with a regression removing the child fixed-file facets. Native Pull 24/24 and
 Git-enabled Clippy pass; external/include/hook/destination checks remain. Next
 is still merging the remaining discovery frontiers and completing recursive
 execution effects. T7 and the whole handoff remain active.
+
+Child configuration capture now proceeds without a redundant continuation when
+the existing proof already covers all sources and resolved auxiliary targets.
+Missing source/hook-target tokens still yield a frontier; positive and negative
+regressions pass within Native Pull 24/24, with Git-enabled Clippy clean. I300
+records logs. This is a conditional phase reduction, not completion of the
+single-discovery flow, production activation, T7 or the full handoff.
