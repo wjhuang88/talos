@@ -8023,3 +8023,20 @@ root cause or replace independent security/Windows review. Keep source fixed
 through the terminal result of future preflights. Bounded content discovery,
 complete recursive effects and production activation remain open; T7 is not
 complete.
+
+Bounded fixed-content checkpoint (2026-10-23): native Pull stored-module
+layout capture now charges missing pointers, retained bytes and capture-time
+comparison reads to the invocation reference budget, preserving the 16 KiB
+per-pointer ceiling. Dedicated discovery may admit only the fixed
+HEAD/commondir/gitdir/config/config.worktree leaves and root of an inventoried
+stored module under the approved parent gitdir; inventory identities are
+revalidated before use. Ordinary receiver capture remains unchanged. External
+common/worktree targets still require their own admission. Tests live in
+receiver_pull_budget_tests.rs rather than extending the inline test module.
+The admission regression removes all descendant Path tokens and verifies layout
+and startup capture still succeed after configuration-chain admission.
+Pull-filtered tests pass 186/186 and Git-enabled lib/tests Clippy passes with
+warnings denied (/private/tmp/i300-pull-content-{suite,clippy}.log). This checkpoint
+does not claim a fresh workspace preflight, Windows runtime or security review.
+Config-chain origins, hooks and remotes still have continuation frontiers;
+complete child execution effects and production activation remain outstanding.

@@ -292,13 +292,39 @@ impl SiblingTargets {
 
 impl Pointer {
     fn capture(path: &Path) -> Result<Self, GitToolError> {
+        Self::capture_with_budget(path, None)
+    }
+
+    fn capture_with_budget(
+        path: &Path,
+        budget: Option<&super::pull_inventory::ReferenceBudget>,
+    ) -> Result<Self, GitToolError> {
         let metadata = match std::fs::symlink_metadata(path) {
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Self::Missing),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                if let Some(budget) = budget
+                    && budget.capture(path)?.entry != snapshot::Entry::Missing
+                {
+                    return Err(invalid());
+                }
+                return Ok(Self::Missing);
+            }
             Ok(metadata) if metadata.is_file() => metadata,
             _ => return Err(invalid()),
         };
         let identity = LeafIdentity::from_metadata(&metadata);
-        let entry = capture_pointer(path)?;
+        let entry = if let Some(budget) = budget {
+            budget
+                .capture_with_budget(
+                    path,
+                    &mut snapshot::Budget {
+                        entries: 1,
+                        bytes: 16 * 1024,
+                    },
+                )?
+                .entry
+        } else {
+            capture_pointer(path)?
+        };
         let after = std::fs::symlink_metadata(path).map_err(|_| invalid())?;
         if !after.is_file() || LeafIdentity::from_metadata(&after) != identity {
             return Err(invalid());
@@ -344,14 +370,22 @@ impl Metadata {
     }
 
     pub(super) fn capture(spelling: &Path, admitted: &Path) -> Result<Self, GitToolError> {
+        Self::capture_with_budget(spelling, admitted, None)
+    }
+
+    pub(super) fn capture_with_budget(
+        spelling: &Path,
+        admitted: &Path,
+        budget: Option<&super::pull_inventory::ReferenceBudget>,
+    ) -> Result<Self, GitToolError> {
         let canonical = spelling.canonicalize().map_err(|_| invalid())?;
         if canonical != admitted || !canonical.is_dir() {
             return Err(invalid());
         }
         let identity = snapshot::PathIdentity::capture(spelling).map_err(|_| invalid())?;
-        let common_pointer = Pointer::capture(&canonical.join("commondir"))?;
-        let worktree_pointer = Pointer::capture(&canonical.join("gitdir"))?;
-        let head = Pointer::capture(&canonical.join("HEAD"))?;
+        let common_pointer = Pointer::capture_with_budget(&canonical.join("commondir"), budget)?;
+        let worktree_pointer = Pointer::capture_with_budget(&canonical.join("gitdir"), budget)?;
+        let head = Pointer::capture_with_budget(&canonical.join("HEAD"), budget)?;
         if let Pointer::File(_, snapshot::Entry::File(_, bytes)) = &head {
             validate_symbolic_target(bytes)?;
         }
@@ -361,9 +395,9 @@ impl Metadata {
         let worktree_marker = worktree_pointer.target(&canonical)?;
         if spelling.canonicalize().map_err(|_| invalid())? != canonical
             || snapshot::PathIdentity::capture(spelling).map_err(|_| invalid())? != identity
-            || Pointer::capture(&canonical.join("commondir"))? != common_pointer
-            || Pointer::capture(&canonical.join("gitdir"))? != worktree_pointer
-            || Pointer::capture(&canonical.join("HEAD"))? != head
+            || Pointer::capture_with_budget(&canonical.join("commondir"), budget)? != common_pointer
+            || Pointer::capture_with_budget(&canonical.join("gitdir"), budget)? != worktree_pointer
+            || Pointer::capture_with_budget(&canonical.join("HEAD"), budget)? != head
         {
             return Err(invalid());
         }
@@ -919,6 +953,10 @@ fn pointer_target(base: &Path, bytes: &[u8]) -> Result<PathBuf, GitToolError> {
     super::remote_state::validate_local_path_syntax(Path::new(text))?;
     Ok(base.join(text))
 }
+
+#[cfg(test)]
+#[path = "receiver_pull_budget_tests.rs"]
+mod pull_budget_tests;
 
 #[cfg(test)]
 mod tests {
