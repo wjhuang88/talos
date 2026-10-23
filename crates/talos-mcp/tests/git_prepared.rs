@@ -169,7 +169,7 @@ async fn real_checkout_transport_denial_success_and_replay() {
                 } else if allowed {
                     assert!(response.get("result").is_some() && response["result"]["isError"] != true, "kind={kind}, initialized={initialized}: {response}");
                 } else {
-                    assert!(response["error"]["message"].as_str().expect("denial").contains("permission denied"), "{response}");
+                    assert!(response["error"]["message"].as_str().is_some_and(|message| message.contains("permission denied")), "kind={kind}, initialized={initialized}, nonempty={nonempty}: {response}");
                 }
                 let expected = if succeeds { target_branch } else if reverse { "target" } else { "base" };
                 assert_eq!(git(&["branch", "--show-current"]), format!("{expected}\n").as_bytes());
