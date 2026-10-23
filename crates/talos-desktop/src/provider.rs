@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use talos_config::{Config, ProviderProtocol};
+use talos_config::Config;
 #[cfg(any(debug_assertions, test))]
 use talos_core::message::{AgentEvent, Message};
 #[cfg(any(debug_assertions, test))]
@@ -109,50 +109,12 @@ pub(crate) fn configured_provider(config: &Config) -> Result<Arc<dyn LanguageMod
         return Err("provider setup is incomplete; configure a provider and model first".into());
     }
     let api_key = config.api_key().map_err(|error| error.to_string())?;
-    let provider_config = config.active_provider_config();
-    let model_config = provider_config.models.get(&config.model).cloned();
-    let context_limit = config.resolve_model_limits().0;
-    let output_limit = Some(
-        config
-            .output_limit()
-            .unwrap_or_else(|| (context_limit / 4).clamp(4096, 32_768).min(context_limit)),
-    );
-
-    match config.provider_protocol() {
-        ProviderProtocol::AnthropicMessages => {
-            let mut provider = talos_provider::AnthropicProvider::new(api_key, &config.model);
-            if let Some(base_url) = config.base_url() {
-                provider = provider.with_base_url(base_url);
-            }
-            provider = provider.with_reasoning(
-                model_config
-                    .as_ref()
-                    .and_then(|model| model.reasoning.clone()),
-                output_limit,
-            );
-            provider = provider.with_timeout_config(provider_config.timeout);
-            Ok(maybe_inject_provider(Arc::new(provider)))
-        }
-        ProviderProtocol::OpenAIChat => {
-            let mut provider = talos_provider::openai::OpenAIProvider::new(api_key, &config.model);
-            if let Some(base_url) = config.base_url() {
-                provider = provider.with_base_url(base_url);
-            }
-            provider = provider.with_reasoning(
-                model_config
-                    .as_ref()
-                    .and_then(|model| model.reasoning.clone()),
-                output_limit,
-            );
-            provider = provider.with_timeout_config(provider_config.timeout);
-            Ok(maybe_inject_provider(Arc::new(provider)))
-        }
-        ProviderProtocol::OpenAIResponses => Err(
-            "openai-responses protocol is staged but not yet wired into the Desktop provider factory"
-                .into(),
-        ),
-        _ => Err("unsupported provider protocol in this Talos build".into()),
-    }
+    let provider = talos_provider::openai_responses::factory::build_configured_provider(
+        &config,
+        &api_key,
+    )
+    .map_err(|error| error.to_string())?;
+    Ok(maybe_inject_provider(provider))
 }
 
 #[cfg(test)]
@@ -175,6 +137,7 @@ mod tests {
         assert_eq!(
             preview
                 .pointer("/body/reasoning_effort")
+                .or_else(|| preview.pointer("/body/reasoning/effort"))
                 .and_then(|v| v.as_str()),
             Some("high")
         );
