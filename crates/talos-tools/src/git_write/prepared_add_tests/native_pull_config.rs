@@ -7,6 +7,7 @@ async fn native_pull_child_destinations_and_final_configuration_checks_are_bound
     for scenario in [
         "unchanged",
         "bounded-fixed",
+        "bounded-config",
         "include-drift",
         "missing-source",
         "missing-chain",
@@ -48,8 +49,23 @@ async fn native_pull_child_destinations_and_final_configuration_checks_are_bound
             &module,
             &["config", "core.worktree", startup.to_str().expect("path")],
         );
-        git(&module, &["config", "include.path", "included-config"]);
-        let source = module.join("included-config");
+        let external = tempfile::tempdir().expect("external configuration");
+        let source = if scenario == "missing-source" {
+            external
+                .path()
+                .canonicalize()
+                .expect("external root")
+                .join("included-config")
+        } else if scenario == "bounded-config" {
+            std::fs::create_dir(module.join("configuration")).expect("configuration directory");
+            module.join("configuration/included-config")
+        } else {
+            module.join("included-config")
+        };
+        git(
+            &module,
+            &["config", "include.path", source.to_str().expect("source")],
+        );
         let destination = if scenario == "local" {
             "../source.git"
         } else {
@@ -185,7 +201,7 @@ async fn native_pull_child_destinations_and_final_configuration_checks_are_bound
                     .await
                     .expect("already admitted sources need no continuation")
             );
-            for missing in [&source, &hook] {
+            for missing in [&hook] {
                 let mut incomplete = tokens.clone();
                 incomplete.retain(|token| {
                     !token.authorizes_path(
@@ -217,6 +233,10 @@ async fn native_pull_child_destinations_and_final_configuration_checks_are_bound
                         .iter()
                         .any(|leaf| path == module.join(leaf).to_str())
             }),
+            "bounded-config" => {
+                plan.facets
+                    .retain(|facet| facet.resource.as_deref() != source.to_str());
+            }
             "hook-created" => std::fs::write(&hook, "new hook").expect("new hook"),
             "missing-hook" => plan
                 .facets
@@ -262,9 +282,26 @@ async fn native_pull_child_destinations_and_final_configuration_checks_are_bound
         let tokens = proof(&plan)
             .consume_for_prepared(&plan.request(), &plan.identity)
             .expect("proof");
+        if scenario == "bounded-config" {
+            let mut exact_only = tokens.clone();
+            exact_only.retain(|token| !token.authorizes_git_pull_bounded_discovery());
+            plan.native_pull_configs.clear();
+            assert!(
+                !plan
+                    .discover_native_pull_configurations(&exact_only)
+                    .await
+                    .expect("root Path Read alone cannot admit nested configuration")
+            );
+            plan.native_pull_configs.clear();
+            assert!(
+                plan.discover_native_pull_configurations(&tokens)
+                    .await
+                    .expect("bounded in-root configuration needs no continuation")
+            );
+        }
         if matches!(
             scenario,
-            "unchanged" | "bounded-fixed" | "local" | "legacy" | "branches"
+            "unchanged" | "bounded-fixed" | "bounded-config" | "local" | "legacy" | "branches"
         ) {
             plan.validate_native_pull_configurations(&tokens)
                 .await
@@ -313,13 +350,21 @@ async fn native_pull_child_configuration_requires_source_admission_and_rejects_d
             .join(".git/modules/child");
         std::fs::create_dir_all(&module).expect("module");
         git(&module, &["init", "--bare"]);
-        let source = module.join("included-config");
+        let external = tempfile::tempdir().expect("external include");
+        let source = external
+            .path()
+            .canonicalize()
+            .expect("external root")
+            .join("included-config");
         std::fs::write(
             &source,
             "[remote \"origin\"]\nurl = git://example.invalid/child\n",
         )
         .expect("include source");
-        git(&module, &["config", "include.path", "included-config"]);
+        git(
+            &module,
+            &["config", "include.path", source.to_str().expect("source")],
+        );
         let mut plan = Box::new(
             prepare_pull_fixture(root.path(), &serde_json::json!({}), ToolProvenance::Native)
                 .expect("plan"),

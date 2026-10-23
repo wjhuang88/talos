@@ -5774,3 +5774,11 @@ before capture/probe. Native Pull 24/24 and Git-enabled Clippy pass, with
 formatting clean. I300 owns logs and remaining scoped discovery, recursive
 effects and production/platform gates. Fetch found no new origin/main commits.
 T7 and the original handoff remain incomplete.
+
+Retained nonredirected child configuration origins inside inventoried module
+roots now reuse bounded discovery instead of exact per-source approval. Nested
+include, missing capability, external denial, drift and linked-ancestor checks
+cover the boundary. Pull tests pass 186/186, separate ancestor regression 1/1
+and Git-enabled Clippy passes. I300 owns evidence and residuals; hook/remote
+consolidation, recursive effects, production and platform gates remain open.
+T7 and all remaining original handoff exits remain incomplete.

@@ -8076,3 +8076,29 @@ validation retained the same locked tests. Fetch succeeded; origin/main has no
 commits absent from this branch. Remaining work is unchanged: scoped content
 discovery consolidation, complete recursive effects, production routing and
 security/platform acceptance. No T7 completion or activation is claimed.
+
+Contained configuration discovery checkpoint (2026-10-23): retained child
+configuration origins under an inventoried stored-module root may reuse the
+dedicated bounded discovery token when their captured canonical identity equals
+the original absolute spelling. This predicate inspects retained evidence only,
+not arbitrary descendant paths. Existing inventory/configuration revalidation
+remains mandatory. Outside origins, redirected ancestors and uncaptured files
+do not gain this authority; ordinary Path Read remains exact. Newly captured
+root-contained includes can therefore proceed without a per-source continuation.
+Tests cover nested configuration without its exact token, removal of only the
+named discovery token, external-source denial, include drift and a Unix linked
+ancestor negative. Existing missing-source fixtures now use external includes
+because in-root sources intentionally fall under the accepted scope. Native
+Pull passes 24/24, Pull selection 186/186, linked-ancestor test 1/1, and Git-enabled
+lib/tests Clippy passes with warnings denied. Logs:
+/private/tmp/i300-contained-config-{tests,pull,redirect,clippy}.log.
+Hook/legacy-remote scoped evidence, complete recursive effects, production
+routing, independent security review and platform gates remain open. This is
+not a full workspace preflight or T7 completion.
+
+The same stage also passes locked MSVC Git-enabled test-target checking with
+`cargo xwin check --locked -p talos-tools --features git --tests --target
+x86_64-pc-windows-msvc` (seven existing reduced-feature warnings). The first
+attempt hit sandbox cache-write EPERM; the authorized retry exited 0. Log:
+/private/tmp/i300-contained-config-xwin.log. This is compilation only, not native
+Windows runtime acceptance. Both governance validators pass with zero warnings.
