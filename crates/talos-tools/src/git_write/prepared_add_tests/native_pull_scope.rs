@@ -574,9 +574,24 @@ async fn native_pull_module_names_are_batched_only_under_dedicated_scope() {
                 assert_eq!(modules.complete(), bounded && retain_token);
                 if bounded && retain_token {
                     assert_eq!(modules.stored_module_roots().count(), 1);
-                    // Enumeration authority does not bypass the still-exact
-                    // content frontier during this orchestration migration.
+                    // The configuration-chain capability is a separate grant.
                     assert!(plan.native_pull_metadata.is_empty());
+                    let mut tokens = proof(&plan)
+                        .consume_for_prepared(&plan.request(), &plan.identity)
+                        .expect("chain admission");
+                    let module_namespace = root
+                        .path()
+                        .canonicalize()
+                        .expect("root")
+                        .join(".git/modules");
+                    tokens.retain(|token| !token.normalized_path().starts_with(&module_namespace));
+                    plan = plan
+                        .discover_native_pull_scope(&tokens)
+                        .await
+                        .expect("bounded content");
+                    let module = module.canonicalize().expect("module");
+                    assert!(plan.native_pull_metadata.contains_key(&module));
+                    assert!(plan.pull_child_startup.contains_key(&module));
                 }
                 assert!(!root.path().join(".git/FETCH_HEAD").exists());
                 break;

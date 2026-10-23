@@ -3,6 +3,44 @@
 use super::*;
 
 impl AddPlan {
+    // Only fixed layout/configuration leaves of retained stored-module roots.
+    // This is not a general descendant-read predicate. Inventory revalidates
+    // every retained ancestor and refuses linked directory entries.
+    fn native_pull_module_read(
+        &self,
+        path: &Path,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<bool, GitToolError> {
+        if !authorizations
+            .iter()
+            .any(|token| token.authorizes_git_pull_bounded_discovery())
+            || !authorizations.iter().any(|token| {
+                token.authorizes_path(
+                    "git_pull",
+                    ToolNature::Read,
+                    &self.workspace,
+                    self.repository.git_dir.to_str().unwrap_or_default(),
+                )
+            })
+        {
+            return Ok(false);
+        }
+        let Some(modules) = &self.native_pull_modules else {
+            return Ok(false);
+        };
+        let covered = modules.stored_module_roots().any(|root| {
+            root.starts_with(&self.repository.git_dir)
+                && (path == root
+                    || ["HEAD", "commondir", "gitdir", "config", "config.worktree"]
+                        .iter()
+                        .any(|leaf| path == root.join(leaf)))
+        });
+        if covered {
+            modules.revalidate()?;
+        }
+        Ok(covered)
+    }
+
     // Native preparation gathers scope only; it does not fetch, predict new
     // commits, or choose an integration command. Sender routing stays on the
     // legacy path until recursive configuration admission is complete.
@@ -105,8 +143,8 @@ impl AddPlan {
             self.identity = PreparedPlanIdentity::new();
             return Ok(self);
         }
-        // These roots are candidates, not yet validated repositories. Exact
-        // config/metadata admission must precede child configuration discovery.
+        // These roots are candidates, not yet validated repositories. Fixed
+        // files require either dedicated bounded discovery or exact admission.
         let roots = modules
             .stored_module_roots()
             .map(Path::to_owned)
@@ -132,14 +170,15 @@ impl AddPlan {
                 ["HEAD", "commondir", "gitdir", "config", "config.worktree"]
                     .map(|leaf| root.join(leaf)),
             ) {
-                metadata_ready &= authorizations.iter().any(|token| {
-                    token.authorizes_path(
-                        "git_pull",
-                        ToolNature::Read,
-                        &self.workspace,
-                        path.to_str().unwrap_or_default(),
-                    )
-                });
+                metadata_ready &= self.native_pull_module_read(&path, authorizations)?
+                    || authorizations.iter().any(|token| {
+                        token.authorizes_path(
+                            "git_pull",
+                            ToolNature::Read,
+                            &self.workspace,
+                            path.to_str().unwrap_or_default(),
+                        )
+                    });
                 if !self.facets.iter().any(|facet| {
                     facet.nature == ToolNature::Read && facet.resource.as_deref() == path.to_str()
                 }) {
@@ -156,20 +195,23 @@ impl AddPlan {
             self.identity = PreparedPlanIdentity::new();
             return Ok(self);
         }
-        // Metadata::capture reads all three fixed pointers. Check the complete
-        // frontier first; a parent metadata grant cannot admit these contents.
+        // Capture all three fixed pointers against the invocation-wide budget.
+        // A generic parent metadata grant cannot admit these contents.
         // Pointer targets remain declarations: publishing them does not open
         // an external common directory or worktree marker.
         for root in roots {
-            // Root identities were inspected by the admitted inventory. Fixed
-            // pointer contents still require the exact frontier above until
-            // the bounded content consumer replaces it.
+            // Root identities were inspected by the admitted inventory; the
+            // fixed frontier above checks the dedicated or exact authority.
             // Entry revalidation already checked retained pointer evidence.
             // Do not replace it or republish its targets on every continuation.
             if self.native_pull_metadata.contains_key(&root) {
                 continue;
             }
-            let metadata = super::super::receiver_state::Metadata::capture(&root, &root)?;
+            let metadata = super::super::receiver_state::Metadata::capture_with_budget(
+                &root,
+                &root,
+                Some(&self.pull_reference_budget),
+            )?;
             if let Some(path) = &metadata.worktree_marker {
                 self.facets.push(path_facet(
                     ToolNature::Read,
@@ -244,8 +286,11 @@ impl AddPlan {
             })
             .collect::<Result<Vec<_>, GitToolError>>()?;
         for (_, common, _) in &common_roots {
-            self.child_read(common, authorizations)?;
-            self.child_read(&common.join("config"), authorizations)?;
+            for path in [common.clone(), common.join("config")] {
+                if !self.native_pull_module_read(&path, authorizations)? {
+                    self.child_read(&path, authorizations)?;
+                }
+            }
         }
         let mut new_startup_targets = false;
         for (root, common, has_common) in common_roots {

@@ -5746,3 +5746,11 @@ timeout attempts without treating them as passes. Final log:
 Next remains bounded configuration/layout content discovery, complete child
 effects and production gates. No new contract approval is required for the
 already accepted simplified flow; T7 and T1–T8 remain incomplete.
+
+Bounded fixed-content follow-up: retained stored-module layout pointers and
+startup configuration can use the dedicated root-bound discovery token without
+individual descendant tokens. Layout capture now shares the Pull entry/byte
+budget; external targets remain separately admitted. Pull-filtered tests pass
+186/186 and Git-enabled Clippy passes. I300 owns detailed evidence and remaining
+config-origin/hook/remote continuations, recursive effects and production gates.
+This is partial implementation, not completion of T7 or a fresh full preflight.
