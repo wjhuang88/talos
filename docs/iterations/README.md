@@ -353,3 +353,9 @@ replace or rewrite them.
 ### TUI-062 / I289 Closeout — 2026-10-03
 
 Complete / Closed; owner Completion Commit `1226f313e7136f4b2a3d8db6f9179c4ed52072e1` (#628 merge). Full preflight, CI `37115859644`, exact-head Agent review and maintainer native acceptance passed. No remaining slice residuals.
+
+I300 Auto prerequisite amendment (2026-10-23): the governance candidate proposes
+only shared prepared-command assessment and Pull integration before T7 activation.
+It is ineffective until target-branch merge. I300 remains Active; PERM-007-H's
+remaining full built-in coverage stays unclaimed and subsequent. See the I300
+owner for scope, acceptance and complete active/review/planned inventory.

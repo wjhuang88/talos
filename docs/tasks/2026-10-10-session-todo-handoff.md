@@ -1,3 +1,13 @@
+## Proposed Pull Auto prerequisite sequencing — 2026-10-23
+
+The I300 governance amendment moves only shared prepared-command Auto assessment
+and native Pull admission ahead of T7 activation, resolving the dependency cycle
+with T8. It takes effect only after the claim amendment merges into main.
+Preserve all T1–T8 requirements and historical ordering below; the remaining
+PERM-007-H full built-in coverage follows I300 and is not activated or complete.
+I300 records scope, tests, API adaptation, independent review and native Windows
+gates. No production activation or successful Auto execution is claimed here.
+
 # Next Task: Session Todo Handoff
 
 Status: Serial execution active; I299/C0 implementation merged and owner closure recorded; all seven original deliverables remain incomplete.

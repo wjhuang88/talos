@@ -6,7 +6,7 @@
 | Type | Permission / Security Story |
 | Status | Refinement / Unclaimed |
 | Source | Maintainer request 2026-10-11: automatic approval must cover all built-in tools, not only script execution |
-| Selected Iteration | Next serial iteration after I300; not activated |
+| Selected Iteration | Remaining full built-in coverage after I300; not activated |
 | Depends On | I300 truthful Git effects; existing Agent-owned permission pipeline and shared evaluator |
 
 ## Outcome
@@ -70,3 +70,13 @@ concrete policy/API delta after investigation, not a speculative blanket waiver.
 MCP/plugin tools are not automatically included by this native-tool request.
 No release, new dependency, new unsafe code or arbitrary permanent grant is
 authorized by this intake. The complete handoff retains this added deliverable.
+
+## I300 prerequisite sequencing amendment — 2026-10-23
+
+I300 proposes ownership of only shared prepared-command assessment and native
+Pull admission needed to satisfy its existing Auto activation acceptance. This
+amendment takes effect only on target-branch merge of the governance candidate.
+It removes the T7-before-T8 dependency cycle without reducing this Story's full
+registry coverage, other built-in operations, or higher-risk policy requirements.
+PERM-007-H remains Refinement / Unclaimed; reuse and verify I300's shared path
+when this Story is activated. No generic all-built-in Auto success is claimed.
