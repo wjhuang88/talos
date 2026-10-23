@@ -8361,3 +8361,25 @@ Accepted-decision documentation checkpoint: both
 `bash scripts/validate_collaboration_claims.sh .` exited 0; `git diff --check`
 passed. Logs: /private/tmp/i300-command-accepted-{governance,claims}.log.
 These checks validate decision records only, not runtime implementation.
+
+Command-authority policy checkpoint (2026-10-23): the closed
+`git:pull-command` Execute/Remote capability now compiles only for `git_pull`
+with an absolute executable and displayed repository Read root. It requires
+exact prepared-plan proof consumption, advertises Once even through the generic
+Session proposal, never stores/reuses a Session grant, and rejects changed
+plan/input/policy evidence. Since helpers are not confined, active non-Internal
+Deny rules conservatively refuse this route even when their resources are not
+in the known preview; explicit Ask rules retain the shared human checkpoint.
+Configured/default Ask remains eligible for the existing Auto assessor.
+
+Validation: `cargo test --locked -p talos-permission` passed (158 unit tests,
+11 integration tests and one doctest); `cargo test --locked -p talos-agent
+permission_pipeline --lib` passed 16 tests, including the new command-authority
+cross-layer regression. `cargo clippy --locked -p talos-permission --all-targets
+-- -D warnings`, formatting and whitespace checks passed. Logs are under
+`/private/tmp/i300-command-policy-{full,clippy}.log` and
+`/private/tmp/i300-command-pipeline-full.log`. Tests live in separate files.
+This is an inactive policy foundation: no tools producer or native execution
+consumer uses the capability yet. Native routing, obsolete prediction removal,
+independent security review, full workspace/current-head CI and native Windows
+evidence remain open. T7 and the complete handoff remain incomplete.

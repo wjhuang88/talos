@@ -71,6 +71,7 @@
 mod access_evidence;
 mod decision;
 mod grant;
+mod native_pull_command;
 mod resource;
 mod rule;
 mod session;
@@ -397,6 +398,9 @@ impl PermissionEngine {
         input: &Value,
     ) -> (PermissionDecision, PermissionDecisionSource) {
         debug_assert_eq!(self.rules.len(), self.rule_metadata.len());
+        if let Some(restriction) = self.native_pull_command_restriction(tool_name, facet) {
+            return restriction;
+        }
         let nature = facet.nature;
 
         let mut matched_rule = None;
