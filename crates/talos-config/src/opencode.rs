@@ -10,10 +10,11 @@ use serde::Deserialize;
 use crate::{ConfigError, ModelConfig, ProviderConfig, ProviderProtocol};
 
 fn npm_to_protocol(npm: &str) -> ProviderProtocol {
-    if npm.contains("anthropic") {
-        ProviderProtocol::AnthropicMessages
-    } else {
-        ProviderProtocol::OpenAIChat
+    match npm {
+        "@ai-sdk/anthropic" => ProviderProtocol::AnthropicMessages,
+        "@ai-sdk/openai" => ProviderProtocol::OpenAIResponses,
+        "@ai-sdk/openai-compatible" => ProviderProtocol::OpenAIChat,
+        _ => ProviderProtocol::OpenAIChat,
     }
 }
 
@@ -183,6 +184,42 @@ mod tests {
                 .expect("operation should succeed")
                 .output_limit,
             Some(4096)
+        );
+    }
+
+    #[test]
+    fn test_official_openai_sdk_selects_responses() {
+        let json = r#"{
+            "provider": {
+                "openai": { "npm": "@ai-sdk/openai" }
+            }
+        }"#;
+
+        let providers = import_opencode_providers(json).expect("operation should succeed");
+        assert_eq!(
+            providers
+                .get("openai")
+                .expect("operation should succeed")
+                .protocol,
+            ProviderProtocol::OpenAIResponses
+        );
+    }
+
+    #[test]
+    fn test_npm_mapping_uses_exact_known_packages_not_name_guessing() {
+        let json = r#"{
+            "provider": {
+                "proxy": { "npm": "@vendor/anthropic-proxy" }
+            }
+        }"#;
+
+        let providers = import_opencode_providers(json).expect("operation should succeed");
+        assert_eq!(
+            providers
+                .get("proxy")
+                .expect("operation should succeed")
+                .protocol,
+            ProviderProtocol::OpenAIChat
         );
     }
 
