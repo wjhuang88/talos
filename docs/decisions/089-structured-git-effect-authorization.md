@@ -633,6 +633,38 @@ evidence under this dedicated scope rather than retain two contradictory modes.
 
 ### Native whole-operation Pull amendment (accepted 2026-10-22)
 
+Maintainer clarification (2026-10-23): proceed with the simplified flow of
+bounded discovery followed by one complete native Pull execution approval.
+Discovery steps inside an admitted scope are internal work, not additional
+approval stages for each path or directory. Batch known discovery resources;
+only resources outside the admitted scope require additional authorization.
+The ordinary-case implementation target is one discovery plan and one execution
+plan. This accepts the control-flow direction, not an unrestricted filesystem
+read grant: existing dedicated capabilities retain their documented boundaries,
+and any expanded discovery capability must state its exact scope and limits.
+Preserve explicit Deny, one-use proof binding, identity checks, process ownership
+and truthful partial-failure reporting. Reducing eleven stages to eight alone is
+not the acceptance target for this simplification.
+
+Concrete discovery-scope proposal (2026-10-23; acceptance pending): a closed
+git_pull-only Read capability binds individually displayed absolute worktree,
+gitdir and common-dir roots and the fixed Git inspection commands. Within those
+roots it may enumerate names and read regular Git configuration, layout pointers,
+refs, index/tree evidence, .gitmodules and attribute/hook evidence needed solely
+to build the operation plan, including stored child repositories under modules.
+It never executes hooks/helpers, writes, fetches or connects to a remote.
+Reuse the invocation-wide 4096-entry/4-MiB evidence allowance and existing process
+deadlines/output limits; refuse exhaustion. Do not follow a link out of scope:
+existing dedicated path-resolution grants may resolve it, but its actual target
+needs fresh admission before content reads. Normal system/global/include parsing
+uses the separately accepted configuration-chain capability; this proposal does
+not turn that capability into general external file access. Configuration values
+remain internal. Final execution still requires a new immutable complete-effects
+approval, including each child mutation root and destination. Generic Path Read
+semantics and other tools remain unchanged. This replaces the narrower pending
+identity-only module-inventory proposal if accepted; no implementation may infer
+acceptance from this proposal text.
+
 The maintainer subsequently required the experience of invoking Git in Bash:
 review the concrete native Pull as a whole, allow the model to make an actual
 invocation-local approval under ADR-064, and let Git perform its own fetch,

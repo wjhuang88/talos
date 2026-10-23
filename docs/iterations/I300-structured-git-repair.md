@@ -7883,3 +7883,49 @@ validation run above; it does not explain the earlier hang or establish a hang
 fix. Retain that occurrence for recurrence diagnostics. Fetch confirms no new
 origin/main commits beyond the current base; no rebase is needed. Native Pull
 activation, the inventory-scope decision and T1-T8 completion remain open.
+
+Native layout retention checkpoint (2026-10-23): continuation entry already
+revalidates all retained child Metadata. Scope discovery now reuses that evidence
+instead of capturing/replacing it and appending its worktree-marker Read facet
+again on each continuation. Fresh exact root/fixed-source admission remains
+required, and changed pointer evidence still refuses at entry. Native Pull
+regressions pass 22/22 (/private/tmp/i300-retained-layout-tests.log). This removes
+redundant captures and repeated target publication; no stage-count reduction,
+new authorization or production activation is claimed.
+
+Approval-flow clarification after maintainer question (2026-10-23): the target
+is one immutable approval for the native mutating Pull, preceded by separately
+authorized bounded discovery. Eleven stages describe discovery/approval
+continuations, not eleven Pull executions or necessarily eleven human dialogs.
+ADR-089's native amendment already supersedes separate fetch/integration
+approvals. Do not optimize the stage count by rebuilding that scheduler or
+raising the core limit. Batch known discovery scopes, then request a new scope
+only when newly discovered resources lie outside the admitted boundary.
+Existing configuration-chain authority covers normal configuration parsing;
+it is not recursive directory or worktree authority. The proposed identity-only
+stored-module inventory remains unaccepted, and the assistant's explanation of
+a broader bounded-discovery architecture is not maintainer acceptance. A single
+discovery approval for all child contents/layouts would require a separately
+specified contract; the narrower inventory proposal alone does not establish it.
+Success evidence must include the actual PreparedStageHistory, a final native
+execution approval, denial before effects, and equivalent native Pull behavior.
+
+Maintainer direction (2026-10-23): implement the simplified bounded-discovery
+plus single-native-execution approval flow. This supersedes treating an eight-
+stage fit as the primary convergence target. Ordinary cases should use one
+discovery plan and one execution plan; internal traversal within the admitted
+scope must not create per-directory approval continuations. Out-of-scope
+resources still require additional authorization. Reuse existing configuration,
+snapshot/identity and owned-runner components; replace the discovery orchestration
+instead of adding another scheduler. Existing capability boundaries remain
+effective until an exact expanded scope is accepted. The retained-marker
+regression passes (/private/tmp/i300-retained-marker-regression.log), but it is
+only a local correction and does not establish the simplified flow.
+
+Checkpoint validation: the retained-marker regression fails without the reuse
+guard (four marker facets instead of one) and passes with it. The full standard
+preflight exits 0 with `release preflight: passed`
+(/private/tmp/i300-layout-retention-preflight.log), including workspace tests and
+external runtime fixtures. This validates the current correction and documents;
+expanded discovery authority, simplified orchestration and native Pull activation
+remain open.
