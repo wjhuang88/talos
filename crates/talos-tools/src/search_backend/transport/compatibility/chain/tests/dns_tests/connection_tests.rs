@@ -45,14 +45,24 @@ async fn refused_connection_advances_to_next_admitted_http_source_without_replay
     );
 }
 
+// Policy-only injection at the existing resolver error seam. Real send-boundary
+// classification and next-source execution remain separate socket tests.
+struct RefusingDns(Arc<Resolver>);
+
+#[async_trait]
+impl SearchDns for RefusingDns {
+    async fn resolve(&self, host: &str, port: u16) -> Result<Vec<SocketAddr>, TransportError> {
+        self.0.resolve(host, port).await?;
+        Err(TransportError::ConnectionRefused)
+    }
+}
+
 #[tokio::test]
-async fn four_refused_connections_exhaust_the_frozen_sources_without_reset() {
+async fn injected_refusal_errors_exhaust_four_frozen_sources_without_reset() {
     let unused = Server::new(vec![]);
-    let reserved = reserve();
-    let port = reserved.local_addr().expect("address").port();
-    let (chain, transport, resolver, budget) =
-        setup_with_ports(&unused, vec![], 4, AfterFailure::Continue, Some([port; 4]));
-    drop(reserved);
+    let (chain, mut transport, resolver, budget) =
+        setup(&unused, vec![], 4, AfterFailure::Continue);
+    transport.dns = Arc::new(RefusingDns(resolver.clone()));
     assert_eq!(
         chain
             .execute(&transport)

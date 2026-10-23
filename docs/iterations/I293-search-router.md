@@ -2140,3 +2140,57 @@ from local281514e7. Fresh governance cannot complete because the local Rust/Carg
 removed again; SQLite metadata gate reports missing cargo (exit1). No fresh integrated local
 full preflight/format pass is claimed. Earlier complete source-tree validation is retained,
 while the integrated exact-head native CI must supply governance and all runtime evidence.
+
+## Windows Refusal Exhaustion Fixture Correction — 2026-10-23
+
+CI3337/run39808611715 attempt1 at919ea785 FAILED: five jobs succeeded, including owner
+reconciliation, Linux and full macOS; Windows119944232586 Test workspace failed tools592/1/0ignored.
+The new four_refused_connections_exhaust_the_frozen_sources_without_reset expected four
+ConnectionRefused errors but observed Terminal{protocol:Html,error:Transport(Deadline)}. This
+is a retained test failure. Real HTTP/HTTPS classification, next-source success, spent-budget
+and truncated-body cases passed. The five-second shared budget remained active; production
+correctly gives expiration terminal precedence. No per-connect timing attribution exists, so
+TCP retry/scheduler/platform latency is not established as the cause. Do not equate Deadline
+with refusal or call the run successful. No unchanged-job rerun was requested.
+
+Independent design review approves replacing only the four-physical-refusal exhaustion assertion
+with explicit typed-error injection at the existing test resolver seam. The real chain/transport
+still consumes all four prepared slots under the original whole-plan Once authority and shared
+five-second budget; exact errors/order/reservations/zero bytes/no HTTP are asserted. A tiny
+test-only resolver wrapper records each lookup through the existing fixture resolver, then
+returns ConnectionRefused without dialing. This is policy coverage, not send-classifier evidence.
+Four real-socket cases remain unchanged, including actual classifier and next-source execution.
+This supersedes the earlier five-actual-socket characterization only for the corrected fixture;
+the original failing source/result remains historical evidence. No production/error/deadline/
+assertion threshold/dependency/lock/workflow change, skip or permissive outcome is introduced.
+Fresh local source checks, corrected-source review and a new stable exact-head CI remain pending.
+I293/#643/#624 remain incomplete/open and default search remains unchanged.
+
+Corrected local validation: focused transport133/0failed/0ignored plus existing child1 PASS;
+strict network-test Clippy PASSexit0. First standard preflight passed workspace check/Clippy/
+tests/doctests, tools591/0failed, all four socket cases and injected policy case. Its saved log
+ends during SDK compilation without a default-SDK receipt or terminal marker. Session70135
+reported SDK-default success followed by coding SDK compile exit1; these first-attempt SDK
+subdetails are session observations, not independently verifiable from that incomplete log.
+The separate failure receipt retains the observed Cranelift0.135.3 archive error:
+"memory map must have a non-zero length" for libcranelift_codegen-443719cae3ac5595.rlib. No
+full preflight pass is claimed. Disk inspection found19G free and no remaining zero object;
+that does not establish the cause. Receipt: refusal-fixture-preflight-failure-receipt.txt.
+
+A bounded generated-cache repair first failed safely because CACHEDIR.TAG was absent. The
+standard cache tag was restored only in the isolated validation target; Cargo clean then
+invalidated cranelift-codegen outputs (60files/270.8MiB). Cargo explicitly ignored the version
+qualifier and cleaned all generated versions of that package, not the whole build tree. A
+complete resumed standard preflight repeated successful workspace tests/tools591/default SDK
+but coding SDK hit the same archive error and exited1. Stop local repetitions; retain both
+failed preflight attempts and their successful subchecks without calling either a full pass.
+Production files, dependency/SDK locks, toolchain, settings, timeouts and assertions remain
+unchanged. The corrected candidate needs fresh exact-head native full preflight and both SDK
+receipts before merge; local coding SDK build remains an explicit build blocker
+with unproven cause. No compiler/dependency workaround or further retry is authorized by this
+record. Corrected-source review and publication must disclose this limitation.
+
+Publication inventory refresh: main advanced from4722fee8 to213c35d8 through #751/#752; the
+only changed path is .github/workflows/actions-maintenance.yml, unrelated to search/runtime
+validation inputs. It is not absorbed into this three-path correction. Provider#749, Git#735
+and Windows#705 retain their independent scopes; verify full path intersections before push.

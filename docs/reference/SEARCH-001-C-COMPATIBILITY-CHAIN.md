@@ -93,3 +93,12 @@ protected reviews, immutable candidates and native terminal receipts are indexed
 The [dormant direct plan](SEARCH-001-C-COMPATIBILITY-PLAN.md) retains this exact prepared chain
 with its configuration-derived manifest/profile. Dispatch builds transport from that retained
 manifest and reuses an injected existing budget; official permission/root integration remains gated.
+
+## Refusal Fixture Evidence Boundary
+
+HTTP/HTTPS classification, refusal followed by an admitted winner, spent request budget and
+truncated-body rejection use real sockets. Four-source refusal exhaustion is a policy-only
+injected typed-error test at the existing test resolver seam. It verifies ordered source visits,
+exact closed errors, four shared reservations, zero bytes and zero HTTP requests; it does not
+exercise send-error classification or assert that four physical refusals finish within a deadline.
+The original five-second shared budget and deadline regressions remain unchanged.
