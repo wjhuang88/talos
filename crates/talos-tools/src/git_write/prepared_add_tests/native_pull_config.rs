@@ -154,6 +154,31 @@ async fn native_pull_child_destinations_and_final_configuration_checks_are_bound
             let tokens = proof(&plan)
                 .consume_for_prepared(&plan.request(), &plan.identity)
                 .expect("existing complete discovery scope");
+            let legacy = module.join("remotes/upstream");
+            let mut incomplete = tokens.clone();
+            incomplete.retain(|token| {
+                !token.authorizes_path(
+                    "git_pull",
+                    ToolNature::Read,
+                    &plan.workspace,
+                    legacy.to_str().expect("path"),
+                )
+            });
+            plan.native_pull_remotes.clear();
+            assert!(
+                !plan
+                    .discover_native_pull_remotes(&incomplete)
+                    .await
+                    .expect("published source without proof remains a frontier")
+            );
+            assert!(plan.native_pull_remotes.is_empty());
+            plan.facets
+                .retain(|facet| facet.resource.as_deref() != legacy.to_str());
+            assert!(
+                plan.discover_native_pull_remotes(&tokens)
+                    .await
+                    .expect("admitted source needs no publication continuation")
+            );
             plan.native_pull_configs.clear();
             assert!(
                 plan.discover_native_pull_configurations(&tokens)

@@ -5767,3 +5767,10 @@ Missing source/hook-target tokens still yield a frontier; positive and negative
 regressions pass within Native Pull 24/24, with Git-enabled Clippy clean. I300
 records logs. This is a conditional phase reduction, not completion of the
 single-discovery flow, production activation, T7 or the full handoff.
+
+Child remote discovery now skips redundant publication continuations only when
+consumed tokens already admit every source; missing tokens return a frontier
+before capture/probe. Native Pull 24/24 and Git-enabled Clippy pass, with
+formatting clean. I300 owns logs and remaining scoped discovery, recursive
+effects and production/platform gates. Fetch found no new origin/main commits.
+T7 and the original handoff remain incomplete.
