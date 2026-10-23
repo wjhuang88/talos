@@ -5680,3 +5680,9 @@ admission. This runner baseline does not authorize or activate production Pull.
 Native parent/child destination classification now shares one helper: local
 sources publish Read Path, network sources publish Network Remote. Native tests
 pass 22/22; source-side configuration/effects and activation remain incomplete.
+
+Source classification and native effect baseline are committed as 0a712c87 and
+94e1eb25. Full standard preflight and cargo xwin MSVC Git test-target check pass;
+I300 records logs and seven reduced-feature compile warnings. PR #735 remains
+at old 06c1ebef with Windows failure, so current native Windows evidence and
+independent review remain missing. The inventory-scope decision is unanswered.

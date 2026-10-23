@@ -7828,3 +7828,16 @@ A missing local-source fixture verifies classification succeeds without requirin
 source existence and publishes no Network facet. Native Pull tests pass 22/22
 (/private/tmp/i300-parent-source-tests.log). No source metadata/configuration
 authorization or production activation is implied by classification alone.
+
+Stable source-classification validation (2026-10-23): implementation commits
+94e1eb25 (Unix local upload-pack effect baseline) and 0a712c87 (shared source
+classification) pass the full standard preflight outside the sandbox, including
+locked workspace tests and external SDK fixtures. Log:
+/private/tmp/i300-source-classification-preflight.log. MSVC cargo xwin check
+--locked -p talos-tools --features git --tests --target x86_64-pc-windows-msvc
+also passes with seven reduced-feature warnings; cache setup required execution
+outside the sandbox. Log: /private/tmp/i300-source-classification-xwin.log.
+Remote PR #735 remains at 06c1ebef with terminal Windows failure in run
+39724001119; those remote results do not validate this local head. No native
+Windows acceptance, review sign-off, production Pull activation or T7 completion
+is claimed. The bounded stored-module inventory decision remains unanswered.
