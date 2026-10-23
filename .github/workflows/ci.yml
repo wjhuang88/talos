@@ -403,6 +403,80 @@ jobs:
       - name: Rebuilt CLI mock smoke
         run: cargo run -p talos-cli --locked -- --mock --print --no-init --no-context "windows shell portability smoke"
 
+  windows-auto-diagnostics:
+    name: Windows Auto timeout diagnostics (${{ matrix.phase }} first-call)
+    # A bounded opt-in experiment, independent of mandatory unchanged code gates.
+    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'diag/windows-auto-')
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        phase: [baseline, instrumented]
+    timeout-minutes: 45
+    env:
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_INCREMENTAL: '0'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.99.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: 'false'
+      - name: Validate exact temporary probe anchors
+        run: python scripts/diagnose_windows_auto.py --self-test
+      - name: Fresh runner first-suite and bounded original Auto sampling
+        timeout-minutes: 40
+        run: python scripts/diagnose_windows_auto.py --fresh-phase ${{ matrix.phase }}
+      - name: Upload every attempt including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-auto-diagnostics-${{ github.event.pull_request.head.sha }}-${{ matrix.phase }}
+          path: windows-auto-diagnostics/
+          if-no-files-found: error
+          retention-days: 14
+
+  windows-config-diagnostics:
+    name: Windows config lock diagnostics (${{ matrix.phase }} first-suite)
+    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'diag/windows-auto-')
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        phase: [baseline, instrumented]
+    timeout-minutes: 30
+    env:
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_INCREMENTAL: '0'
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.99.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: 'false'
+      - name: Validate config probe anchors and invariant guards
+        run: python scripts/diagnose_windows_config.py --self-test
+      - name: Observe original config suite and fixed exact-case samples
+        timeout-minutes: 25
+        run: python scripts/diagnose_windows_config.py --phase ${{ matrix.phase }}
+      - name: Upload every config attempt including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-config-diagnostics-${{ github.event.pull_request.head.sha }}-${{ matrix.phase }}
+          path: windows-config-diagnostics/
+          if-no-files-found: error
+          retention-days: 14
+
   linux-desktop:
     name: Linux Desktop explicit feature
     needs: classify-changes
