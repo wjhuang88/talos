@@ -318,7 +318,7 @@ async fn pull_graph_read_requires_closed_capability_after_configuration() {
         .expect("Pull");
     let mut plan = Box::new(plan).discover().await.expect("configuration");
     plan.facets
-        .retain(|facet| facet.resource.as_deref() != Some("git:pull-repository-metadata"));
+        .retain(|facet| !matches!(facet.resource.as_deref(), Some("git:pull-repository-metadata" | "git:pull-worktree-resolution")));
     let admission = proof(&plan)
         .consume_for_prepared(&plan.request(), &plan.identity)
         .expect("exact-path admission without closed capability");

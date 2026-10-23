@@ -816,7 +816,7 @@ async fn pull_child_metadata_scope_batches_depth_and_requires_own_root() {
         );
         if mode == "missing-capability" {
             plan.facets
-                .retain(|facet| facet.resource.as_deref() != Some("git:pull-repository-metadata"));
+                .retain(|facet| !matches!(facet.resource.as_deref(), Some("git:pull-repository-metadata" | "git:pull-worktree-resolution")));
         }
         let mut tokens = proof(&plan)
             .consume_for_prepared(&plan.request(), &plan.identity)

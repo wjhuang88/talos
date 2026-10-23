@@ -727,6 +727,13 @@ impl AddPlan {
             &repository.git_dir,
             "source anchor for the fixed Git auxiliary path resolver",
         )?);
+        if matches!(operation, Operation::Pull(_)) {
+            facets.push(ToolPermissionFacet::with_resource(
+                ToolNature::Read,
+                "git:pull-worktree-resolution",
+                ToolResourceKind::Remote,
+            ).with_description("resolve frozen Pull gitdir/commondir and startup core.worktree paths; actual external targets require separate Read admission"));
+        }
         let native_pull_command = match &operation {
             Operation::Pull(pull) => Some(command::FrozenCommand::pull(
                 &program,

@@ -3,6 +3,55 @@
 use super::*;
 
 #[tokio::test]
+async fn native_pull_external_startup_worktree_requires_fresh_read() {
+    let root = tempfile::tempdir().expect("fixture");
+    let external = tempfile::tempdir().expect("external worktree");
+    git(root.path(), &["init", "-b", "main"]);
+    git(root.path(), &["config", "core.hooksPath", ""]);
+    git(
+        root.path(),
+        &["remote", "add", "origin", "git://example.invalid/parent"],
+    );
+    let module = root.path().join(".git/modules/child");
+    std::fs::create_dir_all(&module).expect("module");
+    git(&module, &["init", "--bare", "-b", "main"]);
+    git(&module, &["config", "core.bare", "false"]);
+    git(
+        &module,
+        &[
+            "config",
+            "core.worktree",
+            external.path().to_str().expect("path"),
+        ],
+    );
+    git(&module, &["config", "core.hooksPath", ""]);
+    git(
+        &module,
+        &["remote", "add", "origin", "git://example.invalid/child"],
+    );
+    let mut plan =
+        prepare_pull_fixture(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+            .expect("plan");
+    plan.phase = Phase::PullNativePreparation;
+    let admitted = proof(&plan);
+    let next = match Box::new(plan).execute_stage(Box::new(admitted)).await {
+        PreparedNormalStage::Continue(next) => next,
+        PreparedNormalStage::Complete(output) => panic!("discovery stopped: {:?}", output.result),
+    };
+    let target = external.path().canonicalize().expect("actual target");
+    assert!(next.permission_profile().iter().any(|facet| {
+        facet.nature == ToolNature::Read && facet.resource.as_deref() == target.to_str()
+    }));
+    assert!(
+        !next
+            .permission_profile()
+            .iter()
+            .any(|facet| { matches!(facet.nature, ToolNature::Write | ToolNature::Network) })
+    );
+    assert!(!module.join("FETCH_HEAD").exists());
+}
+
+#[tokio::test]
 async fn native_pull_contained_modules_use_one_discovery_profile() {
     let root = tempfile::tempdir().expect("fixture");
     git(root.path(), &["init", "-b", "main"]);
@@ -23,6 +72,19 @@ async fn native_pull_contained_modules_use_one_discovery_profile() {
         );
         modules.push(module);
     }
+    // An initialized child's startup directory is part of the displayed
+    // parent worktree scope after bounded pointer resolution.
+    let child_worktree = root.path().join("child");
+    std::fs::create_dir(&child_worktree).expect("child worktree");
+    git(&modules[0], &["config", "core.bare", "false"]);
+    git(
+        &modules[0],
+        &[
+            "config",
+            "core.worktree",
+            child_worktree.to_str().expect("path"),
+        ],
+    );
     let mut plan =
         prepare_pull_fixture(root.path(), &serde_json::json!({}), ToolProvenance::Native)
             .expect("plan");
@@ -63,6 +125,14 @@ async fn native_pull_contained_modules_use_one_discovery_profile() {
                         == module.canonicalize().expect("module").to_str())
         );
     }
+    assert!(next.permission_profile().iter().any(|facet| {
+        facet.nature == ToolNature::Write
+            && facet.resource.as_deref()
+                == child_worktree
+                    .canonicalize()
+                    .expect("child target")
+                    .to_str()
+    }));
     let PreparedNormalStage::Complete(denied) = next.execute_stage(Box::new(stale)).await else {
         panic!("stale discovery proof continued");
     };

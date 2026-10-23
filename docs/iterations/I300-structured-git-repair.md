@@ -8281,3 +8281,23 @@ publication, independent security review or native Windows acceptance is claimed
 Resume with complete recursive checkout/worktree and executable-effect scope;
 then production routing and Agent/MCP/Runtime acceptance before removing the
 superseded scheduler. T7 and all subsequent handoff items remain incomplete.
+
+Contained startup-worktree convergence checkpoint (2026-10-23): the initial
+Pull discovery profile now includes the already accepted fixed worktree-path
+resolution capability. Newly frozen child core.worktree targets resolve within
+that admitted discovery. A contained actual target can proceed internally only
+with the dedicated bounded-discovery token and exact parent worktree Read;
+external actual targets publish a fresh Read frontier before child startup.
+Final execution still requires exact child root effects admission. No native
+production or recursive execution gate has been removed.
+
+Regression coverage uses real execute_stage admission for initialized contained
+startup targets and external startup targets, including stale-proof refusal.
+The compatibility test separately removes initial dedicated capabilities to
+retain explicit resolution/target-frontier coverage. Negative metadata tests
+remove dependent resolution facets as well, preserving their missing-authority
+assertions. Locked Pull tests pass 193/193; Git lib/tests Clippy with warnings
+denied passes. Logs: /private/tmp/i300-startup-convergence-{pull,clippy}.log.
+These are focused checks, not full workspace, Windows runtime or independent
+security acceptance. T7 remains incomplete; resume with recursive executable
+and worktree effects, then activation and cross-surface acceptance.
