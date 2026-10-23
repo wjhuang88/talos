@@ -8301,3 +8301,10 @@ denied passes. Logs: /private/tmp/i300-startup-convergence-{pull,clippy}.log.
 These are focused checks, not full workspace, Windows runtime or independent
 security acceptance. T7 remains incomplete; resume with recursive executable
 and worktree effects, then activation and cross-surface acceptance.
+
+Frozen startup convergence implementation a9d3b41e passes complete standard
+locked release preflight outside the sandbox: workspace check, Clippy, tests,
+doctests, both governance validators and both external Runtime SDK consumers.
+Log: /private/tmp/i300-startup-convergence-preflight.log (exit 0). This does not
+establish native Windows runtime, independent security review, remote exact-head
+CI or production activation. All remaining T7 gates above remain open.
