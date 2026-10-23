@@ -4,7 +4,10 @@
 //! suggest an invocation-local `ApproveOnce`; policy evaluation and grant admission
 //! remain owned by [`crate::permission_pipeline::PermissionPipeline`].
 
+mod prepared_command;
 mod script_evidence;
+
+pub use prepared_command::PreparedCommandAssessmentRequest;
 
 pub use script_evidence::{ScriptEvidence as AutoScriptEvidence, ScriptFile as AutoScriptFile};
 
@@ -834,6 +837,15 @@ pub enum AutoConfidence {
 /// Provider-independent model assessor. Implementations must not call tools recursively.
 #[async_trait]
 pub trait AutoPermissionAssessor: Send + Sync {
+    /// Reviews a retained command and all disclosed transitive effects.
+    /// Legacy assessors do not implicitly acquire effectful-command support.
+    async fn assess_prepared_command(
+        &self,
+        _request: PreparedCommandAssessmentRequest,
+        _remaining: Duration,
+    ) -> Result<String, String> {
+        Err("prepared command assessment unsupported".into())
+    }
     /// Returns one JSON response within the caller's deadline.
     async fn assess(
         &self,
@@ -939,6 +951,14 @@ impl ProviderAutoPermissionAssessor {
 
 #[async_trait]
 impl AutoPermissionAssessor for ProviderAutoPermissionAssessor {
+    async fn assess_prepared_command(
+        &self,
+        request: PreparedCommandAssessmentRequest,
+        remaining: Duration,
+    ) -> Result<String, String> {
+        self.assess_prepared_command_payload(request, remaining)
+            .await
+    }
     async fn assess(
         &self,
         request: AutoPermissionRequest,
@@ -2035,6 +2055,23 @@ impl AutoPermissionResolver {
 
 #[async_trait]
 impl ApprovalResolver for AutoPermissionResolver {
+    async fn resolve_prepared_command(
+        &self,
+        request: PermissionApprovalRequest,
+        evidence: &talos_core::tool::PreparedCommandEvidence,
+        remaining: Duration,
+        auto_assessment_allowed: bool,
+        user_intent: Option<&str>,
+    ) -> Result<ApprovalChoice, ApprovalResolverError> {
+        self.resolve_command(
+            request,
+            evidence,
+            remaining,
+            auto_assessment_allowed,
+            user_intent,
+        )
+        .await
+    }
     fn observe_user_messages(&self, messages: &[String]) {
         if let Some(session_id) = self.lease.current_session_id() {
             self.observe_locale(&session_id, messages);

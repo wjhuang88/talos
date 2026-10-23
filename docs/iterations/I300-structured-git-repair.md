@@ -1,3 +1,41 @@
+## Prepared-command Auto implementation checkpoint — 2026-10-23
+
+Uncommitted implementation now carries non-serializable, identity-bound command
+evidence from the retained native Pull final stage through Agent and MCP to the
+permission pipeline. The independent reviewer found a compatibility default
+that discarded human-only eligibility; it now forces legacy automatic adapters
+through the nonautomatic path. Discovery supplies no command evidence.
+
+The separate `prepared-command/v1` assessor protocol supports mutation/network
+without pretending the operation is read-only. Provider assessment uses the
+existing bounded model boundary. Responses must acknowledge all six effects,
+accept unconfined transitive effects, match a fresh invocation-bound digest and
+have high confidence. Session/revision and Auto reset/enabled checks run again
+before one-use admission. Unsupported/malformed/failed reviews fall back to
+human approval; explicit Deny and human-only policy remain authoritative.
+
+The expanded 16-scenario synthetic matrix and Agent library tests 486/486 pass
+(`/private/tmp/i300-command-agent-full2.log`). Agent/Tools/MCP all-target Clippy
+passes before the final host-helper/canonical-label delta
+(`/private/tmp/i300-command-clippy2.log`). Known target facts now include relative
+repository/metadata labels, configured and explicit remote hosts, program
+categories and a dynamic-unknown marker. The final producer regression passes
+(`/private/tmp/i300-command-producer-tests3.log`); canonicalizing only the review
+root corrects macOS temporary-path aliases without changing execution paths.
+
+Standard preflight reached Tools with 918 passing tests and one process-observer
+EPERM failure inside the sandbox (`/private/tmp/i300-command-preflight2.log`).
+The same standard locked preflight then passed with approved unsandboxed
+process observation (exit 0, `/private/tmp/i300-command-preflight-authorized.log`),
+including workspace tests, Clippy and external SDK fixtures. This supersedes
+the pending full-workspace check below, not native Windows or execution gates.
+
+This is not production activation or real Agent-to-Auto-to-Git execution
+evidence. The native Pull production gate and Windows gate remain closed.
+Cross-entry real execution, independent final security acceptance, native
+Windows acceptance and exact-head remote gates
+remain required. T7 and all remaining T1–T8 scope stay incomplete.
+
 ## Native Pull line-ending fixture correction — 2026-10-23
 
 The native Git fixture helper now fixes `core.autocrlf=false` for setup commands

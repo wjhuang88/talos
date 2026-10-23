@@ -309,3 +309,41 @@ resource boundaries require PERM-007-H implementation and independent
 permission/security review before rollout. This amendment accepts the product
 direction; it does not claim that the expanded policy is implemented or waive
 that review.
+
+## 2026-10-23 I300 prerequisite API adaptation
+
+Claim amendment #755 (main merge 0e2abd8e3) assigns only the shared
+prepared-command/Pull prerequisite to I300. The remaining PERM-007-H scope is
+unchanged. This applies the accepted effectful Auto decision above; it is not
+production activation evidence.
+
+Before public API implementation, use the following additive migration:
+
+- Keep existing AutoPermissionRequest, AutoPermissionAssessmentContext and
+  exhaustive risk/operation/effect enums source-compatible. A prepared command
+  is not a read-only compatibility request.
+- Add a separate prepared-command evidence type and a default-None method on
+  PreparedNormalToolInvocation. The final frozen producer owns the evidence and
+  binds it to its PreparedPlanIdentity. No evidence comes from caller JSON or
+  approval prose. Do not export raw configuration/environment values or hashes
+  of low-entropy secrets; an opaque per-plan identifier binds retained state.
+- Add a permission-pipeline method accepting the same prepared identity and
+  evidence, retaining existing methods and request struct literals. Missing or
+  mismatched evidence cannot enter prepared-command Auto assessment.
+- Add a separate contextual assessor method/request with a default unsupported
+  error. Existing assessors compile unchanged and fall back to human approval;
+  they cannot silently approve a request whose new effects they never received.
+  Provider adapters opt in explicitly. No old assessor method receives a
+  mislabeled read-only carrier.
+- Reuse the existing isolated model invocation, deadline, reset/policy checks,
+  digest and fallback. The new wire response must acknowledge the disclosed
+  effect set; do not extend the legacy public exhaustive enums. New evidence
+  and tests belong in separate modules rather than growing shell-test files.
+
+Downstream migration: existing human and legacy assessor adapters require no
+source changes. To enable prepared-command Auto they must explicitly implement
+the new contextual method and preserve all identity/effect checks. Older adapters
+continue to require a human (or refuse headlessly). Independent security/API
+review, actual entrypoint success/failure tests and native Windows validation
+remain required before activation. This records implementation constraints, not
+a claim that the API or end-to-end support already exists.

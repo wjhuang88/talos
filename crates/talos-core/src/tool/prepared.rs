@@ -118,6 +118,13 @@ pub trait PreparedNormalToolInvocation: Send {
         None
     }
 
+    /// Returns implementation-owned command evidence for this exact stage.
+    /// Caller JSON and approval presentation notes are not substitutes. Legacy
+    /// producers return None and retain their existing authorization behavior.
+    fn prepared_command_evidence(&self) -> Option<super::PreparedCommandEvidence> {
+        None
+    }
+
     /// The complete set of effects to admit as one invocation.
     fn permission_profile(&self) -> &[ToolPermissionFacet];
 

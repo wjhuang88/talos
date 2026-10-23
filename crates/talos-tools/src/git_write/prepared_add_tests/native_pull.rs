@@ -6,6 +6,43 @@ use super::*;
 #[path = "native_pull_recursion.rs"]
 mod recursion;
 
+#[tokio::test]
+async fn only_final_pull_stage_supplies_identity_bound_redacted_command_evidence() {
+    let root = tempfile::tempdir().expect("fixture");
+    git(root.path(), &["init", "-b", "main"]);
+    let plan = prepare_pull_fixture(
+        root.path(),
+        &serde_json::json!({"remote": "https://private-user:private-remote-name@safe.example:8443/private-path"}),
+        ToolProvenance::Native,
+    )
+    .expect("plan");
+    assert!(plan.prepared_command_evidence().is_none());
+    let plan = Box::new(plan)
+        .discover_pull_command()
+        .await
+        .expect("discovery");
+    let evidence = plan
+        .prepared_command_evidence()
+        .expect("final command evidence");
+    assert!(evidence.belongs_to(&plan.identity));
+    assert!(!evidence.belongs_to(&PreparedPlanIdentity::new()));
+    let description = evidence.description();
+    assert_eq!(description.operation, "git:pull-command/v1");
+    assert_eq!(description.effects.len(), 6);
+    assert!(!description.confined);
+    assert_eq!(description.targets.repository, ".");
+    assert_eq!(
+        description.targets.invocation_remote_host.as_deref(),
+        Some("safe.example:8443")
+    );
+    assert!(description.targets.dynamic_effects_unknown);
+    let json = serde_json::to_string(description).expect("safe projection");
+    assert!(!json.contains("private-remote-name"));
+    assert!(!json.contains("private-user"));
+    assert!(!json.contains("private-path"));
+    assert!(!json.contains(root.path().to_string_lossy().as_ref()));
+}
+
 #[test]
 fn native_pull_plan_rejects_changed_operation_before_discovery() {
     let root = tempfile::tempdir().expect("fixture");

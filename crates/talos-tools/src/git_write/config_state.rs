@@ -10,6 +10,25 @@ type CheckoutCandidates = (Vec<(String, String)>, Option<String>);
 
 type Values = BTreeMap<Vec<u8>, Vec<Option<Vec<u8>>>>;
 
+/// Host-only display evidence; credentials, paths and helper payloads stay private.
+pub(super) fn command_remote_host(value: &[u8]) -> Option<String> {
+    let url = std::panic::catch_unwind(|| gix::url::parse(value))
+        .ok()?
+        .ok()?;
+    let host = url.host?;
+    if host.len() > 253
+        || !host
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || b".-:[]".contains(&byte))
+    {
+        return None;
+    }
+    Some(match url.port {
+        Some(port) => format!("{host}:{port}"),
+        None => host,
+    })
+}
+
 /// Receiver dependencies named by configuration. Construction never opens the
 /// paths; their contents belong to the next independently admitted Read stage.
 pub(super) struct ReceiverEffects {
@@ -816,18 +835,8 @@ impl ConfigState {
                 continue;
             }
             for value in values.iter().flatten() {
-                let parsed = std::panic::catch_unwind(|| gix::url::parse(value.as_slice()));
-                if let Ok(Ok(url)) = parsed
-                    && let Some(host) = url.host
-                    && host.len() <= 253
-                    && host
-                        .bytes()
-                        .all(|byte| byte.is_ascii_alphanumeric() || b".-:[]".contains(&byte))
-                {
-                    hosts.insert(match url.port {
-                        Some(port) => format!("{host}:{port}"),
-                        None => host,
-                    });
+                if let Some(host) = command_remote_host(value) {
+                    hosts.insert(host);
                 }
             }
         }

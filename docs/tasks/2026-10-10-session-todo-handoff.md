@@ -1,3 +1,20 @@
+## Prepared-command Auto checkpoint — 2026-10-23
+
+T7 now has an uncommitted dedicated effectful-command Auto path, with exact-plan
+evidence, complete effect acknowledgement, fresh invocation binding and
+session/reset revalidation. Independent review exposed and corrected legacy
+human-only fallback and missing known-target review facts. I300 owns details,
+logs and pending validation. Expanded synthetic matrix and 486 Agent library
+tests pass, including reset/revision checks; the final redacted target producer
+regression also passes. All-target Agent/Tools/MCP Clippy passed before the last
+host-helper/canonical-label delta. Sandboxed standard preflight stopped at a
+process-observer EPERM (Tools 918 passed, 1 failed); the same approved
+unsandboxed standard locked preflight subsequently passed (exit 0;
+`/private/tmp/i300-command-preflight-authorized.log`), including workspace tests,
+Clippy and external SDK fixtures. Real cross-entry
+Auto execution and production/native Windows acceptance are not implemented or
+proven by those tests. T7 stays Active; the full T1–T8 goal is unchanged.
+
 ## Native Pull line-ending fixture correction — 2026-10-23
 
 The native Git fixture helper now fixes `core.autocrlf=false` for setup commands

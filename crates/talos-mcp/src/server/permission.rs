@@ -121,12 +121,33 @@ impl McpPermissionGate {
         plan: &talos_core::tool::PreparedPlanIdentity,
         deadline_at: tokio::time::Instant,
     ) -> Result<talos_permission::AdmittedInvocation, McpError> {
+        self.authorize_prepared_command_until(
+            hook_context,
+            request,
+            profile,
+            (plan, None),
+            deadline_at,
+        )
+        .await
+    }
+
+    pub(super) async fn authorize_prepared_command_until(
+        &self,
+        hook_context: &HookContext,
+        request: &McpCallRequest,
+        profile: &[ToolPermissionFacet],
+        prepared: (
+            &talos_core::tool::PreparedPlanIdentity,
+            Option<&talos_core::tool::PreparedCommandEvidence>,
+        ),
+        deadline_at: tokio::time::Instant,
+    ) -> Result<talos_permission::AdmittedInvocation, McpError> {
         match self
             .authorize_call_inner(
                 hook_context,
                 request,
                 profile,
-                Some(plan),
+                Some(prepared),
                 Some(deadline_at),
             )
             .await?
@@ -141,7 +162,10 @@ impl McpPermissionGate {
         hook_context: &HookContext,
         request: &McpCallRequest,
         profile: &[ToolPermissionFacet],
-        prepared: Option<&talos_core::tool::PreparedPlanIdentity>,
+        prepared: Option<(
+            &talos_core::tool::PreparedPlanIdentity,
+            Option<&talos_core::tool::PreparedCommandEvidence>,
+        )>,
         prepared_deadline_at: Option<tokio::time::Instant>,
     ) -> Result<McpAdmission, McpError> {
         let deadline_at = prepared_deadline_at.unwrap_or_else(|| self.prepared_deadline_at());
@@ -180,9 +204,9 @@ impl McpPermissionGate {
             summary_fields: Vec::new(),
             deadline: deadline_at.saturating_duration_since(tokio::time::Instant::now()),
         };
-        let authorization = if let Some(plan) = prepared {
+        let authorization = if let Some((plan, evidence)) = prepared {
             self.pipeline
-                .authorize_prepared_plan(authorization_request, None, plan)
+                .authorize_prepared_plan_with_evidence(authorization_request, None, plan, evidence)
                 .await
                 .map(|admission| McpAdmission::Prepared(Box::new(admission)))
         } else {

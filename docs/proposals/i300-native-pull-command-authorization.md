@@ -1,7 +1,7 @@
 # I300 native Pull command authorization alternative
 
 Status: Accepted by the maintainer on 2026-10-23; implementation and activation gates pending.
-Owner: docs/iterations/I300-structured-git-repair.md (T7); Auto remains T8.
+Owner: docs/iterations/I300-structured-git-repair.md (T7, including the minimal shared Auto/Pull prerequisite under #755); remaining all-built-in Auto coverage stays T8.
 
 ## Problem
 
