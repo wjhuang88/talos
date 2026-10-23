@@ -15,7 +15,7 @@
 | Work Slice | T7 structured Git typed effect resources, same-family scope defects and staged/unstaged diff fidelity; shared Auto prepared-command admission required for native Pull activation, with associated tests and documentation. Other built-in Auto coverage remains PERM-007-H. |
 | Claimed At | 2026-10-11 |
 | Source Issue | None |
-| Governance Claim PR | #755 (scope amendment; original activation #704) |
+| Governance Claim PR | #755 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer authorized serial implementation and gated merges, accepted ADR-089, and permitted non-overlap with I293/I294. No separate maintainer reviewer is available; independent Agent security/API review, exact-head CI, validators and CAS are required. |
 | Implementation PR | #735 (Draft; T7 incomplete) |
