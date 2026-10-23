@@ -317,10 +317,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $gateTests = @(cargo test -p talos-tools --features git --locked --test windows_git_preparation_gate -- --list)
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          if ($gateTests -notcontains 'production_windows_preparation_stays_closed_before_repository_discovery: test') {
-            throw 'Required production Windows preparation gate regression is missing'
+          if ($gateTests -notcontains 'production_prepared_add_requires_proof_and_stages_exact_path: test') {
+            throw 'Required production Windows prepared Add execution regression is missing'
           }
           cargo test -p talos-tools --features git --locked --test windows_git_preparation_gate
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo test -p talos-runtime --locked --test i300_native_pull
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo test -p talos-mcp --locked --test git_pull_prepared
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           foreach ($test in $tests) {
             if ($listed -notcontains "${test}: test") {

@@ -72,14 +72,6 @@ impl AddPlan {
                 "Native Pull command authority missing; no command started".into(),
             ));
         }
-        // Keep the activation gate until cross-surface, independent security
-        // review and native platform acceptance validate this replacement.
-        if !cfg!(test) {
-            return Err(GitToolError::InvalidInput(
-                "Native Pull command execution awaits activation evidence; no command started"
-                    .into(),
-            ));
-        }
         self.config
             .as_ref()
             .ok_or_else(|| {
