@@ -4,6 +4,35 @@ use super::*;
 use std::collections::BTreeSet;
 
 impl AddPlan {
+    fn native_pull_child_hook_paths(
+        &self,
+        root: &Path,
+        common: &Path,
+        config: &super::super::config_state::ChildConfig,
+    ) -> Result<Vec<PathBuf>, GitToolError> {
+        let startup = self.pull_child_startup.get(root).ok_or_else(|| {
+            GitToolError::InvalidInput("Native Pull child startup evidence missing".into())
+        })?;
+        let modules = self.native_pull_modules.as_ref().ok_or_else(|| {
+            GitToolError::InvalidInput("Native Pull child inventory missing".into())
+        })?;
+        let worktrees = startup
+            .targets
+            .iter()
+            .map(|path| {
+                modules
+                    .resolved_startup_worktree(path)
+                    .map(Path::to_owned)
+                    .ok_or_else(|| {
+                        GitToolError::InvalidInput(
+                            "Native Pull child startup target unresolved".into(),
+                        )
+                    })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        config.native_pull_hook_paths(common, root, &worktrees, &self.environment)
+    }
+
     pub(super) fn native_pull_auxiliary_roots(&self) -> Result<Vec<PathBuf>, GitToolError> {
         self.repository.revalidate_location()?;
         let mut roots = vec![
@@ -101,7 +130,7 @@ impl AddPlan {
                         )
                     })?
             };
-            let hooks = config.pull_hook_paths(common, root, &self.environment)?;
+            let hooks = self.native_pull_child_hook_paths(root, common, &config)?;
             if let Some(auxiliary) = self.auxiliary_paths.as_mut() {
                 auxiliary.extend(self.operation.name(), hooks.iter().cloned(), authorizations)?;
             } else {
@@ -248,10 +277,10 @@ impl AddPlan {
                 };
                 self.require_native_pull_module_read(common, authorizations)?;
                 self.require_native_pull_module_read(&common.join("config"), authorizations)?;
-                expected_fetch_hooks.extend(self.native_pull_configs[root].pull_hook_paths(
-                    common,
+                expected_fetch_hooks.extend(self.native_pull_child_hook_paths(
                     root,
-                    &self.environment,
+                    common,
+                    &self.native_pull_configs[root],
                 )?);
             }
             for target in modules.resolved_startup_worktrees() {

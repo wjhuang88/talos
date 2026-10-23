@@ -192,6 +192,18 @@ async fn native_pull_recursion(deinitialized: bool) {
     git(&parent.join("nested"), &["checkout", "origin/main"]);
     git(&parent, &["commit", "-am", "parent update"]);
 
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let hook = local.join(".git/modules/nested/hooks/post-checkout");
+        std::fs::write(
+            &hook,
+            "#!/bin/sh\nprintf observed > child-checkout-effect\n",
+        )
+        .expect("child checkout hook");
+        std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o755)).expect("hook mode");
+    }
+
     let plan = prepare(&local);
     let mut environment = plan.environment.clone();
     environment.insert("GIT_CONFIG_NOSYSTEM".into(), "1".into());
@@ -199,10 +211,7 @@ async fn native_pull_recursion(deinitialized: bool) {
         "GIT_CONFIG_GLOBAL".into(),
         root.path().join("absent-global-config").into_os_string(),
     );
-    fixture_config(
-        &mut environment,
-        &[("core.hooksPath", ""), ("protocol.file.allow", "always")],
-    );
+    fixture_config(&mut environment, &[("protocol.file.allow", "always")]);
     let frozen = command::FrozenCommand::pull(
         &plan.program,
         &local,
@@ -236,6 +245,12 @@ async fn native_pull_recursion(deinitialized: bool) {
     assert_eq!(
         std::fs::read(local.join("nested/file")).expect("updated child"),
         b"after\n"
+    );
+    #[cfg(unix)]
+    assert_eq!(
+        std::fs::read(local.join("nested/child-checkout-effect"))
+            .expect("native recursive checkout hook"),
+        b"observed"
     );
     assert_eq!(
         git(&local, &["rev-parse", "HEAD"]),

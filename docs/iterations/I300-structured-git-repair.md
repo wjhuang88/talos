@@ -8308,3 +8308,27 @@ doctests, both governance validators and both external Runtime SDK consumers.
 Log: /private/tmp/i300-startup-convergence-preflight.log (exit 0). This does not
 establish native Windows runtime, independent security review, remote exact-head
 CI or production activation. All remaining T7 gates above remain open.
+
+Native recursive integration-hook checkpoint (2026-10-23): child native
+configuration discovery and final revalidation now use the same union of fetch
+hooks at the stored gitdir and checkout/merge/rebase hooks at each resolved
+startup worktree. Relative core.hooksPath is resolved separately for those
+execution directories; default hooks remain under the bound common directory.
+This plans possible native integration effects without predicting conflicts or
+recreating Git's recursive scheduler. All candidates use the retained auxiliary
+resolver, content budget and existing executable-hook refusal; recursive
+production activation remains gated pending complete executable effects.
+
+New prepared-discovery regression verifies a contained child post-checkout
+candidate reaches the final profile and an executable candidate is refused
+before FETCH_HEAD changes. Real native recursive runner tests now install a
+child post-checkout hook and verify its worktree marker for both initialized
+and deinitialized stored modules, proving that fetch-only hook discovery was
+insufficient. Locked Git-enabled tools library passes 550/550, Native Pull
+32/32, Pull 194/194 before the final runner-fixture change, and Git lib/tests
+Clippy with warnings denied passes. cargo xwin MSVC test-target check passes
+with seven existing reduced-feature warnings; this is not Windows runtime
+acceptance. Logs: /private/tmp/i300-recursive-hooks-{tools,native,pull,clippy,xwin}.log.
+Full latest-stage workspace preflight and independent review remain pending.
+T7 remains open; next complete child helper/worktree effect scope and native
+execution admission before production routing or deletion of the old scheduler.

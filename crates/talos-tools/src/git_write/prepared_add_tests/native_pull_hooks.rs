@@ -3,6 +3,77 @@
 use super::*;
 
 #[tokio::test]
+async fn native_pull_child_update_hooks_are_discovered_before_mutation() {
+    for executable in [false, true] {
+        let root = tempfile::tempdir().expect("fixture");
+        git(root.path(), &["init", "-b", "main"]);
+        git(root.path(), &["config", "core.hooksPath", ""]);
+        git(
+            root.path(),
+            &["remote", "add", "origin", "git://example.invalid/parent"],
+        );
+        let module = root.path().join(".git/modules/child");
+        let worktree = root.path().join("child");
+        std::fs::create_dir_all(&module).expect("module");
+        std::fs::create_dir_all(worktree.join("relative-hooks")).expect("worktree hooks");
+        git(&module, &["init", "--bare", "-b", "main"]);
+        git(&module, &["config", "core.bare", "false"]);
+        git(
+            &module,
+            &["config", "core.worktree", worktree.to_str().expect("path")],
+        );
+        git(&module, &["config", "core.hooksPath", "relative-hooks"]);
+        git(
+            &module,
+            &["remote", "add", "origin", "git://example.invalid/child"],
+        );
+        let candidate = worktree
+            .canonicalize()
+            .expect("actual worktree")
+            .join("relative-hooks/post-checkout");
+        if executable {
+            std::fs::write(&candidate, "#!/bin/sh\nexit 0\n").expect("hook");
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                std::fs::set_permissions(&candidate, std::fs::Permissions::from_mode(0o755))
+                    .expect("mode");
+            }
+        }
+        let mut plan =
+            prepare_pull_fixture(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+                .expect("plan");
+        plan.phase = Phase::PullNativePreparation;
+        let tokens = proof(&plan)
+            .consume_for_prepared(&plan.request(), &plan.identity)
+            .expect("discovery proof");
+        let result = Box::new(plan).discover_native_pull_scope(&tokens).await;
+        if executable {
+            let error = match result {
+                Ok(_) => panic!("executable child checkout hook was not refused"),
+                Err(error) => error,
+            };
+            assert!(
+                error.to_string().contains("post-checkout hook execution"),
+                "{error}"
+            );
+        } else {
+            let plan = result.expect("contained child hooks");
+            assert!(plan.phase == Phase::PullNativeMutation);
+            assert!(plan.native_pull_fetch_hooks.contains(&candidate));
+            assert!(
+                plan.facets
+                    .iter()
+                    .any(|facet| facet.nature == ToolNature::Read
+                        && facet.resource.as_deref() == candidate.to_str())
+            );
+        }
+        assert!(!module.join("FETCH_HEAD").exists());
+        assert!(!root.path().join(".git/FETCH_HEAD").exists());
+    }
+}
+
+#[tokio::test]
 async fn native_pull_hooks_require_complete_frontier_and_exact_reads() {
     for scenario in ["missing-read", "missing-frontier", "executable", "changed"] {
         let root = tempfile::tempdir().expect("fixture");
