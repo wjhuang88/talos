@@ -2,6 +2,68 @@
 
 use super::*;
 
+#[cfg(unix)]
+#[tokio::test]
+async fn native_pull_local_source_can_execute_upload_pack_configuration() {
+    let root = tempfile::tempdir().expect("fixture");
+    let source = root.path().join("source");
+    let local = root.path().join("local");
+    std::fs::create_dir(&source).expect("source");
+    git(&source, &["init", "-b", "main"]);
+    std::fs::write(source.join("file"), "before\n").expect("file");
+    git(&source, &["add", "file"]);
+    git(&source, &["commit", "-m", "base"]);
+    git(
+        root.path(),
+        &[
+            "clone",
+            source.to_str().expect("path"),
+            local.to_str().expect("path"),
+        ],
+    );
+    std::fs::write(source.join("file"), "after\n").expect("update");
+    git(&source, &["commit", "-am", "update"]);
+
+    let plan = prepare(&local);
+    let global = root.path().join("global-config");
+    std::fs::write(
+        &global,
+        "[uploadpack]\npackObjectsHook = printf observed > upload-pack-effect; exit 73;\n",
+    )
+    .expect("global configuration");
+    let mut environment = plan.environment.clone();
+    environment.insert("GIT_CONFIG_NOSYSTEM".into(), "1".into());
+    environment.insert("GIT_CONFIG_GLOBAL".into(), global.into_os_string());
+    // Protected global configuration reaches the local upload-pack.
+    // Deliberately fail after a marker: this is an effect baseline, not an
+    // authorized production Pull or a successful integration claim.
+    fixture_config(&mut environment, &[("core.hooksPath", "")]);
+    let frozen = command::FrozenCommand::pull(
+        &plan.program,
+        &local,
+        &GitPullInput { remote: None },
+        &environment,
+    )
+    .expect("command");
+    let output = plan
+        .run_command_output(
+            frozen.command(),
+            std::time::Duration::from_secs(20),
+            1024 * 1024,
+        )
+        .await
+        .expect("supervised native Pull");
+    assert!(!output.status.success());
+    assert_eq!(
+        std::fs::read(source.join(".git/upload-pack-effect")).expect("source-side effect"),
+        b"observed"
+    );
+    assert_eq!(
+        std::fs::read(local.join("file")).expect("unchanged local file"),
+        b"before\n"
+    );
+}
+
 #[tokio::test]
 async fn native_pull_owned_runner_preserves_configured_submodule_recursion() {
     native_pull_recursion(false).await;
