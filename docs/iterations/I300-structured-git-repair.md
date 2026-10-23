@@ -8250,3 +8250,34 @@ condition changed. Remaining effect scope and stable-candidate gates are open.
 Both repository governance validators exited 0 with zero warnings for this
 candidate; logs /private/tmp/i300-native-convergence-{governance,claims}.log.
 Full standard preflight and independent security review remain pending.
+
+Frozen convergence implementation 03e1a290 passes the complete locked standard
+release preflight outside the sandbox, exit 0, including workspace tests and
+both external Runtime SDK consumers. Log:
+/private/tmp/i300-03e1a290-preflight-elevated.log. The initial sandboxed attempt
+failed only at Push process observation with EPERM (1075 tools tests passed,
+one failed); log /private/tmp/i300-03e1a290-preflight.log. No source changed
+between attempts. Fetch found origin/main ec9ade0f; the implementation branch
+was rebased without conflicts. The pre-rebase result is historical evidence,
+not validation of the rebased head. Independent security review, exact-head
+remote CI, native Windows runtime and remaining T7 effects are still open.
+
+Post-rebase validation: ba2b5e83 full preflight exited 101 at the MCP Checkout
+denial assertion, which did not print its response. Log:
+/private/tmp/i300-native-convergence-rebased-preflight.log. The unchanged single
+test passed 1/1 in package isolation, then workspace-feature Git MCP tests passed
+8/8 after adding response/scenario diagnostics without weakening the assertion.
+Logs /private/tmp/i300-rebased-checkout-{isolation,workspace}.log. Cause is not
+established; these focused passes do not substitute for a full preflight pass.
+
+Final rebased candidate validation passed: the complete standard locked release
+preflight exited 0, including workspace tests, doctests, both governance
+validators and both external Runtime SDK consumers. Source remained fixed during
+the run; log /private/tmp/i300-native-convergence-final-preflight.log. The prior
+MCP Checkout failure remains unexplained; the diagnostic-only assertion change
+preserves its permission-denial requirement and records the response on recurrence.
+Native discovery implementation is ba2b5e83 after rebase onto ec9ade0f. No remote
+publication, independent security review or native Windows acceptance is claimed.
+Resume with complete recursive checkout/worktree and executable-effect scope;
+then production routing and Agent/MCP/Runtime acceptance before removing the
+superseded scheduler. T7 and all subsequent handoff items remain incomplete.
