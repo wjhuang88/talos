@@ -5808,3 +5808,10 @@ content capture or URL inspection. Native Pull 28/28, Pull 190/190, Clippy and
 cargo xwin MSVC checking pass. I300 records logs and remaining complete-effects,
 production, review, resource-accounting and platform requirements. T7 stays Active;
 the original T1–T8 delivery scope is unchanged.
+
+Frozen discovery implementation d248d8e2 now passes the full standard preflight
+outside the sandbox, including locked workspace checks, Clippy, tests, doctests
+and both Runtime SDK consumers. The initial sandbox run hit process-observation
+EPERM; the unchanged authorized retry exits 0. I300 records both logs. Next work
+remains simplified discovery orchestration and complete recursive effects, then
+production/security/platform acceptance; no task completion is claimed.
