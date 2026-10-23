@@ -187,6 +187,9 @@ async fn native_pull_recursion(deinitialized: bool, command_authority: bool) {
         ],
     );
     git(&local, &["config", "submodule.recurse", "true"]);
+    // Recursive checkout runs through the production retained environment;
+    // freeze the child repository's byte policy before possible deinit.
+    git(&local.join("nested"), &["config", "core.autocrlf", "false"]);
     if deinitialized {
         git(&local, &["submodule", "deinit", "-f", "nested"]);
         assert!(!local.join("nested/.git").exists());

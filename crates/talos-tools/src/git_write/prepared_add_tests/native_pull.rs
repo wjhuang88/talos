@@ -81,7 +81,8 @@ async fn native_pull_command_refuses_missing_stale_or_incomplete_authority() {
 }
 
 pub(super) fn git(cwd: &Path, args: &[&str]) -> Vec<u8> {
-    let output = std::process::Command::new("git")
+    let mut command = std::process::Command::new("git");
+    command
         .current_dir(cwd)
         .env("GIT_CONFIG_NOSYSTEM", "1")
         .env("GIT_CONFIG_GLOBAL", cwd.join("absent-global-config"))
@@ -89,11 +90,29 @@ pub(super) fn git(cwd: &Path, args: &[&str]) -> Vec<u8> {
         .env("GIT_AUTHOR_EMAIL", "fixture@example.invalid")
         .env("GIT_COMMITTER_NAME", "Native Pull fixture")
         .env("GIT_COMMITTER_EMAIL", "fixture@example.invalid")
-        .args(["-c", "core.hooksPath=", "-c", "commit.gpgSign=false"])
-        .args(args)
-        .output()
-        .expect("native Git fixture");
+        .args([
+            "-c",
+            "core.hooksPath=",
+            "-c",
+            "commit.gpgSign=false",
+            "-c",
+            "core.autocrlf=false",
+        ]);
+    // Persist the fixture setting before clone checkout; production Pull must
+    // retain the repository's configuration rather than receive test argv flags.
+    if let Some(index) = args.iter().position(|arg| *arg == "clone") {
+        command.args(&args[..index]);
+        command
+            .args(["clone", "--config", "core.autocrlf=false"])
+            .args(&args[index + 1..]);
+    } else {
+        command.args(args);
+    }
+    let output = command.output().expect("native Git fixture");
     assert!(output.status.success(), "{args:?}: {output:?}");
+    if args.first() == Some(&"init") {
+        git(cwd, &["config", "core.autocrlf", "false"]);
+    }
     output.stdout
 }
 

@@ -34,7 +34,13 @@ async fn refused_connection_advances_to_next_admitted_http_source_without_replay
     let rows = chain
         .execute(&transport)
         .await
-        .expect("next admitted source")
+        .unwrap_or_else(|error| {
+            panic!(
+                "next admitted source: {error:?}; resolved={:?}; attempts={}; refused_port={port}; server_port={server_port}",
+                hosts(&resolver),
+                budget.attempts.load(Ordering::Relaxed),
+            )
+        })
         .into_results();
     assert_eq!(rows.len(), 1);
     assert!(rows[0].url.starts_with("https://duckduckgo.com/"));

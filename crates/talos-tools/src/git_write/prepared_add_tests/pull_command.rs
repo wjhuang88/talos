@@ -182,7 +182,11 @@ async fn native_command_conflict_preserves_partial_effects_without_repair() {
         git(&local, &["rev-parse", "FETCH_HEAD"]),
         git(&source, &["rev-parse", "HEAD"])
     );
-    assert!(local.join(".git/MERGE_HEAD").is_file());
+    assert!(
+        local.join(".git/MERGE_HEAD").is_file(),
+        "native Pull must reach merge conflict: {}",
+        output.result.content
+    );
     assert!(!git(&local, &["ls-files", "--unmerged"]).is_empty());
     assert!(
         std::fs::read_to_string(local.join("file"))
