@@ -16,6 +16,30 @@ mod scope;
 mod config;
 
 #[test]
+fn native_pull_parent_local_source_is_a_read_path() {
+    let root = tempfile::tempdir().expect("fixture");
+    git(root.path(), &["init", "-b", "main"]);
+    let mut plan =
+        prepare_pull_fixture(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+            .expect("plan");
+    plan.pull_destinations = vec!["../source.git".into()];
+    let expected = plan.repository.workdir.join("../source.git");
+    let facets = plan.native_pull_parent_facets().expect("scope");
+    assert!(facets.iter().any(|facet| facet.nature == ToolNature::Read
+        && facet.resource_kind == Some(ToolResourceKind::Path)
+        && facet.resource.as_deref() == expected.to_str()));
+    assert!(
+        !facets
+            .iter()
+            .any(|facet| facet.nature == ToolNature::Network)
+    );
+    assert!(
+        !expected.exists(),
+        "classification must not open the source"
+    );
+}
+
+#[test]
 fn native_pull_plan_rejects_changed_operation_before_discovery() {
     let root = tempfile::tempdir().expect("fixture");
     git(root.path(), &["init", "-b", "main"]);
