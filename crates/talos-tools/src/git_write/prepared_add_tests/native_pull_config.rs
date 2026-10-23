@@ -9,6 +9,7 @@ async fn native_pull_child_destinations_and_final_configuration_checks_are_bound
         "bounded-fixed",
         "bounded-config",
         "bounded-hook",
+        "bounded-remote",
         "include-drift",
         "missing-source",
         "missing-chain",
@@ -85,7 +86,7 @@ async fn native_pull_child_destinations_and_final_configuration_checks_are_bound
         }
         if matches!(
             scenario,
-            "legacy" | "branches" | "legacy-drift" | "missing-legacy"
+            "legacy" | "branches" | "legacy-drift" | "missing-legacy" | "bounded-remote"
         ) {
             std::fs::write(&source, "[branch \"main\"]\nremote = upstream\n[url \"git://example.invalid/rewritten/\"]\ninsteadOf = alias:\n").expect("legacy-only config");
             let folder = if scenario == "branches" {
@@ -127,11 +128,11 @@ async fn native_pull_child_destinations_and_final_configuration_checks_are_bound
         assert!(plan.phase == Phase::PullNativeMutation);
         if scenario == "remote-budget" {
             plan.native_pull_remotes.clear();
-            // Leave exactly enough entries for the two absent legacy source
-            // files. Retaining the resolved URL must use the same allowance.
+            // Source content is already retained by shared auxiliary evidence.
+            // Re-probing must still charge the retained URL to the same budget.
             let budget = super::super::super::super::pull_inventory::ReferenceBudget::default();
             budget
-                .retain_configuration_output(&vec![0; 4094 * 2])
+                .retain_configuration_output(&vec![0; 4096 * 2])
                 .expect("reserve other retained records");
             plan.pull_reference_budget = budget.clone();
             let tokens = proof(&plan)
@@ -174,12 +175,13 @@ async fn native_pull_child_destinations_and_final_configuration_checks_are_bound
             let legacy = module.join("remotes/upstream");
             let mut incomplete = tokens.clone();
             incomplete.retain(|token| {
-                !token.authorizes_path(
-                    "git_pull",
-                    ToolNature::Read,
-                    &plan.workspace,
-                    legacy.to_str().expect("path"),
-                )
+                !token.authorizes_git_pull_bounded_discovery()
+                    && !token.authorizes_path(
+                        "git_pull",
+                        ToolNature::Read,
+                        &plan.workspace,
+                        legacy.to_str().expect("path"),
+                    )
             });
             plan.native_pull_remotes.clear();
             assert!(
@@ -263,8 +265,12 @@ async fn native_pull_child_destinations_and_final_configuration_checks_are_bound
                 "URL: git://example.invalid/changed\n",
             )
             .expect("legacy drift"),
+            "bounded-remote" => plan.facets.retain(|facet| {
+                facet.resource.as_deref() != module.join("remotes/upstream").to_str()
+            }),
             "missing-legacy" => plan.facets.retain(|facet| {
                 facet.resource.as_deref() != module.join("remotes/upstream").to_str()
+                    && facet.resource.as_deref() != Some("git:pull-bounded-discovery")
             }),
             "include-drift" => std::fs::write(
                 &source,
@@ -305,12 +311,30 @@ async fn native_pull_child_destinations_and_final_configuration_checks_are_bound
                     .expect("bounded in-root evidence needs no continuation")
             );
         }
+        if scenario == "bounded-remote" {
+            let mut exact_only = tokens.clone();
+            exact_only.retain(|token| !token.authorizes_git_pull_bounded_discovery());
+            plan.native_pull_remotes.clear();
+            assert!(
+                !plan
+                    .discover_native_pull_remotes(&exact_only)
+                    .await
+                    .expect("root Read cannot admit legacy source contents")
+            );
+            assert!(plan.native_pull_remotes.is_empty());
+            assert!(
+                plan.discover_native_pull_remotes(&tokens)
+                    .await
+                    .expect("bounded legacy source requires no fresh continuation")
+            );
+        }
         if matches!(
             scenario,
             "unchanged"
                 | "bounded-fixed"
                 | "bounded-config"
                 | "bounded-hook"
+                | "bounded-remote"
                 | "local"
                 | "legacy"
                 | "branches"
@@ -330,8 +354,7 @@ async fn native_pull_child_destinations_and_final_configuration_checks_are_bound
                 "missing-chain" => "discovery authority missing",
                 "missing-destination" => "destination differs",
                 "missing-startup" => "separate Read admission",
-                "missing-legacy" => "separate Read admission",
-                "legacy-drift" => "legacy remote source changed",
+                "missing-legacy" | "legacy-drift" => "auxiliary path",
                 "legacy-created" => "inventory changed",
                 "hook-created" => "path resolution changed",
                 "missing-hook" => "auxiliary path",

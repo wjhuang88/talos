@@ -1,13 +1,8 @@
-//! Native URL selection after exact legacy-source admission; never connects.
+//! Native URL selection after bounded or exact source admission; never connects.
 
 use super::*;
 
 pub(super) struct RemoteEvidence {
-    files: Vec<(
-        PathBuf,
-        snapshot::RegularEvidence,
-        Option<snapshot::PathIdentity>,
-    )>,
     pub destination: String,
 }
 
@@ -85,76 +80,56 @@ impl AddPlan {
         authorizations: &[talos_core::tool::ToolExecutionAuthorization],
     ) -> Result<bool, GitToolError> {
         let mut sources = Vec::new();
-        let mut ready = true;
         for (root, config) in &self.native_pull_configs {
             let remote = config.fetch_remote(self.native_pull_metadata[root].branch()?)?;
             config.prepare_pull_transport(&remote)?;
             let paths = self.native_pull_remote_sources(root, &remote)?;
-            for path in &paths {
-                if !self.facets.iter().any(|facet| {
-                    facet.nature == ToolNature::Read
-                        && facet.resource_kind == Some(ToolResourceKind::Path)
-                        && facet.resource.as_deref() == path.to_str()
-                }) {
-                    self.facets.push(path_facet(
-                        ToolNature::Read,
-                        path,
-                        "native Pull child legacy remote source; contents deferred",
-                    )?);
-                }
-                // A published facet is a request, not proof. Conversely an
-                // existing proof need not pause just because this pass first
-                // published the corresponding source facet.
-                ready &= authorizations.iter().any(|token| {
+            sources.push((root.clone(), remote, paths));
+        }
+        if sources.is_empty() {
+            return Ok(true);
+        }
+        let roots = self.native_pull_auxiliary_roots()?;
+        let auxiliary = self.auxiliary_paths.as_mut().ok_or_else(|| {
+            GitToolError::InvalidInput("Native Pull auxiliary evidence missing".into())
+        })?;
+        auxiliary.extend(
+            "git_pull",
+            sources
+                .iter()
+                .flat_map(|(_, _, paths)| paths.iter().cloned()),
+            authorizations,
+        )?;
+        auxiliary.add_read_frontier(&mut self.facets)?;
+        // Resolve metadata first, then require the complete actual-target
+        // frontier before reading any content or asking Git for a URL.
+        let ready = auxiliary.targets().all(|path| {
+            auxiliary.native_pull_target_read(path, authorizations, &roots)
+                || authorizations.iter().any(|token| {
                     token.authorizes_path(
                         "git_pull",
                         ToolNature::Read,
                         &self.workspace,
                         path.to_str().unwrap_or_default(),
                     )
-                });
-            }
-            sources.push((root.clone(), remote, paths));
-        }
+                })
+        });
         if !ready {
             return Ok(false);
         }
-        for (_, _, paths) in &sources {
-            for path in paths {
-                self.child_read(path, authorizations)?;
-            }
-        }
-        for (root, remote, paths) in sources {
+        auxiliary.capture_native_pull(authorizations, &[], &self.pull_reference_budget, &roots)?;
+        for (root, remote, _) in sources {
             if self.native_pull_remotes.contains_key(&root) {
                 self.validate_native_pull_remote(&root, &remote, authorizations)
                     .await?;
                 continue;
             }
-            let mut files = Vec::new();
-            for path in paths {
-                if path.canonicalize().is_ok_and(|actual| actual != path) {
-                    return Err(GitToolError::InvalidInput(
-                        "Native Pull legacy source link requires separate target admission".into(),
-                    ));
-                }
-                let evidence = self.pull_reference_budget.capture(&path)?;
-                let identity = if matches!(evidence.entry, snapshot::Entry::Missing) {
-                    None
-                } else {
-                    Some(snapshot::PathIdentity::capture(&path).map_err(|_| {
-                        GitToolError::InvalidInput(
-                            "Native Pull legacy source identity unavailable".into(),
-                        )
-                    })?)
-                };
-                files.push((path, evidence, identity));
-            }
             let destination = self.inspect_native_pull_remote(&root, &remote).await?;
             self.pull_reference_budget
                 .retain_remote_destination(&destination)?;
             self.native_pull_configs[&root].revalidate()?;
-            let evidence = RemoteEvidence { files, destination };
-            evidence.revalidate()?;
+            let evidence = RemoteEvidence { destination };
+            self.validate_native_pull_remote_sources(&root, &remote, authorizations)?;
             self.native_pull_remotes.insert(root.clone(), evidence);
             self.facets.extend(
                 self.native_pull_child_remote_facets(&root, &self.native_pull_configs[&root])?,
@@ -174,30 +149,34 @@ impl AddPlan {
         let evidence = self.native_pull_remotes.get(root).ok_or_else(|| {
             GitToolError::InvalidInput("Native Pull child remote evidence missing".into())
         })?;
-        for (path, _, _) in &evidence.files {
-            self.child_read(path, authorizations)?;
-        }
-        evidence.revalidate()?;
+        self.validate_native_pull_remote_sources(root, remote, authorizations)?;
         if self.inspect_native_pull_remote(root, remote).await? != evidence.destination {
             return Err(GitToolError::InvalidInput(
                 "Native Pull child remote changed; values withheld".into(),
             ));
         }
         self.native_pull_configs[root].revalidate()?;
-        evidence.revalidate()
+        self.validate_native_pull_remote_sources(root, remote, authorizations)
     }
-}
 
-impl RemoteEvidence {
-    fn revalidate(&self) -> Result<(), GitToolError> {
-        for (path, evidence, identity) in &self.files {
-            if snapshot::PathIdentity::capture(path).ok().as_ref() != identity.as_ref()
-                || evidence.revalidate(path).is_err()
-            {
-                return Err(GitToolError::InvalidInput(
-                    "Native Pull child legacy remote source changed".into(),
-                ));
-            }
+    fn validate_native_pull_remote_sources(
+        &self,
+        root: &Path,
+        remote: &str,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<(), GitToolError> {
+        let auxiliary = self.auxiliary_paths.as_ref().ok_or_else(|| {
+            GitToolError::InvalidInput("Native Pull auxiliary evidence missing".into())
+        })?;
+        auxiliary.revalidate_native_pull(authorizations, &self.native_pull_auxiliary_roots()?)?;
+        if self
+            .native_pull_remote_sources(root, remote)?
+            .iter()
+            .any(|path| auxiliary.leaf_evidence(path).is_none())
+        {
+            return Err(GitToolError::InvalidInput(
+                "Native Pull legacy remote source evidence missing".into(),
+            ));
         }
         Ok(())
     }
