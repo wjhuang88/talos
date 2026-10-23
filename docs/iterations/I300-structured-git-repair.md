@@ -8204,3 +8204,49 @@ remain. Simplified orchestration, local-source protected execution, selected
 integration programs, P1 accounting, independent review and native Windows
 acceptance remain open. No T7 completion or full-preflight claim is made for
 this newer implementation.
+
+
+Uncommitted discovery-convergence checkpoint (2026-10-23): native preparation
+now attempts sender and contained module discovery under the initial immutable
+proof. Parent hook candidates reuse the shared auxiliary evidence store and
+shared content budget; identity-validated parent roots join the contained
+auxiliary root set, with exact root Read required outside the gitdir anchor.
+This remains experimental and unreviewed. Native Pull selection passed 28
+existing tests; the new real-dispatcher convergence regression failed because
+host system/global configuration origins introduce an external exact-Read
+frontier before the final mutation profile. Do not suppress that frontier or
+weaken the regression to claim convergence. Log:
+/private/tmp/i300-discovery-convergence-test.log. `git diff --check` passed;
+Clippy, Windows xwin and full preflight have not run for this uncommitted work.
+Next: reconcile normal configuration-chain discovery with retained external
+source-use authorization, then rerun convergence and security regressions.
+Production and recursive execution guards remain enabled; no completion claim.
+
+
+Native discovery convergence validation (2026-10-23): the prior failing
+regression now passes. Initial native discovery retains configuration-chain and
+auxiliary-resolution scopes; sender configuration and contained module work run
+internally under the consumed immutable discovery proof. Child configurations
+may reuse identical parent-retained configuration origins solely for internal
+plan construction; newly introduced external includes still produce a fresh
+Read frontier. Final execution still requires every origin's fresh Read proof.
+Parent hooks use shared auxiliary evidence, retained root identities and the
+invocation content budget. Unapproved external hook candidates publish a frontier
+before content/type capture; a nonregular unread candidate regression proves it.
+The actual PreparedStageHistory regression reaches final mutation scope after
+one discovery approval for two nested stored modules and rejects a stale discovery
+proof without FETCH_HEAD writes. Recursive execution remains deliberately gated.
+The upstream/rebase and conflict baselines now derive their final plans from one
+real bounded discovery rather than manually constructing them, reducing fixture
+code and preserving native upstream, rebase and partial-conflict assertions.
+Pull tests passed 192/192 before the fixture conversion; afterward Native Pull
+passed 30/30. Git lib/tests Clippy with warnings denied passed after the final
+fixture conversion; locked cargo xwin MSVC test-target checking passed before it
+(seven existing reduced-feature xwin warnings). Logs:
+/private/tmp/i300-native-convergence-{pull,clippy,xwin,integration}.log.
+No production routing, recursive refusal, Windows activation or T7 completion
+condition changed. Remaining effect scope and stable-candidate gates are open.
+
+Both repository governance validators exited 0 with zero warnings for this
+candidate; logs /private/tmp/i300-native-convergence-{governance,claims}.log.
+Full standard preflight and independent security review remain pending.

@@ -1,5 +1,5 @@
 //! Native whole-operation baselines for replacing the staged Pull scheduler.
-//! Final-stage admission and owned-runner baselines, not discovery/activation.
+//! Bounded discovery, final-stage admission and runner baselines, not activation.
 
 use super::*;
 
@@ -17,6 +17,9 @@ mod config;
 
 #[path = "native_pull_remote.rs"]
 mod remote;
+
+#[path = "native_pull_convergence.rs"]
+mod convergence;
 
 #[test]
 fn native_pull_parent_local_source_is_a_read_path() {
@@ -277,49 +280,28 @@ async fn native_pull_preserves_configured_integration(conflict: bool) {
     super::isolate_integration_fixture_filters(&local);
     let mut plan = prepare_pull_fixture(&local, &serde_json::json!({}), ToolProvenance::Native)
         .expect("native plan");
-    let config_output = plan
-        .inspect_config()
+    plan.phase = Phase::PullNativePreparation;
+    let mut history = talos_core::tool::PreparedStageHistory::default();
+    assert!(history.record_profile(&plan.identity, &plan.facets));
+    let discovery = proof(&plan);
+    let tokens = discovery
+        .consume_for_prepared(&plan.request(), &plan.identity)
+        .expect("discovery admission");
+    let mut plan = Box::new(plan)
+        .discover_native_pull_scope(&tokens)
         .await
-        .expect("fixture config inspection");
-    plan.config = Some(
-        super::super::super::config_state::ConfigState::capture_host(
-            &config_output,
-            &plan.repository,
-            &plan.environment,
-        )
-        .expect("fixture configuration evidence"),
-    );
-    let (resolved_remote, resolved_destinations) = plan
-        .resolve_native_pull_destination()
-        .await
-        .expect("native destination discovery");
-    assert_eq!(resolved_remote, "upstream");
-    assert_eq!(resolved_destinations, std::slice::from_ref(&destination));
+        .expect("single bounded discovery");
+    assert!(plan.phase == Phase::PullNativeMutation);
+    assert!(history.record_profile(&plan.identity, &plan.facets));
+    assert_eq!(plan.pull_remote.as_deref(), Some("upstream"));
+    assert_eq!(plan.pull_destinations, std::slice::from_ref(&destination));
     assert!(!local.join(".git/FETCH_HEAD").exists());
-    plan.pull_remote = Some(resolved_remote);
-    // Final-stage fixture: discovery is tested separately and remains a gate.
-    plan.facets
-        .retain(|facet| facet.nature == ToolNature::Execute);
-    plan.pull_destinations = resolved_destinations.clone();
-    plan.facets
-        .extend(plan.native_pull_parent_facets().expect("parent scope"));
-    let branch = plan.native_pull_branch().await.expect("branch");
-    plan.pull_hook_paths = plan
-        .config
-        .as_ref()
-        .expect("config")
-        .native_pull_hook_paths(&plan.repository, &plan.environment, branch.as_deref())
-        .expect("whole-operation hook frontier");
-    for path in &plan.pull_hook_paths {
-        plan.facets
-            .push(path_facet(ToolNature::Read, path, "native hook evidence").expect("hook Read"));
-    }
     // Even a separately approved-looking destination cannot substitute for
     // the remote resolved by native Pull's retained config and current branch.
     plan.pull_destinations = vec!["git://different.invalid/source".into()];
     assert!(plan.validate_native_pull_destination().await.is_err());
     assert!(!local.join(".git/FETCH_HEAD").exists());
-    plan.pull_destinations = resolved_destinations;
+    plan.pull_destinations = vec![destination];
     plan.pull_transport_supported = true;
     plan.phase = Phase::PullNativeMutation;
     plan.identity = PreparedPlanIdentity::new();
@@ -332,9 +314,7 @@ async fn native_pull_preserves_configured_integration(conflict: bool) {
             .consume_for_prepared(&plan.request(), &plan.identity)
             .is_err()
     );
-    let PreparedNormalStage::Complete(output) =
-        Box::new(plan).execute_stage(Box::new(admitted)).await
-    else {
+    let PreparedNormalStage::Complete(output) = plan.execute_stage(Box::new(admitted)).await else {
         panic!("native Pull must complete in one execution stage")
     };
     daemon.stop().await.expect("daemon cleanup");
