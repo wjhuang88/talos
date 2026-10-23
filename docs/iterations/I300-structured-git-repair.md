@@ -7874,3 +7874,12 @@ The previous instruction to diagnose/bound the fixture does not constitute a
 confirmed diagnosis. Next reproduction must capture the live test's child
 processes and wait location before termination; a fresh complete preflight is
 still required, and these narrower passes do not supersede its failed attempt.
+
+Full validation retry (2026-10-23): standard preflight completed successfully
+with unchanged scope-control implementation, including locked workspace tests,
+Clippy and SDK fixtures (/private/tmp/i300-uploadpack-scope-preflight-retry.log).
+Scope-control implementation is committed as 96923d31. This closes the pending
+validation run above; it does not explain the earlier hang or establish a hang
+fix. Retain that occurrence for recurrence diagnostics. Fetch confirms no new
+origin/main commits beyond the current base; no rebase is needed. Native Pull
+activation, the inventory-scope decision and T1-T8 completion remain open.

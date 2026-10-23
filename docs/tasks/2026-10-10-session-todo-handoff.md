@@ -5686,3 +5686,10 @@ Source classification and native effect baseline are committed as 0a712c87 and
 I300 records logs and seven reduced-feature compile warnings. PR #735 remains
 at old 06c1ebef with Windows failure, so current native Windows evidence and
 independent review remain missing. The inventory-scope decision is unanswered.
+
+Upload-pack scope control 96923d31 distinguishes protected global execution from
+ignored source-local hook configuration. Full standard preflight retry passes
+(/private/tmp/i300-uploadpack-scope-preflight-retry.log). One earlier workspace
+run hung in a checkout test and was terminated; isolated checkout and the full
+536-test Git suite pass, and the hang cause remains unproven. I300 owns the
+recurrence evidence. No production Pull or Windows runtime completion is claimed.
