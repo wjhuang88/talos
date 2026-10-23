@@ -1,3 +1,18 @@
+## Native Windows candidate evidence — 2026-10-24
+
+CI run 39987142357 at `aecd83cd0` completed with failure. The full Windows job
+log proves production prepared Add, Runtime Pull's four scenarios, MCP real
+fetch/Deny/request-ID replay and the structured Git focused regressions passed
+natively. It does not cover the later local conflict/configuration-drift tests.
+Desktop explicit-feature validation failed 105/1 at
+`enabled_auto_allow_once_reports_without_manual_approval`: Auto approved and
+the tool started, but the 15-second watchdog saw no result. Root cause and
+regression attribution remain unproven; full Windows workspace tests were not
+established by this run. Log: `/private/tmp/i300-windows-full-39987142357.log`.
+The newer MCP/Runtime failure fixtures pass cargo-xwin MSVC checking
+(`/private/tmp/i300-failure-matrix-xwin.log`), which is compilation only.
+T7 and full handoff completion remain open.
+
 ## MCP and Runtime conflict evidence — 2026-10-24
 
 The real JSON-RPC Pull fixture now also creates divergent commits and checks
