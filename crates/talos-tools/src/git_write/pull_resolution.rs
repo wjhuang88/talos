@@ -162,6 +162,14 @@ pub(super) struct Resolution {
 }
 
 impl Resolution {
+    pub(super) fn is_unredirected(&self, spelling: &Path) -> bool {
+        self.resolved == spelling
+            && self
+                .records
+                .iter()
+                .all(|record| !matches!(record.state, State::Link(..)))
+    }
+
     pub(super) fn resolved(&self) -> &Path {
         &self.resolved
     }

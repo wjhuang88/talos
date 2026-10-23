@@ -8125,3 +8125,26 @@ This covers initial retained child auxiliary contents only; path-resolution,
 identity-handle and revalidation accounting are not claimed unified. Scoped
 hook/remote discovery, complete recursive effects, production routing and
 security/platform acceptance remain open. No T7 completion is claimed.
+
+Contained child hook discovery checkpoint (2026-10-23): native Pull auxiliary
+content capture and final revalidation may reuse the dedicated bounded discovery
+token for frozen, unredirected sources inside identity-revalidated stored-module
+roots. The parent metadata anchor must retain its own exact Read. Ordinary tool
+validation and out-of-root or linked sources still require exact target Read;
+this adds no hook execution authority. The same-root symlink negative prevents
+lexical containment from substituting for component evidence. Tests remove the
+exact hook facet, remove only the named capability, capture actual file content,
+and reject both external and same-root linked ancestors before content capture.
+Native Pull tests pass 27/27; the broader Pull selection passes 188/188 before
+the final additional content-only regression; Git-enabled lib/tests Clippy passes
+with warnings denied. Logs: /private/tmp/i300-scoped-hooks-{tests,pull,clippy}.log.
+Remaining work: scoped legacy remote discovery, complete recursive mutation roots
+and destinations, production routing, independent security review and platform
+acceptance. Resolution/identity/revalidation accounting remains the previously
+recorded residual. Production gates stay in place; this is not T7 completion.
+
+This hook stage also passes `cargo xwin check --locked -p talos-tools --features
+git --tests --target x86_64-pc-windows-msvc` (seven existing reduced-feature
+warnings). Sandbox cache-write EPERM was followed by an authorized retry. Log:
+/private/tmp/i300-scoped-hooks-xwin.log. Compilation does not replace native
+Windows runtime acceptance.

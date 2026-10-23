@@ -5793,3 +5793,10 @@ in addition to its local auxiliary limit; the cross-source exhaustion regression
 passes. Native Pull 25/25, auxiliary tests 7/7 and Git-enabled Clippy pass. I300
 records evidence and accounting limits. Discovery consolidation, recursive
 execution effects and production/platform acceptance remain unfinished.
+
+Contained child hook reads now reuse bounded discovery with retained component
+evidence and revalidated module roots. Exact target Read remains required for
+linked/outside sources; hook execution remains ungranted. Native Pull 27/27,
+Pull regression 188/188 and Git-enabled Clippy pass; I300 owns precise validation
+scope and remaining remote/effects/production/security/platform work. T7 and the
+original T1–T8 handoff remain incomplete.

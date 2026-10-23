@@ -197,7 +197,7 @@ impl AuxiliaryPaths {
         authorizations: &[ToolExecutionAuthorization],
         hooks: &[PathBuf],
     ) -> Result<(), GitToolError> {
-        self.capture_with_budget(authorizations, hooks, None)
+        self.capture_with_budget(authorizations, hooks, None, &[])
     }
 
     /// Native Pull shares its invocation evidence allowance across child hooks.
@@ -206,11 +206,12 @@ impl AuxiliaryPaths {
         authorizations: &[ToolExecutionAuthorization],
         hooks: &[PathBuf],
         shared: &super::pull_inventory::ReferenceBudget,
+        roots: &[PathBuf],
     ) -> Result<(), GitToolError> {
         if self.tool != "git_pull" {
             return Err(invalid());
         }
-        self.capture_with_budget(authorizations, hooks, Some(shared))
+        self.capture_with_budget(authorizations, hooks, Some(shared), roots)
     }
 
     fn capture_with_budget(
@@ -218,6 +219,7 @@ impl AuxiliaryPaths {
         authorizations: &[ToolExecutionAuthorization],
         hooks: &[PathBuf],
         shared: Option<&super::pull_inventory::ReferenceBudget>,
+        roots: &[PathBuf],
     ) -> Result<(), GitToolError> {
         if !authorizations
             .iter()
@@ -230,7 +232,7 @@ impl AuxiliaryPaths {
         if let Some(hook) = hooks.iter().find(|hook| self.original_leaf_is_link(hook)) {
             return Err(unsupported_hook(hook));
         }
-        self.require_target_reads(authorizations)?;
+        self.require_target_reads(authorizations, roots)?;
         for source in &mut self.sources {
             if let Some(evidence) = &source.leaf {
                 evidence
@@ -274,7 +276,7 @@ impl AuxiliaryPaths {
                 }
             }
         }
-        self.revalidate(authorizations)
+        self.revalidate_with_roots(authorizations, roots)
     }
 
     /// Recheck the frozen component chain and admitted regular-file leaf
@@ -282,6 +284,22 @@ impl AuxiliaryPaths {
     pub(super) fn revalidate(
         &self,
         authorizations: &[ToolExecutionAuthorization],
+    ) -> Result<(), GitToolError> {
+        self.revalidate_with_roots(authorizations, &[])
+    }
+
+    pub(super) fn revalidate_native_pull(
+        &self,
+        authorizations: &[ToolExecutionAuthorization],
+        roots: &[PathBuf],
+    ) -> Result<(), GitToolError> {
+        self.revalidate_with_roots(authorizations, roots)
+    }
+
+    fn revalidate_with_roots(
+        &self,
+        authorizations: &[ToolExecutionAuthorization],
+        roots: &[PathBuf],
     ) -> Result<(), GitToolError> {
         if !authorizations
             .iter()
@@ -293,7 +311,7 @@ impl AuxiliaryPaths {
             return Err(invalid());
         }
         self.revalidate_resolutions(authorizations)?;
-        self.require_target_reads(authorizations)?;
+        self.require_target_reads(authorizations, roots)?;
         for source in &self.sources {
             let target = source.resolution.resolved();
             let evidence = source.leaf.as_ref().ok_or_else(invalid)?;
@@ -305,21 +323,46 @@ impl AuxiliaryPaths {
     fn require_target_reads(
         &self,
         authorizations: &[ToolExecutionAuthorization],
+        roots: &[PathBuf],
     ) -> Result<(), GitToolError> {
         // Check the entire frontier before re-reading any retained file body.
         for target in self.targets() {
-            if !authorizations.iter().any(|token| {
-                token.authorizes_path(
-                    &self.tool,
-                    ToolNature::Read,
-                    &self.workspace,
-                    target.to_str().unwrap_or_default(),
-                )
-            }) {
+            if !self.native_pull_target_read(target, authorizations, roots)
+                && !authorizations.iter().any(|token| {
+                    token.authorizes_path(
+                        &self.tool,
+                        ToolNature::Read,
+                        &self.workspace,
+                        target.to_str().unwrap_or_default(),
+                    )
+                })
+            {
                 return Err(invalid());
             }
         }
         Ok(())
+    }
+
+    /// Only frozen, unredirected sources may reuse a caller-revalidated module
+    /// root. A directory Path token alone never grants descendant content reads.
+    pub(super) fn native_pull_target_read(
+        &self,
+        target: &Path,
+        authorizations: &[ToolExecutionAuthorization],
+        roots: &[PathBuf],
+    ) -> bool {
+        self.tool == "git_pull"
+            && authorizations
+                .iter()
+                .any(|token| token.authorizes_git_pull_bounded_discovery())
+            && self.authorizes_anchor(authorizations)
+            && roots
+                .iter()
+                .any(|root| root.starts_with(&self.anchor) && target.starts_with(root))
+            && self.sources.iter().any(|source| {
+                source.resolution.resolved() == target
+                    && source.resolution.is_unredirected(&source.spelling)
+            })
     }
 
     fn authorizes_anchor(&self, authorizations: &[ToolExecutionAuthorization]) -> bool {
