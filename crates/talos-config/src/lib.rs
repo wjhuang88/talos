@@ -15,6 +15,7 @@ mod credentials;
 mod endpoint;
 mod env;
 mod error;
+mod protocol_resolution;
 mod store;
 #[cfg(test)]
 mod store_finalization_tests;
@@ -30,6 +31,7 @@ pub use endpoint::{
     validate_provider_name, validate_provider_protocol,
 };
 pub use error::ConfigError;
+pub use protocol_resolution::{ProtocolResolution, ProtocolResolutionSource, resolve_protocol};
 pub use store::ConfigStore;
 pub use types::{
     AutoConfig, Config, ConfigUnsetOutcome, DashboardConfig, HookConfig, HookDeclaration,
