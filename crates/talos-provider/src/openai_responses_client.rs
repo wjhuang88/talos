@@ -109,10 +109,7 @@ impl OpenAIResponsesClient {
             "method": "POST",
             "url": self.endpoint_url(),
             "headers": {
-                "Authorization": format!(
-                    "Bearer {}",
-                    crate::openai_request::redact_secret(&self.api_key)
-                ),
+                "Authorization": format!("Bearer {}", redact_secret(&self.api_key)),
                 "Content-Type": "application/json",
             },
             "body": body,
@@ -280,6 +277,24 @@ impl OpenAIResponsesClient {
             self.timeout_config.backoff_max_ms,
         )
     }
+}
+
+fn redact_secret(secret: &str) -> String {
+    let trimmed = secret.trim();
+    if trimmed.is_empty() {
+        return "<empty>".into();
+    }
+
+    let prefix: String = trimmed.chars().take(4).collect();
+    let suffix: String = trimmed
+        .chars()
+        .rev()
+        .take(4)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect();
+    format!("{prefix}...{suffix}")
 }
 
 fn replay_safe_messages(
