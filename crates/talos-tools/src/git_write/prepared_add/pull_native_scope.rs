@@ -65,6 +65,13 @@ impl AddPlan {
         authorizations: &[talos_core::tool::ToolExecutionAuthorization],
     ) -> Result<Box<Self>, GitToolError> {
         self.revalidate()?;
+        // One admitted native discovery profile covers sender configuration
+        // and contained module inspection. Do not manufacture a continuation
+        // merely to pass between these internal discovery steps.
+        if self.config.is_none() {
+            self = self.discover_admitted(authorizations).await?;
+            self.phase = Phase::PullNativePreparation;
+        }
         // execute_stage has consumed the complete immutable profile proof.
         // Bind this dedicated scope to the displayed, retained parent gitdir;
         // an exact Read of a directory alone never grants descendant reads.
@@ -101,6 +108,44 @@ impl AddPlan {
         }
 
         self.require_pull_parent_metadata(authorizations)?;
+        let hooks = self.pull_hook_paths.clone();
+        if let Some(auxiliary) = self.auxiliary_paths.as_mut() {
+            auxiliary.extend(self.operation.name(), hooks.iter().cloned(), authorizations)?;
+        } else {
+            self.auxiliary_paths = Some(super::super::auxiliary_paths::AuxiliaryPaths::resolve(
+                self.operation.name(),
+                &self.workspace,
+                &self.repository.git_dir,
+                hooks.iter().cloned(),
+                authorizations,
+            )?);
+        }
+        let roots = self.native_pull_auxiliary_roots()?;
+        let auxiliary = self.auxiliary_paths.as_ref().ok_or_else(|| {
+            GitToolError::InvalidInput("Native Pull auxiliary evidence missing".into())
+        })?;
+        auxiliary.add_read_frontier(&mut self.facets)?;
+        if !auxiliary.targets().all(|path| {
+            auxiliary.native_pull_target_read(path, authorizations, &roots)
+                || authorizations.iter().any(|token| {
+                    token.authorizes_path(
+                        "git_pull",
+                        ToolNature::Read,
+                        &self.workspace,
+                        path.to_str().unwrap_or_default(),
+                    )
+                })
+        }) {
+            self.phase = Phase::PullNativePreparation;
+            self.identity = PreparedPlanIdentity::new();
+            return Ok(self);
+        }
+        self.auxiliary_paths
+            .as_mut()
+            .ok_or_else(|| {
+                GitToolError::InvalidInput("Native Pull auxiliary evidence missing".into())
+            })?
+            .capture_native_pull(authorizations, &hooks, &self.pull_reference_budget, &roots)?;
         self.pull_hook_evidence = self.capture_native_pull_hooks(authorizations).await?;
         let mut inventory = self.pull_inventory.take().ok_or_else(|| {
             GitToolError::InvalidInput("Native Pull parent inventory missing".into())

@@ -5,11 +5,17 @@ use std::collections::BTreeSet;
 
 impl AddPlan {
     pub(super) fn native_pull_auxiliary_roots(&self) -> Result<Vec<PathBuf>, GitToolError> {
-        let Some(modules) = &self.native_pull_modules else {
-            return Ok(Vec::new());
-        };
-        modules.revalidate()?;
-        Ok(modules.stored_module_roots().map(Path::to_owned).collect())
+        self.repository.revalidate_location()?;
+        let mut roots = vec![
+            self.repository.workdir.clone(),
+            self.repository.git_dir.clone(),
+            self.repository.common_dir.clone(),
+        ];
+        if let Some(modules) = &self.native_pull_modules {
+            modules.revalidate()?;
+            roots.extend(modules.stored_module_roots().map(Path::to_owned));
+        }
+        Ok(roots)
     }
 
     // The named discovery authority permits Git's normal include-chain read,
@@ -126,8 +132,20 @@ impl AddPlan {
         let auxiliary_roots = self.native_pull_auxiliary_roots()?;
         if discovered {
             for config in self.native_pull_configs.values() {
-                for (path, _) in &config.files {
-                    admitted &= self.native_pull_module_read(path, authorizations)?
+                for (path, entry) in &config.files {
+                    // Parent discovery already retained ordinary host origins
+                    // under the configuration-chain capability. Reusing that
+                    // same frozen source for internal plan construction does
+                    // not require the future execution proof. Newly introduced
+                    // external child includes still publish a fresh frontier.
+                    let retained_parent_source = self.config.as_ref().is_some_and(|parent| {
+                        parent
+                            .files
+                            .iter()
+                            .any(|(source, retained)| source == path && retained == entry)
+                    });
+                    admitted &= retained_parent_source
+                        || self.native_pull_module_read(path, authorizations)?
                         || authorizations.iter().any(|token| {
                             token.authorizes_path(
                                 "git_pull",

@@ -343,8 +343,8 @@ impl AuxiliaryPaths {
         Ok(())
     }
 
-    /// Only frozen, unredirected sources may reuse a caller-revalidated module
-    /// root. A directory Path token alone never grants descendant content reads.
+    /// Only frozen, unredirected sources may reuse caller-revalidated parent or
+    /// module roots. A Path token alone never grants descendant content reads.
     pub(super) fn native_pull_target_read(
         &self,
         target: &Path,
@@ -356,9 +356,18 @@ impl AuxiliaryPaths {
                 .iter()
                 .any(|token| token.authorizes_git_pull_bounded_discovery())
             && self.authorizes_anchor(authorizations)
-            && roots
-                .iter()
-                .any(|root| root.starts_with(&self.anchor) && target.starts_with(root))
+            && roots.iter().any(|root| {
+                target.starts_with(root)
+                    && (root.starts_with(&self.anchor)
+                        || authorizations.iter().any(|token| {
+                            token.authorizes_path(
+                                &self.tool,
+                                ToolNature::Read,
+                                &self.workspace,
+                                root.to_str().unwrap_or_default(),
+                            )
+                        }))
+            })
             && self.sources.iter().any(|source| {
                 source.resolution.resolved() == target
                     && source.resolution.is_unredirected(&source.spelling)

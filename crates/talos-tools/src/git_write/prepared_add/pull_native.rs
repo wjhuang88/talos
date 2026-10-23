@@ -194,9 +194,9 @@ impl AddPlan {
         self.revalidate()
     }
 
-    // Parent root admission cannot substitute for exact hook Read admission.
-    // Re-derive the frontier so an omitted candidate cannot hide executable
-    // effects from the final operation profile.
+    // Reuse bounded, unredirected auxiliary evidence where available; otherwise
+    // require exact hook Read admission. Re-derive the frontier so omitted
+    // candidates cannot hide executable effects from the final operation profile.
     pub(super) async fn capture_native_pull_hooks(
         &self,
         authorizations: &[talos_core::tool::ToolExecutionAuthorization],
@@ -216,6 +216,22 @@ impl AddPlan {
                 "Native Pull hook frontier differs from admitted scope; no Pull started".into(),
             ));
         }
+        if let Some(auxiliary) = &self.auxiliary_paths {
+            auxiliary
+                .revalidate_native_pull(authorizations, &self.native_pull_auxiliary_roots()?)?;
+            if paths
+                .iter()
+                .any(|path| auxiliary.leaf_evidence(path).is_none())
+            {
+                return Err(GitToolError::InvalidInput(
+                    "Native Pull hook evidence missing".into(),
+                ));
+            }
+            // The shared auxiliary store retains and revalidates these handles;
+            // do not duplicate captures or charge their contents twice.
+            return Ok(Vec::new());
+        }
+
         for path in &paths {
             if !authorizations.iter().any(|token| {
                 token.authorizes_path(

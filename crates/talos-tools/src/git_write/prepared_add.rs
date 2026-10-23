@@ -717,18 +717,16 @@ impl AddPlan {
         facets.push(ToolPermissionFacet::with_resource(
             ToolNature::Read, "git:configuration-chain", ToolResourceKind::Remote,
         ).with_description("discover Git system/global/include configuration internally; no general file access"));
-        if !matches!(operation, Operation::Pull(_)) {
-            facets.push(ToolPermissionFacet::with_resource(
-                ToolNature::Read,
-                "git:auxiliary-path-resolution",
-                ToolResourceKind::Remote,
-            ).with_description("resolve frozen local Git auxiliary paths; file contents require separate exact Read admission"));
-            facets.push(path_facet(
-                ToolNature::Read,
-                &repository.git_dir,
-                "source anchor for the fixed Git auxiliary path resolver",
-            )?);
-        }
+        facets.push(ToolPermissionFacet::with_resource(
+            ToolNature::Read,
+            "git:auxiliary-path-resolution",
+            ToolResourceKind::Remote,
+        ).with_description("resolve frozen local Git auxiliary paths; file contents require separate exact Read admission"));
+        facets.push(path_facet(
+            ToolNature::Read,
+            &repository.git_dir,
+            "source anchor for the fixed Git auxiliary path resolver",
+        )?);
         let native_pull_command = match &operation {
             Operation::Pull(pull) => Some(command::FrozenCommand::pull(
                 &program,
@@ -1179,8 +1177,10 @@ impl AddPlan {
             )?;
             self.config = Some(config);
             self.revalidate()?;
-            self.facets
-                .retain(|facet| facet.resource.as_deref() != Some("git:configuration-chain"));
+            if self.phase != Phase::PullNativePreparation {
+                self.facets
+                    .retain(|facet| facet.resource.as_deref() != Some("git:configuration-chain"));
+            }
             for (path, _) in &self
                 .config
                 .as_ref()
