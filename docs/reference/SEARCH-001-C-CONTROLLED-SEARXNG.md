@@ -46,3 +46,17 @@ selection and UTF-8 truncation. Source labels do not come from response data or 
 display conversion is not result admission. A final deadline failure takes precedence over
 formatted success and transport/parser errors. Caller cancellation drops the owned execution.
 This bridge is not an AgentTool registration, configuration discovery or official entry point.
+
+
+## Prepared-only tool wrapper (dormant)
+
+The private tool wrapper owns a caller-supplied validated SearXNG configuration and transport
+limits. It uses the unchanged `web_search` input schema, defaults and 1–20 result-count clamp.
+Preparation captures query and snippets options in a fresh invocation bound to that exact
+configuration; later input changes and wrapper disposal cannot replace them. Malformed input
+returns a fixed preparation error without echoing input or endpoint data.
+
+The wrapper requires network preparation. Every legacy execution surface returns
+`search_prepared_invocation_required`, including when path authorization is supplied. Only the
+prepared object can execute with matching live network authority. There is no environment/config
+lookup, official registration, background execution or Router/default activation in this stage.
