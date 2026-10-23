@@ -57,10 +57,6 @@ mod receiver_state;
 #[path = "git_write/receiver_storage.rs"]
 mod receiver_storage;
 
-// Pull pre-fetch evidence is retained by the admitted discovery continuation.
-#[path = "git_write/pull_state.rs"]
-mod pull_state;
-
 // Component resolution is separately authorized from target content reads.
 #[path = "git_write/pull_resolution.rs"]
 mod pull_resolution;
@@ -70,9 +66,6 @@ mod auxiliary_paths;
 
 #[path = "git_write/pull_inventory.rs"]
 mod pull_inventory;
-
-#[path = "git_write/pull_children.rs"]
-mod pull_children;
 
 // ─── Host git helpers ───
 

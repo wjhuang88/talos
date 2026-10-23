@@ -150,19 +150,11 @@ include!("prepared_add_tests/checkout.rs");
 
 include!("prepared_add_tests/commit.rs");
 
-include!("prepared_add_tests/pull.rs");
 #[path = "prepared_add_tests/native_pull.rs"]
 mod native_pull;
 
 #[path = "prepared_add_tests/pull_command.rs"]
 mod pull_command;
-include!("prepared_add_tests/pull_prefetch.rs");
-include!("prepared_add_tests/pull_fetch_admission.rs");
-include!("prepared_add_tests/pull_postfetch.rs");
-include!("prepared_add_tests/pull_graph_admission.rs");
-include!("prepared_add_tests/pull_rebase.rs");
-
-include!("prepared_add_tests/pull_children.rs");
 
 #[path = "prepared_add_tests/native_process.rs"]
 mod native_process;
@@ -173,5 +165,70 @@ include!("prepared_add_tests/sender_program.rs");
 
 include!("prepared_add_tests/sender_configuration.rs");
 
-include!("prepared_add_tests/pull_integration.rs");
-include!("prepared_add_tests/pull_reconcile.rs");
+fn isolate_integration_fixture_filters(root: &Path) {
+    // These integration fixtures exercise repository-local configuration,
+    // not optional host filter installations (e.g. a system/global Git LFS
+    // driver). Query the effective chain: Git for Windows installs LFS in the
+    // system config, which a --global-only query misses. Preserve local values.
+    let output = std::process::Command::new("git")
+        .current_dir(root)
+        .args([
+            "config",
+            "--includes",
+            "--name-only",
+            "--get-regexp",
+            "^filter\\.",
+        ])
+        .output()
+        .expect("effective filter names");
+    assert!(output.status.success() || output.status.code() == Some(1));
+    for key in String::from_utf8(output.stdout)
+        .expect("filter names")
+        .lines()
+    {
+        if [".clean", ".smudge", ".process"]
+            .iter()
+            .any(|suffix| key.ends_with(suffix))
+            && !std::process::Command::new("git")
+                .current_dir(root)
+                .args(["config", "--local", "--get", key])
+                .output()
+                .expect("local filter")
+                .status
+                .success()
+        {
+            native_pull::git(root, &["config", key, ""]);
+        }
+    }
+}
+
+fn integration_git(root: &Path, args: &[&str]) -> String {
+    let output = std::process::Command::new("git")
+        .current_dir(root)
+        // Fixture commits must finish maintenance before a prepared plan
+        // snapshots the object layout; keep maintenance enabled and foreground.
+        .args([
+            "-c",
+            "maintenance.autoDetach=false",
+            "-c",
+            "gc.autoDetach=false",
+        ])
+        .args([
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+        ])
+        .args(args)
+        .output()
+        .expect("Git fixture");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    String::from_utf8(output.stdout)
+        .expect("Git output")
+        .trim()
+        .to_owned()
+}

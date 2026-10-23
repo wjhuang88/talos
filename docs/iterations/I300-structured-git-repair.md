@@ -8469,3 +8469,62 @@ conflicts; no remote history was rewritten. Post-rebase standard preflight exite
 tests, Clippy, governance and external SDK fixtures. Next: retire the superseded
 Pull scheduler, preserving shared Checkout/Push helpers, then close cross-entry
 and native Windows/security acceptance. No production activation or T7 closure.
+
+MCP command-route checkpoint (2026-10-23): a separate real JSON-RPC transport
+test now covers explicit command Deny, permitted routing up to the deliberate
+production activation gate, repeated-request refusal and unchanged HEAD/config
+with no FETCH_HEAD. This does not prove successful production Pull execution.
+Locked MCP test and warnings-denied Clippy pass; MSVC `cargo xwin check --locked
+-p talos-mcp --test git_pull_prepared --target x86_64-pc-windows-msvc` passes.
+Logs: `/private/tmp/i300-mcp-command-{route,clippy,xwin}.log`. The supervised
+native runner moved to `pull_command.rs` (`096d1dfc`), and all six command-route
+tests still pass (`/private/tmp/i300-command-runner-move.log`). Old scheduling
+has not yet been retired; cross-surface successful execution, independent
+security/current-head CI and native Windows acceptance remain open. No gates
+were relaxed and no T7 completion is claimed.
+
+Legacy Pull retirement checkpoint (2026-10-23, uncommitted work in progress):
+removed the unreachable staged scheduler, eleven old phases, eight scheduler
+modules and 597 lines of orphaned configuration prediction. The configured
+rebase and conflict-preservation baselines now call `execute_approved`, exercising
+the command-authority route once the remaining test migration compiles.
+`cargo check --locked -p talos-tools --features git` exits 0 with 46 dead-code
+warnings (`/private/tmp/i300-retire-config-check.log`). Test compilation currently
+exits 101 because legacy tests still reference retired phases, fields and
+configuration methods (`/private/tmp/i300-retire-tests-compile.log`); this is not
+an accepted or mergeable stage. Next: retire superseded prediction assertions,
+preserve/migrate native behavior and admission regressions, remove newly orphaned
+helpers, then run warnings-denied checks and full preflight. Previous full green
+validation does not cover these deletions. Production gates remain closed.
+
+Legacy Pull retirement validated checkpoint (2026-10-23): supersedes the
+intermediate failing-compilation checkpoint above. The old eleven-phase Pull
+scheduler, recursive inventories and effect predictors are removed; shared
+Checkout/Push configuration, receiver budgets and Windows path identity checks
+remain. Configured rebase and conflict preservation now use the approved command
+route. Missing/stale/incomplete command authority is rejected before FETCH_HEAD.
+Nine native Pull behavior tests pass. The all-features tools suite now contains
+917 tests rather than 1089: retired assertions modeled superseded scheduler
+phases/prediction contracts; native behavior, command admission, recursion and
+cancellation coverage remains in the separate native Pull test modules.
+
+Standard locked release_preflight exited 0 (workspace tests, Clippy, governance,
+external SDK fixtures), log /private/tmp/i300-pull-retirement-preflight.log.
+The preceding sandbox tools run passed 916 tests and failed only the existing
+Push process-observation fixture with EPERM; the authorized preflight resolved
+that environmental failure. Windows all-features cargo-xwin initially exposed
+an incorrectly removed shared PathIdentity::revalidate method and a remaining
+obsolete test reference. Restore the shared method and its ancestor/leaf identity
+regression; retire the obsolete helper-only test. Final MSVC cargo-xwin check
+--locked -p talos-tools --all-features --tests passes without warnings, log
+/private/tmp/i300-pull-retirement-xwin-retry.log. The restored identity regression
+also passes on the host (/private/tmp/i300-retirement-identity.log). These final
+conditional-compilation corrections postdate the full preflight; Windows
+cross-compilation is not native runtime evidence.
+
+Residuals remain owned here: successful Agent/MCP/Runtime production Pull,
+independent security/current-head CI, native Windows execution and default
+sideband Push diagnosis, plus the unresolved synchronous spawn stall. Production
+activation gates stay closed. MCP command-authority transport evidence is already
+committed as ab3861cd2; it proves routing/denial/replay to the gate, not successful
+production Pull. T7/P1–P5 and the complete original T1–T8 scope remain open.

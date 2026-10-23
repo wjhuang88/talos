@@ -49,23 +49,9 @@ fn declared_relative_include_retains_cancelled_ancestor_on_canonical_root() {
         let suffix = if cfg!(windows) { r"traversal\..\target.conf" } else { "traversal/../target.conf" };
         assert!(path.as_os_str().to_string_lossy().ends_with(suffix));
         assert!(path.components().any(|part| part == std::path::Component::ParentDir));
-        let spellings = auxiliary_spellings(path).expect("ancestor inventory");
-        assert!(spellings.contains(&canonical.join("traversal")));
     }
 }
 
-#[cfg(windows)]
-#[test]
-fn cancelled_windows_auxiliary_ancestor_must_be_an_existing_directory() {
-    let root = tempfile::tempdir().expect("fixture");
-    let canonical = root.path().canonicalize().expect("canonical root");
-    std::fs::write(canonical.join("file"), b"not a directory").expect("file");
-    for ancestor in ["missing", "file"] {
-        let mut path = canonical.as_os_str().to_os_string();
-        path.push(format!(r"\{ancestor}\..\target.conf"));
-        assert!(auxiliary_spellings(std::path::Path::new(&path)).is_err());
-    }
-}
 
 #[cfg(windows)]
 #[test]

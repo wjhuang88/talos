@@ -342,27 +342,6 @@ impl Pointer {
 }
 
 impl Metadata {
-    /// Read the branch only from the already admitted HEAD snapshot.
-    pub(super) fn branch(&self) -> Result<Option<&str>, GitToolError> {
-        let Pointer::File(_, snapshot::Entry::File(_, bytes)) = &self.head else {
-            return Err(invalid());
-        };
-        let text = std::str::from_utf8(bytes).map_err(|_| invalid())?;
-        let text = text.trim_end_matches(['\r', '\n']);
-        if let Some(reference) = text.strip_prefix("ref: ") {
-            // Non-branch symbolic chains need separately admitted resolution.
-            let branch = reference.strip_prefix("refs/heads/").ok_or_else(invalid)?;
-            if branch.is_empty() {
-                return Err(invalid());
-            }
-            Ok(Some(branch))
-        } else if matches!(text.len(), 40 | 64) && text.bytes().all(|b| b.is_ascii_hexdigit()) {
-            Ok(None)
-        } else {
-            Err(invalid())
-        }
-    }
-
     /// Whether startup found a commondir pointer, even when it resolves back
     /// to the same directory. Git uses presence, not canonical inequality.
     pub(super) fn has_common(&self) -> bool {
@@ -1266,17 +1245,9 @@ mod tests {
         let path = base.join("HEAD");
         std::fs::write(&path, "ref: refs/heads/before\n").expect("head");
         let before = Metadata::capture(&base, &base).expect("capture");
-        assert_eq!(before.branch().expect("branch"), Some("before"));
         before.revalidate(&base).expect("unchanged");
         std::fs::write(&path, "ref: refs/heads/after\n").expect("switch");
         assert!(before.revalidate(&base).is_err());
-        assert_eq!(before.branch().expect("retained branch"), Some("before"));
-        std::fs::write(&path, format!("{}\n", "a".repeat(40))).expect("detached");
-        let detached = Metadata::capture(&base, &base).expect("capture detached");
-        assert_eq!(detached.branch().expect("detached branch"), None);
-        std::fs::write(&path, "ref: refs/custom/indirect\n").expect("symbolic");
-        let indirect = Metadata::capture(&base, &base).expect("capture symbolic");
-        assert!(indirect.branch().is_err());
     }
 
     #[test]

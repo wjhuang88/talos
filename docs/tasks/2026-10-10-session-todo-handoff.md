@@ -1,3 +1,19 @@
+## Pull scheduler retirement checkpoint — 2026-10-23
+
+Legacy Pull scheduling and effect prediction are removed (about 19,000 net
+lines); shared Checkout/Push helpers remain. Nine native Pull behavior tests and
+full standard locked preflight pass. Windows cargo-xwin found a shared identity
+method incorrectly removed during cleanup; restored it and its regression.
+Final all-features MSVC test compilation passes without warnings; the restored
+identity regression passes locally. See I300's final retirement checkpoint for
+logs, supersession mapping and validation order. This is not native Windows
+runtime or successful production entrypoint evidence; gates remain closed.
+
+Resume with staged review/commit of the retirement, then cross-surface successful
+Pull, security/current-head CI and native Windows acceptance. Retain the spawn
+stall and default sideband Push residuals. All original T1–T8 scope and ordering
+remain intact; no completion is claimed.
+
 ## Local validation / rebase checkpoint — 2026-10-23
 
 Full standard locked preflight passed before rebase, including 1089 all-features

@@ -3,47 +3,8 @@
 
 use super::*;
 
-#[path = "native_pull_hooks.rs"]
-mod hooks;
-
 #[path = "native_pull_recursion.rs"]
 mod recursion;
-
-#[path = "native_pull_scope.rs"]
-mod scope;
-
-#[path = "native_pull_config.rs"]
-mod config;
-
-#[path = "native_pull_remote.rs"]
-mod remote;
-
-#[path = "native_pull_convergence.rs"]
-mod convergence;
-
-#[test]
-fn native_pull_parent_local_source_is_a_read_path() {
-    let root = tempfile::tempdir().expect("fixture");
-    git(root.path(), &["init", "-b", "main"]);
-    let mut plan =
-        prepare_pull_fixture(root.path(), &serde_json::json!({}), ToolProvenance::Native)
-            .expect("plan");
-    plan.pull_destinations = vec!["../source.git".into()];
-    let expected = plan.repository.workdir.join("../source.git");
-    let facets = plan.native_pull_parent_facets().expect("scope");
-    assert!(facets.iter().any(|facet| facet.nature == ToolNature::Read
-        && facet.resource_kind == Some(ToolResourceKind::Path)
-        && facet.resource.as_deref() == expected.to_str()));
-    assert!(
-        !facets
-            .iter()
-            .any(|facet| facet.nature == ToolNature::Network)
-    );
-    assert!(
-        !expected.exists(),
-        "classification must not open the source"
-    );
-}
 
 #[test]
 fn native_pull_plan_rejects_changed_operation_before_discovery() {
@@ -77,69 +38,20 @@ fn native_pull_plan_rejects_changed_operation_before_discovery() {
 }
 
 #[tokio::test]
-async fn native_pull_stage_refuses_missing_or_stale_admission_and_missing_scope() {
-    for scenario in [
-        "missing-proof",
-        "stale-proof",
-        "missing-scope",
-        "missing-root",
-        "missing-network",
-        "missing-execute",
-    ] {
+async fn native_pull_command_refuses_missing_stale_or_incomplete_authority() {
+    for scenario in ["missing-proof", "stale-proof", "missing-command-authority"] {
         let root = tempfile::tempdir().expect("fixture");
         git(root.path(), &["init", "-b", "main"]);
-        let mut plan =
+        let plan =
             prepare_pull_fixture(root.path(), &serde_json::json!({}), ToolProvenance::Native)
                 .expect("plan");
-        plan.phase = Phase::PullNativeMutation;
-        if matches!(
-            scenario,
-            "missing-root" | "missing-network" | "missing-execute"
-        ) {
-            plan.pull_destinations = vec!["git://example.invalid/source".into()];
+        let mut plan = Box::new(plan)
+            .discover_pull_command()
+            .await
+            .expect("discovery");
+        if scenario == "missing-command-authority" {
             plan.facets
-                .extend(plan.native_pull_parent_facets().expect("parent scope"));
-            if scenario == "missing-execute" {
-                plan.facets
-                    .retain(|facet| facet.nature != ToolNature::Execute);
-            } else {
-                let removed = if scenario == "missing-root" {
-                    plan.facets.iter().position(|facet| {
-                        facet.nature == ToolNature::Write
-                            && facet.resource_kind == Some(ToolResourceKind::Path)
-                            && facet.resource.as_deref() == plan.repository.workdir.to_str()
-                    })
-                } else {
-                    plan.facets
-                        .iter()
-                        .position(|facet| facet.nature == ToolNature::Network)
-                }
-                .expect("required facet");
-                plan.facets.remove(removed);
-            }
-        }
-        if scenario == "missing-execute" {
-            // Admission already refuses command-less profiles. Keep the
-            // executor's own scope invariant defensive as well, before probes.
-            let state = PermissionSessionState::new(PermissionEngine::with_workspace_root(
-                plan.workspace.clone(),
-            ));
-            let context = PermissionContext::new(
-                PermissionMode::Interactive,
-                InteractionCapability::Available,
-            );
-            assert!(
-                state
-                    .propose(&plan.request(), &context, GrantScope::Once)
-                    .is_err()
-            );
-            let error = plan
-                .execute_native_pull(&[])
-                .await
-                .expect_err("missing Execute");
-            assert!(error.to_string().contains("scope capability missing"));
-            assert!(!root.path().join(".git/FETCH_HEAD").exists());
-            continue;
+                .retain(|facet| facet.resource.as_deref() != Some("git:pull-command"));
         }
         let admission: Box<dyn std::any::Any + Send> = if scenario == "missing-proof" {
             Box::new(())
@@ -150,15 +62,14 @@ async fn native_pull_stage_refuses_missing_or_stale_admission_and_missing_scope(
             }
             Box::new(admission)
         };
-        let PreparedNormalStage::Complete(output) = Box::new(plan).execute_stage(admission).await
-        else {
-            panic!("denial must complete without discovery")
+        let PreparedNormalStage::Complete(output) = plan.execute_stage(admission).await else {
+            panic!("refusal must complete without further discovery")
         };
         assert!(output.result.is_error, "{scenario}");
         let expected = match scenario {
             "missing-proof" => "requires its admitted proof",
             "stale-proof" => "does not authorize this plan",
-            _ => "scope capability missing",
+            _ => "command authority missing",
         };
         assert!(
             output.result.content.contains(expected),
@@ -278,45 +189,10 @@ async fn native_pull_preserves_configured_integration(conflict: bool) {
         git(&local, &["config", key, value]);
     }
     super::isolate_integration_fixture_filters(&local);
-    let mut plan = prepare_pull_fixture(&local, &serde_json::json!({}), ToolProvenance::Native)
+    let plan = prepare_pull_fixture(&local, &serde_json::json!({}), ToolProvenance::Native)
         .expect("native plan");
-    plan.phase = Phase::PullNativePreparation;
-    let mut history = talos_core::tool::PreparedStageHistory::default();
-    assert!(history.record_profile(&plan.identity, &plan.facets));
-    let discovery = proof(&plan);
-    let tokens = discovery
-        .consume_for_prepared(&plan.request(), &plan.identity)
-        .expect("discovery admission");
-    let mut plan = Box::new(plan)
-        .discover_native_pull_scope(&tokens)
-        .await
-        .expect("single bounded discovery");
-    assert!(plan.phase == Phase::PullNativeMutation);
-    assert!(history.record_profile(&plan.identity, &plan.facets));
-    assert_eq!(plan.pull_remote.as_deref(), Some("upstream"));
-    assert_eq!(plan.pull_destinations, std::slice::from_ref(&destination));
     assert!(!local.join(".git/FETCH_HEAD").exists());
-    // Even a separately approved-looking destination cannot substitute for
-    // the remote resolved by native Pull's retained config and current branch.
-    plan.pull_destinations = vec!["git://different.invalid/source".into()];
-    assert!(plan.validate_native_pull_destination().await.is_err());
-    assert!(!local.join(".git/FETCH_HEAD").exists());
-    plan.pull_destinations = vec![destination];
-    plan.pull_transport_supported = true;
-    plan.phase = Phase::PullNativeMutation;
-    plan.identity = PreparedPlanIdentity::new();
-    let stale = proof(&plan);
-    plan.identity = PreparedPlanIdentity::new();
-    // A proof from an identical-looking earlier plan cannot authorize execution.
-    let admitted = proof(&plan);
-    assert!(
-        stale
-            .consume_for_prepared(&plan.request(), &plan.identity)
-            .is_err()
-    );
-    let PreparedNormalStage::Complete(output) = plan.execute_stage(Box::new(admitted)).await else {
-        panic!("native Pull must complete in one execution stage")
-    };
+    let output = execute_approved(plan).await;
     daemon.stop().await.expect("daemon cleanup");
     assert_eq!(output.result.is_error, conflict, "{:?}", output.result);
     assert_eq!(git(&local, &["rev-parse", "upstream/main"]), remote);
