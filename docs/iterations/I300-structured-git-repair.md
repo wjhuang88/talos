@@ -1,11 +1,17 @@
-## MCP conflict evidence — 2026-10-24
+## MCP and Runtime conflict evidence — 2026-10-24
 
 The real JSON-RPC Pull fixture now also creates divergent commits and checks
 that a failed merge returns `isError`, preserves local HEAD/config, retains
 FETCH_HEAD/MERGE_HEAD, and leaves the unmerged index and conflict markers for
 user resolution. Focused locked MCP integration test passes locally
 (`/private/tmp/i300-mcp-conflict.log`). This is actual production-entry failure
-coverage, not native Windows evidence. Other acceptance gaps remain unchanged.
+coverage, not native Windows evidence. Runtime now also checks a real divergent
+Pull approved by Auto: the provider observes the tool error, local HEAD stays
+unchanged and merge state/index/conflict markers remain. Approval-time configuration drift is also tested through the real human
+callback: changing pull.rebase then approving refuses before fetch, preserving
+HEAD and the worktree. The six-scenario locked integration test passes
+(`/private/tmp/i300-runtime-failures.log`).
+Other acceptance gaps remain unchanged.
 
 ## Post-rebase candidate checkpoint — 2026-10-24
 

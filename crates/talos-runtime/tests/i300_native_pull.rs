@@ -135,6 +135,7 @@ impl LanguageModel for Model {
 struct Human {
     final_approvals: Arc<AtomicUsize>,
     allow_final: bool,
+    drift_repository: Option<std::path::PathBuf>,
 }
 #[async_trait]
 impl ApprovalHandler for Human {
@@ -158,6 +159,9 @@ impl ApprovalHandler for Human {
                 "Auto-only case must not fall back to human command approval"
             );
             self.final_approvals.fetch_add(1, Ordering::SeqCst);
+            if let Some(root) = &self.drift_repository {
+                git(root, &["config", "pull.rebase", "true"]);
+            }
         }
         ApprovalChoice::ApproveOnce
     }
@@ -165,9 +169,19 @@ impl ApprovalHandler for Human {
 
 #[tokio::test]
 async fn runtime_pull_executes_auto_or_human_fallback_and_preserves_explicit_policy() {
-    for scenario in ["auto", "deny", "human_only", "assessor_failure"] {
+    for scenario in [
+        "auto",
+        "deny",
+        "human_only",
+        "assessor_failure",
+        "conflict",
+        "config_drift",
+    ] {
+        let conflict = scenario == "conflict";
         let denied = scenario == "deny";
-        let human_only = scenario == "human_only";
+        let drift = scenario == "config_drift";
+        let no_fetch = denied || drift;
+        let human_only = scenario == "human_only" || drift;
         let assessor_failure = scenario == "assessor_failure";
         let root = tempfile::tempdir().expect("fixture");
         let source = root.path().join("source");
@@ -191,6 +205,20 @@ async fn runtime_pull_executes_auto_or_human_fallback_and_preserves_explicit_pol
                 work.to_str().expect("work path"),
             ],
         );
+        for (key, value) in [
+            ("user.name", "Fixture"),
+            ("user.email", "fixture@example.invalid"),
+            ("commit.gpgSign", "false"),
+            ("core.autocrlf", "false"),
+            ("pull.rebase", "false"),
+        ] {
+            git(&work, &["config", key, value]);
+        }
+        if conflict {
+            std::fs::write(work.join("upstream.txt"), "local content\n").expect("local write");
+            git(&work, &["add", "upstream.txt"]);
+            git(&work, &["commit", "-m", "local divergent addition"]);
+        }
         let before = git(&work, &["rev-parse", "HEAD"]);
         std::fs::write(source.join("upstream.txt"), "new upstream content\n").expect("write");
         git(&source, &["add", "upstream.txt"]);
@@ -203,13 +231,14 @@ async fn runtime_pull_executes_auto_or_human_fallback_and_preserves_explicit_pol
             .provider(Arc::new(Model {
                 turns: AtomicUsize::new(0),
                 reviews: reviews.clone(),
-                allowed: !denied,
+                allowed: !no_fetch && !conflict,
                 assessor_failure,
             }))
             .tool(Arc::new(talos_tools::git::GitPullTool::new(work.clone())))
             .approval_handler(Arc::new(Human {
                 final_approvals: final_approvals.clone(),
                 allow_final: human_only || assessor_failure,
+                drift_repository: drift.then(|| work.clone()),
             }))
             .permission_mode(PermissionMode::Interactive)
             .auto_assistance(true);
@@ -254,10 +283,23 @@ async fn runtime_pull_executes_auto_or_human_fallback_and_preserves_explicit_pol
         );
         assert_eq!(
             git(&work, &["rev-parse", "HEAD"]),
-            if denied { before } else { after }
+            if no_fetch || conflict {
+                before
+            } else {
+                after.clone()
+            }
         );
-        assert_eq!(work.join(".git/FETCH_HEAD").exists(), !denied);
-        assert_eq!(work.join("upstream.txt").exists(), !denied);
+        assert_eq!(work.join(".git/FETCH_HEAD").exists(), !no_fetch);
+        assert_eq!(work.join("upstream.txt").exists(), !no_fetch);
+        if conflict {
+            assert_eq!(
+                std::fs::read(work.join(".git/MERGE_HEAD")).expect("merge state retained"),
+                after
+            );
+            assert!(!git(&work, &["ls-files", "--unmerged"]).is_empty());
+            let content = std::fs::read_to_string(work.join("upstream.txt")).expect("conflict");
+            assert!(content.contains("<<<<<<<") && content.contains(">>>>>>>"));
+        }
         runtime.shutdown().await.expect("shutdown");
     }
 }

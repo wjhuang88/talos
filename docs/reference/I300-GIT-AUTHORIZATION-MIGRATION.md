@@ -25,7 +25,7 @@ do not establish native Windows execution or live-model assessment quality.
 
 | Requirement | Implemented evidence | Remaining validation / coverage |
 | --- | --- | --- |
-| Real Auto allow, explicit Deny, human-only, assessor failure | `crates/talos-runtime/tests/i300_native_pull.rs` runs all four through Runtime, Agent and supervised Git, checking repository effects and review/approval counts | Native Windows and exact-head CI |
+| Real Auto allow, explicit Deny, human-only, assessor failure | `crates/talos-runtime/tests/i300_native_pull.rs` runs all four plus an Auto-approved merge conflict and approval-time configuration drift through Runtime, Agent and supervised Git, checking repository effects, retained conflict state and review/approval counts | Native Windows and exact-head CI |
 | MCP production admission and effects | `crates/talos-mcp/tests/git_pull_prepared.rs` checks real fetch, Deny without fetch, duplicate request-ID refusal and real merge conflict with retained FETCH_HEAD/MERGE_HEAD, unmerged index and conflict markers | Request-ID refusal is not proof replay; full failure matrix is not established at MCP |
 | Missing/stale/incomplete authority and frozen invocation | Tools `prepared_add_tests/native_pull.rs` and `prepared_add_tests/pull_command.rs` reject missing proof, plan/facet mismatch and argv/environment/cwd/program substitution before fetch | These Tools checks do not establish every cross-entry stale/replay case |
 | Configuration drift, configured hook, conflict partial effects | Tools `prepared_add_tests/pull_command.rs` checks drift refusal, approved hook execution, cancellation and retained conflict state | Unix hook cancellation does not prove Windows descendant cleanup |
