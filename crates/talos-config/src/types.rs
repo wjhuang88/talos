@@ -62,6 +62,12 @@ pub struct ModelConfig {
     /// Maximum output tokens to request from this model.
     #[serde(default)]
     pub output_limit: Option<u32>,
+    /// Explicit per-model wire protocol override.
+    ///
+    /// `None` means continue through provider/catalog/default resolution. `Some(openai-chat)` is
+    /// therefore distinguishable from omission and remains a reliable model-scoped rollback.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub protocol: Option<ProviderProtocol>,
     /// Per-model reasoning/thinking configuration (ADR-034).
     #[serde(default)]
     pub reasoning: Option<ReasoningOptions>,
