@@ -89,4 +89,33 @@ impl AddPlan {
         self.revalidate()?;
         self.run_native_pull_command().await
     }
+
+    // Both routes use the same supervised command/result boundary. Callers
+    // must consume their prepared proof and validate their authority first.
+    pub(super) async fn run_native_pull_command(&self) -> Result<String, GitToolError> {
+        let command = self
+            .native_pull_command
+            .as_ref()
+            .ok_or_else(|| GitToolError::InvalidInput("Native Pull command missing".into()))?;
+        let output = self.run_command_output(
+            command.command(), std::time::Duration::from_secs(120), 1024 * 1024,
+        ).await.map_err(|error| GitToolError::Git(format!(
+            "Native Pull execution failed: {error}; partial effects may remain; inspect repositories before retrying",
+        )))?;
+        if !output.status.success() {
+            // No retry, reset, abort or automatic conflict resolution. Avoid
+            // reflecting diagnostic output which may contain remote credentials.
+            return Err(GitToolError::Git(format!(
+                "Native Pull failed ({}); fetched refs, conflicts or partial effects may remain; inspect repositories before retrying",
+                output.status,
+            )));
+        }
+        self.repository.revalidate_location().map_err(|error| GitToolError::Git(format!(
+            "Native Pull completed but repository identity verification failed: {error}; effects are retained",
+        )))?;
+        Ok(
+            "Native Pull completed; Git retained its configured integration and recursion behavior"
+                .into(),
+        )
+    }
 }
