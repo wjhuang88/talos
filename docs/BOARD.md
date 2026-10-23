@@ -180,3 +180,9 @@ independent Agent/API/security review and CAS. [Story](backlog/active/AUTO-UX-00
 [I290](iterations/I290-auto-review-conversation-locale.md) and
 [I291 final matrix](iterations/I291-auto-review-locale-product-followup.md#final-product-acceptance-and-closure)
 record all published acceptance and measured cost boundaries. #630 remains historical draft evidence.
+
+I300 Auto prerequisite amendment (2026-10-23): the governance candidate proposes
+only shared prepared-command assessment and Pull integration before T7 activation.
+It is ineffective until target-branch merge. I300 remains Active; PERM-007-H's
+remaining full built-in coverage stays unclaimed and subsequent. See the I300
+owner for scope, acceptance and complete active/review/planned inventory.
