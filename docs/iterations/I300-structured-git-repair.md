@@ -7993,3 +7993,12 @@ Both governance validators pass with zero warnings; logs use the
 full preflight is running in /private/tmp/i300-bounded-modules-preflight.log;
 its result must be checked before recording workspace validation. These checks
 do not substitute for independent security review or Windows native acceptance.
+
+Workspace preflight attempt exited 101 due to ENOSPC while compiling (not a
+passing workspace result), log /private/tmp/i300-bounded-modules-preflight.log.
+After that process terminated, the previously authorized target/debug cleanup
+completed. Retry uses the same standard script with CARGO_INCREMENTAL=0,
+CARGO_PROFILE_DEV_DEBUG=0 and CARGO_PROFILE_TEST_DEBUG=0 to reduce rebuild storage;
+no test, feature or locked dependency gate is removed. Retry log:
+/private/tmp/i300-bounded-modules-preflight-compact.log. Check its live process
+and terminal result on resume before restarting or claiming validation.
