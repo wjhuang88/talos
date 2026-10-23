@@ -6,6 +6,7 @@ use super::*;
 async fn native_pull_child_destinations_and_final_configuration_checks_are_bound() {
     for scenario in [
         "unchanged",
+        "bounded-fixed",
         "include-drift",
         "missing-source",
         "missing-chain",
@@ -150,6 +151,13 @@ async fn native_pull_child_destinations_and_final_configuration_checks_are_bound
         }
         let hook = module.join("hooks/reference-transaction");
         match scenario {
+            "bounded-fixed" => plan.facets.retain(|facet| {
+                let path = facet.resource.as_deref();
+                path != module.to_str()
+                    && !["HEAD", "commondir", "gitdir", "config", "config.worktree"]
+                        .iter()
+                        .any(|leaf| path == module.join(leaf).to_str())
+            }),
             "hook-created" => std::fs::write(&hook, "new hook").expect("new hook"),
             "missing-hook" => plan
                 .facets
@@ -195,7 +203,10 @@ async fn native_pull_child_destinations_and_final_configuration_checks_are_bound
         let tokens = proof(&plan)
             .consume_for_prepared(&plan.request(), &plan.identity)
             .expect("proof");
-        if matches!(scenario, "unchanged" | "local" | "legacy" | "branches") {
+        if matches!(
+            scenario,
+            "unchanged" | "bounded-fixed" | "local" | "legacy" | "branches"
+        ) {
             plan.validate_native_pull_configurations(&tokens)
                 .await
                 .expect("unchanged child scope");

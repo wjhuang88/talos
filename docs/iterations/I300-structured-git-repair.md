@@ -8040,3 +8040,13 @@ warnings denied (/private/tmp/i300-pull-content-{suite,clippy}.log). This checkp
 does not claim a fresh workspace preflight, Windows runtime or security review.
 Config-chain origins, hooks and remotes still have continuation frontiers;
 complete child execution effects and production activation remain outstanding.
+
+Final configuration validation follow-up (2026-10-23): retained fixed module
+layout/config reads now use the same dedicated-or-exact admission predicate
+during discovery and final validation. An added bounded-fixed scenario removes
+all fixed child root/file facets and still validates the retained configuration;
+include sources, startup worktrees, hooks and remote destinations retain their
+independent checks. Native Pull tests pass 24/24 and Git-enabled lib/tests Clippy
+passes with warnings denied; logs /private/tmp/i300-pull-final-scope.log and
+/private/tmp/i300-pull-final-scope-clippy.log. No production activation or full
+workspace/Windows acceptance is implied by this consistency fix.
