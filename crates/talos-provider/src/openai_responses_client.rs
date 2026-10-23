@@ -7,7 +7,7 @@
 use std::time::Duration;
 
 use reqwest::Client;
-use serde_json::Value;
+use serde_json::{Value, json};
 use talos_config::{ProviderTimeoutConfig, ReasoningOptions};
 use talos_core::message::Message;
 use talos_core::provider::{ProviderError, ProviderProgress, ProviderResult, ToolDefinition};
@@ -84,6 +84,43 @@ impl OpenAIResponsesClient {
         } else {
             format!("{base}{RESPONSES_PATH}")
         }
+    }
+
+    /// Build the same stateless request shape used for dispatch without touching the network.
+    ///
+    /// Credentials are always redacted and image content follows the existing preview projection so
+    /// diagnostics cannot turn a request preview into an implicit file read.
+    pub(crate) fn request_preview(&self, messages: &[Message]) -> Value {
+        let replay = self
+            .reasoning
+            .as_ref()
+            .is_none_or(|reasoning| reasoning.replay);
+        let preview_messages = crate::image_io::preview_messages(messages);
+        let messages = replay_safe_messages(
+            &self.provider_key,
+            &self.model,
+            replay,
+            &preview_messages,
+        );
+        let body = build_request_body(
+            &self.model,
+            &messages,
+            &[],
+            self.reasoning.as_ref(),
+            self.output_limit,
+        );
+        json!({
+            "method": "POST",
+            "url": self.endpoint_url(),
+            "headers": {
+                "Authorization": format!(
+                    "Bearer {}",
+                    crate::openai_request::redact_secret(&self.api_key)
+                ),
+                "Content-Type": "application/json",
+            },
+            "body": body,
+        })
     }
 
     pub(crate) async fn stream(
@@ -321,6 +358,23 @@ mod tests {
             explicit.endpoint_url(),
             "https://gateway.example/v1/responses"
         );
+    }
+
+    #[test]
+    fn request_preview_is_stateless_and_redacts_credentials() {
+        let client = OpenAIResponsesClient::new("sk-super-secret", "gpt-test")
+            .with_reasoning(Some(ReasoningOptions::default()), Some(1234));
+        let preview = client.request_preview(&[Message::User {
+            content: "hello".into(),
+        }]);
+        assert_eq!(preview["url"], "https://api.openai.com/v1/responses");
+        assert_eq!(preview["body"]["store"], false);
+        assert!(preview["body"].get("previous_response_id").is_none());
+        assert_eq!(preview["body"]["max_output_tokens"], 1234);
+        let authorization = preview["headers"]["Authorization"]
+            .as_str()
+            .expect("authorization preview");
+        assert!(!authorization.contains("sk-super-secret"));
     }
 
     #[test]
