@@ -408,7 +408,7 @@ pub enum LogFormat {
     Compact,
 }
 
-/// Log rotation strategy for file-based logging.
+/// Log rotation strategy for file-based log output.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum LogRotation {

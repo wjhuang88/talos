@@ -109,11 +109,9 @@ pub(crate) fn configured_provider(config: &Config) -> Result<Arc<dyn LanguageMod
         return Err("provider setup is incomplete; configure a provider and model first".into());
     }
     let api_key = config.api_key().map_err(|error| error.to_string())?;
-    let provider = talos_provider::openai_responses::factory::build_configured_provider(
-        &config,
-        &api_key,
-    )
-    .map_err(|error| error.to_string())?;
+    let provider =
+        talos_provider::openai_responses::factory::build_configured_provider(&config, &api_key)
+            .map_err(|error| error.to_string())?;
     Ok(maybe_inject_provider(provider))
 }
 
