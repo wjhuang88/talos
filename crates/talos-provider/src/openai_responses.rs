@@ -143,6 +143,10 @@ impl LanguageModel for OpenAIResponsesProvider {
         })
     }
 
+    fn request_preview(&self, messages: &[Message]) -> Option<serde_json::Value> {
+        Some(self.client.request_preview(messages))
+    }
+
     async fn stream(&self, messages: &[Message]) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
         self.legacy_stream(messages, &[], ToolProtocol::Native, None)
             .await
