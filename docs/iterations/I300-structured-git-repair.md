@@ -1,3 +1,12 @@
+## MCP conflict evidence — 2026-10-24
+
+The real JSON-RPC Pull fixture now also creates divergent commits and checks
+that a failed merge returns `isError`, preserves local HEAD/config, retains
+FETCH_HEAD/MERGE_HEAD, and leaves the unmerged index and conflict markers for
+user resolution. Focused locked MCP integration test passes locally
+(`/private/tmp/i300-mcp-conflict.log`). This is actual production-entry failure
+coverage, not native Windows evidence. Other acceptance gaps remain unchanged.
+
 ## Post-rebase candidate checkpoint — 2026-10-24
 
 Implementation head `1c6e040f9` is rebased onto origin/main `d5e0d0627`.
