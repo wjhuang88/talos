@@ -519,6 +519,15 @@ impl ChildConfig {
         })
     }
 
+    /// Only retained, nonredirected configuration sources can reuse a bounded
+    /// root grant. This does not authorize discovering another arbitrary file.
+    pub(super) fn source_is_unredirected(&self, path: &std::path::Path) -> bool {
+        self.files
+            .iter()
+            .zip(&self.identities)
+            .any(|((source, _), identity)| source == path && identity.is_unredirected(path))
+    }
+
     pub(super) fn verify_host(&self, output: &[u8]) -> Result<(), GitToolError> {
         let (values, origins) = parse_origins(output)?;
         if values != self.values || origins != self.origins || output != self.ordered_output {

@@ -206,6 +206,12 @@ pub(super) struct PathIdentity {
 }
 
 impl PathIdentity {
+    /// Whether the retained canonical target is the original absolute spelling.
+    /// This inspects evidence only; callers must revalidate before reading.
+    pub(super) fn is_unredirected(&self, path: &Path) -> bool {
+        self.resolved == path
+    }
+
     /// Revalidate retained ancestors one at a time rather than constructing a
     /// second identity vector (and a second set of Windows handles).
     pub(super) fn revalidate(&self, path: &Path) -> std::io::Result<()> {

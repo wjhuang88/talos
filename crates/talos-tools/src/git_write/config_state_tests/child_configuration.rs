@@ -320,3 +320,21 @@ fn native_pull_retained_host_output_shares_the_source_budget() {
         ).is_err()
     );
 }
+
+#[cfg(unix)]
+#[test]
+fn bounded_configuration_source_does_not_admit_redirected_ancestors() {
+    let root = tempfile::tempdir().expect("fixture");
+    let root = root.path().canonicalize().expect("root");
+    let actual = root.join("actual");
+    std::fs::create_dir(&actual).expect("directory");
+    std::fs::write(actual.join("config"), "").expect("source");
+    let linked = root.join("linked");
+    std::os::unix::fs::symlink(&actual, &linked).expect("directory link");
+    for (source, admitted) in [(actual.join("config"), true), (linked.join("config"), false)] {
+        let output = format!("file:{}\0remote.origin.url\ngit://example.invalid/repo\0", source.display());
+        let config = ChildConfig::capture(output.as_bytes(), &root).expect("chain evidence");
+        assert_eq!(config.source_is_unredirected(&source), admitted);
+        assert!(!config.source_is_unredirected(&root.join("uncaptured")));
+    }
+}

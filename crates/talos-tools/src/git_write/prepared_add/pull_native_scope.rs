@@ -14,9 +14,9 @@ impl AddPlan {
         Ok(())
     }
 
-    // Only fixed layout/configuration leaves of retained stored-module roots.
-    // This is not a general descendant-read predicate. Inventory revalidates
-    // every retained ancestor and refuses linked directory entries.
+    // Fixed layout leaves and already captured, nonredirected configuration
+    // origins of retained stored modules. This never admits arbitrary paths.
+    // Inventory and configuration evidence are revalidated before content use.
     pub(super) fn native_pull_module_read(
         &self,
         path: &Path,
@@ -44,7 +44,12 @@ impl AddPlan {
                 && (path == root
                     || ["HEAD", "commondir", "gitdir", "config", "config.worktree"]
                         .iter()
-                        .any(|leaf| path == root.join(leaf)))
+                        .any(|leaf| path == root.join(leaf))
+                    || (path.starts_with(root)
+                        && self
+                            .native_pull_configs
+                            .get(root)
+                            .is_some_and(|config| config.source_is_unredirected(path))))
         });
         if covered {
             modules.revalidate()?;
