@@ -89,7 +89,9 @@ async fn native_pull_scope_admits_startup_before_discovering_configuration() {
             let result = execute_approved_with_history(*dispatched, history).await;
             assert!(result.result.is_error);
             assert!(
-                result.result.content.contains("stage limit"),
+                result.result.content.contains(
+                    "Native Pull recursive repository configuration admission is incomplete; no Pull started"
+                ),
                 "{:?}",
                 result.result
             );
@@ -530,4 +532,56 @@ async fn native_pull_scope_uses_linked_worktree_private_modules() {
     assert!(!plan.native_pull_metadata.contains_key(&main));
     assert!(!private.join("FETCH_HEAD").exists());
     assert!(!main.join("FETCH_HEAD").exists());
+}
+
+#[tokio::test]
+async fn native_pull_module_names_are_batched_only_under_dedicated_scope() {
+    for bounded in [false, true] {
+        let root = tempfile::tempdir().expect("fixture");
+        git(root.path(), &["init", "-b", "main"]);
+        git(root.path(), &["config", "core.hooksPath", ""]);
+        git(
+            root.path(),
+            &["remote", "add", "origin", "git://example.invalid/parent"],
+        );
+        let module = root.path().join(".git/modules/group/deeper/child");
+        std::fs::create_dir_all(&module).expect("module");
+        git(&module, &["init", "--bare", "-b", "main"]);
+        let mut plan = Box::new(
+            prepare_pull_fixture(root.path(), &serde_json::json!({}), ToolProvenance::Native)
+                .expect("plan"),
+        )
+        .discover()
+        .await
+        .expect("sender");
+        plan.phase = Phase::PullNativePreparation;
+        if !bounded {
+            plan.facets
+                .retain(|facet| facet.resource.as_deref() != Some("git:pull-bounded-discovery"));
+        }
+        for _ in 0..8 {
+            let tokens = proof(&plan)
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .expect("admission");
+            plan = plan
+                .discover_native_pull_scope(&tokens)
+                .await
+                .expect("scope");
+            if let Some(modules) = &plan.native_pull_modules {
+                assert_eq!(modules.complete(), bounded);
+                if bounded {
+                    assert_eq!(modules.stored_module_roots().count(), 1);
+                    // Enumeration authority does not bypass the still-exact
+                    // content frontier during this orchestration migration.
+                    assert!(plan.native_pull_metadata.is_empty());
+                }
+                assert!(!root.path().join(".git/FETCH_HEAD").exists());
+                break;
+            }
+        }
+        assert!(
+            plan.native_pull_modules.is_some(),
+            "module discovery not reached"
+        );
+    }
 }

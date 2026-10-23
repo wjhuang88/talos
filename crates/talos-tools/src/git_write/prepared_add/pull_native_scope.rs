@@ -11,6 +11,21 @@ impl AddPlan {
         authorizations: &[talos_core::tool::ToolExecutionAuthorization],
     ) -> Result<Box<Self>, GitToolError> {
         self.revalidate()?;
+        // execute_stage has consumed the complete immutable profile proof.
+        // Bind this dedicated scope to the displayed, retained parent gitdir;
+        // an exact Read of a directory alone never grants descendant reads.
+        let bounded_modules = self.facets.iter().any(|facet| {
+            facet.nature == ToolNature::Read
+                && facet.resource_kind == Some(ToolResourceKind::Remote)
+                && facet.resource.as_deref() == Some("git:pull-bounded-discovery")
+        }) && authorizations.iter().any(|token| {
+            token.authorizes_path(
+                "git_pull",
+                ToolNature::Read,
+                &self.workspace,
+                self.repository.git_dir.to_str().unwrap_or_default(),
+            )
+        });
         if !self.facets.iter().any(|facet| {
             facet.nature == ToolNature::Read
                 && facet.resource_kind == Some(ToolResourceKind::Remote)
@@ -50,22 +65,28 @@ impl AddPlan {
         let modules = self.native_pull_modules.as_mut().ok_or_else(|| {
             GitToolError::InvalidInput("Native Pull module inventory missing".into())
         })?;
-        // The parent metadata capability is not a grant to read child configs.
-        // Request every module-name frontier before inspecting its identities.
+        // The dedicated discovery scope permits internal module traversal.
+        // Inventory charges the shared budget, rejects links and revalidates
+        // retained directory identities on each advance. Outside this root,
+        // keep exact frontier admission; parent metadata alone is insufficient.
         let admitted = |path: &Path| {
-            authorizations.iter().any(|token| {
-                token.authorizes_path(
-                    "git_pull",
-                    ToolNature::Read,
-                    &self.workspace,
-                    path.to_str().unwrap_or_default(),
-                )
-            })
+            (bounded_modules && path.starts_with(&self.repository.git_dir))
+                || authorizations.iter().any(|token| {
+                    token.authorizes_path(
+                        "git_pull",
+                        ToolNature::Read,
+                        &self.workspace,
+                        path.to_str().unwrap_or_default(),
+                    )
+                })
         };
-        if modules.iter_paths().all(&admitted) && !modules.complete() {
+        while modules.iter_paths().all(&admitted) && !modules.complete() {
             modules.advance(admitted)?;
         }
         for path in modules.iter_paths() {
+            if bounded_modules && path.starts_with(&self.repository.git_dir) {
+                continue;
+            }
             if !self.facets.iter().any(|facet| {
                 facet.nature == ToolNature::Read && facet.resource.as_deref() == path.to_str()
             }) {
@@ -104,9 +125,18 @@ impl AddPlan {
         }
         let mut metadata_ready = true;
         for root in &roots {
-            for leaf in ["HEAD", "commondir", "gitdir", "config", "config.worktree"] {
-                let path = root.join(leaf);
-                metadata_ready &= admitted(&path);
+            for path in std::iter::once(root.clone()).chain(
+                ["HEAD", "commondir", "gitdir", "config", "config.worktree"]
+                    .map(|leaf| root.join(leaf)),
+            ) {
+                metadata_ready &= authorizations.iter().any(|token| {
+                    token.authorizes_path(
+                        "git_pull",
+                        ToolNature::Read,
+                        &self.workspace,
+                        path.to_str().unwrap_or_default(),
+                    )
+                });
                 if !self.facets.iter().any(|facet| {
                     facet.nature == ToolNature::Read && facet.resource.as_deref() == path.to_str()
                 }) {
@@ -128,7 +158,9 @@ impl AddPlan {
         // Pointer targets remain declarations: publishing them does not open
         // an external common directory or worktree marker.
         for root in roots {
-            self.child_read(&root, authorizations)?;
+            // Root identities were inspected by the admitted inventory. Fixed
+            // pointer contents still require the exact frontier above until
+            // the bounded content consumer replaces it.
             // Entry revalidation already checked retained pointer evidence.
             // Do not replace it or republish its targets on every continuation.
             if self.native_pull_metadata.contains_key(&root) {

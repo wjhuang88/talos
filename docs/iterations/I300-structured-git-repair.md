@@ -7967,3 +7967,29 @@ with zero warnings. Logs: /private/tmp/i300-bounded-discovery-clippy.log,
 capability yet, so root escape/budget/runtime denial and independent security
 review remain required before activation. This is compiler-only evidence, not
 full-workspace or T7 completion.
+
+Bounded module discovery checkpoint (2026-10-23): Pull publishes the accepted
+bounded-discovery facet alongside its displayed repository roots. After the
+immutable prepared proof is consumed and the retained repository is revalidated,
+native scope discovery advances all stored-module name frontiers within the
+admitted gitdir in one call. It reuses Inventory's link rejection, identity
+revalidation and shared reference budget; generic exact Path Read is unchanged.
+Without the dedicated facet, the same fixture stops at the first unadmitted
+frontier. Fixed child pointer/config contents still use a batched exact frontier;
+this is an intermediate migration, not the final one-discovery-plan deliverable.
+Native Pull tests pass 24/24 (/private/tmp/i300-bounded-modules-tests.log). The
+real PreparedStageHistory fixture previously stopped at the stage limit; it now
+reaches the explicit incomplete-recursion execution gate without starting Pull.
+Its assertion now checks that gate rather than expecting the old stage failure.
+Production activation, bounded content traversal, complete recursive effects,
+independent security review and whole-task acceptance remain open.
+
+Boundary regressions pass 3/3 (stored-module link refusal, shared-budget
+exhaustion and namespace identity drift), log
+/private/tmp/i300-bounded-modules-boundaries.log. Git-enabled tools lib/tests
+Clippy with warnings denied passes after removing a needless closure borrow.
+Both governance validators pass with zero warnings; logs use the
+/private/tmp/i300-bounded-modules-{clippy,governance,claims}.log prefix. Standard
+full preflight is running in /private/tmp/i300-bounded-modules-preflight.log;
+its result must be checked before recording workspace validation. These checks
+do not substitute for independent security review or Windows native acceptance.
