@@ -29,7 +29,7 @@ impl AddPlan {
         // Check every retained source before any revalidation or host probe.
         for config in self.native_pull_configs.values() {
             for (path, _) in &config.files {
-                self.child_read(path, authorizations)?;
+                self.require_native_pull_module_read(path, authorizations)?;
             }
         }
         for config in self.native_pull_configs.values() {
@@ -169,9 +169,9 @@ impl AddPlan {
                 GitToolError::InvalidInput("Native Pull child inventory missing".into())
             })?;
             for (root, metadata) in &self.native_pull_metadata {
-                self.child_read(root, authorizations)?;
+                self.require_native_pull_module_read(root, authorizations)?;
                 for leaf in ["HEAD", "commondir", "gitdir", "config", "config.worktree"] {
-                    self.child_read(&root.join(leaf), authorizations)?;
+                    self.require_native_pull_module_read(&root.join(leaf), authorizations)?;
                 }
                 let common = if metadata.common_path == *root {
                     root.as_path()
@@ -184,8 +184,8 @@ impl AddPlan {
                             )
                         })?
                 };
-                self.child_read(common, authorizations)?;
-                self.child_read(&common.join("config"), authorizations)?;
+                self.require_native_pull_module_read(common, authorizations)?;
+                self.require_native_pull_module_read(&common.join("config"), authorizations)?;
                 expected_fetch_hooks.extend(self.native_pull_configs[root].pull_hook_paths(
                     common,
                     root,
@@ -202,7 +202,7 @@ impl AddPlan {
         }
         for config in self.native_pull_configs.values() {
             for (path, _) in &config.files {
-                self.child_read(path, authorizations)?;
+                self.require_native_pull_module_read(path, authorizations)?;
             }
         }
         if expected_fetch_hooks != self.native_pull_fetch_hooks {

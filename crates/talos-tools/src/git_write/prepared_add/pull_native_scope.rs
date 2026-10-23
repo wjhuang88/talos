@@ -3,6 +3,17 @@
 use super::*;
 
 impl AddPlan {
+    pub(super) fn require_native_pull_module_read(
+        &self,
+        path: &Path,
+        authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+    ) -> Result<(), GitToolError> {
+        if !self.native_pull_module_read(path, authorizations)? {
+            self.child_read(path, authorizations)?;
+        }
+        Ok(())
+    }
+
     // Only fixed layout/configuration leaves of retained stored-module roots.
     // This is not a general descendant-read predicate. Inventory revalidates
     // every retained ancestor and refuses linked directory entries.
@@ -287,9 +298,7 @@ impl AddPlan {
             .collect::<Result<Vec<_>, GitToolError>>()?;
         for (_, common, _) in &common_roots {
             for path in [common.clone(), common.join("config")] {
-                if !self.native_pull_module_read(&path, authorizations)? {
-                    self.child_read(&path, authorizations)?;
-                }
+                self.require_native_pull_module_read(&path, authorizations)?;
             }
         }
         let mut new_startup_targets = false;

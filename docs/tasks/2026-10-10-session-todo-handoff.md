@@ -5754,3 +5754,9 @@ budget; external targets remain separately admitted. Pull-filtered tests pass
 186/186 and Git-enabled Clippy passes. I300 owns detailed evidence and remaining
 config-origin/hook/remote continuations, recursive effects and production gates.
 This is partial implementation, not completion of T7 or a fresh full preflight.
+
+Final configuration validation now accepts that same bounded fixed-file scope,
+with a regression removing the child fixed-file facets. Native Pull 24/24 and
+Git-enabled Clippy pass; external/include/hook/destination checks remain. Next
+is still merging the remaining discovery frontiers and completing recursive
+execution effects. T7 and the whole handoff remain active.
