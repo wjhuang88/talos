@@ -101,8 +101,18 @@ impl AddPlan {
                         path,
                         "native Pull child legacy remote source; contents deferred",
                     )?);
-                    ready = false;
                 }
+                // A published facet is a request, not proof. Conversely an
+                // existing proof need not pause just because this pass first
+                // published the corresponding source facet.
+                ready &= authorizations.iter().any(|token| {
+                    token.authorizes_path(
+                        "git_pull",
+                        ToolNature::Read,
+                        &self.workspace,
+                        path.to_str().unwrap_or_default(),
+                    )
+                });
             }
             sources.push((root.clone(), remote, paths));
         }

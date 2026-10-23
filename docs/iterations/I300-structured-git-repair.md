@@ -8061,3 +8061,18 @@ Pull. Native Pull tests pass 24/24 and Git-enabled lib/tests Clippy passes with
 warnings denied (/private/tmp/i300-pull-config-batch{,-clippy}.log). This removes
 one redundant phase only when scope is already admitted; remaining new-path
 frontiers and complete recursive execution scope are still open.
+
+Remote continuation checkpoint (2026-10-23): child legacy remote discovery now
+checks consumed source tokens rather than whether a source facet was newly
+published. Already admitted sources proceed immediately; published sources with
+missing tokens return a frontier before source capture or URL probing. Regression
+covers both directions and confirms no remote evidence is retained on refusal.
+Native Pull tests pass 24/24, Git-enabled lib/tests Clippy passes with warnings
+denied, and formatting/whitespace checks pass. Logs:
+/private/tmp/i300-remote-frontier-tests-compact.log and
+/private/tmp/i300-remote-frontier-clippy-compact.log. Initial default-debug
+validation was stopped during recompilation to limit disk usage; compact-debug
+validation retained the same locked tests. Fetch succeeded; origin/main has no
+commits absent from this branch. Remaining work is unchanged: scoped content
+discovery consolidation, complete recursive effects, production routing and
+security/platform acceptance. No T7 completion or activation is claimed.
