@@ -242,3 +242,66 @@ async fn native_command_preview_withholds_config_credentials_and_helper_payloads
     assert!(notes.contains("filters"));
     assert!(!local.join(".git/FETCH_HEAD").exists());
 }
+
+#[tokio::test]
+async fn native_command_refuses_frozen_invocation_substitution_before_fetch() {
+    for changed in ["argv", "environment", "cwd", "program"] {
+        let (_root, source, local) = repositories();
+        let plan = prepare_pull_fixture(&local, &serde_json::json!({}), ToolProvenance::Native)
+            .expect("plan");
+        let mut plan = Box::new(plan)
+            .discover_pull_command()
+            .await
+            .expect("discovery");
+        let admission = proof(&plan);
+        let mut environment = plan.environment.clone();
+        if changed == "environment" {
+            environment.insert("GIT_CONFIG_COUNT".into(), "0".into());
+            environment.insert("TALOS_FROZEN_TEST".into(), "changed".into());
+        }
+        let program = if changed == "program" {
+            source.join("unapproved-git")
+        } else {
+            plan.program.clone()
+        };
+        let cwd = if changed == "cwd" {
+            &source
+        } else {
+            &plan.repository.workdir
+        };
+        let arguments = if changed == "argv" {
+            vec!["pull", "--", "unapproved-remote"]
+        } else {
+            vec![
+                "-c",
+                "maintenance.autoDetach=false",
+                "-c",
+                "gc.autoDetach=false",
+                "--no-pager",
+                "pull",
+            ]
+        };
+        plan.native_pull_command = Some(
+            command::FrozenCommand::new(&program, cwd, arguments, &environment)
+                .expect("substituted invocation"),
+        );
+        let PreparedNormalStage::Complete(output) = plan.execute_stage(Box::new(admission)).await
+        else {
+            panic!("changed invocation must refuse without another stage")
+        };
+        assert!(output.result.is_error, "{changed}");
+        assert!(
+            output
+                .result
+                .content
+                .contains("command changed after preparation"),
+            "{changed}: {}",
+            output.result.content
+        );
+        assert!(!local.join(".git/FETCH_HEAD").exists(), "{changed}");
+        assert_eq!(
+            std::fs::read_to_string(local.join("file")).expect("file"),
+            "base\n"
+        );
+    }
+}
