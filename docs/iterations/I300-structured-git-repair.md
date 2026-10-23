@@ -7944,3 +7944,26 @@ Logs: /private/tmp/i300-native-pull-cancel-suite.log and
 /private/tmp/i300-native-pull-cancel-clippy.log. The proposed discovery scope,
 simplified orchestration, native production activation and all handoff exits
 remain open.
+
+Bounded discovery acceptance (2026-10-23): the maintainer explicitly accepted
+ADR-089's displayed-root, git_pull-only bounded Read scope. This supersedes the
+pending identity-only stored-module inventory proposal. Closure ledger: update
+ADR-089, permission compilation and negative regressions, then replace native
+scope orchestration and verify actual PreparedStageHistory; preserve published
+baseline and all production gates. Residual owner remains I300/T7 and the session
+handoff. The compiler reserves `git:pull-bounded-discovery` for Read/Remote on
+git_pull with an absolute Command and absolute Read root. It does not itself
+implement traversal, root identity checks, fixed inspection argv or budget
+consumption; those are required prepared-consumer work before any use. Production
+Native Pull remains disabled. Permission tests and full validation are pending
+for this checkpoint; no completion or security acceptance is claimed.
+
+Compiler checkpoint validation: `cargo test --locked -p talos-permission` exits
+0 (149 unit, 11 integration and one documentation test); all-target locked
+Clippy with warnings denied exits 0. Both repository governance validators pass
+with zero warnings. Logs: /private/tmp/i300-bounded-discovery-clippy.log,
+/private/tmp/i300-bounded-discovery-governance.log and
+/private/tmp/i300-bounded-discovery-claims.log. No prepared consumer uses the new
+capability yet, so root escape/budget/runtime denial and independent security
+review remain required before activation. This is compiler-only evidence, not
+full-workspace or T7 completion.

@@ -5719,3 +5719,11 @@ pass 23/23 and Git-enabled tools lib/tests Clippy passes with warnings denied
 (/private/tmp/i300-native-pull-cancel-{suite,clippy}.log). I300 records fixture
 corrections and limits. This is runner coverage, not production approval-chain,
 Windows, T7 or whole-task completion; discovery scope acceptance remains pending.
+
+Maintainer accepted the exact bounded native Pull discovery scope on 2026-10-23.
+ADR-089 and I300 now record acceptance; the earlier pending statements are
+historical. Permission compilation is being added with closed-name negative
+coverage. Next: bind identities/fixed inspection commands/shared budgets in the
+prepared consumer and replace per-directory continuations with internal in-scope
+traversal, then verify discovery/execution history. This acceptance does not
+activate production Native Pull or close T7; I300 retains all remaining gates.
