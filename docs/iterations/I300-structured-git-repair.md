@@ -8449,3 +8449,23 @@ No Windows runtime or production activation claim follows from
 cross-compilation. Residual: delete superseded Pull scheduler/prediction, retain
 shared Checkout/Push helpers, complete cross-surface evidence and independent
 security/current-head CI/native Windows acceptance. T7 and T1–T8 remain open.
+
+Search-fixture and convergence checkpoint (2026-10-23): a temporary, content-free
+transport diagnostic captured `BrokenPipe` (errno 32), not `ConnectionRefused`,
+in a failing real-socket test. The diagnostic was removed; production error
+classification remains unchanged. The two refusal fixtures now choose distinct
+low-port ranges instead of releasing ephemeral listeners. Port reuse remains
+a hypothesis, not an established root cause or a universal isolation guarantee.
+The all-features tools library passed 1089 tests, followed by a successful full
+standard locked `./scripts/release_preflight.sh`, including workspace tests,
+Clippy, governance and external SDK fixtures. Evidence:
+`/private/tmp/i300-command-convergence-preflight.log`. The previous startup stall
+did not recur; its unresolved supervision residual remains open.
+
+The bounded test-fixture change is committed as `3bfc2bdea` after a clean rebase
+onto origin/main `444c8ff1c` (SearXNG adapter). The rebase replayed without
+conflicts; no remote history was rewritten. Post-rebase standard preflight exited 0 at
+`/private/tmp/i300-command-postrebase-preflight.log`, including locked workspace
+tests, Clippy, governance and external SDK fixtures. Next: retire the superseded
+Pull scheduler, preserving shared Checkout/Push helpers, then close cross-entry
+and native Windows/security acceptance. No production activation or T7 closure.

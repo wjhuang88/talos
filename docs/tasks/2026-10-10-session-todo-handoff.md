@@ -1,3 +1,17 @@
+## Local validation / rebase checkpoint — 2026-10-23
+
+Full standard locked preflight passed before rebase, including 1089 all-features
+tools tests, workspace tests, Clippy and external SDK fixtures. Test-only refused
+connection destinations now use distinct low-port ranges (`3bfc2bdea`); captured
+BrokenPipe is not treated as connection refusal in production. Port reuse remains
+an unproven cause. Branch rebased cleanly onto origin/main `444c8ff1c`; current
+command-route implementation is `74f88d1c9`, recursion/cancellation evidence is
+`29a54b443`. Post-rebase standard preflight passed at
+`/private/tmp/i300-command-postrebase-preflight.log`. No
+Windows runtime, production activation or T7 completion is claimed yet. Resume
+with that result, then retire obsolete Pull scheduling and close cross-entry,
+independent security/current-head CI/native Windows evidence. All T1–T8 remain.
+
 ## Command-authority route checkpoint — 2026-10-23
 
 Implementation commit `207a3646` connects bounded configuration discovery to
