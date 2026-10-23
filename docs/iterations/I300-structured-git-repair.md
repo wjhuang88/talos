@@ -8332,3 +8332,32 @@ acceptance. Logs: /private/tmp/i300-recursive-hooks-{tools,native,pull,clippy,xw
 Full latest-stage workspace preflight and independent review remain pending.
 T7 remains open; next complete child helper/worktree effect scope and native
 execution admission before production routing or deletion of the old scheduler.
+
+Convergence decision candidate (2026-10-23): the remaining complete-effects
+contract differs materially from Bash's concrete-command authorization. A
+reviewable alternative is recorded in
+`docs/proposals/i300-native-pull-command-authorization.md`. It would authorize
+one frozen native command's transitive effects rather than promise exhaustive
+path/network discovery. It explicitly preserves Deny/human-only policy and
+requires refusing command authority where finer-grained Deny cannot be honored.
+This was a new scope decision, subsequently accepted in the record below, not
+a reinterpretation of earlier bounded-discovery authority. Production guards
+remain in force until implementation and validation.
+
+Concrete-command decision accepted (2026-10-23): the maintainer explicitly
+accepted the proposal above. ADR-089 now supersedes final Pull complete-effects
+authority with one frozen command and its transitive configured-helper effects.
+Discovery limits remain unchanged. Implementation checkpoints: (1) shared typed
+command proof and policy compatibility, (2) native Pull routing and retirement
+of obsolete Pull-only prediction, (3) cross-surface and Windows evidence plus
+independent review/current-head CI. Explicit Deny/human-only policy, one-use
+binding and supervision remain mandatory. This records a Soft contract change;
+it does not activate production or mark T7 complete. Validation for this record:
+both governance validators and whitespace checks; remaining implementation and
+activation evidence stays owned here.
+
+Accepted-decision documentation checkpoint: both
+`scripts/validate_project_governance.sh .` and
+`bash scripts/validate_collaboration_claims.sh .` exited 0; `git diff --check`
+passed. Logs: /private/tmp/i300-command-accepted-{governance,claims}.log.
+These checks validate decision records only, not runtime implementation.
