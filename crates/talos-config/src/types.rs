@@ -29,16 +29,28 @@ pub use talos_core::model::ReasoningEffort;
 #[serde(rename_all = "kebab-case")]
 #[non_exhaustive]
 pub enum ProviderProtocol {
+    /// Internal absence marker for configuration fields. This is never a user-selectable protocol.
+    #[default]
+    #[serde(skip)]
+    #[doc(hidden)]
+    Unspecified,
     /// Anthropic Messages API.
     #[serde(rename = "anthropic-messages")]
     AnthropicMessages,
     /// OpenAI Chat Completions compatible API.
-    #[default]
     #[serde(rename = "openai-chat")]
     OpenAIChat,
     /// OpenAI Responses API.
     #[serde(rename = "openai-responses")]
     OpenAIResponses,
+}
+
+impl ProviderProtocol {
+    /// Returns whether this value represents an omitted configuration field rather than a wire family.
+    #[must_use]
+    pub fn is_unspecified(&self) -> bool {
+        matches!(self, Self::Unspecified)
+    }
 }
 
 /// Per-model runtime limits and capability overrides.
@@ -150,7 +162,8 @@ impl Default for ProviderTimeoutConfig {
 /// Named provider configuration.
 #[derive(Clone, Default, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
 pub struct ProviderConfig {
-    #[serde(default)]
+    /// Explicit wire protocol override. Omitted means protocol selection is resolved later.
+    #[serde(default, skip_serializing_if = "ProviderProtocol::is_unspecified")]
     pub protocol: ProviderProtocol,
     #[serde(default)]
     pub tool_protocol: talos_core::tool::ToolProtocol,
