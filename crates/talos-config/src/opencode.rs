@@ -92,6 +92,7 @@ pub fn import_opencode_providers(
             let model_config = ModelConfig {
                 context_limit: model.limit.context,
                 output_limit: model.limit.output,
+                protocol: None,
                 reasoning: None,
                 image_input: None,
             };
@@ -138,6 +139,7 @@ mod tests {
             .expect("operation should succeed");
         assert_eq!(glm5.context_limit, Some(202_752));
         assert_eq!(glm5.output_limit, Some(4096));
+        assert!(glm5.protocol.is_none());
     }
 
     #[test]
@@ -315,6 +317,7 @@ mod tests {
             .expect("operation should succeed");
         assert!(model.context_limit.is_none());
         assert!(model.output_limit.is_none());
+        assert!(model.protocol.is_none());
     }
 
     #[test]
@@ -336,5 +339,6 @@ mod tests {
             .expect("operation should succeed");
         assert_eq!(model.context_limit, Some(1000));
         assert!(model.output_limit.is_none());
+        assert!(model.protocol.is_none());
     }
 }
