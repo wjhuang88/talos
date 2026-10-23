@@ -5,6 +5,15 @@
 Record reusable lessons from failures, corrections, and unexpected successes. Check here before
 repeating known mistakes.
 
+## 2026-10-23 - Research stalled designs and report implementation honestly
+
+- Trigger: Maintainer correction during prolonged I300 convergence.
+- Symptom: The maintainer identified a risk of isolated design growth and of explanations substituting for current implementation.
+- Root cause: Process guidance did not explicitly define research triggers or prohibit closing requirements through explanatory wording.
+- Fix: Require upstream/comparable implementation research at repeated failure, uncertain platform behavior or disproportionate complexity; distinguish implemented behavior from plans.
+- Prevention: Validate applicable external ideas with focused evidence. Treat comments, TODOs and promised follow-ups as unimplemented work; scope changes require an explicit decision.
+- Promoted to rule/check: `AGENTS.md`, Accuracy Over Approval and Think Before Coding.
+
 ## 2026-10-19 - Use the established Windows cross-compilation route
 
 - Trigger: Maintainer correction during I300 Windows Job validation.
@@ -51,6 +60,8 @@ repeating known mistakes.
 - Promoted to rule/check: `checkout_existing_local_branch_preserves_onbranch_configuration` covers post-checkout and reference-transaction command refusal.
 
 ## Lesson Index
+
+- [Research stalled designs and report implementation honestly](#2026-10-23---research-stalled-designs-and-report-implementation-honestly) — I300.
 
 - [Use the established Windows cross-compilation route](#2026-10-19---use-the-established-windows-cross-compilation-route) — I300.
 
