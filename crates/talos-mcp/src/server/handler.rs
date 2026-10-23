@@ -313,8 +313,9 @@ impl ServerHandler for TalosMcpHandler {
                                 return Err(McpError::new(ErrorCode::INTERNAL_ERROR, "prepared stage limit or reused identity; authorization profile budget may be exhausted", None));
                             }
                             let profile = operation.permission_profile().to_vec();
+                            let evidence = operation.prepared_command_evidence();
                             let admission = self.permission_gate
-                                .authorize_prepared_plan_until(&hook_context, &talos_request, &profile, &plan, prepared_permission_deadline_at).await?;
+                                .authorize_prepared_command_until(&hook_context, &talos_request, &profile, (&plan, evidence.as_ref()), prepared_permission_deadline_at).await?;
                             if context.ct.is_cancelled() || tokio::time::Instant::now() >= prepared_invocation_deadline_at {
                                 return Err(McpError::new(ErrorCode::INTERNAL_ERROR,
                                     "prepared invocation cancelled or expired; effects may be incomplete", None));

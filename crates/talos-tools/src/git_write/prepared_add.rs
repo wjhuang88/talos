@@ -253,6 +253,7 @@ pub(super) struct AddPlan {
     native_pull_command: Option<command::FrozenCommand>,
     identity: PreparedPlanIdentity,
     workspace: PathBuf,
+    workspace_review_root: PathBuf,
     input: Value,
     provenance: ToolProvenance,
     repository: RepositoryState,
@@ -726,6 +727,9 @@ impl AddPlan {
             native_pull_command,
             identity: PreparedPlanIdentity::new(),
             workspace: workspace.to_owned(),
+            workspace_review_root: workspace
+                .canonicalize()
+                .map_err(|error| GitToolError::InvalidInput(error.to_string()))?,
             input: input.clone(),
             provenance,
             repository,
@@ -5079,6 +5083,83 @@ impl PreparedNormalToolInvocation for AddPlan {
 
     fn plan_identity(&self) -> Option<&PreparedPlanIdentity> {
         Some(&self.identity)
+    }
+
+    fn prepared_command_evidence(&self) -> Option<talos_core::tool::PreparedCommandEvidence> {
+        use talos_core::tool::{
+            PreparedCommandDescription, PreparedCommandEffect as Effect, PreparedCommandEvidence,
+            PreparedCommandTargets,
+        };
+        let Operation::Pull(input) = &self.operation else {
+            return None;
+        };
+        if self.phase != Phase::PullCommandMutation || self.native_pull_command.is_none() {
+            return None;
+        }
+        let mut arguments = [
+            "-c",
+            "maintenance.autoDetach=false",
+            "-c",
+            "gc.autoDetach=false",
+            "--no-pager",
+            "pull",
+        ]
+        .map(str::to_owned)
+        .to_vec();
+        if input.remote.is_some() {
+            arguments.extend(["--".into(), "<retained-remote>".into()]);
+        }
+        let config = self.config.as_ref()?;
+        let label = |path: &Path| {
+            path.strip_prefix(&self.workspace_review_root)
+                .ok()
+                .map(|path| {
+                    if path.as_os_str().is_empty() {
+                        ".".into()
+                    } else {
+                        path.to_string_lossy().replace('\\', "/")
+                    }
+                })
+                .unwrap_or_else(|| "<outside-workspace>".into())
+        };
+        Some(PreparedCommandEvidence::new(
+            self.identity.clone(),
+            PreparedCommandDescription {
+                operation: "git:pull-command/v1".into(),
+                arguments,
+                effects: vec![
+                    Effect::Execute,
+                    Effect::Network,
+                    Effect::WorktreeMutation,
+                    Effect::MetadataMutation,
+                    Effect::Recursion,
+                    Effect::ConfiguredPrograms,
+                ],
+                confined: false,
+                targets: PreparedCommandTargets {
+                    repository: label(&self.repository.workdir),
+                    metadata: [&self.repository.git_dir, &self.repository.common_dir]
+                        .map(|path| label(path))
+                        .to_vec(),
+                    remote_selection: if input.remote.is_some() {
+                        "explicit retained remote; name/location withheld"
+                    } else {
+                        "configured upstream"
+                    }
+                    .into(),
+                    configured_remote_hosts: config.pull_command_remote_hosts(),
+                    invocation_remote_host: input.remote.as_deref().and_then(|remote| {
+                        super::config_state::command_remote_host(remote.as_bytes())
+                    }),
+                    configured_program_categories: config
+                        .pull_command_program_categories()
+                        .into_iter()
+                        .map(str::to_owned)
+                        .collect(),
+                    dynamic_effects_unknown: true,
+                },
+            },
+        ))
     }
 
     fn permission_profile(&self) -> &[ToolPermissionFacet] {

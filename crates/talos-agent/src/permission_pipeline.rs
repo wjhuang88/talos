@@ -102,6 +102,19 @@ pub struct PermissionAuthorizationRequest<'a> {
 /// Surface adapter that resolves an already-evaluated `Ask`.
 #[async_trait]
 pub trait ApprovalResolver: Send + Sync {
+    /// Reviews implementation-owned command evidence. Legacy adapters retain
+    /// their human resolution path and do not acquire automatic command approval.
+    async fn resolve_prepared_command(
+        &self,
+        request: PermissionApprovalRequest,
+        _evidence: &talos_core::tool::PreparedCommandEvidence,
+        remaining: Duration,
+        _auto_assessment_allowed: bool,
+        user_intent: Option<&str>,
+    ) -> Result<ApprovalChoice, ApprovalResolverError> {
+        self.resolve_with_auto_assessment(request, remaining, false, user_intent)
+            .await
+    }
     /// Observes bounded user-authored messages for presentation-only session context.
     fn observe_user_messages(&self, _messages: &[String]) {}
 
@@ -355,9 +368,33 @@ impl PermissionPipeline {
         user_intent: Option<&str>,
         plan: &talos_core::tool::PreparedPlanIdentity,
     ) -> Result<talos_permission::AdmittedInvocation, PermissionPipelineError> {
-        self.authorize_inner(authorization, user_intent, None, Some(plan), None)
+        self.authorize_inner(authorization, user_intent, None, Some((plan, None)), None)
             .await?
             .into_prepared()
+    }
+
+    /// Admits a retained command with producer evidence bound to the same plan.
+    pub async fn authorize_prepared_plan_with_evidence(
+        &self,
+        authorization: PermissionAuthorizationRequest<'_>,
+        user_intent: Option<&str>,
+        plan: &talos_core::tool::PreparedPlanIdentity,
+        evidence: Option<&talos_core::tool::PreparedCommandEvidence>,
+    ) -> Result<talos_permission::AdmittedInvocation, PermissionPipelineError> {
+        if evidence.is_some_and(|evidence| !evidence.belongs_to(plan)) {
+            return Err(PermissionPipelineError::State(
+                "command evidence plan mismatch".into(),
+            ));
+        }
+        self.authorize_inner(
+            authorization,
+            user_intent,
+            None,
+            Some((plan, evidence)),
+            None,
+        )
+        .await?
+        .into_prepared()
     }
 
     /// Approves and admits a protected network invocation with its trusted manifest.
@@ -383,7 +420,10 @@ impl PermissionPipeline {
         authorization: PermissionAuthorizationRequest<'_>,
         user_intent: Option<&str>,
         working_directory: Option<&std::path::Path>,
-        prepared: Option<&talos_core::tool::PreparedPlanIdentity>,
+        prepared: Option<(
+            &talos_core::tool::PreparedPlanIdentity,
+            Option<&talos_core::tool::PreparedCommandEvidence>,
+        )>,
         network_manifest: Option<&ToolNetworkManifest>,
     ) -> Result<PermissionAdmission, PermissionPipelineError> {
         let PermissionAuthorizationRequest {
@@ -448,7 +488,16 @@ impl PermissionPipeline {
                     },
                 };
                 let remaining = deadline_at.saturating_duration_since(Instant::now());
-                let resolver_future = if matches!(tool_name, "bash" | "powershell") {
+                let resolver_future = if let Some((_, Some(evidence))) = prepared {
+                    std::panic::AssertUnwindSafe(resolver.resolve_prepared_command(
+                        approval,
+                        evidence,
+                        remaining,
+                        auto_assessment_allowed,
+                        user_intent,
+                    ))
+                    .catch_unwind()
+                } else if matches!(tool_name, "bash" | "powershell") {
                     std::panic::AssertUnwindSafe(resolver.resolve_with_execution_context(
                         approval,
                         input,
@@ -511,7 +560,7 @@ impl PermissionPipeline {
                 .map_err(|error| PermissionPipelineError::State(error.to_string()));
         }
         let admission = match prepared {
-            Some(plan) => {
+            Some((plan, _)) => {
                 self.state
                     .try_admit_prepared_invocation(pending, &request, &self.context, plan)
             }
@@ -591,6 +640,10 @@ mod execution_input_tests;
 #[cfg(test)]
 #[path = "permission_pipeline/native_pull_command_tests.rs"]
 mod native_pull_command_tests;
+
+#[cfg(test)]
+#[path = "permission_pipeline/prepared_command_tests.rs"]
+mod prepared_command_tests;
 
 #[cfg(test)]
 mod tests {

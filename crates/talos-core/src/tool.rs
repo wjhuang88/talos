@@ -10,6 +10,7 @@ mod browser_arguments;
 mod cleanup;
 mod network;
 mod prepared;
+mod prepared_command;
 mod protocol;
 mod registry;
 mod result_presentation;
@@ -24,6 +25,10 @@ pub use prepared::{
     PreparedFailureCode, PreparedInvocationError, PreparedNormalStage,
     PreparedNormalToolInvocation, PreparedPlanIdentity, PreparedStageHistory,
     PreparedToolInvocation,
+};
+pub use prepared_command::{
+    PreparedCommandDescription, PreparedCommandEffect, PreparedCommandEvidence,
+    PreparedCommandTargets,
 };
 pub use todo_presentation::{
     TodoDisplaySpan, TodoDisplayStatus, TodoPresentation, VisibleTodoPresentation,

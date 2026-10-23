@@ -775,8 +775,14 @@ impl Agent {
                             Vec::new(),
                         ));
                     };
+                    let evidence = operation.prepared_command_evidence();
                     pipeline
-                        .authorize_prepared_plan(authorization_request, user_intent, plan)
+                        .authorize_prepared_plan_with_evidence(
+                            authorization_request,
+                            user_intent,
+                            plan,
+                            evidence.as_ref(),
+                        )
                         .await
                         .map(|admission| {
                             prepared_admission = Some(admission);
