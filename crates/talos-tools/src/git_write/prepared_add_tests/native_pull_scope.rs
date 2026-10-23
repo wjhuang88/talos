@@ -23,6 +23,8 @@ async fn native_pull_scope_admits_startup_before_discovering_configuration() {
             std::fs::create_dir(root.path().join(".git/startup-worktree"))
                 .expect("startup worktree");
             std::fs::write(module.join("HEAD"), "ref: refs/heads/main\n").expect("HEAD");
+            std::fs::write(module.join("gitdir"), "../../../startup-worktree/.git\n")
+                .expect("worktree marker pointer");
             std::fs::write(
                 module.join("child-include"),
                 "[remote \"origin\"]\nurl = git://example.invalid/child\n",
@@ -94,6 +96,22 @@ async fn native_pull_scope_admits_startup_before_discovering_configuration() {
             assert!(!module.join("FETCH_HEAD").exists());
             assert_eq!(roots, vec![module.as_path()]);
             assert!(plan.native_pull_metadata.contains_key(&module));
+            let marker = plan.native_pull_metadata[&module]
+                .worktree_marker
+                .as_ref()
+                .expect("retained marker");
+            assert_eq!(
+                plan.facets
+                    .iter()
+                    .filter(|facet| {
+                        facet.nature == ToolNature::Read
+                            && facet.resource_kind == Some(ToolResourceKind::Path)
+                            && facet.resource.as_deref() == marker.to_str()
+                    })
+                    .count(),
+                1,
+                "continuations must not republish retained layout targets"
+            );
             assert!(plan.pull_child_startup.contains_key(&module));
             assert!(plan.native_pull_configs.contains_key(&module));
             assert!(

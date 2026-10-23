@@ -129,6 +129,11 @@ impl AddPlan {
         // an external common directory or worktree marker.
         for root in roots {
             self.child_read(&root, authorizations)?;
+            // Entry revalidation already checked retained pointer evidence.
+            // Do not replace it or republish its targets on every continuation.
+            if self.native_pull_metadata.contains_key(&root) {
+                continue;
+            }
             let metadata = super::super::receiver_state::Metadata::capture(&root, &root)?;
             if let Some(path) = &metadata.worktree_marker {
                 self.facets.push(path_facet(
