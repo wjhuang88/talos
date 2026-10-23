@@ -8170,3 +8170,15 @@ Complete recursive mutation roots/destinations, local-source protected execution
 selected integration programs, production routing, independent security review
 and native Windows acceptance remain open. Shared resolution/identity/revalidation
 accounting remains a P1 residual; no P1–P5 or T7 completion is claimed.
+
+Frozen discovery stage validation (2026-10-23): implementation d248d8e2 passes
+the complete standard `./scripts/release_preflight.sh` outside the sandbox
+(exit 0), including locked workspace checks, Clippy, tests, doctests and both
+external Runtime SDK consumers. Source remained unchanged throughout validation.
+Log: /private/tmp/i300-scoped-discovery-preflight-elevated.log. The first sandboxed
+attempt failed only when the local Push test's process observation received
+EPERM (1073 tools tests passed, one failed); the authorized unchanged retry passed.
+Log: /private/tmp/i300-scoped-discovery-preflight.log. This is local stage
+validation, not remote exact-head CI, independent security review, native Windows
+runtime acceptance or activation. Simplified discovery orchestration and complete
+recursive mutation/executable effects remain open; T7 and T1–T8 remain incomplete.
