@@ -1,4 +1,6 @@
 //! Dormant explicit SearXNG adapter. Configuration grants no network authority.
+
+pub(in crate::search_backend) mod invocation;
 use super::{
     CompatibilityError, Method, PreparedTransportRequest, SearchTransport, TransportError,
     TransportResponse, Url, admission, request_endpoint,

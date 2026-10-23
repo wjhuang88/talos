@@ -32,3 +32,17 @@ Budget checks fence parsing and admission completion, including error outcomes. 
 JSON parsing cannot be preempted by those checks. Unwind recovery does not suppress panic
 hooks or recover from process aborts/OOM. Native CI, source/parity/privacy evidence and the
 remaining router/entry-point gates are still required before activation.
+
+## Prepared invocation bridge (dormant)
+
+The private SearXNG invocation implements the existing prepared-network trait. It retains the
+original plan and delegates its exact manifest/profile without rebuilding configuration or
+authority. Query text and snippets options are captured before approval. A single execution
+budget starts only on actual trait-object dispatch, then covers controlled HTTP, parsing,
+admission and the final formatting fence. Waiting for approval consumes no execution time.
+
+Formatting uses a fixed SearXNG source label and the existing display format, including snippets
+selection and UTF-8 truncation. Source labels do not come from response data or user input;
+display conversion is not result admission. A final deadline failure takes precedence over
+formatted success and transport/parser errors. Caller cancellation drops the owned execution.
+This bridge is not an AgentTool registration, configuration discovery or official entry point.
