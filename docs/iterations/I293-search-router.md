@@ -10,7 +10,7 @@
 | Source Issue | #643 |
 | Depends on | Accepted ADR-085; SEARCH-001-B / #642 complete in #656; NET-001 boundary coordination |
 | Claim State | Claimed |
-| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 merged TLS/CONNECT subset; #716 merged bounded form/diagnostic stage at `b5b8241e`; #732 merged owned payload at `8fa2a50`; #733 merged Lite/HTML parsing at `dea3edc`; #734 merged Instant Answer at `45cf9eb9`; #736 merged Bing parsing at `2b015a6b`; #737 merged fixed requests at `ae6a0791`; #738 merged bound execution at `2d7f4b36`; #739 merged fixed headers at `91c330ba`; #741 merged result admission at `4e20ee95`; #742 merged fixed chain at `9f998392`; #743 merged direct plan at `181d7584`; #744 merged prepared invocation at `032cce61`; #745 merged private tool at `ba93193f`; #746 merged DNS failover at `0caaf832`; typed-refusal candidate #750; full C/EP and default activation Pending |
+| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 merged TLS/CONNECT subset; #716 merged bounded form/diagnostic stage at `b5b8241e`; #732 merged owned payload at `8fa2a50`; #733 merged Lite/HTML parsing at `dea3edc`; #734 merged Instant Answer at `45cf9eb9`; #736 merged Bing parsing at `2b015a6b`; #737 merged fixed requests at `ae6a0791`; #738 merged bound execution at `2d7f4b36`; #739 merged fixed headers at `91c330ba`; #741 merged result admission at `4e20ee95`; #742 merged fixed chain at `9f998392`; #743 merged direct plan at `181d7584`; #744 merged prepared invocation at `032cce61`; #745 merged private tool at `ba93193f`; #746 merged DNS failover at `0caaf832`; typed refusal #750 merged at `ec9ade0f`; full C/EP and default activation Pending |
 | Completion | Pending |
 
 ## Collaboration Claim
@@ -26,7 +26,7 @@
 | Governance Claim PR | #712 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer accepted bounded production scope 2026-10-13; independent protected security/API contract review, exact-head CI, governance validators, Issue reconciliation and final CAS required for #712 merge. No release or native admission authorized. |
-| Last Updated | 2026-10-22 |
+| Last Updated | 2026-10-23 |
 | Handoff / Release Condition | Original #664 claim effective at `d801790454e252699684253166984662ea9dab6a`; expanded scope effective only after #712 accepted-contract merge. Start implementation from that merge or later main; activation requires ADR-090 transport/parity/D gates. |
 
 ## Scope
@@ -2194,3 +2194,23 @@ Publication inventory refresh: main advanced from4722fee8 to213c35d8 through #75
 only changed path is .github/workflows/actions-maintenance.yml, unrelated to search/runtime
 validation inputs. It is not absorbed into this three-path correction. Provider#749, Git#735
 and Windows#705 retain their independent scopes; verify full path intersections before push.
+
+## Explicit SearXNG selection — 2026-10-23
+
+Base: `ec9ade0fa992d80facd9308a2f03e894b17b26da`; effective #712 claim includes optional-adapter transport. Independent design review approved a dormant explicit SearXNG adapter under this same objective.
+
+Selection inventory: Active I293 continues; Active I294, I300 and I306 remain with their existing separate owners; Review I277 and I302 remain deferred to their respective human/device and Windows evidence work; Planned I249 remains deferred. No Blocked iteration selected. Paused I164 is superseded; completed iterations are not reactivated.
+
+Deliverable: private, consuming explicit-base SearXNG plan using endpoint authority, shared budget and backend-specific display admission. No tool registration or default switch. Candidate arrays above 20 are rejected; fields and URLs follow existing bounded admission. This is a deliberate stricter policy, not legacy parity. User-facing search behavior remains unchanged; reference documentation records the dormant boundary. Full C/EP, provider/privacy/parity evidence and activation remain Pending. Validation and publication evidence will be appended after implementation.
+
+Predecessor delivery: #750 merged as `ec9ade0fa992d80facd9308a2f03e894b17b26da` after native CI3351/run39887827755 on reviewed head `7931289a14cc257b788c51b50bf639afcad47807`, all six checks successful and final independent review/CAS accepted. Its historical local coding-SDK failure remains unexplained; native success does not repair or explain it. I293 and #643/#624 remain open.
+
+Local SearXNG validation uses pinned Rust 1.99.0, locked dependencies, two build jobs, debug info/incremental disabled and the existing sole authorized local runtime socket-fixture skip. The repository target symlink was explicitly verified to share the same cache with the SDK fixture. Initial standalone governance without pinned Cargo on PATH failed the SQLite-consumer check; the standard configured preflight subsequently passed both governance validators with zero warnings.
+
+The initial focused run passed 140 and failed 2 new tests at DNS because `Server.url()` deliberately uses `search-fixture.invalid`. A partial fixture correction passed 141 and failed 1; both logs are retained. Correcting both test-only URLs to explicit loopback, retaining encoded prefixes and test-only private-IP scope, passed all 142 transport tests plus the isolated child test. Further strengthening exact Unauthorized and post-parse/admission deadline assertions also passed 142 plus child 1. No production transport, DNS policy or timeout was changed to obtain this result. Strict network-feature test Clippy passed. Standard preflight workspace check/Clippy/tests passed (tools 600/0); external SDK validation is recorded separately below. Independent design, working-source and staged technical reviews found no remaining source/security blockers; these are Agent reviews, not a separate natural person's approval.
+
+Reference: [Controlled SearXNG boundary](../reference/SEARCH-001-C-CONTROLLED-SEARXNG.md). Native exact-head CI, final review/CAS and publication remain pending. No completion, provider qualification or activation is claimed.
+
+Final local preflight: `./scripts/release_preflight.sh` exited 0 (`searxng-preflight.log`, `TALOS_STAGE_TERMINAL_EXIT=0`). Both independently resolved Runtime SDK modes, default and coding, printed `talos-runtime external fixture passed`; the standard script printed `release preflight: passed`. This fresh-cache success is current-candidate evidence, not an explanation of #750's historical local artifact failure. Workspace output contained 120 successful suite summaries and no failed/ignored tests, including tools 600/0; the sole authorized runtime fixture remained locally filtered, with isolated child-process test filters also present. Native CI must retain unfiltered parent suites. The strengthened focused log passed 142/0 plus child 1; strict network Clippy exited 0.
+
+Publication inventory: open Provider #749 (25 files), Git #735 (136 files across both pages), and Windows #705 (4 files) have no intersection with this five-file candidate. These scopes remain separately owned. Final remote-head and merge-time CAS checks remain required.
