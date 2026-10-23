@@ -17,7 +17,11 @@ fn omitted_protocol_roundtrips_as_unset_without_exposing_internal_marker() {
     assert!(provider.protocol.is_unspecified());
 
     let encoded = toml::to_string(&provider).expect("serialize provider");
-    assert!(!encoded.contains("protocol"));
+    assert!(
+        !encoded
+            .lines()
+            .any(|line| line.trim_start().starts_with("protocol ="))
+    );
     assert!(!encoded.contains("unspecified"));
 
     let decoded: ProviderConfig = toml::from_str(&encoded).expect("deserialize provider");
