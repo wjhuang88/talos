@@ -20,7 +20,7 @@ fn git(root: &Path, args: &[&str]) -> Vec<u8> {
 }
 
 #[tokio::test]
-async fn native_pull_mcp_command_denial_and_activation_gate_do_not_fetch_or_replay() {
+async fn native_pull_mcp_command_allows_real_fetch_and_denies_or_rejects_replay() {
     tokio::time::timeout(Duration::from_secs(30), async {
         for denied in [true, false] {
             let root = tempfile::tempdir().expect("workspace");
@@ -140,12 +140,12 @@ async fn native_pull_mcp_command_denial_and_activation_gate_do_not_fetch_or_repl
                         "{response}"
                     );
                 } else {
-                    // This is the real prepared route, not cfg(test) tools code.
-                    // Success remains forbidden until activation evidence closes.
-                    assert_eq!(response["result"]["isError"], true, "{response}");
+                    assert_eq!(response["result"]["isError"], false, "{response}");
+                    let fetched = std::fs::read_to_string(root.path().join(".git/FETCH_HEAD"))
+                        .expect("real fetch writes FETCH_HEAD");
                     assert!(
-                        response.to_string().contains("awaits activation evidence"),
-                        "{response}"
+                        fetched.starts_with(std::str::from_utf8(&head).expect("head").trim()),
+                        "{fetched}"
                     );
                 }
                 assert_eq!(git(root.path(), &["rev-parse", "HEAD"]), head);
@@ -153,7 +153,7 @@ async fn native_pull_mcp_command_denial_and_activation_gate_do_not_fetch_or_repl
                     std::fs::read(root.path().join(".git/config")).expect("config"),
                     config
                 );
-                assert!(!root.path().join(".git/FETCH_HEAD").exists());
+                assert_eq!(root.path().join(".git/FETCH_HEAD").exists(), !denied);
             }
             drop(read);
             drop(write);

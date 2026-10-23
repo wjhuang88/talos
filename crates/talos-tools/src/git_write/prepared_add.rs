@@ -499,17 +499,9 @@ impl AddPlan {
         operation: Operation,
         selected: Option<Vec<String>>,
     ) -> Result<Self, GitToolError> {
-        // Production Windows preparation stays closed pending full native
-        // acceptance. The unit harness exercises the existing Job-backed path
-        // in isolated fixtures; this is not a feature or runtime opt-in.
-        if !cfg!(any(unix, all(test, windows))) {
+        if !cfg!(any(unix, windows)) {
             return Err(GitToolError::InvalidInput(
-                if cfg!(windows) {
-                    "Structured Git on Windows is disabled pending native acceptance of Job-supervised execution"
-                } else {
-                    "Structured Git process-tree supervision is unsupported on this platform"
-                }
-                .into(),
+                "Structured Git process-tree supervision is unsupported on this platform".into(),
             ));
         }
         let environment = execution_environment();

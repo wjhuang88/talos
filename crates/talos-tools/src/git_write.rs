@@ -811,7 +811,7 @@ impl AgentTool for GitPullTool {
         "git_pull"
     }
     fn description(&self) -> &str {
-        "Pull from remote repository (temporarily unavailable until prepared fetch/merge authorization is implemented)"
+        "Pull using configured native Git behavior after configuration discovery and whole-command authorization; may run configured programs and leave partial effects"
     }
     fn parameters(&self) -> Value {
         tool_parameters!(GitPullInput)

@@ -1,3 +1,45 @@
+## Candidate validation — 2026-10-24
+
+The frozen candidate's standard locked release preflight passed (exit 0,
+`/private/tmp/i300-native-candidate-final-preflight.log`), including workspace
+tests, Clippy and both external SDK fixtures. Production-library Add, Runtime
+Pull's four-scenario matrix and MCP real fetch/denial/duplicate-ID tests pass
+locally. The affected Tools/Agent/MCP/Runtime MSVC test targets pass locked
+`cargo xwin check` (`/private/tmp/i300-command-windows-candidate.log`); this is
+compilation only. Independent activation review accepts candidate submission,
+not final merge. Native Windows, exact-head CI and full acceptance mapping
+remain open. Origin main advanced to `d5e0d0627`; reconcile before publication.
+
+## Real native Pull candidate execution — 2026-10-23
+
+Prepared-command Auto prerequisite is committed as `76af2f191`; its standard
+locked preflight passed before this next candidate delta. Independent review
+accepted the canonical review labels and host-only display helper. Review also
+confirmed that acceptance-before-activation permits removing the gate in the
+candidate source to test the actual production path; merge/release still waits
+for all acceptance, security, exact-head CI and native Windows gates.
+
+The uncommitted candidate removes the unconditional production Pull refusal,
+without a test bypass or alternate runner. Real MCP JSON-RPC fetch, explicit
+Deny and replay refusal pass (`/private/tmp/i300-command-mcp-real.log`). The new
+Runtime integration test passes through Runtime, Agent, Provider Auto review,
+one-use admission and supervised Git: it integrates an upstream commit and
+checks HEAD, FETCH_HEAD and the new worktree file. The expanded four-scenario
+Runtime matrix additionally proves explicit Deny prevents model review/fetch,
+human-only Write Ask bypasses Auto and reaches scoped human approval, and an
+assessor network error falls back to scoped human approval before execution
+(`/private/tmp/i300-command-runtime-matrix.log`). The assessor is
+a deterministic provider fixture, not a claim of live model quality. Windows
+production preparation is enabled in this candidate and affected MSVC test
+targets cross-compile with `cargo xwin`; native execution remains pending. Full
+candidate preflight, broader failure-path coverage and final independent/remote
+acceptance remain pending.
+MCP replay coverage here means duplicate JSON-RPC request ID rejection; it is
+not a new proof-replay test. These success tests still need native Windows
+execution evidence; do not change them to expect refusal as a
+substitute for native execution evidence.
+No merge, release or T7 completion is claimed. Resume from these candidate files.
+
 ## Prepared-command Auto implementation checkpoint — 2026-10-23
 
 Uncommitted implementation now carries non-serializable, identity-bound command

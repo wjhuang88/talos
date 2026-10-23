@@ -1,50 +1,79 @@
-//! The unit-test acceptance entry must not enable the production Windows library.
-#![cfg(all(windows, feature = "git"))]
+//! Production-library preparation and exact admission, including Windows Job execution.
+#![cfg(all(any(unix, windows), feature = "git"))]
 
-use talos_core::tool::{AgentTool, ToolProvenance};
-use talos_tools::git::{GitAddTool, GitCheckoutTool, GitCommitTool, GitPullTool, GitPushTool};
+use talos_core::tool::{AgentTool, PreparedNormalStage, PreparedStageHistory, ToolProvenance};
+use talos_permission::{
+    GrantScope, PermissionContext, PermissionEngine, PermissionRequest, PermissionSessionState,
+};
+use talos_tools::git::GitAddTool;
 
-#[test]
-fn production_windows_preparation_stays_closed_before_repository_discovery() {
+fn git(root: &std::path::Path, args: &[&str]) -> Vec<u8> {
+    let output = std::process::Command::new("git")
+        .current_dir(root)
+        .args(args)
+        .output()
+        .expect("fixture Git");
+    assert!(output.status.success(), "{output:?}");
+    output.stdout
+}
+
+#[tokio::test]
+async fn production_prepared_add_requires_proof_and_stages_exact_path() {
     let root = tempfile::tempdir().expect("fixture");
-    // Deliberately not a repository: the platform gate must win before discovery.
-    let cases: Vec<(Box<dyn AgentTool>, serde_json::Value)> = vec![
-        (
-            Box::new(GitAddTool::new(root.path().to_owned())),
-            serde_json::json!({"paths": ["file"]}),
-        ),
-        (
-            Box::new(GitCommitTool::new(root.path().to_owned())),
-            serde_json::json!({"message": "fixture"}),
-        ),
-        (
-            Box::new(GitCheckoutTool::new(root.path().to_owned())),
-            serde_json::json!({"branch": "fixture"}),
-        ),
-        (
-            Box::new(GitPushTool::new(root.path().to_owned())),
-            serde_json::json!({}),
-        ),
-        (
-            Box::new(GitPullTool::new(root.path().to_owned())),
-            serde_json::json!({}),
-        ),
-    ];
-    for (tool, input) in cases {
-        let result = tool.prepare_normalized_with_provenance(&input, ToolProvenance::Native);
-        let Err(error) = result else {
-            panic!("{} enabled production preparation", tool.name());
-        };
+    git(root.path(), &["init", "-b", "main"]);
+    git(root.path(), &["config", "core.autocrlf", "false"]);
+    std::fs::write(root.path().join("selected.txt"), "selected\n").expect("selected");
+    std::fs::write(root.path().join("other.txt"), "other\n").expect("other");
+    let input = serde_json::json!({"paths":["selected.txt"]});
+    let tool = GitAddTool::new(root.path().to_owned());
+    let before = std::fs::read(root.path().join(".git/index")).ok();
+    let operation = tool
+        .prepare_normalized_with_provenance(&input, ToolProvenance::Native)
+        .expect("production preparation")
+        .expect("prepared operation");
+    let output = operation.execute(Box::new(())).await;
+    assert!(output.result.is_error, "forged authority must fail");
+    assert_eq!(std::fs::read(root.path().join(".git/index")).ok(), before);
+    let mut operation = tool
+        .prepare_normalized_with_provenance(&input, ToolProvenance::Native)
+        .expect("fresh production preparation")
+        .expect("prepared operation");
+    let state = PermissionSessionState::new(PermissionEngine::with_workspace_root(
+        root.path().to_owned(),
+    ));
+    let context = PermissionContext::compatibility();
+    let mut history = PreparedStageHistory::default();
+    loop {
+        let plan = operation.plan_identity().expect("identity");
         assert!(
-            error.contains("disabled pending native acceptance of Job-supervised execution"),
-            "{}: {error}",
-            tool.name()
+            history.record_profile(plan, operation.permission_profile()),
+            "bounded distinct stages"
         );
+        let request = PermissionRequest::native("git_add", operation.permission_profile(), &input);
+        let proposal = state
+            .propose(&request, &context, GrantScope::Once)
+            .expect("proposal");
+        let pending = state
+            .approve_once(proposal, &request, &context)
+            .expect("approve");
+        let proof = state
+            .try_admit_prepared_invocation(pending, &request, &context, plan)
+            .expect("exact admission");
+        match operation.execute_stage(Box::new(proof)).await {
+            PreparedNormalStage::Continue(next) => operation = next,
+            PreparedNormalStage::Complete(output) => {
+                assert!(!output.result.is_error, "{}", output.result.content);
+                break;
+            }
+        }
     }
     assert_eq!(
-        std::fs::read_dir(root.path())
-            .expect("fixture entries")
-            .count(),
-        0
+        git(root.path(), &["diff", "--cached", "--name-only"]),
+        b"selected.txt\n"
+    );
+    assert_eq!(git(root.path(), &["show", ":selected.txt"]), b"selected\n");
+    assert_eq!(
+        std::fs::read(root.path().join("other.txt")).expect("other"),
+        b"other\n"
     );
 }
