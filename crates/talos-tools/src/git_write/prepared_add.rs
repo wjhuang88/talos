@@ -4472,7 +4472,10 @@ impl AddPlan {
         }
         if matches!(self.operation, Operation::Push(_))
             || (matches!(self.operation, Operation::Pull(_))
-                && self.phase != Phase::PullCommandMutation)
+                && !matches!(
+                    self.phase,
+                    Phase::SenderConfiguration | Phase::PullCommandMutation
+                ))
         {
             super::remote_state::reject_legacy_remotes(&self.repository.common_dir)?;
         }

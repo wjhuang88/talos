@@ -114,6 +114,50 @@ async fn native_command_refuses_configuration_drift_before_fetch() {
     );
 }
 
+#[cfg(unix)]
+#[tokio::test]
+async fn native_command_cancellation_closes_configured_hook_descendants() {
+    use std::os::unix::fs::PermissionsExt;
+    let (_root, _source, local) = repositories();
+    let hook = local.join(".git/hooks/post-merge");
+    std::fs::write(&hook, "#!/bin/sh\n(while test ! -f release-effect; do sleep 0.01; done; printf forbidden > delayed-effect) &\nprintf observed > hook-started\nwait\n").expect("hook");
+    std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o755)).expect("mode");
+    git(&local, &["config", "core.hooksPath", ".git/hooks"]);
+    let plan =
+        prepare_pull_fixture(&local, &serde_json::json!({}), ToolProvenance::Native).expect("plan");
+    let plan = Box::new(plan)
+        .discover_pull_command()
+        .await
+        .expect("discovery");
+    let receipt = plan.cleanup_receipt().expect("cleanup receipt");
+    let admission = proof(&plan);
+    let task = tokio::spawn(async move {
+        let _ = plan.execute_stage(Box::new(admission)).await;
+    });
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        while !local.join("hook-started").exists() {
+            assert!(!task.is_finished(), "command must reach configured hook");
+            tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .expect("hook started");
+    task.abort();
+    assert!(task.await.expect_err("cancelled").is_cancelled());
+    receipt
+        .wait(std::time::Duration::from_secs(3))
+        .await
+        .expect("owned descendants closed");
+    std::fs::write(local.join("release-effect"), "release\n").expect("release");
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    assert!(!local.join("delayed-effect").exists());
+    // Cancellation retains the completed integration preceding the hook.
+    assert_eq!(
+        std::fs::read_to_string(local.join("file")).expect("file"),
+        "remote\n"
+    );
+}
+
 #[tokio::test]
 async fn native_command_conflict_preserves_partial_effects_without_repair() {
     let (_root, source, local) = repositories();

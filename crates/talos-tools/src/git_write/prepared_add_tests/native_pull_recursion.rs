@@ -137,15 +137,21 @@ async fn local_source_upload_pack_configuration(protected_global: bool, cancel: 
 
 #[tokio::test]
 async fn native_pull_owned_runner_preserves_configured_submodule_recursion() {
-    native_pull_recursion(false).await;
+    native_pull_recursion(false, false).await;
 }
 
 #[tokio::test]
 async fn native_pull_fetches_deinitialized_stored_submodule() {
-    native_pull_recursion(true).await;
+    native_pull_recursion(true, false).await;
 }
 
-async fn native_pull_recursion(deinitialized: bool) {
+#[tokio::test]
+async fn native_command_authority_preserves_initialized_and_deinitialized_recursion() {
+    native_pull_recursion(false, true).await;
+    native_pull_recursion(true, true).await;
+}
+
+async fn native_pull_recursion(deinitialized: bool, command_authority: bool) {
     let root = tempfile::tempdir().expect("fixture");
     let child = root.path().join("child");
     let parent = root.path().join("parent");
@@ -204,30 +210,40 @@ async fn native_pull_recursion(deinitialized: bool) {
         std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o755)).expect("hook mode");
     }
 
-    let plan = prepare(&local);
-    let mut environment = plan.environment.clone();
-    environment.insert("GIT_CONFIG_NOSYSTEM".into(), "1".into());
-    environment.insert(
-        "GIT_CONFIG_GLOBAL".into(),
-        root.path().join("absent-global-config").into_os_string(),
-    );
-    fixture_config(&mut environment, &[("protocol.file.allow", "always")]);
-    let frozen = command::FrozenCommand::pull(
-        &plan.program,
-        &local,
-        &GitPullInput { remote: None },
-        &environment,
-    )
-    .expect("freeze native Pull");
-    let output = plan
-        .run_command_output(
-            frozen.command(),
-            std::time::Duration::from_secs(20),
-            1024 * 1024,
+    if command_authority {
+        // Fixture transport permission is Git configuration, not a changed
+        // process environment: exercise production environment revalidation.
+        git(&local, &["config", "protocol.file.allow", "always"]);
+        let plan = prepare_pull_fixture(&local, &serde_json::json!({}), ToolProvenance::Native)
+            .expect("Pull plan");
+        let output = execute_approved(plan).await;
+        assert!(!output.result.is_error, "{}", output.result.content);
+    } else {
+        let plan = prepare(&local);
+        let mut environment = plan.environment.clone();
+        environment.insert("GIT_CONFIG_NOSYSTEM".into(), "1".into());
+        environment.insert(
+            "GIT_CONFIG_GLOBAL".into(),
+            root.path().join("absent-global-config").into_os_string(),
+        );
+        fixture_config(&mut environment, &[("protocol.file.allow", "always")]);
+        let frozen = command::FrozenCommand::pull(
+            &plan.program,
+            &plan.repository.workdir,
+            &GitPullInput { remote: None },
+            &environment,
         )
-        .await
-        .expect("supervised recursive native Pull");
-    assert!(output.status.success(), "{output:?}");
+        .expect("freeze native Pull");
+        let output = plan
+            .run_command_output(
+                frozen.command(),
+                std::time::Duration::from_secs(20),
+                1024 * 1024,
+            )
+            .await
+            .expect("supervised recursive native Pull");
+        assert!(output.status.success(), "{output:?}");
+    }
     // Git fetches the retained module even after deinit removed its .git marker
     // and submodule.<name>.url from parent config. Current worktree gitlinks or
     // initialized markers alone cannot describe the native operation's effects.

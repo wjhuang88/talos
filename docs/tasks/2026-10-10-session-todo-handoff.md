@@ -1,3 +1,13 @@
+## Command-authority route checkpoint — 2026-10-23
+
+Implementation commit `207a3646` connects bounded configuration discovery to
+one native Pull command-authority stage, with Once-only approval notes,
+credential-free host/category evidence and legacy SDK downgrade refusal.
+Standard locked workspace preflight and MSVC cargo-xwin test compilation pass.
+Production remains gated. Subsequent recursion/cancellation validation and old
+Pull predictor retirement are owned by I300; do not resume the superseded
+per-effect scheduler as the target behavior. All T1–T8 scope remains intact.
+
 ## Rebase / Windows CI evidence — 2026-10-22
 
 Clean branch rebased without conflict onto origin/main `0caaf832` (#746);

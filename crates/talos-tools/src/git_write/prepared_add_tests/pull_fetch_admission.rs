@@ -326,7 +326,7 @@ async fn pull_unsupported_transport_is_shown_but_never_dispatched() {
 }
 
 #[tokio::test]
-async fn pull_rejects_legacy_destinations_before_configuration_and_after_fetch_planning() {
+async fn pull_legacy_destinations_require_command_authority_or_strict_route_refusal() {
     for directory in ["remotes", "branches"] {
         for after_planning in [false, true] {
             let root = fixture();
@@ -352,10 +352,21 @@ async fn pull_rejects_legacy_destinations_before_configuration_and_after_fetch_p
             std::fs::create_dir_all(&legacy).expect("legacy directory");
             std::fs::write(legacy.join("origin"), "URL: ext::unapproved-command\n")
                 .expect("legacy destination");
-            let PreparedNormalStage::Complete(output) =
-                plan.execute_stage(Box::new(admission)).await
-            else {
-                panic!("legacy destination continued");
+            let stage = plan.execute_stage(Box::new(admission)).await;
+            if !after_planning {
+                let PreparedNormalStage::Continue(plan) = stage else {
+                    panic!("bounded configuration discovery should publish command authority")
+                };
+                assert!(plan.permission_profile().iter().any(|facet| facet.resource.as_deref() == Some("git:pull-command")));
+                let PreparedNormalStage::Complete(output) = plan.execute_stage(Box::new(())).await else {
+                    panic!("unapproved command must refuse")
+                };
+                assert!(output.result.is_error);
+                assert!(!root.path().join(".git/FETCH_HEAD").exists());
+                continue;
+            }
+            let PreparedNormalStage::Complete(output) = stage else {
+                panic!("strict legacy destination continued");
             };
             assert!(output.result.is_error, "{}", output.result.content);
             assert!(
