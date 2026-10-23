@@ -24,6 +24,8 @@ mod command;
 mod host_path;
 #[path = "prepared_add/pull_children.rs"]
 mod pull_children;
+#[path = "prepared_add/pull_command.rs"]
+mod pull_command;
 #[path = "prepared_add/pull_discovery.rs"]
 mod pull_discovery;
 #[path = "prepared_add/pull_integration.rs"]
@@ -228,6 +230,7 @@ enum Phase {
     PullIntegrationMutation,
     PullNativePreparation,
     PullNativeMutation,
+    PullCommandMutation,
 }
 
 pub(super) struct AddPlan {
@@ -4467,7 +4470,10 @@ impl AddPlan {
                 ));
             }
         }
-        if matches!(self.operation, Operation::Push(_) | Operation::Pull(_)) {
+        if matches!(self.operation, Operation::Push(_))
+            || (matches!(self.operation, Operation::Pull(_))
+                && self.phase != Phase::PullCommandMutation)
+        {
             super::remote_state::reject_legacy_remotes(&self.repository.common_dir)?;
         }
         for layout in &self.checkout_child_layouts {
@@ -5564,6 +5570,12 @@ impl PreparedNormalToolInvocation for AddPlan {
             ));
         };
         let result = match self.phase {
+            Phase::PullCommandMutation => {
+                return PreparedNormalStage::Complete(match self.execute_pull_command().await {
+                    Ok(content) => ToolExecutionOutput::success(content),
+                    Err(error) => ToolExecutionOutput::error(error.to_string()),
+                });
+            }
             Phase::PullNativePreparation => self.discover_native_pull_scope(&authorizations).await,
             Phase::PullNativeMutation => {
                 return PreparedNormalStage::Complete(match self.execute_native_pull(&authorizations).await {
@@ -5744,6 +5756,9 @@ impl PreparedNormalToolInvocation for AddPlan {
                 plan.identity = PreparedPlanIdentity::new();
                 plan.phase = Phase::PullPostFetch;
                 Ok(plan)
+            }
+            Phase::SenderConfiguration if matches!(self.operation, Operation::Pull(_)) => {
+                self.discover_pull_command().await
             }
             Phase::SenderConfiguration => self.discover_sender(&authorizations).await,
             Phase::ReceiverRoots => {

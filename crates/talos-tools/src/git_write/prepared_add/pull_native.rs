@@ -319,6 +319,12 @@ impl AddPlan {
                 "Native Pull awaits complete effect discovery and activation evidence; no command started".into(),
             ));
         }
+        self.run_native_pull_command().await
+    }
+
+    // Both routes use the same supervised command/result boundary. Callers
+    // must consume their prepared proof and validate their authority first.
+    pub(super) async fn run_native_pull_command(&self) -> Result<String, GitToolError> {
         let command = self
             .native_pull_command
             .as_ref()

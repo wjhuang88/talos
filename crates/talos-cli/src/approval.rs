@@ -118,16 +118,24 @@ impl ApprovalPrompt {
         eprintln!("⚠ Tool requires approval: {tool_name}");
         eprintln!("Arguments: {formatted}");
         if !preview.facets().is_empty() {
-            eprintln!("Always approve scope:");
+            eprintln!("Approval scope ({:?}):", preview.scope());
             for facet in preview.facets() {
                 eprintln!(
-                    "  - session allow: {:?} {:?} `{}`; configured deny rules still win",
+                    "  - allow: {:?} {:?} `{}`; configured deny rules still win",
                     facet.nature, facet.resource_kind, facet.normalized_scope
                 );
             }
         }
         if let Some(scope) = preview.network_scope() {
             eprintln!("{}", format_network_scope(scope));
+        }
+        for note in preview.notes() {
+            eprintln!("{note}");
+        }
+        if preview.scope() == talos_permission::GrantScope::Once {
+            eprintln!(
+                "This scope is invocation-only; Always approve also authorizes this invocation only."
+            );
         }
         eprintln!();
         eprintln!("[1] Approve once  [2] Always approve  [3] Deny");
@@ -246,6 +254,15 @@ pub(crate) fn format_grant_preview(preview: &GrantPreview) -> String {
         formatted.push('\n');
         formatted.push_str(&format_network_scope(scope));
     }
+    for note in preview.notes() {
+        formatted.push('\n');
+        formatted.push_str(note);
+    }
+    if preview.scope() == talos_permission::GrantScope::Once {
+        formatted.push_str(
+            "\nInvocation-only scope; Always approve also authorizes this invocation only.",
+        );
+    }
     formatted
 }
 
@@ -353,6 +370,47 @@ mod tests {
             .preview()
             .clone();
         approval
+    }
+
+    #[test]
+    fn command_preview_displays_transitive_boundary_and_once_scope() {
+        let root = std::env::current_dir().expect("workspace");
+        let facets = [
+            ToolPermissionFacet::with_resource(
+                ToolNature::Read,
+                root.to_string_lossy(),
+                ToolResourceKind::Path,
+            ),
+            ToolPermissionFacet::with_resource(
+                ToolNature::Execute,
+                root.join("git").to_string_lossy(),
+                ToolResourceKind::Command,
+            ),
+            ToolPermissionFacet::with_resource(
+                ToolNature::Execute,
+                "git:pull-command",
+                ToolResourceKind::Remote,
+            )
+            .with_description("native Pull and transitive effects; no per-path confinement"),
+        ];
+        let input = serde_json::json!({});
+        let request = PermissionRequest::native("git_pull", &facets, &input);
+        let state = PermissionSessionState::new(PermissionEngine::with_workspace_root(root));
+        let proposal = state
+            .propose(
+                &request,
+                &PermissionContext::compatibility(),
+                talos_permission::GrantScope::Session,
+            )
+            .expect("proposal");
+        assert_eq!(
+            proposal.preview().scope(),
+            talos_permission::GrantScope::Once
+        );
+        let rendered = format_grant_preview(proposal.preview());
+        assert!(rendered.contains("native Pull and transitive effects; no per-path confinement"));
+        assert!(rendered.contains("git:pull-command"));
+        assert!(rendered.contains("Always approve also authorizes this invocation only"));
     }
 
     #[tokio::test]

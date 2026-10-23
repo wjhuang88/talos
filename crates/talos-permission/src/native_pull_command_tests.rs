@@ -200,7 +200,8 @@ fn capability_is_closed_to_pull_execute_remote_with_bound_root_and_program() {
 fn generic_session_approval_is_once_only_and_cannot_use_legacy_proof() {
     let root = std::env::current_dir().expect("workspace");
     let state = PermissionSessionState::new(PermissionEngine::with_workspace_root(root.clone()));
-    let facets = profile(&root);
+    let mut facets = profile(&root);
+    facets[2].description = Some("frozen native Pull and transitive configured helpers".into());
     let input = serde_json::json!({"remote": "origin"});
     let request = PermissionRequest::native("git_pull", &facets, &input);
     let context = PermissionContext::compatibility();
@@ -210,6 +211,10 @@ fn generic_session_approval_is_once_only_and_cannot_use_legacy_proof() {
         panic!("approval required")
     };
     assert_eq!(session.preview().scope(), GrantScope::Once);
+    assert_eq!(
+        session.preview().notes(),
+        &["frozen native Pull and transitive configured helpers"]
+    );
     let pending = state
         .approve_session(*session, &request, &context, GrantSource::SdkHostApproval)
         .expect("one invocation");

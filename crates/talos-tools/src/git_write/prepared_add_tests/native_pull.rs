@@ -169,7 +169,7 @@ async fn native_pull_stage_refuses_missing_or_stale_admission_and_missing_scope(
     }
 }
 
-fn git(cwd: &Path, args: &[&str]) -> Vec<u8> {
+pub(super) fn git(cwd: &Path, args: &[&str]) -> Vec<u8> {
     let output = std::process::Command::new("git")
         .current_dir(cwd)
         .env("GIT_CONFIG_NOSYSTEM", "1")

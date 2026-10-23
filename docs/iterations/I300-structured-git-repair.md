@@ -8383,3 +8383,32 @@ This is an inactive policy foundation: no tools producer or native execution
 consumer uses the capability yet. Native routing, obsolete prediction removal,
 independent security review, full workspace/current-head CI and native Windows
 evidence remain open. T7 and the complete handoff remain incomplete.
+
+
+Native command routing checkpoint (2026-10-23): production preparation now
+routes Pull from the bounded configuration-chain stage directly to one frozen
+command-authority mutation stage. The final proof covers configured transitive
+helpers rather than publishing a predicted path/endpoint inventory. Approval
+notes show the boundary, static helper categories and sanitized configured hosts;
+credentials, URL paths and helper payloads are withheld. CLI/TUI explain the
+Once-only lifetime, and legacy argument-only SDK approval cannot approve this
+authority. Production execution remains deliberately gated.
+
+Validation: the standard `./scripts/release_preflight.sh` passed, including
+locked workspace check, Clippy, tests, governance and external SDK fixtures
+(`/private/tmp/i300-pull-command-preflight.log`). Four separate command-route
+tests pass: discovery has no mutation, configured hooks run only after final
+proof, configuration drift refuses before fetch, native conflict effects remain,
+and preview secrets are withheld (hook/discovery assertions share one test).
+The Runtime legacy-host test and CLI preview test pass. Git-enabled permission/
+tools all-target Clippy passed with warnings denied. `cargo xwin check --locked
+-p talos-tools --features git --tests --target x86_64-pc-windows-msvc` passed
+with the same seven reduced-feature warnings; this is compilation only.
+
+Remaining in this slice: remove legacy Pull prediction/scheduler code after
+replacement recursion/cancellation tests; remove its initial legacy-remote
+rejection from the new route; complete Agent/MCP/Runtime route evidence and
+independent security review/current-head CI/native Windows acceptance before
+production activation. The old scheduler is currently retained, not presented
+as the final architecture. No T7/P1–P5/T8 completion is claimed. Origin was
+fetched and origin/main is already an ancestor; no rebase was necessary.

@@ -111,12 +111,10 @@ async fn pull_configuration_stage_requires_fresh_admission_without_mutation() {
             .iter()
             .any(|facet| { facet.resource.as_deref() == Some("git:configuration-chain") })
     );
-    for hook in ["pre-merge-commit", "post-merge", "reference-transaction"] {
-        let path = root.path().canonicalize().expect("root").join(".git/hooks").join(hook);
-        assert!(next.permission_profile().iter().any(|facet| {
-            facet.nature == ToolNature::Read && facet.resource.as_deref() == path.to_str()
-        }), "missing whole-operation hook: {hook}");
-    }
+    assert!(next.permission_profile().iter().any(|facet| {
+        facet.nature == ToolNature::Execute
+            && facet.resource.as_deref() == Some("git:pull-command")
+    }), "final command authority must cover transitive hooks");
     let PreparedNormalStage::Complete(replayed) =
         next.execute_stage(Box::new(old_stage_proof)).await
     else {
@@ -334,7 +332,7 @@ async fn pull_prefetch_retains_configured_remote_and_rejects_changed_reflog() {
 
 #[cfg(unix)]
 #[tokio::test]
-async fn pull_bundle_source_refuses_before_native_prefetch_side_effects() {
+async fn pull_bundle_source_waits_for_final_command_authority_before_side_effects() {
     let source = fixture();
     let native = fixture();
     let prepared = fixture();
@@ -404,12 +402,15 @@ async fn pull_bundle_source_refuses_before_native_prefetch_side_effects() {
         .expect("prepare"),
     );
     let admission = proof(&plan);
-    let PreparedNormalStage::Complete(output) = plan.execute_stage(Box::new(admission)).await
+    let PreparedNormalStage::Continue(plan) = plan.execute_stage(Box::new(admission)).await
     else {
-        panic!("unadmitted bundle source continued to fetch planning");
+        panic!("bounded discovery should publish command authority without fetching");
+    };
+    assert!(plan.permission_profile().iter().any(|facet| facet.resource.as_deref() == Some("git:pull-command")));
+    let PreparedNormalStage::Complete(output) = plan.execute_stage(Box::new(())).await else {
+        panic!("unadmitted command continued")
     };
     assert!(output.result.is_error);
-    assert!(output.result.content.contains("bundle URI"), "{output:?}");
     assert_eq!(
         RepositoryState::capture(prepared.path()).expect("after"),
         before
