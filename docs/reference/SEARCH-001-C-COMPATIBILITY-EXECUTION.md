@@ -20,7 +20,7 @@ request through execute_prepared, retaining canonical endpoint membership, live 
 invocation binding, DNS/address/TLS/redirect controls and shared budget. There is no second
 query, count, protocol, destination, header, callback or transport-trait override at this entry.
 Transport errors return from this single-source execution without selecting another parser or
-source. The owning chain separately permits DNS/semantic-only continuation, as linked below.
+source. The owning chain separately permits typed DNS/connection-refusal and semantic continuation, as linked below.
 
 | Captured protocol | Response parser | Captured parser inputs |
 |---|---|---|
@@ -88,5 +88,5 @@ Completion Pending; #643/#624 stay open, #705/#717/#735 remain independently own
 
 The [dormant fixed-source chain](SEARCH-001-C-COMPATIBILITY-CHAIN.md) now owns all4 prepared
 objects and consumes them sequentially through this entry, using one transport/budget and the
-explicit DNS/semantic-only continuation policy. It does not activate an official caller, add retries
+explicit typed availability/semantic continuation policy. It does not activate an official caller, add retries
 or complete upstream source/probe/privacy parity.

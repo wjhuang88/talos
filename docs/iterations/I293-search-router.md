@@ -10,7 +10,7 @@
 | Source Issue | #643 |
 | Depends on | Accepted ADR-085; SEARCH-001-B / #642 complete in #656; NET-001 boundary coordination |
 | Claim State | Claimed |
-| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 merged TLS/CONNECT subset; #716 merged bounded form/diagnostic stage at `b5b8241e`; #732 merged owned payload at `8fa2a50`; #733 merged Lite/HTML parsing at `dea3edc`; #734 merged Instant Answer at `45cf9eb9`; #736 merged Bing parsing at `2b015a6b`; #737 merged fixed requests at `ae6a0791`; #738 merged bound execution at `2d7f4b36`; #739 merged fixed headers at `91c330ba`; #741 merged result admission at `4e20ee95`; #742 merged fixed chain at `9f998392`; #743 merged direct plan at `181d7584`; prepared-invocation candidate tracked from #643; full C/EP and default activation Pending |
+| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 merged TLS/CONNECT subset; #716 merged bounded form/diagnostic stage at `b5b8241e`; #732 merged owned payload at `8fa2a50`; #733 merged Lite/HTML parsing at `dea3edc`; #734 merged Instant Answer at `45cf9eb9`; #736 merged Bing parsing at `2b015a6b`; #737 merged fixed requests at `ae6a0791`; #738 merged bound execution at `2d7f4b36`; #739 merged fixed headers at `91c330ba`; #741 merged result admission at `4e20ee95`; #742 merged fixed chain at `9f998392`; #743 merged direct plan at `181d7584`; #744 merged prepared invocation at `032cce61`; #745 merged private tool at `ba93193f`; #746 merged DNS failover at `0caaf832`; typed-refusal candidate #750; full C/EP and default activation Pending |
 | Completion | Pending |
 
 ## Collaboration Claim
@@ -19,7 +19,7 @@
 |---|---|
 | Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
-| Executing Agent | GPT-6 Sol / talos开发 session |
+| Executing Agent | Codex (GPT-6) / SEARCH-001 continuation of talos开发 session |
 | Work Slice | SEARCH-001-C SearchRouter; search-specific core/permission/Agent prepared invocation and endpoint authority; controlled existing-protocol compatibility internalization and optional-adapter transport; CLI/SDK/MCP dispositions, migration and validation under ADR-085/090 |
 | Claimed At | 2026-10-06 |
 | Source Issue | #643 |
@@ -2019,3 +2019,178 @@ Affected references include SEARCH-001-C-COMPATIBILITY-EXECUTION.md as well as t
 Final staged/exact-local review, stable publication, remote source/native terminal review and
 fresh CAS follow. Shared-identity Agent review is not distinct natural-person approval. This
 remains dormant private evidence; full C/EP and every activation/parent gate above remain pending.
+
+## Merged DNS Stage / Typed Connection Refusal — 2026-10-22
+
+#746 merged0caaf83241b8f94cba0cbdca66e3e166068f024d, sourcea91ae48c/tree27bcda44.
+CI3303/run39716689331 attempt1 retained its cancelled Windows job119620412685: every validation
+step passed (tools588/all6new/governance/claims/CLI), then cache tar/zstd was cancelled at the
+45minute job ceiling. Timing strongly matches that ceiling; the explicit cancellation cause and
+cache speed cause remain unproven. The other5 jobs succeeded, including mac586/original socket/
+both SDK modes/standard preflight/later gates and Linux112. Protected infra review authorized one
+bounded unchanged-job recovery, not retry-to-green. Windows119642614740 succeeded; attempt2
+terminalSUCCESS contains that new execution and5 carried attempt1 successes, not6 reruns.
+Source6331930776, infra6332861643, recovery6333440129, terminal6334145875 and delivery6334255250
+record the exact-source gates. Merge parentba93193f/tree/main verified. Temporary local execution
+loss prevented immediate synchronization; this turn recovered execution, fast-forwarded local main
+to0caaf832 and verified clean status before creating the current implementation branch.
+
+Selection retains effective#712/ADR090, actor@wjhuang88 and unchanged Work Slice. I293/I294/I300
+remain Active C/D/Git; I277 Review retains deferred human/device rows; I302 Review retains#717.
+I249 Planned deferred and I164 Paused/superseded remain unchanged. I301/I303/I304/I305 remain
+Complete/Closed; historical I146/I147/I150 and TEMPLATE do not activate work. Open#73506c1ebef
+full136files and#7055848f899 full4files retain independent ownership and no selected-path overlap.
+Refresh full scopes and intersections again before publication/final CAS; neither is absorbed.
+
+Runnable private deliverable: separate only connection-stage refusal from coarse Request. Actual
+reqwest execute errors require both is_connect() and a typed std::io::ErrorKind::ConnectionRefused
+within8 source entries. The whole classifier is panic-guarded, retains no dependency error, and
+unknown/depth-exhausted/panicking classification remains Request. Builder/body errors remain
+Request; no Display/raw OS-code inference, TLS/protocol/reset/read continuation or proxy fallback.
+Official pinned reqwest0.13.4 src/error.rs confirms is_connect() also covers connector errors
+which can include TLS, hence the additional exact typed I/O gate. Talos bounds its own traversal,
+not reqwest's internal traversal or synchronous execution. Independent design preview APPROVE
+requires precisely this narrow split, not a general network-availability classifier.
+
+The frozen chain now continues only on Dns/ConnectionRefused and existing semantic cases. No
+source replay, new endpoint, authority facet removal, counter/deadline reset or default activation.
+Five new actual-socket cases cover HTTP/HTTPS refusal with closed static error, first refusal then
+next admitted winner, all4 refused sources with finite counters, spent request budget before the
+next lookup, and truncated response body remaining terminal Request. Existing real whole-plan
+Once admission and cfg(test)-only relocation/resolver helpers are reused. Ephemeral port release
+has an unavoidable reuse race: an unexpected actual error fails, never skips or counts equivalent.
+These fixtures are not provider/regional/proxy or official-root qualification.
+
+Hard constraints: no dependency/lock/public API/model schema/permission/default changes, new skip,
+warmup or threshold relaxation. Soft choice: narrow current-direct-connector typed evidence rather
+than a speculative general classifier; replace only after separately reviewed typed evidence and
+cross-platform fixtures. Checksummed Rust1.99 restoration and actual rustc verification completed;
+workspace target resolves to the same isolated physical target used by SDK --target-dir. Local
+focused/strict network Clippy/standard locked preflight and independent source review are running;
+no pass is claimed yet. Stable publication, native exact-head terminal review and fresh CAS remain
+gates. Affected references: SEARCH-001-C-COMPATIBILITY-CHAIN.md and COMPATIBILITY-EXECUTION.md.
+I293 remains Active/Claimed/Completion Pending; #643/#624 stay OPEN. Full C/EP/parity/proxy/D/
+privacy/official roots/router/health/cancellation/rollback/default activation/release remain gated.
+
+Read-only protected working-source review APPROVE found no source/security blocker. It confirms
+all5cases exercise actual transport and existing certificate/protocol regressions retain Request.
+Precision limit: the shared transport can also classify a refused explicitly configured proxy
+connection; these direct compatibility fixtures prove neither proxy attribution nor parity. The
+chain reference records that limit. Frozen source blobs: transportc3b5b761, chaina47220e7,
+chaintestse6382d8b, dnstestsb9648c37, connectfb741c1f and connectiontests79411333. Full open-PR
+scope refresh again found#735136files/#7054files, no selected-path overlap. Shared-identity Agent
+review is not distinct natural-person approval; exact-local/publication/native gates remain pending.
+
+Initial local focused compilation exited101 on6 E0616 private Server.port accesses in the new
+chain fixtures; no test executed and Clippy/preflight did not start. Retain the complete failed
+journal as connection-refusal-initial-compile-failed.log. Correct the fixtures to derive the port
+from the existing server URL interface, without expanding visibility or changing production code.
+Fresh full local convergence follows this actual source correction; no unchanged-test retry.
+
+Resume checkpoint — 2026-10-22: the six private-field accesses are already corrected to
+derive ports through Server::url(). Existing retained journals showed focused transport133/0
+and strict network-test Clippy exit0 on the corrected source; the preflight journal had no
+terminal marker. On resume the physical /tmp target was absent and was recreated. Fresh
+validation is blocked while restoring dependencies: online Cargo reports proxy connection
+failures to static.crates.io; offline verification exits101 because addr2line0.26.1 is absent.
+Do not treat the earlier partial preflight or the dependency-restoration attempt as a pass.
+The initial E0616 journal remains retained. No stable candidate was published or merged.
+Next: restore fixed dependencies, complete fresh focused/strict Clippy/standard preflight,
+then update evidence and perform exact-source review/publication/native CI gates.
+
+Fresh local convergence completed after dependency service recovery. Corrected focused transport
+tests passed133/0failed/0ignored/228filtered plus existing child1/360filtered. All five new
+actual-socket cases passed. Strict network-test Clippy exited0. Standard locked pinned Rust1.99
+release_preflight.sh exited0 with terminal passed marker: workspace check/Clippy/tests/doctests,
+tools591/0failed/0ignored, both external runtime SDK modes, SQLite17, delivery12, governance
+and claims0warnings. Only the pre-existing authorized local runtime socket test filter applied;
+no added skip, threshold change or dependency/lock modification. Native original socket coverage
+is still required. Preserve initial E0616 failure and dependency-restoration failures as historical
+failures; later passes do not erase them. Independent read-only corrected-source review APPROVE
+found no blocker and verified the direct/proxy attribution limits. Shared-identity Agent review is
+not distinct natural-person approval. Executing Agent metadata corrected to this Codex session.
+
+Fresh remote inventory: #73506c1ebef (136files), #7055848f899 (4files), neither intersects this
+10-path candidate. Main advanced through docs-only Provider claim #747 to4722fee8; I306/#748
+retains independent Provider ownership, with no search implementation/claim overlap. This
+candidate remains based on0caaf832; publication/native terminal review and fresh merge CAS follow.
+I293 remains Active/Claimed/Completion Pending; no default activation or release is claimed.
+Journal SHA256:
+- focused: `ba3303cf211cd37c0155df3385e94436499d838757ead5af067b76efe22fb037`
+- network-clippy: `d038af2eb1ece14943ec38ac0a612d7b320e60c616d2369c2fc0c7382daab78a`
+- preflight: `9d13c35c38c7ecdc7db67691e31138358ff63879e6152c2e96b1963c58273f28`
+
+Publication/integration checkpoint — 2026-10-22: maintainer explicitly authorized publishing
+local281514e7 to wjhuang88/talos, creating a PR and merging only after CI/review pass. Git CLI
+had no credentials; connected GitHub publication produced6cacba66 with identical source tree
+3479966ad8821cb41e04c7df53665b0f8c5ac75b and parent0caaf832. Independent exact-remote review
+verified all10paths and approved publication only. PR#750 / CI3336 run39808091501 first attempt
+failed Remote issue / owner reconciliation job119926609124: missing open Issue#748 in the
+candidate's old reconciliation matrix. This is a real retained failure, not a Rust test failure.
+Main already contains the correction in docs-only #747 at4722fee8. Integrate that existing
+target-branch governance tree, without editing its Provider scope or changing any search Rust
+blob. Other original platform jobs retain their own outcomes; do not reinterpret the first run
+as green. The stable integrated candidate requires fresh exact-head CI/review, not an unchanged
+rerun. Local source tests remain evidence for unchanged Rust; merged documentation/claims
+validators are rerun. I293/#643/#624 remain incomplete/open and default search remains unchanged.
+
+Integrated documentation checks: claims PASS0warnings, text boundary23/0errors and whitespace
+PASS; exact comparison confirms all Rust/manifests/lock/toolchain/scripts/workflows unchanged
+from local281514e7. Fresh governance cannot complete because the local Rust/Cargo/cache was
+removed again; SQLite metadata gate reports missing cargo (exit1). No fresh integrated local
+full preflight/format pass is claimed. Earlier complete source-tree validation is retained,
+while the integrated exact-head native CI must supply governance and all runtime evidence.
+
+## Windows Refusal Exhaustion Fixture Correction — 2026-10-23
+
+CI3337/run39808611715 attempt1 at919ea785 FAILED: five jobs succeeded, including owner
+reconciliation, Linux and full macOS; Windows119944232586 Test workspace failed tools592/1/0ignored.
+The new four_refused_connections_exhaust_the_frozen_sources_without_reset expected four
+ConnectionRefused errors but observed Terminal{protocol:Html,error:Transport(Deadline)}. This
+is a retained test failure. Real HTTP/HTTPS classification, next-source success, spent-budget
+and truncated-body cases passed. The five-second shared budget remained active; production
+correctly gives expiration terminal precedence. No per-connect timing attribution exists, so
+TCP retry/scheduler/platform latency is not established as the cause. Do not equate Deadline
+with refusal or call the run successful. No unchanged-job rerun was requested.
+
+Independent design review approves replacing only the four-physical-refusal exhaustion assertion
+with explicit typed-error injection at the existing test resolver seam. The real chain/transport
+still consumes all four prepared slots under the original whole-plan Once authority and shared
+five-second budget; exact errors/order/reservations/zero bytes/no HTTP are asserted. A tiny
+test-only resolver wrapper records each lookup through the existing fixture resolver, then
+returns ConnectionRefused without dialing. This is policy coverage, not send-classifier evidence.
+Four real-socket cases remain unchanged, including actual classifier and next-source execution.
+This supersedes the earlier five-actual-socket characterization only for the corrected fixture;
+the original failing source/result remains historical evidence. No production/error/deadline/
+assertion threshold/dependency/lock/workflow change, skip or permissive outcome is introduced.
+Fresh local source checks, corrected-source review and a new stable exact-head CI remain pending.
+I293/#643/#624 remain incomplete/open and default search remains unchanged.
+
+Corrected local validation: focused transport133/0failed/0ignored plus existing child1 PASS;
+strict network-test Clippy PASSexit0. First standard preflight passed workspace check/Clippy/
+tests/doctests, tools591/0failed, all four socket cases and injected policy case. Its saved log
+ends during SDK compilation without a default-SDK receipt or terminal marker. Session70135
+reported SDK-default success followed by coding SDK compile exit1; these first-attempt SDK
+subdetails are session observations, not independently verifiable from that incomplete log.
+The separate failure receipt retains the observed Cranelift0.135.3 archive error:
+"memory map must have a non-zero length" for libcranelift_codegen-443719cae3ac5595.rlib. No
+full preflight pass is claimed. Disk inspection found19G free and no remaining zero object;
+that does not establish the cause. Receipt: refusal-fixture-preflight-failure-receipt.txt.
+
+A bounded generated-cache repair first failed safely because CACHEDIR.TAG was absent. The
+standard cache tag was restored only in the isolated validation target; Cargo clean then
+invalidated cranelift-codegen outputs (60files/270.8MiB). Cargo explicitly ignored the version
+qualifier and cleaned all generated versions of that package, not the whole build tree. A
+complete resumed standard preflight repeated successful workspace tests/tools591/default SDK
+but coding SDK hit the same archive error and exited1. Stop local repetitions; retain both
+failed preflight attempts and their successful subchecks without calling either a full pass.
+Production files, dependency/SDK locks, toolchain, settings, timeouts and assertions remain
+unchanged. The corrected candidate needs fresh exact-head native full preflight and both SDK
+receipts before merge; local coding SDK build remains an explicit build blocker
+with unproven cause. No compiler/dependency workaround or further retry is authorized by this
+record. Corrected-source review and publication must disclose this limitation.
+
+Publication inventory refresh: main advanced from4722fee8 to213c35d8 through #751/#752; the
+only changed path is .github/workflows/actions-maintenance.yml, unrelated to search/runtime
+validation inputs. It is not absorbed into this three-path correction. Provider#749, Git#735
+and Windows#705 retain their independent scopes; verify full path intersections before push.

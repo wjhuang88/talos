@@ -28,6 +28,8 @@ pub(super) enum TransportError {
     UnsupportedProxy,
     #[error("search_transport_dns_failed")]
     Dns,
+    #[error("search_transport_connection_refused")]
+    ConnectionRefused,
     #[error("search_transport_address_denied")]
     Address,
     #[error("search_transport_redirect_denied")]
@@ -42,6 +44,29 @@ pub(super) enum TransportError {
     Deadline,
     #[error("search_transport_request_failed")]
     Request,
+}
+
+// Only the actual send boundary uses this classification. Construction and body-read errors
+// remain Request; an unknown typed chain must not turn a TLS/protocol failure into failover.
+fn classify_send_error(error: reqwest::Error) -> TransportError {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        if error.is_connect() {
+            let mut current: Option<&(dyn std::error::Error + 'static)> = Some(&error);
+            // This bounds Talos's traversal, not reqwest's own is_connect() implementation.
+            for _ in 0..8 {
+                let Some(cause) = current else { break };
+                if cause
+                    .downcast_ref::<std::io::Error>()
+                    .is_some_and(|io| io.kind() == std::io::ErrorKind::ConnectionRefused)
+                {
+                    return TransportError::ConnectionRefused;
+                }
+                current = cause.source();
+            }
+        }
+        TransportError::Request
+    }))
+    .unwrap_or(TransportError::Request)
 }
 
 /// One execution budget shared by all future router candidates and redirect hops.
@@ -510,10 +535,7 @@ impl SearchTransport {
             // exposes no check between its internal physical steps; later revocation stops
             // later hops, and cannot undo the already-started compound hop.
             self.check(request.url(), request.method())?;
-            let mut response = client
-                .execute(request)
-                .await
-                .map_err(|_| TransportError::Request)?;
+            let mut response = client.execute(request).await.map_err(classify_send_error)?;
             self.budget.check_live()?;
             // Hyper's HTTP/1 parser has its own finite buffer limit; this tighter
             // bound applies after parsing, before redirect interpretation or body reads.

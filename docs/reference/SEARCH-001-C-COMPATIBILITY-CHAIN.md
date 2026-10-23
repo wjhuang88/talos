@@ -24,7 +24,7 @@ must contain at least one admitted display URL; HTTP/parsing completion alone ca
 
 | Error family | Continue to the next declared source | Terminal whole-chain errors |
 |---|---|---|
-| Transport | Dns only | Every other variant, including Request, authorization/address/redirect denial and shared limits/deadline |
+| Transport | Dns, ConnectionRefused | Every other variant, including Request, authorization/address/redirect denial and shared limits/deadline |
 | DDG parser | Empty, Status, Challenge | Limit, Encoding, Parse |
 | Bing parser | Empty, Status, RateLimited, Challenge | Limit, Encoding, Parse |
 | Result admission | Empty, Invalid | Limit, Identity, Parse |
@@ -35,9 +35,9 @@ terminal. No error is reclassified using text. Terminal errors retain protocol a
 exhaustion retains exactly4 actual errors in fixed order. Both Display strings are static, Debug
 contains only enums, and no query/URL/body/dependency diagnostic is stored in outcomes or health.
 This adds no health state. Internal exhaustion placeholders cannot escape before all4slots are
-overwritten by observed DNS or semantic failures.
+overwritten by observed typed availability or semantic failures.
 
-Typed resolver failure can proceed only to the next already prepared source. It does not retry
+Typed resolver failure or connection refusal can proceed only to the next already prepared source. It does not retry
 the failed source, add a destination, discard a facet or refresh any counter/deadline. A failed
 resolution sends no HTTP query; its hostname lookup may already have occurred. Current Request
 coarsens client construction, TLS verification, protocol/send and body-read failures, so it remains
@@ -46,6 +46,17 @@ resolved-address sets remain Address failures; resolver timeout remains the encl
 Each later source still passes live authority before DNS and before send. Revocation after a DNS
 failure, spent request reservations and expiry therefore stop further work. A forbidden address
 is counted as a completed lookup and terminates without a send or another lookup.
+
+ConnectionRefused is emitted only at the actual reqwest execute error boundary: is_connect()
+must be true and at most8 typed source-chain entries must contain std::io::ErrorKind::ConnectionRefused.
+No Display text, raw OS code or dependency diagnostic is retained. The classifier is panic-guarded;
+unknown/deeper evidence or panic returns Request. This bounds Talos's traversal, not reqwest's own
+is_connect() traversal or synchronous execution. Client construction and response-body errors
+remain Request; TLS verification/protocol/reset/read failures do not gain a continuation rule.
+This narrowly classifies the current direct connector, not general reachability or proxy failure.
+The shared transport can also emit this code for an explicitly configured refused proxy connection;
+the direct compatibility fixtures establish neither proxy attribution nor proxy parity.
+Each refused attempt consumes its existing reservation, without resetting shared counters.
 
 The same transport performs live authority, invocation, DNS/address, proxy/TLS, redirect and
 request/body checks for every actual hop. Budget checks precede each source and follow every
@@ -68,7 +79,7 @@ documented). Chain ownership/safety/budget/result logic and synthetic fixtures a
 Upstream also rate-limits, probes/caches reachability, retries some network failures, draws UA at
 client construction, and conditionally tries configured SearXNG. This chain omits those behaviors;
 it performs4 upfront entropy draws, including unused sources, and terminates on all transport
-errors except typed DNS failure.
+errors except typed DNS failure and the narrowly evidenced connection refusal above.
 It is only a traditional sequential fixed4 subset, not full source/retry/probe/entropy timing/
 charset/proxy/service parity. It is one compatibility family, never4 native independent routes.
 No live official-host search, result fetch or regional/provider qualification occurs.
@@ -82,3 +93,12 @@ protected reviews, immutable candidates and native terminal receipts are indexed
 The [dormant direct plan](SEARCH-001-C-COMPATIBILITY-PLAN.md) retains this exact prepared chain
 with its configuration-derived manifest/profile. Dispatch builds transport from that retained
 manifest and reuses an injected existing budget; official permission/root integration remains gated.
+
+## Refusal Fixture Evidence Boundary
+
+HTTP/HTTPS classification, refusal followed by an admitted winner, spent request budget and
+truncated-body rejection use real sockets. Four-source refusal exhaustion is a policy-only
+injected typed-error test at the existing test resolver seam. It verifies ordered source visits,
+exact closed errors, four shared reservations, zero bytes and zero HTTP requests; it does not
+exercise send-error classification or assert that four physical refusals finish within a deadline.
+The original five-second shared budget and deadline regressions remain unchanged.
