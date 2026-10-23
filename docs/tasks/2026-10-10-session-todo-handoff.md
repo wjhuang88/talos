@@ -1,3 +1,14 @@
+## Activation dependency finding — 2026-10-23
+
+Independent review of implementation `496893c25` did not approve activation:
+the accepted Pull exit requires real Auto approval, but shared Auto currently
+returns classifier_not_eligible for git_pull. Existing synthetic authorization
+and closed-gate transport tests cannot prove success. Resolve the effective
+claim/owner boundary to move only T8's shared Auto Pull prerequisite before T7
+activation; preserve the full remaining T8 scope. Do not waive Auto acceptance
+or introduce a test-only execution bypass. I300 records the review and current
+validation logs. Production gates remain closed; T1–T8 remain incomplete.
+
 ## Pull scheduler retirement checkpoint — 2026-10-23
 
 Legacy Pull scheduling and effect prediction are removed (about 19,000 net
@@ -9,7 +20,9 @@ identity regression passes locally. See I300's final retirement checkpoint for
 logs, supersession mapping and validation order. This is not native Windows
 runtime or successful production entrypoint evidence; gates remain closed.
 
-Resume with staged review/commit of the retirement, then cross-surface successful
+Retirement is committed as `606496611`. Frozen invocation substitution coverage
+is committed as `496893c25`: argv, environment, cwd and program replacement are
+rejected before fetch. Resume with cross-surface successful
 Pull, security/current-head CI and native Windows acceptance. Retain the spawn
 stall and default sideband Push residuals. All original T1–T8 scope and ordering
 remain intact; no completion is claimed.
