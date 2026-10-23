@@ -10,6 +10,8 @@ use talos_core::tool::{
     ToolPermissionFacet,
 };
 
+pub(in crate::search_backend) mod tool;
+
 pub(in crate::search_backend) struct PreparedSearXngInvocation {
     plan: PreparedSearXng,
     query: String,
