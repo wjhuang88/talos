@@ -17,6 +17,9 @@ use crate::openai_responses_bridge::forward_response_stream;
 use crate::openai_responses_client::OpenAIResponsesClient;
 use crate::openai_sse::InvocationSender;
 
+#[path = "factory.rs"]
+pub mod factory;
+
 /// OpenAI Responses provider implementing Talos' provider boundary.
 #[derive(Clone)]
 pub struct OpenAIResponsesProvider {
