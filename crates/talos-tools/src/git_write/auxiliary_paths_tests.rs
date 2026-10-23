@@ -231,3 +231,33 @@ fn continuation_refuses_replaced_prior_source_before_extending() {
     assert_eq!(paths.sources.len(), 1);
     assert_eq!(paths.budget.entries, remaining);
 }
+
+#[test]
+fn native_pull_auxiliary_content_shares_budget_across_discovery_sources() {
+    let workspace = tempfile::tempdir().expect("workspace");
+    let root = workspace.path().canonicalize().expect("root");
+    let anchor = root.join(".git");
+    let shared = super::super::pull_inventory::ReferenceBudget::default();
+    // Each source fits the auxiliary local limit; together they exceed Pull's
+    // invocation allowance, even when separate discovery objects are used.
+    for (index, succeeds) in [(0, true), (1, false)] {
+        let source = root.join(format!("source-{index}"));
+        std::fs::write(&source, vec![b'x'; 3 * 1024 * 1024]).expect("source");
+        let authority = vec![
+            capability("git_pull"),
+            read("git_pull", &root, &anchor),
+            read("git_pull", &root, &source),
+        ];
+        let mut paths =
+            AuxiliaryPaths::resolve("git_pull", &root, &anchor, [source.clone()], &authority)
+                .expect("resolution");
+        let result = paths.capture_native_pull(&authority, &[], &shared.clone());
+        assert_eq!(result.is_ok(), succeeds);
+        assert_eq!(paths.leaf_evidence(&source).is_some(), succeeds);
+        if succeeds {
+            paths
+                .capture_native_pull(&authority, &[], &shared)
+                .expect("retained evidence is not recaptured");
+        }
+    }
+}

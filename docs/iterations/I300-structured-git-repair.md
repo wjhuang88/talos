@@ -8110,3 +8110,18 @@ consumers. Source remained unchanged during validation. Log:
 /private/tmp/i300-contained-config-preflight.log. This establishes local stage
 validation; remote exact-head CI, independent security review, native Windows
 execution and remaining T7 implementation are still outstanding.
+
+Native child auxiliary content budget checkpoint (2026-10-23): native Pull
+configuration discovery now captures admitted hook leaves through the shared
+ReferenceBudget as well as the auxiliary local allowance. Failed captures
+retain consumed local/shared accounting; existing retained evidence is validated
+without charging a second initial capture. Other tools keep their existing
+capture entry point. A regression uses separate auxiliary discovery objects
+with individually valid 3 MiB sources and proves the second cannot exceed the
+shared 4 MiB allowance. Native Pull tests pass 25/25, auxiliary tests 7/7 and
+Git-enabled lib/tests Clippy passes with warnings denied. Logs:
+/private/tmp/i300-pull-aux-budget-{tests,auxiliary,clippy}.log.
+This covers initial retained child auxiliary contents only; path-resolution,
+identity-handle and revalidation accounting are not claimed unified. Scoped
+hook/remote discovery, complete recursive effects, production routing and
+security/platform acceptance remain open. No T7 completion is claimed.
