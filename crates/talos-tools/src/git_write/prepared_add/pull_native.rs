@@ -69,6 +69,63 @@ impl AddPlan {
         Ok(facets)
     }
 
+    // Publish all currently bound roots together. This is not a claim that
+    // recursive execution effects are complete: activation retains its guard.
+    pub(super) fn native_pull_known_root_facets(
+        &self,
+    ) -> Result<Vec<ToolPermissionFacet>, GitToolError> {
+        let mut facets = self.native_pull_parent_facets()?;
+        let Some(modules) = &self.native_pull_modules else {
+            return Ok(facets);
+        };
+        modules.revalidate()?;
+        if !modules.complete() || !modules.all_worktree_targets_resolved() {
+            return Err(GitToolError::InvalidInput(
+                "Native Pull child root inventory incomplete".into(),
+            ));
+        }
+        let mut roots = std::collections::BTreeSet::new();
+        for root in modules.stored_module_roots() {
+            let metadata = self.native_pull_metadata.get(root).ok_or_else(|| {
+                GitToolError::InvalidInput("Native Pull child metadata missing".into())
+            })?;
+            if !self.native_pull_configs.contains_key(root)
+                || !self.pull_child_startup.contains_key(root)
+            {
+                return Err(GitToolError::InvalidInput(
+                    "Native Pull child root configuration incomplete".into(),
+                ));
+            }
+            let common = if metadata.common_path == root {
+                root
+            } else {
+                modules
+                    .resolved_common_target(&metadata.common_path)
+                    .ok_or_else(|| {
+                        GitToolError::InvalidInput(
+                            "Native Pull child common target unresolved".into(),
+                        )
+                    })?
+            };
+            roots.insert(root);
+            roots.insert(common);
+        }
+        roots.extend(modules.resolved_startup_worktrees());
+        for root in roots {
+            for nature in [ToolNature::Read, ToolNature::Write] {
+                let facet = path_facet(nature, root, "native Pull bound child repository root")?;
+                if !facets.iter().any(|existing| {
+                    existing.nature == facet.nature
+                        && existing.resource_kind == facet.resource_kind
+                        && existing.resource == facet.resource
+                }) {
+                    facets.push(facet);
+                }
+            }
+        }
+        Ok(facets)
+    }
+
     // Resolve against retained, revalidated configuration and the current HEAD.
     // This is a local scalar probe, never a transport or fetch invocation.
     pub(super) async fn resolve_native_pull_destination(
@@ -196,7 +253,8 @@ impl AddPlan {
                 "Native Pull stage missing".into(),
             ));
         }
-        for required in self.native_pull_parent_facets()? {
+        let required_facets = self.native_pull_known_root_facets()?;
+        for required in &required_facets {
             if !self.facets.iter().any(|facet| {
                 facet.nature == required.nature
                     && facet.resource_kind == required.resource_kind
@@ -207,19 +265,13 @@ impl AddPlan {
                 ));
             }
         }
-        for nature in [ToolNature::Read, ToolNature::Write] {
-            for root in [
-                &self.repository.workdir,
-                &self.repository.git_dir,
-                &self.repository.common_dir,
-            ] {
+        for required in &required_facets {
+            if required.resource_kind == Some(ToolResourceKind::Path) {
+                let root = required.resource.as_deref().ok_or_else(|| {
+                    GitToolError::InvalidInput("Native Pull root path missing".into())
+                })?;
                 if !authorizations.iter().any(|token| {
-                    token.authorizes_path(
-                        "git_pull",
-                        nature,
-                        &self.workspace,
-                        root.to_str().unwrap_or_default(),
-                    )
+                    token.authorizes_path("git_pull", required.nature, &self.workspace, root)
                 }) {
                     return Err(GitToolError::InvalidInput(
                         "Native Pull root lacks fresh admission".into(),

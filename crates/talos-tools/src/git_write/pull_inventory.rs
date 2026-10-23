@@ -582,6 +582,10 @@ impl Inventory {
         })
     }
 
+    pub(super) fn all_worktree_targets_resolved(&self) -> bool {
+        self.worktree_targets.values().all(Option::is_some)
+    }
+
     /// Caller must consume a current prepared proof covering the dedicated
     /// resolution capability before entering. No target content is read here.
     pub(super) fn resolve_worktree_targets(&mut self) -> Result<bool, GitToolError> {

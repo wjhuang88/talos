@@ -372,7 +372,7 @@ impl AddPlan {
         self.pull_remote = Some(remote);
         self.pull_destinations = destinations;
         self.pull_transport_supported = true;
-        self.facets.extend(self.native_pull_parent_facets()?);
+        self.facets.extend(self.native_pull_known_root_facets()?);
         self.phase = Phase::PullNativeMutation;
         self.identity = PreparedPlanIdentity::new();
         self.revalidate()?;

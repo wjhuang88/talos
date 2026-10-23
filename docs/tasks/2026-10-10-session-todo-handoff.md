@@ -5815,3 +5815,12 @@ and both Runtime SDK consumers. The initial sandbox run hit process-observation
 EPERM; the unchanged authorized retry exits 0. I300 records both logs. Next work
 remains simplified discovery orchestration and complete recursive effects, then
 production/security/platform acceptance; no task completion is claimed.
+
+Native Pull final profiles now explicitly publish all known bound child gitdir,
+resolved common and startup-worktree Read/Write roots. Execution re-derives and
+checks the complete root profile and fresh path grants before configuration
+probes; omissions refuse without fetch. Pull 190/190, Clippy and cargo xwin MSVC
+checking pass. I300 records scope limits and logs. This does not establish full
+recursive checkout/effect coverage: recursive and production guards remain,
+and simplified orchestration, external programs and review/platform gates are
+still outstanding. T7 and the full T1–T8 handoff remain incomplete.
