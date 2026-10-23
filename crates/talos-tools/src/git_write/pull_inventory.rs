@@ -582,6 +582,11 @@ impl Inventory {
         })
     }
 
+    pub(super) fn resolved_startup_worktree(&self, path: &Path) -> Option<&Path> {
+        self.startup_worktree_targets.contains(path).then_some(())?;
+        Some(self.worktree_targets.get(path)?.as_ref()?.resolved())
+    }
+
     pub(super) fn all_worktree_targets_resolved(&self) -> bool {
         self.worktree_targets.values().all(Option::is_some)
     }

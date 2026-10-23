@@ -256,6 +256,51 @@ impl ChildConfig {
         fetch_hook_paths(&self.values, common, execution_dir, environment)
     }
 
+    // Native recursive fetch runs from the stored gitdir; recursive update
+    // can also checkout, merge or rebase in an initialized worktree. Discover
+    // the union without predicting Git's integration result or running hooks.
+    pub(super) fn native_pull_hook_paths(
+        &self,
+        common: &std::path::Path,
+        gitdir: &std::path::Path,
+        worktrees: &[PathBuf],
+        environment: &BTreeMap<OsString, OsString>,
+    ) -> Result<Vec<PathBuf>, GitToolError> {
+        let mut paths = self.pull_hook_paths(common, gitdir, environment)?;
+        for worktree in worktrees {
+            let directory = configured_path(&self.values, b"core.hookspath", environment)?
+                .unwrap_or_else(|| common.join("hooks"));
+            let directory = if directory.is_absolute() {
+                directory
+            } else {
+                worktree.join(directory)
+            };
+            paths.extend(
+                [
+                    "pre-merge-commit",
+                    "prepare-commit-msg",
+                    "commit-msg",
+                    "post-merge",
+                    "post-checkout",
+                    "post-index-change",
+                    "pre-rebase",
+                    "post-commit",
+                    "post-rewrite",
+                    "reference-transaction",
+                    "pre-auto-gc",
+                    "applypatch-msg",
+                    "pre-applypatch",
+                    "post-applypatch",
+                ]
+                .into_iter()
+                .map(|name| directory.join(name)),
+            );
+        }
+        paths.sort();
+        paths.dedup();
+        Ok(paths)
+    }
+
     /// The first recursive fetch uses ordinary fetch default-remote semantics.
     pub(super) fn fetch_remote(&self, branch: Option<&str>) -> Result<String, GitToolError> {
         super::pull_state::fetch_remote(&ordered_records(&self.ordered_output)?, branch, None)
