@@ -8528,3 +8528,50 @@ sideband Push diagnosis, plus the unresolved synchronous spawn stall. Production
 activation gates stay closed. MCP command-authority transport evidence is already
 committed as ab3861cd2; it proves routing/denial/replay to the gate, not successful
 production Pull. T7/P1–P5 and the complete original T1–T8 scope remain open.
+
+Committed candidate checkpoint (2026-10-23): retirement is `606496611`;
+`496893c25` adds the separate native command substitution regression. All four
+substitutions (argv, retained environment, cwd, executable) are rejected before
+FETCH_HEAD creation and leave the base worktree file unchanged. Focused locked
+test passed, log /private/tmp/i300-command-substitution.log. This is not a full
+current-head preflight or production activation result. Cross-surface success,
+independent security review and native Windows evidence remain required.
+
+Activation dependency audit (2026-10-23): the accepted proposal requires real
+Auto approval before activation, but `project_auto_request` in
+crates/talos-agent/src/auto_resolver.rs currently projects only write-file,
+exec and shell requests. Native Pull therefore falls back with
+`classifier_not_eligible`; synthetic authorization tests are not assessor or
+successful execution evidence. The serial T8-after-T7 plan and T7's Auto exit
+form a dependency cycle. Resolve the ownership/claim boundary for the minimal
+shared Auto command-authority prerequisite before implementing it; preserve
+PERM-007-H's full built-in coverage requirement. Do not remove Auto acceptance
+or add a test-only execution bypass to conceal this gap. The independent review
+is in progress; this finding alone is not completed security review.
+
+Independent review outcome (2026-10-23, reviewed implementation 496893c25):
+no obvious prepared-proof bypass was found, but activation is not approved.
+The reviewer confirmed missing real Auto projection and cross-entry successful
+execution evidence. Recommended convergence is to move only the shared Auto
+Pull prerequisite ahead of T7 activation, retaining every other PERM-007-H
+acceptance item and its incomplete state. Then remove the production gate in
+the unmerged local candidate and obtain real entrypoint tests, renewed security
+review, current-head CI and native Windows evidence before merge. This does
+not authorize expanding the effective implementation claim silently.
+
+Current candidate validation attempt (2026-10-23): standard locked preflight
+passed check/Clippy and reached tools tests, then exited 101 with 917 passing
+and one failure: prepared_local_push_runs_all_eight_admitted_stages could not
+observe the child process (EPERM under the execution sandbox). Log:
+/private/tmp/i300-current-candidate-preflight.log. An authorized unsandboxed
+standard preflight is running with output retained at
+/private/tmp/i300-current-candidate-preflight-authorized.log; no passing result
+is claimed until terminal success. Standalone collaboration validation passed
+with zero warnings (/private/tmp/i300-candidate-claims.log).
+
+Authorized validation result (2026-10-23): the same standard locked preflight
+finished with exit 0, including workspace check, warnings-denied Clippy,
+workspace tests, both governance validators and external runtime SDK fixtures.
+Log: /private/tmp/i300-current-candidate-preflight-authorized.log. This supersedes
+the running state above, not the native Windows or activation gaps. Fresh fetch
+found zero origin/main-only commits; no additional rebase was needed.
