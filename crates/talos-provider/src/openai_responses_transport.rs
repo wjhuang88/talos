@@ -26,7 +26,10 @@ pub(crate) struct ResponsesSseDecoder {
 impl ResponsesSseDecoder {
     #[must_use]
     pub(crate) fn new() -> Self {
-        Self::default()
+        Self {
+            state: ResponsesStreamState::new(),
+            ..Self::default()
+        }
     }
 
     /// Push one arbitrary transport chunk.
