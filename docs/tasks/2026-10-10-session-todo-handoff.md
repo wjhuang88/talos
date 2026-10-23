@@ -1,3 +1,12 @@
+## Auto prerequisite scope effective — 2026-10-23
+
+#755 merged as 0e2abd8e3 with exact-head CI, independent Agent approval and CAS.
+The I300 branch now includes that main merge through rebase. The minimal shared
+prepared-command Auto/Pull prerequisite is in scope; the remaining full T8
+coverage is still unclaimed and subsequent. Windows CI inventory correction was
+published as 18c69b8da before rebase. No Auto execution, Windows acceptance or
+T7 completion is established by these governance and CI changes.
+
 ## Windows CI inventory correction — 2026-10-23
 
 Run 39935313756 at 0106a2204 stopped before Windows workspace tests because

@@ -8586,3 +8586,13 @@ replacement tests pass locally (2/2), log
 identity and process-supervision entries remain. This fixes the CI inventory,
 not the unresolved native Windows Push/runtime evidence; a fresh native run is
 required. Production gates and all T7 acceptance remain unchanged.
+
+Auto prerequisite scope effective (2026-10-23): governance PR #755 merged as
+0e2abd8e3 after exact-head CI at 8380eb09f, independent Agent APPROVE, both
+validators and merge-time CAS. The amended claim now permits the minimum shared
+prepared-command Auto/Pull prerequisite; remaining PERM-007-H coverage remains
+unclaimed. The implementation branch rebased onto that merge. Conflicts retained
+the new claim and historical execution records; source and workflow trees are
+unchanged from the pre-rebase CI correction 18c69b8da. Production activation is
+still unapproved. Next implement the contextual assessor path without adding a
+Git-only evaluator, legacy-adapter downgrade or test-only gate bypass.
