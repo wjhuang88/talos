@@ -5,12 +5,18 @@ use super::*;
 #[cfg(unix)]
 #[tokio::test]
 async fn native_pull_local_source_can_execute_upload_pack_configuration() {
-    local_source_upload_pack_configuration(true).await;
-    local_source_upload_pack_configuration(false).await;
+    local_source_upload_pack_configuration(true, false).await;
+    local_source_upload_pack_configuration(false, false).await;
 }
 
 #[cfg(unix)]
-async fn local_source_upload_pack_configuration(protected_global: bool) {
+#[tokio::test]
+async fn native_pull_cancellation_closes_local_upload_pack_descendants() {
+    local_source_upload_pack_configuration(true, true).await;
+}
+
+#[cfg(unix)]
+async fn local_source_upload_pack_configuration(protected_global: bool, cancel: bool) {
     let root = tempfile::tempdir().expect("fixture");
     let source = root.path().join("source");
     let local = root.path().join("local");
@@ -34,8 +40,10 @@ async fn local_source_upload_pack_configuration(protected_global: bool) {
     let global = root.path().join("global-config");
     std::fs::write(
         &global,
-        if protected_global {
-            "[uploadpack]\npackObjectsHook = printf observed > upload-pack-effect; exit 73;\n"
+        if cancel {
+            "[uploadpack]\npackObjectsHook = \"(while test ! -f release-effect; do sleep 0.01; done; printf forbidden > delayed-effect) & printf observed > upload-pack-effect; wait; exit 73;\"\n"
+        } else if protected_global {
+            "[uploadpack]\npackObjectsHook = \"printf observed > upload-pack-effect; exit 73;\"\n"
         } else {
             ""
         },
@@ -65,6 +73,40 @@ async fn local_source_upload_pack_configuration(protected_global: bool) {
         &environment,
     )
     .expect("command");
+    if cancel {
+        let receipt = plan.cleanup_receipt().expect("Pull cleanup receipt");
+        let task = tokio::spawn(async move {
+            plan.run_command_output(
+                frozen.command(),
+                std::time::Duration::from_secs(20),
+                1024 * 1024,
+            )
+            .await
+        });
+        tokio::time::timeout(std::time::Duration::from_secs(5), async {
+            while !source.join(".git/upload-pack-effect").exists() {
+                assert!(!task.is_finished(), "Pull must reach the source hook");
+                tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+            }
+        })
+        .await
+        .expect("source hook started");
+        task.abort();
+        assert!(task.await.expect_err("cancelled Pull").is_cancelled());
+        receipt
+            .wait(std::time::Duration::from_secs(3))
+            .await
+            .expect("confirmed native Pull cleanup");
+        std::fs::write(source.join(".git/release-effect"), b"release\n")
+            .expect("release descendant only after cleanup");
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        assert!(!source.join(".git/delayed-effect").exists());
+        assert_eq!(
+            std::fs::read(local.join("file")).expect("local file"),
+            b"before\n"
+        );
+        return;
+    }
     let output = plan
         .run_command_output(
             frozen.command(),

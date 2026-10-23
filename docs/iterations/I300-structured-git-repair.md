@@ -7929,3 +7929,18 @@ preflight exits 0 with `release preflight: passed`
 external runtime fixtures. This validates the current correction and documents;
 expanded discovery authority, simplified orchestration and native Pull activation
 remain open.
+
+Native Pull cancellation baseline (2026-10-23): a real local Pull starts a
+protected upload-pack hook with a waiting descendant. Aborting the owned runner
+then awaiting its cleanup receipt precedes releasing the descendant's write
+condition; no delayed source write occurs and the destination stays unchanged.
+This is Unix runner evidence, not prepared production admission or Windows
+acceptance. The initial delay-based fixture raced with completion; the replacement
+uses an explicit release file. Quoting the Git config value is essential because
+unquoted semicolons introduce config comments; the existing effect baseline is
+corrected as well. Current native Pull tests pass 23/23, Git-enabled tools
+lib/tests Clippy passes with warnings denied, formatting and diff checks pass.
+Logs: /private/tmp/i300-native-pull-cancel-suite.log and
+/private/tmp/i300-native-pull-cancel-clippy.log. The proposed discovery scope,
+simplified orchestration, native production activation and all handoff exits
+remain open.
