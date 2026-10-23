@@ -150,6 +150,40 @@ async fn native_pull_child_destinations_and_final_configuration_checks_are_bound
             );
         }
         let hook = module.join("hooks/reference-transaction");
+        if scenario == "unchanged" {
+            let tokens = proof(&plan)
+                .consume_for_prepared(&plan.request(), &plan.identity)
+                .expect("existing complete discovery scope");
+            plan.native_pull_configs.clear();
+            assert!(
+                plan.discover_native_pull_configurations(&tokens)
+                    .await
+                    .expect("already admitted sources need no continuation")
+            );
+            for missing in [&source, &hook] {
+                let mut incomplete = tokens.clone();
+                incomplete.retain(|token| {
+                    !token.authorizes_path(
+                        "git_pull",
+                        ToolNature::Read,
+                        &plan.workspace,
+                        missing.to_str().expect("path"),
+                    )
+                });
+                plan.native_pull_configs.clear();
+                assert!(
+                    !plan
+                        .discover_native_pull_configurations(&incomplete)
+                        .await
+                        .expect("new source remains a frontier")
+                );
+            }
+            assert!(
+                plan.discover_native_pull_configurations(&tokens)
+                    .await
+                    .expect("complete proof resumes discovery")
+            );
+        }
         match scenario {
             "bounded-fixed" => plan.facets.retain(|facet| {
                 let path = facet.resource.as_deref();

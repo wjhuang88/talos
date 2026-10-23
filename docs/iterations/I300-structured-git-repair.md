@@ -8050,3 +8050,14 @@ independent checks. Native Pull tests pass 24/24 and Git-enabled lib/tests Clipp
 passes with warnings denied; logs /private/tmp/i300-pull-final-scope.log and
 /private/tmp/i300-pull-final-scope-clippy.log. No production activation or full
 workspace/Windows acceptance is implied by this consistency fix.
+
+Configuration continuation checkpoint (2026-10-23): capturing new child config
+evidence no longer unconditionally creates a continuation. If the consumed
+proof already covers all reported sources and resolved auxiliary targets,
+discovery captures admitted hooks and proceeds in the same call. Missing source
+or hook-target tokens still return a frontier; a subsequent complete proof
+resumes normally. Regression covers both missing-token cases without starting
+Pull. Native Pull tests pass 24/24 and Git-enabled lib/tests Clippy passes with
+warnings denied (/private/tmp/i300-pull-config-batch{,-clippy}.log). This removes
+one redundant phase only when scope is already admitted; remaining new-path
+frontiers and complete recursive execution scope are still open.

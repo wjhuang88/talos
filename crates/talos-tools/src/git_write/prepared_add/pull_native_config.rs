@@ -110,7 +110,39 @@ impl AddPlan {
             self.native_pull_configs.insert(root.clone(), config);
             discovered = true;
         }
-        if !discovered {
+        // Newly retained evidence does not itself require another approval:
+        // continue immediately when this immutable proof already covers every
+        // published source and resolved auxiliary target. Otherwise return the
+        // frontier without capturing unapproved auxiliary contents or executing Pull.
+        let mut admitted = true;
+        if discovered {
+            for config in self.native_pull_configs.values() {
+                for (path, _) in &config.files {
+                    admitted &= self.native_pull_module_read(path, authorizations)?
+                        || authorizations.iter().any(|token| {
+                            token.authorizes_path(
+                                "git_pull",
+                                ToolNature::Read,
+                                &self.workspace,
+                                path.to_str().unwrap_or_default(),
+                            )
+                        });
+                }
+            }
+            if let Some(auxiliary) = &self.auxiliary_paths {
+                admitted &= auxiliary.targets().all(|path| {
+                    authorizations.iter().any(|token| {
+                        token.authorizes_path(
+                            "git_pull",
+                            ToolNature::Read,
+                            &self.workspace,
+                            path.to_str().unwrap_or_default(),
+                        )
+                    })
+                });
+            }
+        }
+        if admitted {
             self.auxiliary_paths
                 .as_mut()
                 .ok_or_else(|| {
@@ -125,7 +157,7 @@ impl AddPlan {
                         .collect::<Vec<_>>(),
                 )?;
         }
-        Ok(!discovered)
+        Ok(admitted)
     }
 
     // Scope derivation from frozen native URL selection; never contacts the source.
