@@ -85,6 +85,7 @@ pub struct GrantPreview {
     scope: GrantScope,
     facets: Vec<GrantPreviewFacet>,
     network_scope: Option<Box<ToolNetworkScope>>,
+    notes: Vec<String>,
 }
 
 impl fmt::Debug for GrantPreview {
@@ -98,6 +99,11 @@ impl fmt::Debug for GrantPreview {
 }
 
 impl GrantPreview {
+    /// Returns prepared command review notes, not additional grant authority.
+    /// Native producers must supply credential-free descriptions.
+    pub fn notes(&self) -> &[String] {
+        &self.notes
+    }
     /// Returns the requested approval lifetime.
     #[must_use]
     pub const fn scope(&self) -> GrantScope {
@@ -281,6 +287,15 @@ pub(crate) fn compile_proposal(
     let facets = compile_facets(request, workspace_root, true)?;
     let fingerprint = fingerprint_request(request, &facets);
     let preview = GrantPreview {
+        notes: if crate::native_pull_command::requested(request.facets()) {
+            request
+                .facets()
+                .iter()
+                .filter_map(|facet| facet.description.clone())
+                .collect()
+        } else {
+            Vec::new()
+        },
         // The existing Ask carrier includes both proposal slots. Even its
         // Session slot advertises only Once for native command authority;
         // committing it is downgraded to an invocation without storing a grant.

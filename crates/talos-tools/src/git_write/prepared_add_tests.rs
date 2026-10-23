@@ -153,6 +153,9 @@ include!("prepared_add_tests/commit.rs");
 include!("prepared_add_tests/pull.rs");
 #[path = "prepared_add_tests/native_pull.rs"]
 mod native_pull;
+
+#[path = "prepared_add_tests/pull_command.rs"]
+mod pull_command;
 include!("prepared_add_tests/pull_prefetch.rs");
 include!("prepared_add_tests/pull_fetch_admission.rs");
 include!("prepared_add_tests/pull_postfetch.rs");

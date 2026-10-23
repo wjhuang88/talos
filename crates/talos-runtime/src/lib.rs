@@ -986,6 +986,7 @@ pub trait ApprovalHandler: Send + Sync {
     /// the projection-only default implementation for legacy scopes. An invocation-bound
     /// network scope requires overriding this method and inspecting its complete preview;
     /// the old argument-only callback cannot silently approve the new authority.
+    /// Prepared native Pull command notes likewise require a scope-aware host.
     async fn request_scoped_approval(
         &self,
         tool_name: &str,
@@ -993,7 +994,12 @@ pub trait ApprovalHandler: Send + Sync {
         summary_fields: &[String],
         preview: &GrantPreview,
     ) -> ApprovalChoice {
-        if preview.network_scope().is_some() {
+        if preview.network_scope().is_some()
+            || preview
+                .facets()
+                .iter()
+                .any(|facet| facet.normalized_scope == "git:pull-command")
+        {
             return ApprovalChoice::Deny;
         }
         self.request_approval(tool_name, arguments, summary_fields)
@@ -5055,6 +5061,10 @@ mod tests {
         runtime.shutdown().await.expect("shutdown succeeds");
     }
 }
+
+#[cfg(test)]
+#[path = "native_pull_approval_tests.rs"]
+mod native_pull_approval_tests;
 
 #[cfg(test)]
 mod tool_cleanup_finalizer_tests {

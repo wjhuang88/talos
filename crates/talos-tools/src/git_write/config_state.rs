@@ -1087,10 +1087,87 @@ impl ConfigState {
         repository: &RepositoryState,
         environment: &BTreeMap<OsString, OsString>,
     ) -> Result<Self, GitToolError> {
+        Self::capture_host_mode(output, repository, environment, false)
+    }
+
+    /// Capture the same bounded configuration evidence without predicting
+    /// helper effects. Only final native Pull command authority covers them.
+    pub(super) fn capture_pull_command(
+        output: &[u8],
+        repository: &RepositoryState,
+        environment: &BTreeMap<OsString, OsString>,
+    ) -> Result<Self, GitToolError> {
+        Self::capture_host_mode(output, repository, environment, true)
+    }
+
+    /// Static category labels only: configuration keys/subsections and values
+    /// may contain credentials and must not be copied into review notes.
+    pub(super) fn pull_command_program_categories(&self) -> Vec<&'static str> {
+        let categories = [
+            (b"filter.".as_slice(), "filters"),
+            (b"merge.".as_slice(), "merge configuration/drivers"),
+            (b"credential.".as_slice(), "credentials"),
+            (b"remote.".as_slice(), "remote transport configuration"),
+            (b"hook.".as_slice(), "configured hook commands"),
+            (b"core.hookspath".as_slice(), "hook directory"),
+            (b"core.fsmonitor".as_slice(), "filesystem monitor"),
+            (b"core.sshcommand".as_slice(), "SSH command"),
+            (b"gpg.".as_slice(), "signing programs"),
+            (b"rebase.".as_slice(), "rebase configuration"),
+        ];
+        let mut found = categories
+            .into_iter()
+            .filter_map(|(prefix, label)| {
+                self.values
+                    .keys()
+                    .any(|key| key.starts_with(prefix))
+                    .then_some(label)
+            })
+            .collect::<Vec<_>>();
+        if found.is_empty() {
+            found.push("none in the inspected categories");
+        }
+        found
+    }
+
+    /// Sanitized host evidence only; URL credentials, paths and helper payloads
+    /// remain private. This is not exhaustive endpoint discovery.
+    pub(super) fn pull_command_remote_hosts(&self) -> Vec<String> {
+        let mut hosts = BTreeSet::new();
+        for (key, values) in &self.values {
+            if !key.starts_with(b"remote.") || !key.ends_with(b".url") {
+                continue;
+            }
+            for value in values.iter().flatten() {
+                let parsed = std::panic::catch_unwind(|| gix::url::parse(value.as_slice()));
+                if let Ok(Ok(url)) = parsed
+                    && let Some(host) = url.host
+                    && host.len() <= 253
+                    && host
+                        .bytes()
+                        .all(|byte| byte.is_ascii_alphanumeric() || b".-:[]".contains(&byte))
+                {
+                    hosts.insert(match url.port {
+                        Some(port) => format!("{host}:{port}"),
+                        None => host,
+                    });
+                }
+            }
+        }
+        hosts.into_iter().collect()
+    }
+
+    fn capture_host_mode(
+        output: &[u8],
+        repository: &RepositoryState,
+        environment: &BTreeMap<OsString, OsString>,
+        command_authority: bool,
+    ) -> Result<Self, GitToolError> {
         let (values, paths) = parse_origins(output)?;
-        if values
-            .keys()
-            .any(|key| key.starts_with(b"hook.") && key.ends_with(b".command"))
+        if !command_authority
+            && values
+                .keys()
+                .any(|key| key.starts_with(b"hook.") && key.ends_with(b".command"))
         {
             return Err(unsupported(
                 "Configured Git hook commands require separate execution authorization",
@@ -1109,7 +1186,7 @@ impl ConfigState {
         // source/index facets. Do not disable them or stage unfiltered bytes.
         for (key, entries) in &values {
             let key = key.as_slice();
-            if key == b"core.fsmonitor" {
+            if !command_authority && key == b"core.fsmonitor" {
                 let value = entries
                     .last()
                     .ok_or_else(|| unsupported("Git fsmonitor configuration is empty"))?;
