@@ -1,6 +1,6 @@
 use crate::{
-    Config, ConfigError, ConfigStore, ConfigUnsetOutcome, Credentials, ModelConfig, ProtocolResolution,
-    ProviderConfig, ProviderProtocol, builtin_provider_config, home_dir, model,
+    Config, ConfigError, ConfigStore, ConfigUnsetOutcome, Credentials, ModelConfig,
+    ProtocolResolution, ProviderConfig, ProviderProtocol, builtin_provider_config, home_dir, model,
     normalize_provider_endpoint, opencode, resolve_protocol,
 };
 use std::env;
@@ -185,9 +185,7 @@ impl Config {
         let confirmed_provider_default = if self.provider == "openai" {
             let official_endpoint = user_provider
                 .and_then(|provider| provider.base_url.as_deref())
-                .is_none_or(|url| {
-                    url.trim().trim_end_matches('/') == "https://api.openai.com/v1"
-                });
+                .is_none_or(|url| url.trim().trim_end_matches('/') == "https://api.openai.com/v1");
             if official_endpoint {
                 Some(ProviderProtocol::OpenAIResponses)
             } else {

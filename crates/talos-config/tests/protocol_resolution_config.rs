@@ -1,6 +1,4 @@
-use talos_config::{
-    Config, ProtocolResolutionSource, ProviderConfig, ProviderProtocol,
-};
+use talos_config::{Config, ProtocolResolutionSource, ProviderConfig, ProviderProtocol};
 
 fn config_with_provider(name: &str, provider: ProviderConfig) -> Config {
     let mut config = Config::default();
