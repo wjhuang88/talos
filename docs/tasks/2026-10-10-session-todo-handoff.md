@@ -5711,3 +5711,11 @@ The new discovery capability and production Pull remain unenabled.
 Full standard preflight subsequently exits 0 with `release preflight: passed`
 (/private/tmp/i300-layout-retention-preflight.log); this is checkpoint evidence,
 not acceptance of the proposed capability or completion of T7.
+
+Native Pull cancellation follow-up: real Unix local upload-pack descendants are
+cancelled through the owned runner and confirmed cleanup receipt; releasing a
+waiting descendant after cleanup produces no source write. Native Pull tests
+pass 23/23 and Git-enabled tools lib/tests Clippy passes with warnings denied
+(/private/tmp/i300-native-pull-cancel-{suite,clippy}.log). I300 records fixture
+corrections and limits. This is runner coverage, not production approval-chain,
+Windows, T7 or whole-task completion; discovery scope acceptance remains pending.
