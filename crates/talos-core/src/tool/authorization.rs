@@ -105,6 +105,28 @@ impl ToolExecutionAuthorization {
         }
     }
 
+    /// Creates the dedicated Pull discovery capability after permission admission.
+    /// Root identity and the shared discovery budget must still be checked by
+    /// the consumer; this token does not grant general descendant file access.
+    pub fn for_git_pull_bounded_discovery(scope: ToolAuthorizationScope) -> Self {
+        Self {
+            tool_name: "git_pull".into(),
+            nature: ToolNature::Read,
+            resource_kind: ToolResourceKind::Remote,
+            normalized_resource: PathBuf::new(),
+            named_capability: Some("git:pull-bounded-discovery".into()),
+            scope,
+        }
+    }
+
+    /// Returns whether this token carries the dedicated Pull discovery capability.
+    pub fn authorizes_git_pull_bounded_discovery(&self) -> bool {
+        self.tool_name == "git_pull"
+            && self.nature == ToolNature::Read
+            && self.resource_kind == ToolResourceKind::Remote
+            && self.named_capability.as_deref() == Some("git:pull-bounded-discovery")
+    }
+
     /// Returns whether this authorization exactly covers a requested path and
     /// operation.
     pub fn authorizes_path(

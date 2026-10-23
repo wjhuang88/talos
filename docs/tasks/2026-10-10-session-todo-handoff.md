@@ -5735,3 +5735,14 @@ stage-history case now reaches the incomplete-recursion gate instead of the
 stage limit, with no Pull started. I300 owns evidence and remaining work: replace
 fixed-content continuations, finish complete execution effects, validate and
 review before production activation. T7 and the full handoff remain incomplete.
+
+2026-10-23 follow-up: bounded module traversal now also requires a dedicated
+`git_pull` execution token; a retained facet without that token cannot traverse.
+Native Pull tests pass 24/24. Complete standard preflight finally exited 0 in
+the authorized unsandboxed environment, including independent Runtime SDK
+consumers. I300 records earlier mixed-build, sandbox EPERM and transient session
+timeout attempts without treating them as passes. Final log:
+/private/tmp/i300-bounded-discovery-token-preflight-unsandboxed.log.
+Next remains bounded configuration/layout content discovery, complete child
+effects and production gates. No new contract approval is required for the
+already accepted simplified flow; T7 and T1–T8 remain incomplete.

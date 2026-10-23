@@ -499,7 +499,7 @@ impl PermissionEngine {
     /// Builds exact path authorizations after a permission decision has been
     /// resolved by a composition root.
     ///
-    /// Non-path facets do not produce an authorization. This method does not
+    /// Only path facets and dedicated Git capabilities produce authorizations. This method does not
     /// evaluate permission and must only be called after `Allow` or explicit
     /// user approval.
     pub fn execution_authorizations(
@@ -514,6 +514,16 @@ impl PermissionEngine {
         };
         let mut authorizations = Vec::new();
         for facet in profile {
+            if tool_name == "git_pull"
+                && facet.nature == ToolNature::Read
+                && facet.resource_kind == Some(ToolResourceKind::Remote)
+                && facet.resource.as_deref() == Some("git:pull-bounded-discovery")
+            {
+                authorizations.push(ToolExecutionAuthorization::for_git_pull_bounded_discovery(
+                    scope,
+                ));
+                continue;
+            }
             if facet.nature == ToolNature::Read
                 && facet.resource_kind == Some(ToolResourceKind::Remote)
                 && facet.resource.as_deref() == Some("git:auxiliary-path-resolution")
