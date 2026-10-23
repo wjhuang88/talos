@@ -1,3 +1,46 @@
+## Native Pull line-ending fixture correction — 2026-10-23
+
+The native Git fixture helper now fixes `core.autocrlf=false` for setup commands
+and persists it for initialized/cloned repositories; recursive command tests
+also persist the child setting before deinit. This isolates byte expectations
+from the host conversion policy without changing production argv/environment.
+The conflict assertion now retains the operation output when MERGE_HEAD is
+absent, rather than assuming every error is a merge conflict.
+
+Focused macOS coding-feature regressions pass for configured upstream/rebase,
+initialized/deinitialized recursion, and conflict partial effects. Logs:
+`/private/tmp/i300-native-pull-eol-focused.log`,
+`/private/tmp/i300-recursion-eol-focused.log`, and
+`/private/tmp/i300-conflict-eol-focused.log`. Native Windows confirmation and
+full workspace validation remain required; these checks do not close T7.
+
+## Validation failure separation — 2026-10-23
+
+Current-head preflight reached tools tests and failed 917/1 at the first Lite
+source of the real connection-refusal test (`Transport(Request)`). Two later
+918-test tools runs did not reproduce that Search failure; no root cause or
+fix is claimed. A test-only panic receipt now records resolver hosts, attempt
+count and fixture ports without query/config values. Temporary production-file
+diagnostics were removed.
+
+The sandboxed coding-feature run failed process observation (EPERM). The
+authorized run instead passed 916/918: the Git daemon native dry-run could not
+connect after readiness, and the Pull cancellation hook did not start within
+five seconds. The hook test passes individually in the authorized focused run
+(`/private/tmp/i300-hook-cancel-focused.log`); this does not establish parallel
+reliability. Logs: `/private/tmp/i300-refusal-diagnostic-coding.log` and
+`/private/tmp/i300-refusal-diagnostic-authorized.log`.
+
+Remote run 39938672176 is terminal: macOS validation succeeds, Windows fails.
+Windows Agent/MCP/Runtime entry tests include explicit production-gate refusals;
+these are not execution acceptance. Tools additionally has four failures: two
+LF/CRLF byte expectations, a conflict fixture without MERGE_HEAD, and the native
+Git-daemon Push baseline. Failure log:
+`/private/tmp/i300-ci-39938672176-windows-failed.log`. Keep production gates
+closed. Next separate deterministic fixture configuration from execution
+failures, then complete trusted prepared-command Auto evidence and cross-entry
+execution. Full T1–T8 scope remains incomplete.
+
 ## Auto prerequisite scope effective — 2026-10-23
 
 #755 merged as 0e2abd8e3 with exact-head CI, independent Agent approval and CAS.
