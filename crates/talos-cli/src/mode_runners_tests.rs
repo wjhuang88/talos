@@ -157,6 +157,7 @@ async fn handle_connect_with_credential_preserves_unrelated_provider_fields() {
                     talos_config::ModelConfig {
                         context_limit: Some(999_000),
                         output_limit: None,
+                        protocol: None,
                         reasoning: None,
                         image_input: None,
                     },
@@ -368,26 +369,7 @@ use super::*;
 
 #[test]
 fn parse_dashboard_board_section_extracts_items() {
-    let board = "# Board
-
-## Now
-
-| Item | State | Owner Doc | Gate |
-|---|---|---|---|
-| T57 Tool sweep | Active | [x](x.md) | Tests |
-
-## Blocked / Paused
-
-| Item | State | Owner Doc | Gate |
-|---|---|---|---|
-| T58 Dashboard review | Blocked | [x](x.md) | Security |
-
-## Next
-
-| Item | State | Owner Doc | Gate |
-|---|---|---|---|
-| T61 Rehearsal | Planned | [x](x.md) | Evidence |
-";
+    let board = "# Board\n\n## Now\n\n| Item | State | Owner Doc | Gate |\n|---|---|---|---|\n| T57 Tool sweep | Active | [x](x.md) | Tests |\n\n## Blocked / Paused\n\n| Item | State | Owner Doc | Gate |\n|---|---|---|---|\n| T58 Dashboard review | Blocked | [x](x.md) | Security |\n\n## Next\n\n| Item | State | Owner Doc | Gate |\n|---|---|---|---|\n| T61 Rehearsal | Planned | [x](x.md) | Evidence |\n";
 
     assert_eq!(
         crate::dashboard_helpers::parse_dashboard_board_section(board, "Blocked / Paused"),
