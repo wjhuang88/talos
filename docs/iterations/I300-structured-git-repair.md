@@ -14,6 +14,10 @@ initialized/deinitialized recursion, and conflict partial effects. Logs:
 `/private/tmp/i300-conflict-eol-focused.log`. Native Windows confirmation and
 full workspace validation remain required; these checks do not close T7.
 
+The subsequent authorized macOS tools coding-feature suite passes 918/918
+(`/private/tmp/i300-eol-tools-full.log`). Format/diff checks and both governance
+validators pass (0 warnings). This is not a full workspace or Windows pass.
+
 ## Upstream reference investigation — 2026-10-23
 
 At the maintainer's request, inspected reqwest issue search and Tokio/Mio
