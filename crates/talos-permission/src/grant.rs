@@ -420,6 +420,28 @@ fn compile_facets(
                         .as_deref()
                         .is_some_and(|path| Path::new(path).is_absolute())
             });
+        // The prepared consumer enforces root identity, fixed inspection argv
+        // and cumulative discovery budgets. This is never generic subtree Read.
+        let pull_discovery = facet.nature == ToolNature::Read
+            && resource_kind == ToolResourceKind::Remote
+            && facet.resource.as_deref() == Some("git:pull-bounded-discovery")
+            && request.tool_name() == "git_pull"
+            && bound_git_command
+            && request.facets().iter().any(|root| {
+                root.nature == ToolNature::Read
+                    && root.resource_kind == Some(ToolResourceKind::Path)
+                    && root
+                        .resource
+                        .as_deref()
+                        .is_some_and(|path| Path::new(path).is_absolute())
+            });
+        // Reserve the name for every nature/kind, including otherwise valid
+        // Network/Remote pairs. A malformed capability must not fall through.
+        if facet.resource.as_deref().map(str::trim) == Some("git:pull-bounded-discovery")
+            && !pull_discovery
+        {
+            return Err(GrantError::MissingResource(index));
+        }
         let pull_metadata = matches!(facet.nature, ToolNature::Read | ToolNature::Write)
             && resource_kind == ToolResourceKind::Remote
             && facet.resource.as_deref() == Some("git:pull-repository-metadata")
@@ -473,6 +495,7 @@ fn compile_facets(
             && !receiver_reference_tree
             && !receiver_metadata
             && !pull_metadata
+            && !pull_discovery
             && !pull_resolution
             && !pull_integration_worktree
         {
@@ -735,3 +758,7 @@ mod discovery_tests;
 #[cfg(test)]
 #[path = "grant_pull_integration_tests.rs"]
 mod pull_integration_tests;
+
+#[cfg(test)]
+#[path = "grant_pull_discovery_tests.rs"]
+mod pull_discovery_tests;

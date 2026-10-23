@@ -646,7 +646,7 @@ Preserve explicit Deny, one-use proof binding, identity checks, process ownershi
 and truthful partial-failure reporting. Reducing eleven stages to eight alone is
 not the acceptance target for this simplification.
 
-Concrete discovery-scope proposal (2026-10-23; acceptance pending): a closed
+Concrete discovery scope (accepted by the maintainer on 2026-10-23): a closed
 git_pull-only Read capability binds individually displayed absolute worktree,
 gitdir and common-dir roots and the fixed Git inspection commands. Within those
 roots it may enumerate names and read regular Git configuration, layout pointers,
@@ -662,8 +662,13 @@ not turn that capability into general external file access. Configuration values
 remain internal. Final execution still requires a new immutable complete-effects
 approval, including each child mutation root and destination. Generic Path Read
 semantics and other tools remain unchanged. This replaces the narrower pending
-identity-only module-inventory proposal if accepted; no implementation may infer
-acceptance from this proposal text.
+identity-only module-inventory proposal. The maintainer's explicit acceptance
+authorizes implementation of `git:pull-bounded-discovery`, not production
+activation or execution. Permission compilation binds Read, git_pull, an absolute
+Command and individually displayed absolute Read roots; the prepared consumer
+must additionally bind root identities, fixed inspection argv and the shared
+budget before using this capability. Independent security review and the
+existing production validation gates remain required.
 
 The maintainer subsequently required the experience of invoking Git in Bash:
 review the concrete native Pull as a whole, allow the model to make an actual
