@@ -5800,3 +5800,11 @@ linked/outside sources; hook execution remains ungranted. Native Pull 27/27,
 Pull regression 188/188 and Git-enabled Clippy pass; I300 owns precise validation
 scope and remaining remote/effects/production/security/platform work. T7 and the
 original T1–T8 handoff remain incomplete.
+
+Legacy child remote discovery now reuses shared auxiliary source evidence,
+removing its duplicate snapshot/identity implementation. Contained sources reuse
+bounded discovery; external linked targets require fresh exact Read before
+content capture or URL inspection. Native Pull 28/28, Pull 190/190, Clippy and
+cargo xwin MSVC checking pass. I300 records logs and remaining complete-effects,
+production, review, resource-accounting and platform requirements. T7 stays Active;
+the original T1–T8 delivery scope is unchanged.

@@ -15,6 +15,9 @@ mod scope;
 #[path = "native_pull_config.rs"]
 mod config;
 
+#[path = "native_pull_remote.rs"]
+mod remote;
+
 #[test]
 fn native_pull_parent_local_source_is_a_read_path() {
     let root = tempfile::tempdir().expect("fixture");

@@ -4,7 +4,7 @@ use super::*;
 use std::collections::BTreeSet;
 
 impl AddPlan {
-    fn native_pull_auxiliary_roots(&self) -> Result<Vec<PathBuf>, GitToolError> {
+    pub(super) fn native_pull_auxiliary_roots(&self) -> Result<Vec<PathBuf>, GitToolError> {
         let Some(modules) = &self.native_pull_modules else {
             return Ok(Vec::new());
         };

@@ -8148,3 +8148,25 @@ git --tests --target x86_64-pc-windows-msvc` (seven existing reduced-feature
 warnings). Sandbox cache-write EPERM was followed by an authorized retry. Log:
 /private/tmp/i300-scoped-hooks-xwin.log. Compilation does not replace native
 Windows runtime acceptance.
+
+Contained legacy remote discovery checkpoint (2026-10-23): child remotes/branches
+files now reuse the existing AuxiliaryPaths component resolution, target
+admission, content capture and identity revalidation. Removed the parallel
+RegularEvidence/PathIdentity store from RemoteEvidence; only the resolved URL
+remains there. Root-contained, unredirected legacy files reuse bounded discovery.
+Linked sources publish their actual target and return before content capture or
+URL inspection until its exact Read is consumed. Auxiliary resolution still
+requires its dedicated token. Final revalidation checks the derived source set
+and retained evidence before and after URL inspection; no transport connects.
+Tests cover scoped legacy content with its exact token removed, denial after
+removing only bounded discovery, external linked-source admission and subsequent
+content drift. The external-source regression lives in a separate test module.
+Native Pull passes 28/28, full Pull selection 190/190, and Git-enabled lib/tests
+Clippy passes with warnings denied. MSVC Git-enabled test-target checking via
+cargo xwin also passes (seven existing reduced-feature warnings). Logs:
+/private/tmp/i300-scoped-remote-{tests,pull,clippy,xwin}.log. This consolidates
+discovery evidence rather than introducing a new authorization capability.
+Complete recursive mutation roots/destinations, local-source protected execution,
+selected integration programs, production routing, independent security review
+and native Windows acceptance remain open. Shared resolution/identity/revalidation
+accounting remains a P1 residual; no P1–P5 or T7 completion is claimed.
