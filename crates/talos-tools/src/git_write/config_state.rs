@@ -10,9 +10,6 @@ type CheckoutCandidates = (Vec<(String, String)>, Option<String>);
 
 type Values = BTreeMap<Vec<u8>, Vec<Option<Vec<u8>>>>;
 
-#[path = "config_state/merge_options.rs"]
-mod merge_options;
-
 /// Receiver dependencies named by configuration. Construction never opens the
 /// paths; their contents belong to the next independently admitted Read stage.
 pub(super) struct ReceiverEffects {
@@ -94,36 +91,14 @@ impl ChildStartupLayout {
         common: &std::path::Path,
         has_common: bool,
     ) -> Result<Self, GitToolError> {
-        Self::capture_with_budget(gitdir, common, has_common, None)
-    }
-
-    pub(super) fn capture_native_pull(
-        gitdir: &std::path::Path,
-        common: &std::path::Path,
-        has_common: bool,
-        shared: &super::pull_inventory::ReferenceBudget,
-    ) -> Result<Self, GitToolError> {
-        Self::capture_with_budget(gitdir, common, has_common, Some(shared))
-    }
-
-    fn capture_with_budget(
-        gitdir: &std::path::Path,
-        common: &std::path::Path,
-        has_common: bool,
-        shared: Option<&super::pull_inventory::ReferenceBudget>,
-    ) -> Result<Self, GitToolError> {
         let mut budget = snapshot::Budget {
             entries: 2,
             bytes: 256 * 1024,
         };
         let mut capture = |path: &std::path::Path| {
-            if let Some(shared) = shared {
-                shared.capture_with_budget(path, &mut budget)
-            } else {
-                snapshot::RegularEvidence::capture(path, &mut budget).map_err(|_| {
-                    unsupported("Child startup configuration must be bounded regular files")
-                })
-            }
+            snapshot::RegularEvidence::capture(path, &mut budget).map_err(|_| {
+                unsupported("Child startup configuration must be bounded regular files")
+            })
         };
         let mut files = Vec::new();
         let mut targets = BTreeSet::new();
@@ -220,114 +195,9 @@ fn startup_values(entry: &snapshot::Entry) -> Result<StartupValues, GitToolError
     .unwrap_or_else(|_| Err(unsupported("Child startup configuration parser failed")))
 }
 
-/// Strip origin fields while retaining ordered, possibly valueless records.
-fn ordered_records(output: &[u8]) -> Result<Vec<u8>, GitToolError> {
-    if output.is_empty() {
-        return Ok(Vec::new());
-    }
-    let fields: Vec<_> = output
-        .strip_suffix(&[0])
-        .ok_or_else(|| unsupported("Incomplete Pull configuration"))?
-        .split(|byte| *byte == 0)
-        .collect();
-    let (pairs, tail) = fields.as_chunks::<2>();
-    if !tail.is_empty() {
-        return Err(unsupported("Incomplete Pull configuration"));
-    }
-    let mut records = Vec::new();
-    for [_, record] in pairs {
-        records.extend_from_slice(record);
-        records.push(0);
-    }
-    Ok(records)
-}
-
 impl ChildConfig {
     pub(super) fn filter_attribute_is_inert(&self, attribute: &[u8]) -> bool {
         filter_attribute_is_inert(&self.values, attribute)
-    }
-
-    pub(super) fn pull_hook_paths(
-        &self,
-        common: &std::path::Path,
-        execution_dir: &std::path::Path,
-        environment: &BTreeMap<OsString, OsString>,
-    ) -> Result<Vec<PathBuf>, GitToolError> {
-        fetch_hook_paths(&self.values, common, execution_dir, environment)
-    }
-
-    // Native recursive fetch runs from the stored gitdir; recursive update
-    // can also checkout, merge or rebase in an initialized worktree. Discover
-    // the union without predicting Git's integration result or running hooks.
-    pub(super) fn native_pull_hook_paths(
-        &self,
-        common: &std::path::Path,
-        gitdir: &std::path::Path,
-        worktrees: &[PathBuf],
-        environment: &BTreeMap<OsString, OsString>,
-    ) -> Result<Vec<PathBuf>, GitToolError> {
-        let mut paths = self.pull_hook_paths(common, gitdir, environment)?;
-        for worktree in worktrees {
-            let directory = configured_path(&self.values, b"core.hookspath", environment)?
-                .unwrap_or_else(|| common.join("hooks"));
-            let directory = if directory.is_absolute() {
-                directory
-            } else {
-                worktree.join(directory)
-            };
-            paths.extend(
-                [
-                    "pre-merge-commit",
-                    "prepare-commit-msg",
-                    "commit-msg",
-                    "post-merge",
-                    "post-checkout",
-                    "post-index-change",
-                    "pre-rebase",
-                    "post-commit",
-                    "post-rewrite",
-                    "reference-transaction",
-                    "pre-auto-gc",
-                    "applypatch-msg",
-                    "pre-applypatch",
-                    "post-applypatch",
-                ]
-                .into_iter()
-                .map(|name| directory.join(name)),
-            );
-        }
-        paths.sort();
-        paths.dedup();
-        Ok(paths)
-    }
-
-    /// The first recursive fetch uses ordinary fetch default-remote semantics.
-    pub(super) fn fetch_remote(&self, branch: Option<&str>) -> Result<String, GitToolError> {
-        super::pull_state::fetch_remote(&ordered_records(&self.ordered_output)?, branch, None)
-    }
-
-    pub(super) fn prepare_pull_transport(&self, remote: &str) -> Result<(), GitToolError> {
-        validate_fetch_external_effects(&self.values)?;
-        for key in [
-            format!("remote.{remote}.uploadpack"),
-            format!("remote.{remote}.vcs"),
-        ] {
-            if self.values.contains_key(key.as_bytes()) {
-                return Err(unsupported(
-                    "Configured Pull child transport helper requires separate execution authorization",
-                ));
-            }
-        }
-        Ok(())
-    }
-
-    /// Resolve fetch destinations using Git's ordered URL and rewrite rules.
-    pub(super) fn fetch_destinations(&self, remote: &str) -> Result<Vec<String>, GitToolError> {
-        super::remote_state::destinations(
-            &super::remote_state::records(&self.ordered_output)?,
-            remote,
-            false,
-        )
     }
 
     pub(super) fn receiver_effects(
@@ -444,21 +314,6 @@ impl ChildConfig {
         Self::capture(output, gitdir)
     }
 
-    pub(super) fn capture_native_pull(
-        output: &[u8],
-        gitdir: &std::path::Path,
-        budget: &super::pull_inventory::ReferenceBudget,
-    ) -> Result<Self, GitToolError> {
-        budget.retain_configuration_output(output)?;
-        let (_, origins) = parse_origins(output)?;
-        if origins.iter().any(|path| !path.is_absolute()) {
-            return Err(unsupported(
-                "Native Pull configuration origin must be absolute",
-            ));
-        }
-        Self::capture_with_budget(output, gitdir, Some(budget))
-    }
-
     pub(super) fn attribute_paths(
         &self,
         workdir: &std::path::Path,
@@ -500,14 +355,6 @@ impl ChildConfig {
     }
 
     pub(super) fn capture(output: &[u8], workdir: &std::path::Path) -> Result<Self, GitToolError> {
-        Self::capture_with_budget(output, workdir, None)
-    }
-
-    fn capture_with_budget(
-        output: &[u8],
-        workdir: &std::path::Path,
-        shared: Option<&super::pull_inventory::ReferenceBudget>,
-    ) -> Result<Self, GitToolError> {
         let (values, origins) = parse_origins(output)?;
         refuse_promisor_objects(&values)?;
         if let Some(value) = values
@@ -534,13 +381,9 @@ impl ChildConfig {
                 };
                 let identity = snapshot::PathIdentity::capture(&path)
                     .map_err(|_| unsupported("Submodule configuration identity unavailable"))?;
-                let entry = if let Some(shared) = shared {
-                    shared.capture(&path)?.entry
-                } else {
-                    snapshot::Entry::capture_regular(&path, &mut budget).map_err(|_| {
-                        unsupported("Submodule configuration source cannot be captured")
-                    })?
-                };
+                let entry = snapshot::Entry::capture_regular(&path, &mut budget).map_err(|_| {
+                    unsupported("Submodule configuration source cannot be captured")
+                })?;
                 if !matches!(entry, snapshot::Entry::File(..) | snapshot::Entry::Missing) {
                     return Err(unsupported(
                         "Submodule configuration sources must be regular files",
@@ -562,15 +405,6 @@ impl ChildConfig {
             files,
             identities,
         })
-    }
-
-    /// Only retained, nonredirected configuration sources can reuse a bounded
-    /// root grant. This does not authorize discovering another arbitrary file.
-    pub(super) fn source_is_unredirected(&self, path: &std::path::Path) -> bool {
-        self.files
-            .iter()
-            .zip(&self.identities)
-            .any(|((source, _), identity)| source == path && identity.is_unredirected(path))
     }
 
     pub(super) fn verify_host(&self, output: &[u8]) -> Result<(), GitToolError> {
@@ -701,49 +535,10 @@ fn push_recursion_enabled(output: &[u8]) -> Result<bool, GitToolError> {
     Ok(enabled)
 }
 
-// Canonicalize the existing prefix so a hooksPath symlink or `..` spelling
-// cannot hide its overlap with a target worktree entry. Missing suffixes are
-// retained as paths only; no content is read through them.
-fn resolve_optional_path(path: &std::path::Path) -> Result<PathBuf, GitToolError> {
-    #[cfg(windows)]
-    let resolved_parents = windows_auxiliary_parents(path)?;
-    #[cfg(windows)]
-    let path = resolved_parents.as_path();
-    let mut prefix = path.to_path_buf();
-    let mut suffix = Vec::new();
-    loop {
-        match prefix.canonicalize() {
-            Ok(mut resolved) => {
-                for part in suffix.iter().rev() {
-                    resolved.push(part);
-                }
-                return Ok(resolved);
-            }
-            Err(error)
-                if matches!(
-                    error.kind(),
-                    std::io::ErrorKind::NotFound | std::io::ErrorKind::NotADirectory
-                ) =>
-            {
-                let name = prefix
-                    .file_name()
-                    .ok_or_else(|| unsupported("Checkout auxiliary path cannot be resolved"))?
-                    .to_os_string();
-                suffix.push(name);
-                if !prefix.pop() {
-                    return Err(unsupported("Checkout auxiliary path cannot be resolved"));
-                }
-            }
-            Err(_) => return Err(unsupported("Checkout auxiliary path cannot be resolved")),
-        }
-    }
-}
-
 // Verbatim Windows paths do not interpret `..` during filesystem access.
 // Resolve each cancelled directory through the filesystem before taking its
 // parent; lexical folding would incorrectly accept missing/file ancestors.
-// auxiliary_spellings separately inventories the original traversal spelling.
-#[cfg(windows)]
+#[cfg(all(windows, test))]
 fn windows_auxiliary_parents(path: &std::path::Path) -> Result<PathBuf, GitToolError> {
     let mut prefix = PathBuf::new();
     for part in path.components() {
@@ -815,96 +610,6 @@ fn potential_path_prefix(prefix: &std::path::Path, path: &std::path::Path) -> bo
         }
         potentially_equal(left.as_os_str(), right.as_os_str())
     })
-}
-
-fn lexical_path(path: &std::path::Path) -> PathBuf {
-    let mut result = PathBuf::new();
-    for part in path.components() {
-        match part {
-            std::path::Component::CurDir => {}
-            std::path::Component::ParentDir => {
-                result.pop();
-            }
-            _ => result.push(part.as_os_str()),
-        }
-    }
-    result
-}
-
-fn auxiliary_spellings(path: &std::path::Path) -> Result<BTreeSet<PathBuf>, GitToolError> {
-    let mut current = path.to_path_buf();
-    let mut spellings = BTreeSet::new();
-    // Preserve every symlink hop: an external alias may lead through a tracked
-    // worktree alias and back outside. Final canonicalization loses that hop.
-    for _ in 0..64 {
-        spellings.insert(lexical_path(&current));
-        spellings.insert(resolve_optional_path(&current)?);
-        let components: Vec<_> = current.components().collect();
-        let mut prefix = PathBuf::new();
-        let mut next = None;
-        for (position, component) in components.iter().enumerate() {
-            #[cfg(windows)]
-            if *component == std::path::Component::ParentDir {
-                // Keep the cancelled ancestor in spellings (inserted on the
-                // previous iteration), but use a resolved path for OS lookup.
-                let mut traversal = prefix.as_os_str().to_os_string();
-                traversal.push(r"\..");
-                prefix = windows_auxiliary_parents(std::path::Path::new(&traversal))?;
-                spellings.insert(prefix.clone());
-                continue;
-            }
-            prefix.push(component.as_os_str());
-            // A Windows prefix alone (notably \\?\C:) is not the absolute
-            // root. Inspect it only after appending the following RootDir.
-            if matches!(component, std::path::Component::Prefix(_))
-                && matches!(
-                    components.get(position + 1),
-                    Some(std::path::Component::RootDir)
-                )
-            {
-                continue;
-            }
-            // Even an ancestor later followed by `..` is a real traversal
-            // dependency; replacing it can turn a valid lookup into ENOTDIR.
-            spellings.insert(lexical_path(&prefix));
-            match std::fs::symlink_metadata(&prefix) {
-                Ok(metadata) if metadata.file_type().is_symlink() => {
-                    let target = std::fs::read_link(&prefix)
-                        .map_err(|_| unsupported("Checkout auxiliary link unavailable"))?;
-                    let mut resolved = if target.is_absolute() {
-                        target
-                    } else {
-                        prefix
-                            .parent()
-                            .ok_or_else(|| unsupported("Invalid auxiliary link"))?
-                            .join(target)
-                    };
-                    for remaining in &components[position + 1..] {
-                        resolved.push(remaining.as_os_str());
-                    }
-                    next = Some(resolved);
-                    break;
-                }
-                Ok(_) => {}
-                Err(error)
-                    if matches!(
-                        error.kind(),
-                        std::io::ErrorKind::NotFound | std::io::ErrorKind::NotADirectory
-                    ) =>
-                {
-                    break;
-                }
-                Err(_) => return Err(unsupported("Checkout auxiliary path unavailable")),
-            }
-        }
-        match next {
-            Some(path) => current = path,
-            None => return Ok(spellings),
-        }
-    }
-    Err(unsupported(
-        "Checkout auxiliary symlink chain exceeds limit",
-    ))
 }
 
 impl ConfigState {
@@ -1054,34 +759,6 @@ impl ConfigState {
         Ok(writes)
     }
 
-    /// Prevent read-only Pull graph probes from triggering lazy network fetches.
-    pub(super) fn prepare_pull_inspection(&self) -> Result<(), GitToolError> {
-        refuse_promisor_objects(&self.values)
-    }
-
-    pub(super) fn pull_diff_order_file(
-        &self,
-        workdir: &std::path::Path,
-        environment: &BTreeMap<OsString, OsString>,
-    ) -> Result<Option<PathBuf>, GitToolError> {
-        Ok(
-            configured_path(&self.values, b"diff.orderfile", environment)?.map(|path| {
-                if path.is_absolute() {
-                    path
-                } else {
-                    workdir.join(path)
-                }
-            }),
-        )
-    }
-    /// Preserve declaration order and valueless records for Pull policy parsing.
-    pub(super) fn pull_records(&self) -> Result<Vec<u8>, GitToolError> {
-        ordered_records(&self.ordered_output)
-    }
-
-    pub(super) fn pull_remote_records(&self) -> Result<Vec<(String, String)>, GitToolError> {
-        super::remote_state::records(&self.ordered_output)
-    }
     pub fn capture_host(
         output: &[u8],
         repository: &RepositoryState,
@@ -1517,285 +1194,6 @@ impl ConfigState {
         Ok(())
     }
 
-    /// Resolve integration hook candidates without reading or executing them.
-    /// Fetch admission does not cover this separately admitted frontier.
-    pub(super) fn pull_integration_hook_paths(
-        &self,
-        repository: &RepositoryState,
-        environment: &BTreeMap<OsString, OsString>,
-        integration: &super::pull_state::Integration,
-        branch: Option<&str>,
-    ) -> Result<Vec<PathBuf>, GitToolError> {
-        use super::pull_state::Integration;
-        let merge = matches!(integration, Integration::Merge { .. });
-        let rebase = match integration {
-            Integration::Rebase { mode, .. } => Some(mode),
-            _ => None,
-        };
-        self.pull_operation_hook_paths(repository, environment, merge, rebase, branch)
-    }
-
-    /// Discover the native operation's hook frontier from pre-fetch policy only.
-    /// No hook contents, fetched identities or integration outcome are needed.
-    pub(super) fn prepare_native_pull(
-        &mut self,
-        repository: &RepositoryState,
-        environment: &BTreeMap<OsString, OsString>,
-        branch: Option<&str>,
-    ) -> Result<Vec<PathBuf>, GitToolError> {
-        let paths = self.native_pull_hook_paths(repository, environment, branch)?;
-        self.auxiliary.extend(paths.iter().cloned());
-        self.hooks.extend(paths.iter().cloned());
-        self.hooks.sort();
-        self.hooks.dedup();
-        Ok(paths)
-    }
-
-    /// Recompute the complete native frontier without reading hook contents.
-    pub(super) fn native_pull_hook_paths(
-        &self,
-        repository: &RepositoryState,
-        environment: &BTreeMap<OsString, OsString>,
-        branch: Option<&str>,
-    ) -> Result<Vec<PathBuf>, GitToolError> {
-        let mode = super::pull_state::native_rebase_mode(&self.pull_records()?, branch)?;
-        let merge = mode == super::pull_state::Rebase::Off;
-        let mut paths = self.pull_operation_hook_paths(
-            repository,
-            environment,
-            merge,
-            (!merge).then_some(&mode),
-            branch,
-        )?;
-        validate_fetch_external_effects(&self.values)?;
-        paths.extend(fetch_hook_paths(
-            &self.values,
-            &repository.common_dir,
-            &repository.workdir,
-            environment,
-        )?);
-        paths.sort();
-        paths.dedup();
-        Ok(paths)
-    }
-
-    fn pull_operation_hook_paths(
-        &self,
-        repository: &RepositoryState,
-        environment: &BTreeMap<OsString, OsString>,
-        merge: bool,
-        rebase: Option<&super::pull_state::Rebase>,
-        branch: Option<&str>,
-    ) -> Result<Vec<PathBuf>, GitToolError> {
-        // Current-worktree attributes cannot predict attributes introduced by
-        // the fetched tree or by replayed commits. A worktree write grant does
-        // not authorize configured programs selected by those new attributes.
-        for (key, values) in &self.values {
-            let filter = key.starts_with(b"filter.")
-                && [b".clean".as_slice(), b".smudge", b".process"]
-                    .iter()
-                    .any(|suffix| key.ends_with(suffix));
-            let driver = (merge || rebase.is_some())
-                && key.starts_with(b"merge.")
-                && key.ends_with(b".driver");
-            if (filter || driver)
-                && values
-                    .last()
-                    .is_some_and(|value| value.as_deref().is_none_or(|value| !value.is_empty()))
-            {
-                return Err(unsupported(if filter {
-                    "Pull integration configured filter requires separate execution authorization"
-                } else {
-                    "Pull integration custom merge driver requires separate execution authorization"
-                }));
-            }
-        }
-        if rebase == Some(&super::pull_state::Rebase::Interactive) {
-            return Err(unsupported(
-                "Interactive Pull rebase requires separate sequence editor execution authorization",
-            ));
-        }
-        self.validate_pull_integration_signing_mode(merge, rebase.is_some())?;
-        // The sequencer expands this format into its executable todo list.
-        // In particular, %nexec can launch a command even for noninteractive
-        // rebase. Worktree scope does not authorize those commands. Empty
-        // formats retain Git's default; custom formats need effect discovery.
-        if rebase.is_some()
-            && self
-                .values
-                .get(b"rebase.instructionformat".as_slice())
-                .and_then(|values| values.last())
-                .is_some_and(|value| value.as_deref().is_none_or(|value| !value.is_empty()))
-        {
-            return Err(unsupported(
-                "Custom rebase instruction format requires separate executable-todo effect authorization",
-            ));
-        }
-        if merge {
-            self.validate_pull_merge_strategy()?;
-            self.validate_pull_merge_options(branch)?;
-        }
-        let directory = configured_path(&self.values, b"core.hookspath", environment)?
-            .unwrap_or_else(|| repository.common_dir.join("hooks"));
-        let directory = if directory.is_absolute() {
-            directory
-        } else {
-            repository.workdir.join(directory)
-        };
-        let names: &[&str] = match (merge, rebase.is_some()) {
-            (true, _) => &[
-                "pre-merge-commit",
-                "prepare-commit-msg",
-                "commit-msg",
-                "post-merge",
-                "post-checkout",
-                "post-index-change",
-                "reference-transaction",
-                "pre-auto-gc",
-            ],
-            (_, true) => &[
-                "pre-rebase",
-                "prepare-commit-msg",
-                "commit-msg",
-                "post-commit",
-                "post-checkout",
-                "post-index-change",
-                "post-rewrite",
-                "reference-transaction",
-                "pre-auto-gc",
-            ],
-            _ => &["reference-transaction", "post-index-change"],
-        };
-        let mut paths: Vec<_> = names.iter().map(|name| directory.join(name)).collect();
-        // Plain rebase honors rebase.backend=apply and invokes git-am.
-        // --rebase-merges selects the merge backend regardless of this setting.
-        if rebase == Some(&super::pull_state::Rebase::On)
-            && self
-                .values
-                .get(b"rebase.backend".as_slice())
-                .and_then(|values| values.last())
-                .and_then(|value| value.as_deref())
-                == Some(b"apply")
-        {
-            paths.extend(
-                ["applypatch-msg", "pre-applypatch", "post-applypatch"]
-                    .iter()
-                    .map(|name| directory.join(name)),
-            );
-        }
-        Ok(paths)
-    }
-
-    // These booleans can start a signing/verifier program even when no hook
-    // exists. Worktree scope approval does not authorize that execution.
-    // Branch merge options and other external effects need their own checks;
-    // this is deliberately not a complete integration execution validator.
-    fn validate_pull_integration_signing_mode(
-        &self,
-        merge: bool,
-        rebase: bool,
-    ) -> Result<(), GitToolError> {
-        let keys: &[&[u8]] = match (merge, rebase) {
-            (true, _) => &[b"commit.gpgsign", b"merge.verifysignatures"],
-            (_, true) => &[b"commit.gpgsign"],
-            _ => &[],
-        };
-        for key in keys {
-            let mut enabled = false;
-            for value in self.values.get(*key).into_iter().flatten() {
-                // Git parses every declaration, including overridden values.
-                enabled = git_boolean(value.as_deref())?;
-            }
-            if enabled {
-                return Err(unsupported(
-                    "Pull integration signing or signature verification requires separate execution authorization",
-                ));
-            }
-        }
-        Ok(())
-    }
-
-    /// Validate the selected fetch remote after policy discovery, before any fetch mutation.
-    pub(super) fn prepare_pull_transport(&self, remote: &str) -> Result<(), GitToolError> {
-        validate_fetch_external_effects(&self.values)?;
-        for key in [
-            format!("remote.{remote}.uploadpack"),
-            format!("remote.{remote}.vcs"),
-        ] {
-            if self.values.contains_key(key.as_bytes()) {
-                return Err(unsupported(
-                    "Configured Pull transport helper requires separate execution authorization",
-                ));
-            }
-        }
-        Ok(())
-    }
-
-    /// Integration can rewrite dynamic paths: retained executable/configuration
-    /// sources must therefore live outside its worktree mutation range.
-    pub(super) fn validate_pull_integration_sources(
-        &self,
-        repository: &RepositoryState,
-        hooks: &[PathBuf],
-    ) -> Result<(), GitToolError> {
-        for path in self
-            .files
-            .iter()
-            .map(|(path, _)| path)
-            .chain(self.stable_auxiliary.iter())
-            .chain(hooks.iter())
-        {
-            for resolved in auxiliary_spellings(path)? {
-                if resolved != repository.workdir
-                    && potential_path_prefix(&repository.workdir, &resolved)
-                    && ![&repository.git_dir, &repository.common_dir]
-                        .iter()
-                        .any(|root| resolved.starts_with(root))
-                {
-                    return Err(unsupported(
-                        "Pull integration may rewrite an effective configuration or hook source",
-                    ));
-                }
-            }
-        }
-        Ok(())
-    }
-
-    /// Capture Pull hooks only after their exact paths were admitted.
-    pub(super) fn capture_pull_hooks(
-        paths: &[PathBuf],
-    ) -> Result<Vec<(PathBuf, snapshot::RegularEvidence)>, GitToolError> {
-        let mut budget = snapshot::Budget {
-            entries: paths.len(),
-            bytes: 4 * 1024 * 1024,
-        };
-        paths
-            .iter()
-            .map(|path| {
-                let evidence = snapshot::RegularEvidence::capture(path, &mut budget)
-                    .map_err(|_| unsupported("Git Pull hook must be a regular file"))?;
-                if let snapshot::Entry::File(permissions, _) = &evidence.entry {
-                    #[cfg(unix)]
-                    let executable = {
-                        use std::os::unix::fs::PermissionsExt;
-                        permissions.mode() & 0o111 != 0
-                    };
-                    #[cfg(not(unix))]
-                    let executable = {
-                        let _ = permissions;
-                        true
-                    };
-                    if executable {
-                        return Err(unsupported(
-                            "Executable Git Pull hooks require separate execution authorization",
-                        ));
-                    }
-                }
-                Ok((path.clone(), evidence))
-            })
-            .collect()
-    }
-
     pub(super) fn has_branch_conditionals(&self) -> bool {
         self.values
             .keys()
@@ -2168,61 +1566,6 @@ impl ConfigState {
     }
 }
 
-fn fetch_hook_paths(
-    values: &Values,
-    common: &std::path::Path,
-    worktree: &std::path::Path,
-    environment: &BTreeMap<OsString, OsString>,
-) -> Result<Vec<PathBuf>, GitToolError> {
-    let directory = configured_path(values, b"core.hookspath", environment)?
-        .unwrap_or_else(|| common.join("hooks"));
-    let directory = if directory.is_absolute() {
-        directory
-    } else {
-        worktree.join(directory)
-    };
-    Ok(["reference-transaction", "pre-auto-gc"]
-        .into_iter()
-        .map(|name| directory.join(name))
-        .collect())
-}
-
-fn validate_fetch_external_effects(values: &Values) -> Result<(), GitToolError> {
-    // Git fetch consumes this extra source before opening the selected
-    // remote. Its bundles can read local paths or contact other endpoints;
-    // approving the configured remote does not authorize either effect.
-    // Git itself uses an empty final value to disable bundle retrieval.
-    if values
-        .get(b"fetch.bundleuri".as_slice())
-        .and_then(|values| values.last())
-        .is_some_and(|value| value.as_deref() != Some(b""))
-    {
-        return Err(unsupported(
-            "Pull bundle URI sources require separate read or network authorization",
-        ));
-    }
-    let maintenance_enabled = values
-        .get(b"maintenance.auto".as_slice())
-        .and_then(|values| values.last())
-        .map(|value| git_boolean(value.as_deref()))
-        .transpose()?
-        .unwrap_or(true);
-    if values.contains_key(b"core.gitproxy".as_slice())
-        || maintenance_enabled
-            && (values.contains_key(b"gc.recentobjectshook".as_slice())
-                || values
-                    .get(b"gc.repackfilterto".as_slice())
-                    .and_then(|values| values.last())
-                    .and_then(|value| value.as_deref())
-                    .is_some_and(|value| !value.is_empty()))
-    {
-        return Err(unsupported(
-            "Configured Git fetch helper or external maintenance effects require separate authorization",
-        ));
-    }
-    Ok(())
-}
-
 fn refuse_promisor_objects(values: &Values) -> Result<(), GitToolError> {
     for (key, entries) in values {
         if key == b"extensions.partialclone"
@@ -2459,13 +1802,10 @@ pub(super) fn parse_host(bytes: &[u8]) -> Result<Values, GitToolError> {
 mod tests {
     use super::*;
 
-    include!("config_state_tests/pull_signing.rs");
-    include!("config_state_tests/pull_sources.rs");
     include!("config_state_tests/child_layout.rs");
     include!("config_state_tests/child_configuration.rs");
     include!("config_state_tests/checkout.rs");
     include!("config_state_tests/receiver_push.rs");
     include!("config_state_tests/parsing.rs");
     include!("config_state_tests/auxiliary.rs");
-    include!("config_state_tests/pull.rs");
 }

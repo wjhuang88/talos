@@ -197,30 +197,6 @@ impl AuxiliaryPaths {
         authorizations: &[ToolExecutionAuthorization],
         hooks: &[PathBuf],
     ) -> Result<(), GitToolError> {
-        self.capture_with_budget(authorizations, hooks, None, &[])
-    }
-
-    /// Native Pull shares its invocation evidence allowance across child hooks.
-    pub(super) fn capture_native_pull(
-        &mut self,
-        authorizations: &[ToolExecutionAuthorization],
-        hooks: &[PathBuf],
-        shared: &super::pull_inventory::ReferenceBudget,
-        roots: &[PathBuf],
-    ) -> Result<(), GitToolError> {
-        if self.tool != "git_pull" {
-            return Err(invalid());
-        }
-        self.capture_with_budget(authorizations, hooks, Some(shared), roots)
-    }
-
-    fn capture_with_budget(
-        &mut self,
-        authorizations: &[ToolExecutionAuthorization],
-        hooks: &[PathBuf],
-        shared: Option<&super::pull_inventory::ReferenceBudget>,
-        roots: &[PathBuf],
-    ) -> Result<(), GitToolError> {
         if !authorizations
             .iter()
             .any(|token| token.authorizes_git_auxiliary_path_resolution(&self.tool))
@@ -232,7 +208,7 @@ impl AuxiliaryPaths {
         if let Some(hook) = hooks.iter().find(|hook| self.original_leaf_is_link(hook)) {
             return Err(unsupported_hook(hook));
         }
-        self.require_target_reads(authorizations, roots)?;
+        self.require_target_reads(authorizations)?;
         for source in &mut self.sources {
             if let Some(evidence) = &source.leaf {
                 evidence
@@ -246,12 +222,9 @@ impl AuxiliaryPaths {
                 entries: self.budget.entries,
                 bytes: self.budget.bytes,
             };
-            let evidence = if let Some(shared) = shared {
-                shared.capture_with_budget(source.resolution.resolved(), &mut allowance)
-            } else {
+            let evidence =
                 snapshot::RegularEvidence::capture(source.resolution.resolved(), &mut allowance)
-                    .map_err(|_| invalid())
-            };
+                    .map_err(|_| invalid());
             let entries = self.budget.entries - allowance.entries;
             let bytes = self.budget.bytes - allowance.bytes;
             self.budget.charge(entries, bytes)?;
@@ -276,7 +249,7 @@ impl AuxiliaryPaths {
                 }
             }
         }
-        self.revalidate_with_roots(authorizations, roots)
+        self.revalidate(authorizations)
     }
 
     /// Recheck the frozen component chain and admitted regular-file leaf
@@ -284,22 +257,6 @@ impl AuxiliaryPaths {
     pub(super) fn revalidate(
         &self,
         authorizations: &[ToolExecutionAuthorization],
-    ) -> Result<(), GitToolError> {
-        self.revalidate_with_roots(authorizations, &[])
-    }
-
-    pub(super) fn revalidate_native_pull(
-        &self,
-        authorizations: &[ToolExecutionAuthorization],
-        roots: &[PathBuf],
-    ) -> Result<(), GitToolError> {
-        self.revalidate_with_roots(authorizations, roots)
-    }
-
-    fn revalidate_with_roots(
-        &self,
-        authorizations: &[ToolExecutionAuthorization],
-        roots: &[PathBuf],
     ) -> Result<(), GitToolError> {
         if !authorizations
             .iter()
@@ -311,7 +268,7 @@ impl AuxiliaryPaths {
             return Err(invalid());
         }
         self.revalidate_resolutions(authorizations)?;
-        self.require_target_reads(authorizations, roots)?;
+        self.require_target_reads(authorizations)?;
         for source in &self.sources {
             let target = source.resolution.resolved();
             let evidence = source.leaf.as_ref().ok_or_else(invalid)?;
@@ -323,55 +280,21 @@ impl AuxiliaryPaths {
     fn require_target_reads(
         &self,
         authorizations: &[ToolExecutionAuthorization],
-        roots: &[PathBuf],
     ) -> Result<(), GitToolError> {
         // Check the entire frontier before re-reading any retained file body.
         for target in self.targets() {
-            if !self.native_pull_target_read(target, authorizations, roots)
-                && !authorizations.iter().any(|token| {
-                    token.authorizes_path(
-                        &self.tool,
-                        ToolNature::Read,
-                        &self.workspace,
-                        target.to_str().unwrap_or_default(),
-                    )
-                })
-            {
+            if !authorizations.iter().any(|token| {
+                token.authorizes_path(
+                    &self.tool,
+                    ToolNature::Read,
+                    &self.workspace,
+                    target.to_str().unwrap_or_default(),
+                )
+            }) {
                 return Err(invalid());
             }
         }
         Ok(())
-    }
-
-    /// Only frozen, unredirected sources may reuse caller-revalidated parent or
-    /// module roots. A Path token alone never grants descendant content reads.
-    pub(super) fn native_pull_target_read(
-        &self,
-        target: &Path,
-        authorizations: &[ToolExecutionAuthorization],
-        roots: &[PathBuf],
-    ) -> bool {
-        self.tool == "git_pull"
-            && authorizations
-                .iter()
-                .any(|token| token.authorizes_git_pull_bounded_discovery())
-            && self.authorizes_anchor(authorizations)
-            && roots.iter().any(|root| {
-                target.starts_with(root)
-                    && (root.starts_with(&self.anchor)
-                        || authorizations.iter().any(|token| {
-                            token.authorizes_path(
-                                &self.tool,
-                                ToolNature::Read,
-                                &self.workspace,
-                                root.to_str().unwrap_or_default(),
-                            )
-                        }))
-            })
-            && self.sources.iter().any(|source| {
-                source.resolution.resolved() == target
-                    && source.resolution.is_unredirected(&source.spelling)
-            })
     }
 
     fn authorizes_anchor(&self, authorizations: &[ToolExecutionAuthorization]) -> bool {

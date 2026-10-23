@@ -22,24 +22,8 @@ use super::{
 mod command;
 #[path = "prepared_add/host_path.rs"]
 mod host_path;
-#[path = "prepared_add/pull_children.rs"]
-mod pull_children;
 #[path = "prepared_add/pull_command.rs"]
 mod pull_command;
-#[path = "prepared_add/pull_discovery.rs"]
-mod pull_discovery;
-#[path = "prepared_add/pull_integration.rs"]
-mod pull_integration;
-#[path = "prepared_add/pull_native.rs"]
-mod pull_native;
-#[path = "prepared_add/pull_native_config.rs"]
-mod pull_native_config;
-#[path = "prepared_add/pull_native_remote.rs"]
-mod pull_native_remote;
-#[path = "prepared_add/pull_native_scope.rs"]
-mod pull_native_scope;
-#[path = "prepared_add/pull_reconcile.rs"]
-mod pull_reconcile;
 
 struct ChildInspectionEvidence {
     attributes: Vec<PathBuf>,
@@ -219,17 +203,6 @@ enum Phase {
     CheckoutChildConfiguration,
     CheckoutChildWorktree,
     TargetConfiguration,
-    PullPreparation,
-    PullFetch,
-    PullPostFetch,
-    PullChildAttributes,
-    PullChildIdentity,
-    PullChildConfiguration,
-    PullChildFetch,
-    PullIntegration,
-    PullIntegrationMutation,
-    PullNativePreparation,
-    PullNativeMutation,
     PullCommandMutation,
 }
 
@@ -278,44 +251,6 @@ pub(super) struct AddPlan {
     target_hook_paths: Option<Vec<PathBuf>>,
     target_hook_evidence: Vec<(PathBuf, snapshot::RegularEvidence)>,
     native_pull_command: Option<command::FrozenCommand>,
-    native_pull_modules: Option<super::pull_inventory::Inventory>,
-    native_pull_metadata: BTreeMap<PathBuf, super::receiver_state::Metadata>,
-    native_pull_configs: BTreeMap<PathBuf, super::config_state::ChildConfig>,
-    native_pull_remotes: BTreeMap<PathBuf, pull_native_remote::RemoteEvidence>,
-    native_pull_fetch_hooks: std::collections::BTreeSet<PathBuf>,
-    pull_before: Option<super::pull_state::BeforeFetch>,
-    pull_evidence: Option<super::pull_state::PullEvidence>,
-    pull_sources: Option<PullSources>,
-    pull_attribute_paths: Vec<PathBuf>,
-    pull_attributes: Vec<PullAttribute>,
-    pull_activity_globals: Vec<PathBuf>,
-    pull_remote: Option<String>,
-    pull_destinations: Vec<String>,
-    pull_transport_supported: bool,
-    pull_hook_paths: Vec<PathBuf>,
-    pull_hook_evidence: Vec<(PathBuf, snapshot::RegularEvidence)>,
-    pull_graph_paths: Option<Vec<PathBuf>>,
-    pull_inventory: Option<super::pull_inventory::Inventory>,
-    pull_reference_budget: super::pull_inventory::ReferenceBudget,
-    pull_integration: Option<super::pull_state::Integration>,
-    pull_ref_tips: Option<Vec<String>>,
-    pull_new_commits: Vec<String>,
-    pull_child_trees: BTreeMap<String, super::pull_children::Tree>,
-    pull_changed_children: BTreeMap<String, super::pull_children::Changed>,
-    pull_child_layouts: Vec<(
-        super::receiver_state::Root,
-        Option<super::receiver_state::Metadata>,
-    )>,
-    pull_index_children: BTreeMap<String, String>,
-    pull_child_fetch_targets: BTreeMap<PathBuf, (String, Vec<String>)>,
-    pull_child_hook_evidence: Vec<(PathBuf, snapshot::RegularEvidence)>,
-    pull_children_fetched: std::collections::BTreeSet<PathBuf>,
-    pull_child_inventories: BTreeMap<PathBuf, super::pull_inventory::Inventory>,
-    pull_child_startup: BTreeMap<PathBuf, super::config_state::ChildStartupLayout>,
-    pull_child_worktrees: BTreeMap<PathBuf, (PathBuf, snapshot::PathIdentity)>,
-    pull_current_fetch_children: BTreeMap<String, super::pull_children::Recursion>,
-    pull_current_modules: Option<super::pull_children::Tree>,
-    pull_modules_evidence: Option<PullAttribute>,
     identity: PreparedPlanIdentity,
     workspace: PathBuf,
     input: Value,
@@ -334,8 +269,6 @@ pub(super) struct AddPlan {
     sender_program_binding: Option<SenderProgramBinding>,
     config: Option<super::config_state::ConfigState>,
     child_configs: Vec<(PathBuf, super::config_state::ChildConfig)>,
-    pull_config_sources_discovered: bool,
-    pull_config_source_paths: Vec<PathBuf>,
     child_locations: Vec<(PathBuf, super::repository_state::ChildLocation)>,
     child_attributes: std::collections::BTreeSet<PathBuf>,
     child_attributes_discovered: bool,
@@ -791,41 +724,6 @@ impl AddPlan {
             target_hook_paths: None,
             target_hook_evidence: Vec::new(),
             native_pull_command,
-            pull_before: None,
-            pull_evidence: None,
-            pull_sources: None,
-            pull_attribute_paths: Vec::new(),
-            pull_attributes: Vec::new(),
-            pull_activity_globals: Vec::new(),
-            pull_remote: None,
-            pull_destinations: Vec::new(),
-            pull_transport_supported: false,
-            pull_hook_paths: Vec::new(),
-            pull_hook_evidence: Vec::new(),
-            pull_graph_paths: None,
-            native_pull_modules: None,
-            native_pull_metadata: BTreeMap::new(),
-            native_pull_configs: BTreeMap::new(),
-            native_pull_remotes: BTreeMap::new(),
-            native_pull_fetch_hooks: std::collections::BTreeSet::new(),
-            pull_inventory: None,
-            pull_reference_budget: super::pull_inventory::ReferenceBudget::default(),
-            pull_integration: None,
-            pull_ref_tips: None,
-            pull_new_commits: Vec::new(),
-            pull_child_trees: BTreeMap::new(),
-            pull_changed_children: BTreeMap::new(),
-            pull_child_layouts: Vec::new(),
-            pull_index_children: BTreeMap::new(),
-            pull_child_fetch_targets: BTreeMap::new(),
-            pull_child_hook_evidence: Vec::new(),
-            pull_children_fetched: std::collections::BTreeSet::new(),
-            pull_child_inventories: BTreeMap::new(),
-            pull_child_startup: BTreeMap::new(),
-            pull_child_worktrees: BTreeMap::new(),
-            pull_current_fetch_children: BTreeMap::new(),
-            pull_current_modules: None,
-            pull_modules_evidence: None,
             identity: PreparedPlanIdentity::new(),
             workspace: workspace.to_owned(),
             input: input.clone(),
@@ -844,8 +742,6 @@ impl AddPlan {
             sender_program_binding: None,
             config,
             child_configs: Vec::new(),
-            pull_config_sources_discovered: false,
-            pull_config_source_paths: Vec::new(),
             child_locations: Vec::new(),
             child_attributes: std::collections::BTreeSet::new(),
             child_attributes_discovered: false,
@@ -1171,68 +1067,6 @@ impl AddPlan {
             &self.repository,
             &self.environment,
         )?;
-        if let Operation::Pull(pull) = &self.operation {
-            // Retain configuration before selecting a transport or probing its
-            // upstream. No fetch, worktree update or helper execution belongs
-            // to this independently admitted configuration discovery stage.
-            if let Some(remote) = &pull.remote {
-                super::validate_git_positional(remote)?;
-            }
-            config.verify_host(&self.inspect_config().await?)?;
-            let branch = self.native_pull_branch().await?;
-            self.pull_hook_paths = config.prepare_native_pull(
-                &self.repository,
-                &self.environment,
-                branch.as_deref(),
-            )?;
-            self.config = Some(config);
-            self.revalidate()?;
-            if self.phase != Phase::PullNativePreparation {
-                self.facets
-                    .retain(|facet| facet.resource.as_deref() != Some("git:configuration-chain"));
-            }
-            for (path, _) in &self
-                .config
-                .as_ref()
-                .ok_or_else(|| GitToolError::Git("missing Pull configuration evidence".into()))?
-                .files
-            {
-                self.facets.push(path_facet(
-                    ToolNature::Read,
-                    path,
-                    "Pull configuration evidence",
-                )?);
-            }
-            for path in &self.pull_hook_paths {
-                self.facets.push(path_facet(
-                    ToolNature::Read,
-                    path,
-                    "Pull whole-operation Git hook inspection",
-                )?);
-            }
-            self.identity = PreparedPlanIdentity::new();
-            let inventory = super::pull_inventory::Inventory::with_reference_budget(
-                &self.repository.git_dir,
-                &self.repository.common_dir,
-                self.pull_reference_budget.clone(),
-            )?;
-            for path in
-                super::pull_state::PullEvidence::required_paths(&self.repository, None, false)?
-            {
-                if !self.facets.iter().any(|facet| {
-                    facet.nature == ToolNature::Read && facet.resource.as_deref() == path.to_str()
-                }) {
-                    self.facets.push(path_facet(
-                        ToolNature::Read,
-                        &path,
-                        "Pull fixed evidence path, including absent metadata",
-                    )?);
-                }
-            }
-            self.pull_inventory = Some(inventory);
-            self.phase = Phase::PullPreparation;
-            return Ok(self);
-        }
         if let Operation::Push(push) = &self.operation {
             super::remote_state::reject_legacy_remotes(&self.repository.common_dir)?;
             config.prepare_push(
@@ -4470,36 +4304,11 @@ impl AddPlan {
                 ));
             }
         }
-        if matches!(self.operation, Operation::Push(_))
-            || (matches!(self.operation, Operation::Pull(_))
-                && !matches!(
-                    self.phase,
-                    Phase::SenderConfiguration | Phase::PullCommandMutation
-                ))
-        {
+        if matches!(self.operation, Operation::Push(_)) {
             super::remote_state::reject_legacy_remotes(&self.repository.common_dir)?;
         }
         for layout in &self.checkout_child_layouts {
             layout.revalidate(&layout.canonical)?;
-        }
-        for (layout, metadata) in &self.pull_child_layouts {
-            layout.revalidate(&layout.canonical)?;
-            if let Some(metadata) = metadata {
-                metadata.revalidate(&metadata.canonical)?;
-            }
-        }
-        for inventory in self.pull_child_inventories.values() {
-            inventory.revalidate()?;
-        }
-        for startup in self.pull_child_startup.values() {
-            startup.revalidate()?;
-        }
-        for (target, identity) in self.pull_child_worktrees.values() {
-            if snapshot::PathIdentity::capture(target).ok().as_ref() != Some(identity) {
-                return Err(GitToolError::InvalidInput(
-                    "Pull child configured worktree changed after admission".into(),
-                ));
-            }
         }
         for metadata in &self.checkout_child_metadata {
             metadata.revalidate(&metadata.canonical)?;
@@ -4520,18 +4329,7 @@ impl AddPlan {
             }
         }
         for (path, expected) in &self.child_locations {
-            let metadata_path = if matches!(self.operation, Operation::Pull(_)) {
-                self.pull_child_layouts
-                    .iter()
-                    .find(|(layout, _)| &layout.spelling == path)
-                    .map(|(layout, _)| layout.metadata_path.clone())
-                    .ok_or_else(|| {
-                        GitToolError::InvalidInput("Pull child layout evidence missing".into())
-                    })?
-            } else {
-                path.clone()
-            };
-            if &super::repository_state::ChildLocation::capture(&metadata_path)? != expected {
+            if &super::repository_state::ChildLocation::capture(path)? != expected {
                 return Err(GitToolError::InvalidInput(
                     "Submodule location changed after discovery".into(),
                 ));
@@ -4613,63 +4411,6 @@ impl AddPlan {
         if let Some(config) = &self.config {
             config.revalidate()?;
         }
-        if let Some(evidence) = &self.pull_evidence {
-            evidence.revalidate()?;
-        }
-        if let Some(sources) = &self.pull_sources {
-            sources.revalidate(&self.repository.workdir)?;
-        }
-        let mut attribute_budget = snapshot::Budget {
-            entries: 4096,
-            bytes: 4 * 1024 * 1024,
-        };
-        for attribute in &self.pull_attributes {
-            attribute.revalidate(&mut attribute_budget)?;
-        }
-        if let Some(modules) = &self.pull_modules_evidence {
-            modules.revalidate(&mut snapshot::Budget {
-                entries: 1,
-                bytes: 1024 * 1024,
-            })?;
-        }
-        if !self.pull_hook_evidence.is_empty()
-            && super::config_state::ConfigState::capture_pull_hooks(&self.pull_hook_paths)?
-                != self.pull_hook_evidence
-        {
-            return Err(GitToolError::InvalidInput(
-                "Pull fetch hook evidence changed after discovery".into(),
-            ));
-        }
-        if !self.pull_child_hook_evidence.is_empty() {
-            let paths = self
-                .pull_child_hook_evidence
-                .iter()
-                .map(|(path, _)| path.clone())
-                .collect::<Vec<_>>();
-            if super::config_state::ConfigState::capture_pull_hooks(&paths)?
-                != self.pull_child_hook_evidence
-            {
-                return Err(GitToolError::InvalidInput(
-                    "Pull child fetch hook evidence changed after discovery".into(),
-                ));
-            }
-        }
-        if let Some(inventory) = &self.pull_inventory {
-            inventory.revalidate()?;
-        }
-        if let Some(inventory) = &self.native_pull_modules {
-            inventory.revalidate()?;
-        }
-        for metadata in self.native_pull_metadata.values() {
-            metadata.revalidate(&metadata.canonical)?;
-        }
-        if self.phase == Phase::PullFetch
-            && (self.pull_before.is_none() || self.pull_remote.is_none())
-        {
-            return Err(GitToolError::Git(
-                "Missing retained Pull pre-fetch evidence".into(),
-            ));
-        }
         Ok(())
     }
 }
@@ -4684,169 +4425,6 @@ struct GitlinkEvidence {
     entry: snapshot::Entry,
     metadata_path: Option<PathBuf>,
     marker: snapshot::Entry,
-}
-
-// Parse only: discovering names must not inspect worktree metadata or follow links.
-struct PullSources {
-    paths: Vec<String>,
-    parents: super::checkout_state::TargetParents,
-    entries: Vec<snapshot::Entry>,
-}
-
-struct PullAttribute {
-    path: PathBuf,
-    root: PathBuf,
-    relative: Vec<String>,
-    parents: super::checkout_state::TargetParents,
-    evidence: snapshot::RegularEvidence,
-}
-
-impl PullAttribute {
-    fn capture(path: &Path, budget: &mut snapshot::Budget) -> Result<Self, GitToolError> {
-        let root = path
-            .ancestors()
-            .last()
-            .filter(|root| root.is_absolute())
-            .ok_or_else(|| {
-                GitToolError::InvalidInput("Pull attribute path must be absolute".into())
-            })?
-            .to_owned();
-        let relative = vec![
-            path.strip_prefix(&root)
-                .ok()
-                .and_then(Path::to_str)
-                .ok_or_else(|| GitToolError::InvalidInput("Invalid Pull attribute path".into()))?
-                .to_owned(),
-        ];
-        let parents = super::checkout_state::TargetParents::capture(&root, &relative)?;
-        let evidence = snapshot::RegularEvidence::capture(path, budget)
-            .map_err(|error| GitToolError::InvalidInput(error.to_string()))?;
-        if super::checkout_state::TargetParents::capture(&root, &relative)? != parents {
-            return Err(GitToolError::InvalidInput(
-                "Pull attribute parent changed during inspection".into(),
-            ));
-        }
-        Ok(Self {
-            path: path.to_owned(),
-            root,
-            relative,
-            parents,
-            evidence,
-        })
-    }
-
-    fn revalidate(&self, budget: &mut snapshot::Budget) -> Result<(), GitToolError> {
-        if super::checkout_state::TargetParents::capture(&self.root, &self.relative)?
-            != self.parents
-            || snapshot::RegularEvidence::capture(&self.path, budget)
-                .map_err(|error| GitToolError::InvalidInput(error.to_string()))?
-                != self.evidence
-            || super::checkout_state::TargetParents::capture(&self.root, &self.relative)?
-                != self.parents
-        {
-            return Err(GitToolError::InvalidInput(
-                "Pull attribute changed after inspection".into(),
-            ));
-        }
-        Ok(())
-    }
-}
-
-impl PullSources {
-    // Caller must admit every exact source path before capturing contents.
-    fn capture(workdir: &Path, paths: Vec<String>) -> Result<Self, GitToolError> {
-        let parents = super::checkout_state::TargetParents::capture(workdir, &paths)?;
-        let entries = capture_tracked_sources(workdir, &paths)?;
-        let result = Self {
-            paths,
-            parents,
-            entries,
-        };
-        result.revalidate(workdir)?;
-        Ok(result)
-    }
-
-    fn revalidate(&self, workdir: &Path) -> Result<(), GitToolError> {
-        // Check ancestors before opening sources: old path admission must not
-        // become permission to follow a newly substituted directory link.
-        if super::checkout_state::TargetParents::capture(workdir, &self.paths)? != self.parents
-            || capture_tracked_sources(workdir, &self.paths)? != self.entries
-            || super::checkout_state::TargetParents::capture(workdir, &self.paths)? != self.parents
-        {
-            return Err(GitToolError::InvalidInput(
-                "Pull tracked sources changed after inspection".into(),
-            ));
-        }
-        Ok(())
-    }
-}
-
-fn pull_sparse_names(prefix: &[u8], output: &[u8]) -> Result<Vec<u8>, GitToolError> {
-    let invalid = || GitToolError::InvalidInput("Invalid Pull sparse tree listing".into());
-    if !prefix.ends_with(b"/") || output.len() > 16 * 1024 * 1024 {
-        return Err(invalid());
-    }
-    let mut names = Vec::new();
-    if output.is_empty() {
-        return Ok(names);
-    }
-    for record in output
-        .strip_suffix(&[0])
-        .ok_or_else(invalid)?
-        .split(|byte| *byte == 0)
-    {
-        let tab = record
-            .iter()
-            .position(|byte| *byte == b'\t')
-            .ok_or_else(invalid)?;
-        let header: Vec<_> = record[..tab].split(|byte| *byte == b' ').collect();
-        if header.len() != 3
-            || !matches!(header[2].len(), 40 | 64)
-            || !header[2].iter().all(u8::is_ascii_hexdigit)
-            || header[2].iter().all(|byte| *byte == b'0')
-        {
-            return Err(invalid());
-        }
-        if header[0] == b"160000" && header[1] == b"commit" {
-            continue;
-        }
-        if !matches!(header[0], b"100644" | b"100755" | b"120000") || header[1] != b"blob" {
-            return Err(invalid());
-        }
-        names.extend_from_slice(prefix);
-        names.extend_from_slice(&record[tab + 1..]);
-        names.push(0);
-        if names.len() > 16 * 1024 * 1024 {
-            return Err(invalid());
-        }
-    }
-    // Validate joined names lexically here as well as at facet construction.
-    // This helper performs no filesystem access.
-    pull_tracked_read_paths(Path::new(""), &names)?;
-    Ok(names)
-}
-
-fn pull_tracked_read_paths(workdir: &Path, output: &[u8]) -> Result<Vec<PathBuf>, GitToolError> {
-    if output.is_empty() {
-        return Ok(Vec::new());
-    }
-    let invalid = || GitToolError::InvalidInput("Invalid Pull tracked-path inventory".into());
-    let bytes = output.strip_suffix(&[0]).ok_or_else(invalid)?;
-    let mut paths = std::collections::BTreeSet::new();
-    for name in bytes.split(|byte| *byte == 0) {
-        let name = std::str::from_utf8(name).map_err(|_| invalid())?;
-        if name.is_empty()
-            || name.split('/').any(|part| matches!(part, "" | "." | ".."))
-            || Path::new(name)
-                .components()
-                .any(|part| !matches!(part, std::path::Component::Normal(_)))
-            || name.contains('\\')
-        {
-            return Err(invalid());
-        }
-        paths.insert(workdir.join(name));
-    }
-    Ok(paths.into_iter().collect())
 }
 
 #[cfg(unix)]
@@ -5492,52 +5070,6 @@ fn receiver_command(program: &Path) -> Result<String, GitToolError> {
     ))
 }
 
-fn pull_network_transport_supported(destination: &str) -> bool {
-    std::panic::catch_unwind(|| gix::url::parse(destination)).is_ok_and(|parsed| {
-        parsed.is_ok_and(|url| {
-            url.scheme == gix::url::Scheme::Git
-                && url.host.is_some()
-                && url.user.is_none()
-                && url.password.is_none()
-        })
-    })
-}
-
-fn pull_fetch_command(
-    program: &Path,
-    workdir: &Path,
-    remote: &str,
-    environment: &BTreeMap<OsString, OsString>,
-) -> Result<tokio::process::Command, GitToolError> {
-    if !program.is_absolute()
-        || !workdir.is_absolute()
-        || remote.is_empty()
-        || remote.contains(['\0', '\n', '\r'])
-    {
-        return Err(GitToolError::InvalidInput(
-            "Pull fetch command inputs are not bound absolute values".into(),
-        ));
-    }
-    Ok(command::FrozenCommand::new(
-        program,
-        workdir,
-        [
-            "-c",
-            "maintenance.autoDetach=false",
-            "-c",
-            "gc.autoDetach=false",
-            "--no-pager",
-            "fetch",
-            "--no-recurse-submodules",
-            "--update-head-ok",
-            "--",
-            remote,
-        ],
-        environment,
-    )?
-    .command())
-}
-
 #[async_trait]
 impl PreparedNormalToolInvocation for AddPlan {
     #[cfg(any(unix, windows))]
@@ -5579,13 +5111,6 @@ impl PreparedNormalToolInvocation for AddPlan {
                     Err(error) => ToolExecutionOutput::error(error.to_string()),
                 });
             }
-            Phase::PullNativePreparation => self.discover_native_pull_scope(&authorizations).await,
-            Phase::PullNativeMutation => {
-                return PreparedNormalStage::Complete(match self.execute_native_pull(&authorizations).await {
-                    Ok(content) => ToolExecutionOutput::success(content),
-                    Err(error) => ToolExecutionOutput::error(error.to_string()),
-                });
-            }
             Phase::CheckoutNewGitlinks => self.discover_new_gitlinks(&authorizations),
             Phase::CheckoutChildMarkers => self.discover_checkout_child_markers(&authorizations),
             Phase::CheckoutChildMetadata => self.discover_checkout_child_metadata(&authorizations),
@@ -5602,164 +5127,6 @@ impl PreparedNormalToolInvocation for AddPlan {
                 .map_err(|error| {
                     GitToolError::InvalidInput(format!("target-branch discovery: {error}"))
                 }),
-            Phase::PullPreparation => self.discover_pull_prefetch(&authorizations).await,
-            Phase::PullChildAttributes => self.discover_pull_child_attributes(&authorizations).await,
-            Phase::PullChildIdentity => self.discover_pull_child_identity(&authorizations),
-            Phase::PullChildConfiguration => {
-                let child_effects = !self.pull_children_fetched.is_empty();
-                self.discover_pull_child_configuration(&authorizations)
-                    .await
-                    .map_err(|error| {
-                        if child_effects {
-                            GitToolError::Git(format!(
-                                "Pull child post-fetch discovery failed: {error}; this operation may have partial fetch effects retained; inspect repositories before retrying",
-                            ))
-                        } else {
-                            error
-                        }
-                    })
-            }
-            Phase::PullChildFetch => self.execute_pull_child_fetch(&authorizations).await.map_err(|error| GitToolError::Git(format!(
-                "Pull child fetch stage failed: {error}; this operation may have partial fetch effects retained; inspect repositories before retrying",
-            ))),
-            Phase::PullPostFetch => self.discover_pull_postfetch(&authorizations).await.map_err(|error| GitToolError::Git(format!("Pull parent fetch completed; post-fetch discovery failed: {error}; fetched effects are retained; inspect repository before retrying"))),
-            Phase::PullIntegration => self.discover_pull_integration_hooks().map_err(|error| {
-                GitToolError::Git(format!("Pull integration effect discovery failed: {error}; fetched effects are retained; inspect repository before retrying"))
-            }),
-            Phase::PullIntegrationMutation => {
-                let result = self.validate_pull_integration_scope(&authorizations)
-                    .and_then(|()| self.capture_pull_integration_hooks(&authorizations));
-                let result = match result {
-                    Ok(()) => self.execute_pull_integration().await,
-                    Err(error) => Err(error),
-                };
-                match result {
-                    Ok(()) if matches!(self.pull_integration, Some(super::pull_state::Integration::Reconcile { .. })) => {
-                        self.refresh_reconciled_pull().await.map_err(|error| GitToolError::Git(format!("Pull worktree reconciliation completed but continuation discovery failed: {error}; partial effects are retained; inspect repository before retrying")))
-                    }
-                    result => return PreparedNormalStage::Complete(match result {
-                        Err(error) => ToolExecutionOutput::error(format!("Pull integration failed: {error}; fetched effects are retained; inspect repository before retrying")),
-                        Ok(()) => ToolExecutionOutput::success("Pull integration completed"),
-                    }),
-                }
-            }
-            Phase::PullFetch => {
-                if let Err(error) = self.revalidate() {
-                    return PreparedNormalStage::Complete(ToolExecutionOutput::error(
-                        error.to_string(),
-                    ));
-                }
-                for root in [&self.repository.git_dir, &self.repository.common_dir] {
-                    if !authorizations.iter().any(|token| {
-                        token.authorizes_path(
-                            "git_pull",
-                            ToolNature::Write,
-                            &self.workspace,
-                            root.to_str().unwrap_or_default(),
-                        )
-                    }) {
-                        return PreparedNormalStage::Complete(ToolExecutionOutput::error(
-                            "Pull fetch metadata root lacks Write admission",
-                        ));
-                    }
-                }
-                if !self.facets.iter().any(|facet| {
-                    facet.nature == ToolNature::Write
-                        && facet.resource_kind == Some(ToolResourceKind::Remote)
-                        && facet.resource.as_deref() == Some("git:pull-repository-metadata")
-                }) {
-                    return PreparedNormalStage::Complete(ToolExecutionOutput::error(
-                        "Pull fetch metadata Write capability missing",
-                    ));
-                }
-                if !self.pull_transport_supported {
-                    return PreparedNormalStage::Complete(ToolExecutionOutput::error(
-                        "Pull transport requires separately validated path, helper, credential, or network effects",
-                    ));
-                }
-                for path in &self.pull_hook_paths {
-                    if !authorizations.iter().any(|token| {
-                        token.authorizes_path(
-                            "git_pull",
-                            ToolNature::Read,
-                            &self.workspace,
-                            path.to_str().unwrap_or_default(),
-                        )
-                    }) {
-                        return PreparedNormalStage::Complete(ToolExecutionOutput::error(
-                            "Pull fetch hook lacks exact Read admission",
-                        ));
-                    }
-                }
-                let hook_evidence = match super::config_state::ConfigState::capture_pull_hooks(
-                    &self.pull_hook_paths,
-                ) {
-                    Ok(evidence) => evidence,
-                    Err(error) => {
-                        return PreparedNormalStage::Complete(ToolExecutionOutput::error(
-                            error.to_string(),
-                        ));
-                    }
-                };
-                if !self.pull_hook_evidence.is_empty() && hook_evidence != self.pull_hook_evidence {
-                    return PreparedNormalStage::Complete(ToolExecutionOutput::error(
-                        "Pull fetch hook evidence changed after discovery",
-                    ));
-                }
-                let command = match pull_fetch_command(
-                    &self.program,
-                    &self.repository.workdir,
-                    self.pull_remote.as_deref().unwrap_or_default(),
-                    &self.environment,
-                ) {
-                    Ok(command) => command,
-                    Err(error) => {
-                        return PreparedNormalStage::Complete(ToolExecutionOutput::error(
-                            error.to_string(),
-                        ));
-                    }
-                };
-                // ADR-089 permits implementation before activation, but requires
-                // recursive child execution and independent runtime evidence
-                // before production fetch can mutate a repository.
-                if !cfg!(test) {
-                    return PreparedNormalStage::Complete(ToolExecutionOutput::error(
-                        "Pull execution awaits recursive-child, integration and independent activation gates; no fetch started",
-                    ));
-                }
-                let output = match self
-                    .run_command_output(command, std::time::Duration::from_secs(120), 1024 * 1024)
-                    .await
-                {
-                    Ok(output) => output,
-                    Err(error) => {
-                        return PreparedNormalStage::Complete(ToolExecutionOutput::error(
-                            error.to_string(),
-                        ));
-                    }
-                };
-                if !output.status.success() {
-                    let diagnostics = if output.stderr.is_empty() {
-                        &output.stdout
-                    } else {
-                        &output.stderr
-                    };
-                    return PreparedNormalStage::Complete(ToolExecutionOutput::error(format!(
-                        "Pull parent fetch failed ({}): {}; effects may be partial; inspect repository before retrying",
-                        output.status,
-                        String::from_utf8_lossy(diagnostics).trim(),
-                    )));
-                }
-                let mut plan = self;
-                // Fetch mutates the graph. Retain the new inventory across any
-                // post-fetch target admissions, never reuse pre-fetch evidence.
-                plan.pull_inventory = None;
-                plan.facets
-                    .retain(|facet| matches!(facet.nature, ToolNature::Read | ToolNature::Execute));
-                plan.identity = PreparedPlanIdentity::new();
-                plan.phase = Phase::PullPostFetch;
-                Ok(plan)
-            }
             Phase::SenderConfiguration if matches!(self.operation, Operation::Pull(_)) => {
                 self.discover_pull_command().await
             }
@@ -5767,20 +5134,20 @@ impl PreparedNormalToolInvocation for AddPlan {
             Phase::ReceiverRoots => {
                 let plan = if cfg!(windows) {
                     self.rebind_push_program(&authorizations).await
-                } else { Ok(self) };
+                } else {
+                    Ok(self)
+                };
                 plan.and_then(|plan| plan.discover_receiver_roots(&authorizations))
             }
-            Phase::PushProgram => {
-                match self.rebind_push_program(&authorizations).await {
-                    Ok(mut plan) => {
-                        plan.facets.append(&mut plan.sender_mutation_facets);
-                        plan.phase = Phase::Mutation;
-                        plan.identity = PreparedPlanIdentity::new();
-                        Ok(plan)
-                    }
-                    Err(error) => Err(error),
+            Phase::PushProgram => match self.rebind_push_program(&authorizations).await {
+                Ok(mut plan) => {
+                    plan.facets.append(&mut plan.sender_mutation_facets);
+                    plan.phase = Phase::Mutation;
+                    plan.identity = PreparedPlanIdentity::new();
+                    Ok(plan)
                 }
-            }
+                Err(error) => Err(error),
+            },
             Phase::ReceiverMetadata => self.discover_receiver_metadata(&authorizations),
             Phase::ReceiverCommon => self.discover_receiver_common(&authorizations),
             Phase::ReceiverConfiguration => {
@@ -5794,28 +5161,17 @@ impl PreparedNormalToolInvocation for AddPlan {
                     Ok(mut plan) if plan.identity.same_plan(&previous) => {
                         // No new source frontier: reuse this admission rather
                         // than spending another stage on already-bound rules.
-                        return PreparedNormalStage::Complete(match plan.execute_admitted(&authorizations).await {
-                            Ok(content) => ToolExecutionOutput::success(content),
-                            Err(error) => ToolExecutionOutput::error(error.to_string()),
-                        });
+                        return PreparedNormalStage::Complete(
+                            match plan.execute_admitted(&authorizations).await {
+                                Ok(content) => ToolExecutionOutput::success(content),
+                                Err(error) => ToolExecutionOutput::error(error.to_string()),
+                            },
+                        );
                     }
                     result => result,
                 }
             }
         };
-        // Hook path discovery uses retained configuration only. Do it before
-        // returning the next plan instead of spending an admission stage on
-        // computation. Opening the candidates still requires the fresh hook
-        // frontier identity and its exact Read admissions.
-        let result = result.and_then(|plan| {
-            if plan.phase == Phase::PullIntegration {
-                plan.discover_pull_integration_hooks().map_err(|error| {
-                    GitToolError::Git(format!("Pull integration effect discovery failed: {error}; fetched effects are retained; inspect repository before retrying"))
-                })
-            } else {
-                Ok(plan)
-            }
-        });
         match result {
             Ok(plan) => PreparedNormalStage::Continue(plan),
             Err(error) => {
