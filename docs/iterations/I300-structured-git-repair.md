@@ -8102,3 +8102,11 @@ x86_64-pc-windows-msvc` (seven existing reduced-feature warnings). The first
 attempt hit sandbox cache-write EPERM; the authorized retry exited 0. Log:
 /private/tmp/i300-contained-config-xwin.log. This is compilation only, not native
 Windows runtime acceptance. Both governance validators pass with zero warnings.
+
+Frozen implementation commit faed8061 passes the complete standard
+`./scripts/release_preflight.sh` outside the sandbox (exit 0), including locked
+workspace checks, Clippy, tests, doctests and both independent Runtime SDK
+consumers. Source remained unchanged during validation. Log:
+/private/tmp/i300-contained-config-preflight.log. This establishes local stage
+validation; remote exact-head CI, independent security review, native Windows
+execution and remaining T7 implementation are still outstanding.
