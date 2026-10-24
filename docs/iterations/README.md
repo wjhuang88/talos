@@ -43,9 +43,10 @@ PERM-007-H retain their separate scopes.
 comparisons satisfy the bounded storage acceptance. I301 retains prior failures and #705
 retains independent broader timeout/integration residuals.
 
-[I300](I300-structured-git-repair.md) plans handoff T7 Git permission/diff repair.
-PR #704 proposes Active / Claimed under accepted ADR-089; both are ineffective
-until merge. No implementation is activated before that gate.
+[I300](I300-structured-git-repair.md) is Active / Claimed for handoff T7 Git
+permission/diff repair; #704 merged as `55fef9f9`, making the claim effective.
+ADR-089 and its additive API amendment are accepted. Implementation remains
+incomplete; PERM-007-H follows as a separate serial iteration.
 
 [I299](I299-preserved-presentation-recovery.md) is Complete / Closed through #701,
 Completion Commit `690926759229818fcec92b1487d0cffef1bf5fcb`.

@@ -48,6 +48,114 @@ pub mod hardening;
 #[cfg(unix)]
 mod supervisor;
 
+/// Executes an already-authorized Unix command with owned process-group cleanup.
+///
+/// This establishes lifecycle ownership, not sandboxing or permission admission.
+/// Each output stream is bounded; overflow fails and terminates the owned group.
+/// Dropping the caller signals cleanup. Application shutdown must keep the runtime
+/// alive for cleanup; runtime teardown is not evidence of successful reaping.
+#[cfg(unix)]
+pub async fn execute_owned_command(
+    command: std::process::Command,
+    deadline: std::time::Duration,
+    output_limit: usize,
+) -> Result<std::process::Output, SandboxError> {
+    let cleanup = std::sync::Arc::new(supervisor::Cleanup::default());
+    let result =
+        supervisor::execute_with_limit(command, cleanup.clone(), deadline, (), output_limit).await;
+    if let Err(cleanup_error) = cleanup.wait(std::time::Duration::from_secs(2)).await {
+        return Err(match result {
+            Err(error) => SandboxError::ExecutionFailed(format!("{error}; {cleanup_error}")),
+            Ok(_) => cleanup_error,
+        });
+    }
+    result
+}
+
+/// Unix command owner with retained aggregate cleanup evidence.
+/// Admission here controls lifecycle only; callers still authorize every command.
+#[cfg(unix)]
+#[derive(Clone, Default)]
+pub struct OwnedCommandExecutor {
+    cleanup: std::sync::Arc<supervisor::Cleanup>,
+}
+
+#[cfg(unix)]
+impl OwnedCommandExecutor {
+    /// Creates an isolated invocation scope, shared by its continuation stages.
+    /// Commands still check owner admission immediately before registration.
+    pub fn operation(&self) -> OwnedCommandOperation {
+        OwnedCommandOperation {
+            cleanup: std::sync::Arc::new(supervisor::Cleanup::child(self.cleanup.clone())),
+        }
+    }
+
+    /// Permanently rejects future command registrations, including continuations.
+    /// Commands registered before this fence remain owned and must be cancelled
+    /// and joined by the caller before waiting for cleanup.
+    pub fn seal(&self) {
+        self.cleanup.seal();
+    }
+
+    /// Returns evidence spanning all operations created by this owner.
+    pub fn cleanup_receipt(&self) -> SandboxCleanupReceipt {
+        SandboxCleanupReceipt {
+            cleanup: self.cleanup.clone(),
+        }
+    }
+}
+
+/// Invocation-local process ownership, excluding unrelated calls on the executor.
+#[cfg(unix)]
+#[derive(Clone)]
+pub struct OwnedCommandOperation {
+    cleanup: std::sync::Arc<supervisor::Cleanup>,
+}
+
+#[cfg(unix)]
+impl OwnedCommandOperation {
+    /// Executes an authorized command with finite, caller-owned standard input.
+    /// Input delivery shares output collection's deadline and cancellation scope;
+    /// the pipe closes after delivery. Input is not an authorization grant.
+    pub async fn execute_with_input(
+        &self,
+        command: std::process::Command,
+        deadline: std::time::Duration,
+        output_limit: usize,
+        input: Vec<u8>,
+    ) -> Result<std::process::Output, SandboxError> {
+        supervisor::execute_with_input(
+            command,
+            self.cleanup.clone(),
+            deadline,
+            (),
+            output_limit,
+            Some(input),
+        )
+        .await
+    }
+
+    /// Returns invocation-local cleanup evidence before any command starts.
+    pub fn cleanup_receipt(&self) -> SandboxCleanupReceipt {
+        SandboxCleanupReceipt {
+            cleanup: self.cleanup.clone(),
+        }
+    }
+
+    /// Executes one authorized command within this invocation's lifecycle scope.
+    /// A sealed owner refuses registration without spawning. Dropping execution
+    /// signals cancellation; retain the receipt to confirm the resulting cleanup.
+    pub async fn execute(
+        &self,
+        command: std::process::Command,
+        deadline: std::time::Duration,
+        output_limit: usize,
+    ) -> Result<std::process::Output, SandboxError> {
+        supervisor::execute_with_limit(command, self.cleanup.clone(), deadline, (), output_limit)
+            .await
+    }
+}
+
 /// Cleanup evidence for commands owned by a managed sandbox provider.
 ///
 /// Stop admitting commands and drop their execution futures before waiting.
@@ -59,6 +167,23 @@ pub struct SandboxCleanupReceipt {
 }
 
 impl SandboxCleanupReceipt {
+    /// Returns content-free typed evidence without parsing diagnostic strings.
+    /// Unsupported platforms do not claim managed process cleanup.
+    pub async fn wait_confirmed(
+        &self,
+        timeout: std::time::Duration,
+    ) -> Result<(), talos_core::tool::ToolCleanupError> {
+        #[cfg(unix)]
+        {
+            self.cleanup.wait_confirmed(timeout).await
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = timeout;
+            Err(talos_core::tool::ToolCleanupError::Unconfirmed)
+        }
+    }
+
     /// Wait until all registered commands have confirmed cleanup, or report the
     /// supplied deadline or a previously unconfirmed cleanup. This does not cancel
     /// running commands and does not cover intentionally escaped process groups.
@@ -72,6 +197,34 @@ impl SandboxCleanupReceipt {
             let _ = timeout;
             Ok(())
         }
+    }
+}
+
+#[async_trait]
+impl talos_core::tool::ToolCleanupReceipt for SandboxCleanupReceipt {
+    async fn wait(
+        &self,
+        timeout: std::time::Duration,
+    ) -> Result<(), talos_core::tool::ToolCleanupError> {
+        self.wait_confirmed(timeout).await
+    }
+}
+
+#[cfg(unix)]
+#[async_trait]
+impl talos_core::tool::ToolCleanupReceipt for OwnedCommandExecutor {
+    async fn wait(
+        &self,
+        timeout: std::time::Duration,
+    ) -> Result<(), talos_core::tool::ToolCleanupError> {
+        self.cleanup.wait_confirmed(timeout).await
+    }
+}
+
+#[cfg(unix)]
+impl talos_core::tool::ToolCleanupOwner for OwnedCommandExecutor {
+    fn seal(&self) {
+        OwnedCommandExecutor::seal(self);
     }
 }
 

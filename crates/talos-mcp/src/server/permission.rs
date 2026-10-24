@@ -41,6 +41,8 @@ impl McpPermissionGate {
     }
 
     /// Overrides the total budget shared by MCP permission hooks and admission.
+    /// Prepared normal-tool stages share this admission deadline. Their execution
+    /// uses a separate cumulative wall-clock budget.
     #[must_use]
     pub fn with_deadline(mut self, deadline: Duration) -> Self {
         self.deadline = deadline;
@@ -69,7 +71,107 @@ impl McpPermissionGate {
         request: &McpCallRequest,
         profile: &[ToolPermissionFacet],
     ) -> Result<Vec<ToolExecutionAuthorization>, McpError> {
-        let deadline_at = tokio::time::Instant::now() + self.deadline;
+        match self
+            .authorize_call_inner(hook_context, request, profile, None, None)
+            .await?
+        {
+            McpAdmission::Paths(paths) => Ok(paths),
+            McpAdmission::Prepared(_) => Err(permission_error("admission route mismatch")),
+        }
+    }
+
+    /// Legacy entrypoint: refuses preparation without a bound plan identity.
+    pub async fn authorize_prepared_call(
+        &self,
+        hook_context: &HookContext,
+        request: &McpCallRequest,
+        profile: &[ToolPermissionFacet],
+    ) -> Result<talos_permission::AdmittedInvocation, McpError> {
+        let _ = (hook_context, request, profile);
+        Err(permission_error("prepared plan identity required"))
+    }
+
+    /// Admits one exact prepared plan; legacy proofs cannot authorize this route.
+    pub async fn authorize_prepared_plan(
+        &self,
+        hook_context: &HookContext,
+        request: &McpCallRequest,
+        profile: &[ToolPermissionFacet],
+        plan: &talos_core::tool::PreparedPlanIdentity,
+    ) -> Result<talos_permission::AdmittedInvocation, McpError> {
+        self.authorize_prepared_plan_until(
+            hook_context,
+            request,
+            profile,
+            plan,
+            self.prepared_deadline_at(),
+        )
+        .await
+    }
+
+    pub(super) fn prepared_deadline_at(&self) -> tokio::time::Instant {
+        tokio::time::Instant::now() + self.deadline
+    }
+
+    pub(super) async fn authorize_prepared_plan_until(
+        &self,
+        hook_context: &HookContext,
+        request: &McpCallRequest,
+        profile: &[ToolPermissionFacet],
+        plan: &talos_core::tool::PreparedPlanIdentity,
+        deadline_at: tokio::time::Instant,
+    ) -> Result<talos_permission::AdmittedInvocation, McpError> {
+        self.authorize_prepared_command_until(
+            hook_context,
+            request,
+            profile,
+            (plan, None),
+            deadline_at,
+        )
+        .await
+    }
+
+    pub(super) async fn authorize_prepared_command_until(
+        &self,
+        hook_context: &HookContext,
+        request: &McpCallRequest,
+        profile: &[ToolPermissionFacet],
+        prepared: (
+            &talos_core::tool::PreparedPlanIdentity,
+            Option<&talos_core::tool::PreparedCommandEvidence>,
+        ),
+        deadline_at: tokio::time::Instant,
+    ) -> Result<talos_permission::AdmittedInvocation, McpError> {
+        match self
+            .authorize_call_inner(
+                hook_context,
+                request,
+                profile,
+                Some(prepared),
+                Some(deadline_at),
+            )
+            .await?
+        {
+            McpAdmission::Prepared(admission) => Ok(*admission),
+            McpAdmission::Paths(_) => Err(permission_error("admission route mismatch")),
+        }
+    }
+
+    async fn authorize_call_inner(
+        &self,
+        hook_context: &HookContext,
+        request: &McpCallRequest,
+        profile: &[ToolPermissionFacet],
+        prepared: Option<(
+            &talos_core::tool::PreparedPlanIdentity,
+            Option<&talos_core::tool::PreparedCommandEvidence>,
+        )>,
+        prepared_deadline_at: Option<tokio::time::Instant>,
+    ) -> Result<McpAdmission, McpError> {
+        let deadline_at = prepared_deadline_at.unwrap_or_else(|| self.prepared_deadline_at());
+        if tokio::time::Instant::now() >= deadline_at {
+            return Err(permission_error("permission deadline exceeded"));
+        }
         let tool_call = to_permission_tool_call(request);
 
         self.run_permission_hook_before_deadline(
@@ -91,20 +193,28 @@ impl McpPermissionGate {
             .clone()
             .map(serde_json::Value::Object)
             .unwrap_or_else(|| serde_json::json!({}));
-        let authorization = self
-            .pipeline
-            .authorize(PermissionAuthorizationRequest {
-                tool_name: request.name.as_str(),
-                provenance: talos_core::tool::ToolProvenance::McpRemote {
-                    server: "standalone-mcp".to_owned(),
-                },
-                profile,
-                input: &input,
-                presentation_input: tool_call.input.clone(),
-                summary_fields: Vec::new(),
-                deadline: deadline_at.saturating_duration_since(tokio::time::Instant::now()),
-            })
-            .await;
+        let authorization_request = PermissionAuthorizationRequest {
+            tool_name: request.name.as_str(),
+            provenance: talos_core::tool::ToolProvenance::McpRemote {
+                server: "standalone-mcp".to_owned(),
+            },
+            profile,
+            input: &input,
+            presentation_input: tool_call.input.clone(),
+            summary_fields: Vec::new(),
+            deadline: deadline_at.saturating_duration_since(tokio::time::Instant::now()),
+        };
+        let authorization = if let Some((plan, evidence)) = prepared {
+            self.pipeline
+                .authorize_prepared_plan_with_evidence(authorization_request, None, plan, evidence)
+                .await
+                .map(|admission| McpAdmission::Prepared(Box::new(admission)))
+        } else {
+            self.pipeline
+                .authorize(authorization_request)
+                .await
+                .map(McpAdmission::Paths)
+        };
         let decision = authorization
             .as_ref()
             .err()
@@ -149,6 +259,11 @@ impl McpPermissionGate {
             talos_plugin::HookOutcome::Deny { reason, .. } => Err(permission_error(&reason)),
         }
     }
+}
+
+enum McpAdmission {
+    Paths(Vec<ToolExecutionAuthorization>),
+    Prepared(Box<talos_permission::AdmittedInvocation>),
 }
 
 fn to_permission_tool_call(request: &McpCallRequest) -> ToolCall {

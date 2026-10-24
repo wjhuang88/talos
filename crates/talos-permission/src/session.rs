@@ -141,7 +141,7 @@ struct State {
 
 /// Composition-root-owned policy, proposal, grant, and admission state.
 pub struct PermissionSessionState {
-    state: Mutex<State>,
+    state: Arc<Mutex<State>>,
 }
 
 impl fmt::Debug for PermissionSessionState {
@@ -155,13 +155,13 @@ impl PermissionSessionState {
     #[must_use]
     pub fn new(engine: PermissionEngine) -> Self {
         Self {
-            state: Mutex::new(State {
+            state: Arc::new(Mutex::new(State {
                 session_id: PermissionSessionId::new(),
                 revisions: PermissionStateRevisions::ZERO,
                 engine,
                 grants: Vec::new(),
                 authority_reset: 0,
-            }),
+            })),
         }
     }
 
@@ -269,6 +269,50 @@ impl PermissionSessionState {
             return Err(GrantError::AdmissionInvalidated);
         }
         admit_locked(&state, &pending, request, context)
+    }
+
+    /// Admits one exact invocation and retains a one-use proof for prepared execution.
+    pub fn try_admit_invocation(
+        &self,
+        pending: PendingInvocation,
+        request: &PermissionRequest<'_>,
+        context: &PermissionContext,
+    ) -> Result<AdmittedInvocation, GrantError> {
+        // Network manifests require their live authority, never a path-only proof.
+        if request.network_manifest().is_some() {
+            return Err(GrantError::AdmissionInvalidated);
+        }
+        let state = self.try_lock_state()?;
+        let paths = admit_locked(&state, &pending, request, context)?;
+        let (facets, fingerprint) = compiled_identity(request, state.engine.workspace_root())?;
+        Ok(AdmittedInvocation {
+            state: Arc::clone(&self.state),
+            session_id: state.session_id,
+            revisions: state.revisions,
+            tool_name: request.tool_name().to_owned(),
+            provenance: request.provenance().clone(),
+            facets,
+            fingerprint,
+            workspace_root: state
+                .engine
+                .workspace_root()
+                .map(std::path::Path::to_path_buf),
+            paths,
+            plan_identity: None,
+        })
+    }
+
+    /// Binds a prepared plan identity to an invocation proof.
+    pub fn try_admit_prepared_invocation(
+        &self,
+        pending: PendingInvocation,
+        request: &PermissionRequest<'_>,
+        context: &PermissionContext,
+        plan_identity: &talos_core::tool::PreparedPlanIdentity,
+    ) -> Result<AdmittedInvocation, GrantError> {
+        let mut proof = self.try_admit_invocation(pending, request, context)?;
+        proof.plan_identity = Some(plan_identity.clone());
+        Ok(proof)
     }
 
     #[cfg(test)]
@@ -677,6 +721,11 @@ fn approve_session_locked(
     context: &PermissionContext,
     source: GrantSource,
 ) -> Result<PendingInvocation, GrantError> {
+    if crate::native_pull_command::requested(request.facets()) {
+        // Command authority is always invocation-local, including when a host
+        // chooses its generic "always approve" response. Its preview says Once.
+        return approve_once_locked(state, proposal, request, context);
+    }
     validate_proposal(state, &proposal, request, context)?;
     let id = GrantId::new();
     let next_store = next_generation(state.revisions.store)?;
@@ -772,6 +821,71 @@ pub struct PendingInvocation {
     network_scope: Option<ToolNetworkScope>,
 }
 
+/// One-use proof retained across prepared discovery stages.
+pub struct AdmittedInvocation {
+    plan_identity: Option<talos_core::tool::PreparedPlanIdentity>,
+    state: Arc<Mutex<State>>,
+    session_id: PermissionSessionId,
+    revisions: PermissionStateRevisions,
+    tool_name: String,
+    provenance: talos_core::tool::ToolProvenance,
+    facets: Vec<CompiledFacetScope>,
+    fingerprint: crate::grant::RequestFingerprint,
+    workspace_root: Option<std::path::PathBuf>,
+    paths: Vec<ToolExecutionAuthorization>,
+}
+
+impl AdmittedInvocation {
+    /// Consumes a proof for the exact prepared plan and request.
+    pub fn consume_for_prepared(
+        self,
+        request: &PermissionRequest<'_>,
+        plan_identity: &talos_core::tool::PreparedPlanIdentity,
+    ) -> Result<Vec<ToolExecutionAuthorization>, GrantError> {
+        if !self
+            .plan_identity
+            .as_ref()
+            .is_some_and(|p| p.same_plan(plan_identity))
+        {
+            return Err(GrantError::AdmissionInvalidated);
+        }
+        self.consume(request)
+    }
+
+    /// Consumes a legacy one-use proof for the exact request.
+    pub fn consume_for(
+        self,
+        request: &PermissionRequest<'_>,
+    ) -> Result<Vec<ToolExecutionAuthorization>, GrantError> {
+        if self.plan_identity.is_some() || crate::native_pull_command::requested(request.facets()) {
+            return Err(GrantError::AdmissionInvalidated);
+        }
+        self.consume(request)
+    }
+
+    fn consume(
+        self,
+        request: &PermissionRequest<'_>,
+    ) -> Result<Vec<ToolExecutionAuthorization>, GrantError> {
+        let state = self
+            .state
+            .try_lock()
+            .map_err(|_| GrantError::StateUnavailable)?;
+        if state.session_id != self.session_id || state.revisions != self.revisions {
+            return Err(GrantError::AdmissionInvalidated);
+        }
+        let (facets, fingerprint) = compiled_identity(request, self.workspace_root.as_deref())?;
+        if self.tool_name != request.tool_name()
+            || self.provenance != *request.provenance()
+            || self.facets != facets
+            || self.fingerprint != fingerprint
+        {
+            return Err(GrantError::AdmissionInvalidated);
+        }
+        Ok(self.paths)
+    }
+}
+
 #[derive(Clone, Copy)]
 enum PendingAuthority {
     Policy,
@@ -827,13 +941,14 @@ fn evaluate_locked(
     }
     let (facets, _) = compiled_identity(request, state.engine.workspace_root())?;
     if let Some(grant) = state.grants.iter().find(|grant| {
-        grant_matches(
-            grant,
-            request.tool_name(),
-            request.provenance(),
-            &facets,
-            request.network_manifest().map(|m| m.scope()),
-        )
+        !crate::native_pull_command::requested(request.facets())
+            && grant_matches(
+                grant,
+                request.tool_name(),
+                request.provenance(),
+                &facets,
+                request.network_manifest().map(|m| m.scope()),
+            )
     }) {
         let id = grant.id;
         let source = grant.source;
@@ -982,6 +1097,170 @@ mod tests {
             path.display().to_string(),
             ToolResourceKind::Path,
         )
+    }
+
+    #[test]
+    fn whole_invocation_proof_binds_non_path_facets_and_input() {
+        let state = PermissionSessionState::new(PermissionEngine::new());
+        let facets = [
+            ToolPermissionFacet::with_resource(
+                ToolNature::Execute,
+                "git",
+                ToolResourceKind::Command,
+            ),
+            ToolPermissionFacet::with_resource(
+                ToolNature::Network,
+                "origin",
+                ToolResourceKind::Remote,
+            ),
+        ];
+        let input = json!({"operation": "push", "plan": "one"});
+        let request = PermissionRequest::native("git_push", &facets, &input);
+        let context = context();
+        let admit = || {
+            let proposal = state
+                .propose(&request, &context, GrantScope::Once)
+                .expect("proposal");
+            let pending = state
+                .approve_once(proposal, &request, &context)
+                .expect("approval");
+            state
+                .try_admit_invocation(pending, &request, &context)
+                .expect("admission")
+        };
+        assert!(
+            admit()
+                .consume_for(&request)
+                .expect("exact request")
+                .is_empty()
+        );
+        let changed = json!({"operation": "push", "plan": "two"});
+        assert!(
+            admit()
+                .consume_for(&PermissionRequest::native("git_push", &facets, &changed))
+                .is_err()
+        );
+        assert!(
+            admit()
+                .consume_for(&PermissionRequest::native("git_push", &facets[..1], &input))
+                .is_err()
+        );
+        assert!(
+            admit()
+                .consume_for(&PermissionRequest::native("git_pull", &facets, &input))
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn prepared_proof_rejects_plan_exchange_and_legacy_consumption() {
+        let state = PermissionSessionState::new(PermissionEngine::new());
+        let facets = [ToolPermissionFacet::with_resource(
+            ToolNature::Execute,
+            "git",
+            ToolResourceKind::Command,
+        )];
+        let input = json!({});
+        let request = PermissionRequest::native("prepared_read", &facets, &input);
+        let context = context();
+        let plan = talos_core::tool::PreparedPlanIdentity::new();
+        let other = talos_core::tool::PreparedPlanIdentity::new();
+        let admit = || {
+            let proposal = state
+                .propose(&request, &context, GrantScope::Once)
+                .expect("proposal");
+            let pending = state
+                .approve_once(proposal, &request, &context)
+                .expect("approval");
+            state
+                .try_admit_prepared_invocation(pending, &request, &context, &plan)
+                .expect("admission")
+        };
+        assert!(
+            admit()
+                .consume_for_prepared(&request, &plan.clone())
+                .is_ok()
+        );
+        assert!(admit().consume_for_prepared(&request, &other).is_err());
+        assert!(admit().consume_for(&request).is_err());
+        let remote_request = PermissionRequest::new(
+            "prepared_read",
+            talos_core::tool::ToolProvenance::McpRemote {
+                server: "standalone-mcp".into(),
+            },
+            &facets,
+            &input,
+        );
+        assert!(
+            admit()
+                .consume_for_prepared(&remote_request, &plan)
+                .is_err()
+        );
+        let proposal = state
+            .propose(&request, &context, GrantScope::Once)
+            .expect("proposal");
+        let pending = state
+            .approve_once(proposal, &request, &context)
+            .expect("approval");
+        assert!(
+            state
+                .try_admit_invocation(pending, &request, &context)
+                .expect("legacy")
+                .consume_for_prepared(&request, &plan)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn invocation_proof_consumption_fails_closed_when_state_fence_is_contended() {
+        let state = PermissionSessionState::new(PermissionEngine::new());
+        let facets = [ToolPermissionFacet::new(ToolNature::Read)];
+        let input = json!({});
+        let request = PermissionRequest::native("read", &facets, &input);
+        let context = context();
+        let plan = talos_core::tool::PreparedPlanIdentity::new();
+
+        for prepared in [false, true] {
+            let pending = state
+                .prepare_authorized(&request, &context)
+                .expect("evaluation")
+                .expect("read policy allows");
+            let proof = if prepared {
+                state.try_admit_prepared_invocation(pending, &request, &context, &plan)
+            } else {
+                state.try_admit_invocation(pending, &request, &context)
+            }
+            .expect("admission before contention");
+            state.with_state_fence_held(|| {
+                let result = if prepared {
+                    proof.consume_for_prepared(&request, &plan)
+                } else {
+                    proof.consume_for(&request)
+                };
+                assert!(matches!(result, Err(GrantError::StateUnavailable)));
+            });
+        }
+    }
+
+    #[test]
+    fn whole_invocation_proof_expires_on_session_change() {
+        let state = PermissionSessionState::new(PermissionEngine::new());
+        let facets = [ToolPermissionFacet::new(ToolNature::Read)];
+        let input = json!({"path": "README.md"});
+        let request = PermissionRequest::native("read", &facets, &input);
+        let context = context();
+        let pending = state
+            .prepare_authorized(&request, &context)
+            .expect("evaluation")
+            .expect("read policy allows");
+        let admitted = state
+            .try_admit_invocation(pending, &request, &context)
+            .expect("admission");
+        state.rebind_session().expect("new session");
+        assert!(matches!(
+            admitted.consume_for(&request),
+            Err(GrantError::AdmissionInvalidated)
+        ));
     }
 
     #[test]

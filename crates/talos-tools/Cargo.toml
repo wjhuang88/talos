@@ -34,7 +34,7 @@ shell = [
     "tokio/fs",
     "dep:windows-sys",
 ]
-git = ["dep:gix", "dep:similar", "tokio/fs", "tokio/process", "tokio/time"]
+git = ["dep:libc", "dep:windows-sys", "dep:same-file", "tokio/rt", "dep:gix", "dep:similar", "dep:talos-permission", "dep:talos-sandbox", "tokio/fs", "tokio/io-util", "tokio/macros", "tokio/process", "tokio/time"]
 network = [
     "dep:image",
     "tokio/macros",
@@ -64,6 +64,7 @@ coding = [
 
 [dependencies]
 talos-core = { version = "0.10.1", path = "../talos-core" }
+talos-permission = { version = "0.10.1", path = "../talos-permission", optional = true }
 talos-text = { version = "0.10.1", path = "../talos-text" }
 talos-sandbox = { version = "0.10.1", path = "../talos-sandbox", optional = true }
 async-trait = "0.1.92"
@@ -81,7 +82,7 @@ grep-matcher = { version = "0.1.9", optional = true }
 ignore = { version = "0.4.33", optional = true }
 similar = { version = "3.2.0", optional = true }
 gix = { version = "0.87.1", default-features = false, optional = true, features = [
-    "basic", "status", "revision", "blob-diff", "index", "sha1"
+    "basic", "status", "revision", "blob-diff", "index", "sha1", "sha256"
 ] }
 reqwest = { version = "0.13.4", default-features = false, optional = true, features = ["rustls", "json"] }
 rust-websearch = { version = "0.1", optional = true }
@@ -95,6 +96,7 @@ cap-std = { version = "4.0.3", default-features = false, optional = true }
 libc = { version = "0.2", optional = true }
 
 [target.'cfg(windows)'.dependencies]
+same-file = { version = "=1.0.6", optional = true }
 windows-sys = { version = "0.61.2", optional = true, features = [
     "Win32_Foundation",
     "Win32_Security",

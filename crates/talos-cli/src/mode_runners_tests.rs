@@ -484,7 +484,13 @@ async fn assert_failed_registration_discovery(
         headers.lines().next(),
         Some(format!("GET {models_path} HTTP/1.1").as_str())
     );
-    assert!(headers.lines().any(|line| line == credential_header));
+    let (expected_name, expected_value) = credential_header.split_once(':').expect("header");
+    assert!(headers.lines().skip(1).any(|line| {
+        line.split_once(':').is_some_and(|(name, value)| {
+            name.eq_ignore_ascii_case(expected_name)
+                && value.trim_matches([' ', '\t']) == expected_value.trim_matches([' ', '\t'])
+        })
+    }));
     assert!(body.is_empty(), "model discovery GET must not send a body");
 }
 

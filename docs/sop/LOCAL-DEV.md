@@ -50,6 +50,22 @@ All three must exit 0 before starting work.
 | `cargo test -p talos-{crate}` | Test a specific crate |
 | `cargo test -p talos-{crate} test_name` | Run a specific test |
 
+## Windows Cross-Compilation From macOS/Linux
+
+Use `cargo xwin` with the MSVC target for Windows cross-compilation. Run from
+this repository so `rust-toolchain.toml` selects the pinned toolchain:
+
+```bash
+rustup target add x86_64-pc-windows-msvc
+cargo xwin check --locked -p talos-tools --all-features --target x86_64-pc-windows-msvc
+```
+
+Install `cargo-xwin` if unavailable. It uses a local Windows SDK/CRT cache and
+LLVM tools; allow its cache setup when the execution sandbox blocks it. Do not
+substitute a GNU/MinGW target and report missing MinGW as a project blocker.
+Cross-compilation proves build compatibility only; run lifecycle, permission,
+and process ownership tests on native Windows CI before claiming Windows delivery.
+
 ## Project Structure
 
 ```

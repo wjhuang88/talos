@@ -1,9 +1,7 @@
 //! I302 test-only direct Win32 control; ADR-068/091 ownership and evidence limits apply.
 //! Counts qualify a lifecycle interval, not resource identity, process exit or absence of leaks.
 
-use super::{
-    WindowsBackgroundLauncher, quote_windows_arg, resolve_windows_program, windows_environment,
-};
+use super::{WindowsBackgroundLauncher, resolve_windows_program, windows_environment};
 use std::mem::{size_of, zeroed};
 use std::os::windows::ffi::OsStrExt;
 use windows_sys::Win32::Foundation::{
@@ -131,16 +129,19 @@ fn run_checked(launcher: &WindowsBackgroundLauncher) -> Result<[u32; 4], String>
     // Prepare the same fixture inputs before acquiring resources or taking the baseline.
     let wide = |value: &std::ffi::OsStr| value.encode_wide().chain(Some(0)).collect::<Vec<u16>>();
     let mut program = wide(resolve_windows_program(&launcher.program)?.as_os_str());
-    let mut command = quote_windows_arg(&launcher.program);
-    for arg in &launcher.args {
-        command.push(' ');
-        command.push_str(&quote_windows_arg(arg));
-    }
-    let command = wide(std::ffi::OsStr::new(&command));
+    let arguments = std::iter::once(launcher.program.as_str())
+        .chain(launcher.args.iter().map(String::as_str))
+        .map(|argument| {
+            std::ffi::OsStr::new(argument)
+                .encode_wide()
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+    let command = super::windows_command_line::encode(&arguments)?;
     // CreateProcessW can modify its command buffer; prepare both independent copies now.
     let commands = [command.clone(), command];
     let cwd = wide(launcher.cwd.as_os_str());
-    let mut environment = windows_environment(&launcher.env);
+    let mut environment = windows_environment(&launcher.env)?;
     let mut counts = [0; 4];
     counts[0] = count()?;
     {

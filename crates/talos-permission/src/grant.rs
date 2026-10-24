@@ -85,6 +85,7 @@ pub struct GrantPreview {
     scope: GrantScope,
     facets: Vec<GrantPreviewFacet>,
     network_scope: Option<Box<ToolNetworkScope>>,
+    notes: Vec<String>,
 }
 
 impl fmt::Debug for GrantPreview {
@@ -98,6 +99,11 @@ impl fmt::Debug for GrantPreview {
 }
 
 impl GrantPreview {
+    /// Returns prepared command review notes, not additional grant authority.
+    /// Native producers must supply credential-free descriptions.
+    pub fn notes(&self) -> &[String] {
+        &self.notes
+    }
     /// Returns the requested approval lifetime.
     #[must_use]
     pub const fn scope(&self) -> GrantScope {
@@ -281,7 +287,23 @@ pub(crate) fn compile_proposal(
     let facets = compile_facets(request, workspace_root, true)?;
     let fingerprint = fingerprint_request(request, &facets);
     let preview = GrantPreview {
-        scope,
+        notes: if crate::native_pull_command::requested(request.facets()) {
+            request
+                .facets()
+                .iter()
+                .filter_map(|facet| facet.description.clone())
+                .collect()
+        } else {
+            Vec::new()
+        },
+        // The existing Ask carrier includes both proposal slots. Even its
+        // Session slot advertises only Once for native command authority;
+        // committing it is downgraded to an invocation without storing a grant.
+        scope: if crate::native_pull_command::requested(request.facets()) {
+            GrantScope::Once
+        } else {
+            scope
+        },
         network_scope: request
             .network_manifest()
             .map(|m| Box::new(m.scope().clone())),
@@ -327,6 +349,12 @@ fn compile_facets(
     validate_network_profile(request)?;
     let mut compiled = Vec::with_capacity(request.facets().len());
     for (index, facet) in request.facets().iter().enumerate() {
+        if facet.resource.as_deref().map(str::trim) == Some(crate::native_pull_command::CAPABILITY)
+            && (facet.nature != ToolNature::Execute
+                || facet.resource_kind != Some(ToolResourceKind::Remote))
+        {
+            return Err(GrantError::MissingResource(index));
+        }
         let consequential = matches!(
             facet.nature,
             ToolNature::Write | ToolNature::Execute | ToolNature::Network
@@ -342,7 +370,182 @@ fn compile_facets(
             });
             continue;
         };
-        if !supported_resource_pair(facet.nature, resource_kind) {
+        // These closed capabilities are consumed only by the prepared Git
+        // stages. They do not admit generic Remote or Path subtree grants.
+        let bound_git_command = request.facets().iter().any(|facet| {
+            facet.nature == ToolNature::Execute
+                && facet.resource_kind == Some(ToolResourceKind::Command)
+                && facet
+                    .resource
+                    .as_deref()
+                    .is_some_and(|path| Path::new(path).is_absolute())
+        });
+        let pull_command = facet.nature == ToolNature::Execute
+            && resource_kind == ToolResourceKind::Remote
+            && facet.resource.as_deref() == Some(crate::native_pull_command::CAPABILITY)
+            && request.tool_name() == "git_pull"
+            && bound_git_command
+            && request.facets().iter().any(|root| {
+                root.nature == ToolNature::Read
+                    && root.resource_kind == Some(ToolResourceKind::Path)
+                    && root
+                        .resource
+                        .as_deref()
+                        .is_some_and(|path| Path::new(path).is_absolute())
+            });
+        if facet.resource.as_deref().map(str::trim) == Some(crate::native_pull_command::CAPABILITY)
+            && !pull_command
+        {
+            return Err(GrantError::MissingResource(index));
+        }
+        let bound_git_read_path = request.facets().iter().any(|facet| {
+            facet.nature == ToolNature::Read
+                && facet.resource_kind == Some(ToolResourceKind::Path)
+                && facet.resource.as_deref().is_some_and(|path| {
+                    let path = Path::new(path);
+                    path.is_absolute()
+                        && matches!(
+                            path.file_name().and_then(std::ffi::OsStr::to_str),
+                            Some("git" | "git.exe")
+                        )
+                })
+        });
+        let git_config_discovery = facet.nature == ToolNature::Read
+            && resource_kind == ToolResourceKind::Remote
+            && facet.resource.as_deref() == Some("git:configuration-chain")
+            && matches!(
+                request.tool_name(),
+                "git_add" | "git_commit" | "git_checkout" | "git_push" | "git_pull"
+            )
+            && bound_git_command;
+        let auxiliary_resolution = facet.nature == ToolNature::Read
+            && resource_kind == ToolResourceKind::Remote
+            && facet.resource.as_deref() == Some("git:auxiliary-path-resolution")
+            && matches!(
+                request.tool_name(),
+                "git_add" | "git_commit" | "git_checkout" | "git_push" | "git_pull"
+            )
+            && (bound_git_command || bound_git_read_path)
+            && request.facets().iter().any(|source| {
+                source.nature == ToolNature::Read
+                    && source.resource_kind == Some(ToolResourceKind::Path)
+                    && source
+                        .resource
+                        .as_deref()
+                        .is_some_and(|path| Path::new(path).is_absolute())
+            });
+        // Reserve this closed capability name even where generic Remote pairs
+        // (notably Network) would otherwise compile. It is metadata Read only.
+        if facet.resource.as_deref().map(str::trim) == Some("git:auxiliary-path-resolution")
+            && !auxiliary_resolution
+        {
+            return Err(GrantError::MissingResource(index));
+        }
+        let receiver_reference_tree = facet.nature == ToolNature::Read
+            && resource_kind == ToolResourceKind::Remote
+            && facet.resource.as_deref() == Some("git:receiver-reference-tree")
+            && request.tool_name() == "git_push"
+            && request.facets().iter().any(|facet| {
+                facet.nature == ToolNature::Read
+                    && facet.resource_kind == Some(ToolResourceKind::Path)
+                    && facet.resource.as_deref().is_some_and(|path| {
+                        Path::new(path).is_absolute()
+                            && Path::new(path).file_name() == Some(std::ffi::OsStr::new("refs"))
+                    })
+            });
+        let receiver_metadata = matches!(facet.nature, ToolNature::Read | ToolNature::Write)
+            && resource_kind == ToolResourceKind::Remote
+            && facet.resource.as_deref() == Some("git:receiver-metadata")
+            && request.tool_name() == "git_push"
+            && bound_git_command
+            && request.facets().iter().any(|root| {
+                root.nature == facet.nature
+                    && root.resource_kind == Some(ToolResourceKind::Path)
+                    && root
+                        .resource
+                        .as_deref()
+                        .is_some_and(|path| Path::new(path).is_absolute())
+            });
+        // The prepared consumer enforces root identity, fixed inspection argv
+        // and cumulative discovery budgets. This is never generic subtree Read.
+        let pull_discovery = facet.nature == ToolNature::Read
+            && resource_kind == ToolResourceKind::Remote
+            && facet.resource.as_deref() == Some("git:pull-bounded-discovery")
+            && request.tool_name() == "git_pull"
+            && bound_git_command
+            && request.facets().iter().any(|root| {
+                root.nature == ToolNature::Read
+                    && root.resource_kind == Some(ToolResourceKind::Path)
+                    && root
+                        .resource
+                        .as_deref()
+                        .is_some_and(|path| Path::new(path).is_absolute())
+            });
+        // Reserve the name for every nature/kind, including otherwise valid
+        // Network/Remote pairs. A malformed capability must not fall through.
+        if facet.resource.as_deref().map(str::trim) == Some("git:pull-bounded-discovery")
+            && !pull_discovery
+        {
+            return Err(GrantError::MissingResource(index));
+        }
+        let pull_metadata = matches!(facet.nature, ToolNature::Read | ToolNature::Write)
+            && resource_kind == ToolResourceKind::Remote
+            && facet.resource.as_deref() == Some("git:pull-repository-metadata")
+            && request.tool_name() == "git_pull"
+            && bound_git_command
+            && request.facets().iter().any(|root| {
+                root.nature == facet.nature
+                    && root.resource_kind == Some(ToolResourceKind::Path)
+                    && root
+                        .resource
+                        .as_deref()
+                        .is_some_and(|path| Path::new(path).is_absolute())
+            });
+        // Dedicated integration authority; generic Path grants remain exact.
+        // Runtime consumption additionally binds the actual worktree and stage.
+        let pull_integration_worktree =
+            matches!(facet.nature, ToolNature::Read | ToolNature::Write)
+                && resource_kind == ToolResourceKind::Remote
+                && facet.resource.as_deref() == Some("git:pull-integration-worktree")
+                && request.tool_name() == "git_pull"
+                && bound_git_command
+                && request.facets().iter().any(|root| {
+                    root.nature == facet.nature
+                        && root.resource_kind == Some(ToolResourceKind::Path)
+                        && root
+                            .resource
+                            .as_deref()
+                            .is_some_and(|path| Path::new(path).is_absolute())
+                });
+        let pull_resolution = facet.nature == ToolNature::Read
+            && resource_kind == ToolResourceKind::Remote
+            && facet.resource.as_deref() == Some("git:pull-worktree-resolution")
+            && request.tool_name() == "git_pull"
+            && bound_git_command
+            && request.facets().iter().any(|scope| {
+                scope.nature == ToolNature::Read
+                    && scope.resource_kind == Some(ToolResourceKind::Remote)
+                    && scope.resource.as_deref() == Some("git:pull-repository-metadata")
+            })
+            && request.facets().iter().any(|root| {
+                root.nature == ToolNature::Read
+                    && root.resource_kind == Some(ToolResourceKind::Path)
+                    && root
+                        .resource
+                        .as_deref()
+                        .is_some_and(|path| Path::new(path).is_absolute())
+            });
+        if !supported_resource_pair(facet.nature, resource_kind)
+            && !pull_command
+            && !git_config_discovery
+            && !auxiliary_resolution
+            && !receiver_reference_tree
+            && !receiver_metadata
+            && !pull_metadata
+            && !pull_discovery
+            && !pull_resolution
+            && !pull_integration_worktree
+        {
             return Err(GrantError::MissingResource(index));
         }
         let raw_resource = facet.resource.clone();
@@ -594,3 +797,15 @@ const fn kind_tag(value: ToolResourceKind) -> u8 {
         ToolResourceKind::Remote => 3,
     }
 }
+
+#[cfg(test)]
+#[path = "grant_discovery_tests.rs"]
+mod discovery_tests;
+
+#[cfg(test)]
+#[path = "grant_pull_integration_tests.rs"]
+mod pull_integration_tests;
+
+#[cfg(test)]
+#[path = "grant_pull_discovery_tests.rs"]
+mod pull_discovery_tests;
