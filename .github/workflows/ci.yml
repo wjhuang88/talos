@@ -374,6 +374,9 @@ jobs:
           retention-days: 14
 
       - name: Test workspace
+        # Preserve cross-crate evidence after an independent Desktop/guard failure.
+        # This does not suppress the earlier failure or run after cancellation.
+        if: ${{ !cancelled() }}
         timeout-minutes: 20
         shell: pwsh
         run: |
