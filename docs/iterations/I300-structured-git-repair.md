@@ -1,3 +1,26 @@
+## MCP running Pull disconnect — 2026-10-24
+
+A separate Unix transport fixture now disconnects an actual native Pull while
+its post-merge hook and descendant are running. Connection shutdown waits for
+the owned Git cleanup; releasing the descendant's barrier after shutdown does
+not create its delayed file. Integrated HEAD and worktree bytes remain intact.
+`cargo test --locked -p talos-mcp --test git_pull_prepared` passes both tests,
+including the existing denial/success/conflict matrix. This establishes real
+Git EOF cleanup locally, not Windows runtime or transport-error coverage.
+
+## Pull conflict fixture identity — 2026-10-24
+
+A minimal native Git reproduction with no global/system identity and
+`user.useConfigOnly=true` exits 128 after fetch without MERGE_HEAD. Persisting
+fixture-local user.name/email instead reaches the intended conflict (exit 1,
+MERGE_HEAD present). The Pull command fixture now persists that identity and
+requires explicit configuration, avoiding dependence on host identity guessing.
+The locked talos-tools test with `--features git` and filter
+`native_command_conflict_preserves_partial_effects_without_repair` passes locally
+(one test). This supports a fixture defect diagnosis, but native Windows rerun
+is still required to confirm the CI failure is resolved. Production identity
+handling is unchanged.
+
 ## Runtime recursive acceptance — 2026-10-24
 
 A separate Runtime integration module now exercises initialized submodule
