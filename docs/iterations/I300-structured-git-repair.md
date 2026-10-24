@@ -8887,3 +8887,15 @@ Runtime failures on the next Windows run; it does not establish a Windows fix.
 Upstream reference: <https://github.com/git/git/blob/master/submodule.c>,
 `get_next_submodule` / `prepare_submodule_repo_env_in_gitdir`; inspected on
 2026-10-24 as a diagnostic lead, not proof of the CI failure cause.
+
+MCP running transport-error evidence: `c164279ff` adds an injected
+`ConnectionReset` while real native Pull is blocked in a post-merge hook with a
+descendant. The test asserts the error was observed, waits for owner shutdown,
+then releases the descendant barrier and verifies no delayed side effect and
+preserved completed integration. The full locked `talos-mcp --test
+git_pull_prepared` suite passed locally (3/3), including EOF disconnect and
+allow/deny/conflict/replay coverage; log `/private/tmp/i300-mcp-pull-all.log`.
+This is Unix local evidence, not native Windows or final exact-head acceptance.
+The initial default-profile build failed from ENOSPC before test execution;
+previously authorized `target/debug` cleanup and debug-info/incremental-disabled
+rebuild produced the passing result. No source or Git data was removed.
