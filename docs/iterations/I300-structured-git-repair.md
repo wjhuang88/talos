@@ -8860,3 +8860,19 @@ Standard release preflight also exited101 at talos-mcp/git_prepared:4 passed/4 f
 Linux comparison follow-up: CI3389/run40058631665 at diagnostic89f9d94d, job120767097863, failed109/3. Auto returned a successful shell result containing `/home/runner` rather than its workspace; the two descendant-readiness tests also failed. Parent aecd83cd, run39987142357 job120543638868, passed112/112, but raw setup logs show Ubuntu24.04/image20261012.334.1 there and Ubuntu26.04/image20261012.163.1 in3389. This is a confounded code/environment comparison. The default Agent constructor delegates to the same hook-aware constructor with an empty registry, excluding replacement of existing default handlers as one specific explanation; scheduling effects remain possible. Existing Bubblewrap mount ordering and lack of explicit chdir are a lead only: actual sandbox visibility has not been captured, and this local environment refuses namespace creation.
 
 A temporary PR735-only Linux comparison runs the unchanged full Desktop Clippy/test commands on pinned uninstrumented parent aecd83cd in a separate worktree on the same runner, after the candidate commands even when those fail. It records OS/image, bwrap availability/version and a real Rust std::env::temp_dir canonical classification. Factory naming is a source observation, not a selected-backend or namespace-visibility receipt. Sequential execution shares warm caches and possible residual state, so matching failures show that the baseline can also fail under these conditions, not complete causal equivalence. Normal-exit worktree cleanup is attempted; cancellation/timeout cleanup is not guaranteed. No candidate failure is masked, no assertion/filter/deadline is changed, and no sandbox production code is modified. This temporary comparison must be removed before any merge. Same-runner baseline results remain pending; no Linux root cause or Windows repair is claimed.
+## Exact-head Windows rerun — 2026-10-24
+
+CI run `40070455415` at `d7d04000a` reached terminal failure. The full locked
+workspace format/check/clippy/test job passed. Windows native execution passed
+the ordinary Runtime Pull scenario, but the recursive initialized-submodule
+scenario exited with code 1 and the production result only exposed the generic
+partial-effects error; the Git stderr needed to identify the cause was not
+retained by the test. The MCP Checkout matrix and network Push test hit their
+existing 30-second deadlines, the Tools native full-transfer Push baseline hit
+its 10-second deadline before Talos dispatch, and one Tools search compatibility
+test failed. Linux Desktop's separate explicit-feature job also failed three
+Desktop tests (workspace assertion and descendant readiness). This is not a
+green native-Windows or exact-head acceptance result. Preserve the log at
+`/private/tmp/i300-windows-current.log`; diagnose recursive Git with a minimal
+Windows reproduction or primary upstream evidence before changing production
+behavior.
