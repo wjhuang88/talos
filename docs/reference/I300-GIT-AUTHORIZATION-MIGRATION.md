@@ -13,7 +13,8 @@ leave partial effects; there is no automatic retry/reset/repair.
 The local candidate has real MCP fetch and Runtime -> Agent -> provider Auto ->
 Git integration evidence. Windows production preparation is enabled in the
 candidate, and the affected MSVC test targets cross-compile with `cargo xwin`;
-native Windows execution and exact-head CI remain unverified. Direct calls without
+native Windows execution is partially verified as detailed below; final exact-head CI
+and full acceptance remain open. Direct calls without
 prepared authorization remain refused. Final security acceptance is open. T7 is
 Active, not delivered or complete.
 Earlier checkpoints below are historical and do not override this boundary.
@@ -30,10 +31,10 @@ do not establish native Windows execution or live-model assessment quality.
 | Missing/stale/incomplete authority and frozen invocation | Tools `prepared_add_tests/native_pull.rs` and `prepared_add_tests/pull_command.rs` reject missing proof, plan/facet mismatch and argv/environment/cwd/program substitution before fetch | These Tools checks do not establish every cross-entry stale/replay case |
 | Configuration drift, configured hook, conflict partial effects | Tools `prepared_add_tests/pull_command.rs` checks drift refusal, approved hook execution, cancellation and retained conflict state | Unix hook cancellation does not prove Windows descendant cleanup |
 | Initialized/deinitialized recursive Pull | Tools `prepared_add_tests/native_pull_recursion.rs` exercises the command-authority path; Runtime `tests/support/i300_native_pull_recursion.rs` runs an Auto-approved initialized-child update, checking parent/child HEAD, child bytes and a Unix hook marker, with an ordinary native Git baseline | Runtime initialized-child test passes locally and on native Windows in run 40089763867; broader cross-entry recursive/helper coverage remains open |
-| Running Pull interruption | Runtime `tests/support/i300_native_pull_cancellation.rs` interrupts a real Pull in its post-merge hook, waits for cleanup and checks no delayed descendant write while completed integration remains | Test now compiles for Windows; execution evidence remains local Unix only, native Windows running cancellation remains open |
+| Running Pull interruption | Runtime `tests/support/i300_native_pull_cancellation.rs` interrupts a real Pull in its post-merge hook, waits for cleanup and checks no delayed descendant write while completed integration remains | Passes native Windows in run 40102073658 at 79f2ea9bd, including cleanup and retained-effects assertions; final-head validation remains open |
 | MCP connection EOF and read error | MCP `tests/support/git_pull_disconnect.rs` exercises real running Pull cleanup on EOF and injected ConnectionReset; waits for service/owned Git termination, releases a descendant barrier and checks no delayed write with completed integration intact | Both pass locally and on native Windows in run 40089763867, including an assertion that the injected error was observed; final exact-head validation remains required |
 | One-use admission and conservative fallback | Agent prepared-command and permission-session tests cover exact-plan binding, admission consumption and legacy Auto downgrade | Synthetic assessor scenarios do not substitute for actual Git effects |
-| Windows production execution | Production gate removed; affected MSVC test targets compile using cargo xwin and CI includes production Add/Pull tests | Native Windows run, including existing Push daemon regression, remains required |
+| Windows production execution | Production gate removed; affected MSVC test targets compile using cargo xwin and CI includes production Add/Pull tests | Run 40102073658 verifies native Pull cancellation and eligible Checkout cases; default git:// Push fails outside Talos too, while explicitly sideband-disabled Tools Push passes. Maintainer accepted this host limitation; final configured MCP Push and exact-head CI remain required |
 
 The original same-family Add/Commit/Checkout/Push, two-file index-preservation,
 diff fidelity, cancellation, documentation and final review/merge requirements
