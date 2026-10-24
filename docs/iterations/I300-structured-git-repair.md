@@ -1,3 +1,17 @@
+## Linux mount-order diagnostic candidate — 2026-10-24
+
+The PR-only Linux Desktop diagnostic now compares native Bubblewrap execution
+with the current mount order against tmpfs-before-workspace plus explicit
+`--chdir`. Each uses a disposable `/tmp` workspace and checks a marker through
+the sandbox. This tests the hypothesis that the current later `/tmp` mount
+hides the workspace and causes Bubblewrap's cwd fallback. Upstream source
+(`https://github.com/containers/bubblewrap/blob/main/bubblewrap.c`, cwd selection)
+supports the hypothesis, but is not runtime proof. CI execution is pending;
+namespace/mount failures must be distinguished from marker invisibility.
+No production sandbox fix or root-cause confirmation is claimed. Remove the
+temporary diagnostic before merge. Production changes require their applicable
+scope authorization and security review.
+
 ## MCP running Pull disconnect — 2026-10-24
 
 A separate Unix transport fixture now disconnects an actual native Pull while
