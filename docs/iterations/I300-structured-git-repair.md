@@ -1,3 +1,29 @@
+## Terminal CI and recursive fixture correction — 2026-10-24
+
+Run 40073444119 at `c164279ff` is terminal: the macOS standard validation job
+passes; Linux Desktop fails the same three cwd/readiness cases; Windows Desktop
+passes but structured Git and workspace tests fail. Windows log:
+`/private/tmp/i300-windows-c164.log`. Runtime recursion fails in ordinary native
+Git before Runtime dispatch: the child file is dirty after changing autocrlf
+after its clone. MCP Checkout completes 16 cases (roughly 1.1–2.5 seconds each)
+before reaching its aggregate 30-second deadline in the next case. Network Push
+still times out; Tools has exactly one failed test, the default-sideband native
+full-transfer baseline, not the intentional Search panic-recovery tests.
+
+The recursive fixture now sets autocrlf=false on fixture commands before clone
+and checks initial child bytes/clean status for both clones. With an injected
+autocrlf=true command environment, the previous helper reproduces CRLF bytes;
+this environment is intentionally rejected by production authorization, so it
+is fixture reproduction evidence only. The corrected ordinary Runtime suite
+passes 3/3 (`/private/tmp/i300-recursion-eol-fixed.log`). Native Windows rerun is
+required. Production configuration policy and behavior are unchanged.
+
+Runtime cancellation and MCP EOF/read-error fixtures are also enabled for
+Windows, retaining Unix-only chmod. Host suites pass 6/6 and cargo-xwin MSVC
+test-target checking passes (`/private/tmp/i300-cross-platform-pull-cleanup-host.log`,
+`/private/tmp/i300-cross-platform-pull-cleanup-xwin.log`). Native Windows cleanup
+is not established by compilation. T7 and all original handoff work remain open.
+
 ## Windows independent transport control candidate — 2026-10-24
 
 Upstream's current [Known Issues](https://github.com/git-for-windows/build-extra/blob/main/ReleaseNotes.md#known-issues)

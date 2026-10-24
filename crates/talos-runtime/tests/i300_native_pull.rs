@@ -26,6 +26,8 @@ fn git(root: &Path, args: &[&str]) -> Vec<u8> {
             "maintenance.autoDetach=false",
             "-c",
             "gc.autoDetach=false",
+            "-c",
+            "core.autocrlf=false",
         ])
         .args(args)
         .output()
