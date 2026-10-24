@@ -1,3 +1,40 @@
+## Runtime recursive acceptance — 2026-10-24
+
+A separate Runtime integration module now exercises initialized submodule
+recursion through the actual Runtime -> Agent -> Auto -> supervised Git path.
+It checks one Auto review and no final human approval, parent and child commit
+identities, updated child bytes, and on Unix a child post-checkout hook marker.
+Both Runtime integration tests pass locally
+(`/private/tmp/i300-runtime-recursion.log`). Windows execution of this new
+fixture remains pending. The sandboxed standard preflight failed at the
+process-observer EPERM boundary (Tools 933/1). Its authorized follow-up completed
+with exit 0, including workspace tests and external SDK fixtures
+(`/private/tmp/i300-recursion-preflight.log`).
+The recursive fixture also passes locked MSVC cargo-xwin checking
+(`/private/tmp/i300-runtime-recursion-xwin.log`), which is compilation only.
+
+A separate Unix Runtime cancellation module now interrupts an actual approved
+Pull while its post-merge hook and descendant are running. The public interrupt
+returns a Cancelled terminal; successful Runtime shutdown confirms cleanup,
+and releasing the descendant's write barrier produces no delayed file. Already
+integrated HEAD and bytes remain intact. All three Runtime integration tests
+pass (`/private/tmp/i300-runtime-cancellation.log`). This new cancellation test
+postdates the full preflight above; Windows running cancellation, MCP connection
+cleanup and final gates remain open.
+
+## Windows rerun failure separation — 2026-10-24
+
+Attempt 2 of run 39987142357 remains failed at published head `aecd83cd0`.
+Desktop explicit-feature validation now passes, including the earlier Auto
+watchdog case; its original intermittent cause remains unknown. Workspace
+validation instead fails MCP Checkout's aggregate deadline, MCP network Push's
+deadline, Tools native Pull conflict's missing MERGE_HEAD, and Tools network
+Push's native full-transfer baseline deadline. The latter fails before Talos
+dispatch, but uses the shared supervised launcher and does not alone establish
+an upstream-only cause. Do not treat this rerun as green Windows acceptance.
+Full rerun log: `/private/tmp/i300-windows-attempt2.log`. Newer Runtime/MCP
+failure and recursion fixtures are not covered by this published head.
+
 ## Native Windows candidate evidence — 2026-10-24
 
 CI run 39987142357 at `aecd83cd0` completed with failure. The full Windows job

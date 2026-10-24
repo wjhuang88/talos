@@ -303,3 +303,10 @@ async fn runtime_pull_executes_auto_or_human_fallback_and_preserves_explicit_pol
         runtime.shutdown().await.expect("shutdown");
     }
 }
+
+#[path = "support/i300_native_pull_recursion.rs"]
+mod recursion;
+
+#[cfg(unix)]
+#[path = "support/i300_native_pull_cancellation.rs"]
+mod cancellation;
