@@ -138,6 +138,16 @@ struct ApiModel {
     attachment: Option<bool>,
     #[serde(default)]
     release_date: Option<String>,
+    #[serde(default)]
+    provider: Option<ApiModelProvider>,
+}
+
+#[derive(Deserialize)]
+struct ApiModelProvider {
+    #[serde(default)]
+    npm: Option<String>,
+    #[serde(default)]
+    shape: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -157,6 +167,7 @@ struct ApiCost {
     #[serde(default)]
     cache_read: Option<f64>,
 }
+
 fn parse_api_json(json: &str) -> Result<(Vec<TomlProvider>, Vec<TomlModel>), String> {
     let root: BTreeMap<String, ApiProvider> =
         serde_json::from_str(json).map_err(|e| format!("parse api.json: {e}"))?;
@@ -216,10 +227,12 @@ fn parse_api_json(json: &str) -> Result<(Vec<TomlProvider>, Vec<TomlModel>), Str
                 .as_ref()
                 .and_then(|l| l.output)
                 .map(|v| v as u32);
+            let protocol = infer_model_protocol(model.provider.as_ref(), provider.npm.as_deref());
 
             models.push(TomlModel {
                 id: model_id.clone(),
                 provider: provider_id.clone(),
+                protocol,
                 context_limit,
                 output_limit,
                 release_date: model.release_date.clone(),
@@ -286,9 +299,44 @@ fn infer_provider_protocol(
 }
 
 #[derive(Clone, Deserialize, Serialize)]
+enum TomlModelProtocol {
+    #[serde(rename = "anthropic-messages")]
+    AnthropicMessages,
+    #[serde(rename = "openai-chat")]
+    OpenAIChat,
+    #[serde(rename = "openai-responses")]
+    OpenAIResponses,
+}
+
+fn infer_model_protocol(
+    model_provider: Option<&ApiModelProvider>,
+    provider_npm: Option<&str>,
+) -> Option<TomlModelProtocol> {
+    if let Some(shape) = model_provider.and_then(|provider| provider.shape.as_deref()) {
+        return match shape.trim() {
+            "responses" => Some(TomlModelProtocol::OpenAIResponses),
+            "completions" => Some(TomlModelProtocol::OpenAIChat),
+            _ => None,
+        };
+    }
+
+    let npm_package = model_provider
+        .and_then(|provider| provider.npm.as_deref())
+        .or(provider_npm);
+    match npm_package.map(str::trim) {
+        Some("@ai-sdk/anthropic") => Some(TomlModelProtocol::AnthropicMessages),
+        Some("@ai-sdk/openai") => Some(TomlModelProtocol::OpenAIResponses),
+        Some("@ai-sdk/openai-compatible") => Some(TomlModelProtocol::OpenAIChat),
+        _ => None,
+    }
+}
+
+#[derive(Clone, Deserialize, Serialize)]
 struct TomlModel {
     id: String,
     provider: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    protocol: Option<TomlModelProtocol>,
     #[serde(skip_serializing_if = "Option::is_none")]
     context_limit: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
