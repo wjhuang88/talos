@@ -19,6 +19,9 @@ fn repositories() -> (tempfile::TempDir, PathBuf, PathBuf) {
         ],
     );
     git(&local, &["config", "pull.rebase", "false"]);
+    git(&local, &["config", "user.useConfigOnly", "true"]);
+    git(&local, &["config", "user.name", "Native Pull fixture"]);
+    git(&local, &["config", "user.email", "fixture@example.invalid"]);
     std::fs::write(source.join("file"), "remote\n").expect("file");
     git(&source, &["commit", "-am", "remote"]);
     (root, source, local)
