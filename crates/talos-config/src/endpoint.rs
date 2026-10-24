@@ -3,7 +3,7 @@ use crate::ProviderProtocol;
 /// Provider endpoint normalized for Talos provider adapters.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NormalizedProviderEndpoint {
-    /// Protocol adapter implied by the endpoint.
+    /// Protocol adapter confirmed by the endpoint shape, if any.
     pub protocol: ProviderProtocol,
     /// Base URL in the shape expected by that protocol adapter.
     pub base_url: String,
@@ -11,11 +11,12 @@ pub struct NormalizedProviderEndpoint {
 
 /// Normalize catalog or user-entered provider endpoints.
 ///
-/// OpenAI-compatible providers expect a gateway root because the OpenAI adapter
-/// appends `/chat/completions`. Anthropic-compatible providers expect the full
-/// `/messages` endpoint. Endpoint shape is intentionally conservative: a generic
-/// OpenAI-compatible root remains `openai-chat`; Responses is selected only by
-/// explicit or confirmed catalog/provider evidence, never by URL guessing.
+/// OpenAI-compatible providers expect a gateway root because the OpenAI Chat adapter appends
+/// `/chat/completions`. Anthropic-compatible providers expect the full `/messages` endpoint.
+/// Endpoint shape is intentionally conservative: a generic OpenAI-compatible root carries no
+/// protocol evidence (`Unspecified`); an explicit `/chat/completions` path confirms Chat, while
+/// Responses is selected only by explicit or confirmed catalog/provider evidence, never by URL
+/// guessing.
 #[must_use]
 pub fn normalize_provider_endpoint(url: &str) -> NormalizedProviderEndpoint {
     let trimmed = url.trim().trim_end_matches('/');
@@ -35,6 +36,7 @@ pub fn normalize_provider_endpoint(url: &str) -> NormalizedProviderEndpoint {
         };
     }
 
+    let explicit_chat_endpoint = lower.ends_with("/chat/completions");
     let base_url = lower
         .strip_suffix("/chat/completions")
         .map(|_| &trimmed[..trimmed.len() - "/chat/completions".len()])
@@ -42,7 +44,11 @@ pub fn normalize_provider_endpoint(url: &str) -> NormalizedProviderEndpoint {
         .to_string();
 
     NormalizedProviderEndpoint {
-        protocol: ProviderProtocol::OpenAIChat,
+        protocol: if explicit_chat_endpoint {
+            ProviderProtocol::OpenAIChat
+        } else {
+            ProviderProtocol::Unspecified
+        },
         base_url,
     }
 }
@@ -155,10 +161,10 @@ mod tests {
     }
 
     #[test]
-    fn preserves_openai_gateway_root() {
+    fn generic_openai_gateway_root_has_no_protocol_evidence() {
         let endpoint = normalize_provider_endpoint("https://example.test/v1/");
 
-        assert_eq!(endpoint.protocol, ProviderProtocol::OpenAIChat);
+        assert_eq!(endpoint.protocol, ProviderProtocol::Unspecified);
         assert_eq!(endpoint.base_url, "https://example.test/v1");
     }
 
@@ -223,7 +229,7 @@ mod tests {
         assert!(result.is_ok());
         assert_eq!(
             result.expect("operation should succeed").protocol,
-            ProviderProtocol::OpenAIChat
+            ProviderProtocol::Unspecified
         );
     }
 
