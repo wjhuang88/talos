@@ -19,7 +19,7 @@
 | Governance Claim PR | #758 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer requested session-handoff and failing-CI closure; no distinct maintainer reviewer available. Independent Agent security review, exact-head CI, both validators and merge-time CAS remain mandatory. Ineffective until merged to main. |
-| Implementation PR | Not started |
+| Implementation PR | #759 |
 | Last Updated | 2026-10-24 |
 | Handoff / Release Condition | Governance-only preparation; implement only after effective claim. No release authorization. |
 
