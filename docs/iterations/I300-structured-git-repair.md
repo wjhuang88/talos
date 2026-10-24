@@ -1,3 +1,22 @@
+## Windows independent transport control candidate — 2026-10-24
+
+Upstream's current [Known Issues](https://github.com/git-for-windows/build-extra/blob/main/ReleaseNotes.md#known-issues)
+still lists indefinite `git://` Push hangs and the sideband-off workaround.
+[#907's maintainer explanation](https://github.com/git-for-windows/git/issues/907#issuecomment-2208798208)
+states that closed status does not mean fixed, and explains the loss/delay of
+remote errors when disabling sideband. This supports a compatibility hypothesis,
+not attribution of our current native runner failure.
+
+A temporary PR-only PowerShell diagnostic now starts native Git daemon and
+Push directly via `Start-Process`, without any Talos launcher or Job primitive.
+Separate empty bare receivers compare default and explicit sideband-off transfer,
+print actual refs, retain command errors, and bound readiness/execution/cleanup.
+Timed-out senders and the receiver daemon are terminated using Windows
+`taskkill /T`; unconfirmed cleanup fails the diagnostic and retains its fixture.
+PowerShell parser validation and diff checks pass locally. Native execution is
+pending; this is not Windows acceptance or a production sideband override.
+Remove the script and temporary CI step before merge after recording results.
+
 ## Linux mount-order diagnostic candidate — 2026-10-24
 
 The PR-only Linux Desktop diagnostic now compares native Bubblewrap execution
