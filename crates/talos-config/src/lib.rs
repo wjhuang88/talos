@@ -10,6 +10,7 @@ pub mod variant;
 
 mod atomic_file;
 mod builtin;
+mod catalog_protocol;
 mod config;
 mod credentials;
 mod endpoint;
@@ -32,7 +33,8 @@ pub use endpoint::{
 };
 pub use error::ConfigError;
 pub use protocol_resolution::{
-    ProtocolResolution, ProtocolResolutionSource, infer_models_dev_model_protocol, resolve_protocol,
+    ProtocolResolution, ProtocolResolutionSource, infer_models_dev_model_protocol,
+    resolve_config_provider_protocol, resolve_protocol,
 };
 pub use store::ConfigStore;
 pub use types::{

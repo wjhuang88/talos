@@ -4,7 +4,10 @@
 //! independent from any one wire family and lets PROVIDER-008-A add future protocol variants without
 //! re-encoding the decision tree in CLI/Desktop call sites.
 
-use crate::ProviderProtocol;
+use crate::{
+    Config, ProviderProtocol, builtin_provider_config, catalog_protocol::builtin_model_protocol,
+    normalize_provider_endpoint,
+};
 
 /// Provenance for one effective provider protocol.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -101,9 +104,71 @@ pub fn resolve_protocol<T: Clone>(
     }
 }
 
+/// Resolves the active config's effective provider protocol, including packaged model evidence.
+///
+/// This is the runtime resolver used by provider construction. It inspects raw user configuration
+/// (rather than the merged provider view) so an omitted protocol remains distinguishable from an
+/// explicit `openai-chat` rollback.
+#[must_use]
+pub fn resolve_config_provider_protocol(
+    config: &Config,
+) -> ProtocolResolution<ProviderProtocol> {
+    let catalog_model = builtin_model_protocol(&config.provider, &config.model);
+    resolve_config_provider_protocol_with_catalog_signal(config, catalog_model)
+}
+
+fn resolve_config_provider_protocol_with_catalog_signal(
+    config: &Config,
+    catalog_model: Option<ProviderProtocol>,
+) -> ProtocolResolution<ProviderProtocol> {
+    let user_provider = config.providers.get(&config.provider);
+    let model_explicit = user_provider
+        .and_then(|provider| provider.models.get(&config.model))
+        .and_then(|model| model.protocol.clone())
+        .filter(|protocol| !protocol.is_unspecified());
+    let provider_explicit = user_provider
+        .map(|provider| provider.protocol.clone())
+        .filter(|protocol| !protocol.is_unspecified());
+
+    let endpoint_signal = user_provider
+        .and_then(|provider| provider.base_url.as_deref())
+        .map(normalize_provider_endpoint)
+        .and_then(|endpoint| {
+            (endpoint.protocol == ProviderProtocol::AnthropicMessages)
+                .then_some(ProviderProtocol::AnthropicMessages)
+        });
+
+    let confirmed_provider_default = if config.provider == "openai" {
+        let official_endpoint = user_provider
+            .and_then(|provider| provider.base_url.as_deref())
+            .is_none_or(|url| url.trim().trim_end_matches('/') == "https://api.openai.com/v1");
+        if official_endpoint {
+            Some(ProviderProtocol::OpenAIResponses)
+        } else {
+            endpoint_signal
+        }
+    } else {
+        builtin_provider_config(&config.provider)
+            .map(|provider| provider.protocol)
+            .filter(|protocol| !protocol.is_unspecified())
+            .or(endpoint_signal)
+    };
+
+    resolve_protocol(
+        model_explicit,
+        provider_explicit,
+        catalog_model.filter(|protocol| !protocol.is_unspecified()),
+        confirmed_provider_default,
+        ProviderProtocol::OpenAIChat,
+    )
+}
+
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use super::*;
+    use crate::{ModelConfig, ProviderConfig};
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     enum Protocol {
@@ -220,5 +285,75 @@ mod tests {
             infer_models_dev_model_protocol(Some("@ai-sdk/openai"), Some("future-shape")),
             None
         );
+    }
+
+    fn config_with_provider(provider: &str, model: &str) -> Config {
+        Config {
+            provider: provider.into(),
+            model: model.into(),
+            ..Config::default()
+        }
+    }
+
+    #[test]
+    fn config_model_explicit_beats_provider_explicit_and_catalog() {
+        let mut config = config_with_provider("openai", "o3");
+        config.providers.insert(
+            "openai".into(),
+            ProviderConfig {
+                protocol: ProviderProtocol::OpenAIResponses,
+                models: HashMap::from([(
+                    "o3".into(),
+                    ModelConfig {
+                        protocol: Some(ProviderProtocol::OpenAIChat),
+                        ..Default::default()
+                    },
+                )]),
+                ..Default::default()
+            },
+        );
+        let resolved = resolve_config_provider_protocol_with_catalog_signal(
+            &config,
+            Some(ProviderProtocol::AnthropicMessages),
+        );
+        assert_eq!(resolved.protocol, ProviderProtocol::OpenAIChat);
+        assert_eq!(resolved.source, ProtocolResolutionSource::Configured);
+    }
+
+    #[test]
+    fn config_provider_explicit_chat_beats_catalog_responses() {
+        let mut config = config_with_provider("gateway", "o3");
+        config.providers.insert(
+            "gateway".into(),
+            ProviderConfig {
+                protocol: ProviderProtocol::OpenAIChat,
+                ..Default::default()
+            },
+        );
+        let resolved = resolve_config_provider_protocol_with_catalog_signal(
+            &config,
+            Some(ProviderProtocol::OpenAIResponses),
+        );
+        assert_eq!(resolved.protocol, ProviderProtocol::OpenAIChat);
+        assert_eq!(resolved.source, ProtocolResolutionSource::Configured);
+    }
+
+    #[test]
+    fn config_catalog_signal_beats_official_openai_default() {
+        let config = config_with_provider("openai", "legacy-model");
+        let resolved = resolve_config_provider_protocol_with_catalog_signal(
+            &config,
+            Some(ProviderProtocol::OpenAIChat),
+        );
+        assert_eq!(resolved.protocol, ProviderProtocol::OpenAIChat);
+        assert_eq!(resolved.source, ProtocolResolutionSource::CatalogInferred);
+    }
+
+    #[test]
+    fn config_unconfirmed_gateway_falls_back_to_chat() {
+        let config = config_with_provider("gateway", "unknown-model");
+        let resolved = resolve_config_provider_protocol_with_catalog_signal(&config, None);
+        assert_eq!(resolved.protocol, ProviderProtocol::OpenAIChat);
+        assert_eq!(resolved.source, ProtocolResolutionSource::Default);
     }
 }

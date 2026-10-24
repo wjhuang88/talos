@@ -6,7 +6,7 @@
 
 use std::sync::Arc;
 
-use talos_config::{Config, ProviderProtocol};
+use talos_config::{Config, ProviderProtocol, resolve_config_provider_protocol};
 use talos_core::provider::{LanguageModel, ProviderError, ProviderResult};
 
 use crate::{AnthropicProvider, OpenAIResponsesProvider, openai::OpenAIProvider};
@@ -38,7 +38,7 @@ pub fn build_configured_provider(
     let output_limit = Some(effective_output_limit(config));
     let timeout = provider_config.timeout;
     let base_url = config.base_url();
-    let resolution = config.resolve_provider_protocol();
+    let resolution = resolve_config_provider_protocol(config);
 
     match resolution.protocol {
         ProviderProtocol::AnthropicMessages => {
