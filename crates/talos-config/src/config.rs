@@ -1,7 +1,7 @@
 use crate::{
-    Config, ConfigError, ConfigStore, ConfigUnsetOutcome, Credentials, ModelConfig, ProviderConfig,
-    ProviderProtocol, builtin_provider_config, home_dir, model, normalize_provider_endpoint,
-    opencode,
+    Config, ConfigError, ConfigStore, ConfigUnsetOutcome, Credentials, ModelConfig,
+    ProtocolResolution, ProviderConfig, ProviderProtocol, builtin_provider_config, home_dir, model,
+    normalize_provider_endpoint, opencode, resolve_protocol,
 };
 use std::env;
 use std::path::PathBuf;
@@ -152,10 +152,59 @@ impl Config {
         self.active_provider_config().base_url
     }
 
-    /// Returns the active provider protocol.
+    /// Returns the active provider protocol using the legacy merged-config behavior.
+    ///
+    /// Runtime activation of the new resolver is intentionally a later atomic step with the
+    /// Responses provider factory. Call [`Config::resolve_provider_protocol`] to inspect the future
+    /// effective protocol and provenance without changing dispatch behavior yet.
     #[must_use]
     pub fn provider_protocol(&self) -> ProviderProtocol {
         self.active_provider_config().protocol
+    }
+
+    /// Resolves the provider wire protocol without endpoint probing or cross-protocol retry.
+    ///
+    /// This stage wires provider-explicit intent and confirmed provider defaults into the shared
+    /// resolver. Model-explicit and catalog-model candidates are added by the subsequent catalog
+    /// stage, so their positions are intentionally passed as `None` here rather than approximated.
+    #[must_use]
+    pub fn resolve_provider_protocol(&self) -> ProtocolResolution<ProviderProtocol> {
+        let user_provider = self.providers.get(&self.provider);
+        let provider_explicit = user_provider
+            .map(|provider| provider.protocol.clone())
+            .filter(|protocol| !protocol.is_unspecified());
+
+        let endpoint_signal = user_provider
+            .and_then(|provider| provider.base_url.as_deref())
+            .map(normalize_provider_endpoint)
+            .and_then(|endpoint| {
+                (endpoint.protocol == ProviderProtocol::AnthropicMessages)
+                    .then_some(ProviderProtocol::AnthropicMessages)
+            });
+
+        let confirmed_provider_default = if self.provider == "openai" {
+            let official_endpoint = user_provider
+                .and_then(|provider| provider.base_url.as_deref())
+                .is_none_or(|url| url.trim().trim_end_matches('/') == "https://api.openai.com/v1");
+            if official_endpoint {
+                Some(ProviderProtocol::OpenAIResponses)
+            } else {
+                endpoint_signal
+            }
+        } else {
+            builtin_provider_config(&self.provider)
+                .map(|provider| provider.protocol)
+                .filter(|protocol| !protocol.is_unspecified())
+                .or(endpoint_signal)
+        };
+
+        resolve_protocol(
+            None,
+            provider_explicit,
+            None,
+            confirmed_provider_default,
+            ProviderProtocol::OpenAIChat,
+        )
     }
 
     #[must_use]
@@ -295,25 +344,34 @@ impl Config {
     pub fn active_provider_config(&self) -> ProviderConfig {
         let mut config = builtin_provider_config(&self.provider).unwrap_or_default();
         if let Some(user_config) = self.providers.get(&self.provider) {
-            if !matches!(user_config.protocol, ProviderProtocol::OpenAIChat)
-                || builtin_provider_config(&self.provider).is_none()
-            {
+            let protocol_explicit = !user_config.protocol.is_unspecified();
+            if protocol_explicit {
                 config.protocol = user_config.protocol.clone();
             }
             if user_config.base_url.is_some() {
-                let endpoint = normalize_provider_endpoint(
-                    user_config.base_url.as_deref().unwrap_or_default(),
-                );
-                if endpoint.protocol == ProviderProtocol::AnthropicMessages
+                let raw_base_url = user_config.base_url.as_deref().unwrap_or_default();
+                let endpoint = normalize_provider_endpoint(raw_base_url);
+                if protocol_explicit {
+                    let compatible_normalization = matches!(
+                        (&user_config.protocol, &endpoint.protocol),
+                        (
+                            ProviderProtocol::AnthropicMessages,
+                            ProviderProtocol::AnthropicMessages
+                        ) | (ProviderProtocol::OpenAIChat, ProviderProtocol::OpenAIChat)
+                    );
+                    config.base_url = Some(if compatible_normalization {
+                        endpoint.base_url
+                    } else {
+                        raw_base_url.trim().trim_end_matches('/').to_string()
+                    });
+                } else if endpoint.protocol == ProviderProtocol::AnthropicMessages
+                    || config.protocol.is_unspecified()
                     || config.protocol == ProviderProtocol::OpenAIChat
                 {
                     config.protocol = endpoint.protocol;
                     config.base_url = Some(endpoint.base_url);
                 } else {
-                    config.base_url = user_config
-                        .base_url
-                        .as_deref()
-                        .map(|url| url.trim().trim_end_matches('/').to_string());
+                    config.base_url = Some(raw_base_url.trim().trim_end_matches('/').to_string());
                 }
             }
             if user_config.api_key.is_some() {
@@ -324,6 +382,9 @@ impl Config {
             }
             config.models.extend(user_config.models.clone());
             config.timeout = user_config.timeout.clone();
+        }
+        if config.protocol.is_unspecified() {
+            config.protocol = ProviderProtocol::OpenAIChat;
         }
         config
     }

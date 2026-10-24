@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use talos_config::{Config, McpConfig, ProviderProtocol};
+use talos_config::{Config, McpConfig};
 use talos_mcp::types::{McpClientConfig, McpServerLaunchConfig};
 
 pub(crate) fn config_to_mcp_client_config(config: &McpConfig) -> McpClientConfig {
@@ -42,10 +42,7 @@ pub(crate) fn parse_provider(s: &str) -> anyhow::Result<String> {
 /// and Agent budget use this same value.
 #[must_use]
 pub(crate) fn effective_output_limit(config: &Config) -> u32 {
-    config.output_limit().unwrap_or_else(|| {
-        let (context_limit, _) = config.resolve_model_limits();
-        (context_limit / 4).clamp(4096, 32_768).min(context_limit)
-    })
+    talos_provider::openai_responses::factory::effective_output_limit(config)
 }
 
 pub(crate) fn build_provider(
@@ -68,63 +65,36 @@ pub(crate) fn build_provider(
     if mock {
         use talos_provider::mock::MockProvider;
         let api_key = api_key.to_string();
-        let model = config.model.clone();
-        let base_url = config.base_url();
-        let provider_protocol = config.provider_protocol();
+        let debug_config = config.clone();
         return Arc::new(
             MockProvider::new().with_request_debug_builder(move |messages| {
-                let snapshot = match &provider_protocol {
-                    ProviderProtocol::AnthropicMessages => {
-                        talos_provider::anthropic_request_debug_snapshot(
-                            &api_key,
-                            &model,
-                            base_url.as_deref(),
-                            messages,
-                        )
-                    }
-                    ProviderProtocol::OpenAIChat => {
-                        talos_provider::openai::openai_request_debug_snapshot(
-                            &api_key,
-                            &model,
-                            base_url.as_deref(),
-                            messages,
-                        )
-                    }
-                };
-                serde_json::to_string(&snapshot).unwrap_or_else(|_| snapshot.to_string())
+                match talos_provider::openai_responses::factory::build_configured_provider(
+                    &debug_config,
+                    &api_key,
+                ) {
+                    Ok(provider) => provider
+                        .request_preview(messages)
+                        .map(|snapshot| {
+                            serde_json::to_string(&snapshot)
+                                .unwrap_or_else(|_| snapshot.to_string())
+                        })
+                        .unwrap_or_else(|| {
+                            serde_json::json!({
+                                "error": "selected provider does not expose a request preview",
+                            })
+                            .to_string()
+                        }),
+                    Err(error) => serde_json::json!({
+                        "error": error.to_string(),
+                    })
+                    .to_string(),
+                }
             }),
         );
     }
-    match config.provider_protocol() {
-        ProviderProtocol::AnthropicMessages => {
-            let mut provider = talos_provider::AnthropicProvider::new(api_key, &config.model);
-            if let Some(base_url) = config.base_url() {
-                provider = provider.with_base_url(base_url);
-            }
-            let provider_config = config.active_provider_config();
-            let model_config = provider_config.models.get(&config.model).cloned();
-            provider = provider.with_reasoning(
-                model_config.as_ref().and_then(|m| m.reasoning.clone()),
-                Some(effective_output_limit(config)),
-            );
-            provider = provider.with_timeout_config(provider_config.timeout.clone());
-            Arc::new(provider)
-        }
-        ProviderProtocol::OpenAIChat => {
-            let mut provider = talos_provider::openai::OpenAIProvider::new(api_key, &config.model);
-            if let Some(base_url) = config.base_url() {
-                provider = provider.with_base_url(base_url);
-            }
-            let provider_config = config.active_provider_config();
-            let model_config = provider_config.models.get(&config.model).cloned();
-            provider = provider.with_reasoning(
-                model_config.as_ref().and_then(|m| m.reasoning.clone()),
-                Some(effective_output_limit(config)),
-            );
-            provider = provider.with_timeout_config(provider_config.timeout.clone());
-            Arc::new(provider)
-        }
-    }
+
+    talos_provider::openai_responses::factory::build_configured_provider(config, api_key)
+        .unwrap_or_else(|error| panic!("failed to build configured provider: {error}"))
 }
 
 #[cfg(test)]
@@ -150,6 +120,7 @@ mod tests {
             .expect("real provider request preview");
         preview
             .pointer("/body/reasoning_effort")
+            .or_else(|| preview.pointer("/body/reasoning/effort"))
             .and_then(serde_json::Value::as_str)
             .map(str::to_string)
     }
