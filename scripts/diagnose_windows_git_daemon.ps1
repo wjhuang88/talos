@@ -3,7 +3,7 @@ $ErrorActionPreference = 'Stop'
 if (-not $IsWindows) { throw 'This diagnostic requires native Windows.' }
 $probeRoot = Join-Path ([IO.Path]::GetTempPath()) ('talos-native-push-' + [guid]::NewGuid())
 $processes = [Collections.Generic.List[Diagnostics.Process]]::new()
-$gitExe = (Get-Command git -CommandType Application).Source
+$gitExe = (Get-Command git -CommandType Application | Select-Object -First 1).Source
 function Invoke-FixtureGit {
     param([string]$Directory, [string[]]$GitArgs)
     & $gitExe -C $Directory @GitArgs
