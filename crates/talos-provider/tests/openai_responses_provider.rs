@@ -57,8 +57,8 @@ fn public_factory_builds_responses_for_confirmed_official_openai_default() {
         .set_active_model("openai/o3")
         .expect("packaged OpenAI model");
 
-    let provider = factory::build_configured_provider(&config, "sk-test")
-        .expect("configured provider builds");
+    let provider =
+        factory::build_configured_provider(&config, "sk-test").expect("configured provider builds");
     assert_eq!(
         provider.protocol_capabilities(),
         CapabilityProbe::Known(ProtocolCapabilities {
