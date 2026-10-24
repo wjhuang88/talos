@@ -1,5 +1,8 @@
 # Talos Board
 
+[I307](iterations/I307-bubblewrap-workspace-visibility.md) / #757 is proposed Active /
+Claimed in #758, ineffective until merge: bounded Linux workspace visibility repair; no implementation yet.
+
 This board is a derived operating view. It is not the source of truth for story scope,
 acceptance criteria, verification evidence, or iteration state.
 
