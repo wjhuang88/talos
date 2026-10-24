@@ -1,6 +1,6 @@
 # Iteration I307: Bubblewrap Workspace Visibility
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-10-24
 > Planned objective: restore the authorized Linux workspace after temporary mounts without expanding writable scope.
 > Baseline rule: preserve this bounded repair; broader sandbox redesign requires a separate owner.
@@ -10,13 +10,13 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | SANDBOX-001: Linux Bubblewrap workspace mount order, explicit cwd, isolation tests and docs; no Git admission, fallback policy, dependencies or API changes. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-10-24 |
 | Source Issue | #757 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #758 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer requested session-handoff and failing-CI closure; no distinct maintainer reviewer available. Independent Agent security review, exact-head CI, both validators and merge-time CAS remain mandatory. Ineffective until merged to main. |
 | Implementation PR | Not started |
@@ -83,3 +83,9 @@ produces exact workspace cwd and visible marker. This proves the probe, not
 a product fix. Independent Agent scope/security review requires the acceptance
 above and separate effective claim before coding. No implementation or completion
 is claimed; I300 and the full handoff remain incomplete.
+
+## Proposed Atomic Activation
+
+Claim and Active state above are proposed by #758 and become effective only
+when its finalized reviewed head merges to main. Both validators passed before
+PR creation; repeat them and target-branch CAS on the finalized candidate.

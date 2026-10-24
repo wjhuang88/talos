@@ -1,6 +1,6 @@
 # Iterations
 
-[I307](I307-bubblewrap-workspace-visibility.md) is Planned / Unclaimed: #757,
+[I307](I307-bubblewrap-workspace-visibility.md) is proposed Active / Claimed in #758: #757,
 bounded Linux Bubblewrap workspace visibility repair. Its owner records the
 nonterminal inventory; governance claim must merge before implementation.
 
