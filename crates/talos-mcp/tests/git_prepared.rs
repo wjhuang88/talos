@@ -20,6 +20,8 @@ async fn real_checkout_transport_denial_success_and_replay() {
             if (nonempty || initialized) && !cfg!(unix) { continue; }
             let kind = if initialized { kind - 8 } else if nonempty { kind - 4 } else { kind };
             if kind == 3 && !cfg!(unix) { continue; }
+            let case_started = std::time::Instant::now();
+            eprintln!("checkout case start: allowed={allowed}, kind={kind}, initialized={initialized}, nonempty={nonempty}");
             let gitlink = !matches!(kind, 0 | 7 | 8);
             let reverse = matches!(kind, 2 | 4 | 5 | 6 | 9);
             let new_directory = kind >= 10;
@@ -242,6 +244,7 @@ async fn real_checkout_transport_denial_success_and_replay() {
             }
             drop(read); drop(write);
             task.await.expect("joined");
+            eprintln!("checkout case complete: allowed={allowed}, kind={kind}, elapsed={:?}", case_started.elapsed());
         }
     }).await.expect("test deadline");
 }
