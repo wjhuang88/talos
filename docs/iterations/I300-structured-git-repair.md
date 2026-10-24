@@ -8869,10 +8869,21 @@ scenario exited with code 1 and the production result only exposed the generic
 partial-effects error; the Git stderr needed to identify the cause was not
 retained by the test. The MCP Checkout matrix and network Push test hit their
 existing 30-second deadlines, the Tools native full-transfer Push baseline hit
-its 10-second deadline before Talos dispatch, and one Tools search compatibility
-test failed. Linux Desktop's separate explicit-feature job also failed three
+its 10-second deadline before Talos dispatch. The Tools summary was 890 passed
+and one failed: that same Push baseline, not a search compatibility failure.
+The search chain test emitted its intentional synthetic panic and finished `ok`.
+Linux Desktop's separate explicit-feature job also failed three
 Desktop tests (workspace assertion and descendant readiness). This is not a
 green native-Windows or exact-head acceptance result. Preserve the log at
 `/private/tmp/i300-windows-current.log`; diagnose recursive Git with a minimal
 Windows reproduction or primary upstream evidence before changing production
 behavior.
+
+Diagnostic follow-up: `fc242b850` adds a separate native Git recursive Pull
+baseline from the same source revision and transport configuration before the
+Runtime operation. The locked Runtime recursion test passed locally on macOS;
+format and diff checks passed. This distinguishes fixture/native failures from
+Runtime failures on the next Windows run; it does not establish a Windows fix.
+Upstream reference: <https://github.com/git/git/blob/master/submodule.c>,
+`get_next_submodule` / `prepare_submodule_repo_env_in_gitdir`; inspected on
+2026-10-24 as a diagnostic lead, not proof of the CI failure cause.
