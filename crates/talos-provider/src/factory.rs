@@ -40,6 +40,14 @@ pub fn build_configured_provider(
     let base_url = config.base_url();
     let resolution = resolve_config_provider_protocol(config);
 
+    tracing::debug!(
+        provider = %config.provider,
+        model = %config.model,
+        effective_protocol = ?resolution.protocol,
+        protocol_source = ?resolution.source,
+        "resolved provider wire protocol"
+    );
+
     match resolution.protocol {
         ProviderProtocol::AnthropicMessages => {
             let mut provider = AnthropicProvider::new(api_key, &config.model);
