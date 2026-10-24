@@ -249,12 +249,6 @@ jobs:
           Get-Item -LiteralPath $transportShell -ErrorAction Stop |
             Select-Object FullName, LinkType, Target
 
-      - name: Native Windows Git daemon control (temporary I300 diagnostic)
-        if: ${{ !cancelled() && github.event.pull_request.number == 735 }}
-        timeout-minutes: 2
-        shell: pwsh
-        run: ./scripts/diagnose_windows_git_daemon.ps1
-
       - name: Format
         run: cargo fmt --all -- --check
 

@@ -1,3 +1,13 @@
+## Accepted Windows Git transport limitation — 2026-10-25
+
+Maintainer accepted preserving native configuration: Windows success fixtures
+explicitly set sendpack.sideband=false; production never injects that setting.
+CI 40102073658 at 79f2ea9bd independently reproduces default native git:// Push
+timeout with tree cleanup, while sideband-off exits 0. Tools configured Push
+passes natively; default Tools/MCP Push remains failing on this build. This is
+an accepted host limitation, not a product fix or T7 completion. Runtime
+cancellation and all eligible split Checkout cases pass natively in that run.
+
 ## Independent Checkout deadlines and native CI findings — 2026-10-24
 
 The sandboxed standard preflight fails Tools 933/1 solely at process observation

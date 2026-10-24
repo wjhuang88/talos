@@ -505,6 +505,10 @@ Skill 主体和引用内容不会被直接打印到滚动历史、诊断信息�
 显式 Deny 和仅人类审批策略仍然有效。这不提供逐路径或端点隔离，失败可能留下部分效果。
 Windows 候选已启用生产准备及 Job 监督，相关 MSVC 测试目标通过 cargo xwin 编译；
 Windows 原生执行、当前提交 CI 和完整验收仍待验证。T7 尚未完成。
+
+已验证的 Git for Windows 版本在 Talos 外执行默认 `git://` Push 也会挂起；
+显式仓库配置 `git config sendpack.sideband false` 可完成该传输测试。
+Talos 保留用户配置，不自动应用这一兼容配置；超时可能留下部分远端效果。
 详见 [I300 迁移清单](docs/reference/I300-GIT-AUTHORIZATION-MIGRATION.md)。
 候选版的非递归 checkout 替换非空子模块目录时，先发现目录条目，再逐项申请删除权限，
 其中包括未跟踪文件和 Unix FIFO/socket 条目。有效配置源仍受保护；符号链接和不支持的特殊条目

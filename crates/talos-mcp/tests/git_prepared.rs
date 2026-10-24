@@ -218,6 +218,8 @@ async fn real_push_transport_success_and_replay_preserve_remote_head() {
             output.stdout
         };
         git(root.path(), &["init", "-b", "main"]);
+        #[cfg(windows)]
+        git(root.path(), &["config", "sendpack.sideband", "false"]);
         git(receiver.path(), &["init", "--bare"]);
         for (key, value) in [("user.name", "Fixture"), ("user.email", "fixture@example.invalid"), ("commit.gpgSign", "false")] {
             git(root.path(), &["config", key, value]);
