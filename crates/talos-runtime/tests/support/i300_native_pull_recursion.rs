@@ -66,6 +66,14 @@ async fn runtime_auto_pull_updates_initialized_submodule() {
         &baseline.join("nested"),
         &["config", "core.autocrlf", "false"],
     );
+    for checkout in [&work, &baseline] {
+        git(checkout, &["config", "core.autocrlf", "false"]);
+        assert_eq!(
+            std::fs::read(checkout.join("nested/file")).expect("initial child bytes"),
+            b"before\n"
+        );
+        assert!(git(&checkout.join("nested"), &["status", "--porcelain"]).is_empty());
+    }
     std::fs::write(child.join("file"), "after\n").expect("update");
     git(&child, &["commit", "-am", "child update"]);
     let expected_child = git(&child, &["rev-parse", "HEAD"]);
