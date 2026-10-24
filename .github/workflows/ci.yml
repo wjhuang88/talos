@@ -570,6 +570,28 @@ jobs:
           }
           RS
           "${RUNNER_TEMP}/talos-auto-temp-diagnostic"
+          if command -v bwrap >/dev/null 2>&1; then
+            probe_root=$(mktemp -d /tmp/talos-bwrap-order.XXXXXX)
+            trap 'rm -rf -- "$probe_root"' EXIT
+            mkdir "$probe_root/workspace"
+            printf 'workspace marker\n' > "$probe_root/workspace/marker"
+            cd "$probe_root/workspace"
+            # Compare native mount semantics without changing Talos production behavior.
+            for layout in current workspace-last; do
+              args=(--ro-bind / /)
+              if [[ "$layout" == current ]]; then
+                args+=(--bind "$PWD" "$PWD" --dev /dev --proc /proc --tmpfs /tmp)
+              else
+                args+=(--dev /dev --proc /proc --tmpfs /tmp --bind "$PWD" "$PWD" --chdir "$PWD")
+              fi
+              echo "Bubblewrap mount-order probe: $layout"
+              if bwrap "${args[@]}" --unshare-net --die-with-parent -- sh -c 'pwd; test -f ./marker'; then
+                echo 'workspace marker visible: yes'
+              else
+                echo "workspace marker probe failed: exit $? (inspect stderr for namespace or mount failure)"
+              fi
+            done
+          fi
           echo 'Source factory is ManagedSandbox/BubblewrapSandbox; selected backend and namespace visibility are not observed here'
   remote-governance-reconciliation:
     name: Remote issue / owner reconciliation
