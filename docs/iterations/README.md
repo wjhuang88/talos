@@ -1,5 +1,9 @@
 # Iterations
 
+[I307](I307-bubblewrap-workspace-visibility.md) is Planned / Unclaimed: #757,
+bounded Linux Bubblewrap workspace visibility repair. Its owner records the
+nonterminal inventory; governance claim must merge before implementation.
+
 ## Purpose
 
 [I305](I305-windows-known-resource-acceptance.md) / [TEST-004](../backlog/active/TEST-004-windows-known-resource-acceptance.md)
