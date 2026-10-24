@@ -1,6 +1,7 @@
 //! Running native Pull cleanup at the MCP connection boundary.
 
 use super::*;
+#[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::{
     pin::Pin,
@@ -73,6 +74,7 @@ async fn running_pull_connection_failure(transport_error: bool) {
             "#!/bin/sh\n(while test ! -f release-effect; do sleep 0.01; done; printf forbidden > delayed-effect) &\nprintf observed > hook-started\nwait\n",
         )
         .expect("hook");
+        #[cfg(unix)]
         std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o755))
             .expect("executable hook");
         git(root.path(), &["config", "core.hooksPath", ".git/hooks"]);

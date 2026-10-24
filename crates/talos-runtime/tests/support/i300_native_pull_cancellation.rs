@@ -1,5 +1,6 @@
 //! Running native Pull interruption through the public Runtime API.
 use super::*;
+#[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
 #[tokio::test]
@@ -32,7 +33,9 @@ async fn interrupt_running_pull_closes_hook_descendants_and_preserves_completed_
     git(&source, &["commit", "-am", "upstream"]);
     let hook = work.join(".git/hooks/post-merge");
     std::fs::write(&hook, "#!/bin/sh\n(while test ! -f release-effect; do sleep 0.01; done; printf forbidden > delayed-effect) &\nprintf observed > hook-started\nwait\n").expect("hook");
+    #[cfg(unix)]
     std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o755)).expect("mode");
+    git(&work, &["config", "core.hooksPath", ".git/hooks"]);
     let reviews = Arc::new(AtomicUsize::new(0));
     let mut runtime = RuntimeBuilder::new()
         .workspace_root(&work)

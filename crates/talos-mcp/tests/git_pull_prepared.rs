@@ -9,7 +9,6 @@ use talos_permission::{PermissionDecision, PermissionEngine, PermissionRule};
 use talos_plugin::HookRegistry;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
-#[cfg(unix)]
 #[path = "support/git_pull_disconnect.rs"]
 mod disconnect;
 
