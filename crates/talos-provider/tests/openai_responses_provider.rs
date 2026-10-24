@@ -1,44 +1,69 @@
-//! Standalone contract tests for the OpenAI Responses public provider seam before crate export.
+//! Public contract tests for the OpenAI Responses provider and centralized factory.
 
-#[path = "../src/image_io.rs"]
-mod image_io;
-#[path = "../src/openai_responses.rs"]
-mod openai_responses;
-#[path = "../src/openai_responses_bridge.rs"]
-mod openai_responses_bridge;
-#[path = "../src/openai_responses_client.rs"]
-mod openai_responses_client;
-#[path = "../src/openai_responses_reasoning.rs"]
-mod openai_responses_reasoning;
-#[path = "../src/openai_responses_request.rs"]
-mod openai_responses_request;
-#[path = "../src/openai_responses_sse.rs"]
-mod openai_responses_sse;
-#[path = "../src/openai_responses_transport.rs"]
-mod openai_responses_transport;
-#[path = "support/openai_responses_invocation_sender.rs"]
-mod openai_sse;
-#[path = "../src/retry.rs"]
-mod retry;
-#[path = "../src/stream_utf8.rs"]
-mod stream_utf8;
+use talos_config::Config;
+use talos_core::provider::{DecisionRequestLimits, LanguageModel, ProviderError};
+use talos_core::tool::{CapabilityProbe, ProtocolCapabilities, ToolProtocol};
+use talos_provider::{OpenAIResponsesProvider, openai_responses::factory};
+use tokio::sync::mpsc;
 
-fn validate_decision_messages(
-    messages: &[talos_core::message::Message],
-    limits: talos_core::provider::DecisionRequestLimits,
-) -> talos_core::provider::ProviderResult<()> {
-    if limits.max_output_tokens == 0
-        || messages.iter().any(|message| {
-            !matches!(
-                message,
-                talos_core::message::Message::System { .. }
-                    | talos_core::message::Message::User { .. }
-            )
+#[test]
+fn public_provider_declares_native_tool_evidence() {
+    let provider = OpenAIResponsesProvider::new("sk-test", "gpt-test");
+    assert_eq!(
+        provider.protocol_capabilities(),
+        CapabilityProbe::Known(ProtocolCapabilities {
+            native_tools: true,
+            compatibility: false,
         })
-    {
-        return Err(talos_core::provider::ProviderError::InvalidResponse(
-            "invalid isolated decision request".into(),
-        ));
+    );
+    assert_eq!(
+        provider.protocol_capabilities().select(),
+        ToolProtocol::Native
+    );
+}
+
+#[tokio::test]
+async fn public_provider_rejects_non_native_protocols_before_network_dispatch() {
+    let provider = OpenAIResponsesProvider::new("sk-test", "gpt-test");
+    for protocol in [
+        ToolProtocol::Auto,
+        ToolProtocol::Compat,
+        ToolProtocol::TalosStrict,
+    ] {
+        let (progress, _rx) = mpsc::unbounded_channel();
+        let error = provider
+            .stream_with_protocol(&[], &[], protocol, progress)
+            .await
+            .expect_err("non-native protocol must fail before dispatch");
+        assert!(matches!(error, ProviderError::InvalidResponse(_)));
     }
-    Ok(())
+}
+
+#[tokio::test]
+async fn public_provider_rejects_invalid_decision_before_network_dispatch() {
+    let provider = OpenAIResponsesProvider::new("sk-test", "gpt-test");
+    let limits = DecisionRequestLimits {
+        max_output_tokens: 0,
+        max_retries: 0,
+    };
+    assert!(provider.stream_decision(&[], limits).await.is_err());
+    assert!(provider.stream_auto_review(&[], limits).await.is_err());
+}
+
+#[test]
+fn public_factory_builds_responses_for_confirmed_official_openai_default() {
+    let mut config = Config::default();
+    config
+        .set_active_model("openai/o3")
+        .expect("packaged OpenAI model");
+
+    let provider = factory::build_configured_provider(&config, "sk-test")
+        .expect("configured provider builds");
+    assert_eq!(
+        provider.protocol_capabilities(),
+        CapabilityProbe::Known(ProtocolCapabilities {
+            native_tools: true,
+            compatibility: false,
+        })
+    );
 }
