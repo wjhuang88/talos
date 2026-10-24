@@ -1,3 +1,46 @@
+## Independent Checkout deadlines and native CI findings — 2026-10-24
+
+The sandboxed standard preflight fails Tools 933/1 solely at process observation
+EPERM in `prepared_local_push_runs_all_eight_admitted_stages`
+(`/private/tmp/i300-fixture-split-preflight.log`). The authorized standard rerun passes
+(exit 0; `/private/tmp/i300-fixture-split-preflight-authorized.log`), including
+locked workspace tests and external SDK fixtures. Both governance validators pass with zero
+warnings. Linux product repair has separate issue #757 and proposed I307,
+prepared from main in `/private/tmp/talos-i307-governance`; its claim is not yet
+effective (governance PR #758) and no production sandbox changes have been made.
+
+Run 40089763867 at `f30b4df6f` is terminal: macOS standard validation succeeds;
+Linux Desktop and Windows workspace fail. Native Windows now passes Runtime
+initialized-submodule recursion and MCP EOF/read-error cleanup (MCP Pull 3/3).
+Runtime cancellation reaches its final retained-bytes assertion but fails on
+CRLF versus LF; this is not a full cancellation-test pass. Its cloned worktree
+now persists autocrlf=false before production dispatch and asserts initial LF
+bytes and a clean index. The corrected local Runtime suite passes 3/3
+(`/private/tmp/i300-runtime-cancel-eol-fixed.log`); native confirmation remains.
+
+MCP Checkout's original 40-case aggregate timeout is replaced by 40 independent
+tests in `tests/support/git_checkout_cases.rs`, retaining all fixture actions,
+assertions and platform restrictions (24 cases on Windows). Each operation
+retains a 30-second deadline. Local full `git_prepared` passes 47/47 in 4.03s;
+cargo-xwin MSVC checking passes. Logs: `/private/tmp/i300-checkout-full-split.log`
+and `/private/tmp/i300-checkout-split-xwin.log`. This does not establish native
+Windows success or change production deadlines/admission.
+
+The independent Windows Push diagnostic failed before launching Git because
+Get-Command returned three executables. It now selects the first application
+in command precedence; local PowerShell parsing and invocation pass. The native
+default-versus-sideband transport hypothesis remains untested by this probe.
+The actual Tools and MCP default-transfer baseline timeouts remain unresolved.
+
+Linux's native Bubblewrap probe reproduces cwd fallback to `/home/runner` and
+an invisible workspace marker with the current order. Mounting tmpfs first,
+then binding the workspace and explicitly selecting cwd exposes the marker.
+This proves the probe's mount-order failure, not a validated product fix.
+Production sandbox repair requires its own regression and security review;
+temporary diagnostics must be removed after evidence is captured, before merge.
+Logs: `/private/tmp/i300-linux-f30b.log`, `/private/tmp/i300-windows-f30b.log`.
+Full T7 acceptance, exact-head gates and the original T1–T8 scope remain open.
+
 ## Terminal CI and recursive fixture correction — 2026-10-24
 
 Run 40073444119 at `c164279ff` is terminal: the macOS standard validation job

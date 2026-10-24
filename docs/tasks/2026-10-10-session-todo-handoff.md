@@ -1,3 +1,26 @@
+## Native findings and fixture convergence — 2026-10-24
+
+Run 40089763867 at `f30b4df6f` is terminal: macOS standard validation succeeds;
+Linux Desktop and Windows workspace fail. Windows Runtime recursion and MCP
+EOF/read-error cleanup now pass. Runtime cancellation fails only at the final
+CRLF/LF assertion; local fixture configuration correction passes Runtime 3/3.
+The independent Windows Push probe fails before launching Git because executable
+discovery returns multiple paths; its scalar selection is corrected locally,
+but native Push attribution remains open. Linux's native mount-order probe
+confirms hidden `/tmp` workspace/current-directory fallback; no product sandbox
+fix has been applied or reviewed.
+
+Checkout extraction preserves all 40 cases and their bodies, with 24 eligible
+on Windows, using separate 30-second deadlines. Local full MCP `git_prepared`
+passes 47/47 and cargo-xwin MSVC checking passes. Changes are committed as e908f84e2 (Checkout), e0d1d5d32
+(Runtime fixture) and d7f19dc14 (native diagnostic). Sandboxed preflight fails process observation EPERM
+(Tools 933/1); authorized standard preflight passes exit 0
+(`/private/tmp/i300-fixture-split-preflight-authorized.log`). Both governance
+validators pass with zero warnings. Linux claim PR #758 is pending without
+production changes. Resume by finalizing the evidence checkpoint and obtaining native evidence. I300
+owns detailed logs and remaining security/acceptance gates. Do not mark T7 or
+any original T1–T8 requirement complete from this checkpoint.
+
 ## Native Windows candidate evidence — 2026-10-24
 
 CI run 39987142357 at `aecd83cd0` completed with failure. The full Windows job
