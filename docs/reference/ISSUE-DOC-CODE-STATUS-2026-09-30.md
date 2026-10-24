@@ -8,6 +8,7 @@
 
 | Issue | Summary | Owner | Owner Status | Disposition |
 |---|---|---|---|---|
+| [#757](https://github.com/wjhuang88/talos/issues/757) | Bubblewrap workspace visibility below /tmp | [SANDBOX-001](../backlog/active/SANDBOX-001-bubblewrap-workspace-visibility.md) | In Progress / proposed activation | I307 claim proposed in #758; implementation unauthorized until merge. |
 | [#22](https://github.com/wjhuang88/talos/issues/22) | feat: 设计权限沙箱模型 | [PERM-004](../backlog/active/PERM-004-workspace-trust-sandbox.md) | Partial | Keep open: broader sandbox/security residuals. |
 | [#29](https://github.com/wjhuang88/talos/issues/29) | proposal: 构建 talos-desktop | [DESKTOP-001](../backlog/active/DESKTOP-001-desktop-product-direction.md) | Deferred | Directional proposal; no implementation authorization. |
 | [#30](https://github.com/wjhuang88/talos/issues/30) | proposal: 多 Agent 体系架构设计思考 | [AGENT-003](../backlog/active/AGENT-003-multi-agent-architecture.md) | Deferred | Architecture decision required. |
