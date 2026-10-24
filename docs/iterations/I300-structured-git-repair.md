@@ -8899,3 +8899,13 @@ This is Unix local evidence, not native Windows or final exact-head acceptance.
 The initial default-profile build failed from ENOSPC before test execution;
 previously authorized `target/debug` cleanup and debug-info/incremental-disabled
 rebuild produced the passing result. No source or Git data was removed.
+
+Same-runner Desktop comparison completed in run `40072620233`, job
+`120809154390`: both candidate `fc7d6c035` and uninstrumented parent
+`aecd83cd09fac86bf92613a18828a062d5b0494f` failed the same three tests (109/3).
+Both Auto workspace assertions returned `/home/runner`; both descendant tests
+timed out before readiness. Log: `/private/tmp/i300-desktop-fc7.log`. This shows
+the failures also occur without the recent Auto diagnostics on that runner;
+it does not prove a root cause or make the candidate green. The temporary
+PR735-only baseline step is removed after collecting this evidence, as required
+before merge; normal Desktop Clippy/test gates remain unchanged.

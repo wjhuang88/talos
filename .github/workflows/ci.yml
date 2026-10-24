@@ -571,27 +571,6 @@ jobs:
           RS
           "${RUNNER_TEMP}/talos-auto-temp-diagnostic"
           echo 'Source factory is ManagedSandbox/BubblewrapSandbox; selected backend and namespace visibility are not observed here'
-      # Temporary PR #735 comparison: preserve candidate failures and test the
-      # uninstrumented parent on the same runner. Remove before any merge.
-      - name: Compare uninstrumented Desktop parent on the same Linux runner
-        if: ${{ !cancelled() && github.event.pull_request.number == 735 }}
-        timeout-minutes: 20
-        shell: bash
-        run: |
-          set -euo pipefail
-          unset RXCB_EXPORT RING_PREGENERATE_ASM
-          baseline=aecd83cd09fac86bf92613a18828a062d5b0494f
-          baseline_dir="${RUNNER_TEMP}/talos-auto-uninstrumented-parent"
-          git fetch --no-tags --depth=1 origin "$baseline"
-          git worktree add --detach "$baseline_dir" "$baseline"
-          trap 'git -C "$GITHUB_WORKSPACE" worktree remove "$baseline_dir"' EXIT
-          export CARGO_TARGET_DIR="${GITHUB_WORKSPACE}/target"
-          cd "$baseline_dir"
-          test "$(git rev-parse HEAD)" = "$baseline"
-          git rev-parse HEAD
-          cargo clippy -p talos-desktop --features desktop-ui --all-targets --locked -- -D warnings
-          cargo test -p talos-desktop --features desktop-ui --locked
-
   remote-governance-reconciliation:
     name: Remote issue / owner reconciliation
     continue-on-error: true
