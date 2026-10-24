@@ -110,9 +110,7 @@ pub fn resolve_protocol<T: Clone>(
 /// (rather than the merged provider view) so an omitted protocol remains distinguishable from an
 /// explicit `openai-chat` rollback.
 #[must_use]
-pub fn resolve_config_provider_protocol(
-    config: &Config,
-) -> ProtocolResolution<ProviderProtocol> {
+pub fn resolve_config_provider_protocol(config: &Config) -> ProtocolResolution<ProviderProtocol> {
     let catalog_model = builtin_model_protocol(&config.provider, &config.model);
     resolve_config_provider_protocol_with_catalog_signal(config, catalog_model)
 }

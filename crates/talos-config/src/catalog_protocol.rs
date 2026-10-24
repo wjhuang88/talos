@@ -38,10 +38,7 @@ static PROTOCOL_DATASET: LazyLock<ProtocolDataset> = LazyLock::new(|| {
 /// Built-in providers require an exact `(provider, model)` match. Custom providers follow the same
 /// conservative matching rule as context-limit inference: exact bare model id first, then exactly
 /// one stripped gateway prefix (`gateway/model` or `gateway:model`). Any ambiguity fails closed.
-pub(crate) fn builtin_model_protocol(
-    provider: &str,
-    model_id: &str,
-) -> Option<ProviderProtocol> {
+pub(crate) fn builtin_model_protocol(provider: &str, model_id: &str) -> Option<ProviderProtocol> {
     let provider_is_builtin = model::builtin_providers()
         .iter()
         .any(|entry| entry.id == provider);
@@ -66,7 +63,10 @@ fn infer_model_protocol(
             .and_then(|entry| entry.protocol.clone());
     }
 
-    let exact: Vec<_> = catalog.iter().filter(|entry| entry.id == model_id).collect();
+    let exact: Vec<_> = catalog
+        .iter()
+        .filter(|entry| entry.id == model_id)
+        .collect();
     match exact.as_slice() {
         [entry] => return entry.protocol.clone(),
         [] => {}
