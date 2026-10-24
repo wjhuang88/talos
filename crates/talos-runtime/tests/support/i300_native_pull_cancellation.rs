@@ -29,6 +29,12 @@ async fn interrupt_running_pull_closes_hook_descendants_and_preserves_completed_
             work.to_str().expect("work"),
         ],
     );
+    git(&work, &["config", "core.autocrlf", "false"]);
+    assert_eq!(
+        std::fs::read(work.join("file")).expect("initial file"),
+        b"before\n"
+    );
+    assert!(git(&work, &["status", "--porcelain"]).is_empty());
     std::fs::write(source.join("file"), "after\n").expect("update");
     git(&source, &["commit", "-am", "upstream"]);
     let hook = work.join(".git/hooks/post-merge");
