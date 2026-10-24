@@ -425,7 +425,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y clang libclang-dev pkg-config libfontconfig1-dev libfreetype6-dev \
             libx11-dev libx11-xcb-dev libxcb1-dev libxcb-shape0-dev libxcb-xfixes0-dev \
-            libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libegl1-mesa-dev libvulkan-dev
+            libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libegl1-mesa-dev libvulkan-dev bubblewrap
+      - name: Native Bubblewrap isolation regressions
+        run: cargo test -p talos-sandbox --features bwrap_installed --locked
       - name: Desktop explicit feature validation
         shell: bash
         run: |

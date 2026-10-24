@@ -89,3 +89,24 @@ is claimed; I300 and the full handoff remain incomplete.
 Claim and Active state above are proposed by #758 and become effective only
 when its finalized reviewed head merges to main. Both validators passed before
 PR creation; repeat them and target-branch CAS on the finalized candidate.
+
+## Implementation Checkpoint — 2026-10-24
+
+Claim #758 merged as `b29903196e182e63cc1eaffeb9f837918f7e5aa2` before
+implementation branch `fix/i307-bubblewrap-workspace` was created. The candidate
+moves workspace bind after temporary mounts, retains later extra-read read-only
+priority and adds explicit sandbox cwd. Three native integration regressions
+cover workspace visibility/writes, private temporary siblings, outside writes,
+extra-read precedence and missing-workspace refusal. The previously referenced
+`bwrap_installed` feature was absent from Cargo.toml; it is now declared and
+explicitly invoked by Linux CI with Bubblewrap installed.
+
+Independent Agent escape-vector review accepts this candidate for validation,
+with no mandatory corrections, not as completed runtime acceptance. Local macOS
+sandbox tests pass 41/41 plus two doctests; the Linux integration target runs
+zero tests on macOS and supplies no Linux evidence. Standard preflight passed exit 0
+(`/private/tmp/i307-release-preflight.log`), including workspace tests, Clippy
+and external SDK fixtures. Native Linux regressions, original
+Desktop failures, exact-head review/CI and merge remain outstanding. No Complete
+status or Completion Commit is asserted. User documentation is now provided in
+crates/talos-sandbox/README.md.

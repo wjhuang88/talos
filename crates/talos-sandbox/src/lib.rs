@@ -222,10 +222,10 @@ mod linux {
             cmd.current_dir(&config.workspace_root);
 
             cmd.args(["--ro-bind", "/", "/"]);
-            cmd.args(["--bind", workspace, workspace]);
             cmd.args(["--dev", "/dev"]);
             cmd.args(["--proc", "/proc"]);
             cmd.args(["--tmpfs", "/tmp"]);
+            cmd.args(["--bind", workspace, workspace]);
 
             for path in &config.extra_read_paths {
                 if let Some(path_str) = path.to_str() {
@@ -237,6 +237,7 @@ mod linux {
                 cmd.arg("--unshare-net");
             }
 
+            cmd.args(["--chdir", workspace]);
             cmd.arg("--die-with-parent");
             cmd.args(["--", "sh", "-c", command]);
 

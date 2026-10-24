@@ -8,6 +8,10 @@ repository.workspace = true
 homepage.workspace = true
 rust-version.workspace = true
 
+[features]
+# Require a working native Bubblewrap installation for Linux isolation tests.
+bwrap_installed = []
+
 [dependencies]
 talos-core = { version = "0.10.1", path = "../talos-core" }
 async-trait = "0.1.92"
