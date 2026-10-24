@@ -7,6 +7,7 @@ async fn runtime_auto_pull_updates_initialized_submodule() {
     let child = root.path().join("child");
     let source = root.path().join("source");
     let work = root.path().join("work");
+    let baseline = root.path().join("native-baseline");
     for path in [&child, &source] {
         std::fs::create_dir(path).expect("repository");
         git(path, &["init", "-b", "main"]);
@@ -48,12 +49,36 @@ async fn runtime_auto_pull_updates_initialized_submodule() {
     git(&work, &["config", "submodule.recurse", "true"]);
     git(&work, &["config", "protocol.file.allow", "always"]);
     git(&work.join("nested"), &["config", "core.autocrlf", "false"]);
+    git(
+        root.path(),
+        &[
+            "-c",
+            "protocol.file.allow=always",
+            "clone",
+            "--recurse-submodules",
+            source.to_str().expect("source path"),
+            baseline.to_str().expect("baseline path"),
+        ],
+    );
+    git(&baseline, &["config", "submodule.recurse", "true"]);
+    git(&baseline, &["config", "protocol.file.allow", "always"]);
+    git(
+        &baseline.join("nested"),
+        &["config", "core.autocrlf", "false"],
+    );
     std::fs::write(child.join("file"), "after\n").expect("update");
     git(&child, &["commit", "-am", "child update"]);
     let expected_child = git(&child, &["rev-parse", "HEAD"]);
     git(&source.join("nested"), &["fetch"]);
     git(&source.join("nested"), &["checkout", "origin/main"]);
     git(&source, &["commit", "-am", "parent update"]);
+    // Keep native Git failures distinguishable from the Runtime execution path.
+    // The fixture helper reports captured stderr on failure.
+    git(&baseline, &["pull"]);
+    assert_eq!(
+        git(&baseline.join("nested"), &["rev-parse", "HEAD"]),
+        expected_child
+    );
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
