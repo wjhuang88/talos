@@ -56,6 +56,56 @@ impl LanguageModel for AssessmentProvider {
     }
 }
 
+// Fixed stage labels only: never retain event payloads, paths, commands or results.
+struct AutoStages {
+    started: std::time::Instant,
+    observed: Mutex<Vec<(&'static str, Duration)>>,
+}
+
+impl AutoStages {
+    fn snapshot(&self) -> Vec<(&'static str, Duration)> {
+        self.observed.lock().expect("stage observer").clone()
+    }
+}
+
+#[async_trait]
+impl talos_plugin::HookHandler for AutoStages {
+    fn name(&self) -> &str {
+        "desktop-auto-stage-observer"
+    }
+    fn subscribed(&self) -> &'static [talos_plugin::HookEventKind] {
+        use talos_plugin::HookEventKind as Kind;
+        &[
+            Kind::BeforeToolCall,
+            Kind::AfterPermissionCheck,
+            Kind::BeforeBashSandboxExec,
+            Kind::AfterToolCall,
+            Kind::TurnComplete,
+        ]
+    }
+    async fn on_event(
+        &self,
+        _context: &talos_plugin::HookContext,
+        event: &mut talos_plugin::HookEvent<'_>,
+    ) -> talos_plugin::HookResult {
+        let stage = match event {
+            talos_plugin::HookEvent::BeforeToolCall { .. } => Some("before_tool_call"),
+            talos_plugin::HookEvent::AfterPermissionCheck { .. } => Some("after_permission_check"),
+            talos_plugin::HookEvent::BeforeBashSandboxExec { .. } => Some("before_shell_sandbox"),
+            talos_plugin::HookEvent::AfterToolCall { .. } => Some("after_tool_call"),
+            talos_plugin::HookEvent::TurnComplete { .. } => Some("turn_complete"),
+            _ => None,
+        };
+        if let Some(stage) = stage {
+            let mut observed = self.observed.lock().expect("stage observer");
+            if observed.len() < 32 {
+                observed.push((stage, self.started.elapsed()));
+            }
+        }
+        talos_plugin::HookResult::Continue
+    }
+}
+
 struct Workspace(PathBuf);
 
 impl Drop for Workspace {
@@ -81,10 +131,16 @@ async fn exercise_auto(enabled: bool, allow: bool) {
         allow,
     });
     let configured = provider.clone();
-    let mut host = RuntimeHost::start_with(
+    let observed = Arc::new(AutoStages {
+        started: std::time::Instant::now(),
+        observed: Mutex::new(Vec::new()),
+    });
+    let mut host = RuntimeHost::start_with_evaluation_observed(
         move || Ok((configured, 128_000, enabled)),
         workspace.0.clone(),
         None,
+        None,
+        Some(observed.clone()),
     )
     .expect("host starts");
     host.try_send(RuntimeCommand::Submit(
@@ -95,7 +151,7 @@ async fn exercise_auto(enabled: bool, allow: bool) {
     let mut approvals = 0;
     let mut results = Vec::new();
     let mut explanations = Vec::new();
-    let started = std::time::Instant::now();
+    let started = observed.started;
     let mut stages = Vec::new();
     let outcome = tokio::time::timeout(Duration::from_secs(15), async {
         loop {
@@ -136,10 +192,11 @@ async fn exercise_auto(enabled: bool, allow: bool) {
         }
     })
     .await;
+    let execution_before_shutdown = observed.snapshot();
     if outcome.is_err() {
         // Preserve evidence even if the independent cleanup watchdog also fails.
         eprintln!(
-            "Auto test watchdog: stages={stages:?}, assessments={}, reports={reports:?}, approvals={approvals}, results={results:?}, explanations={explanations:?}",
+            "Auto test watchdog: stages={stages:?}, assessments={}, reports={reports:?}, approvals={approvals}, results={results:?}, explanations={explanations:?}, execution_before_shutdown={execution_before_shutdown:?}",
             provider.assessments.load(Ordering::SeqCst),
         );
     }
@@ -151,8 +208,15 @@ async fn exercise_auto(enabled: bool, allow: bool) {
     .expect("host shutdown completes");
     assert!(
         outcome.is_ok(),
-        "approval flow timed out: stages={stages:?}, assessments={}, reports={reports:?}, approvals={approvals}, results={results:?}, explanations={explanations:?}",
+        "approval flow timed out: stages={stages:?}, assessments={}, reports={reports:?}, approvals={approvals}, results={results:?}, explanations={explanations:?}, execution_before_shutdown={execution_before_shutdown:?}, execution_after_shutdown={:?}",
         provider.assessments.load(Ordering::SeqCst),
+        observed.snapshot(),
+    );
+    // A successful run must prove that this diagnostic observer was installed.
+    assert!(
+        execution_before_shutdown
+            .iter()
+            .any(|(stage, _)| *stage == "before_tool_call")
     );
     assert_eq!(results.len(), 1, "one authoritative tool result");
     assert_eq!(approvals, usize::from(!(enabled && allow)));
