@@ -17,7 +17,7 @@
 | Work Slice | SANDBOX-001: Linux Bubblewrap workspace mount order, explicit cwd, isolation tests and docs; no Git admission, fallback policy, dependencies or API changes. |
 | Claimed At | 2026-10-24 |
 | Source Issue | #757 |
-| Governance Claim PR | None |
+| Governance Claim PR | #761 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer requested session-handoff and failing-CI closure; no distinct maintainer reviewer available. Independent Agent security review, exact-head CI, both validators and merge-time CAS remain mandatory. Prior claim #758 and implementation #759 are historical; this follow-up claim is ineffective until its governance merge. |
 | Implementation PR | None; follow-up pending |
