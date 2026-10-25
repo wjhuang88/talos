@@ -10,9 +10,9 @@ That snapshot is historical evidence, not current activation authority.
 ## Current Priorities
 
 [SANDBOX-001](active/SANDBOX-001-bubblewrap-workspace-visibility.md) / #757 is
-reopened Active in I307 for protected-mount overlap correction. Prior `3beb011a77`
+Review in I307 for protected-mount overlap correction. Prior `3beb011a77`
 (#759) restores narrow workspace visibility but does not prove broad-root isolation.
-Follow-up claim awaits target-branch merge; T7 remains open.
+Claim #761 is effective; native Linux candidate validation remains open, as does T7.
 
 2026-10-11 session-handoff addition: [PERM-007-H](active/PERM-007-H-all-builtin-auto-review.md)
 will extend Auto review to all built-in tools after I300 Git repair. Refinement /
