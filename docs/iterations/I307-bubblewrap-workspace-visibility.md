@@ -1,6 +1,7 @@
 # Iteration I307: Bubblewrap Workspace Visibility
 
-> Document status: Review
+> Document status: Complete
+> Completion Commit: f643d87759189eed9d14cef965b7e9260a51d1ab
 > Prior Implementation Evidence: 3beb011a77e0cc80422d915443e6caf9f8f74742
 > Published plan date: 2026-10-24
 > Planned objective: restore the authorized Linux workspace after temporary mounts without expanding writable scope.
@@ -11,7 +12,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | SANDBOX-001: Linux Bubblewrap workspace mount order, explicit cwd, isolation tests and docs; no Git admission, fallback policy, dependencies or API changes. |
@@ -19,10 +20,41 @@
 | Source Issue | #757 |
 | Governance Claim PR | #761 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Maintainer requested session-handoff and failing-CI closure; no distinct maintainer reviewer available. Independent Agent security review, exact-head CI, both validators and merge-time CAS remain mandatory. Prior claim #758 and implementation #759 are historical; this follow-up claim is ineffective until its governance merge. |
-| Implementation PR | Not started |
+| Authorization Evidence | Maintainer requested session-handoff and failing-CI closure; no distinct maintainer reviewer available. Independent Agent security review, exact-head CI, both validators and merge-time CAS remain mandatory. Prior claim #758 and implementation #759 are historical; follow-up claim #761 became effective on main before implementation #762. |
+| Implementation PR | #762 (merged as f643d87759189eed9d14cef965b7e9260a51d1ab) |
 | Last Updated | 2026-10-26 |
-| Handoff / Release Condition | Reopened for protected-mount overlap correction; no implementation before effective follow-up claim. No release authorization. |
+| Handoff / Release Condition | Protected-mount isolation acceptance complete at #762; I300 must integrate and validate its own final candidate. No release authorization. |
+
+## Protected-mount closure — 2026-10-26
+
+Requested outcome: close the reopened isolation defect without changing the published
+acceptance. Updated artifacts: this owner, SANDBOX-001 and derived Board/backlog/iteration
+indexes; preserve historical checkpoints below. No new contract or dependency decision.
+
+PR #762 merged as `f643d87759189eed9d14cef965b7e9260a51d1ab`, containing
+implementation `51245b28c` and fixture correction `48a6285de`. Exact-head CI
+[40213017639](https://github.com/wjhuang88/talos/actions/runs/40213017639)
+is terminal success across all jobs, including full macOS locked preflight and
+native Windows workspace validation. Native Linux job 121231556761 logs were
+inspected: 37 sandbox unit tests, all five Bubblewrap integration tests and two
+doctests passed; Desktop passed 112 tests including Auto allow-once and both
+running-shell cancellation cleanup cases. This covers the seven published
+acceptance rows and reopened protected-root/alias rejection boundary. The older
+run failed the historical basic fixture using /tmp itself; the final fixture
+uses an owned temporary child, without weakening protection or skipping tests.
+
+Independent Agent security review approved exact head `48a6285de`; both governance
+validators passed with zero warnings. Merge-time CAS confirmed unchanged claim,
+actor/slice and main, clean mergeability, no overlapping new PR or unresolved
+review threads. The recorded Single-maintainer merge path applies; Agent technical
+review is not a distinct-human GitHub approval. Native log:
+`/private/tmp/i307-48a-linux-native.log`; final PR evidence comments retain review/CAS.
+User documentation is `crates/talos-sandbox/README.md`.
+
+No remaining I307 implementation or validation is deferred. Existing path-resolution
+to spawn TOCTOU is not claimed fixed or race-free by this bounded repair. T7/I300
+and the other handoff requirements remain separate and incomplete. Issue #757 and
+these derived indexes follow this owner; closure records still require publication.
 
 ## Protected-mount implementation checkpoint — 2026-10-26
 

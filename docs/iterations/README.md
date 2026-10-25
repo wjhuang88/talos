@@ -1,9 +1,8 @@
 # Iterations
 
-[I307](I307-bubblewrap-workspace-visibility.md) is Review for #757:
-protected-mount overlap validation was missing from prior `3beb011a77` (#759).
-The same isolation objective remains; claim #761 is effective and the local
-implementation passed full preflight. Native Linux and final review remain open.
+[I307](I307-bubblewrap-workspace-visibility.md) is Complete for #757 at #762
+(`f643d8775`). Native Linux isolation, full platform CI and independent security
+review passed; I300 retains integration and final T7 acceptance.
 
 ## Purpose
 
