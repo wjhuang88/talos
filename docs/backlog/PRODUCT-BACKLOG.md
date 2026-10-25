@@ -10,8 +10,8 @@ That snapshot is historical evidence, not current activation authority.
 ## Current Priorities
 
 [SANDBOX-001](active/SANDBOX-001-bubblewrap-workspace-visibility.md) / #757 is
-proposed In Progress / Claimed in #758 for I307, ineffective until merge. Repair Linux workspace visibility
-under /tmp without broadening isolation; separate prerequisite for I300 CI.
+Complete / Closed in I307. Completion Commit `3beb011a77` (#759) restores Linux
+workspace visibility under /tmp with native isolation evidence; T7 remains open.
 
 2026-10-11 session-handoff addition: [PERM-007-H](active/PERM-007-H-all-builtin-auto-review.md)
 will extend Auto review to all built-in tools after I300 Git repair. Refinement /

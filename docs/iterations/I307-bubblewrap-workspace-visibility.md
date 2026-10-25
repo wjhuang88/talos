@@ -1,6 +1,7 @@
 # Iteration I307: Bubblewrap Workspace Visibility
 
-> Document status: Active
+> Document status: Complete / Closed
+> Completion Commit: 3beb011a77e0cc80422d915443e6caf9f8f74742
 > Published plan date: 2026-10-24
 > Planned objective: restore the authorized Linux workspace after temporary mounts without expanding writable scope.
 > Baseline rule: preserve this bounded repair; broader sandbox redesign requires a separate owner.
@@ -10,7 +11,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Released |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | SANDBOX-001: Linux Bubblewrap workspace mount order, explicit cwd, isolation tests and docs; no Git admission, fallback policy, dependencies or API changes. |
@@ -18,10 +19,10 @@
 | Source Issue | #757 |
 | Governance Claim PR | #758 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Maintainer requested session-handoff and failing-CI closure; no distinct maintainer reviewer available. Independent Agent security review, exact-head CI, both validators and merge-time CAS remain mandatory. Ineffective until merged to main. |
+| Authorization Evidence | Maintainer requested session-handoff and failing-CI closure; no distinct maintainer reviewer available. Independent Agent security review, exact-head CI, both validators and merge-time CAS remain mandatory. Claim effective via #758; implementation merged via #759. |
 | Implementation PR | #759 |
-| Last Updated | 2026-10-24 |
-| Handoff / Release Condition | Governance-only preparation; implement only after effective claim. No release authorization. |
+| Last Updated | 2026-10-25 |
+| Handoff / Release Condition | Closed after validated implementation merge #759. No release authorization. |
 
 ## Published Baseline
 
@@ -110,3 +111,22 @@ and external SDK fixtures. Native Linux regressions, original
 Desktop failures, exact-head review/CI and merge remain outstanding. No Complete
 status or Completion Commit is asserted. User documentation is now provided in
 crates/talos-sandbox/README.md.
+
+## Native Validation Checkpoint — 2026-10-25
+
+Implementation cee63a8c8 passes CI 40113337467 on all jobs. Native Linux proves
+37 sandbox tests, three new isolation regressions and two doctests, followed by
+112 Desktop tests including the original Auto allow-once failure. Final candidate
+81f3d6e1f changes only implementation-PR bindings; independent exact-head security
+review accepts it. Its CI 40113538524 passes Linux and Windows, but macOS reports
+EPERM in the existing delayed-descendant cleanup test. Same-head failed-job rerun passed; run 40113538524 is terminal success.
+The initial EPERM cause remains unproven; rerun success does not claim a cleanup fix.
+Both governance validators pass with zero warnings. Independent exact-head
+security review reconfirmed ACCEPT. Merge-time CAS verified unchanged target
+claim, mergeability and no overlapping PR. PR #759 merged as
+3beb011a77e0cc80422d915443e6caf9f8f74742 on 2026-10-25.
+The six published acceptance rows are covered by the three native Linux
+regressions and unchanged-policy assertions in bubblewrap_workspace.rs.
+User documentation is crates/talos-sandbox/README.md. No remaining I307
+implementation or validation item is deferred; T7 and #705 remain separate. Logs retained at
+/private/tmp/i307-native-linux-cee.log and /private/tmp/i307-final-ci-failure.log.

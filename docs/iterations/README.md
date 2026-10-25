@@ -1,8 +1,8 @@
 # Iterations
 
-[I307](I307-bubblewrap-workspace-visibility.md) is proposed Active / Claimed in #758: #757,
-bounded Linux Bubblewrap workspace visibility repair. Its owner records the
-nonterminal inventory; governance claim must merge before implementation.
+[I307](I307-bubblewrap-workspace-visibility.md) is Complete / Closed: #757,
+Completion Commit `3beb011a77` (#759), exact-head CI 40113538524, native Linux
+isolation evidence and independent security review ACCEPT.
 
 ## Purpose
 
