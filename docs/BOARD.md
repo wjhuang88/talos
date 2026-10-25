@@ -1,8 +1,8 @@
 # Talos Board
 
-[I307](iterations/I307-bubblewrap-workspace-visibility.md) / #757 is Review
-for protected-mount overlap correction; claim #761 is effective on main.
-Prior #759 narrow-root evidence remains valid but does not prove broad-root isolation.
+[I307](iterations/I307-bubblewrap-workspace-visibility.md) / #757 is Complete
+at #762 (`f643d8775`) with native isolation evidence. I300/T7 retains its
+integration and final validation gate.
 
 This board is a derived operating view. It is not the source of truth for story scope,
 acceptance criteria, verification evidence, or iteration state.
