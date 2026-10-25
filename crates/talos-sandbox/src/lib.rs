@@ -203,6 +203,30 @@ mod linux {
         }
     }
 
+    fn checked_mount_path(path: &std::path::Path) -> Result<PathBuf, SandboxError> {
+        let resolved = std::fs::canonicalize(path).map_err(|error| {
+            SandboxError::ExecutionFailed(format!(
+                "cannot resolve sandbox mount {}: {error}",
+                path.display()
+            ))
+        })?;
+        for protected in ["/tmp", "/dev", "/proc"] {
+            let protected_path = std::path::Path::new(protected);
+            let protected_target = std::fs::canonicalize(protected_path).map_err(|error| {
+                SandboxError::ExecutionFailed(format!(
+                    "cannot resolve protected mount {protected}: {error}"
+                ))
+            })?;
+            if protected_path.starts_with(&resolved) || protected_target.starts_with(&resolved) {
+                return Err(SandboxError::PermissionDenied(format!(
+                    "sandbox mount {} would cover a protected mount",
+                    resolved.display()
+                )));
+            }
+        }
+        Ok(resolved)
+    }
+
     impl BubblewrapSandbox {
         pub(crate) async fn execute_with_cleanup(
             &self,
@@ -214,12 +238,18 @@ mod linux {
                 return Err(SandboxError::NotAvailable);
             }
 
-            let workspace = config.workspace_root.to_str().ok_or_else(|| {
+            let workspace_path = checked_mount_path(&config.workspace_root)?;
+            let workspace = workspace_path.to_str().ok_or_else(|| {
                 SandboxError::ExecutionFailed("workspace path is not valid UTF-8".into())
             })?;
+            let extra_read_paths = config
+                .extra_read_paths
+                .iter()
+                .map(|path| checked_mount_path(path))
+                .collect::<Result<Vec<_>, _>>()?;
 
             let mut cmd = Command::new("bwrap");
-            cmd.current_dir(&config.workspace_root);
+            cmd.current_dir(&workspace_path);
 
             cmd.args(["--ro-bind", "/", "/"]);
             cmd.args(["--dev", "/dev"]);
@@ -227,10 +257,8 @@ mod linux {
             cmd.args(["--tmpfs", "/tmp"]);
             cmd.args(["--bind", workspace, workspace]);
 
-            for path in &config.extra_read_paths {
-                if let Some(path_str) = path.to_str() {
-                    cmd.args(["--ro-bind", path_str, path_str]);
-                }
+            for path in &extra_read_paths {
+                cmd.arg("--ro-bind").arg(path).arg(path);
             }
 
             if !config.allow_network {
