@@ -1,7 +1,7 @@
 # Talos Board
 
-[I307](iterations/I307-bubblewrap-workspace-visibility.md) / #757 is reopened Active
-for protected-mount overlap correction; follow-up claim awaits target-branch merge.
+[I307](iterations/I307-bubblewrap-workspace-visibility.md) / #757 is Review
+for protected-mount overlap correction; claim #761 is effective on main.
 Prior #759 narrow-root evidence remains valid but does not prove broad-root isolation.
 
 This board is a derived operating view. It is not the source of truth for story scope,

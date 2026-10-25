@@ -1,6 +1,6 @@
 # SANDBOX-001: Bubblewrap Workspace Visibility
 
-**Status**: Active
+**Status**: Review
 **Prior Implementation Evidence:** 3beb011a77e0cc80422d915443e6caf9f8f74742
 **Type**: Defect
 **Source Issue**: #757
@@ -14,7 +14,13 @@ roots can cover protected /tmp, /dev or /proc mounts after the I307 reorder.
 Native narrow-root success does not validate these inputs. I307 retains the same
 objective and acceptance; its follow-up requires canonical overlap rejection,
 non-execution/sentinel regressions and independent native Linux security evidence.
-No follow-up source implementation exists yet; governance reactivation precedes it.
+Follow-up claim #761 is effective on main `d8da359ad`. A local implementation
+now checks canonical workspace/read roots against lexical and canonical protected
+mounts, with 16 rejection combinations and an ordinary-alias success regression.
+macOS sandbox tests pass (41 unit tests, two doctests); native Linux execution,
+final security review and implementation merge remain pending. Full standard
+preflight and both governance validators passed; implementation `51245b28c`
+is a local candidate, not completion evidence.
 
 ## Requirement
 
@@ -27,8 +33,8 @@ I307 owns full scope, acceptance, validation, documentation and claim.
 The governance record reached main through #758 before implementation began.
 User documentation target: crates/talos-sandbox/README.md.
 PR #759 merged with exact-head CI 40113538524 successful, independent security
-review ACCEPT and both governance validators passing. Native Linux validates
-all six I307 acceptance rows. This does not close T7 or I161 residuals.
+review ACCEPT and both governance validators passing. The prior native Linux
+evidence covered the narrow-workspace cases; it did not cover the reopened broad-root defect. This does not close T7 or I161 residuals.
 
 ## Collaboration Claim
 
@@ -43,6 +49,6 @@ all six I307 acceptance rows. This does not close T7 or I161 residuals.
 | Governance Claim PR | #761 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer requested session-handoff and failing-CI closure; no distinct maintainer reviewer available. Independent Agent security review, exact-head CI, both validators and merge-time CAS remain mandatory. Prior claim #758 and implementation #759 are historical; this follow-up claim is ineffective until its governance merge. |
-| Implementation PR | None; follow-up pending |
+| Implementation PR | Not started |
 | Last Updated | 2026-10-26 |
 | Handoff / Release Condition | Reopened for protected-mount overlap correction; no implementation before effective follow-up claim. No release authorization. |

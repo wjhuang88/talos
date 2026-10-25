@@ -1,6 +1,6 @@
 # Iteration I307: Bubblewrap Workspace Visibility
 
-> Document status: Active
+> Document status: Review
 > Prior Implementation Evidence: 3beb011a77e0cc80422d915443e6caf9f8f74742
 > Published plan date: 2026-10-24
 > Planned objective: restore the authorized Linux workspace after temporary mounts without expanding writable scope.
@@ -20,9 +20,27 @@
 | Governance Claim PR | #761 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer requested session-handoff and failing-CI closure; no distinct maintainer reviewer available. Independent Agent security review, exact-head CI, both validators and merge-time CAS remain mandatory. Prior claim #758 and implementation #759 are historical; this follow-up claim is ineffective until its governance merge. |
-| Implementation PR | None; follow-up pending |
+| Implementation PR | Not started |
 | Last Updated | 2026-10-26 |
 | Handoff / Release Condition | Reopened for protected-mount overlap correction; no implementation before effective follow-up claim. No release authorization. |
+
+## Protected-mount implementation checkpoint — 2026-10-26
+
+Follow-up claim #761 became effective on main `d8da359ad`; implementation branch
+`fix/i307-protected-mount-overlap` starts there. The local patch canonicalizes
+workspace and extra-read sources/destinations, checks lexical and canonical
+protected roots, and rejects overlapping mounts before payload launch. Regressions
+cover 16 direct/alias and workspace/read-overlay rejection combinations, plus an
+ordinary workspace-alias success case; the original three native cases remain.
+README describes canonical cwd and rejected roots. No API/dependency/unsafe change.
+
+`cargo test -p talos-sandbox --locked` passed on macOS (41 unit tests and two
+doctests); the Linux integration target ran zero tests and is not runtime evidence.
+`cargo fmt --all` and `git diff --check` pass. Full standard preflight passed exit 0
+at `/private/tmp/i307-protected-mount-preflight.log`, including workspace tests
+and both external SDK fixtures. Both governance validators passed with zero warnings.
+Implementation commit: `51245b28c`. Native Linux execution, final exact-head
+security review, CI and merge remain unverified. Status is Review.
 
 ## Reopened Isolation Acceptance — 2026-10-26
 
