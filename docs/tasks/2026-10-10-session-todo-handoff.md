@@ -1,3 +1,36 @@
+## T7 final-candidate audit — 2026-10-25
+
+2026-10-26 merge blocker: PR #735 CAS exposed an I307 protected-mount overlap
+finding for broad/canonical workspace roots. Independent merge readiness was
+withdrawn; green narrow-root CI does not cover it. I300's top checkpoint owns
+this prerequisite and the required sandbox follow-up. T7 is not Complete.
+
+
+T7/I300 remains Active; the full queue is still T7 → T8 → T2/T3 → T4 → T5 →
+T1 → T6, with C0 already Complete. Candidate `a51d44b27` is pushed to PR #735.
+The [I300 owner](../iterations/I300-structured-git-repair.md) now maps the original
+acceptance requirements and full ADR diff matrix to concrete assertions, while
+keeping shared proof/session tests distinct from MCP request-ID reservation.
+The exact original two-document paths pass production Agent approval/denial
+regressions (3/3), preserving unrelated staged and unstaged bytes. Existing
+historical publication `e58e26783e2f48416b871a394b17ac79b642bb1f` contains exactly
+those documents and is verified on origin/main; no duplicate publication is needed.
+
+Independent review at that candidate found no new concrete permission/process/API
+blocker across Add/Commit/Checkout/Push/Pull and Agent/Runtime/MCP, but did not
+declare T7 delivered. Previous full preflight passed Tools 934/934 before the last
+test correction; current executable source now also passes the complete authorized
+standard preflight (exit 0, Tools 934/934 and both SDK consumers). The sandboxed
+attempt failed process-observation EPERM and one Search classification test;
+no intermittent Search cause or repair is claimed. CI 40206441856 has passed
+macOS full validation, Linux/native Bubblewrap and owner reconciliation; Windows
+also passed; this run is terminal success.
+Native Windows configured MCP Push passed in the preceding run. Default git://
+Push remains an accepted host limitation; product preserves user configuration.
+Required remaining gates: final full/platform evidence, synchronized documentation,
+governance, merge CAS and implementation merge, then owner-first completion with
+the existing implementation SHA. None of the later handoff tasks is waived.
+
 ## Native findings and fixture convergence — 2026-10-24
 
 Run 40089763867 at `f30b4df6f` is terminal: macOS standard validation succeeds;
@@ -4835,7 +4868,7 @@ refused before mutation in the separate Unix regression. Independent static
 review against Git 2.54 confirms backend selection and finds no blocker in
 this increment; it does not establish complete external-effect safety or
 production activation. The earlier 784b1d8d CI Linux workspace job passed;
-Windows remains running. Current-head 54a34618 CI is run39236567890.
+Windows also passed; this run is terminal success. Current-head 54a34618 CI is run39236567890.
 
 Rebase backend validation follow-up (2026-10-19): real execution additionally
 covers duplicate backend declarations (last value wins) and explicit

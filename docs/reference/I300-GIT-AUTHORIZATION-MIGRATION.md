@@ -1,6 +1,28 @@
 # I300 Git Authorization Migration Inventory
 
-Current candidate boundary (2026-10-23; unpublished): Unix prepared Add, Commit,
+2026-10-26 merge blocker: PR #735 CAS exposed an I307 protected-mount overlap
+finding for broad/canonical workspace roots. Independent merge readiness was
+withdrawn; green narrow-root CI does not cover it. I300's top checkpoint owns
+this prerequisite and the required sandbox follow-up. T7 is not Complete.
+
+
+Current evidence checkpoint (2026-10-25): candidate
+`a51d44b27503e34fbf93dab34c48d1c785619bf9` is pushed to PR #735, not merged.
+The [I300 final-candidate audit](../iterations/I300-structured-git-repair.md)
+maps the original requirements and ADR diff matrix to concrete assertions and
+records the shared proof/session coverage separately from MCP request-ID refusal.
+Independent review found no new concrete permission/process/API blocker across
+all five mutations and Agent/Runtime/MCP; final validation and delivery remain
+open. Local full preflight at the preceding source passed (Tools 934/934), and
+the final exact-path Agent cases pass 3/3. The current executable source passes the full standard locked preflight outside
+the sandbox (exit 0, Tools 934/934 and both SDK consumers;
+`/private/tmp/i300-a51-final-preflight-authorized.log`). The sandboxed attempt
+failed one process-observation EPERM and one Search classification test; no
+intermittent Search cause/fix is claimed. CI 40206441856 has passed macOS full
+validation, Linux/native Bubblewrap and owner reconciliation; Windows also passed; this run is terminal success. These results supersede older pending statements only for the same
+evidence; final platform and merge gates remain open.
+
+Current candidate boundary: Unix prepared Add, Commit,
 nonrecursive Checkout, limited Push and native Pull have executable paths. Pull
 uses approved bounded configuration discovery followed by one frozen native
 command authorization, including transitive network, integration, recursion and
@@ -16,7 +38,9 @@ candidate, and the affected MSVC test targets cross-compile with `cargo xwin`;
 native Windows execution is partially verified as detailed below; final exact-head CI
 and full acceptance remain open. Direct calls without
 prepared authorization remain refused. Final security acceptance is open. T7 is
-Active, not delivered or complete.
+Active, not delivered or complete. Native Windows configured MCP Push passed in
+the prior run 40168941745; current-head confirmation remains required. Default
+git:// Push timeout is an accepted host Git limitation, not a Talos fix.
 Earlier checkpoints below are historical and do not override this boundary.
 
 ## Native Pull acceptance evidence — 2026-10-24

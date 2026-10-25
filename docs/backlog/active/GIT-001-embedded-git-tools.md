@@ -1,5 +1,11 @@
 # GIT-001: Built-in Git Tools — Native Git Support
 
+2026-10-26 merge blocker: PR #735 CAS exposed an I307 protected-mount overlap
+finding for broad/canonical workspace roots. Independent merge readiness was
+withdrawn; green narrow-root CI does not cover it. I300's top checkpoint owns
+this prerequisite and the required sandbox follow-up. T7 is not Complete.
+
+
 Tracking recheck (2026-10-17): the live crates.io sparse index at
 `https://index.crates.io/3/g/gix` still ends at non-yanked `gix 0.89.0`
 (MSRV 1.88), while the Talos lockfile remains at 0.87.1. This is a release
@@ -23,6 +29,22 @@ through structured tool calls.
 Historical I026/I094 acceptance below does not prove closure of the current
 permission and diff defects. [I300](../../iterations/I300-structured-git-repair.md)
 owns the active repair; no implementation merge or completion SHA exists yet.
+
+2026-10-25 evidence: pushed candidate `a51d44b27` (PR #735) has the original
+two-document paths in the production Agent regression, including preservation
+of unrelated staged and unstaged bytes (3/3 approved/denied cases pass).
+I300's top audit maps the complete ADR diff matrix and distinguishes shared
+proof replay protection from MCP protocol request-ID reservation. Independent
+whole-T7 source review found no new concrete permission/process/API blocker;
+final full validation, platform CI, governance/CAS and merge remain required.
+Prior native Windows configured MCP Push passed; default git:// Push remains
+an accepted host limitation, and production preserves the user's sideband setting.
+The previous full preflight passed Tools 934/934 before the last test correction;
+current executable source now also passes the full authorized standard preflight
+(exit 0; Tools 934/934 and both SDK consumers). Current macOS/Linux CI passes;
+Windows also passed; this run is terminal success. The sandboxed attempt failed EPERM and one Search
+classification case; no intermittent Search cause or repair is claimed. No completion
+or exhaustive cross-entry test coverage is claimed.
 
 The local `git_add` candidate interprets selected paths literally and separately
 authorizes fixed Git configuration-chain discovery and the resulting exact

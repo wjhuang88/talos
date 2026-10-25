@@ -1,3 +1,66 @@
+## Protected mount overlap blocker — 2026-10-26
+
+CAS inspection of PR #735 found an independent concrete I307 security finding:
+Linux binds the writable workspace after /dev, /proc and private /tmp, without
+canonical overlap validation. Broad roots such as /tmp, /dev, /proc and / can
+therefore cover the protected mount. No native broad-root reproduction is yet
+claimed. Current a51 CI is all-success but covers narrow workspace roots only.
+The independent reviewer withdrew merge readiness after this finding; do not merge
+#735 until the sandbox follow-up is reviewed and validated. This is I307's existing
+isolation requirement, not a new T7 authorization contract. Keep ordinary /tmp
+child workspaces usable and review extra-read mount aliases/overlap too.
+The owner/claim follow-up and concrete regression evidence remain outstanding.
+
+## Final-candidate acceptance audit — 2026-10-25
+
+Requested outcome remains the full original T7 repair, followed by the remaining
+T1–T8 handoff queue. Candidate `a51d44b27503e34fbf93dab34c48d1c785619bf9`
+is pushed to PR #735. This audit changes evidence records only; I300/T7 remains
+Active. Preserve the published baseline and historical checkpoints below.
+Synchronize GIT-001/migration and the handoff before derived Board/index closure;
+remaining evidence belongs here until implementation merge and owner-first closure.
+
+| Original requirement | Inspected evidence and current result | Remaining gate |
+| --- | --- | --- |
+| Production admission cause/build | The verified 2026-10-11 characterization below ran the real Agent/GitAddTool permission chain and asserted untyped-facet refusal before approval. Current Agent fixture records the original characterization baseline `55fef9f9`; the repaired test build is this candidate. An unavailable historical executable is not claimed. | Final-head suite result |
+| Literal paths, actual metadata effects, invalid/denied/escape behavior | `prepared_add_tests/authorization.rs`: `direct_and_forged_or_exchanged_proofs_cannot_stage`, `approval_is_bound_to_prepared_source_and_index`, `sender_location_redirection_refuses_before_repository_rediscovery`, `inherited_git_redirection_is_refused_without_echoing_values`; permission-session `multi_facet_compilation_is_atomic` rejects a missing typed Execute resource with zero grants; Agent discovery-denied and mutation-denied tests preserve index bytes. | Final-head suite/platform evidence |
+| Same-family mutations without bypass | MCP `git_prepared.rs` exercises Add, Commit, local/network Push success/denial/replay; split `support/git_checkout_cases.rs` covers Checkout transitions. Tools shared final dispatcher revalidates proof, sources/index/program and configuration before mutation. Direct mutation-tool execution refuses without prepared admission. | Final-head suite/platform evidence |
+| Ordinary configured Git behavior | Tools native Pull command/recursion tests, Runtime `i300_native_pull.rs` and its recursion/cancellation modules, and MCP `git_pull_prepared.rs`/disconnect modules exercise real effects. Accepted whole-command Pull authority supersedes legacy per-helper prediction; explicit Deny and human-only policy remain authoritative. Default Windows git:// Push remains an accepted host limitation, not repaired behavior; production does not set sideband. | Final-head configured Windows Push and other platform results |
+| Exact original two-file operation/publication | Current production Agent approved/denied cases use both original docs/tasks paths and preserve unrelated staged/unstaged bytes; final focused run passes 3/3. Existing publication `e58e26783e2f48416b871a394b17ac79b642bb1f` contains exactly those two documents and is an ancestor of origin/main. Fixture bytes are synthetic. | Final-head full gate; no duplicate publication needed |
+| One-use, stale authority and cross-entry boundaries | Tools exchanged-proof/source-index tests plus permission-session revision/reset tests cover shared authority; Agent `normal_prepared_operation_requires_pipeline_and_refuses_replay` exercises admission/replay. MCP duplicate request IDs prove protocol reservation only, separately from shared proof validation. Runtime uses the production Agent chain and collects execution owners for shutdown. No claim of an exhaustive entrypoint × operation matrix. | Final-head suite and final evidence binding |
+| Protected security/API review | Independent reviewer re-read all five mutation dispatch/revalidation paths, Agent/MCP admission and Runtime owner collection at this exact SHA: no new concrete permission/process/API blocker. Pull whole-command contract ACCEPT; whole-T7 delivery remains NOT READY pending evidence below. Review reused earlier configuration/Unix/Windows supervision reviews and did not execute tests or formally prove all auxiliary parsers. | Validation, docs, CAS and merge |
+
+### Diff regression matrix inspected against ADR-089
+
+The following are actual assertions in `crates/talos-tools/src/git_tests.rs`,
+not test-name-only coverage. Their final suite execution remains a separate gate.
+
+| Required distinction | Assertion-bearing regression |
+| --- | --- |
+| Staged-only HEAD/index; three distinct versions; clean index/worktree | `git_diff_staged_shows_head_vs_index`: staged-only output, clean default diff, then default `-staged/+unstaged` excluding `-original` |
+| Unstaged-only content | `git_diff_produces_unified_diff_content`: committed baseline and worktree-only line replacement |
+| Add/delete, unborn HEAD, binary and empty-file metadata | `git_diff_distinguishes_add_delete_and_binary` initializes an unborn repository and checks /dev/null/binary output, then both deletion modes; `git_diff_reports_empty_file_addition` checks mode/header |
+| Executable mode fidelity | `git_diff_reports_mode_only_change`, `git_diff_ignores_worktree_executable_bit_when_filemode_is_false`, `git_diff_uses_owner_execute_bit_like_git`, `git_diff_retains_index_executable_mode_without_filemode_tracking` |
+| Symlink entry content and index/worktree separation | `git_diff_reads_symlink_entry_not_target`, `git_diff_symlink_targets_preserve_index_and_worktree_separation`; replaced-ancestor test rejects traversal |
+| Literal component boundaries and untracked exclusion | `git_diff_literal_path_boundary_and_untracked_exclusion`; non-UTF8 identities and escaped display paths have separate regressions |
+| Truncation and exceptional reads | `git_diff_line_limit_counts_metadata_and_exact_boundary`, read-error/FIFO tests and explicit unresolved-conflict refusal |
+| Ref comparison retained | `git_diff_ref_comparison_requires_two_resolved_refs` and `git_diff_ref_comparison_rejects_oversized_host_output` |
+| Gitlink fidelity | Staged OID test avoids child-object loading; unstaged HEAD/dirty, missing/uninitialized and file-replacement tests compare native Git behavior |
+
+Validation state: current executable source at `a51d44b27` passes the complete
+standard locked preflight outside the sandbox (exit 0, session 32178;
+`/private/tmp/i300-a51-final-preflight-authorized.log`), including Tools 934/934
+and both external Runtime SDK consumers. The sandboxed attempt exited 101 with
+one process-observation EPERM and one Search connection-classification failure
+(`/private/tmp/i300-a51-final-preflight.log`); the unchanged authorized full run
+passes, but no intermittent Search cause or repair is claimed. Focused final
+Agent cases also pass 3/3. Both governance validators pass with zero warnings
+(`/private/tmp/i300-audit-{governance,claims}.log`). CI run 40206441856 has passed
+macOS full validation, Linux/native Bubblewrap, installer and owner reconciliation;
+Windows also passed; run 40206441856 is terminal success at a51d44b27. This record is a documentation-only
+delta from the tested executable source. Required closure remains final platform
+validation, documentation synchronization, governance, CAS and merge.
+
 ## Historical operation acceptance correction — 2026-10-25
 
 Rebased onto main `3beb011a77` without conflicts. The existing production
