@@ -1,3 +1,30 @@
+## Current verification checkpoint — 2026-10-25
+
+Candidate `2b000de8c` is pushed to PR #735. Standard local preflight retry
+terminated with exit 101: Tools reported 932 passed and two failures in
+`refused_connection_advances_to_next_admitted_http_source_without_replay` and
+`refused_connection_consumes_budget_before_the_next_source_can_resolve`.
+Both received terminal Request instead of the expected refused-connection
+continuation. Log: `/private/tmp/i300-accepted-windows-preflight-retry.log`.
+The authorized isolated rerun with `--features coding` passes both tests
+(`/private/tmp/i300-search-refusal-coding-recheck.log`); this does not establish
+the cause or replace the failed full preflight. An earlier git-only filter ran
+zero tests and is not evidence. The authorized full Tools coding recheck also
+fails the same two tests (932 passed, two failed, 32.21 seconds;
+`/private/tmp/i300-tools-coding-recheck.log`). The failure reproduces in the full
+suite but not the two-test run; its concurrency/environment cause is unproven.
+
+PR #735 run 40168941745 fails remote owner reconciliation because its Issue
+matrix lacks #757; platform jobs remain running at this checkpoint. Main's
+I307 claim is merged via #758. I307 implementation PR #759 has passing Linux
+and Windows jobs; its same-head macOS rerun subsequently passed and run
+40113538524 is terminal success. Both validators pass with zero warnings and
+independent exact-head security review reconfirms ACCEPT. Merge-time CAS found
+unchanged main/claim and no overlapping PR; #759 is merged as
+`3beb011a77e0cc80422d915443e6caf9f8f74742`. I300 remains unready.
+Synchronize main, retain exact-head validation, and audit all original T7 acceptance
+items before closure. T7 and the full T1–T8 handoff remain Active/incomplete.
+
 ## Accepted Windows Git transport limitation — 2026-10-25
 
 Maintainer accepted preserving native configuration: Windows success fixtures
