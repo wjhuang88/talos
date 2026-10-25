@@ -1,8 +1,8 @@
 # Iterations
 
-[I307](I307-bubblewrap-workspace-visibility.md) is Complete / Closed: #757,
-Completion Commit `3beb011a77` (#759), exact-head CI 40113538524, native Linux
-isolation evidence and independent security review ACCEPT.
+[I307](I307-bubblewrap-workspace-visibility.md) is reopened Active for #757:
+protected-mount overlap validation was missing from prior `3beb011a77` (#759).
+The same isolation objective remains; follow-up claim awaits target-branch merge.
 
 ## Purpose
 

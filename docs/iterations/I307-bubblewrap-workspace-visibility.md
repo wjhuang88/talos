@@ -1,7 +1,7 @@
 # Iteration I307: Bubblewrap Workspace Visibility
 
-> Document status: Complete / Closed
-> Completion Commit: 3beb011a77e0cc80422d915443e6caf9f8f74742
+> Document status: Active
+> Prior Implementation Evidence: 3beb011a77e0cc80422d915443e6caf9f8f74742
 > Published plan date: 2026-10-24
 > Planned objective: restore the authorized Linux workspace after temporary mounts without expanding writable scope.
 > Baseline rule: preserve this bounded repair; broader sandbox redesign requires a separate owner.
@@ -11,18 +11,50 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Released |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | SANDBOX-001: Linux Bubblewrap workspace mount order, explicit cwd, isolation tests and docs; no Git admission, fallback policy, dependencies or API changes. |
 | Claimed At | 2026-10-24 |
 | Source Issue | #757 |
-| Governance Claim PR | #758 |
+| Governance Claim PR | None |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Maintainer requested session-handoff and failing-CI closure; no distinct maintainer reviewer available. Independent Agent security review, exact-head CI, both validators and merge-time CAS remain mandatory. Claim effective via #758; implementation merged via #759. |
-| Implementation PR | #759 |
-| Last Updated | 2026-10-25 |
-| Handoff / Release Condition | Closed after validated implementation merge #759. No release authorization. |
+| Authorization Evidence | Maintainer requested session-handoff and failing-CI closure; no distinct maintainer reviewer available. Independent Agent security review, exact-head CI, both validators and merge-time CAS remain mandatory. Prior claim #758 and implementation #759 are historical; this follow-up claim is ineffective until its governance merge. |
+| Implementation PR | None; follow-up pending |
+| Last Updated | 2026-10-26 |
+| Handoff / Release Condition | Reopened for protected-mount overlap correction; no implementation before effective follow-up claim. No release authorization. |
+
+## Reopened Isolation Acceptance — 2026-10-26
+
+The original objective and acceptance are unchanged. Prior narrow-workspace
+implementation `3beb011a77` and successful CI remain historical evidence, but
+PR #735 review exposed a missing input boundary: a late workspace bind at /,
+/tmp, /dev or /proc can cover protected mounts. No native broad-root reproduction
+has yet been run. This invalidates the full isolation completion claim.
+
+Requested outcome: enforce the existing protected-mount isolation for all accepted
+workspace/read overlays. Artifacts: sandbox implementation, native regressions,
+sandbox README and these owners/derived indexes. Verification: original narrow
+/tmp tests plus broad-root and symlink-alias non-execution/sentinel tests; locked
+preflight, native Linux CI, independent escape review, both validators and CAS.
+Residual destination: this owner and #757 until reviewed implementation merge.
+
+Follow-up implementation plan:
+1. Resolve workspace and extra-read mount paths before spawning bwrap; reject
+   roots that equal or contain /tmp, /dev or /proc, including canonical aliases.
+   Preserve ordinary /tmp child workspaces and read-only extra-path precedence.
+2. Verify rejected configurations never execute the payload or alter a host
+   sentinel; retain all original workspace/cwd, missing-path, outside-write,
+   private-temp and read-only overlay regressions. Review overlap in both mount
+   sets rather than guarding workspace string spelling alone.
+3. Record actual native evidence; do not claim macOS compilation tests Linux
+   namespace behavior. No public API, dependency, unsafe or Git contract change.
+
+Selection inventory at main `238bae0f1`: I249 Planned, I277/I302 Review,
+I293/I294/I300/I306 Active retain their owners; no new overlapping iteration
+or open PR owns this sandbox correction. Existing #735/#749/#705 scopes remain
+unchanged. Reuse the same I307 objective and #757; no new product requirement.
+This proposed governance-only reactivation is ineffective before target merge.
 
 ## Published Baseline
 
