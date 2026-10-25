@@ -1,3 +1,25 @@
+## Historical operation acceptance correction — 2026-10-25
+
+Rebased onto main `3beb011a77` without conflicts. The existing production
+Agent Add regression used first.txt/second.txt, so it did not establish the
+published exact-path replay requirement. It now uses the original two paths
+under docs/tasks (2026-10-10-session-todo-handoff.md and
+2026-10-10-session-todo-recovery.md), checks selected index bytes and preserves
+both unrelated staged and unstaged bytes. Approved, discovery-denied and
+mutation-denied cases pass 3/3 in the final focused locked library run
+(`/private/tmp/i300-historical-path-agent-final.log`). Formatting and whitespace
+checks pass. Fixture contents are synthetic; no historical executable is claimed.
+
+Historical publication is verified independently: commit
+`e58e26783e2f48416b871a394b17ac79b642bb1f` adds exactly the two documents,
+and `git merge-base --is-ancestor e58e26783 origin/main` exits 0 after fetching
+main. No duplicate historical publication is created. The rebased standard
+preflight remains running (`/private/tmp/i300-rebased-preflight.log`); it began
+before this test-only correction and does not validate this correction's final
+source. Native Windows run 40168941745 at pre-rebase `2b000de8c` is successful;
+Linux Desktop and remote matrix failures there precede the integrated I307 fix.
+Final exact-head review, validation and all original T7 gates remain open.
+
 ## Current verification checkpoint — 2026-10-25
 
 Candidate `2b000de8c` is pushed to PR #735. Standard local preflight retry

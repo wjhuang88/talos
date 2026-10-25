@@ -893,7 +893,12 @@ async fn i300_git_add_admission(approve: bool, allow_discovery: bool) {
         .output()
         .expect("host Git fixture");
     assert!(init.status.success());
-    for name in ["first.txt", "second.txt"] {
+    std::fs::create_dir_all(root.path().join("docs/tasks")).expect("historical paths");
+    let paths = [
+        "docs/tasks/2026-10-10-session-todo-handoff.md",
+        "docs/tasks/2026-10-10-session-todo-recovery.md",
+    ];
+    for name in paths {
         std::fs::write(root.path().join(name), "fixture\n").expect("fixture file");
     }
     std::fs::write(root.path().join("unrelated.txt"), "staged before\n").expect("unrelated");
@@ -912,7 +917,7 @@ async fn i300_git_add_admission(approve: bool, allow_discovery: bool) {
                 call: ToolCall {
                     id: "i300-two-files".into(),
                     name: "git_add".into(),
-                    input: serde_json::json!({"paths": ["first.txt", "second.txt"]}),
+                    input: serde_json::json!({"paths": paths}),
                 },
                 provenance: Default::default(),
                 summary_fields: vec![],
@@ -994,7 +999,7 @@ async fn i300_git_add_admission(approve: bool, allow_discovery: bool) {
         .output()
         .expect("inspect index");
     assert!(index.status.success());
-    assert_eq!(index.stdout, b"first.txt\0second.txt\0unrelated.txt\0");
+    assert_eq!(index.stdout, b"docs/tasks/2026-10-10-session-todo-handoff.md\0docs/tasks/2026-10-10-session-todo-recovery.md\0unrelated.txt\0");
     let unrelated = std::process::Command::new("git")
         .args(["show", ":unrelated.txt"])
         .current_dir(root.path())
@@ -1002,6 +1007,19 @@ async fn i300_git_add_admission(approve: bool, allow_discovery: bool) {
         .expect("unrelated index content");
     assert!(unrelated.status.success());
     assert_eq!(unrelated.stdout, b"staged before\n");
+    assert_eq!(
+        std::fs::read(root.path().join("unrelated.txt")).expect("unstaged bytes"),
+        b"unstaged after\n"
+    );
+    for path in paths {
+        let selected = std::process::Command::new("git")
+            .args(["show", &format!(":{path}")])
+            .current_dir(root.path())
+            .output()
+            .expect("selected index content");
+        assert!(selected.status.success());
+        assert_eq!(selected.stdout, b"fixture\n");
+    }
 }
 
 struct NormalPreparedFixture {
