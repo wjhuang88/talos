@@ -638,8 +638,9 @@ mod tests {
         #[tokio::test]
         async fn test_bubblewrap_basic_execution() {
             let sandbox = BubblewrapSandbox::new();
+            let workspace = tempfile::tempdir().expect("operation should succeed");
             let config = SandboxConfig {
-                workspace_root: PathBuf::from("/tmp"),
+                workspace_root: workspace.path().to_path_buf(),
                 allow_network: false,
                 extra_read_paths: vec![],
             };
