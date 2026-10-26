@@ -264,3 +264,33 @@ No implementation completion evidence exists. Do not mark H, G or T8 Complete fr
   versus per-destination isolation: ADR-064 does not currently authorize unknown/unbound
   targets, while ADR-090's prepared route requires every destination to be declared.
   No scope expansion is implemented or assumed while that decision is pending.
+
+- File recovery implementation checkpoint: `edit` now accepts opt-in `retain_backup`
+  for legacy and anchored edits and returns a real recovery ID. A separate `edit`
+  call with path/ID restores original contents through current Write authorization,
+  verifies the post-edit digest and consumes the ID on successful restoration.
+  The instance-local memory store expires entries after 15 minutes, caps originals at
+  2 MiB/file, 16 MiB total and 64 records, and refuses capacity before mutation without
+  evicting live entries. README describes actual use and limits. Mutation errors retain
+  recovery IDs; post-mutation snapshot errors explicitly report the changed state.
+- Locked file-tools tests passed 76/76 and locked file-write library Clippy passed with
+  warnings denied before the additional concurrent-restore test. Independent security/API
+  review and that final test rerun are pending. This is uncommitted implementation,
+  not complete G: no durable/delete/directory recovery, full OS identity/CAS protection
+  against external writers, higher-risk Auto admission, complete impact evidence or
+  cancellation/platform validation is claimed. H/G/T8 remain Active and incomplete.
+- Independent incremental review requested changes: recoverable and ordinary anchored
+  edits used separate locks, and a post-rename restore error omitted its potentially
+  completed effect. The working implementation now shares the registry path lock for
+  anchored edits/backups/restores and reports uncertain restore completion with retained
+  ID. Prior tests passed 77/77 including single-consumption concurrent restore; latest
+  fixes still require regression coverage for mixed edit modes and injected post-rename
+  failure plus reviewer follow-up. Do not treat the recovery stage as review-approved.
+- Recovery follow-up: locked file-tools tests passed 80/80, including injected
+  post-rename edit and restore failures, concurrent single-consumption recovery and
+  mixed recoverable/ordinary atomic writes sharing a revision lock. Independent
+  incremental security/API re-review withdrew both blockers and found no new concrete
+  blocker; it was static review, not final exact-head approval. Legacy non-backup
+  string writes retain their existing non-atomic behavior and do not join this lock.
+  Both governance validators passed before this checkpoint-only update. The stage
+  remains local; complete H/G acceptance and final platform/preflight/CI gates remain.

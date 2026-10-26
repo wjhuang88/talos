@@ -273,6 +273,12 @@ pub(crate) fn digest(bytes: &[u8]) -> [u8; 32] {
 }
 
 #[cfg(feature = "file-write")]
+#[cfg(test)]
+thread_local! {
+    pub(super) static FAIL_AFTER_RENAME: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+#[cfg(feature = "file-write")]
 pub(crate) fn atomic_replace(
     path: &Path,
     bytes: &[u8],
@@ -308,6 +314,12 @@ pub(crate) fn atomic_replace(
         drop(file);
         verify_path_identity(path)?;
         fs::rename(&temp, path)?;
+        #[cfg(test)]
+        if FAIL_AFTER_RENAME.replace(false) {
+            return Err(FileToolError::AtomicWriteFailed(
+                "injected post-rename sync failure".into(),
+            ));
+        }
         #[cfg(unix)]
         fs::File::open(parent)?.sync_all()?;
         Ok(())

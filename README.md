@@ -742,6 +742,16 @@ history, exports, transcripts, and TLOG. Display/history retain ordinary sanitiz
 resumed or rebuilt Runtime must read the file again, and every write still passes the current
 permission policy.
 
+For an existing-file edit, add `"retain_backup": true` to retain the original contents.
+The result returns a `recovery_id`; restore with
+`{"path":"src/example.rs","recovery_id":"<returned-id>"}` through the same `edit`
+tool instance and current Write permission. Restoration refuses a different path or
+contents changed since the edit and consumes the ID after success. Backups expire after
+15 minutes, disappear on tool/runtime replacement or shutdown, and are limited to 2 MiB
+per file, 16 MiB and 64 records per instance. A full store refuses the edit before mutation.
+This restores file contents only, not historical metadata, deleted files or directories;
+it is not durable recovery or protection against concurrent external writers.
+
 File tools remain workspace-confined by default. When an interactive permission-aware mode requests
 an external path, Talos asks the operator; approval carries only the selected tool operation and
 normalized path. Denial, missing headless approval, path reuse, operation reuse, and changed
