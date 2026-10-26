@@ -11,8 +11,10 @@ The review was by a separate read-only Agent sharing the session/GitHub identity
 not a separate natural person. It did not independently run tests.
 
 I308/H/G/T8 remain Active and incomplete. Mutation #770 merged as
-`687b84a93b4a9f40ede1eb600151c0a22a8f2d59`; policy/read coverage commits `82667ca54` and `07c005b87` are published in
-unmerged #771. Ordinary effectful Execute/HTTP/WebSearch Auto, remaining registered
+`687b84a93b4a9f40ede1eb600151c0a22a8f2d59`; policy/read coverage #771 merged as
+`b21b6146c21894dc42e8fc5bf1d815af71fbc7c8` after all-six-success exact-head
+CI 40280848025, independent final-target review and merge CAS. Scheduler/read/
+Todo/recovery stage #772 remains unmerged. Ordinary effectful Execute/HTTP/WebSearch Auto, remaining registered
 operation/profile dispositions and final delivery gates remain outstanding.
 Earlier checkpoints below preserve historical states and do not override this one.
 
@@ -35,7 +37,7 @@ Earlier checkpoints below preserve historical states and do not override this on
 | Governance Claim PR | #765 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer authorized continued full handoff delivery; #765 requires independent permission/security/API review, exact-head CI, both validators and final merge-time CAS before merge. |
-| Implementation PR | #769 (foundation); #770 (stacked file mutation stage) |
+| Implementation PR | #769 (foundation, merged); #770 (file mutation, merged); #771 (policy/read tests, merged); #772 (scheduler and native operation evidence) |
 | Last Updated | 2026-10-26 |
 | Handoff / Release Condition | Satisfy full H/G acceptance with existing implementation commits, independent permission/security/API review and platform evidence; no release authorized. |
 
@@ -1004,3 +1006,19 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
 - Locked focused Agent tests passed 2/2, with twelve recovery dispatch scenarios.
   No production behavior changed. This test extension is not covered by the
   running remote candidate; independent review and fresh exact-head CI remain due.
+
+### Stage integration and rebase checkpoint — 2026-10-26
+
+- #771 completed all six CI jobs successfully, including native Windows and its
+  cache post-job. Final target review approved main `687b84a93` to head `e8e8dccdb`;
+  merge CAS and review are recorded in
+  [the final receipt](https://github.com/wjhuang88/talos/pull/771#issuecomment-6412063934).
+  Merge commit is `b21b6146c21894dc42e8fc5bf1d815af71fbc7c8`.
+- #772 published head `6f56cb939` also passed all six jobs in CI 40291895444.
+  Retargeting to main exposed a merge conflict after the preceding squash merges.
+  Rebase onto `b21b6146c` completed without file conflicts, including the two local
+  recovery-test commits; the resulting tree at `525df4172` is identical to the
+  pre-rebase tree at `9c57b246d`. No cache-workflow change was needed or made.
+- Earlier CI does not cover the additional recovery tests or the new commit
+  identities. Fresh aggregate review, exact-head CI and merge CAS remain due.
+  T8 and the later handoff tasks remain incomplete.
