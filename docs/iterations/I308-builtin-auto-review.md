@@ -240,3 +240,12 @@ No implementation completion evidence exists. Do not mark H, G or T8 Complete fr
   unimplemented, so H/G/T8 remain Active and incomplete.
 
 - Latest local checks: locked agent Clippy passed with warnings denied after the context-enum cleanup; registration/input tests and independent incremental review are stage evidence only. Ordinary evidence plumbing is committed as `a44cba863`. Fetch reconfirmed unchanged main `8f0ce2340`; no rebase required.
+
+- HTTP configuration stability prerequisite: per-request timeout now uses the retained
+  client's request builder instead of constructing a client that resets redirect policy
+  and rereads proxy environment. Separate regression tests verify timeout clamping and
+  rejection of a redirect under a zero redirect budget. Locked `talos-tools --features
+  network --lib http_request::` passed 26/26. The initial no-feature invocation selected
+  zero tests and is not validation evidence; an initial regression assertion incorrectly
+  expected a 302 rather than reqwest's zero-budget redirect error and was corrected.
+  This does not implement HTTP Auto admission, G recovery or final delivery gates.

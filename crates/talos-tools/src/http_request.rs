@@ -276,6 +276,10 @@ impl HttpRequestTool {
             req = req.body(body.clone());
         }
 
+        if let Some(secs) = input.timeout_secs {
+            req = req.timeout(Duration::from_secs(secs.clamp(1, 60)));
+        }
+
         Ok(req)
     }
 }
@@ -439,20 +443,8 @@ impl AgentTool for HttpRequestTool {
             return ToolResult::error(format!("SSRF guard blocked request to {host}: {e}"));
         }
 
-        // Override timeout if specified.
-        let client = if let Some(secs) = parsed.timeout_secs {
-            let secs = secs.clamp(1, 60);
-            reqwest::Client::builder()
-                .redirect(reqwest::redirect::Policy::limited(DEFAULT_REDIRECT_LIMIT))
-                .timeout(Duration::from_secs(secs))
-                .build()
-                .expect("reqwest Client builder should never fail with default config")
-        } else {
-            self.client.clone()
-        };
-
         // Build and send request.
-        let request = match self.build_request(&client, &parsed) {
+        let request = match self.build_request(&self.client, &parsed) {
             Ok(req) => req,
             Err(e) => {
                 return ToolResult::error(format!("failed to build request: {e}"));
@@ -527,6 +519,9 @@ impl AgentTool for HttpRequestTool {
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod timeout_tests;
 
 #[cfg(test)]
 mod tests {
