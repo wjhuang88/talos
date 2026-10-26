@@ -18,8 +18,10 @@ use super::{
     SearchBackend, SearchBackendError, SearchBackendId, SearchBackendRequest, SearchBackendResult,
 };
 
-type CandidateFuture =
-    Pin<Box<dyn Future<Output = Result<Vec<SearchBackendResult>, SearchBackendError>> + Send>>;
+const MAX_FIELD_BYTES: usize = 16_384;
+
+type CandidateFuture<'a> =
+    Pin<Box<dyn Future<Output = Result<Vec<SearchBackendResult>, SearchBackendError>> + Send + 'a>>;
 
 /// Explicit private routing bounds. No production defaults are selected by this stage.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -91,12 +93,16 @@ pub(crate) enum SearchRouterError {
 }
 
 /// Private router over one explicit ordered candidate set.
-pub(crate) struct SearchRouter {
-    candidates: Vec<Arc<dyn SearchBackend>>,
+///
+/// The lifetime is intentional: existing compatibility adapters borrow `WebSearchTool`. The
+/// router owns an `Arc` to each adapter for one invocation without requiring those adapters to be
+/// `'static` or spawning detached work.
+pub(crate) struct SearchRouter<'a> {
+    candidates: Vec<Arc<dyn SearchBackend + 'a>>,
     policy: SearchRouterPolicy,
 }
 
-impl std::fmt::Debug for SearchRouter {
+impl std::fmt::Debug for SearchRouter<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("SearchRouter")
             .field(
@@ -112,9 +118,9 @@ impl std::fmt::Debug for SearchRouter {
     }
 }
 
-impl SearchRouter {
+impl<'a> SearchRouter<'a> {
     pub(crate) fn new(
-        candidates: Vec<Arc<dyn SearchBackend>>,
+        candidates: Vec<Arc<dyn SearchBackend + 'a>>,
         policy: SearchRouterPolicy,
     ) -> Result<Self, SearchRouterPolicyError> {
         for (index, backend) in candidates.iter().enumerate() {
@@ -149,7 +155,7 @@ impl SearchRouter {
         }
 
         let mut remaining = self.candidates.iter().cloned();
-        let mut active: Vec<(SearchBackendId, CandidateFuture)> = Vec::new();
+        let mut active: Vec<(SearchBackendId, CandidateFuture<'a>)> = Vec::new();
         let mut failures = Vec::new();
         let mut launch_next = true;
         let hedge = sleep(self.policy.hedge_delay);
@@ -252,7 +258,12 @@ impl SearchRouter {
             return Err(AdmissionError::NoResults);
         }
         if results.len() > self.policy.max_examined_results
-            || results.iter().any(|result| result.backend != backend)
+            || results.iter().any(|result| {
+                result.backend != backend
+                    || result.title.len() > MAX_FIELD_BYTES
+                    || result.snippet.len() > MAX_FIELD_BYTES
+                    || result.url.len() > self.policy.max_url_bytes
+            })
         {
             return Err(AdmissionError::InvalidResults);
         }
@@ -262,13 +273,15 @@ impl SearchRouter {
             if let Some(error) = control(deadline, cancellation) {
                 return Err(AdmissionError::Control(error));
             }
-            let valid = result.url.len() <= self.policy.max_url_bytes
-                && Url::parse(&result.url).is_ok_and(|url| {
+            let valid = std::panic::catch_unwind(|| {
+                Url::parse(&result.url).is_ok_and(|url| {
                     matches!(url.scheme(), "http" | "https")
                         && url.host_str().is_some()
                         && url.username().is_empty()
                         && url.password().is_none()
-                });
+                })
+            })
+            .map_err(|_| AdmissionError::InvalidResults)?;
             if let Some(error) = control(deadline, cancellation) {
                 return Err(AdmissionError::Control(error));
             }
