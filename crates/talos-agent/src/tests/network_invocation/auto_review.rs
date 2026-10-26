@@ -3,7 +3,12 @@ use super::*;
 use crate::auto_resolver::BuiltinNetworkAssessmentRequest;
 use talos_core::tool::{ToolContribution, ToolContributionSource};
 
-struct NetworkAssessor(Arc<AtomicUsize>);
+struct NetworkAssessor {
+    calls: Arc<AtomicUsize>,
+    scenario: &'static str,
+    state: Arc<PermissionSessionState>,
+    control: AutoPermissionControl,
+}
 
 #[async_trait]
 impl AutoPermissionAssessor for NetworkAssessor {
@@ -20,15 +25,23 @@ impl AutoPermissionAssessor for NetworkAssessor {
         request: BuiltinNetworkAssessmentRequest,
         _: std::time::Duration,
     ) -> Result<String, String> {
-        self.0.fetch_add(1, Ordering::SeqCst);
+        self.calls.fetch_add(1, Ordering::SeqCst);
         assert_eq!(request.input["query"], "rust documentation");
         assert_eq!(request.endpoints[0].host, "search.example");
         assert_eq!(request.user_intent, "search rust documentation");
+        match self.scenario {
+            "error" => return Err("fixture provider unavailable".into()),
+            "cancel" => self.control.set_enabled(false),
+            "stale" => {
+                self.state.rebind_session().expect("rebind");
+            }
+            _ => {}
+        }
         Ok(serde_json::json!({
             "schema": request.schema,
             "request_digest": request.request_digest,
-            "decision": "allow_once",
-            "confidence": "high"
+            "decision": if self.scenario == "uncertain" { "human_required" } else { "allow_once" },
+            "confidence": if self.scenario == "low" { "low" } else { "high" }
         })
         .to_string())
     }
@@ -36,7 +49,18 @@ impl AutoPermissionAssessor for NetworkAssessor {
 
 #[tokio::test]
 async fn auto_network_dispatch_requires_builtin_ownership_and_preserves_deny() {
-    for scenario in ["builtin", "external", "replacement", "deny", "policy_allow"] {
+    for scenario in [
+        "builtin",
+        "external",
+        "replacement",
+        "deny",
+        "policy_allow",
+        "error",
+        "cancel",
+        "stale",
+        "uncertain",
+        "low",
+    ] {
         let root = tempfile::tempdir().expect("workspace");
         let mut engine = PermissionEngine::with_workspace_root(root.path().to_owned());
         if matches!(scenario, "deny" | "policy_allow") {
@@ -78,13 +102,19 @@ async fn auto_network_dispatch_requires_builtin_ownership_and_preserves_deny() {
             registry.register(tool);
         }
         let assessments = Arc::new(AtomicUsize::new(0));
+        let control = AutoPermissionControl::new(true);
         let resolver = AutoPermissionResolver::new(
-            Arc::new(NetworkAssessor(assessments.clone())),
+            Arc::new(NetworkAssessor {
+                calls: assessments.clone(),
+                scenario,
+                state: state.clone(),
+                control: control.clone(),
+            }),
             Arc::new(AutoDenyFallback),
             ManagedWorkspaceLease::for_permission_session(root.path(), state.clone())
                 .expect("lease"),
             std::time::Duration::from_secs(2),
-            AutoPermissionControl::new(true),
+            control,
         );
         let input = serde_json::json!({"query": "rust documentation"});
         let agent = Agent::with_security(
@@ -109,7 +139,10 @@ async fn auto_network_dispatch_requires_builtin_ownership_and_preserves_deny() {
         assert_eq!(prepared.load(Ordering::SeqCst), 1, "{scenario}");
         assert_eq!(
             assessments.load(Ordering::SeqCst),
-            usize::from(scenario == "builtin"),
+            usize::from(!matches!(
+                scenario,
+                "external" | "replacement" | "deny" | "policy_allow"
+            )),
             "{scenario}"
         );
         let expected = if matches!(scenario, "builtin" | "policy_allow") {
