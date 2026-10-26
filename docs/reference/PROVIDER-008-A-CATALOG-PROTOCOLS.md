@@ -1,0 +1,192 @@
+# PROVIDER-008-A: Protocol-Only Catalog Projection
+
+Carrier: a generated-data Draft PR stacked on code PR #749; not independently activatable.
+
+Source: https://models.dev/api.json, fetched 2026-10-26. This is catalog evidence, not a live endpoint
+probe or a claim that vendor-specific authentication/transports have been implemented.
+
+- Snapshot SHA-256: `e8819dc5eceb8dfeea7212725b1f1dc933ec34e74b661100f830c8979283a159`.
+- Snapshot bytes: 5,944,295; 232 upstream providers.
+- Preserved packaged models: 6,474, with the same IDs, providers, limits, pricing, capabilities,
+  release dates and variants. Provider metadata and API roots are byte-for-byte unchanged.
+- Added model protocol keys: 3,859 Chat, 38 Anthropic Messages, 119 Responses (4,016 total).
+- Withheld: 911 models absent upstream, 1,350 unsupported/unknown SDK transports, 56 model-specific
+  endpoint overrides and 141 records whose provider API root changed upstream.
+
+The projection matches only exact `(provider, model)` identities already in the package. It uses the
+shared `protocol_signal.rs` map: explicit `responses`/`completions` shape first, otherwise exact
+supported SDK package defaults. Host and model SDKs must belong to the three already implemented
+wire families. Azure, Bedrock, Vertex and unknown transports are not admitted just because an item
+says `shape=responses`. Model endpoint overrides differing from the provider root are withheld until
+routing support exists. Upstream provider-root drift is also withheld in this protocol-only stage;
+no old endpoint is silently reinterpreted using a newer root's protocol evidence.
+
+At runtime, overriding a built-in provider's endpoint to a different root suppresses that built-in
+catalog evidence. User-explicit model/provider protocols still win. Unique custom-provider model
+matching remains the published ADR-093 rule. A model-level Messages choice on a gateway root is
+normalized once to `/messages` by the shared adapter factory; explicit full Messages endpoints are
+preserved.
+
+Normal builds remain offline. Full `BUILD_MODELS=1` refreshes use the same shared map and admission
+checks but may separately update broader upstream metadata; those changes are not included here.
+The one-time protocol projection was checked by parsing both datasets and removing the optional
+model `protocol` fields: every remaining model field and every provider record matched the old
+package. Generation/routing tests exercise transport refusal, endpoint refusal, explicit overrides
+and packaged catalog selection. No recorded network model responses or vendor credentials were used.
+
+## Responses Signal Ledger
+
+All rows below passed the supported-host/model-SDK and unchanged-endpoint checks. An absent shape
+uses the exact `@ai-sdk/openai` default; these are data signals, not name-based guesses.
+
+| Provider | Packaged model | Model SDK / inherited SDK | Shape |
+|---|---|---|---|
+| github-copilot | `gpt-5.3-codex` | `@ai-sdk/openai` | (SDK default) |
+| github-copilot | `gpt-5.4` | `@ai-sdk/openai` | (SDK default) |
+| github-copilot | `gpt-5.4-mini` | `@ai-sdk/openai` | (SDK default) |
+| github-copilot | `gpt-5.4-nano` | `@ai-sdk/openai` | (SDK default) |
+| github-copilot | `gpt-5.5` | `@ai-sdk/openai` | (SDK default) |
+| github-copilot | `gpt-5.6-luna` | `@ai-sdk/openai` | (SDK default) |
+| github-copilot | `gpt-5.6-sol` | `@ai-sdk/openai` | (SDK default) |
+| github-copilot | `gpt-5.6-terra` | `@ai-sdk/openai` | (SDK default) |
+| github-copilot | `grok-4.5` | `@ai-sdk/openai` | (SDK default) |
+| github-copilot | `grok-4.6` | `@ai-sdk/openai` | (SDK default) |
+| github-copilot | `mai-code-1.1-flash` | `@ai-sdk/openai` | (SDK default) |
+| meta | `muse-spark-1.1` | `@ai-sdk/openai` | (SDK default) |
+| meta | `muse-spark-1.2` | `@ai-sdk/openai` | (SDK default) |
+| meta | `muse-spark-1.2-contributor` | `@ai-sdk/openai` | (SDK default) |
+| neosmith | `neosmith.intelligent-basic` | `@ai-sdk/openai` | (SDK default) |
+| neosmith | `neosmith.intelligent-maestro` | `@ai-sdk/openai` | (SDK default) |
+| neosmith | `neosmith.intelligent-pro` | `@ai-sdk/openai` | (SDK default) |
+| neosmith | `neosmith.neolite` | `@ai-sdk/openai` | (SDK default) |
+| ofox | `openai/gpt-4.1` | `@ai-sdk/openai` | (SDK default) |
+| ofox | `openai/gpt-4.1-mini` | `@ai-sdk/openai` | (SDK default) |
+| ofox | `openai/gpt-4o` | `@ai-sdk/openai` | (SDK default) |
+| ofox | `openai/gpt-4o-mini` | `@ai-sdk/openai` | (SDK default) |
+| ofox | `openai/gpt-5` | `@ai-sdk/openai` | (SDK default) |
+| ofox | `openai/gpt-5-mini` | `@ai-sdk/openai` | (SDK default) |
+| ofox | `openai/gpt-5-nano` | `@ai-sdk/openai` | (SDK default) |
+| ofox | `openai/gpt-5.1` | `@ai-sdk/openai` | (SDK default) |
+| ofox | `openai/gpt-5.1-codex-max` | `@ai-sdk/openai` | (SDK default) |
+| ofox | `openai/gpt-5.1-codex-mini` | `@ai-sdk/openai` | (SDK default) |
+| ofox | `openai/gpt-5.2` | `@ai-sdk/openai` | (SDK default) |
+| ofox | `openai/gpt-5.2-codex` | `@ai-sdk/openai` | (SDK default) |
+| ofox | `openai/gpt-5.3-codex` | `@ai-sdk/openai` | (SDK default) |
+| ofox | `openai/gpt-5.4` | `@ai-sdk/openai` | (SDK default) |
+| ofox | `openai/gpt-5.4-mini` | `@ai-sdk/openai` | (SDK default) |
+| ofox | `openai/gpt-5.4-nano` | `@ai-sdk/openai` | (SDK default) |
+| ofox | `openai/gpt-5.4-pro` | `@ai-sdk/openai` | (SDK default) |
+| ofox | `openai/gpt-5.5` | `@ai-sdk/openai` | (SDK default) |
+| ofox | `openai/gpt-5.6-luna` | `@ai-sdk/openai` | (SDK default) |
+| ofox | `openai/gpt-5.6-sol` | `@ai-sdk/openai` | (SDK default) |
+| ofox | `openai/gpt-5.6-terra` | `@ai-sdk/openai` | (SDK default) |
+| openai | `gpt-4` | `@ai-sdk/openai` | (SDK default) |
+| openai | `gpt-4-turbo` | `@ai-sdk/openai` | (SDK default) |
+| openai | `gpt-4.1` | `@ai-sdk/openai` | (SDK default) |
+| openai | `gpt-4.1-mini` | `@ai-sdk/openai` | (SDK default) |
+| openai | `gpt-4.1-nano` | `@ai-sdk/openai` | (SDK default) |
+| openai | `gpt-4o` | `@ai-sdk/openai` | (SDK default) |
+| openai | `gpt-4o-2024-05-13` | `@ai-sdk/openai` | (SDK default) |
+| openai | `gpt-4o-2024-08-06` | `@ai-sdk/openai` | (SDK default) |
+| openai | `gpt-4o-2024-11-20` | `@ai-sdk/openai` | (SDK default) |
+| openai | `gpt-4o-mini` | `@ai-sdk/openai` | (SDK default) |
+| openai | `gpt-5` | `@ai-sdk/openai` | (SDK default) |
+| openai | `gpt-5-mini` | `@ai-sdk/openai` | (SDK default) |
+| openai | `gpt-5-nano` | `@ai-sdk/openai` | (SDK default) |
+| openai | `gpt-5-pro` | `@ai-sdk/openai` | (SDK default) |
+| openai | `gpt-5.1` | `@ai-sdk/openai` | (SDK default) |
+| openai | `gpt-5.2` | `@ai-sdk/openai` | (SDK default) |
+| openai | `gpt-5.2-pro` | `@ai-sdk/openai` | (SDK default) |
+| openai | `gpt-5.3-codex` | `@ai-sdk/openai` | (SDK default) |
+| openai | `gpt-5.3-codex-spark` | `@ai-sdk/openai` | (SDK default) |
+| openai | `gpt-5.4` | `@ai-sdk/openai` | (SDK default) |
+| openai | `gpt-5.4-mini` | `@ai-sdk/openai` | (SDK default) |
+| openai | `gpt-5.4-nano` | `@ai-sdk/openai` | (SDK default) |
+| openai | `gpt-5.4-pro` | `@ai-sdk/openai` | (SDK default) |
+| openai | `gpt-5.5` | `@ai-sdk/openai` | (SDK default) |
+| openai | `gpt-5.5-pro` | `@ai-sdk/openai` | (SDK default) |
+| openai | `gpt-5.6` | `@ai-sdk/openai` | (SDK default) |
+| openai | `gpt-5.6-luna` | `@ai-sdk/openai` | (SDK default) |
+| openai | `gpt-5.6-sol` | `@ai-sdk/openai` | (SDK default) |
+| openai | `gpt-5.6-terra` | `@ai-sdk/openai` | (SDK default) |
+| openai | `gpt-realtime-2.1` | `@ai-sdk/openai` | (SDK default) |
+| openai | `o1` | `@ai-sdk/openai` | (SDK default) |
+| openai | `o1-pro` | `@ai-sdk/openai` | (SDK default) |
+| openai | `o3` | `@ai-sdk/openai` | (SDK default) |
+| openai | `o3-mini` | `@ai-sdk/openai` | (SDK default) |
+| openai | `o3-pro` | `@ai-sdk/openai` | (SDK default) |
+| openai | `o4-mini` | `@ai-sdk/openai` | (SDK default) |
+| perplexity-agent | `anthropic/claude-haiku-4-5` | `@ai-sdk/openai` | (SDK default) |
+| perplexity-agent | `anthropic/claude-opus-4-5` | `@ai-sdk/openai` | (SDK default) |
+| perplexity-agent | `anthropic/claude-opus-4-6` | `@ai-sdk/openai` | (SDK default) |
+| perplexity-agent | `anthropic/claude-opus-4-7` | `@ai-sdk/openai` | (SDK default) |
+| perplexity-agent | `anthropic/claude-sonnet-4-5` | `@ai-sdk/openai` | (SDK default) |
+| perplexity-agent | `anthropic/claude-sonnet-4-6` | `@ai-sdk/openai` | (SDK default) |
+| perplexity-agent | `deepseek/deepseek-v4-flash-0731` | `@ai-sdk/openai` | (SDK default) |
+| perplexity-agent | `google/gemini-3-flash-preview` | `@ai-sdk/openai` | (SDK default) |
+| perplexity-agent | `google/gemini-3.1-pro-preview` | `@ai-sdk/openai` | (SDK default) |
+| perplexity-agent | `moonshot-ai/kimi-k2.7-code` | `@ai-sdk/openai` | (SDK default) |
+| perplexity-agent | `moonshot-ai/kimi-k3` | `@ai-sdk/openai` | (SDK default) |
+| perplexity-agent | `nvidia/nemotron-3-super-120b-a12b` | `@ai-sdk/openai` | (SDK default) |
+| perplexity-agent | `openai/gpt-5-mini` | `@ai-sdk/openai` | (SDK default) |
+| perplexity-agent | `openai/gpt-5.1` | `@ai-sdk/openai` | (SDK default) |
+| perplexity-agent | `openai/gpt-5.2` | `@ai-sdk/openai` | (SDK default) |
+| perplexity-agent | `openai/gpt-5.4` | `@ai-sdk/openai` | (SDK default) |
+| perplexity-agent | `openai/gpt-5.5` | `@ai-sdk/openai` | (SDK default) |
+| perplexity-agent | `perplexity/sonar` | `@ai-sdk/openai` | (SDK default) |
+| perplexity-agent | `xai/grok-4-1-fast-non-reasoning` | `@ai-sdk/openai` | (SDK default) |
+| perplexity-agent | `xai/grok-4.6` | `@ai-sdk/openai` | (SDK default) |
+| sakana | `fugu` | `@ai-sdk/openai-compatible` | responses |
+| sakana | `fugu-ultra` | `@ai-sdk/openai-compatible` | responses |
+| sakana | `fugu-ultra-20260615` | `@ai-sdk/openai-compatible` | responses |
+| vivgrid | `gpt-5.1-codex` | `@ai-sdk/openai` | (SDK default) |
+| vivgrid | `gpt-5.1-codex-max` | `@ai-sdk/openai` | (SDK default) |
+| vivgrid | `gpt-5.2-codex` | `@ai-sdk/openai` | (SDK default) |
+| vivgrid | `gpt-5.3-codex` | `@ai-sdk/openai` | (SDK default) |
+| vivgrid | `gpt-5.6-luna` | `@ai-sdk/openai` | (SDK default) |
+| vivgrid | `gpt-5.6-sol` | `@ai-sdk/openai` | (SDK default) |
+| vivgrid | `gpt-5.6-terra` | `@ai-sdk/openai` | (SDK default) |
+| vivgrid | `kimi-k3` | `@ai-sdk/openai` | (SDK default) |
+| zenmux | `openai/gpt-5` | `@ai-sdk/openai` | (SDK default) |
+| zenmux | `openai/gpt-5-codex` | `@ai-sdk/openai` | (SDK default) |
+| zenmux | `openai/gpt-5.1` | `@ai-sdk/openai` | (SDK default) |
+| zenmux | `openai/gpt-5.1-codex` | `@ai-sdk/openai` | (SDK default) |
+| zenmux | `openai/gpt-5.1-codex-mini` | `@ai-sdk/openai` | (SDK default) |
+| zenmux | `openai/gpt-5.2` | `@ai-sdk/openai` | (SDK default) |
+| zenmux | `openai/gpt-5.2-codex` | `@ai-sdk/openai` | (SDK default) |
+| zenmux | `openai/gpt-5.2-pro` | `@ai-sdk/openai` | (SDK default) |
+| zenmux | `openai/gpt-5.3-codex` | `@ai-sdk/openai` | (SDK default) |
+| zenmux | `openai/gpt-5.4` | `@ai-sdk/openai` | (SDK default) |
+| zenmux | `openai/gpt-5.4-mini` | `@ai-sdk/openai` | (SDK default) |
+| zenmux | `openai/gpt-5.4-nano` | `@ai-sdk/openai` | (SDK default) |
+| zenmux | `openai/gpt-5.4-pro` | `@ai-sdk/openai` | (SDK default) |
+
+## Projection Integrity
+
+- Old catalog bytes SHA-256: `aa173e5361159000dd22a6a6bfa8b8cfa08e42e37961b736393763db5c8d02ed`.
+- New catalog bytes SHA-256: `b742393abbb56a8fd65230d7b0865b2d1deda31f65bf77c70def571e5889d0aa`.
+- Semantic SHA-256 after removing model protocol keys: `acc90a95ff8f87fbf131788548066575d02cd8e1ccb8f3545a9c62e01712947d`.
+
+The semantic digest serializes parsed TOML with Python JSON `sort_keys=True` and compact separators;
+it is identical to the old catalog. The pinned old bytes remain reachable through archived #749
+head `5acd2161`. New-source and generated-data CI are independent gates; merging this data does not
+close I306 or admit withheld endpoint/transport cases.
+
+## Candidate Validation And Residuals
+
+Code dependency: #749 at `7fd35dcf1e66317a7523f5cfdf64168079091207`, rebased on main `2789b97b`.
+Four new snapshot acceptance cases pass: actual per-model wire selection/source, unconfirmed-endpoint
+refusal with explicit override, unsupported transport/root-drift refusal, and exact projected counts.
+Focused strict Clippy for `catalog_protocol_snapshot` passes. Model/protocol data and provider,
+configuration, CLI/binary image-tool integration cases passed in the isolated worktree run.
+
+The first data-worktree build reused another worktree's target and failed with E0463/colliding
+StableCrateId; it is not acceptance evidence. All later data validation uses this worktree's own
+target directory. The initial isolated four-package test run recorded **1,653 passed / 1 failed**,
+stopping in existing `highlight::tests::unavailable_grammar_keeps_existing_markdown_fallback` at
+`highlight("rust", ...).is_some()`. Its exact focused rerun passed (1 test). A second full run again
+recorded **1,653 passed / 1 failed** at the same assertion. Preserve both full failures; no full-suite
+success or root-cause closure is claimed. The assertion and production highlighting code are
+unchanged. Treat this as an open validation blocker for the data candidate, not proof that the
+catalog caused or did not cause the behavior. Fresh unfiltered remote CI and full acceptance remain
+required; do not merge or activate the data from the passing four snapshot cases alone.
