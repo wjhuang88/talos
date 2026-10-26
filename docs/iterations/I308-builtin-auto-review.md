@@ -1052,3 +1052,27 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
   compatibility and positive network eligibility/I293 ownership boundaries;
   the proposal now includes both, and distinguishes human review from isolation.
   This is design feedback, not implementation approval or T8 delivery evidence.
+
+### Runtime shared-instance registration repair — 2026-10-26
+
+- `RuntimeBuilder::shared_tools()` previously discarded factory contribution
+  identity and registered its tools as caller instances. The local repair retains
+  internal contributions, preserves last-registration-wins ordering with `tool()`,
+  and never transfers built-in identity to a caller replacement. Presets still
+  fill only absent names. All registered cleanup owners, including replaced
+  instances, remain retained and pointer-deduplicated for shutdown.
+- Three separate registration regressions pass; the full locked Runtime library
+  suite with `shared-composition` passes 82/82, including actual shared Read,
+  preset override, skill policy and shutdown tests. Locked Runtime library/tests
+  Clippy passes with warnings denied. These tests do not establish full Runtime
+  Auto-dispatch acceptance or ordinary command/network Auto implementation.
+- The default-feature locked Runtime library suite also passes 73/73; both
+  governance validators pass with zero warnings. The standard workspace
+  preflight is running and is not yet claimed successful.
+- Independent same-session read-only Agent security/API review approved the
+  production/test diff, with no independent test execution. This local repair
+  is outside published #772 head `05d0f4889`; it still needs the next stable
+  candidate's full validation, exact-head CI/review and merge. T8 remains Partial.
+- The first broad test invocation failed during linking with disk exhaustion,
+  before test execution. Previously authorized `target/debug` example and
+  incremental artifacts were cleared; subsequent library-only tests above pass.
