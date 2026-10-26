@@ -569,6 +569,13 @@ repeating known mistakes.
 
 **Prevention**: macOS 路径处理必须考虑符号链接，尤其是 `/tmp`、`/var`、`/etc` 等系统目录。
 
+**I306 / CI3448 follow-up (2026-10-26)**: A Responses image HTTP fixture bypassed the CLI grant
+path and stored a lexical temp path, so the unchanged TOCTOU guard correctly omitted the image on
+macOS. Canonicalize fixture paths before creating durable Image parts. The HTTP regression now
+starts from a Unix file alias on Linux too; removing canonicalization reproduces the failure.
+Keep path-drift/digest guards and image-presence/no-path-leak assertions intact. Promoted to check:
+`mock_http_accepts_adr051_multimodal_continuation_without_path_leak`.
+
 ---
 
 ### 5. Mock LLM 是测试基础设施，应尽早实现 (I005)

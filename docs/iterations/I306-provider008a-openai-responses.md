@@ -208,3 +208,31 @@ strict read-result assertion and production permissions remain unchanged.
 
 Unfiltered current-head CI and independent provider/API review remain mandatory. Do not mark this
 stage Ready, merged, Complete or released from the local affected-package results alone.
+
+### CI3448 Fixture Correction — 2026-10-26
+
+Run `40300248919` / CI3448 on `ee68851dd72ac436eee2b4ade3c4009848b6f865` failed the macOS
+`Format + Check + Clippy + Test` job (`121496129738`) in
+`openai_responses_http::mock_http_accepts_adr051_multimodal_continuation_without_path_leak`.
+The tool-call HTTP case passed; the image case returned `ServerError("")` because the mock did not
+match a request containing an image. This failure is inside #748, distinct from the earlier local
+Unix-socket/native-Git blockers. Linux Desktop and remote owner reconciliation passed; the Windows
+workspace job was still running when this correction began, so no complete CI3448 pass is claimed.
+
+The fixture put its lexical temporary-file path into a durable Image part, although ADR-050/051
+requires the grant-time canonical path. The existing image guard re-canonicalizes and omits an image
+if the stored path differs. macOS temporary-directory aliases expose that fixture error. A local
+Unix file-symlink reproduction confirmed the exact failure without changing production code:
+removing only fixture canonicalization gives the same `ServerError`, and restoring it passes.
+
+The correction canonicalizes the existing fixture after file creation and before constructing the
+message. Unix runs deliberately use a file alias first so Linux exercises the same precondition.
+Filename leakage checks cover both canonical and alias filenames, including JSON-escaped Windows
+paths. Assertions still require image bytes, the streamed answer, a semantic terminal event and the
+expected HTTP request. No guard, retry, permission, production image or CI policy is relaxed.
+
+Focused validation: both HTTP fixtures passed with the fix; red/green alias reproduction
+failed/passed as expected; all nine selected image-guard regressions passed; focused strict Clippy
+(`cargo clippy --locked -p talos-provider --test openai_responses_http -- -D warnings`) passed.
+Format and both governance validators are checked before the stable correction is published. CI3448's failed first attempt is preserved; a new head requires fresh
+unfiltered CI. All remaining I306 acceptance gates and Draft/Active/Claimed state are unchanged.

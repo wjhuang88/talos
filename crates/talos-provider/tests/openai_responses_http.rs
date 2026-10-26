@@ -174,6 +174,18 @@ async fn mock_http_accepts_adr051_multimodal_continuation_without_path_leak() {
         .save(&path)
         .expect("fixture png");
 
+    // Durable image parts carry grant-time canonical paths. Exercise an alias on Unix so Linux
+    // also covers the precondition exposed by macOS's temporary-directory aliases.
+    #[cfg(unix)]
+    let path = {
+        let alias = temp.path().join("continuation-alias.png");
+        std::os::unix::fs::symlink(&path, &alias).expect("fixture image alias");
+        alias
+    };
+    let path = path
+        .canonicalize()
+        .expect("grant-time canonical image path");
+
     let mut server = mockito::Server::new_async().await;
     let path_text = path.to_string_lossy().into_owned();
     let mock = server
@@ -181,7 +193,10 @@ async fn mock_http_accepts_adr051_multimodal_continuation_without_path_leak() {
         .match_request(move |request| {
             let raw = request.body().expect("request body");
             let body_text = String::from_utf8_lossy(raw);
-            if body_text.contains(&path_text) {
+            if body_text.contains(&path_text)
+                || body_text.contains("continuation.png")
+                || body_text.contains("continuation-alias.png")
+            {
                 return false;
             }
             let body: Value = serde_json::from_slice(raw).expect("Responses request JSON");
