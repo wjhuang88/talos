@@ -12,7 +12,7 @@ rust-version.workspace = true
 plugin-acceptance = ["code-intelligence"]
 default = ["file-read", "search"]
 file-read = ["dep:sha2", "dep:uuid", "dep:walkdir", "tokio/fs"]
-file-write = ["file-read", "dep:cap-std", "tokio/fs"]
+file-write = ["file-read", "dep:cap-std", "tokio/fs", "tokio/io-util"]
 search = [
     "dep:glob",
     "dep:grep-matcher",

@@ -9,6 +9,7 @@ use talos_core::tool::{
     ToolPermissionFacet, ToolResourceKind, ToolResult,
 };
 use talos_core::tool_parameters;
+use tokio::io::AsyncWriteExt;
 
 use super::{FileSnapshotRegistry, FileToolError, resolve_authorized_path};
 use crate::file_tools::snapshot::{atomic_replace, digest, line_spans};
@@ -117,9 +118,41 @@ impl WriteTool {
             tokio::fs::create_dir_all(parent).await?;
         }
 
-        tokio::fs::write(&path, &write_input.content).await?;
+        let mut file = tokio::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+            .await
+            .map_err(|error| {
+                if error.kind() == std::io::ErrorKind::AlreadyExists {
+                    FileToolError::FileExists(write_input.path.clone())
+                } else {
+                    FileToolError::Io(error)
+                }
+            })?;
         if let Some(registry) = &self.snapshots {
-            registry.invalidate_path(&path)?;
+            registry.invalidate_path(&path).map_err(|error| {
+                FileToolError::AtomicWriteFailed(format!(
+                    "file was created but snapshot invalidation failed: {error}"
+                ))
+            })?;
+        }
+        async {
+            file.write_all(write_input.content.as_bytes()).await?;
+            file.flush().await
+        }
+        .await
+        .map_err(|error: std::io::Error| {
+            FileToolError::AtomicWriteFailed(format!(
+                "file was created and may contain partial content: {error}"
+            ))
+        })?;
+        if let Some(registry) = &self.snapshots {
+            registry.invalidate_path(&path).map_err(|error| {
+                FileToolError::AtomicWriteFailed(format!(
+                    "file content was written but snapshot invalidation failed: {error}"
+                ))
+            })?;
         }
 
         Ok(format!(
