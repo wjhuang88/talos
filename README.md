@@ -714,6 +714,10 @@ Talos ships with built-in tools for common coding-agent work:
 - Code intelligence: `find_symbol`, `find_references`, `list_symbols`, `list_imports`
 - Git: `git_status`, `git_diff`, `git_log`, `git_show`, `git_branch_list`, `git_add`, `git_commit`, `git_push`, `git_pull`, `git_checkout`
 - Network: `fetch_url` (bounded URL context — public pages, HTML extraction, JSON), `http_request` (advanced HTTP/API inspection — custom methods/headers/bodies, disclosed on demand via continuation), `save_url` (download URL to local file — dual network+write permission), `web_search` (DuckDuckGo + Tavily + SearXNG + Wikipedia)
+
+`http_request` stops reading the response once its body limit is exceeded (64 KiB
+by default). Truncated responses report a lower bound on the received size;
+the remaining body is not downloaded to calculate a total.
 - Document extraction: `document_extract` (read-only bounded text extraction from local text/HTML/JSON/CSV/Markdown/XML files)
 - Image reading: `read_image` (model-invoked image read for vision-capable models; validates PNG/JPEG/GIF/WebP through shared ingestion; exact-path authorization; returns a safe summary and a one-shot provider continuation artifact per ADR-051; only presented when the active model's catalog metadata confirms `image_input = true`)
 - Process execution: `exec` (argv-only single process, no shell parsing), plus the

@@ -464,15 +464,14 @@ impl AgentTool for HttpRequestTool {
         let status = response.status();
         let response_headers = response.headers().clone();
 
-        // Read body with size cap.
-        let body_bytes = match response.bytes().await {
-            Ok(b) => b,
+        // Stop consuming once the output cap is exceeded; never collect the full body.
+        let (body_bytes, truncated) = match read_bounded_body(response, self.max_body_bytes).await {
+            Ok(body) => body,
             Err(e) => {
                 return ToolResult::error(format!("failed to read response body: {e}"));
             }
         };
 
-        let truncated = body_bytes.len() > self.max_body_bytes;
         let body_display = if truncated {
             &body_bytes[..self.max_body_bytes]
         } else {
@@ -493,7 +492,7 @@ impl AgentTool for HttpRequestTool {
 
         let size_label = if truncated {
             format!(
-                "first {} of {} bytes",
+                "first {} of at least {} bytes",
                 self.max_body_bytes,
                 body_bytes.len()
             )
@@ -506,7 +505,7 @@ impl AgentTool for HttpRequestTool {
 
         if truncated {
             output.push_str(&format!(
-                "\n\n[Response truncated at {} bytes. Total size: {} bytes]",
+                "\n\n[Response truncated at {} bytes. Received at least {} bytes; remaining body not read]",
                 self.max_body_bytes,
                 body_bytes.len()
             ));
@@ -516,12 +515,31 @@ impl AgentTool for HttpRequestTool {
     }
 }
 
+async fn read_bounded_body(
+    mut response: reqwest::Response,
+    limit: usize,
+) -> Result<(Vec<u8>, bool), reqwest::Error> {
+    let retained_limit = limit.saturating_add(1);
+    let mut bytes = Vec::new();
+    while let Some(chunk) = response.chunk().await? {
+        let take = chunk.len().min(retained_limit.saturating_sub(bytes.len()));
+        bytes.extend_from_slice(&chunk[..take]);
+        if bytes.len() > limit {
+            return Ok((bytes, true));
+        }
+    }
+    Ok((bytes, false))
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod timeout_tests;
+
+#[cfg(test)]
+mod body_limit_tests;
 
 #[cfg(test)]
 mod tests {

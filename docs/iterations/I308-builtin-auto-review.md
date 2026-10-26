@@ -249,3 +249,18 @@ No implementation completion evidence exists. Do not mark H, G or T8 Complete fr
   zero tests and is not validation evidence; an initial regression assertion incorrectly
   expected a 302 rather than reqwest's zero-budget redirect error and was corrected.
   This does not implement HTTP Auto admission, G recovery or final delivery gates.
+
+- HTTP bounded-response prerequisite: response collection now stops after the configured
+  body limit plus one byte, rather than downloading the complete body before truncation.
+  Output reports a lower bound instead of claiming an unknown total. Separate transport
+  tests cover empty, exact-limit, over-limit and zero-limit bodies plus a chunked server
+  that never completes its stream. This bounds retained application body bytes, not
+  reqwest's internal per-chunk/decompression buffers. Locked `talos-tools --features
+  network --lib http_request::` passed 29/29 after adding the independent reviewer's
+  suggested incomplete-body error test. Static incremental review found no blocker;
+  both governance validators passed with zero warnings before this test-only follow-up.
+  This is not final exact-head delivery approval. HTTP Auto admission remains
+  unimplemented. A maintainer question is pending on whole-operation network review
+  versus per-destination isolation: ADR-064 does not currently authorize unknown/unbound
+  targets, while ADR-090's prepared route requires every destination to be declared.
+  No scope expansion is implemented or assumed while that decision is pending.
