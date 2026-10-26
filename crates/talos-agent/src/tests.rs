@@ -6743,3 +6743,4 @@ fn dispatch_recovery_requires_explicit_protocol_evidence() {
 }
 
 mod edit_auto;
+mod recovery_dispatch;

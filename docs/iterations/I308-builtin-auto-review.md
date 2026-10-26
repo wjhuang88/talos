@@ -877,3 +877,24 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
 - Local Git is 2.54.0 while the failing CI recorded 2.55.0. Version difference
   is an observation, not an established cause. Existing Windows jobs continue;
   no failed CI rerun or production fixture change is used to claim resolution.
+
+### Recovery invocation permission verification — 2026-10-26
+
+- A separate real-Agent dispatch test covers restoration through both native
+  edit and delete instances. Explicit Write Allow restores and consumes the
+  receipt exactly once. Write Deny and Ask with a denying resolver leave the
+  mutation untouched and the receipt usable. A concurrent edit or recreation
+  is preserved even when current Write policy allows restoration. Every case
+  returns one tool result and creates no persistent grant.
+- This tests current permission enforcement on a later recovery invocation;
+  it does not implement model-assisted recovery approval. The focused locked
+  Agent test and Agent library/test Clippy pass. The first test attempt assumed
+  edit's multiline receipt format for delete too; the fixture parser was
+  corrected to accept delete's existing inline format.
+- Standard serial preflight was started at `a110a12fe` before this new test
+  existed. Its eventual result cannot establish final-head coverage of this
+  additional test; the separate focused run supplies that evidence.
+- Independent static read-only Agent review approved `a110a12fe` against
+  `17c6e458f`, without blockers or independent test reruns. It confirmed fixed
+  diagnostic categories expose no captured paths/values and preserve refusal.
+  This same-session Agent shares tool/GitHub identity and is not a human review.
