@@ -261,6 +261,14 @@ The `[auto] enabled` setting defaults to `true` as an attempted bounded-assistan
 unconditional permission. `/auto`, `/auto on`, and `/auto off` inspect or override the active
 session without writing configuration or transcript state.
 
+With an interactive approval surface, registered built-in `delay`, `schedule`, and
+`cancel_scheduled_task` requests can receive one-time model approval after review of
+their exact arguments and current user intent. Scheduling may create recurring model
+work; approval does not authorize tools called by future messages. Explicit Deny or
+mandatory-human rules remain authoritative. Uncertain, failed, oversized or stale
+reviews return to human approval. This support does not extend to caller-supplied
+tools with matching names.
+
 Set `[auto] locale = "zh-CN"` to choose the presentation locale for model explanations and human
 decision points. Supported tags use `language[-Script][-REGION]` (for example `zh-Hans-CN`
 or `en-001`); POSIX encoding/modifier suffixes are accepted and discarded. This bounded subset

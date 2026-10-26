@@ -329,7 +329,7 @@ Runtime shared composition has a separate Product/Runtime inventory-equivalence 
 | `bash` (Unix) / `powershell` (Windows), `exec` | Existing shell/direct-command paths retained; I308 full profile/decision evidence outstanding. |
 | `todo_create`, `todo_create_batch`, `todo_update_batch`, `todo_update_status`, `todo_update`, `todo_delete`, `todo_add_dependency`, `todo_remove_dependency`, `todo_query` | Session-scoped Internal facets retain default deterministic Allow, not model approval. Local real-Agent tests cover all nine operations under default Allow and explicit Internal Deny, actual SQLite effects, unchanged other-session data, zero assessor calls and zero grants. MCP does not add Todo; complete profile/platform evidence remains outstanding. |
 | `status` | MCP-only read tool; concrete built-in ownership checked. |
-| `delay`, `schedule`, `list_scheduled_tasks`, `cancel_scheduled_task` | Product-owned scheduler factory now registers actual instances as built-ins in interactive/Print/Inline/RPC/TUI; caller-supplied scheduler instances remain external. Model-assisted scheduling allowance remains unimplemented. |
+| `delay`, `schedule`, `list_scheduled_tasks`, `cancel_scheduled_task` | Product-owned scheduler factory registers actual instances as built-ins; caller-supplied instances remain external. A local action-review implementation now admits exact scheduling/cancellation invocations, pending validation and independent review below. `list_scheduled_tasks` retains Read policy. This stage is not merged acceptance. |
 
 Inventory work found and repaired a production gap: Print/Inline/RPC/TUI previously
 constructed scheduler tools locally but passed them through generic external registration.
@@ -918,3 +918,49 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
   Full T8 and the later handoff queue remain incomplete.
 - Both project governance and Collaboration Claim validators passed with zero
   warnings after this checkpoint update.
+
+### Session-local action review implementation — 2026-10-26
+
+- Scope follows the accepted effectful H baseline: review only one session-local
+  scheduling or cancellation invocation; later scheduled model work retains normal
+  tool permissions. No whole-shell/network authority is inferred from this stage.
+- Additive `BuiltinActionAssessmentRequest` and a default-unsupported assessor
+  method preserve existing public struct literals and exhaustive enums. The
+  provider receives bounded exact arguments, implementation description, complete
+  facets, current user intent, session/revisions, nonce and digest. Failures,
+  stale context, disabled Auto and invalid responses retain human fallback.
+- Real dispatch testing exposed an existing scheduler admission gap: Execute
+  facets had no typed resource, so the permission pipeline could not even form
+  an approval proposal. Following existing session-owned process cancellation,
+  scheduler actions now use named Command resources bound to operation plus the
+  complete argument digest. They grant no OS executable authority; the normal
+  invocation/session binding still applies. No permission-engine bypass added.
+- Tests are separate in `tests/scheduler_auto.rs`: 51 real Agent/Scheduler
+  combinations cover delay, recurring schedule and cancellation with Allow,
+  explicit Deny/human, external ownership, uncertain/low-confidence, stale,
+  disabled, malformed/replayed-digest/schema/extra-field/oversized responses,
+  error/panic/timeout and oversized input outcomes. Actual scheduler state and
+  zero persistent grants are checked. Final locked Agent library tests pass
+  500/500; Agent library/test Clippy passes with warnings denied. Logs:
+  `/private/tmp/i308-scheduler-agent-full.log` and
+  `/private/tmp/i308-scheduler-auto-clippy.log`. Both governance validators pass.
+- Independent static read-only Agent security/API review approved the final
+  working diff against `f29b4cbc7`, including the final input/payload size checks;
+  no blockers or independent test reruns. Same-session Agent shares tool/GitHub
+  identity and is not human review. Final exact-head CI/merge remain outstanding.
+- Provider review payloads are bounded to 16 KiB, including the digest. Resource
+  hashing still serializes the full already-supplied input; no claim that every
+  temporary allocation is 16 KiB-bounded. Cancellation exposes task ID and exact
+  invocation, not retained task message/timing; insufficient user intent must
+  require human review. Future-fire permission enforcement and exhaustive policy
+  revision/race coverage are not established by this test.
+- The authorized preflight above terminated during the external Runtime SDK
+  fixture after concurrent source edits introduced a digest-format compile error.
+  The error was fixed. This mixed-source run cannot prove final-head validation;
+  rerun only after this stage stabilizes, with no concurrent source edits.
+- Remote results: #772 Windows workspace passed in run 40285467815, while its
+  macOS Runtime failure remains. #771 run 40280848025 completed all substantive
+  Windows tests/checks/governance/smoke successfully, then exceeded the 45-minute
+  job limit in post-job Rust cache saving. GitHub still reports cancelled, so
+  this is not a green gate. Failed-job rerun requested after terminal evidence;
+  no live job was cancelled or replaced.

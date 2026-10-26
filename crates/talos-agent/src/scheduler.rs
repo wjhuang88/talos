@@ -15,11 +15,14 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use async_trait::async_trait;
+use sha2::{Digest, Sha256};
 use talos_core::session::{
     MAX_SUBMISSION_ITEM_BYTES, SessionOp, StructuredSubmission, SubmissionItem, SubmissionKind,
     SubmissionReceipt, SubmissionReceiptDisposition, SubmissionSource,
 };
-use talos_core::tool::{AgentTool, ToolFamily, ToolNature, ToolResult};
+use talos_core::tool::{
+    AgentTool, ToolFamily, ToolNature, ToolPermissionFacet, ToolResourceKind, ToolResult,
+};
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
@@ -27,6 +30,25 @@ use tokio_util::sync::CancellationToken;
 
 /// Minimum allowed one-shot delay.
 pub(crate) const MIN_DELAY_SECS: u64 = 1;
+
+// Like session-owned background cancellation, scheduler actions use a named
+// command resource, not an executable path. Bind the complete arguments so an
+// approval cannot be reused for another message, interval or cancellation ID.
+pub(super) fn action_permission_profile(
+    name: &str,
+    input: &serde_json::Value,
+) -> Vec<ToolPermissionFacet> {
+    let bytes = input.to_string();
+    let digest: String = Sha256::digest(bytes.as_bytes())
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    vec![ToolPermissionFacet::with_resource(
+        ToolNature::Execute,
+        format!("scheduler:{name}:sha256:{digest}"),
+        ToolResourceKind::Command,
+    )]
+}
 /// Maximum allowed one-shot delay (24 hours).
 pub(crate) const MAX_DELAY_SECS: u64 = 86_400;
 /// Minimum allowed recurring interval.
@@ -642,6 +664,9 @@ impl DelayTool {
 
 #[async_trait]
 impl AgentTool for DelayTool {
+    fn permission_profile(&self, input: &serde_json::Value) -> Vec<ToolPermissionFacet> {
+        action_permission_profile(self.name(), input)
+    }
     fn name(&self) -> &str {
         "delay"
     }
@@ -719,6 +744,9 @@ impl ScheduleTool {
 
 #[async_trait]
 impl AgentTool for ScheduleTool {
+    fn permission_profile(&self, input: &serde_json::Value) -> Vec<ToolPermissionFacet> {
+        action_permission_profile(self.name(), input)
+    }
     fn name(&self) -> &str {
         "schedule"
     }
@@ -866,6 +894,9 @@ impl CancelScheduledTaskTool {
 
 #[async_trait]
 impl AgentTool for CancelScheduledTaskTool {
+    fn permission_profile(&self, input: &serde_json::Value) -> Vec<ToolPermissionFacet> {
+        action_permission_profile(self.name(), input)
+    }
     fn name(&self) -> &str {
         "cancel_scheduled_task"
     }
