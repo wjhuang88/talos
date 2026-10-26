@@ -1040,3 +1040,15 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
   its running CI 40296390604. No production implementation changed. T8 remains
   incomplete; ordinary effectful command/network Auto and other acceptance gaps
   are not satisfied by this evidence.
+
+### Ordinary invocation decision draft — 2026-10-26
+
+- The previously pending ordinary command/network authorization question now has
+  a concrete [decision proposal](../proposals/i308-native-invocation-authorization.md).
+  It requests invocation-level review of transitive effects, not per-target
+  confinement, and remains unaccepted/unimplemented. A maintainer question is
+  pending; no answer is inferred from the earlier Pull-only acceptance.
+- Independent read-only design review requested explicit pre-Allow policy
+  compatibility and positive network eligibility/I293 ownership boundaries;
+  the proposal now includes both, and distinguishes human review from isolation.
+  This is design feedback, not implementation approval or T8 delivery evidence.
