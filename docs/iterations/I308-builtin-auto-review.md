@@ -1087,3 +1087,11 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
   Four local continuation commits were rebased onto it without conflicts; file
   trees before and after rebase match. The repair is now `75d5811c0`, on
   `feat/i308-runtime-registration`. No new candidate has been published yet.
+
+- Authorized standard preflight completed with exit 0 on 2026-10-26 for
+  production tree `57ee6103c3831e9ebaad18339fa0057fc170a653`:
+  `RUST_TEST_THREADS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_DEV_DEBUG=0 ./scripts/release_preflight.sh`.
+  Workspace checks, Clippy, tests/doctests, governance and external Runtime SDK
+  fixture passed; log: `/private/tmp/i308-runtime-registration-preflight-authorized.log`.
+  This supersedes the pending result above, preserves the sandbox failure, and
+  does not establish remote CI, merge, or full T8 completion.
