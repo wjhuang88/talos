@@ -17,6 +17,8 @@ use crate::file_tools::snapshot::{atomic_replace, digest, line_spans};
 const MAX_PREVIEW_LINES: usize = 20;
 const MAX_PREVIEW_CHARS: usize = 2_000;
 
+mod prepared_edit;
+
 /// Input parameters for the [`WriteTool`].
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct WriteInput {
@@ -235,7 +237,7 @@ pub struct EditInput {
 pub struct EditTool {
     workspace_root: PathBuf,
     snapshots: Option<FileSnapshotRegistry>,
-    recovery: super::recovery::FileRecoveryStore,
+    recovery: std::sync::Arc<super::recovery::FileRecoveryStore>,
 }
 
 impl EditTool {
@@ -413,11 +415,6 @@ impl EditTool {
             .snapshots
             .as_ref()
             .ok_or(FileToolError::SnapshotNotFound)?;
-        if anchored.operations.is_empty() {
-            return Err(FileToolError::InvalidEditRange(
-                "at least one operation is required".into(),
-            ));
-        }
         let path = resolve_authorized_path(
             &self.workspace_root,
             &anchored.path,
@@ -445,38 +442,12 @@ impl EditTool {
         } else {
             tokio::fs::read(&path).await?
         };
-        if digest(&current) != snapshot.file_revision {
-            return Err(FileToolError::FileRevisionMismatch);
-        }
-        let spans = line_spans(&current);
-        let mut mutations = Vec::with_capacity(anchored.operations.len());
-        for operation in &anchored.operations {
-            mutations.push(build_mutation(
-                operation,
-                &current,
-                &spans,
-                &snapshot.line_digests,
-            )?);
-        }
-        validate_mutations(&mut mutations)?;
-        let old_preview = mutations
-            .iter()
-            .map(|mutation| String::from_utf8_lossy(&current[mutation.start..mutation.end]))
-            .collect::<Vec<_>>()
-            .join("\n");
-        let new_preview = mutations
-            .iter()
-            .map(|mutation| String::from_utf8_lossy(&mutation.replacement))
-            .collect::<Vec<_>>()
-            .join("\n");
-        let diff = bounded_replacement_diff(&old_preview, &new_preview);
-        let mut updated = current.clone();
-        for mutation in mutations.iter().rev() {
-            updated.splice(
-                mutation.start..mutation.end,
-                mutation.replacement.iter().copied(),
-            );
-        }
+        let (updated, diff) = plan_anchored_edit(
+            &current,
+            &anchored,
+            &snapshot,
+            retain_backup.then_some(talos_core::tool::MAX_FILE_MUTATION_REVIEW_BYTES),
+        )?;
         let path_lock = registry.path_lock(&path)?;
         let recovery = if retain_backup {
             recovery_receipt(
@@ -494,6 +465,64 @@ impl EditTool {
         })?;
         Ok(format!("edited {}{recovery}\ndiff:\n{diff}", anchored.path))
     }
+}
+
+fn plan_anchored_edit(
+    current: &[u8],
+    anchored: &AnchoredEditInput,
+    snapshot: &super::snapshot::SnapshotRecord,
+    limit: Option<usize>,
+) -> Result<(Vec<u8>, String), FileToolError> {
+    if anchored.operations.is_empty() {
+        return Err(FileToolError::InvalidEditRange(
+            "at least one operation is required".into(),
+        ));
+    }
+    if digest(current) != snapshot.file_revision {
+        return Err(FileToolError::FileRevisionMismatch);
+    }
+    let spans = line_spans(current);
+    let mut mutations = Vec::with_capacity(anchored.operations.len());
+    for operation in &anchored.operations {
+        mutations.push(build_mutation(
+            operation,
+            current,
+            &spans,
+            &snapshot.line_digests,
+        )?);
+    }
+    validate_mutations(&mut mutations)?;
+    let old_preview = mutations
+        .iter()
+        .map(|mutation| String::from_utf8_lossy(&current[mutation.start..mutation.end]))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let new_preview = mutations
+        .iter()
+        .map(|mutation| String::from_utf8_lossy(&mutation.replacement))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let diff = bounded_replacement_diff(&old_preview, &new_preview);
+    let length = mutations
+        .iter()
+        .try_fold(current.len(), |length, mutation| {
+            length
+                .checked_sub(mutation.end - mutation.start)
+                .and_then(|length| length.checked_add(mutation.replacement.len()))
+        })
+        .filter(|length| limit.is_none_or(|limit| *length <= limit))
+        .ok_or_else(|| {
+            FileToolError::SnapshotLimit("anchored edit result exceeds recovery image limit".into())
+        })?;
+    let mut updated = Vec::with_capacity(length);
+    let mut cursor = 0;
+    for mutation in &mutations {
+        updated.extend_from_slice(&current[cursor..mutation.start]);
+        updated.extend_from_slice(&mutation.replacement);
+        cursor = mutation.end;
+    }
+    updated.extend_from_slice(&current[cursor..]);
+    Ok((updated, diff))
 }
 
 fn recovery_receipt(id: String) -> String {
@@ -592,6 +621,14 @@ struct Mutation {
 
 #[async_trait]
 impl AgentTool for EditTool {
+    fn prepare_normalized_with_provenance(
+        &self,
+        input: &Value,
+        provenance: talos_core::tool::ToolProvenance,
+    ) -> Result<Option<Box<dyn talos_core::tool::PreparedNormalToolInvocation>>, String> {
+        prepared_edit::prepare(self, input, provenance)
+    }
+
     fn name(&self) -> &str {
         "edit"
     }

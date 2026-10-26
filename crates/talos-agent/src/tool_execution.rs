@@ -781,18 +781,37 @@ impl Agent {
                         ));
                     };
                     let evidence = operation.prepared_command_evidence();
-                    pipeline
-                        .authorize_prepared_plan_with_evidence(
-                            authorization_request,
-                            user_intent,
-                            plan,
-                            evidence.as_ref(),
-                        )
-                        .await
-                        .map(|admission| {
-                            prepared_admission = Some(admission);
-                            Vec::new()
-                        })
+                    let mutation = operation.prepared_file_mutation_evidence();
+                    if evidence.is_some() && mutation.is_some() {
+                        return Ok((
+                            ToolExecutionResult::error("ambiguous prepared review evidence"),
+                            Vec::new(),
+                        ));
+                    }
+                    let admission = if let Some(mutation) = mutation.as_ref() {
+                        pipeline
+                            .authorize_registered_file_mutation(
+                                authorization_request,
+                                user_intent,
+                                plan,
+                                mutation,
+                                registry.is_builtin_instance(&call.name),
+                            )
+                            .await
+                    } else {
+                        pipeline
+                            .authorize_prepared_plan_with_evidence(
+                                authorization_request,
+                                user_intent,
+                                plan,
+                                evidence.as_ref(),
+                            )
+                            .await
+                    };
+                    admission.map(|admission| {
+                        prepared_admission = Some(admission);
+                        Vec::new()
+                    })
                 } else if matches!(call.name.as_str(), "bash" | "powershell")
                     && working_directory.is_some()
                 {

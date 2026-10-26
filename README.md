@@ -317,8 +317,19 @@ user intent to a separate tool-free Auto review. The existing direct-workspace-c
 text-file and atomic-create capability restrictions remain. The complete review payload
 must fit 16 KiB; secret-like or oversized input requires human approval. A matching
 high-confidence decision permits that invocation once. Custom assessors must implement
-`assess_builtin_invocation` to support this path; the default is unsupported. This does
-not enable Auto approval of existing-file edits or deletes.
+`assess_builtin_invocation` to support this path; the default is unsupported.
+
+Registered native string and snapshot-anchored `edit` requests with `retain_backup=true` can receive
+one-use Auto approval after review of the complete captured original and replacement,
+exact arguments and user intent. The complete encoded review must fit 16 KiB;
+oversized or secret-like content requires human approval. Execution refuses a changed
+original and retains a recovery receipt on success. Anchored edits reuse existing
+anchor/overlap validation and recheck the snapshot before execution. Custom assessors must implement
+`assess_file_mutation`; the default is unsupported. Registered native text-file
+`delete` with `retain_backup=true` uses the same complete-original review and refuses
+deletion if the captured bytes have changed. Binary files remain eligible for human
+approved recoverable deletion, but not this text review. Auto approval of directory
+deletion and mutations without retained backups is not implemented.
 
 ## Development
 

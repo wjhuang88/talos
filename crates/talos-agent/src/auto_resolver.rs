@@ -4,11 +4,13 @@
 //! suggest an invocation-local `ApproveOnce`; policy evaluation and grant admission
 //! remain owned by [`crate::permission_pipeline::PermissionPipeline`].
 
+mod file_mutation_review;
 mod invocation_review;
 mod network_review;
 mod prepared_command;
 mod script_evidence;
 
+pub use file_mutation_review::FileMutationAssessmentRequest;
 pub use invocation_review::BuiltinInvocationAssessmentRequest;
 pub use network_review::{BuiltinNetworkAssessmentRequest, NetworkReviewEndpoint};
 pub use prepared_command::PreparedCommandAssessmentRequest;
@@ -841,6 +843,14 @@ pub enum AutoConfidence {
 /// Provider-independent model assessor. Implementations must not call tools recursively.
 #[async_trait]
 pub trait AutoPermissionAssessor: Send + Sync {
+    /// Reviews complete captured images of one retained native file mutation.
+    async fn assess_file_mutation(
+        &self,
+        _request: FileMutationAssessmentRequest,
+        _remaining: Duration,
+    ) -> Result<String, String> {
+        Err("file mutation assessment unsupported".into())
+    }
     /// Reviews exact bounded arguments and intent of a trusted native invocation.
     /// Existing assessors remain unsupported until explicitly implemented.
     async fn assess_builtin_invocation(
@@ -972,6 +982,13 @@ impl ProviderAutoPermissionAssessor {
 
 #[async_trait]
 impl AutoPermissionAssessor for ProviderAutoPermissionAssessor {
+    async fn assess_file_mutation(
+        &self,
+        request: FileMutationAssessmentRequest,
+        remaining: Duration,
+    ) -> Result<String, String> {
+        self.assess_file_mutation_payload(request, remaining).await
+    }
     async fn assess_builtin_invocation(
         &self,
         request: BuiltinInvocationAssessmentRequest,
@@ -2090,6 +2107,23 @@ impl AutoPermissionResolver {
 
 #[async_trait]
 impl ApprovalResolver for AutoPermissionResolver {
+    async fn resolve_builtin_file_mutation(
+        &self,
+        request: PermissionApprovalRequest,
+        evidence: crate::permission_pipeline::BuiltinFileMutationReviewEvidence<'_>,
+        remaining: Duration,
+        auto_assessment_allowed: bool,
+        user_intent: Option<&str>,
+    ) -> Result<ApprovalChoice, ApprovalResolverError> {
+        self.resolve_file_mutation_review(
+            request,
+            evidence,
+            remaining,
+            auto_assessment_allowed,
+            user_intent,
+        )
+        .await
+    }
     async fn resolve_builtin_invocation(
         &self,
         request: PermissionApprovalRequest,

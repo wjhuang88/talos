@@ -15,6 +15,8 @@ use super::{
     resolve_workspace_path,
 };
 
+mod prepared_delete;
+
 /// Input parameters for the [`DeleteTool`].
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct DeleteInput {
@@ -26,7 +28,7 @@ pub struct DeleteInput {
 pub struct DeleteTool {
     workspace_root: PathBuf,
     snapshots: Option<FileSnapshotRegistry>,
-    recovery: super::recovery::FileRecoveryStore,
+    recovery: std::sync::Arc<super::recovery::FileRecoveryStore>,
 }
 
 impl DeleteTool {
@@ -172,6 +174,14 @@ impl DeleteTool {
 
 #[async_trait]
 impl AgentTool for DeleteTool {
+    fn prepare_normalized_with_provenance(
+        &self,
+        input: &Value,
+        provenance: talos_core::tool::ToolProvenance,
+    ) -> Result<Option<Box<dyn talos_core::tool::PreparedNormalToolInvocation>>, String> {
+        prepared_delete::prepare(self, input, provenance)
+    }
+
     fn name(&self) -> &str {
         "delete"
     }

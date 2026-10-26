@@ -491,3 +491,178 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
   row, now synchronized here; no functional test failure is inferred from it.
 - Stage remains Review; I308/T8 remains Active / partial. Native Windows runtime,
   final exact-head CI/review/CAS and all remaining H/G implementation are open.
+
+
+### File mutation review implementation started — 2026-10-26
+
+- Local continuation branch `feat/i308-file-mutation-auto` starts at the published
+  foundation head `ffa35973022c18f752cacad1922325e15c648379`; #769 stays unchanged.
+- Added a compatible default prepared-invocation file evidence hook and a separate
+  plan-bound before/after text carrier. Each image is bounded to 2 MiB without
+  truncation; relative targets are rejected and Debug hides contents. The carrier
+  is not authority; dispatch must independently check built-in instance ownership.
+- `cargo test --locked -p talos-core` with incremental/debug disabled passed:
+  122 unit tests plus all eight integration tests. Existing downstream trait
+  defaults compile. The two new tests cover plan rebinding/private Debug and both
+  over-limit images. No new dependency or changed existing public struct shape.
+- This is local implementation plumbing only: no file producer, dispatcher or
+  Auto assessor consumes it yet. Edit/delete Auto execution is still unimplemented.
+  Next implement read-admitted content capture, identity-bound mutation review,
+  fresh-state checks and mandatory bounded recovery through the normal pipeline,
+  then end-to-end outcome tests and independent review before publication.
+
+### File mutation dispatch admission — 2026-10-26
+
+- Prepared normal-tool dispatch now routes file-change evidence through an
+  instance-ownership check and verifies its retained plan identity before
+  resolution. Simultaneous command and file-change evidence is rejected.
+- The additive resolver receives complete private images, normalized arguments,
+  permission facets and user intent separately from redacted presentation. Its
+  default preserves existing approval behavior and adds no Auto allowance.
+- Focused locked agent pipeline tests pass 20/20, including trusted allow/deny,
+  same-name external instance rejection and mismatched-plan rejection. Approved
+  evidence yields an exact one-use prepared proof without persistent grants.
+  `cargo fmt --all -- --check` passes.
+- This stage does not implement the file-tool producer or model assessor.
+  Actual edit/delete Auto execution, stale-state/recovery integration tests,
+  independent security review and final platform/CI gates remain outstanding.
+
+### Recoverable string edit producer — 2026-10-26
+
+- Added a prepared producer for legacy string edits with `retain_backup=true`.
+  Preparation performs no file read. An exact read admission captures bounded
+  complete text; a fresh plan exposes before/after evidence and requires a new
+  Read/Write admission before atomic replacement through the owning backup store.
+  The final replacement checks the captured content digest and rejects changed
+  content. Anchored edits, restore and non-backup edits retain their existing route.
+- Explicit `cargo test --locked -p talos-tools --features file-write --lib
+  file_tools::` with incremental/debug disabled passed 93/93. New tests exercise
+  real capture, first-match replacement, owning-instance restore, missing proof
+  refusal and concurrent-content preservation. Tests live in a separate file.
+- The initial default-feature check did not compile this feature-gated module;
+  its zero-test run is not evidence. Explicit feature validation exposed and
+  fixed a provenance move and incorrect test permission setup before the passing
+  run above. No default-feature success is claimed as file-write coverage.
+- Changes are local and still require source/security review, final integration
+  and platform validation. The Auto assessor is not implemented, and this does
+  not establish model-approved edit/delete execution or T8 completion.
+
+- Follow-up standalone file-write Clippy exposed that test dev-dependencies masked
+  the production optional permission dependency. `file-write` now enables the
+  existing `talos-permission` dependency directly; standalone locked Clippy with
+  `--features file-write --lib -- -D warnings` passes. The producer refuses an
+  oversized after image before allocating it; the additional test also proves
+  the file remains unchanged, and capture/commit identities differ.
+
+### Model-reviewed recoverable string edits — 2026-10-26
+
+- Added a separate complete-image assessor payload and provider adapter. Auto
+  dispatch reviews registered native `edit` with `retain_backup=true`; the
+  payload includes exact arguments, original/result, facets, user intent and a
+  fresh nonce/digest. Strict matching high-confidence `allow_once` is required.
+  Permission revision/reset checks remain live, and all outcomes are one-use.
+- The shared 16 KiB encoded review budget is enforced without truncation. Larger
+  files may use bounded recovery but require human approval; suspected secrets,
+  unsupported assessors, invalid responses and uncertain outcomes also fall back.
+  Delete and anchored-edit Auto remain unimplemented, not implicitly supported.
+- Agent end-to-end tests cover 13 scenarios: real replacement on allow; human
+  required, assessor error, disabled/stale context, oversized request, low
+  confidence, wrong digest/schema, extra response fields, malformed/oversized
+  response, and a concurrent writer during review. That writer's data survives
+  even when the assessor returns allow. No persistent grant is created.
+- Locked agent library tests pass 494/494; locked agent library Clippy with
+  `-D warnings` passes. These are local checks, not full workspace, native Windows
+  or independent review evidence. Foundation PR #769 remains pending remotely
+  (run 40274739232 has no jobs); the continuation is not pushed or merged.
+
+### Captured recoverable deletion — 2026-10-26
+
+- Added read-admitted deletion capture with a fresh final plan identity. Text files
+  expose complete-original evidence to the same invocation-local model review;
+  binary files retain human-approved backup/deletion without text-model evidence.
+  Preparation itself performs no filesystem read. Recovery and other deletion
+  modes keep their existing routes.
+- Final execution consumes exact-plan Read/Write evidence, re-resolves the target,
+  and checks the captured bytes under the recovery/path lock before creating a
+  backup and removing the file. The returned receipt restores through the owning
+  tool instance. This lock serializes participating Talos mutations; it does not
+  claim exclusion of arbitrary external writers after the final check.
+- Separate producer tests cover real text/binary deletion and restoration, changed
+  content preservation, missing admission and distinct capture/commit identities.
+  Explicit standalone file-write file-tool tests pass 94/94. Agent end-to-end
+  review tests pass for edit and delete, with 13 scenarios each. These remain local
+  tests; security review, final workspace/platform checks and merge are outstanding.
+- String-edit assessor stage committed as `81df1fc45`. Anchored-edit Auto, ordinary
+  effectful Execute and ordinary HTTP/WebSearch Auto remain unimplemented. T8 and
+  all later handoff items remain incomplete.
+- Independent static review found a binary-boundary omission: UTF-8 with NUL was
+  treated as text. The continuation now excludes captured NUL files from deletion
+  text evidence and rejects NUL in either edit image before invoking the assessor.
+  Added Agent refusal cases for NUL original/replacement and a producer case proving
+  NUL deletion remains human-admitted and recoverable. Review is not final approval;
+  the review finding and current full-preflight outcome still require verification.
+- Follow-up independent static inspection confirmed the NUL fix and found no new
+  concrete blocker in the staged continuation. Focused Agent tests pass with 15 edit
+  scenarios and 14 delete scenarios, including the zero-assessor NUL cases. The
+  complete agent library suite passed 495/495 before the final NUL fixture addition;
+  do not treat that earlier suite as exact-final evidence. Full serial locked
+  preflight is running with log `/private/tmp/i308-mutation-preflight.log`; no final
+  outcome, native Windows evidence or publication approval is claimed.
+
+### Retained anchored-edit review — 2026-10-26
+
+- Extended the existing prepared edit path to snapshot-anchored operations with
+  `retain_backup=true`. Both edit schemas share read-admitted capture, complete
+  before/after evidence, one-use approval and real recovery-backed execution.
+  Final anchored execution also rechecks the snapshot record and captured revision;
+  an invalidated snapshot does not execute even when file bytes are unchanged.
+- Extracted one shared anchored-edit calculation used by ordinary and prepared
+  execution. It preserves anchor/revision/overlap checks, checks the complete output
+  length before allocation for recoverable edits and builds the output in one pass.
+  This is implemented behavior, not a separate future refactor promise.
+- Explicit standalone file-write file-tool tests pass 95/95. A separate prepared
+  anchored test covers actual edit/restoration, changed content before/after capture,
+  snapshot invalidation, oversize, bad anchor and overlapping operations. Agent
+  production dispatch tests pass for string edit, delete and anchored edit; anchored
+  review uses the same allow/uncertain/error/cancel/stale/malformed/oversize/NUL matrix.
+- Full preflight started before this anchored continuation is still running at
+  `/private/tmp/i308-mutation-preflight.log`. Source changed during that run, so even
+  a passing result will not establish final exact-head validation for this stage.
+  Final workspace/platform validation, independent review and merge remain open.
+  Ordinary effectful Execute and ordinary HTTP/WebSearch Auto remain unimplemented;
+  T8 and the original later handoff queue are incomplete.
+- Follow-up validation: Agent library tests pass 496/496, Agent and standalone
+  file-write library Clippy pass with `-D warnings`, formatting and both governance
+  validators pass. Incremental independent static review found no concrete blocker;
+  this is not final exact-head publication approval.
+- The earlier full preflight terminated with Tools 974 passed / 1 failed:
+  `prepared_local_push_runs_all_eight_admitted_stages` could not launch `ps`
+  (`Operation not permitted`) to observe maintenance descendants under the sandbox.
+  A full serial preflight is now running outside that sandbox with stable source;
+  log: `/private/tmp/i308-mutation-preflight-final.log`. Its outcome is pending.
+- Anchored continuation committed as `037bf5e55`. Locked cargo-xwin checking of
+  `talos-tools --no-default-features --features file-write --tests` for
+  `x86_64-pc-windows-msvc` passes; log: `/private/tmp/i308-anchored-xwin.log`.
+  This proves test-target compilation only, not native Windows execution. The
+  sandbox attempt could not update the cargo-xwin cache link; the authorized
+  outside-sandbox rerun succeeded. Fetch of `origin/main` found no upstream-only
+  commits at this checkpoint; no rebase was necessary.
+- Locked Agent test-target cargo-xwin checking also passes for
+  `x86_64-pc-windows-msvc`; log: `/private/tmp/i308-agent-mutation-xwin.log`.
+- Independent read-only Agent permission/security/API static review APPROVE:
+  base `ffa35973022c18f752cacad1922325e15c648379`, head
+  `099e6bd4754e79e0eca7e8cbb4a86c09c5d15a46`. No blocking findings remain;
+  the earlier NUL boundary issue is closed. Reviewer shares this session's tool
+  and GitHub identity, is not an independent human, and did not independently run
+  tests. Approval covers this file-mutation stage only; full preflight, native
+  Windows, remote CI and merge-time CAS remain pending. No external-writer
+  isolation or universal secret detection is claimed.
+- Current full preflight has passed Tools 976/976, including the formerly
+  sandbox-blocked eight-stage local Push test, and workspace doctests. Runtime
+  SDK consumer checks are still running; no complete preflight pass is claimed.
+  Both governance validators pass after the evidence update.
+- Full serial locked preflight subsequently exited 0 (`release preflight: passed`),
+  including both independent Runtime SDK consumer fixtures. Log:
+  `/private/tmp/i308-mutation-preflight-final.log`. Production source remained
+  stable from `037bf5e55`; subsequent commits only record validation evidence.
+  Native Windows execution, remote exact-head CI and merge CAS remain required.

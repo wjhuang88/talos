@@ -96,6 +96,15 @@ impl FileRecoveryStore {
         path: &Path,
         path_lock: Option<&Mutex<()>>,
     ) -> Result<String, FileToolError> {
+        self.remove_captured(path, None, path_lock)
+    }
+
+    pub(super) fn remove_captured(
+        &self,
+        path: &Path,
+        expected: Option<&[u8]>,
+        path_lock: Option<&Mutex<()>>,
+    ) -> Result<String, FileToolError> {
         let mut records = self.records()?;
         let _guard = path_lock
             .unwrap_or(&self.write_lock)
@@ -105,6 +114,9 @@ impl FileRecoveryStore {
             return Err(FileToolError::PathIdentityChanged);
         }
         let (original, permissions) = read_bounded_regular_file(path)?;
+        if expected.is_some_and(|expected| expected != original) {
+            return Err(FileToolError::FileRevisionMismatch);
+        }
         let total = records
             .values()
             .map(|record| record.original.len())
