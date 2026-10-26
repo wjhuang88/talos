@@ -70,7 +70,7 @@ impl ProviderAutoPermissionAssessor {
 }
 
 impl AutoPermissionResolver {
-    fn command_context_current(&self, request: &PermissionApprovalRequest) -> bool {
+    pub(super) fn command_context_current(&self, request: &PermissionApprovalRequest) -> bool {
         self.lease.permission_state.as_ref().is_some_and(|state| {
             state.state_snapshot().is_ok_and(|snapshot| {
                 snapshot.session_id.stable_id() == request.binding.session_id

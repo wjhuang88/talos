@@ -175,3 +175,42 @@ No implementation completion evidence exists. Do not mark H, G or T8 Complete fr
   Formatting and both governance validators passed. Ownership foundation is recorded
   in local implementation commit `d2d31b9b6`; it has not been pushed or independently
   reviewed. No stage merge, full preflight, native Windows run or T8 completion claimed.
+
+- Network review implementation checkpoint: dispatch now conveys registered built-in
+  ownership with retained network evidence to a dedicated model assessment route.
+  The response must match the fresh invocation digest and closed schema; only
+  high-confidence AllowOnce can admit the request. Explicit human/Deny policy,
+  stale state, replay, provider failure and external instances remain covered by
+  focused tests. Serialization stops at 16 KiB, with an input check before cloning.
+  The initial human-policy test incorrectly appended its rule after the default
+  Ask; it now constructs an explicit-rule engine so that the intended rule matches.
+- Validation: locked `talos-agent --lib auto_resolver` tests passed 71/71;
+  log `/private/tmp/i308-auto-resolver-tests.log`. This includes encoded-size
+  boundary coverage and 15 network-admission scenarios. These are pipeline-level
+  results, not production tool execution evidence. The network changes remain
+  uncommitted; complete native registration coverage, production end-to-end
+  execution, G recovery, full preflight, Windows and independent review remain open.
+- Agent-loop dispatch test passed for five scenarios: model-approved built-in
+  executes with live network authority, external same-name registration and ordinary
+  replacement do not inherit trust, explicit Deny blocks execution, and deterministic
+  Allow executes without model assessment. This uses an offline prepared transport
+  fixture, not the WebSearch HTTP implementation. Actual product transport evidence
+  remains outstanding. Log: `/private/tmp/i308-auto-network-dispatch.log`.
+- Independent working-tree review found JSON credential fields could bypass the
+  shell-oriented secret heuristic. Added bounded structural key/value inspection
+  and consistent text scanning for intent and serialized assessment fields.
+  Six credential scenarios (keys, nested objects, arrays, prefixes, intent and
+  endpoint paths) assert zero assessor calls. Auto resolver tests remain 71/71.
+- Standard preflight initially failed in two Git process integration tests under
+  sandboxing (process observation EPERM; configured hook start timeout). Both
+  actual target tests passed outside the sandbox with `--features git` (1/1 each).
+  An earlier rerun without that feature selected zero tests and is not validation.
+  Full standard preflight is rerunning outside the sandbox; current process 64384,
+  log `/private/tmp/i308-network-stage-preflight-unsandboxed.log`. No full pass
+  or stage readiness is claimed until its terminal result is inspected.
+- Terminal validation: the sandbox-external full standard preflight exited 0,
+  including workspace check, Clippy, tests, governance and the independent Runtime
+  SDK consumer (`release preflight: passed` in the log above). Independent working-tree
+  security/API follow-up found the credential fixes resolved its blockers. This
+  is local stage evidence, not final exact-head CI/Windows evidence or T8 completion.
+  Fetch confirmed origin/main remains `8f0ce2340`; no rebase was needed.

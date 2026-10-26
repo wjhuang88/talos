@@ -99,9 +99,51 @@ pub struct PermissionAuthorizationRequest<'a> {
     pub deadline: Duration,
 }
 
+/// Retained network evidence constructed by dispatch for a registered built-in instance.
+pub struct BuiltinNetworkReviewEvidence<'a> {
+    input: &'a serde_json::Value,
+    profile: &'a [ToolPermissionFacet],
+    manifest: &'a ToolNetworkManifest,
+}
+
+impl BuiltinNetworkReviewEvidence<'_> {
+    /// Exact normalized execution input; private assessment material, not display text.
+    pub fn input(&self) -> &serde_json::Value {
+        self.input
+    }
+    /// Complete evaluated facets, all of which must be admitted together.
+    pub fn profile(&self) -> &[ToolPermissionFacet] {
+        self.profile
+    }
+    /// Retained transport-enforced network plan.
+    pub fn manifest(&self) -> &ToolNetworkManifest {
+        self.manifest
+    }
+}
+
 /// Surface adapter that resolves an already-evaluated `Ask`.
 #[async_trait]
 pub trait ApprovalResolver: Send + Sync {
+    /// Reviews a network invocation whose implementation ownership was explicitly
+    /// registered by the product. Evidence is constructed only by the Agent pipeline.
+    async fn resolve_builtin_network(
+        &self,
+        request: PermissionApprovalRequest,
+        evidence: BuiltinNetworkReviewEvidence<'_>,
+        remaining: Duration,
+        auto_assessment_allowed: bool,
+        user_intent: Option<&str>,
+    ) -> Result<ApprovalChoice, ApprovalResolverError> {
+        self.resolve_network_invocation(
+            request,
+            evidence.input,
+            evidence.manifest,
+            remaining,
+            auto_assessment_allowed,
+            user_intent,
+        )
+        .await
+    }
     /// Reviews the retained network plan separately from caller-controlled arguments.
     ///
     /// The manifest describes transport-enforced destinations, not native implementation
@@ -428,8 +470,25 @@ impl PermissionPipeline {
         manifest: &ToolNetworkManifest,
         user_intent: Option<&str>,
     ) -> Result<Arc<dyn ToolNetworkAuthority>, PermissionPipelineError> {
+        self.authorize_registered_network(authorization, manifest, user_intent, false)
+            .await
+    }
+
+    pub(crate) async fn authorize_registered_network(
+        &self,
+        authorization: PermissionAuthorizationRequest<'_>,
+        manifest: &ToolNetworkManifest,
+        user_intent: Option<&str>,
+        builtin: bool,
+    ) -> Result<Arc<dyn ToolNetworkAuthority>, PermissionPipelineError> {
         match self
-            .authorize_inner(authorization, user_intent, None, None, Some(manifest))
+            .authorize_inner(
+                authorization,
+                user_intent,
+                None,
+                None,
+                Some((manifest, builtin)),
+            )
             .await?
         {
             PermissionAdmission::Network(authority) => Ok(authority),
@@ -448,8 +507,9 @@ impl PermissionPipeline {
             &talos_core::tool::PreparedPlanIdentity,
             Option<&talos_core::tool::PreparedCommandEvidence>,
         )>,
-        network_manifest: Option<&ToolNetworkManifest>,
+        network_context: Option<(&ToolNetworkManifest, bool)>,
     ) -> Result<PermissionAdmission, PermissionPipelineError> {
+        let network_manifest = network_context.map(|(manifest, _)| manifest);
         let PermissionAuthorizationRequest {
             tool_name,
             provenance,
@@ -516,6 +576,19 @@ impl PermissionPipeline {
                     std::panic::AssertUnwindSafe(resolver.resolve_prepared_command(
                         approval,
                         evidence,
+                        remaining,
+                        auto_assessment_allowed,
+                        user_intent,
+                    ))
+                    .catch_unwind()
+                } else if let Some((manifest, true)) = network_context {
+                    std::panic::AssertUnwindSafe(resolver.resolve_builtin_network(
+                        approval,
+                        BuiltinNetworkReviewEvidence {
+                            input,
+                            profile,
+                            manifest,
+                        },
                         remaining,
                         auto_assessment_allowed,
                         user_intent,
