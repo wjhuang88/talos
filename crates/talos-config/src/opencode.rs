@@ -10,10 +10,11 @@ use serde::Deserialize;
 use crate::{ConfigError, ModelConfig, ProviderConfig, ProviderProtocol};
 
 fn npm_to_protocol(npm: &str) -> ProviderProtocol {
-    if npm.contains("anthropic") {
-        ProviderProtocol::AnthropicMessages
-    } else {
-        ProviderProtocol::OpenAIChat
+    match npm {
+        "@ai-sdk/anthropic" => ProviderProtocol::AnthropicMessages,
+        "@ai-sdk/openai" => ProviderProtocol::OpenAIResponses,
+        "@ai-sdk/openai-compatible" => ProviderProtocol::OpenAIChat,
+        _ => ProviderProtocol::OpenAIChat,
     }
 }
 
@@ -91,6 +92,7 @@ pub fn import_opencode_providers(
             let model_config = ModelConfig {
                 context_limit: model.limit.context,
                 output_limit: model.limit.output,
+                protocol: None,
                 reasoning: None,
                 image_input: None,
             };
@@ -137,6 +139,7 @@ mod tests {
             .expect("operation should succeed");
         assert_eq!(glm5.context_limit, Some(202_752));
         assert_eq!(glm5.output_limit, Some(4096));
+        assert!(glm5.protocol.is_none());
     }
 
     #[test]
@@ -187,6 +190,42 @@ mod tests {
     }
 
     #[test]
+    fn test_official_openai_sdk_selects_responses() {
+        let json = r#"{
+            "provider": {
+                "openai": { "npm": "@ai-sdk/openai" }
+            }
+        }"#;
+
+        let providers = import_opencode_providers(json).expect("operation should succeed");
+        assert_eq!(
+            providers
+                .get("openai")
+                .expect("operation should succeed")
+                .protocol,
+            ProviderProtocol::OpenAIResponses
+        );
+    }
+
+    #[test]
+    fn test_npm_mapping_uses_exact_known_packages_not_name_guessing() {
+        let json = r#"{
+            "provider": {
+                "proxy": { "npm": "@vendor/anthropic-proxy" }
+            }
+        }"#;
+
+        let providers = import_opencode_providers(json).expect("operation should succeed");
+        assert_eq!(
+            providers
+                .get("proxy")
+                .expect("operation should succeed")
+                .protocol,
+            ProviderProtocol::OpenAIChat
+        );
+    }
+
+    #[test]
     fn test_import_bare_provider_object_without_wrapper() {
         let json = r#"{
             "custom": {
@@ -219,7 +258,7 @@ mod tests {
         assert_eq!(providers.len(), 1);
 
         let minimal = providers.get("minimal").expect("operation should succeed");
-        assert_eq!(minimal.protocol, ProviderProtocol::OpenAIChat);
+        assert_eq!(minimal.protocol, ProviderProtocol::Unspecified);
         assert!(minimal.base_url.is_none());
         assert!(minimal.models.is_empty());
     }
@@ -278,6 +317,7 @@ mod tests {
             .expect("operation should succeed");
         assert!(model.context_limit.is_none());
         assert!(model.output_limit.is_none());
+        assert!(model.protocol.is_none());
     }
 
     #[test]
@@ -299,5 +339,6 @@ mod tests {
             .expect("operation should succeed");
         assert_eq!(model.context_limit, Some(1000));
         assert!(model.output_limit.is_none());
+        assert!(model.protocol.is_none());
     }
 }

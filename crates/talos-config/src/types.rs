@@ -27,14 +27,41 @@ pub use talos_core::model::ReasoningEffort;
 /// Wire protocol used to talk to a provider.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
+#[non_exhaustive]
 pub enum ProviderProtocol {
+    /// Internal absence marker for configuration fields. This is never a user-selectable protocol.
+    #[default]
+    #[serde(skip)]
+    #[doc(hidden)]
+    Unspecified,
     /// Anthropic Messages API.
     #[serde(rename = "anthropic-messages")]
     AnthropicMessages,
     /// OpenAI Chat Completions compatible API.
-    #[default]
     #[serde(rename = "openai-chat")]
     OpenAIChat,
+    /// OpenAI Responses API.
+    #[serde(rename = "openai-responses")]
+    OpenAIResponses,
+}
+
+impl ProviderProtocol {
+    /// Returns whether this value represents an omitted configuration field rather than a wire family.
+    #[must_use]
+    pub fn is_unspecified(&self) -> bool {
+        matches!(self, Self::Unspecified)
+    }
+}
+
+impl std::fmt::Display for ProviderProtocol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Unspecified => "unspecified",
+            Self::AnthropicMessages => "anthropic-messages",
+            Self::OpenAIChat => "openai-chat",
+            Self::OpenAIResponses => "openai-responses",
+        })
+    }
 }
 
 /// Per-model runtime limits and capability overrides.
@@ -46,6 +73,12 @@ pub struct ModelConfig {
     /// Maximum output tokens to request from this model.
     #[serde(default)]
     pub output_limit: Option<u32>,
+    /// Explicit per-model wire protocol override.
+    ///
+    /// `None` means continue through provider/catalog/default resolution. `Some(openai-chat)` is
+    /// therefore distinguishable from omission and remains a reliable model-scoped rollback.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub protocol: Option<ProviderProtocol>,
     /// Per-model reasoning/thinking configuration (ADR-034).
     #[serde(default)]
     pub reasoning: Option<ReasoningOptions>,
@@ -146,7 +179,8 @@ impl Default for ProviderTimeoutConfig {
 /// Named provider configuration.
 #[derive(Clone, Default, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
 pub struct ProviderConfig {
-    #[serde(default)]
+    /// Explicit wire protocol override. Omitted means protocol selection is resolved later.
+    #[serde(default, skip_serializing_if = "ProviderProtocol::is_unspecified")]
     pub protocol: ProviderProtocol,
     #[serde(default)]
     pub tool_protocol: talos_core::tool::ToolProtocol,
@@ -385,7 +419,7 @@ pub enum LogFormat {
     Compact,
 }
 
-/// Log rotation strategy for file-based logging.
+/// Log rotation strategy for file-based log output.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum LogRotation {

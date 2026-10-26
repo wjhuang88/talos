@@ -340,7 +340,7 @@ impl Tui {
                             self.state.wizard_backspace();
                         }
                         KeyCode::Up | KeyCode::Down => {
-                            self.state.wizard_cycle_protocol();
+                            self.state.wizard_cycle_protocol(key.code == KeyCode::Up);
                         }
                         KeyCode::Char(c) => {
                             self.last_char_time = Some(Instant::now());

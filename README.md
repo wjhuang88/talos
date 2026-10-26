@@ -437,6 +437,13 @@ context_limit = 202752
 output_limit = 4096
 ```
 
+Talos also supports `protocol = "openai-responses"` at provider or model scope. Official OpenAI
+uses Responses when the protocol is omitted and support is confirmed; unconfirmed gateways retain
+Chat. An explicit `openai-chat` override provides rollback, with no automatic cross-protocol retry.
+The model picker and catalog browser show the effective protocol and its source. See
+[wire-protocol configuration and migration](docs/reference/PROVIDER-PROTOCOLS.md) for precedence,
+model overrides and the required pre-1.0 minor public-enum migration.
+
 Set the matching environment variable before starting Talos:
 
 ```bash
@@ -692,7 +699,7 @@ packaged offline `models.toml`, asks for an API key, then offers an optional cus
 default endpoint submit after the API key without prompting for a URL; custom providers (or any row
 without a built-in endpoint) still require a non-empty `base_url`. The `/connect` picker also has an
 **Add custom provider** entry that opens a cancel-safe wizard: enter a provider name (1–64 char
-slug), choose a protocol (`openai-chat` or `anthropic-messages`), enter an HTTPS base URL (HTTP only
+slug), choose a protocol (`openai-chat`, `openai-responses` or `anthropic-messages`), enter an HTTPS base URL (HTTP only
 for loopback), enter an API key (masked), and confirm. The wizard saves all fields as one atomic
 config update — cancellation or any validation error leaves your existing config unchanged. A fresh
 install does not need a manual catalog initialization step: Talos does not create a runtime

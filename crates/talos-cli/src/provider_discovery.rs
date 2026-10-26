@@ -69,7 +69,8 @@ pub(crate) async fn discover_provider_models(
         .map_err(|e| DiscoveryError::Network(e.to_string()))?;
 
     let request = match protocol {
-        talos_config::ProviderProtocol::OpenAIChat => {
+        talos_config::ProviderProtocol::OpenAIChat
+        | talos_config::ProviderProtocol::OpenAIResponses => {
             let models_url = format!("{}/models", base_url.trim_end_matches('/'));
             client
                 .get(&models_url)
@@ -83,6 +84,7 @@ pub(crate) async fn discover_provider_models(
                 .header("x-api-key", api_key)
                 .header("anthropic-version", "2023-06-01")
         }
+        _ => return Err(DiscoveryError::NotSupported),
     };
 
     let response = request.send().await.map_err(|e| {
@@ -196,6 +198,23 @@ mod tests {
         assert!(result.is_ok());
         let models = result.expect("operation should succeed");
         assert_eq!(models, vec!["gpt-4o", "gpt-4o-mini"]);
+    }
+
+    #[tokio::test]
+    async fn discover_openai_responses_models_success() {
+        let body = r#"{"data":[{"id":"gpt-5"},{"id":"gpt-5-mini"}]}"#;
+        let url = mock_server("200 OK", "application/json", body).await;
+
+        let result = discover_provider_models(
+            &url,
+            "test-key",
+            talos_config::ProviderProtocol::OpenAIResponses,
+        )
+        .await;
+
+        assert!(result.is_ok());
+        let models = result.expect("operation should succeed");
+        assert_eq!(models, vec!["gpt-5", "gpt-5-mini"]);
     }
 
     #[tokio::test]

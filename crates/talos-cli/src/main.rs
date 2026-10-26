@@ -58,7 +58,7 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use clap::Subcommand;
 use clap::ValueEnum;
-use talos_config::{Config, ConfigError, ConfigStore, ProviderProtocol};
+use talos_config::{Config, ConfigError, ConfigStore};
 use talos_plugin::{HookRegistry, LoggingHandler};
 
 use crate::logging::init_logger;
@@ -793,8 +793,15 @@ pub(crate) fn config_get_dotted(config: &Config, key: &str) -> Result<String> {
         ["providers", name, "protocol"] => config
             .providers
             .get(*name)
-            .map(|p| format!("{:?}", p.protocol))
+            .map(|p| p.protocol.to_string())
             .ok_or_else(|| anyhow::anyhow!("provider '{name}' not found")),
+        ["providers", name, "models", model @ .., "protocol"] if !model.is_empty() => config
+            .providers
+            .get(*name)
+            .and_then(|p| p.models.get(&model.join(".")))
+            .and_then(|m| m.protocol.as_ref())
+            .map(ToString::to_string)
+            .ok_or_else(|| anyhow::anyhow!("not found")),
         ["providers", name, "base_url"] => Ok(config
             .providers
             .get(*name)
@@ -849,13 +856,8 @@ pub(crate) fn config_set_dotted(config: &mut Config, key: &str, value: &str) -> 
             Ok(())
         }
         ["providers", name, "protocol"] => {
-            let protocol = match value {
-                "anthropic-messages" => ProviderProtocol::AnthropicMessages,
-                "openai-chat" => ProviderProtocol::OpenAIChat,
-                _ => anyhow::bail!(
-                    "unknown protocol '{value}': must be 'anthropic-messages' or 'openai-chat'"
-                ),
-            };
+            let protocol =
+                talos_config::validate_provider_protocol(value).map_err(anyhow::Error::msg)?;
             config
                 .providers
                 .entry((*name).to_string())
@@ -863,6 +865,19 @@ pub(crate) fn config_set_dotted(config: &mut Config, key: &str, value: &str) -> 
                     ..Default::default()
                 })
                 .protocol = protocol;
+            Ok(())
+        }
+        ["providers", name, "models", model @ .., "protocol"] if !model.is_empty() => {
+            let protocol =
+                talos_config::validate_provider_protocol(value).map_err(anyhow::Error::msg)?;
+            config
+                .providers
+                .entry((*name).to_string())
+                .or_default()
+                .models
+                .entry(model.join("."))
+                .or_default()
+                .protocol = Some(protocol);
             Ok(())
         }
         ["providers", name, "api_key_env"] => {

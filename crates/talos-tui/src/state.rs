@@ -340,16 +340,16 @@ impl TuiState {
         };
     }
 
-    pub(crate) fn wizard_cycle_protocol(&mut self) {
+    pub(crate) fn wizard_cycle_protocol(&mut self, reverse: bool) {
         let Some(PanelKind::ProviderWizard { step, protocol, .. }) = &mut self.slash_menu.kind
         else {
             return;
         };
         if *step == WizardStep::Protocol {
-            *protocol = if protocol == "openai-chat" {
-                "anthropic-messages"
-            } else {
-                "openai-chat"
+            *protocol = match (protocol.as_str(), reverse) {
+                ("openai-chat", false) | ("openai-responses", true) => "anthropic-messages",
+                ("anthropic-messages", false) | ("openai-chat", true) => "openai-responses",
+                _ => "openai-chat",
             }
             .to_string();
         }

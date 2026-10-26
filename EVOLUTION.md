@@ -141,6 +141,7 @@ repeating known mistakes.
 | 65 | Resource tests | Process-wide counters need isolated workers and owned descendant cleanup | I293 / #716 |
 | 66 | Native borrowing | Attribute value buffers need independent stable storage through native list deletion | I302 / #716 |
 | 67 | Parser compatibility | Verify the exact helper replacement set before defining entity-decoding fixtures | I293 / Instant Answer |
+| 71 | Config | Materializing connection defaults must preserve omitted protocol intent | I306 / #748 |
 
 | 67 | Permissions | 一次性授权消费也必须非阻塞；外层异步超时无法抢占同步锁等待 | I300 |
 | 68 | Agent execution | 工具可用性以实际调用结果为准，不把列表呈现差异当作不可用证据 | I300 |
@@ -567,6 +568,13 @@ repeating known mistakes.
 **Remedy**: 在生成 sandbox 配置时，使用 `std::fs::canonicalize()` 解析所有路径。
 
 **Prevention**: macOS 路径处理必须考虑符号链接，尤其是 `/tmp`、`/var`、`/etc` 等系统目录。
+
+**I306 / CI3448 follow-up (2026-10-26)**: A Responses image HTTP fixture bypassed the CLI grant
+path and stored a lexical temp path, so the unchanged TOCTOU guard correctly omitted the image on
+macOS. Canonicalize fixture paths before creating durable Image parts. The HTTP regression now
+starts from a Unix file alias on Linux too; removing canonicalization reproduces the failure.
+Keep path-drift/digest guards and image-presence/no-path-leak assertions intact. Promoted to check:
+`mock_http_accepts_adr051_multimodal_continuation_without_path_leak`.
 
 ---
 
@@ -1419,6 +1427,19 @@ visible; distinguish passed assertions from independently emitted evidence.
 - Prevention: characterize named and numeric entities, tag-cleanup order and raw sentence splitting
   against the exact helper before claiming parity.
 - Promoted to rule/check: instant_answer topic/limited-cleanup tests and the parser reference.
+
+## 2026-10-26 - Materialized provider defaults are not explicit protocol intent
+
+- Trigger: #748 continuation audited runtime routing against Config queries and connection flows.
+- Symptom: choosing/connecting an official OpenAI model could silently pin Chat, while other paths
+  resolved Responses; model overrides could also disagree with a second public resolver.
+- Root cause: built-in provider defaults were copied into user overrides and then classified as
+  explicit intent; an intermediate resolver survived after factory activation.
+- Fix: preserve protocol omission during model/credential materialization and use one resolver for
+  adapter construction, public queries and selection previews.
+- Prevention: exercise persisted configuration edits and adapter selection through the actual binary;
+  assert protocol/source after model selection and credential reload, not just pure precedence.
+- Promoted to rule/check: `responses_config` binary tests and config protocol-resolution regressions.
 ## 2026-10-12 - Keep proof consumption inside the cancellation boundary
 
 - Trigger: Independent incremental I300 permission/API review.
