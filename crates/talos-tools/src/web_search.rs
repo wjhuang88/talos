@@ -175,10 +175,7 @@ fn normalize_compatibility_results(
         .collect()
 }
 
-fn parse_tavily(
-    body: &Value,
-    max_results: u32,
-) -> Result<Vec<WebResult>, SearchBackendError> {
+fn parse_tavily(body: &Value, max_results: u32) -> Result<Vec<WebResult>, SearchBackendError> {
     let results_array = body["results"]
         .as_array()
         .ok_or(SearchBackendError::Parse)?;
@@ -199,10 +196,7 @@ fn parse_tavily(
     Ok(results)
 }
 
-fn parse_searxng(
-    body: &Value,
-    max_results: u32,
-) -> Result<Vec<WebResult>, SearchBackendError> {
+fn parse_searxng(body: &Value, max_results: u32) -> Result<Vec<WebResult>, SearchBackendError> {
     let results_array = body["results"]
         .as_array()
         .ok_or(SearchBackendError::Parse)?;
@@ -227,10 +221,7 @@ fn parse_searxng(
     Ok(results)
 }
 
-fn parse_wikipedia(
-    body: &Value,
-    max_results: u32,
-) -> Result<Vec<WebResult>, SearchBackendError> {
+fn parse_wikipedia(body: &Value, max_results: u32) -> Result<Vec<WebResult>, SearchBackendError> {
     let titles = body[1].as_array();
     let descriptions = body[2].as_array();
     let urls = body[3].as_array();
