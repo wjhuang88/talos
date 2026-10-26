@@ -11,8 +11,8 @@ The review was by a separate read-only Agent sharing the session/GitHub identity
 not a separate natural person. It did not independently run tests.
 
 I308/H/G/T8 remain Active and incomplete. Mutation #770 is a separate unmerged
-stage; local policy/read coverage commits `82667ca54` and `07c005b87` are not yet
-published. Ordinary effectful Execute/HTTP/WebSearch Auto, remaining registered
+stage; policy/read coverage commits `82667ca54` and `07c005b87` are published in
+unmerged #771. Ordinary effectful Execute/HTTP/WebSearch Auto, remaining registered
 operation/profile dispositions and final delivery gates remain outstanding.
 Earlier checkpoints below preserve historical states and do not override this one.
 
@@ -322,12 +322,12 @@ Runtime shared composition has a separate Product/Runtime inventory-equivalence 
 | Registered operations | Current I308 disposition / remaining evidence |
 |---|---|
 | `read`, `ls`, `read_image`, `document_extract`, `grep`, `glob`, `diff`, `stat`, `tree`, `find_symbol`, `find_references`, `list_symbols`, `list_imports` | Existing policy/read paths retained; complete per-operation Auto fallback/production evidence still required. MCP omits `read_image`. |
-| `write`, `edit`, `delete` | Exact-content atomic creation is in #769; complete-image review and opt-in real recovery for string/anchored edit and text deletion are in #770. Binary/NUL and secret-like content retain human fallback. Expanded special-path/policy tests are local; neither PR is merged and full G acceptance remains incomplete. |
+| `write`, `edit`, `delete` | Exact-content atomic creation is merged in #769; complete-image review and opt-in real recovery for string/anchored edit and text deletion are in unmerged #770. Binary/NUL and secret-like content retain human fallback. Expanded special-path/policy tests are published in #771; full G acceptance remains incomplete. |
 | `save_url`, `fetch_url`, `http_request`, `web_search` | Protected prepared network assessment exists; ordinary product transport Auto allowance remains unimplemented and its pending contract decision is not assumed accepted. |
 | `git_status`, `git_diff`, `git_log`, `git_show`, `git_branch_list` | Existing read policy retained; I308 complete disposition evidence outstanding. |
 | `git_add`, `git_commit`, `git_push`, `git_pull`, `git_checkout` | I300 prepared command route retained; no reopening of accepted whole-command Pull semantics. I308 full coverage evidence outstanding. |
 | `bash` (Unix) / `powershell` (Windows), `exec` | Existing shell/direct-command paths retained; I308 full profile/decision evidence outstanding. |
-| `todo_create`, `todo_create_batch`, `todo_update_batch`, `todo_update_status`, `todo_update`, `todo_delete`, `todo_add_dependency`, `todo_remove_dependency`, `todo_query` | Print/TUI session-scoped registrations inventoried; mutation Auto assessment and full disposition evidence outstanding. MCP does not add Todo. |
+| `todo_create`, `todo_create_batch`, `todo_update_batch`, `todo_update_status`, `todo_update`, `todo_delete`, `todo_add_dependency`, `todo_remove_dependency`, `todo_query` | Session-scoped Internal facets retain default deterministic Allow, not model approval. Local real-Agent tests cover all nine operations under default Allow and explicit Internal Deny, actual SQLite effects, unchanged other-session data, zero assessor calls and zero grants. MCP does not add Todo; complete profile/platform evidence remains outstanding. |
 | `status` | MCP-only read tool; concrete built-in ownership checked. |
 | `delay`, `schedule`, `list_scheduled_tasks`, `cancel_scheduled_task` | Product-owned scheduler factory now registers actual instances as built-ins in interactive/Print/Inline/RPC/TUI; caller-supplied scheduler instances remain external. Model-assisted scheduling allowance remains unimplemented. |
 
@@ -718,3 +718,24 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
   `-D warnings`. Logs: `/private/tmp/i308-read-policy-agent.log` and
   `/private/tmp/i308-read-policy-clippy.log`. No new production behavior or full
   workspace/native Windows validation is claimed by this test-only continuation.
+
+### Todo deterministic admission continuation — 2026-10-26
+
+- Separate `tests/todo_auto.rs` runs all nine actual Todo tools through Agent
+  dispatch against initialized SQLite storage. Default Internal Allow performs
+  actual create/batch/update/status/delete/dependency/query operations; explicit
+  Internal Deny leaves rows and dependency edges unchanged. Both paths require
+  exactly one result, zero assessor calls and zero persistent grants. Other-session
+  data remains unchanged and absent from results.
+- This corrects the earlier inventory assumption that Todo mutation needed model
+  assessment: the existing session-scoped Internal policy already admits it. No
+  production permission rule or authority is changed. Cross-session malicious-ID
+  attempts and complete profile/platform coverage are not established by this test.
+- Locked Agent library tests pass 498/498; library/test Clippy passes with
+  `-D warnings`. Logs: `/private/tmp/i308-todo-agent.log` and
+  `/private/tmp/i308-todo-clippy.log`. Full T8 remains incomplete.
+- Issue #563 was incorrectly completed when foundation #769 merged, despite its
+  remaining acceptance. It is reopened; #769's body now states the issue remains
+  incomplete without a closing-keyword phrase. #771's failed reconciliation must
+  be rerun after its current CI run is terminal; no product failure is inferred
+  from that metadata mismatch.
