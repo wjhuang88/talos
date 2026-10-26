@@ -289,7 +289,7 @@ pub(crate) fn atomic_replace(
         .lock()
         .map_err(|_| FileToolError::SnapshotRegistryUnavailable)?;
     verify_path_identity(path)?;
-    let current = fs::read(path)?;
+    let (current, permissions) = super::recovery::read_bounded_regular_file(path)?;
     verify_path_identity(path)?;
     if digest(&current) != expected_revision {
         return Err(FileToolError::FileRevisionMismatch);
@@ -310,7 +310,7 @@ pub(crate) fn atomic_replace(
             .open(&temp)?;
         file.write_all(bytes)?;
         file.sync_all()?;
-        file.set_permissions(fs::metadata(path)?.permissions())?;
+        file.set_permissions(permissions)?;
         drop(file);
         verify_path_identity(path)?;
         fs::rename(&temp, path)?;

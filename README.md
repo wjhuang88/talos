@@ -756,7 +756,8 @@ The result returns a `recovery_id`; restore with
 tool instance and current Write permission. Restoration refuses a different path or
 contents changed since the edit and consumes the ID after success. Backups expire after
 15 minutes, disappear on tool/runtime replacement or shutdown, and are limited to 2 MiB
-per file, 16 MiB and 64 records per instance. A full store refuses the edit before mutation.
+per file (both before and after an edit), 16 MiB and 64 records per instance.
+Backup capture also requires Read permission. A full store refuses the edit before mutation.
 This restores file contents only, not historical metadata, deleted files or directories;
 it is not durable recovery or protection against concurrent external writers.
 

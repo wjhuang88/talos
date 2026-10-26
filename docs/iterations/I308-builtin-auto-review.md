@@ -387,3 +387,23 @@ remaining H/G coverage remain unimplemented.
 - README documents actual recovery limits. Auto deletion and full G coverage remain
   unimplemented. Final full preflight, xwin/native Windows, exact-head review/CI and
   merge remain outstanding. This local checkpoint does not complete T8.
+
+### Bounded recoverable edit follow-up — 2026-10-26
+
+- Recoverable legacy/anchored edits now declare Read alongside Write and require
+  matching resolved targets before backup capture. Original content is read through
+  the shared no-follow/nonblocking regular-file handle with a 2 MiB maximum.
+- Atomic revision validation uses the same bounded handle read and its permissions,
+  eliminating its previous full-file read. Recoverable edits reject either before
+  or after content above 2 MiB before backup insertion/mutation, so admitted backups
+  remain restorable within the bound. External concurrent path replacement is still
+  not isolated; this is not a general transactional rollback guarantee.
+- Locked file-write file-tool tests pass 90/90, including external Read/Write
+  authorization, oversized originals/replacements and enlarged revision targets.
+  Log: `/private/tmp/i308-bounded-edit-tests.log`. Final-source cargo-xwin locked
+  MSVC test-target checking passes; log:
+  `/private/tmp/i308-file-recovery-xwin-authorized.log`. This is compilation, not
+  native Windows runtime evidence. The first sandboxed xwin attempt failed cache
+  permission; the authorized rerun supplied compilation evidence.
+- Full H/G model review/execution coverage and final platform/review/CI/merge remain
+  outstanding. No Auto edit/delete allowance or T8 completion is claimed here.

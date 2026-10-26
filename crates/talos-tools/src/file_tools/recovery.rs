@@ -50,9 +50,9 @@ impl FileRecoveryStore {
         updated: &[u8],
         path_lock: Option<&Mutex<()>>,
     ) -> Result<String, FileToolError> {
-        if original.len() > MAX_FILE_BYTES {
+        if original.len() > MAX_FILE_BYTES || updated.len() > MAX_FILE_BYTES {
             return Err(FileToolError::SnapshotLimit(
-                "recoverable edit exceeds 2 MiB backup limit".into(),
+                "recoverable edit before/after content exceeds 2 MiB limit".into(),
             ));
         }
         let id = uuid::Uuid::new_v4().to_string();
@@ -104,16 +104,7 @@ impl FileRecoveryStore {
         if path.canonicalize()? != path {
             return Err(FileToolError::PathIdentityChanged);
         }
-        let file = open_backup_file(path)?;
-        let metadata = file.metadata()?;
-        if !metadata.is_file() || metadata.len() > MAX_FILE_BYTES as u64 {
-            return Err(FileToolError::SnapshotLimit(
-                "recoverable deletion requires a regular file of at most 2 MiB".into(),
-            ));
-        }
-        let mut original = Vec::new();
-        file.take(MAX_FILE_BYTES as u64 + 1)
-            .read_to_end(&mut original)?;
+        let (original, permissions) = read_bounded_regular_file(path)?;
         let total = records
             .values()
             .map(|record| record.original.len())
@@ -132,7 +123,7 @@ impl FileRecoveryStore {
             Backup {
                 path: path.to_path_buf(),
                 original: Arc::from(original),
-                expected: ExpectedState::Deleted(metadata.permissions()),
+                expected: ExpectedState::Deleted(permissions),
                 created: Instant::now(),
             },
         );
@@ -183,6 +174,28 @@ impl FileRecoveryStore {
         records.remove(id);
         Ok(())
     }
+}
+
+/// Reads only a bounded regular file through the same checked handle.
+pub(super) fn read_bounded_regular_file(
+    path: &Path,
+) -> Result<(Vec<u8>, Permissions), FileToolError> {
+    let file = open_backup_file(path)?;
+    let metadata = file.metadata()?;
+    if metadata.len() > MAX_FILE_BYTES as u64 {
+        return Err(FileToolError::SnapshotLimit(
+            "recoverable mutation exceeds 2 MiB backup limit".into(),
+        ));
+    }
+    let mut bytes = Vec::new();
+    file.take(MAX_FILE_BYTES as u64 + 1)
+        .read_to_end(&mut bytes)?;
+    if bytes.len() > MAX_FILE_BYTES {
+        return Err(FileToolError::SnapshotLimit(
+            "recoverable mutation exceeds 2 MiB backup limit".into(),
+        ));
+    }
+    Ok((bytes, metadata.permissions()))
 }
 
 fn open_backup_file(path: &Path) -> Result<fs::File, FileToolError> {

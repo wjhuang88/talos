@@ -335,11 +335,27 @@ impl EditTool {
             authorizations,
         )?;
 
+        if retain_backup
+            && resolve_authorized_path(
+                &self.workspace_root,
+                &edit_input.path,
+                "edit",
+                ToolNature::Read,
+                authorizations,
+            )? != path
+        {
+            return Err(FileToolError::PathIdentityChanged);
+        }
         if !path.exists() {
             return Err(FileToolError::FileNotFound(edit_input.path));
         }
 
-        let content = tokio::fs::read_to_string(&path).await?;
+        let content = if retain_backup {
+            String::from_utf8(super::recovery::read_bounded_regular_file(&path)?.0)
+                .map_err(|_| FileToolError::BinaryFile(edit_input.path.clone()))?
+        } else {
+            tokio::fs::read_to_string(&path).await?
+        };
 
         let Some(first_match_start) = content.find(&edit_input.old_string) else {
             return Err(FileToolError::StringNotFound(edit_input.old_string));
@@ -409,11 +425,26 @@ impl EditTool {
             ToolNature::Write,
             authorizations,
         )?;
+        if retain_backup
+            && resolve_authorized_path(
+                &self.workspace_root,
+                &anchored.path,
+                "edit",
+                ToolNature::Read,
+                authorizations,
+            )? != path
+        {
+            return Err(FileToolError::PathIdentityChanged);
+        }
         if !path.exists() {
             return Err(FileToolError::FileNotFound(anchored.path));
         }
         let snapshot = registry.get(&anchored.snapshot_id, &path)?;
-        let current = tokio::fs::read(&path).await?;
+        let current = if retain_backup {
+            super::recovery::read_bounded_regular_file(&path)?.0
+        } else {
+            tokio::fs::read(&path).await?
+        };
         if digest(&current) != snapshot.file_revision {
             return Err(FileToolError::FileRevisionMismatch);
         }
@@ -607,7 +638,7 @@ impl AgentTool for EditTool {
             tool_parameters!(EditInput)
         };
         schema["properties"]["retain_backup"] = serde_json::json!({
-            "type": "boolean", "description": "Retain an instance-local pre-edit backup for up to 15 minutes (2 MiB per file, 16 MiB and 64 backups total). Fails before mutation if capacity is unavailable."
+            "type": "boolean", "description": "Retain an instance-local pre-edit backup for up to 15 minutes (before and after contents each at most 2 MiB; 16 MiB and 64 backups total). Fails before mutation if capacity is unavailable."
         });
         schema["properties"]["recovery_id"] = serde_json::json!({
             "type": "string", "minLength": 1, "maxLength": 64,
@@ -648,11 +679,22 @@ impl AgentTool for EditTool {
             .get("path")
             .and_then(Value::as_str)
             .map(|path| {
-                vec![ToolPermissionFacet::with_resource(
+                let mut facets = vec![ToolPermissionFacet::with_resource(
                     ToolNature::Write,
                     path,
                     ToolResourceKind::Path,
-                )]
+                )];
+                if input.get("retain_backup").and_then(Value::as_bool) == Some(true) {
+                    facets.push(
+                        ToolPermissionFacet::with_resource(
+                            ToolNature::Read,
+                            path,
+                            ToolResourceKind::Path,
+                        )
+                        .with_description("read original bytes for edit backup"),
+                    );
+                }
+                facets
             })
             .unwrap_or_else(|| vec![ToolPermissionFacet::new(ToolNature::Write)])
     }

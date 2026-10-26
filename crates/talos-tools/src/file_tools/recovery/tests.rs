@@ -307,3 +307,84 @@ fn backup_open_rejects_leaf_links_and_special_files() {
     // Without O_NONBLOCK this open would wait indefinitely for a writer.
     assert!(super::open_backup_file(&fifo).is_err());
 }
+
+#[tokio::test]
+async fn recoverable_edit_rejects_oversize_before_mutation() {
+    let dir = tempfile::tempdir().expect("dir");
+    let path = dir.path().join("large.txt");
+    let bytes = vec![b'a'; MAX_FILE_BYTES + 1];
+    std::fs::write(&path, &bytes).expect("write");
+    let tool = EditTool::new(dir.path().to_path_buf());
+    let result = tool
+        .execute(
+            json!({"path":"large.txt", "old_string":"a", "new_string":"b", "retain_backup":true}),
+        )
+        .await;
+    assert!(result.is_error);
+    assert!(result.content.contains("2 MiB"), "{}", result.content);
+    assert_eq!(std::fs::read(path).expect("read"), bytes);
+}
+
+#[tokio::test]
+async fn external_recoverable_edit_requires_read_and_write() {
+    use talos_core::tool::{ToolAuthorizationScope, ToolExecutionAuthorization, ToolNature};
+    let workspace = tempfile::tempdir().expect("workspace");
+    let external = tempfile::tempdir().expect("external");
+    let path = external.path().join("file.txt");
+    std::fs::write(&path, "before").expect("write");
+    let path = path.to_string_lossy().into_owned();
+    let write = ToolExecutionAuthorization::for_path(
+        "edit",
+        ToolNature::Write,
+        workspace.path(),
+        &path,
+        ToolAuthorizationScope::Once,
+    )
+    .expect("write grant");
+    let read = ToolExecutionAuthorization::for_path(
+        "edit",
+        ToolNature::Read,
+        workspace.path(),
+        &path,
+        ToolAuthorizationScope::Once,
+    )
+    .expect("read grant");
+    let tool = EditTool::new(workspace.path().to_path_buf());
+    let input =
+        json!({"path":path,"old_string":"before","new_string":"after","retain_backup":true});
+    assert_eq!(tool.permission_profile(&input).len(), 2);
+    let refused = tool
+        .execute_authorized(input.clone(), std::slice::from_ref(&write))
+        .await;
+    assert!(refused.is_error);
+    assert_eq!(std::fs::read_to_string(&path).expect("read"), "before");
+    let result = tool.execute_authorized(input, &[write, read]).await;
+    assert!(!result.is_error, "{}", result.content);
+    assert_eq!(std::fs::read_to_string(&path).expect("read"), "after");
+}
+
+#[test]
+fn oversized_replacement_is_rejected_before_backup_or_write() {
+    let dir = tempfile::tempdir().expect("dir");
+    let path = dir.path().canonicalize().expect("root").join("file");
+    std::fs::write(&path, b"before").expect("write");
+    let store = FileRecoveryStore::default();
+    assert!(
+        store
+            .replace(&path, b"before", &vec![b'x'; MAX_FILE_BYTES + 1], None)
+            .is_err()
+    );
+    assert!(store.records().expect("records").is_empty());
+    assert_eq!(std::fs::read(path).expect("read"), b"before");
+}
+
+#[test]
+fn atomic_revision_check_rejects_grown_file_without_mutation() {
+    let dir = tempfile::tempdir().expect("dir");
+    let path = dir.path().canonicalize().expect("root").join("file");
+    let bytes = vec![b'x'; MAX_FILE_BYTES + 1];
+    std::fs::write(&path, &bytes).expect("write");
+    let result = atomic_replace(&path, b"new", digest(b"before"), &Mutex::new(()));
+    assert!(result.is_err());
+    assert_eq!(std::fs::read(path).expect("read"), bytes);
+}
