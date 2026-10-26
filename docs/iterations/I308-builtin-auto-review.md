@@ -10,8 +10,8 @@ review and merge-time CAS are recorded in
 The review was by a separate read-only Agent sharing the session/GitHub identity,
 not a separate natural person. It did not independently run tests.
 
-I308/H/G/T8 remain Active and incomplete. Mutation #770 is a separate unmerged
-stage; policy/read coverage commits `82667ca54` and `07c005b87` are published in
+I308/H/G/T8 remain Active and incomplete. Mutation #770 merged as
+`687b84a93b4a9f40ede1eb600151c0a22a8f2d59`; policy/read coverage commits `82667ca54` and `07c005b87` are published in
 unmerged #771. Ordinary effectful Execute/HTTP/WebSearch Auto, remaining registered
 operation/profile dispositions and final delivery gates remain outstanding.
 Earlier checkpoints below preserve historical states and do not override this one.
@@ -322,7 +322,7 @@ Runtime shared composition has a separate Product/Runtime inventory-equivalence 
 | Registered operations | Current I308 disposition / remaining evidence |
 |---|---|
 | `read`, `ls`, `read_image`, `document_extract`, `grep`, `glob`, `diff`, `stat`, `tree`, `find_symbol`, `find_references`, `list_symbols`, `list_imports` | Real Agent dispatch tests cover default Read Allow and explicit Read Deny for read/ls/stat/tree/grep/glob/diff with actual results and zero model calls/grants. Remaining operations and complete profile/platform coverage remain outstanding. MCP omits `read_image`. |
-| `write`, `edit`, `delete` | Exact-content atomic creation is merged in #769; complete-image review and opt-in real recovery for string/anchored edit and text deletion are in unmerged #770. Binary/NUL and secret-like content retain human fallback. Expanded special-path/policy tests are published in #771; full G acceptance remains incomplete. |
+| `write`, `edit`, `delete` | Exact-content atomic creation is merged in #769; complete-image review and opt-in real recovery for string/anchored edit and text deletion are merged in #770. Binary/NUL and secret-like content retain human fallback. Expanded special-path/policy tests are published in #771; full G acceptance remains incomplete. |
 | `save_url`, `fetch_url`, `http_request`, `web_search` | Protected prepared network assessment exists; ordinary product transport Auto allowance remains unimplemented and its pending contract decision is not assumed accepted. |
 | `git_status`, `git_diff`, `git_log`, `git_show`, `git_branch_list` | Existing read policy retained; I308 complete disposition evidence outstanding. |
 | `git_add`, `git_commit`, `git_push`, `git_pull`, `git_checkout` | I300 prepared command route retained; no reopening of accepted whole-command Pull semantics. I308 full coverage evidence outstanding. |
@@ -758,3 +758,21 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
   read-only Agent APPROVE against base `e8e8dccdb5a7d8de281cf54206036778e45e5ac2`.
   No blocking findings; reviewer did not independently execute tests and shares
   this session's tooling/GitHub identity. Full T8 is not complete.
+
+### Retained mutation stage merged — 2026-10-26
+
+- #770 merged as `687b84a93b4a9f40ede1eb600151c0a22a8f2d59` after terminal
+  all-success CI 40279276903, including native Windows. Independent read-only
+  Agent renewed APPROVE for exact main base `d45d08f0a82706c2abb26fcb32899f8b24fa64b1`
+  and head `400b76a678381421ee6a265364ae952a4744776a`: the foundation merge tree
+  equals the earlier reviewed base; subsequent mutation changes only record
+  evidence. No blocking findings; no independent test rerun or natural-person review.
+- Merge CAS and review receipt:
+  https://github.com/wjhuang88/talos/pull/770#issuecomment-6410153470
+  Issue #563 remains Open and has the partial-stage update. Full T8 and later
+  handoff tasks remain incomplete. #771 is still unmerged.
+- Search/diff test commit `29212de48809b0147fb9f03f46df6c0e8dd18762` received
+  independent read-only Agent APPROVE against `3626be38682369d3f490d285db5c86ece6f3a4b4`;
+  no blockers, no independent test execution. Complete local serial locked preflight
+  for this continuation is running; `/private/tmp/i308-dispositions-preflight.log`
+  is not yet final success evidence.
