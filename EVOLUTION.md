@@ -5,6 +5,15 @@
 Record reusable lessons from failures, corrections, and unexpected successes. Check here before
 repeating known mistakes.
 
+## 2026-10-27 - Use logical time for offline cancellation fixtures
+
+- Trigger: CI3463 Windows failed before the I293 stand-in tool started; approval exceeded its 10ms budget.
+- Symptom: A Session interruption test never reached its cancellation/cleanup assertions.
+- Root cause: The offline fixture used a real Tokio clock for an approval deadline unrelated to its cancellation observation; a temporary 30ms resolver delay reproduced the rejection.
+- Fix: Start that Session test with paused Tokio time, retaining its budget and every cleanup/result assertion. Remove temporary delay instrumentation before submission.
+- Prevention: Use logical time for offline timer premises; keep real transport/process timing evidence separate. This does not locate the exact delay in the original CI worker.
+- Promoted to rule/check: `session_interrupt_releases_owned_tool_before_cancelled_terminal_event` uses the same paused-clock setup as its adjacent approval/execution characterization.
+
 ## 2026-10-23 - Research stalled designs and report implementation honestly
 
 - Trigger: Maintainer correction during prolonged I300 convergence.
