@@ -349,3 +349,20 @@ with warnings denied. Independent incremental static review identified the pre-c
 and otherwise found no concrete new blocker. This stage does not enable existing-file
 edits/deletes, expand network authorization or complete T8. Ordinary Execute and the
 remaining H/G coverage remain unimplemented.
+
+### Creation stage validation checkpoint
+
+- Local implementation `9852b65b3` adds exact-content creation assessment;
+  `75ffc8f9f` adds real Agent refusal cases for low confidence, mismatched digest,
+  wrong schema, extra response fields, malformed JSON and oversized responses.
+  All cases prove no file creation and no persistent grant; the focused test passed.
+- Independent incremental static re-review confirmed the pre-clone input limit
+  finding is resolved and found no new concrete blocker. It is not final whole-stage
+  exact-head approval, and the reviewer did not independently rerun tests.
+- Standard locked preflight at `75ffc8f9f` passed exit 0, including workspace checks,
+  Clippy, tests (Tools 951/951) and both Runtime SDK consumers. Log:
+  `/private/tmp/i308-creation-stage-preflight-authorized.log`. The preceding sandboxed
+  run failed one process-observation test with EPERM; the authorized rerun passed.
+- These commits remain local. Native Windows evidence, complete ordinary
+  Write/Network/Execute coverage, full higher-risk recovery, final review, CI and
+  merge are outstanding. This checkpoint does not complete T8 or any later task.

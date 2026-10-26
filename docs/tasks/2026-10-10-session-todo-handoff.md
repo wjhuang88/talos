@@ -6,6 +6,13 @@ retained-network review and ordinary invocation evidence stages. Full T8 is inco
 default HTTP/WebSearch Auto admission, higher-risk backup/recovery and final platform/CI/review
 remain open. No T8 stage is claimed merged. T2/T3 → T4 → T5 → T1 → T6 remain incomplete.
 
+Creation-stage checkpoint: local `9852b65b3` enables exact-content model review
+followed by real atomic new-file creation; `75ffc8f9f` verifies refusal of invalid
+or low-confidence responses. Standard locked preflight at that head passed,
+including Tools 951/951 and both Runtime SDK consumers. Incremental independent
+review closed the input-clone limit finding; final stage review, full T8 coverage,
+native Windows/CI and merge remain outstanding. See I308 for evidence and limits.
+
 ## T7 merged and closed — 2026-10-26
 
 T7/I300 is Complete / Closed at #735, merge `ee84889fd19c590fdcc125cb971143dffd3cfb94`.
