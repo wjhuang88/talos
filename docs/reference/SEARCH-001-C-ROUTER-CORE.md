@@ -2,8 +2,8 @@
 
 Status: implementation stage under I293; **not an activation or C completion record**.
 
-Parent: SEARCH-001-C / #643, SEARCH-001 / #624  
-Architecture: ADR-085 and ADR-090  
+Parent: SEARCH-001-C / #643, SEARCH-001 / #624
+Architecture: ADR-085 and ADR-090
 Integration plan: `SEARCH-001-C-ROUTER-INTEGRATION-PLAN.md`
 
 ## Purpose
