@@ -661,3 +661,8 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
   sandbox-blocked eight-stage local Push test, and workspace doctests. Runtime
   SDK consumer checks are still running; no complete preflight pass is claimed.
   Both governance validators pass after the evidence update.
+- Full serial locked preflight subsequently exited 0 (`release preflight: passed`),
+  including both independent Runtime SDK consumer fixtures. Log:
+  `/private/tmp/i308-mutation-preflight-final.log`. Production source remained
+  stable from `037bf5e55`; subsequent commits only record validation evidence.
+  Native Windows execution, remote exact-head CI and merge CAS remain required.
