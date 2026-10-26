@@ -321,7 +321,7 @@ Runtime shared composition has a separate Product/Runtime inventory-equivalence 
 
 | Registered operations | Current I308 disposition / remaining evidence |
 |---|---|
-| `read`, `ls`, `read_image`, `document_extract`, `grep`, `glob`, `diff`, `stat`, `tree`, `find_symbol`, `find_references`, `list_symbols`, `list_imports` | Real Agent dispatch tests cover default Read Allow and explicit Read Deny for read/ls/stat/tree/grep/glob/diff with actual results and zero model calls/grants. Remaining operations and complete profile/platform coverage remain outstanding. MCP omits `read_image`. |
+| `read`, `ls`, `read_image`, `document_extract`, `grep`, `glob`, `diff`, `stat`, `tree`, `find_symbol`, `find_references`, `list_symbols`, `list_imports` | Real Agent dispatch tests cover default Read Allow and explicit Read Deny for all listed operations except read_image, with actual results and zero model calls/grants. Image attachment and complete profile/platform coverage remain outstanding. MCP omits `read_image`. |
 | `write`, `edit`, `delete` | Exact-content atomic creation is merged in #769; complete-image review and opt-in real recovery for string/anchored edit and text deletion are merged in #770. Binary/NUL and secret-like content retain human fallback. Expanded special-path/policy tests are published in #771; full G acceptance remains incomplete. |
 | `save_url`, `fetch_url`, `http_request`, `web_search` | Protected prepared network assessment exists; ordinary product transport Auto allowance remains unimplemented and its pending contract decision is not assumed accepted. |
 | `git_status`, `git_diff`, `git_log`, `git_show`, `git_branch_list` | Real Agent dispatch verifies default Read Allow returns actual temporary-repository status/diff/history/commit/branch evidence and explicit Read Deny rejects all five, with zero assessor calls/grants. Complete profile/platform evidence remains outstanding. |
@@ -816,3 +816,20 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
 - This does not implement new Git behavior or prove the full feature/host/profile
   matrix. T8 remains incomplete; ordinary Execute/HTTP/WebSearch and remaining
   native families retain their outstanding requirements.
+
+### Document and symbol read verification — 2026-10-26
+
+- The real-Agent read matrix additionally exercises document extraction and all
+  four symbol operations against text/Rust fixtures. Allowed results contain the
+  actual content, function, reference path or imported type; explicit Read Deny
+  rejects each operation. Each invocation has one result and no assessor calls
+  or grants. The focused locked test passes across 17 operations.
+- Agent's dev-only tools dependency enables existing `document` and
+  `code-intelligence` features. Production defaults and dependency versions are
+  unchanged. `find_symbol` takes a directory search root; its fixture uses `.`.
+  Image continuation delivery, complete host/profile evidence and full T8 remain
+  outstanding; this test stage does not add effectful Auto approval.
+- Independent read-only Agent review approved base
+  `29212de48809b0147fb9f03f46df6c0e8dd18762` through published #772 head
+  `9514b0152e48f4db73fbabdbdd61f0bc9ca0c7fc`, with no blockers and no independent
+  test rerun. This review does not cover the later document/symbol additions.

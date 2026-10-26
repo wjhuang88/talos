@@ -24,6 +24,10 @@ async fn real_read_tools_preserve_policy_allow_and_deny_without_assessment() {
         std::fs::write(root.path().join("evidence.txt"), "read-fast-path-evidence")
             .expect("fixture");
         std::fs::write(root.path().join("changed.txt"), "changed-evidence").expect("fixture");
+        std::fs::write(
+            root.path().join("fixture.rs"),
+            "use std::path::PathBuf;\npub fn auto_fixture() -> PathBuf { PathBuf::new() }\nfn caller() { let _ = auto_fixture(); }\n",
+        ).expect("source fixture");
         // Git is used only to build an isolated fixture; product reads use the actual tools.
         for args in [
             vec!["init", "--template=", "--initial-branch=auto-proof"],
@@ -117,6 +121,34 @@ async fn real_read_tools_preserve_policy_allow_and_deny_without_assessment() {
                 Arc::new(talos_tools::git::GitShowTool::new(root.path().into())),
                 serde_json::json!({"revision":"HEAD"}),
             ),
+            (
+                Arc::new(talos_tools::document_extract::DocumentExtractTool::new(
+                    root.path().into(),
+                )),
+                serde_json::json!({"path":"evidence.txt"}),
+            ),
+            (
+                Arc::new(talos_tools::symbol::FindSymbolTool::new(root.path().into())),
+                serde_json::json!({"name":"auto_fixture","path":"."}),
+            ),
+            (
+                Arc::new(talos_tools::symbol::FindReferencesTool::new(
+                    root.path().into(),
+                )),
+                serde_json::json!({"name":"auto_fixture","file":"fixture.rs"}),
+            ),
+            (
+                Arc::new(talos_tools::symbol::ListSymbolsTool::new(
+                    root.path().into(),
+                )),
+                serde_json::json!({"path":"fixture.rs"}),
+            ),
+            (
+                Arc::new(talos_tools::symbol::ListImportsTool::new(
+                    root.path().into(),
+                )),
+                serde_json::json!({"file":"fixture.rs"}),
+            ),
         ];
         for (tool, input) in tools {
             let name = tool.name().to_owned();
@@ -194,7 +226,10 @@ async fn real_read_tools_preserve_policy_allow_and_deny_without_assessment() {
                     if !denied {
                         assert!(
                             result.content.contains(match name.as_str() {
-                                "read" => "read-fast-path-evidence",
+                                "read" | "document_extract" => "read-fast-path-evidence",
+                                "find_symbol" | "list_symbols" => "auto_fixture",
+                                "find_references" => "fixture.rs",
+                                "list_imports" => "PathBuf",
                                 "git_log" | "git_show" => "auto-read-commit-evidence",
                                 "git_branch_list" => "auto-proof",
                                 _ => "evidence.txt",
