@@ -11,6 +11,7 @@ struct Assessor {
     control: AutoPermissionControl,
     delete: bool,
     anchored: bool,
+    path: &'static str,
 }
 #[async_trait]
 impl AutoPermissionAssessor for Assessor {
@@ -27,6 +28,8 @@ impl AutoPermissionAssessor for Assessor {
         _: std::time::Duration,
     ) -> Result<String, String> {
         self.calls.fetch_add(1, Ordering::SeqCst);
+        assert_eq!(request.input["path"], self.path);
+        assert!(request.mutation.path.ends_with(self.path));
         if self.anchored {
             assert_eq!(request.input["operations"][0]["content"], "hello");
         } else if !self.delete {
@@ -40,9 +43,9 @@ impl AutoPermissionAssessor for Assessor {
         assert_eq!(
             request.user_intent,
             if self.delete {
-                "delete existing.txt with a retained backup"
+                format!("delete {} with a retained backup", self.path)
             } else {
-                "replace hi with hello in existing.txt"
+                format!("replace hi with hello in {}", self.path)
             }
         );
         assert_eq!(request.facets.len(), 2);
@@ -89,6 +92,14 @@ async fn trusted_anchored_edit_reviews_complete_images_before_real_execution() {
 async fn run_mutation_scenarios(delete: bool, anchored: bool) {
     for scenario in [
         "allow",
+        "config_allow",
+        "dependency_allow",
+        "release_allow",
+        "security_allow",
+        "explicit_deny",
+        "explicit_human",
+        "secret_original",
+        "secret_replacement",
         "changed_file",
         "uncertain",
         "error",
@@ -104,14 +115,27 @@ async fn run_mutation_scenarios(delete: bool, anchored: bool) {
         "nul_original",
         "nul_replacement",
     ] {
-        if (delete && scenario == "nul_replacement") || (anchored && scenario == "nul_original") {
+        if (delete && matches!(scenario, "nul_replacement" | "secret_replacement"))
+            || (anchored && scenario == "nul_original")
+        {
             continue;
         }
-        let allow = scenario == "allow";
+        let allow = scenario == "allow" || scenario.ends_with("_allow");
+        let path = match scenario {
+            "config_allow" => ".talos/config.toml",
+            "dependency_allow" => "Cargo.toml",
+            "release_allow" => ".github/workflows/release.yml",
+            "security_allow" | "explicit_deny" | "explicit_human" => "security/policy.toml",
+            _ => "existing.txt",
+        };
         let root = tempfile::tempdir().expect("workspace");
+        std::fs::create_dir_all(root.path().join(path).parent().expect("parent"))
+            .expect("directories");
         std::fs::write(
-            root.path().join("existing.txt"),
-            if scenario == "nul_original" {
+            root.path().join(path),
+            if scenario == "secret_original" {
+                "hi\npassword=fixture-value".into()
+            } else if scenario == "nul_original" {
                 "hi\0payload".into()
             } else if delete && scenario == "oversized" {
                 "x".repeat(20 * 1024)
@@ -125,9 +149,7 @@ async fn run_mutation_scenarios(delete: bool, anchored: bool) {
         let edit_tool: Arc<dyn AgentTool> = if anchored {
             let (read, _, edit, _) =
                 talos_tools::file_tools::snapshot_aware_file_tools(root.path().to_owned());
-            let result = read
-                .execute(serde_json::json!({"path":"existing.txt"}))
-                .await;
+            let result = read.execute(serde_json::json!({"path":path})).await;
             assert!(!result.is_error, "{}", result.content);
             let mut lines = result.content.lines();
             let snapshot = lines
@@ -163,9 +185,32 @@ async fn run_mutation_scenarios(delete: bool, anchored: bool) {
                 },
             )])
             .expect("registration");
-        let state = Arc::new(talos_permission::PermissionSessionState::new(
-            PermissionEngine::with_workspace_root(root.path().to_owned()),
-        ));
+        let mut engine = if matches!(scenario, "explicit_deny" | "explicit_human") {
+            let mut engine = PermissionEngine::empty();
+            engine.set_workspace_root(root.path().to_owned());
+            engine.add_rule(talos_permission::PermissionRule::new_nature(
+                talos_core::tool::ToolNature::Read,
+                None,
+                None,
+                talos_permission::PermissionDecision::Allow,
+            ));
+            engine
+        } else {
+            PermissionEngine::with_workspace_root(root.path().to_owned())
+        };
+        if matches!(scenario, "explicit_deny" | "explicit_human") {
+            engine.add_rule(talos_permission::PermissionRule::new_nature(
+                talos_core::tool::ToolNature::Write,
+                None,
+                None,
+                if scenario == "explicit_deny" {
+                    talos_permission::PermissionDecision::Deny("fixture explicit deny".into())
+                } else {
+                    talos_permission::PermissionDecision::Ask
+                },
+            ));
+        }
+        let state = Arc::new(talos_permission::PermissionSessionState::new(engine));
         let calls = Arc::new(AtomicUsize::new(0));
         let control = AutoPermissionControl::new(true);
         let resolver = AutoPermissionResolver::new(
@@ -176,6 +221,7 @@ async fn run_mutation_scenarios(delete: bool, anchored: bool) {
                 control: control.clone(),
                 delete,
                 anchored,
+                path,
             }),
             Arc::new(AutoDenyFallback),
             ManagedWorkspaceLease::for_permission_session(root.path(), state.clone())
@@ -183,7 +229,9 @@ async fn run_mutation_scenarios(delete: bool, anchored: bool) {
             std::time::Duration::from_secs(2),
             control,
         );
-        let content = if scenario == "nul_replacement" {
+        let content = if scenario == "secret_replacement" {
+            "password=fixture-value".into()
+        } else if scenario == "nul_replacement" {
             "hello\0payload".into()
         } else if scenario == "oversized" {
             "x".repeat(20 * 1024)
@@ -197,11 +245,11 @@ async fn run_mutation_scenarios(delete: bool, anchored: bool) {
                         id: "create".into(),
                         name: if delete { "delete" } else { "edit" }.into(),
                         input: if delete {
-                            serde_json::json!({"path":"existing.txt","retain_backup":true})
+                            serde_json::json!({"path":path,"retain_backup":true})
                         } else if let Some((snapshot, target)) = &anchor {
-                            serde_json::json!({"path":"existing.txt","snapshot_id":snapshot,"retain_backup":true,"operations":[{"op":"replace","target":target,"content":content}]})
+                            serde_json::json!({"path":path,"snapshot_id":snapshot,"retain_backup":true,"operations":[{"op":"replace","target":target,"content":content}]})
                         } else {
-                            serde_json::json!({"path":"existing.txt","old_string":"hi","new_string":content,"retain_backup":true})
+                            serde_json::json!({"path":path,"old_string":"hi","new_string":content,"retain_backup":true})
                         },
                     },
                     provenance: Default::default(),
@@ -230,30 +278,35 @@ async fn run_mutation_scenarios(delete: bool, anchored: bool) {
             Some(Arc::new(resolver)),
         );
         agent
-            .run(
-                if delete {
-                    "delete existing.txt with a retained backup"
-                } else {
-                    "replace hi with hello in existing.txt"
-                }
-                .into(),
-            )
+            .run(if delete {
+                format!("delete {path} with a retained backup")
+            } else {
+                format!("replace hi with hello in {path}")
+            })
             .await
             .expect("run");
         assert_eq!(
             calls.load(Ordering::SeqCst),
             usize::from(!matches!(
                 scenario,
-                "oversized" | "nul_original" | "nul_replacement"
+                "oversized"
+                    | "nul_original"
+                    | "nul_replacement"
+                    | "explicit_deny"
+                    | "explicit_human"
+                    | "secret_original"
+                    | "secret_replacement"
             )),
             "{scenario}"
         );
         if delete && allow {
-            assert!(!root.path().join("existing.txt").exists());
+            assert!(!root.path().join(path).exists());
         } else {
             assert_eq!(
-                std::fs::read_to_string(root.path().join("existing.txt")).expect("file"),
-                if scenario == "nul_original" {
+                std::fs::read_to_string(root.path().join(path)).expect("file"),
+                if scenario == "secret_original" {
+                    "hi\npassword=fixture-value".into()
+                } else if scenario == "nul_original" {
                     "hi\0payload".into()
                 } else if delete && scenario == "oversized" {
                     "x".repeat(20 * 1024)

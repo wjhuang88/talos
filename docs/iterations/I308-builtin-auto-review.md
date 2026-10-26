@@ -666,3 +666,25 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
   `/private/tmp/i308-mutation-preflight-final.log`. Production source remained
   stable from `037bf5e55`; subsequent commits only record validation evidence.
   Native Windows execution, remote exact-head CI and merge CAS remain required.
+
+### File mutation policy coverage continuation — 2026-10-26
+
+- File-mutation candidate published as stacked draft #770, head `400b76a67`,
+  based on foundation #769. Both have live remote CI; neither is merged.
+- The next local test-only continuation extends real Agent dispatch for string
+  edits, anchored edits and deletions to configuration, dependency, release and
+  security paths. Complete captured images and the exact target are asserted at
+  the assessor boundary. These path fixtures prove routing, not semantic safety
+  of arbitrary configuration contents or a real provider's judgment.
+- Explicit priority Write Deny and Ask rules prevent both model review and
+  mutation, leaving file bytes intact. Secret-like original/replacement fixtures
+  also fall back before any assessor call. No persistent grants are created.
+  An initial fixture incorrectly appended Ask after the default rule; it was
+  corrected to install an effective first-match explicit rule, without changing
+  production policy ordering.
+- Locked Agent library tests pass 496/496 with the expanded scenarios, and Agent
+  library/test Clippy passes with `-D warnings`. Logs:
+  `/private/tmp/i308-mutation-policy-agent.log` and
+  `/private/tmp/i308-mutation-policy-clippy.log`. This continuation has no new
+  production code; publication review/platform gates remain outstanding. Full T8,
+  ordinary Execute/HTTP/WebSearch Auto and all later handoff items remain open.
