@@ -4348,15 +4348,12 @@ impl AddPlan {
         }
         let current_repository = RepositoryState::capture(&self.workspace)?;
         if current_repository != self.repository {
-            #[cfg(test)]
-            eprintln!(
-                "Git repository evidence changed: {:?}",
-                self.repository.changed_fields(&current_repository)
-            );
-            return Err(GitToolError::InvalidInput(
-                "Git repository metadata changed after preparation; request a fresh authorization"
-                    .into(),
-            ));
+            return Err(GitToolError::InvalidInput(format!(
+                "Git repository metadata changed after preparation; request a fresh authorization (changed categories: {})",
+                self.repository
+                    .changed_fields(&current_repository)
+                    .join(", ")
+            )));
         }
         if match &self.operation {
             Operation::Push(_) | Operation::Pull(_) => false,

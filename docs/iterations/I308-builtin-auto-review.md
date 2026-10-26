@@ -10,9 +10,11 @@ review and merge-time CAS are recorded in
 The review was by a separate read-only Agent sharing the session/GitHub identity,
 not a separate natural person. It did not independently run tests.
 
-I308/H/G/T8 remain Active and incomplete. Mutation #770 is a separate unmerged
-stage; local policy/read coverage commits `82667ca54` and `07c005b87` are not yet
-published. Ordinary effectful Execute/HTTP/WebSearch Auto, remaining registered
+I308/H/G/T8 remain Active and incomplete. Mutation #770 merged as
+`687b84a93b4a9f40ede1eb600151c0a22a8f2d59`; policy/read coverage #771 merged as
+`b21b6146c21894dc42e8fc5bf1d815af71fbc7c8` after all-six-success exact-head
+CI 40280848025, independent final-target review and merge CAS. Scheduler/read/
+Todo/recovery stage #772 remains unmerged. Ordinary effectful Execute/HTTP/WebSearch Auto, remaining registered
 operation/profile dispositions and final delivery gates remain outstanding.
 Earlier checkpoints below preserve historical states and do not override this one.
 
@@ -35,7 +37,7 @@ Earlier checkpoints below preserve historical states and do not override this on
 | Governance Claim PR | #765 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer authorized continued full handoff delivery; #765 requires independent permission/security/API review, exact-head CI, both validators and final merge-time CAS before merge. |
-| Implementation PR | #769 (foundation); #770 (stacked file mutation stage) |
+| Implementation PR | #769 (foundation, merged); #770 (file mutation, merged); #771 (policy/read tests, merged); #772 (scheduler and native operation evidence) |
 | Last Updated | 2026-10-26 |
 | Handoff / Release Condition | Satisfy full H/G acceptance with existing implementation commits, independent permission/security/API review and platform evidence; no release authorized. |
 
@@ -321,15 +323,15 @@ Runtime shared composition has a separate Product/Runtime inventory-equivalence 
 
 | Registered operations | Current I308 disposition / remaining evidence |
 |---|---|
-| `read`, `ls`, `read_image`, `document_extract`, `grep`, `glob`, `diff`, `stat`, `tree`, `find_symbol`, `find_references`, `list_symbols`, `list_imports` | Existing policy/read paths retained; complete per-operation Auto fallback/production evidence still required. MCP omits `read_image`. |
-| `write`, `edit`, `delete` | Exact-content atomic creation is in #769; complete-image review and opt-in real recovery for string/anchored edit and text deletion are in #770. Binary/NUL and secret-like content retain human fallback. Expanded special-path/policy tests are local; neither PR is merged and full G acceptance remains incomplete. |
+| `read`, `ls`, `read_image`, `document_extract`, `grep`, `glob`, `diff`, `stat`, `tree`, `find_symbol`, `find_references`, `list_symbols`, `list_imports` | Real Agent dispatch tests cover default Read Allow and explicit Read Deny for all listed operations, with actual results and zero model assessments/grants. Image attachment reaches only the next provider request after an allowed read. Complete profile/platform coverage remains outstanding. MCP omits `read_image`. |
+| `write`, `edit`, `delete` | Exact-content atomic creation is merged in #769; complete-image review and opt-in real recovery for string/anchored edit and text deletion are merged in #770. Binary/NUL and secret-like content retain human fallback. Expanded special-path/policy tests are published in #771; full G acceptance remains incomplete. |
 | `save_url`, `fetch_url`, `http_request`, `web_search` | Protected prepared network assessment exists; ordinary product transport Auto allowance remains unimplemented and its pending contract decision is not assumed accepted. |
-| `git_status`, `git_diff`, `git_log`, `git_show`, `git_branch_list` | Existing read policy retained; I308 complete disposition evidence outstanding. |
+| `git_status`, `git_diff`, `git_log`, `git_show`, `git_branch_list` | Real Agent dispatch verifies default Read Allow returns actual temporary-repository status/diff/history/commit/branch evidence and explicit Read Deny rejects all five, with zero assessor calls/grants. Complete profile/platform evidence remains outstanding. |
 | `git_add`, `git_commit`, `git_push`, `git_pull`, `git_checkout` | I300 prepared command route retained; no reopening of accepted whole-command Pull semantics. I308 full coverage evidence outstanding. |
 | `bash` (Unix) / `powershell` (Windows), `exec` | Existing shell/direct-command paths retained; I308 full profile/decision evidence outstanding. |
-| `todo_create`, `todo_create_batch`, `todo_update_batch`, `todo_update_status`, `todo_update`, `todo_delete`, `todo_add_dependency`, `todo_remove_dependency`, `todo_query` | Print/TUI session-scoped registrations inventoried; mutation Auto assessment and full disposition evidence outstanding. MCP does not add Todo. |
+| `todo_create`, `todo_create_batch`, `todo_update_batch`, `todo_update_status`, `todo_update`, `todo_delete`, `todo_add_dependency`, `todo_remove_dependency`, `todo_query` | Session-scoped Internal facets retain default deterministic Allow, not model approval. Local real-Agent tests cover all nine operations under default Allow and explicit Internal Deny, actual SQLite effects, unchanged other-session data, zero assessor calls and zero grants. MCP does not add Todo; complete profile/platform evidence remains outstanding. |
 | `status` | MCP-only read tool; concrete built-in ownership checked. |
-| `delay`, `schedule`, `list_scheduled_tasks`, `cancel_scheduled_task` | Product-owned scheduler factory now registers actual instances as built-ins in interactive/Print/Inline/RPC/TUI; caller-supplied scheduler instances remain external. Model-assisted scheduling allowance remains unimplemented. |
+| `delay`, `schedule`, `list_scheduled_tasks`, `cancel_scheduled_task` | Product-owned scheduler factory registers actual instances as built-ins; caller-supplied instances remain external. A local action-review implementation now admits exact scheduling/cancellation invocations, pending validation and independent review below. `list_scheduled_tasks` retains Read policy. This stage is not merged acceptance. |
 
 Inventory work found and repaired a production gap: Print/Inline/RPC/TUI previously
 constructed scheduler tools locally but passed them through generic external registration.
@@ -718,3 +720,305 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
   `-D warnings`. Logs: `/private/tmp/i308-read-policy-agent.log` and
   `/private/tmp/i308-read-policy-clippy.log`. No new production behavior or full
   workspace/native Windows validation is claimed by this test-only continuation.
+
+### Todo deterministic admission continuation — 2026-10-26
+
+- Separate `tests/todo_auto.rs` runs all nine actual Todo tools through Agent
+  dispatch against initialized SQLite storage. Default Internal Allow performs
+  actual create/batch/update/status/delete/dependency/query operations; explicit
+  Internal Deny leaves rows and dependency edges unchanged. Both paths require
+  exactly one result, zero assessor calls and zero persistent grants. Other-session
+  data remains unchanged and absent from results.
+- This corrects the earlier inventory assumption that Todo mutation needed model
+  assessment: the existing session-scoped Internal policy already admits it. No
+  production permission rule or authority is changed. Cross-session malicious-ID
+  attempts and complete profile/platform coverage are not established by this test.
+- Locked Agent library tests pass 498/498; library/test Clippy passes with
+  `-D warnings`. Logs: `/private/tmp/i308-todo-agent.log` and
+  `/private/tmp/i308-todo-clippy.log`. Full T8 remains incomplete.
+- Issue #563 was incorrectly completed when foundation #769 merged, despite its
+  remaining acceptance. It is reopened; #769's body now states the issue remains
+  incomplete without a closing-keyword phrase. #771's failed reconciliation must
+  be rerun after its current CI run is terminal; no product failure is inferred
+  from that metadata mismatch.
+
+### Search and diff read admission continuation — 2026-10-26
+
+- Existing `tests/read_auto.rs` now also dispatches real grep, glob and two-file
+  diff tools under default Read Allow and explicit Read Deny. Allowed results
+  contain the fixture path; denied calls return errors. All seven operations
+  retain zero assessor calls, zero grants and exactly one result per invocation.
+- Agent's dev-only talos-tools dependency enables its existing `search` feature
+  so these tests also compile in isolated package checks. No production feature
+  default, dependency version or permission behavior changes.
+- Locked Agent library tests pass 498/498; library/test Clippy passes with
+  `-D warnings`. Logs: `/private/tmp/i308-search-read-agent.log` and
+  `/private/tmp/i308-search-read-clippy.log`. Complete read-family/profile/platform
+  evidence remains outstanding; these fixtures do not prove arbitrary search or
+  diff content correctness.
+- Todo commit `3626be38682369d3f490d285db5c86ece6f3a4b4` received independent
+  read-only Agent APPROVE against base `e8e8dccdb5a7d8de281cf54206036778e45e5ac2`.
+  No blocking findings; reviewer did not independently execute tests and shares
+  this session's tooling/GitHub identity. Full T8 is not complete.
+
+### Retained mutation stage merged — 2026-10-26
+
+- #770 merged as `687b84a93b4a9f40ede1eb600151c0a22a8f2d59` after terminal
+  all-success CI 40279276903, including native Windows. Independent read-only
+  Agent renewed APPROVE for exact main base `d45d08f0a82706c2abb26fcb32899f8b24fa64b1`
+  and head `400b76a678381421ee6a265364ae952a4744776a`: the foundation merge tree
+  equals the earlier reviewed base; subsequent mutation changes only record
+  evidence. No blocking findings; no independent test rerun or natural-person review.
+- Merge CAS and review receipt:
+  https://github.com/wjhuang88/talos/pull/770#issuecomment-6410153470
+  Issue #563 remains Open and has the partial-stage update. Full T8 and later
+  handoff tasks remain incomplete. #771 is still unmerged.
+- Search/diff test commit `29212de48809b0147fb9f03f46df6c0e8dd18762` received
+  independent read-only Agent APPROVE against `3626be38682369d3f490d285db5c86ece6f3a4b4`;
+  no blockers, no independent test execution. Complete local serial locked preflight
+  for this continuation is running; `/private/tmp/i308-dispositions-preflight.log`
+  is not yet final success evidence.
+
+### Serial workspace validation result — 2026-10-26
+
+- The continuation's authorized full preflight completed successfully with
+  `RUST_TEST_THREADS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_DEV_DEBUG=0 ./scripts/release_preflight.sh`.
+  The script uses locked dependency checks; both external SDK fixture runs passed
+  and the terminal result is `release preflight: passed`. Evidence log:
+  `/private/tmp/i308-dispositions-preflight-authorized.log`.
+- The earlier sandbox run in `/private/tmp/i308-dispositions-preflight.log`
+  failed while observing the prepared local push subprocess with EPERM. The
+  authorized rerun passed; the earlier failure is retained rather than reported
+  as success. Production/test content is `29212de48809b0147fb9f03f46df6c0e8dd18762`;
+  subsequent changes record evidence only. Native Windows CI for the unpublished
+  Todo/search continuation is still outstanding. I308 and T8 remain Partial.
+
+### Todo cross-session input verification — 2026-10-26
+
+- The real-Agent Todo matrix additionally supplies another session's item ID to
+  batch update, status update, update, delete, dependency addition and dependency
+  removal under default Allow and explicit Deny. Current-session rows/edges and
+  the other session's item remain unchanged; results do not disclose its title.
+  Missing-item delete and missing-edge removal preserve their existing successful
+  no-op response, explicitly asserted as `not found`; the other foreign-target
+  mutations error. Assessment and persistent-grant counts remain zero.
+- Locked Agent library tests pass 498/498 after this extension; formatting passes.
+  This establishes these concrete foreign-ID cases, not arbitrary cross-session
+  attack coverage, new production behavior or complete I308 acceptance.
+
+### Git read admission verification — 2026-10-26
+
+- `tests/read_auto.rs` now dispatches all five actual Git read tools under
+  default Read Allow and explicit Read Deny, alongside the seven existing file
+  read/search/diff operations. Fixture initialization uses a cleared environment,
+  an empty template and a local unsigned commit; no user repository is modified.
+  Allowed calls must return fixture-specific path, commit message or branch
+  evidence. Every call produces one result, zero model assessments and zero
+  persistent grants. The focused locked production-dispatch test passes.
+- This does not implement new Git behavior or prove the full feature/host/profile
+  matrix. T8 remains incomplete; ordinary Execute/HTTP/WebSearch and remaining
+  native families retain their outstanding requirements.
+
+### Document and symbol read verification — 2026-10-26
+
+- The real-Agent read matrix additionally exercises document extraction and all
+  four symbol operations against text/Rust fixtures. Allowed results contain the
+  actual content, function, reference path or imported type; explicit Read Deny
+  rejects each operation. Each invocation has one result and no assessor calls
+  or grants. The focused locked test passes across 17 operations.
+- Agent's dev-only tools dependency enables existing `document` and
+  `code-intelligence` features. Production defaults and dependency versions are
+  unchanged. `find_symbol` takes a directory search root; its fixture uses `.`.
+  Image continuation delivery, complete host/profile evidence and full T8 remain
+  outstanding; this test stage does not add effectful Auto approval.
+- Independent read-only Agent review approved base
+  `29212de48809b0147fb9f03f46df6c0e8dd18762` through published #772 head
+  `9514b0152e48f4db73fbabdbdd61f0bc9ca0c7fc`, with no blockers and no independent
+  test rerun. This review does not cover the later document/symbol additions.
+
+### Image read continuation verification — 2026-10-26
+
+- Added the actual `read_image` tool to the existing real-Agent policy matrix,
+  bringing it to 18 operations. An allowed PNG read reaches only the second
+  provider request with the expected basename, MIME and byte count; explicit
+  Read Deny produces no image attachment in either request. Both paths retain
+  zero model assessments and zero persistent grants.
+- Enabled the existing image feature only in Agent's development dependency.
+  Locked Agent library tests pass 498/498, Agent library/test Clippy passes with
+  warnings denied, and workspace format checking passes. These results do not
+  establish native Windows or final workspace acceptance.
+- Published #772 CI 40285467815 failed its Runtime conditional Checkout test:
+  retained repository metadata changed after preparation. The focused local
+  reproduction passes; the cause remains unestablished and is not repaired by
+  this image test change. Existing Windows jobs remain running. T8 remains
+  Partial, with effectful invocation families and final acceptance outstanding.
+- Independent read-only Agent static review approved image commit
+  `b3b1eb28cff6788f295462ab0a97e75a8167ccf8` against
+  `824a276b748e702ae1bac7ca84401cfb356de701`, without blockers or an independent
+  test rerun. This was a same-session Agent sharing tools/GitHub identity, not
+  a separate human. Mock provider capture does not establish real provider
+  acceptance, pixel decoding or longer-history attachment lifetime.
+- Additional local investigation: locked Runtime library tests pass 72/72, and
+  the compiled conditional Checkout test passes 30/30 isolated repetitions.
+  This narrows reproduction conditions but does not explain or repair the
+  published macOS CI failure. No security revalidation was weakened.
+
+### Checkout CI diagnosis prerequisite — 2026-10-26
+
+- Retained-repository refusal now reports only fixed changed category names
+  (for example `entries` or `object_layout`), including when Tools is compiled
+  as a Runtime dependency. Previously that diagnostic existed only under Tools'
+  own test configuration and was absent from the failing Runtime CI output.
+  No paths, configuration values or captured contents are disclosed, and the
+  comparison and refusal behavior are unchanged. This is diagnostic capability,
+  not a root-cause fix or permission relaxation.
+- Locked Tools Git repository-state tests pass 14/14, Tools Git library/test
+  Clippy passes with warnings denied, and Runtime's focused Checkout test passes.
+  The initial Tools command omitted the Git feature and selected zero tests;
+  only the subsequent explicit `--features git` run counts as evidence.
+- Local Git is 2.54.0 while the failing CI recorded 2.55.0. Version difference
+  is an observation, not an established cause. Existing Windows jobs continue;
+  no failed CI rerun or production fixture change is used to claim resolution.
+
+### Recovery invocation permission verification — 2026-10-26
+
+- A separate real-Agent dispatch test covers restoration through both native
+  edit and delete instances. Explicit Write Allow restores and consumes the
+  receipt exactly once. Write Deny and Ask with a denying resolver leave the
+  mutation untouched and the receipt usable. A concurrent edit or recreation
+  is preserved even when current Write policy allows restoration. Every case
+  returns one tool result and creates no persistent grant.
+- This tests current permission enforcement on a later recovery invocation;
+  it does not implement model-assisted recovery approval. The focused locked
+  Agent test and Agent library/test Clippy pass. The first test attempt assumed
+  edit's multiline receipt format for delete too; the fixture parser was
+  corrected to accept delete's existing inline format.
+- Standard serial preflight was started at `a110a12fe` before this new test
+  existed. Its eventual result cannot establish final-head coverage of this
+  additional test; the separate focused run supplies that evidence.
+- Independent static read-only Agent review approved `a110a12fe` against
+  `17c6e458f`, without blockers or independent test reruns. It confirmed fixed
+  diagnostic categories expose no captured paths/values and preserve refusal.
+  This same-session Agent shares tool/GitHub identity and is not a human review.
+
+### Current-head validation checkpoint — 2026-10-26
+
+- Independent static read-only Agent review approved recovery verification
+  `c16a4548c7c163f705b6b67023140bb3e4eb4a01` against `a110a12fe`, with no
+  blockers and no independent test reruns. The review does not establish
+  exhaustive race coverage or model-assisted recovery approval.
+- The earlier serial preflight exited 101: the prepared local Push test could
+  not observe its process (`EPERM`); Tools reported 975 passed and one failed.
+  This is failed validation, not a passing final-head result.
+- A newly authorized sandbox-external serial locked preflight now covers
+  `c16a4548c7c163f705b6b67023140bb3e4eb4a01`; its log is
+  `/private/tmp/i308-read-diagnostic-preflight-authorized.log`. It remains
+  running at this checkpoint, so no final result is claimed.
+- Remote runs 40280848025 and 40285467815 were verified live with Windows
+  workspace jobs still in progress. The latter retains its macOS Runtime
+  Checkout failure; added category diagnostics are not a root-cause repair.
+  Full T8 and the later handoff queue remain incomplete.
+- Both project governance and Collaboration Claim validators passed with zero
+  warnings after this checkpoint update.
+
+### Session-local action review implementation — 2026-10-26
+
+- Scope follows the accepted effectful H baseline: review only one session-local
+  scheduling or cancellation invocation; later scheduled model work retains normal
+  tool permissions. No whole-shell/network authority is inferred from this stage.
+- Additive `BuiltinActionAssessmentRequest` and a default-unsupported assessor
+  method preserve existing public struct literals and exhaustive enums. The
+  provider receives bounded exact arguments, implementation description, complete
+  facets, current user intent, session/revisions, nonce and digest. Failures,
+  stale context, disabled Auto and invalid responses retain human fallback.
+- Real dispatch testing exposed an existing scheduler admission gap: Execute
+  facets had no typed resource, so the permission pipeline could not even form
+  an approval proposal. Following existing session-owned process cancellation,
+  scheduler actions now use named Command resources bound to operation plus the
+  complete argument digest. They grant no OS executable authority; the normal
+  invocation/session binding still applies. No permission-engine bypass added.
+- Tests are separate in `tests/scheduler_auto.rs`: 51 real Agent/Scheduler
+  combinations cover delay, recurring schedule and cancellation with Allow,
+  explicit Deny/human, external ownership, uncertain/low-confidence, stale,
+  disabled, malformed/replayed-digest/schema/extra-field/oversized responses,
+  error/panic/timeout and oversized input outcomes. Actual scheduler state and
+  zero persistent grants are checked. Final locked Agent library tests pass
+  500/500; Agent library/test Clippy passes with warnings denied. Logs:
+  `/private/tmp/i308-scheduler-agent-full.log` and
+  `/private/tmp/i308-scheduler-auto-clippy.log`. Both governance validators pass.
+- Independent static read-only Agent security/API review approved the final
+  working diff against `f29b4cbc7`, including the final input/payload size checks;
+  no blockers or independent test reruns. Same-session Agent shares tool/GitHub
+  identity and is not human review. Final exact-head CI/merge remain outstanding.
+- Provider review payloads are bounded to 16 KiB, including the digest. Resource
+  hashing still serializes the full already-supplied input; no claim that every
+  temporary allocation is 16 KiB-bounded. Cancellation exposes task ID and exact
+  invocation, not retained task message/timing; insufficient user intent must
+  require human review. Future-fire permission enforcement and exhaustive policy
+  revision/race coverage are not established by this test.
+- The authorized preflight above terminated during the external Runtime SDK
+  fixture after concurrent source edits introduced a digest-format compile error.
+  The error was fixed. This mixed-source run cannot prove final-head validation;
+  rerun only after this stage stabilizes, with no concurrent source edits.
+- Remote results: #772 Windows workspace passed in run 40285467815, while its
+  macOS Runtime failure remains. #771 run 40280848025 completed all substantive
+  Windows tests/checks/governance/smoke successfully, then exceeded the 45-minute
+  job limit in post-job Rust cache saving. GitHub still reports cancelled, so
+  this is not a green gate. Failed-job rerun requested after terminal evidence;
+  no live job was cancelled or replaced.
+
+### Stable scheduler candidate validation — 2026-10-26
+
+- Serial sandbox-external locked `./scripts/release_preflight.sh` exited 0
+  at implementation commit `b5e8bbe98b4a4290552fec40c13273d6b9fcc831`,
+  with no source edits during the run. Workspace tests, doctests and the
+  independent external Runtime SDK fixture passed. Log:
+  `/private/tmp/i308-read-diagnostic-preflight-authorized.log`.
+- Independent read-only Agent review approved exact delta
+  `f29b4cbc76fdca9a219ae39237357a671c873d5c` to
+  `b5e8bbe98b4a4290552fec40c13273d6b9fcc831`, with no blockers.
+  The reviewer did not independently rerun tests and is not a human reviewer.
+- This local success does not repair or explain the previous macOS CI Checkout
+  drift. Fresh exact-head CI and merge gates remain mandatory; T8 remains Partial.
+
+### Recovery caller-cancellation evidence — 2026-10-26
+
+- Real edit and delete restoration dispatch now also waits in the production
+  approval pipeline, then aborts the owning caller after observing approval
+  entry. Neither file state nor the reusable recovery receipt changes, no
+  ToolResult is fabricated and no persistent grant remains. A direct restore
+  afterwards verifies the receipt was not consumed. This proves cancellation
+  before admission, not rollback of an already-started filesystem mutation.
+- Locked focused Agent tests passed 2/2 (including ten recovery dispatch
+  combinations); Agent library/test Clippy with warnings denied and formatting
+  passed. Logs: `/private/tmp/i308-recovery-cancellation.log` and
+  `/private/tmp/i308-recovery-cancel-clippy.log`. This local extension is not
+  covered by the already-running CI for `6f56cb939`; fresh review/CI remains due.
+
+### Recovery replacement-directory evidence — 2026-10-26
+
+- Real Agent restoration dispatch for edit and delete now also covers a target
+  replaced by a nonempty directory. The permission-allowed invocation fails,
+  preserves the directory and sentinel contents, and retains the receipt. After
+  explicitly restoring the expected post-mutation state, same-instance recovery
+  succeeds. This covers a changed target type, not arbitrary same-content inode
+  replacement or rollback after a mutation starts.
+- Locked focused Agent tests passed 2/2, with twelve recovery dispatch scenarios.
+  No production behavior changed. This test extension is not covered by the
+  running remote candidate; independent review and fresh exact-head CI remain due.
+
+### Stage integration and rebase checkpoint — 2026-10-26
+
+- #771 completed all six CI jobs successfully, including native Windows and its
+  cache post-job. Final target review approved main `687b84a93` to head `e8e8dccdb`;
+  merge CAS and review are recorded in
+  [the final receipt](https://github.com/wjhuang88/talos/pull/771#issuecomment-6412063934).
+  Merge commit is `b21b6146c21894dc42e8fc5bf1d815af71fbc7c8`.
+- #772 published head `6f56cb939` also passed all six jobs in CI 40291895444.
+  Retargeting to main exposed a merge conflict after the preceding squash merges.
+  Rebase onto `b21b6146c` completed without file conflicts, including the two local
+  recovery-test commits; the resulting tree at `525df4172` is identical to the
+  pre-rebase tree at `9c57b246d`. No cache-workflow change was needed or made.
+- Earlier CI does not cover the additional recovery tests or the new commit
+  identities. Fresh aggregate review, exact-head CI and merge CAS remain due.
+  T8 and the later handoff tasks remain incomplete.

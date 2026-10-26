@@ -2,10 +2,13 @@
 
 Foundation #769 is now merged as `d45d08f0a82706c2abb26fcb32899f8b24fa64b1`,
 after all-success exact-head CI 40274739232 (including native Windows), independent
-Agent permission/security/API review and merge-time CAS. Mutation #770 remains
-unmerged with CI running at this checkpoint. Local follow-up commits `82667ca54`
-and `07c005b87` extend mutation-policy and real read-only dispatch evidence;
-Agent tests pass 497/497, Clippy and both governance validators pass.
+Agent permission/security/API review and merge-time CAS. Mutation #770 is now merged as
+`687b84a93b4a9f40ede1eb600151c0a22a8f2d59` after all-success CI 40279276903,
+including native Windows, independent review and merge CAS. Policy/read tests #771
+merged as `b21b6146c21894dc42e8fc5bf1d815af71fbc7c8` after all-six-success CI
+40280848025 and independent final-target review/CAS. Scheduler and native-operation
+evidence #772 passed CI at its old published head, then rebased onto this main;
+the two additional recovery tests and rebased head still require fresh CI/review.
 This is partial T8 delivery; ordinary Execute/HTTP/WebSearch Auto and the remaining
 operation/profile/platform coverage remain incomplete. T2/T3 → T4 → T5 → T1 → T6
 retain their full scope and remain incomplete.

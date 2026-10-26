@@ -1,6 +1,7 @@
 #![allow(warnings)]
 mod network_invocation;
 mod read_auto;
+mod todo_auto;
 mod write_auto;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -6742,3 +6743,5 @@ fn dispatch_recovery_requires_explicit_protocol_evidence() {
 }
 
 mod edit_auto;
+mod recovery_dispatch;
+mod scheduler_auto;

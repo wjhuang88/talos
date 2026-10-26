@@ -4,12 +4,14 @@
 //! suggest an invocation-local `ApproveOnce`; policy evaluation and grant admission
 //! remain owned by [`crate::permission_pipeline::PermissionPipeline`].
 
+mod action_review;
 mod file_mutation_review;
 mod invocation_review;
 mod network_review;
 mod prepared_command;
 mod script_evidence;
 
+pub use action_review::BuiltinActionAssessmentRequest;
 pub use file_mutation_review::FileMutationAssessmentRequest;
 pub use invocation_review::BuiltinInvocationAssessmentRequest;
 pub use network_review::{BuiltinNetworkAssessmentRequest, NetworkReviewEndpoint};
@@ -843,6 +845,14 @@ pub enum AutoConfidence {
 /// Provider-independent model assessor. Implementations must not call tools recursively.
 #[async_trait]
 pub trait AutoPermissionAssessor: Send + Sync {
+    /// Reviews one session-local action. Existing assessors remain unsupported.
+    async fn assess_builtin_action(
+        &self,
+        _request: BuiltinActionAssessmentRequest,
+        _remaining: Duration,
+    ) -> Result<String, String> {
+        Err("builtin action assessment unsupported".into())
+    }
     /// Reviews complete captured images of one retained native file mutation.
     async fn assess_file_mutation(
         &self,
@@ -982,6 +992,13 @@ impl ProviderAutoPermissionAssessor {
 
 #[async_trait]
 impl AutoPermissionAssessor for ProviderAutoPermissionAssessor {
+    async fn assess_builtin_action(
+        &self,
+        request: BuiltinActionAssessmentRequest,
+        remaining: Duration,
+    ) -> Result<String, String> {
+        self.assess_action_payload(request, remaining).await
+    }
     async fn assess_file_mutation(
         &self,
         request: FileMutationAssessmentRequest,

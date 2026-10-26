@@ -68,6 +68,14 @@ impl AutoPermissionResolver {
         allowed: bool,
         intent: Option<&str>,
     ) -> Result<ApprovalChoice, ApprovalResolverError> {
+        if matches!(
+            request.tool_name.as_str(),
+            "delay" | "schedule" | "cancel_scheduled_task"
+        ) {
+            return self
+                .resolve_action_review(request, evidence, remaining, allowed, intent)
+                .await;
+        }
         // Preserve the existing shell/exec classifier until its effectful successor
         // has execution evidence; this branch is not a tool-name trust assertion.
         if request.tool_name != "write" {

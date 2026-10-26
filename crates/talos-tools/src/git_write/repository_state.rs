@@ -100,7 +100,6 @@ pub(super) struct RepositoryState {
 }
 
 impl RepositoryState {
-    #[cfg(test)]
     pub(super) fn changed_fields(&self, current: &Self) -> Vec<&'static str> {
         let mut changed = Vec::new();
         macro_rules! compare {
@@ -714,9 +713,11 @@ mod tests {
         git(root.path(), &["add", "file"]);
         let staged = RepositoryState::capture(root.path()).expect("staged");
         assert_ne!(initial, staged);
+        assert!(initial.changed_fields(&staged).contains(&"entries"));
         git(root.path(), &["symbolic-ref", "HEAD", "refs/heads/other"]);
         let head = RepositoryState::capture(root.path()).expect("HEAD");
         assert_ne!(staged, head);
+        assert_eq!(staged.changed_fields(&head), ["entries"]);
         git(root.path(), &["config", "core.autocrlf", "false"]);
         assert_ne!(head, RepositoryState::capture(root.path()).expect("config"));
     }

@@ -3,6 +3,23 @@ use super::*;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use talos_core::tool::{ToolContribution, ToolContributionSource};
 
+const MINIMAL_PNG: &[u8] = &[
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, // signature
+    0x00, 0x00, 0x00, 0x0d, // IHDR length
+    0x49, 0x48, 0x44, 0x52, // "IHDR"
+    0x00, 0x00, 0x00, 0x01, // width=1
+    0x00, 0x00, 0x00, 0x01, // height=1
+    0x08, 0x02, 0x00, 0x00, 0x00, // bitdepth=8, colortype=RGB
+    0x90, 0x77, 0x53, 0xde, // CRC
+    0x00, 0x00, 0x00, 0x0c, // IDAT length
+    0x49, 0x44, 0x41, 0x54, // "IDAT"
+    0x78, 0x9c, 0x63, 0xf8, 0xff, 0xff, 0x3f, 0x00, 0x05, 0xfe, 0x02, 0xfe, 0xa3, 0x35, 0x81,
+    0x84, // compressed data + CRC
+    0x00, 0x00, 0x00, 0x00, // IEND length
+    0x49, 0x45, 0x4e, 0x44, // "IEND"
+    0xae, 0x42, 0x60, 0x82, // IEND CRC
+];
+
 struct UnexpectedAssessor(Arc<AtomicUsize>);
 
 #[async_trait]
@@ -23,6 +40,56 @@ async fn real_read_tools_preserve_policy_allow_and_deny_without_assessment() {
         let root = tempfile::tempdir().expect("workspace");
         std::fs::write(root.path().join("evidence.txt"), "read-fast-path-evidence")
             .expect("fixture");
+        std::fs::write(root.path().join("changed.txt"), "changed-evidence").expect("fixture");
+        std::fs::write(
+            root.path().join("fixture.rs"),
+            "use std::path::PathBuf;\npub fn auto_fixture() -> PathBuf { PathBuf::new() }\nfn caller() { let _ = auto_fixture(); }\n",
+        ).expect("source fixture");
+        std::fs::write(root.path().join("fixture.png"), MINIMAL_PNG).expect("image fixture");
+        // Git is used only to build an isolated fixture; product reads use the actual tools.
+        for args in [
+            vec!["init", "--template=", "--initial-branch=auto-proof"],
+            vec!["add", "evidence.txt"],
+            vec![
+                "-c",
+                "user.name=Auto fixture",
+                "-c",
+                "user.email=auto@example.invalid",
+                "-c",
+                "commit.gpgSign=false",
+                "-c",
+                "maintenance.auto=false",
+                "commit",
+                "-m",
+                "auto-read-commit-evidence",
+            ],
+        ] {
+            let output = std::process::Command::new("git")
+                .env_clear()
+                .env("PATH", std::env::var_os("PATH").expect("PATH"))
+                .env("HOME", root.path())
+                .env("TEMP", root.path())
+                .env("TMP", root.path())
+                .env(
+                    "SystemRoot",
+                    std::env::var_os("SystemRoot").unwrap_or_default(),
+                )
+                .env("GIT_CONFIG_NOSYSTEM", "1")
+                .current_dir(root.path())
+                .args(args)
+                .output()
+                .expect("fixture Git");
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+        std::fs::write(
+            root.path().join("evidence.txt"),
+            "read-fast-path-evidence\nmodified",
+        )
+        .expect("modified tracked fixture");
         let tools: Vec<(Arc<dyn AgentTool>, Value)> = vec![
             (
                 Arc::new(talos_tools::file_tools::ReadTool::new(root.path().into())),
@@ -39,6 +106,72 @@ async fn real_read_tools_preserve_policy_allow_and_deny_without_assessment() {
             (
                 Arc::new(talos_tools::tree::TreeTool::new(root.path().into())),
                 serde_json::json!({"path":"."}),
+            ),
+            (
+                Arc::new(talos_tools::search_tools::GrepTool::new(root.path().into())),
+                serde_json::json!({"path":".","pattern":"read-fast-path-evidence"}),
+            ),
+            (
+                Arc::new(talos_tools::search_tools::GlobTool::new(root.path().into())),
+                serde_json::json!({"pattern":"*.txt"}),
+            ),
+            (
+                Arc::new(talos_tools::diff_stat::DiffTool::new(root.path().into())),
+                serde_json::json!({"old_path":"evidence.txt","new_path":"changed.txt"}),
+            ),
+            (
+                Arc::new(talos_tools::git::GitStatusTool::new(root.path().into())),
+                serde_json::json!({}),
+            ),
+            (
+                Arc::new(talos_tools::git::GitLogTool::new(root.path().into())),
+                serde_json::json!({}),
+            ),
+            (
+                Arc::new(talos_tools::git::GitBranchListTool::new(root.path().into())),
+                serde_json::json!({}),
+            ),
+            (
+                Arc::new(talos_tools::git::GitDiffTool::new(root.path().into())),
+                serde_json::json!({}),
+            ),
+            (
+                Arc::new(talos_tools::git::GitShowTool::new(root.path().into())),
+                serde_json::json!({"revision":"HEAD"}),
+            ),
+            (
+                Arc::new(talos_tools::document_extract::DocumentExtractTool::new(
+                    root.path().into(),
+                )),
+                serde_json::json!({"path":"evidence.txt"}),
+            ),
+            (
+                Arc::new(talos_tools::symbol::FindSymbolTool::new(root.path().into())),
+                serde_json::json!({"name":"auto_fixture","path":"."}),
+            ),
+            (
+                Arc::new(talos_tools::symbol::FindReferencesTool::new(
+                    root.path().into(),
+                )),
+                serde_json::json!({"name":"auto_fixture","file":"fixture.rs"}),
+            ),
+            (
+                Arc::new(talos_tools::symbol::ListSymbolsTool::new(
+                    root.path().into(),
+                )),
+                serde_json::json!({"path":"fixture.rs"}),
+            ),
+            (
+                Arc::new(talos_tools::symbol::ListImportsTool::new(
+                    root.path().into(),
+                )),
+                serde_json::json!({"file":"fixture.rs"}),
+            ),
+            (
+                Arc::new(talos_tools::read_image_tool::ReadImageTool::new(
+                    root.path().into(),
+                )),
+                serde_json::json!({"path":"fixture.png"}),
             ),
         ];
         for (tool, input) in tools {
@@ -89,21 +222,18 @@ async fn real_read_tools_preserve_policy_allow_and_deny_without_assessment() {
                 ],
                 text_done_events("done"),
             ];
-            let agent = Agent::with_security(
-                Arc::new(MockModel::new(responses)),
-                registry,
-                None,
-                None,
-                root.path().into(),
-            )
-            .with_permission_pipeline(
-                state.clone(),
-                talos_permission::PermissionContext::new(
-                    talos_permission::PermissionMode::Interactive,
-                    talos_permission::InteractionCapability::Available,
-                ),
-                Some(Arc::new(resolver)),
-            );
+            let (model, captured) = CapturingMockModel::new(responses);
+            let mut agent =
+                Agent::with_security(Arc::new(model), registry, None, None, root.path().into())
+                    .with_permission_pipeline(
+                        state.clone(),
+                        talos_permission::PermissionContext::new(
+                            talos_permission::PermissionMode::Interactive,
+                            talos_permission::InteractionCapability::Available,
+                        ),
+                        Some(Arc::new(resolver)),
+                    );
+            agent.set_image_input_supported(true);
             let (tx, mut rx) = mpsc::unbounded_channel();
             agent
                 .run_streaming("inspect evidence.txt".into(), vec![], tx)
@@ -116,14 +246,45 @@ async fn real_read_tools_preserve_policy_allow_and_deny_without_assessment() {
                     assert_eq!(result.is_error, denied, "{name}: {}", result.content);
                     if !denied {
                         assert!(
-                            result.content.contains(if name == "read" {
-                                "read-fast-path-evidence"
-                            } else {
-                                "evidence.txt"
+                            result.content.contains(match name.as_str() {
+                                "read" | "document_extract" => "read-fast-path-evidence",
+                                "find_symbol" | "list_symbols" => "auto_fixture",
+                                "find_references" => "fixture.rs",
+                                "list_imports" => "PathBuf",
+                                "read_image" => "fixture.png",
+                                "git_log" | "git_show" => "auto-read-commit-evidence",
+                                "git_branch_list" => "auto-proof",
+                                _ => "evidence.txt",
                             }),
                             "{name}: {}",
                             result.content
                         );
+                    }
+                }
+            }
+            if name == "read_image" {
+                let calls = captured.lock().await;
+                assert_eq!(calls.len(), 2);
+                for (index, messages) in calls.iter().enumerate() {
+                    let images: Vec<_> = messages
+                        .iter()
+                        .flat_map(|message| match message {
+                            Message::Multimodal { parts } => parts.as_slice(),
+                            _ => &[],
+                        })
+                        .filter(|part| matches!(part, ContentPart::Image { .. }))
+                        .collect();
+                    assert_eq!(images.len(), usize::from(!denied && index == 1));
+                    if let Some(ContentPart::Image {
+                        path,
+                        mime,
+                        byte_count,
+                        ..
+                    }) = images.first()
+                    {
+                        assert_eq!(path.file_name().expect("basename"), "fixture.png");
+                        assert_eq!(mime, "image/png");
+                        assert_eq!(*byte_count, MINIMAL_PNG.len() as u64);
                     }
                 }
             }
