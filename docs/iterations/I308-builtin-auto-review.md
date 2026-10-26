@@ -526,3 +526,30 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
 - This stage does not implement the file-tool producer or model assessor.
   Actual edit/delete Auto execution, stale-state/recovery integration tests,
   independent security review and final platform/CI gates remain outstanding.
+
+### Recoverable string edit producer — 2026-10-26
+
+- Added a prepared producer for legacy string edits with `retain_backup=true`.
+  Preparation performs no file read. An exact read admission captures bounded
+  complete text; a fresh plan exposes before/after evidence and requires a new
+  Read/Write admission before atomic replacement through the owning backup store.
+  The final replacement checks the captured content digest and rejects changed
+  content. Anchored edits, restore and non-backup edits retain their existing route.
+- Explicit `cargo test --locked -p talos-tools --features file-write --lib
+  file_tools::` with incremental/debug disabled passed 93/93. New tests exercise
+  real capture, first-match replacement, owning-instance restore, missing proof
+  refusal and concurrent-content preservation. Tests live in a separate file.
+- The initial default-feature check did not compile this feature-gated module;
+  its zero-test run is not evidence. Explicit feature validation exposed and
+  fixed a provenance move and incorrect test permission setup before the passing
+  run above. No default-feature success is claimed as file-write coverage.
+- Changes are local and still require source/security review, final integration
+  and platform validation. The Auto assessor is not implemented, and this does
+  not establish model-approved edit/delete execution or T8 completion.
+
+- Follow-up standalone file-write Clippy exposed that test dev-dependencies masked
+  the production optional permission dependency. `file-write` now enables the
+  existing `talos-permission` dependency directly; standalone locked Clippy with
+  `--features file-write --lib -- -D warnings` passes. The producer refuses an
+  oversized after image before allocating it; the additional test also proves
+  the file remains unchanged, and capture/commit identities differ.

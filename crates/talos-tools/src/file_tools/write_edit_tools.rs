@@ -17,6 +17,8 @@ use crate::file_tools::snapshot::{atomic_replace, digest, line_spans};
 const MAX_PREVIEW_LINES: usize = 20;
 const MAX_PREVIEW_CHARS: usize = 2_000;
 
+mod prepared_edit;
+
 /// Input parameters for the [`WriteTool`].
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct WriteInput {
@@ -235,7 +237,7 @@ pub struct EditInput {
 pub struct EditTool {
     workspace_root: PathBuf,
     snapshots: Option<FileSnapshotRegistry>,
-    recovery: super::recovery::FileRecoveryStore,
+    recovery: std::sync::Arc<super::recovery::FileRecoveryStore>,
 }
 
 impl EditTool {
@@ -592,6 +594,14 @@ struct Mutation {
 
 #[async_trait]
 impl AgentTool for EditTool {
+    fn prepare_normalized_with_provenance(
+        &self,
+        input: &Value,
+        provenance: talos_core::tool::ToolProvenance,
+    ) -> Result<Option<Box<dyn talos_core::tool::PreparedNormalToolInvocation>>, String> {
+        prepared_edit::prepare(self, input, provenance)
+    }
+
     fn name(&self) -> &str {
         "edit"
     }
