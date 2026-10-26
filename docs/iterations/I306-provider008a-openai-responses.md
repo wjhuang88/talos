@@ -292,3 +292,59 @@ Code and data publication verifies complete Git tree identity, and rewriting #74
 `5acd2161` head as a force-with-lease precondition. Its old history remains in the archive branch.
 Neither code nor data is ready for merge until fresh unfiltered CI and the owner-defined API,
 fixture and endpoint residual gates are dispositioned. No sibling or I309 implementation is claimed.
+
+### CI And Stream Lifecycle Review — 2026-10-26
+
+Published code `7fd35dcf1e66317a7523f5cfdf64168079091207` passed CI3457
+(run 40326364387); stacked catalog `bb705cc0e53ab07791581f5915a6fd3f3ce75ebf`
+passed CI3458 (run 40327420437). Each run has six successful jobs, including macOS
+standard release preflight, Windows workspace tests and Linux Desktop validation. This is
+current-source machine evidence for those exact heads; earlier local MCP/TUI failures remain
+recorded observations with no inferred root cause. A substantive correction invalidates use of
+those runs as exact-head acceptance for a new candidate.
+
+Source audit found a stream lifecycle defect: semantic completion/failure did not close the HTTP
+body reader. A server retaining the connection could keep the provider channel alive and append
+an idle timeout error after a successful terminal; a trailing malformed SSE record could similarly
+append a transport error. The correction stops transport processing at the first semantic terminal
+or decoder failure, sends that batch in order, and releases the HTTP body immediately. EOF without
+a terminal and malformed input before a terminal continue to fail.
+
+Fixture audit: the existing Responses suites use inline synthetic events/mock HTTP responses;
+there is no checked-in captured upstream Responses SSE transcript. `openai/openai-python` at
+`5d72315876ffd8b72b958623ef4db26da3fb1e61` was inspected: the live-API snapshot in
+`tests/lib/responses/test_responses.py::test_output_text` is a non-stream response, and its
+WebSocket scenario fixtures do not establish a captured SSE transcript for this acceptance row.
+No upstream capture is invented or relabeled. Existing single-call, semantic text/summary/usage,
+Unicode/CRLF/chunk/EOF property tests and mock binary rounds remain useful but do not substitute
+for recorded upstream parallel-tool/reasoning/error streams. Recorded-stream acceptance and
+independent provider/API review remain open. Distinct model-endpoint routing remains withheld,
+not implemented by catalog admission. I306/child A stay Active/Claimed and both PRs stay Draft.
+
+#### Terminal Lifecycle Validation
+
+Pinned Rust 1.99.0 and locked dependencies; four build jobs, zero debug info, incremental disabled.
+Before the production correction, the HTTP regression failed with 2 passed / 1 failed (semantic
+terminal left the channel open); the decoder regression failed with 24 passed / 1 failed (two
+outputs instead of one). With the correction, `cargo test --locked -p talos-provider` passed
+**347 tests across 15 result groups**, zero failed/ignored/filtered, including both regression
+loops' completed and failed outcomes. The strict HTTP-target Clippy check also passed.
+
+Standard `release_preflight.sh` passed static/installer checks, both governance validators, format,
+workspace check and strict workspace Clippy. Real binary `responses_agent` (1 test) and
+`responses_config` (2 tests) passed in the unfiltered workspace run. Preflight then stopped in the
+inherited MCP `git_prepared` group at **26 passed / 21 failed**, again reporting local Unix-socket
+creation denial and `Git maintenance executable differs from the bound Git binary`. No full local
+workspace/preflight pass is claimed; no native/security implementation, policy or assertion changed.
+
+Official `openai/openai-node` source was also inspected at
+`ac0867f7ecfab8afbc249b14c75d9df6f9a1d943`. Its `ResponseStream.test.ts.snap` contains SSE
+examples behind an API-snapshot helper, but the checked-in fixtures carry test IDs and do not
+establish real-call provenance for all required paths. They are not admitted as captured upstream
+acceptance evidence. No upstream code or fixture was copied.
+
+A final target refresh found `main@7ca67d9ecd2aa89ef3c66293ef4adebd01c022d0` after #767. The
+post-2789 diff changes only Search's `search_backend.rs` and `web_search.rs`, outside this slice.
+A Git merge-tree check is clean. The validation baseline remains 2789 plus this candidate; no
+validation of an integrated 7ca67d9e tree is inferred. Repeat merge-time CAS and fresh exact-head CI
+before merge.

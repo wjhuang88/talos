@@ -163,3 +163,16 @@ binary regressions and property tests are recorded in the
 Status remains Active / Claimed. Catalog regeneration, complete validation, recorded-fixture audit,
 current-head CI and independent API review remain acceptance gates. No completion or release is
 claimed; the non-exhaustive public enum must ship only in a pre-1.0 minor release.
+
+## Stream Lifecycle Follow-up — 2026-10-26
+
+Rebased code CI3457 and stacked catalog CI3458 passed all six jobs, including full macOS preflight
+and Windows workspace testing. Prior local failures remain recorded without a root-cause claim.
+Review then found that the Responses HTTP reader waited for EOF after semantic completion/failure;
+regressions reproduced the retained-connection timeout and duplicate terminal/framing error. The
+correction and exact validation are recorded in I306. New code requires fresh exact-head CI.
+
+Recorded upstream SSE capture (including parallel tools/reasoning/error paths), independent API
+review and the distinct-endpoint residual remain open. Existing inline mocks and non-stream SDK
+snapshots are not relabeled as captured upstream streams. Status stays Active / Claimed; no
+completion, merge or release is claimed.

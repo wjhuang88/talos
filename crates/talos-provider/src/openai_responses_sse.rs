@@ -53,6 +53,11 @@ impl ResponsesStreamState {
         Self::default()
     }
 
+    /// Whether a semantic terminal outcome has already been emitted.
+    pub(crate) fn is_terminal(&self) -> bool {
+        self.terminal
+    }
+
     /// Apply one decoded Responses streaming event.
     ///
     /// Unknown event types are ignored for forward compatibility. Raw reasoning-text events are

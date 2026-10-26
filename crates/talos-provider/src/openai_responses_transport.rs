@@ -32,12 +32,16 @@ impl ResponsesSseDecoder {
         }
     }
 
+    fn is_finished(&self) -> bool {
+        self.failed || self.state.is_terminal()
+    }
+
     /// Push one arbitrary transport chunk.
     ///
     /// Chunks may split UTF-8 code points, SSE lines, blank-line record delimiters, or JSON tokens.
     /// Complete SSE records are decoded immediately; an incomplete suffix is retained.
     pub(crate) fn push(&mut self, bytes: &[u8]) -> Vec<ResponsesStreamOutput> {
-        if self.failed {
+        if self.is_finished() {
             return Vec::new();
         }
         let decoded = match self.utf8.push(bytes) {
@@ -50,7 +54,7 @@ impl ResponsesSseDecoder {
 
     /// Finish decoding after transport EOF.
     pub(crate) fn finish(&mut self) -> Vec<ResponsesStreamOutput> {
-        if self.failed {
+        if self.is_finished() {
             return Vec::new();
         }
         if self.utf8.finish().is_err() {
@@ -58,7 +62,7 @@ impl ResponsesSseDecoder {
         }
 
         let mut outputs = self.drain_complete_records();
-        if self.failed {
+        if self.is_finished() {
             return outputs;
         }
 
@@ -66,7 +70,7 @@ impl ResponsesSseDecoder {
             let tail = std::mem::take(&mut self.buffer);
             outputs.extend(self.decode_record(&tail));
         }
-        if !self.failed {
+        if !self.is_finished() {
             outputs.extend(self.state.finish_eof());
         }
         outputs
@@ -78,7 +82,8 @@ impl ResponsesSseDecoder {
             let record = self.buffer[..index].to_string();
             self.buffer.drain(..index + delimiter_len);
             outputs.extend(self.decode_record(&record));
-            if self.failed {
+            if self.is_finished() {
+                self.buffer.clear();
                 break;
             }
         }
@@ -116,7 +121,7 @@ impl ResponsesSseDecoder {
     }
 
     fn fail(&mut self, message: impl Into<String>) -> Vec<ResponsesStreamOutput> {
-        if self.failed {
+        if self.is_finished() {
             return Vec::new();
         }
         self.failed = true;
@@ -175,6 +180,9 @@ pub(crate) async fn parse_response_stream(
                     if tx.send(output).await.is_err() {
                         return;
                     }
+                }
+                if decoder.is_finished() {
+                    return;
                 }
             }
             Ok(None) => {
@@ -286,6 +294,26 @@ mod tests {
             } else {
                 proptest::prop_assert!(matches!(terminal, Some(ResponsesStreamOutput::Agent(AgentEvent::Error { .. }))), "unterminated stream must fail");
             }
+        }
+    }
+
+    #[test]
+    fn semantic_terminal_discards_later_records_and_closes_decoder() {
+        for terminal in [
+            r#"{"type":"response.completed","response":{}}"#,
+            r#"{"type":"response.failed","response":{"error":{"message":"failed"}}}"#,
+        ] {
+            let mut decoder = ResponsesSseDecoder::new();
+            let outputs = agents(
+                decoder.push(format!("data: {terminal}\n\ndata: {{not-json}}\n\n").as_bytes()),
+            );
+            assert_eq!(
+                outputs.len(),
+                1,
+                "terminal must not be followed by a framing error"
+            );
+            assert!(decoder.push(b"data: {not-json}\n\n").is_empty());
+            assert!(decoder.finish().is_empty());
         }
     }
 
