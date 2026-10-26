@@ -1,3 +1,16 @@
+## Sandbox prerequisite integrated — 2026-10-26
+
+I307 protected-mount repair #762 and owner closure #763 are merged on main
+(`f643d8775`, `34af9ba9a`); Issue #757 is closed. Their exact-head CI and independent
+review passed. T7 was rebased without conflicts onto `34af9ba9a`, producing
+`c0f9a90f247272677c25caf8d373430f3acbc03b`; the prior branch is retained as
+`backup-i300-before-i307-closure-20261026`. The blocker checkpoint below is historical,
+not a current unrepaired sandbox defect. The integrated standard locked preflight passed (exit 0;
+`/private/tmp/i300-post-i307-preflight.log`), including workspace checks, Clippy,
+tests and both Runtime SDK consumers. Final platform CI, independent review,
+CAS and #735 merge remain outstanding. No T7 or T1–T8 completion
+is claimed.
+
 ## Protected mount overlap blocker — 2026-10-26
 
 CAS inspection of PR #735 found an independent concrete I307 security finding:
