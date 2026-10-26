@@ -850,3 +850,13 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
   reproduction passes; the cause remains unestablished and is not repaired by
   this image test change. Existing Windows jobs remain running. T8 remains
   Partial, with effectful invocation families and final acceptance outstanding.
+- Independent read-only Agent static review approved image commit
+  `b3b1eb28cff6788f295462ab0a97e75a8167ccf8` against
+  `824a276b748e702ae1bac7ca84401cfb356de701`, without blockers or an independent
+  test rerun. This was a same-session Agent sharing tools/GitHub identity, not
+  a separate human. Mock provider capture does not establish real provider
+  acceptance, pixel decoding or longer-history attachment lifetime.
+- Additional local investigation: locked Runtime library tests pass 72/72, and
+  the compiled conditional Checkout test passes 30/30 isolated repetitions.
+  This narrows reproduction conditions but does not explain or repair the
+  published macOS CI failure. No security revalidation was weakened.
