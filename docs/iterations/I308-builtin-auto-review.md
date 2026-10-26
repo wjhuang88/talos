@@ -14,7 +14,9 @@ I308/H/G/T8 remain Active and incomplete. Mutation #770 merged as
 `687b84a93b4a9f40ede1eb600151c0a22a8f2d59`; policy/read coverage #771 merged as
 `b21b6146c21894dc42e8fc5bf1d815af71fbc7c8` after all-six-success exact-head
 CI 40280848025, independent final-target review and merge CAS. Scheduler/read/
-Todo/recovery stage #772 remains unmerged. Ordinary effectful Execute/HTTP/WebSearch Auto, remaining registered
+Todo/recovery stage #772 merged as `881a27b890e5310055380e6e3f5b0da78f9fdd3c`
+after all-six-success exact-head CI 40296390604, independent review and merge CAS.
+Ordinary effectful Execute/HTTP/WebSearch Auto, remaining registered
 operation/profile dispositions and final delivery gates remain outstanding.
 Earlier checkpoints below preserve historical states and do not override this one.
 
@@ -37,7 +39,7 @@ Earlier checkpoints below preserve historical states and do not override this on
 | Governance Claim PR | #765 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer authorized continued full handoff delivery; #765 requires independent permission/security/API review, exact-head CI, both validators and final merge-time CAS before merge. |
-| Implementation PR | #769 (foundation, merged); #770 (file mutation, merged); #771 (policy/read tests, merged); #772 (scheduler and native operation evidence) |
+| Implementation PR | #769 (foundation, merged); #770 (file mutation, merged); #771 (policy/read tests, merged); #772 (scheduler and native operation evidence, merged) |
 | Last Updated | 2026-10-26 |
 | Handoff / Release Condition | Satisfy full H/G acceptance with existing implementation commits, independent permission/security/API review and platform evidence; no release authorized. |
 

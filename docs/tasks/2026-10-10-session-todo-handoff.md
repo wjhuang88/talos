@@ -7,8 +7,8 @@ Agent permission/security/API review and merge-time CAS. Mutation #770 is now me
 including native Windows, independent review and merge CAS. Policy/read tests #771
 merged as `b21b6146c21894dc42e8fc5bf1d815af71fbc7c8` after all-six-success CI
 40280848025 and independent final-target review/CAS. Scheduler and native-operation
-evidence #772 passed CI at its old published head, then rebased onto this main;
-the two additional recovery tests and rebased head still require fresh CI/review.
+evidence #772 merged as `881a27b890e5310055380e6e3f5b0da78f9fdd3c` after
+fresh all-six-success exact-head CI 40296390604, independent review and merge CAS.
 This is partial T8 delivery; ordinary Execute/HTTP/WebSearch Auto and the remaining
 operation/profile/platform coverage remain incomplete. T2/T3 → T4 → T5 → T1 → T6
 retain their full scope and remain incomplete.
