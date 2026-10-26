@@ -1,5 +1,21 @@
 # Iteration I308: Shared Auto Review For All Built-In Tools
 
+## Current delivery checkpoint — 2026-10-26
+
+Foundation #769 merged as `d45d08f0a82706c2abb26fcb32899f8b24fa64b1`.
+Exact head `ffa35973022c18f752cacad1922325e15c648379` passed all six jobs in
+CI 40274739232, including native Windows. Independent permission/security/API
+review and merge-time CAS are recorded in
+[#769 review receipt](https://github.com/wjhuang88/talos/pull/769#issuecomment-6409815251).
+The review was by a separate read-only Agent sharing the session/GitHub identity,
+not a separate natural person. It did not independently run tests.
+
+I308/H/G/T8 remain Active and incomplete. Mutation #770 is a separate unmerged
+stage; local policy/read coverage commits `82667ca54` and `07c005b87` are not yet
+published. Ordinary effectful Execute/HTTP/WebSearch Auto, remaining registered
+operation/profile dispositions and final delivery gates remain outstanding.
+Earlier checkpoints below preserve historical states and do not override this one.
+
 > Document status: Active (#765 merged; effective at `8f0ce2340d7728ac5b3ee8eba814050a2360e194`)
 > Published plan date: 2026-10-26
 > Planned objective: complete handoff T8 with model-assisted, invocation-local approval across registered native tools, including suitable Write, Network and Execute operations and higher-risk file changes.
@@ -19,7 +35,7 @@
 | Governance Claim PR | #765 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer authorized continued full handoff delivery; #765 requires independent permission/security/API review, exact-head CI, both validators and final merge-time CAS before merge. |
-| Implementation PR | #769 |
+| Implementation PR | #769 (foundation); #770 (stacked file mutation stage) |
 | Last Updated | 2026-10-26 |
 | Handoff / Release Condition | Satisfy full H/G acceptance with existing implementation commits, independent permission/security/API review and platform evidence; no release authorized. |
 
@@ -306,7 +322,7 @@ Runtime shared composition has a separate Product/Runtime inventory-equivalence 
 | Registered operations | Current I308 disposition / remaining evidence |
 |---|---|
 | `read`, `ls`, `read_image`, `document_extract`, `grep`, `glob`, `diff`, `stat`, `tree`, `find_symbol`, `find_references`, `list_symbols`, `list_imports` | Existing policy/read paths retained; complete per-operation Auto fallback/production evidence still required. MCP omits `read_image`. |
-| `write`, `edit`, `delete` | Existing creation path retained; opt-in edit recovery implemented locally; higher-risk effect assessment and Auto execution still incomplete. |
+| `write`, `edit`, `delete` | Exact-content atomic creation is in #769; complete-image review and opt-in real recovery for string/anchored edit and text deletion are in #770. Binary/NUL and secret-like content retain human fallback. Expanded special-path/policy tests are local; neither PR is merged and full G acceptance remains incomplete. |
 | `save_url`, `fetch_url`, `http_request`, `web_search` | Protected prepared network assessment exists; ordinary product transport Auto allowance remains unimplemented and its pending contract decision is not assumed accepted. |
 | `git_status`, `git_diff`, `git_log`, `git_show`, `git_branch_list` | Existing read policy retained; I308 complete disposition evidence outstanding. |
 | `git_add`, `git_commit`, `git_push`, `git_pull`, `git_checkout` | I300 prepared command route retained; no reopening of accepted whole-command Pull semantics. I308 full coverage evidence outstanding. |
@@ -666,3 +682,39 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
   `/private/tmp/i308-mutation-preflight-final.log`. Production source remained
   stable from `037bf5e55`; subsequent commits only record validation evidence.
   Native Windows execution, remote exact-head CI and merge CAS remain required.
+
+### File mutation policy coverage continuation — 2026-10-26
+
+- File-mutation candidate published as stacked draft #770, head `400b76a67`,
+  based on foundation #769. Both have live remote CI; neither is merged.
+- The next local test-only continuation extends real Agent dispatch for string
+  edits, anchored edits and deletions to configuration, dependency, release and
+  security paths. Complete captured images and the exact target are asserted at
+  the assessor boundary. These path fixtures prove routing, not semantic safety
+  of arbitrary configuration contents or a real provider's judgment.
+- Explicit priority Write Deny and Ask rules prevent both model review and
+  mutation, leaving file bytes intact. Secret-like original/replacement fixtures
+  also fall back before any assessor call. No persistent grants are created.
+  An initial fixture incorrectly appended Ask after the default rule; it was
+  corrected to install an effective first-match explicit rule, without changing
+  production policy ordering.
+- Locked Agent library tests pass 496/496 with the expanded scenarios, and Agent
+  library/test Clippy passes with `-D warnings`. Logs:
+  `/private/tmp/i308-mutation-policy-agent.log` and
+  `/private/tmp/i308-mutation-policy-clippy.log`. This continuation has no new
+  production code; publication review/platform gates remain outstanding. Full T8,
+  ordinary Execute/HTTP/WebSearch Auto and all later handoff items remain open.
+
+### Read policy execution continuation — 2026-10-26
+
+- Separate `tests/read_auto.rs` exercises the real Read, Ls, Stat and Tree tools
+  through production Agent dispatch with Auto enabled. Workspace-policy Allow
+  returns actual file content/metadata/listings with zero assessor calls and zero
+  persistent grants. Explicit Read Deny returns an error, also with zero assessor
+  calls. Each invocation must produce exactly one tool result.
+- This verifies four read operations, not the complete production/profile inventory.
+  The file-mutation policy tests are committed independently as `82667ca54`.
+- Locked Agent library tests pass 497/497; library/test Clippy passes with
+  `-D warnings`. Logs: `/private/tmp/i308-read-policy-agent.log` and
+  `/private/tmp/i308-read-policy-clippy.log`. No new production behavior or full
+  workspace/native Windows validation is claimed by this test-only continuation.

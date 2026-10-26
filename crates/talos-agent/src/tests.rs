@@ -1,5 +1,6 @@
 #![allow(warnings)]
 mod network_invocation;
+mod read_auto;
 mod write_auto;
 use std::path::PathBuf;
 use std::sync::Arc;
