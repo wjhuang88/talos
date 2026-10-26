@@ -964,3 +964,17 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
   job limit in post-job Rust cache saving. GitHub still reports cancelled, so
   this is not a green gate. Failed-job rerun requested after terminal evidence;
   no live job was cancelled or replaced.
+
+### Stable scheduler candidate validation — 2026-10-26
+
+- Serial sandbox-external locked `./scripts/release_preflight.sh` exited 0
+  at implementation commit `b5e8bbe98b4a4290552fec40c13273d6b9fcc831`,
+  with no source edits during the run. Workspace tests, doctests and the
+  independent external Runtime SDK fixture passed. Log:
+  `/private/tmp/i308-read-diagnostic-preflight-authorized.log`.
+- Independent read-only Agent review approved exact delta
+  `f29b4cbc76fdca9a219ae39237357a671c873d5c` to
+  `b5e8bbe98b4a4290552fec40c13273d6b9fcc831`, with no blockers.
+  The reviewer did not independently rerun tests and is not a human reviewer.
+- This local success does not repair or explain the previous macOS CI Checkout
+  drift. Fresh exact-head CI and merge gates remain mandatory; T8 remains Partial.
