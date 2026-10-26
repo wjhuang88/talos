@@ -224,12 +224,12 @@ impl SearchRouter {
                             Err(AdmissionError::Control(error)) => return Err(error),
                         },
                     }
-                    if !remaining.as_slice().is_empty() {
+                    if remaining.len() > 0 {
                         launch_next = true;
                     }
                 }
                 _ = &mut hedge,
-                    if active.len() < self.policy.max_in_flight && !remaining.as_slice().is_empty() =>
+                    if active.len() < self.policy.max_in_flight && remaining.len() > 0 =>
                 {
                     launch_next = true;
                 }
