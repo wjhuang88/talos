@@ -124,24 +124,39 @@ impl SearchBackend for CompatibilityBackend<'_> {
                     .search_wikipedia(&request.query, max_results)
                     .await
             }
-        }
-        .map_err(classify_compatibility_error)?;
+        }?;
 
         Ok(normalize_compatibility_results(self.id(), results))
     }
 }
 
-fn classify_compatibility_error(error: String) -> SearchBackendError {
-    if error == "TAVILY_API_KEY not set" || error == "SEARXNG_URL not configured" {
-        SearchBackendError::NotConfigured
-    } else if error.starts_with("failed to parse ")
-        || error.starts_with("unexpected Tavily response format:")
-        || error == "SearXNG response missing results array"
-        || error == "unexpected Wikipedia response format"
-    {
-        SearchBackendError::InvalidResponse(error)
+fn classify_http_status(status: reqwest::StatusCode) -> SearchBackendError {
+    match status {
+        reqwest::StatusCode::UNAUTHORIZED => SearchBackendError::Auth,
+        reqwest::StatusCode::TOO_MANY_REQUESTS => SearchBackendError::RateLimited,
+        _ => SearchBackendError::HttpStatus(status.as_u16()),
+    }
+}
+
+fn classify_request_error(error: reqwest::Error) -> SearchBackendError {
+    if error.is_timeout() {
+        SearchBackendError::Timeout
+    } else if error.is_connect() {
+        SearchBackendError::Unreachable
     } else {
-        SearchBackendError::RequestFailed(error)
+        SearchBackendError::RequestFailed(error.to_string())
+    }
+}
+
+fn classify_response_error(error: reqwest::Error) -> SearchBackendError {
+    if error.is_timeout() {
+        SearchBackendError::Timeout
+    } else if error.is_connect() {
+        SearchBackendError::Unreachable
+    } else if error.is_decode() {
+        SearchBackendError::Parse
+    } else {
+        SearchBackendError::RequestFailed(error.to_string())
     }
 }
 
@@ -160,13 +175,10 @@ fn normalize_compatibility_results(
         .collect()
 }
 
-fn parse_tavily(body: &Value, max_results: u32) -> Result<Vec<WebResult>, String> {
-    let results_array = body["results"].as_array().ok_or_else(|| {
-        format!(
-            "unexpected Tavily response format: {}",
-            serde_json::to_string_pretty(body).unwrap_or_default()
-        )
-    })?;
+fn parse_tavily(body: &Value, max_results: u32) -> Result<Vec<WebResult>, SearchBackendError> {
+    let results_array = body["results"]
+        .as_array()
+        .ok_or(SearchBackendError::Parse)?;
 
     let mut results = Vec::new();
     for item in results_array.iter().take(max_results as usize) {
@@ -178,16 +190,16 @@ fn parse_tavily(body: &Value, max_results: u32) -> Result<Vec<WebResult>, String
     }
 
     if results.is_empty() {
-        return Err("Tavily returned no results".to_string());
+        return Err(SearchBackendError::NoResults);
     }
 
     Ok(results)
 }
 
-fn parse_searxng(body: &Value, max_results: u32) -> Result<Vec<WebResult>, String> {
+fn parse_searxng(body: &Value, max_results: u32) -> Result<Vec<WebResult>, SearchBackendError> {
     let results_array = body["results"]
         .as_array()
-        .ok_or_else(|| "SearXNG response missing results array".to_string())?;
+        .ok_or(SearchBackendError::Parse)?;
 
     let mut results = Vec::new();
     for item in results_array.iter().take(max_results as usize) {
@@ -203,24 +215,24 @@ fn parse_searxng(body: &Value, max_results: u32) -> Result<Vec<WebResult>, Strin
     }
 
     if results.is_empty() {
-        return Err("SearXNG returned no results".to_string());
+        return Err(SearchBackendError::NoResults);
     }
 
     Ok(results)
 }
 
-fn parse_wikipedia(body: &Value, max_results: u32) -> Result<Vec<WebResult>, String> {
+fn parse_wikipedia(body: &Value, max_results: u32) -> Result<Vec<WebResult>, SearchBackendError> {
     let titles = body[1].as_array();
     let descriptions = body[2].as_array();
     let urls = body[3].as_array();
 
     let (Some(titles), Some(descriptions), Some(urls)) = (titles, descriptions, urls) else {
-        return Err("unexpected Wikipedia response format".to_string());
+        return Err(SearchBackendError::Parse);
     };
 
     let count = titles.len().min(descriptions.len()).min(urls.len());
     if count == 0 {
-        return Err("Wikipedia returned no results".to_string());
+        return Err(SearchBackendError::NoResults);
     }
 
     let mut results = Vec::new();
@@ -238,7 +250,7 @@ fn parse_wikipedia(body: &Value, max_results: u32) -> Result<Vec<WebResult>, Str
 fn convert_rust_websearch(
     results: Vec<rust_websearch::SearchResult>,
     max_results: u32,
-) -> Result<Vec<WebResult>, String> {
+) -> Result<Vec<WebResult>, SearchBackendError> {
     let converted: Vec<WebResult> = results
         .into_iter()
         .take(max_results as usize)
@@ -250,7 +262,7 @@ fn convert_rust_websearch(
         .collect();
 
     if converted.is_empty() {
-        return Err("DuckDuckGo returned no results".to_string());
+        return Err(SearchBackendError::NoResults);
     }
 
     Ok(converted)
@@ -299,10 +311,12 @@ impl WebSearchTool {
         &self,
         query: &str,
         max_results: u32,
-    ) -> Result<Vec<WebResult>, String> {
+    ) -> Result<Vec<WebResult>, SearchBackendError> {
         let results = rust_websearch::search(query, &self.duckduckgo_config)
             .await
-            .map_err(|e| format!("DuckDuckGo search failed: {e}"))?;
+            .map_err(|error| {
+                SearchBackendError::RequestFailed(format!("DuckDuckGo search failed: {error}"))
+            })?;
 
         convert_rust_websearch(results.results, max_results)
     }
@@ -313,16 +327,16 @@ impl WebSearchTool {
         query: &str,
         max_results: u32,
         _include_snippets: bool,
-    ) -> Result<Vec<WebResult>, String> {
+    ) -> Result<Vec<WebResult>, SearchBackendError> {
         let api_key = self
             .tavily_api_key
             .as_ref()
-            .ok_or_else(|| "TAVILY_API_KEY not set".to_string())?;
+            .ok_or(SearchBackendError::NotConfigured)?;
 
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(15))
             .build()
-            .map_err(|e| format!("failed to build HTTP client: {e}"))?;
+            .map_err(|error| SearchBackendError::RequestFailed(error.to_string()))?;
 
         let response = client
             .post("https://api.tavily.com/search")
@@ -338,16 +352,13 @@ impl WebSearchTool {
             }))
             .send()
             .await
-            .map_err(|e| format!("Tavily request failed: {e}"))?;
+            .map_err(classify_request_error)?;
 
         if !response.status().is_success() {
-            return Err(format!("Tavily returned status {}", response.status()));
+            return Err(classify_http_status(response.status()));
         }
 
-        let body: Value = response
-            .json()
-            .await
-            .map_err(|e| format!("failed to parse Tavily response: {e}"))?;
+        let body: Value = response.json().await.map_err(classify_response_error)?;
 
         parse_tavily(&body, max_results)
     }
@@ -357,11 +368,11 @@ impl WebSearchTool {
         &self,
         query: &str,
         max_results: u32,
-    ) -> Result<Vec<WebResult>, String> {
+    ) -> Result<Vec<WebResult>, SearchBackendError> {
         let searxng_url = self
             .searxng_url
             .as_ref()
-            .ok_or_else(|| "SEARXNG_URL not configured".to_string())?;
+            .ok_or(SearchBackendError::NotConfigured)?;
 
         let base = searxng_url.trim_end_matches('/');
         let search_url = format!("{base}/search?format=json&q={}", urlencoding(query));
@@ -369,22 +380,19 @@ impl WebSearchTool {
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(15))
             .build()
-            .map_err(|e| format!("failed to build HTTP client: {e}"))?;
+            .map_err(|error| SearchBackendError::RequestFailed(error.to_string()))?;
 
         let response = client
             .get(&search_url)
             .send()
             .await
-            .map_err(|e| format!("SearXNG request failed: {e}"))?;
+            .map_err(classify_request_error)?;
 
         if !response.status().is_success() {
-            return Err(format!("SearXNG returned status {}", response.status()));
+            return Err(classify_http_status(response.status()));
         }
 
-        let body: Value = response
-            .json()
-            .await
-            .map_err(|e| format!("failed to parse SearXNG response: {e}"))?;
+        let body: Value = response.json().await.map_err(classify_response_error)?;
 
         parse_searxng(&body, max_results)
     }
@@ -394,7 +402,7 @@ impl WebSearchTool {
         &self,
         query: &str,
         max_results: u32,
-    ) -> Result<Vec<WebResult>, String> {
+    ) -> Result<Vec<WebResult>, SearchBackendError> {
         let encoded = urlencoding(query);
         let url = format!(
             "https://en.wikipedia.org/w/api.php?action=opensearch&search={encoded}&limit={max_results}&namespace=0&format=json"
@@ -403,23 +411,20 @@ impl WebSearchTool {
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(10))
             .build()
-            .map_err(|e| format!("failed to build HTTP client: {e}"))?;
+            .map_err(|error| SearchBackendError::RequestFailed(error.to_string()))?;
 
         let response = client
             .get(&url)
             .send()
             .await
-            .map_err(|e| format!("Wikipedia request failed: {e}"))?;
+            .map_err(classify_request_error)?;
 
         if !response.status().is_success() {
-            return Err(format!("Wikipedia returned status {}", response.status()));
+            return Err(classify_http_status(response.status()));
         }
 
         // Wikipedia OpenSearch returns: [query, [titles], [descriptions], [urls]]
-        let body: Value = response
-            .json()
-            .await
-            .map_err(|e| format!("failed to parse Wikipedia response: {e}"))?;
+        let body: Value = response.json().await.map_err(classify_response_error)?;
 
         parse_wikipedia(&body, max_results)
     }
@@ -837,41 +842,45 @@ mod tests {
     }
 
     #[test]
-    fn compatibility_parser_errors_retain_legacy_message_and_class() {
+    fn compatibility_parser_and_status_failures_are_typed_before_formatting() {
         let malformed = serde_json::json!({});
         for error in [
             parse_tavily(&malformed, 10).expect_err("malformed"),
             parse_searxng(&malformed, 10).expect_err("malformed"),
             parse_wikipedia(&malformed, 10).expect_err("malformed"),
         ] {
-            assert_eq!(
-                classify_compatibility_error(error.clone()),
-                SearchBackendError::InvalidResponse(error)
-            );
+            assert_eq!(error, SearchBackendError::Parse);
         }
+
         let empty = serde_json::json!({"results": []});
         assert_eq!(
             parse_tavily(&empty, 10).expect_err("empty"),
-            "Tavily returned no results"
+            SearchBackendError::NoResults
         );
         assert_eq!(
             parse_searxng(&empty, 10).expect_err("empty"),
-            "SearXNG returned no results"
+            SearchBackendError::NoResults
         );
         assert_eq!(
             parse_wikipedia(&serde_json::json!(["q", [], [], []]), 10).expect_err("empty"),
-            "Wikipedia returned no results"
+            SearchBackendError::NoResults
         );
-        for message in ["TAVILY_API_KEY not set", "SEARXNG_URL not configured"] {
-            assert_eq!(
-                classify_compatibility_error(message.into()),
-                SearchBackendError::NotConfigured
-            );
-        }
-        let message = "Tavily request failed: not configured by upstream";
+
         assert_eq!(
-            classify_compatibility_error(message.into()),
-            SearchBackendError::RequestFailed(message.into())
+            classify_http_status(reqwest::StatusCode::UNAUTHORIZED),
+            SearchBackendError::Auth
+        );
+        assert_eq!(
+            classify_http_status(reqwest::StatusCode::TOO_MANY_REQUESTS),
+            SearchBackendError::RateLimited
+        );
+        assert_eq!(
+            classify_http_status(reqwest::StatusCode::FORBIDDEN),
+            SearchBackendError::HttpStatus(403)
+        );
+        assert_eq!(
+            classify_http_status(reqwest::StatusCode::SERVICE_UNAVAILABLE),
+            SearchBackendError::HttpStatus(503)
         );
     }
 
