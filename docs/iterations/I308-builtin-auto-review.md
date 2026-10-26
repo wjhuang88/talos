@@ -1,6 +1,6 @@
 # Iteration I308: Shared Auto Review For All Built-In Tools
 
-> Document status: Active (proposed; effective only when #765 merges)
+> Document status: Active (#765 merged; effective at `8f0ce2340d7728ac5b3ee8eba814050a2360e194`)
 > Published plan date: 2026-10-26
 > Planned objective: complete handoff T8 with model-assisted, invocation-local approval across registered native tools, including suitable Write, Network and Execute operations and higher-risk file changes.
 > Baseline rule: preserve this published target; implementation stages do not reduce acceptance.
@@ -19,7 +19,7 @@
 | Governance Claim PR | #765 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer authorized continued full handoff delivery; #765 requires independent permission/security/API review, exact-head CI, both validators and final merge-time CAS before merge. |
-| Implementation PR | Not started |
+| Implementation PR | #769 |
 | Last Updated | 2026-10-26 |
 | Handoff / Release Condition | Satisfy full H/G acceptance with existing implementation commits, independent permission/security/API review and platform evidence; no release authorized. |
 
@@ -142,3 +142,352 @@ No implementation completion evidence exists. Do not mark H, G or T8 Complete fr
 - Remaining handoff tasks and gix capability/advisory tracking retain separate owners.
 
 - 2026-10-26: #765 number backfilled; proposed Claimed/Active record and H/G owner synchronization are ineffective until main merge.
+
+### Local execution checkpoint — 2026-10-26
+
+- Activation #765 is merged; implementation branch `feat/i308-builtin-auto-review`
+  starts from `8f0ce2340d7728ac5b3ee8eba814050a2360e194`.
+- Added a compatible default `ApprovalResolver::resolve_network_invocation` entry point.
+  The pipeline now passes the retained transport manifest separately from exact execution
+  input and human presentation. Existing adapters delegate to their previous exact-input
+  resolution method. The manifest does not establish native implementation ownership.
+- Focused validation: `cargo test --locked -p talos-agent --lib
+  permission_pipeline::execution_input_tests` passed all four tests, including network
+  evidence delivery, denial without grants and legacy adapter compatibility.
+- This is unmerged admission plumbing, not model-based network allowance. Shared typed
+  assessment, complete native ownership coverage, actual Auto execution and G
+  recovery remain unimplemented; full preflight and independent review remain outstanding.
+
+- Ownership foundation: added explicit built-in instance registration, with same-name
+  ordinary replacement revoking the marker and duplicate batches remaining atomic.
+  Product-owned CLI groups and Runtime coding-preset/skill contributions now use it;
+  caller overrides and plugin registration retain ordinary APIs. Direct scheduler,
+  process and other registrations still need coverage; no complete inventory claim.
+- Core ownership tests passed 3/3. Runtime `shared-composition` locked check passed
+  with `CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0`. An earlier default-debug
+  check exhausted disk space and is not a code-validation success. Previously authorized
+  `target/debug/deps` and incremental cleanup recovered space; no source/Git data removed.
+- CLI production registry ownership assertions are in a separate test module.
+  Ownership is not yet consumed for model approval; implementing
+  the common assessment/admission route remains the next step.
+
+- CLI production registry ownership test passed (1/1) across print/TUI/MCP assemblies.
+  Formatting and both governance validators passed. Ownership foundation is recorded
+  in local implementation commit `d2d31b9b6`; it has not been pushed or independently
+  reviewed. No stage merge, full preflight, native Windows run or T8 completion claimed.
+
+- Network review implementation checkpoint: dispatch now conveys registered built-in
+  ownership with retained network evidence to a dedicated model assessment route.
+  The response must match the fresh invocation digest and closed schema; only
+  high-confidence AllowOnce can admit the request. Explicit human/Deny policy,
+  stale state, replay, provider failure and external instances remain covered by
+  focused tests. Serialization stops at 16 KiB, with an input check before cloning.
+  The initial human-policy test incorrectly appended its rule after the default
+  Ask; it now constructs an explicit-rule engine so that the intended rule matches.
+- Validation: locked `talos-agent --lib auto_resolver` tests passed 71/71;
+  log `/private/tmp/i308-auto-resolver-tests.log`. This includes encoded-size
+  boundary coverage and 15 network-admission scenarios. These are pipeline-level
+  results, not production tool execution evidence. The network changes remain
+  uncommitted; complete native registration coverage, production end-to-end
+  execution, G recovery, full preflight, Windows and independent review remain open.
+- Agent-loop dispatch test passed for five scenarios: model-approved built-in
+  executes with live network authority, external same-name registration and ordinary
+  replacement do not inherit trust, explicit Deny blocks execution, and deterministic
+  Allow executes without model assessment. This uses an offline prepared transport
+  fixture, not the WebSearch HTTP implementation. Actual product transport evidence
+  remains outstanding. Log: `/private/tmp/i308-auto-network-dispatch.log`.
+- Independent working-tree review found JSON credential fields could bypass the
+  shell-oriented secret heuristic. Added bounded structural key/value inspection
+  and consistent text scanning for intent and serialized assessment fields.
+  Six credential scenarios (keys, nested objects, arrays, prefixes, intent and
+  endpoint paths) assert zero assessor calls. Auto resolver tests remain 71/71.
+- Standard preflight initially failed in two Git process integration tests under
+  sandboxing (process observation EPERM; configured hook start timeout). Both
+  actual target tests passed outside the sandbox with `--features git` (1/1 each).
+  An earlier rerun without that feature selected zero tests and is not validation.
+  Full standard preflight is rerunning outside the sandbox; current process 64384,
+  log `/private/tmp/i308-network-stage-preflight-unsandboxed.log`. No full pass
+  or stage readiness is claimed until its terminal result is inspected.
+- Terminal validation: the sandbox-external full standard preflight exited 0,
+  including workspace check, Clippy, tests, governance and the independent Runtime
+  SDK consumer (`release preflight: passed` in the log above). Independent working-tree
+  security/API follow-up found the credential fixes resolved its blockers. This
+  is local stage evidence, not final exact-head CI/Windows evidence or T8 completion.
+  Fetch confirmed origin/main remains `8f0ce2340`; no rebase was needed.
+- Production ownership follow-up: interactive mode now explicitly registers its locally
+  constructed scheduler instances as built-ins, and MCP registers its concrete `status`
+  instance as a built-in. Generic registry builders still treat caller-supplied scheduler
+  instances as external; a regression test verifies they cannot inherit built-in ownership.
+  Locked CLI `builtin_registration_tests` passed 2/2. The earlier filter
+  `registry_builtin_tests` selected zero tests and is not evidence. These changes are
+  local and unreviewed; they do not enable default HTTP/WebSearch Auto execution or
+  implement G recovery. Complete production inventory, common admission, final platform
+  validation and independent review remain open.
+- Ordinary invocation evidence plumbing: dispatch now conveys exact arguments, complete
+  evaluated facets, implementation description and optional implementation-owned working
+  directory for explicitly registered ordinary built-ins. Prepared network, prepared Git
+  and shell routes retain precedence. The additive resolver default delegates to the
+  existing execution-context/exact-input methods; external adapters cannot construct the
+  evidence, and no ordinary-tool model AllowOnce implementation is enabled by this change.
+- Locked `talos-agent --lib permission_pipeline::execution_input_tests` passed 4/4,
+  including registered evidence delivery and legacy-adapter delegation. The Auto resolver
+  suite passed 71/71 before the private context-enum cleanup; focused input tests passed
+  again after cleanup. Independent working-tree review found no blocker in ownership,
+  routing or API compatibility; this is not final exact-head delivery approval.
+- Registration follow-up is committed locally as `06aa93f3e`; no push/merge claimed.
+  Both governance validators passed with zero warnings before the ordinary evidence
+  extension. Default HTTP/WebSearch model execution and G backup/recovery remain
+  unimplemented, so H/G/T8 remain Active and incomplete.
+
+- Latest local checks: locked agent Clippy passed with warnings denied after the context-enum cleanup; registration/input tests and independent incremental review are stage evidence only. Ordinary evidence plumbing is committed as `a44cba863`. Fetch reconfirmed unchanged main `8f0ce2340`; no rebase required.
+
+- HTTP configuration stability prerequisite: per-request timeout now uses the retained
+  client's request builder instead of constructing a client that resets redirect policy
+  and rereads proxy environment. Separate regression tests verify timeout clamping and
+  rejection of a redirect under a zero redirect budget. Locked `talos-tools --features
+  network --lib http_request::` passed 26/26. The initial no-feature invocation selected
+  zero tests and is not validation evidence; an initial regression assertion incorrectly
+  expected a 302 rather than reqwest's zero-budget redirect error and was corrected.
+  This does not implement HTTP Auto admission, G recovery or final delivery gates.
+
+- HTTP bounded-response prerequisite: response collection now stops after the configured
+  body limit plus one byte, rather than downloading the complete body before truncation.
+  Output reports a lower bound instead of claiming an unknown total. Separate transport
+  tests cover empty, exact-limit, over-limit and zero-limit bodies plus a chunked server
+  that never completes its stream. This bounds retained application body bytes, not
+  reqwest's internal per-chunk/decompression buffers. Locked `talos-tools --features
+  network --lib http_request::` passed 29/29 after adding the independent reviewer's
+  suggested incomplete-body error test. Static incremental review found no blocker;
+  both governance validators passed with zero warnings before this test-only follow-up.
+  This is not final exact-head delivery approval. HTTP Auto admission remains
+  unimplemented. A maintainer question is pending on whole-operation network review
+  versus per-destination isolation: ADR-064 does not currently authorize unknown/unbound
+  targets, while ADR-090's prepared route requires every destination to be declared.
+  No scope expansion is implemented or assumed while that decision is pending.
+
+- File recovery implementation checkpoint: `edit` now accepts opt-in `retain_backup`
+  for legacy and anchored edits and returns a real recovery ID. A separate `edit`
+  call with path/ID restores original contents through current Write authorization,
+  verifies the post-edit digest and consumes the ID on successful restoration.
+  The instance-local memory store expires entries after 15 minutes, caps originals at
+  2 MiB/file, 16 MiB total and 64 records, and refuses capacity before mutation without
+  evicting live entries. README describes actual use and limits. Mutation errors retain
+  recovery IDs; post-mutation snapshot errors explicitly report the changed state.
+- Locked file-tools tests passed 76/76 and locked file-write library Clippy passed with
+  warnings denied before the additional concurrent-restore test. Independent security/API
+  review and that final test rerun are pending. This is uncommitted implementation,
+  not complete G: no durable/delete/directory recovery, full OS identity/CAS protection
+  against external writers, higher-risk Auto admission, complete impact evidence or
+  cancellation/platform validation is claimed. H/G/T8 remain Active and incomplete.
+- Independent incremental review requested changes: recoverable and ordinary anchored
+  edits used separate locks, and a post-rename restore error omitted its potentially
+  completed effect. The working implementation now shares the registry path lock for
+  anchored edits/backups/restores and reports uncertain restore completion with retained
+  ID. Prior tests passed 77/77 including single-consumption concurrent restore; latest
+  fixes still require regression coverage for mixed edit modes and injected post-rename
+  failure plus reviewer follow-up. Do not treat the recovery stage as review-approved.
+- Recovery follow-up: locked file-tools tests passed 80/80, including injected
+  post-rename edit and restore failures, concurrent single-consumption recovery and
+  mixed recoverable/ordinary atomic writes sharing a revision lock. Independent
+  incremental security/API re-review withdrew both blockers and found no new concrete
+  blocker; it was static review, not final exact-head approval. Legacy non-backup
+  string writes retain their existing non-atomic behavior and do not join this lock.
+  Both governance validators passed before this checkpoint-only update. The stage
+  remains local; complete H/G acceptance and final platform/preflight/CI gates remain.
+
+### Production inventory checkpoint
+
+`registry_builtin_tests::product_registries_have_no_uninventoried_native_operations`
+compares the complete Print/TUI/MCP registries against an explicit inventory and checks
+instance ownership for every entry. New registrations fail this test until inventoried.
+This is a coverage assertion, never a runtime tool-name allowlist or proof of Auto support.
+Runtime shared composition has a separate Product/Runtime inventory-equivalence test.
+
+| Registered operations | Current I308 disposition / remaining evidence |
+|---|---|
+| `read`, `ls`, `read_image`, `document_extract`, `grep`, `glob`, `diff`, `stat`, `tree`, `find_symbol`, `find_references`, `list_symbols`, `list_imports` | Existing policy/read paths retained; complete per-operation Auto fallback/production evidence still required. MCP omits `read_image`. |
+| `write`, `edit`, `delete` | Existing creation path retained; opt-in edit recovery implemented locally; higher-risk effect assessment and Auto execution still incomplete. |
+| `save_url`, `fetch_url`, `http_request`, `web_search` | Protected prepared network assessment exists; ordinary product transport Auto allowance remains unimplemented and its pending contract decision is not assumed accepted. |
+| `git_status`, `git_diff`, `git_log`, `git_show`, `git_branch_list` | Existing read policy retained; I308 complete disposition evidence outstanding. |
+| `git_add`, `git_commit`, `git_push`, `git_pull`, `git_checkout` | I300 prepared command route retained; no reopening of accepted whole-command Pull semantics. I308 full coverage evidence outstanding. |
+| `bash` (Unix) / `powershell` (Windows), `exec` | Existing shell/direct-command paths retained; I308 full profile/decision evidence outstanding. |
+| `todo_create`, `todo_create_batch`, `todo_update_batch`, `todo_update_status`, `todo_update`, `todo_delete`, `todo_add_dependency`, `todo_remove_dependency`, `todo_query` | Print/TUI session-scoped registrations inventoried; mutation Auto assessment and full disposition evidence outstanding. MCP does not add Todo. |
+| `status` | MCP-only read tool; concrete built-in ownership checked. |
+| `delay`, `schedule`, `list_scheduled_tasks`, `cancel_scheduled_task` | Product-owned scheduler factory now registers actual instances as built-ins in interactive/Print/Inline/RPC/TUI; caller-supplied scheduler instances remain external. Model-assisted scheduling allowance remains unimplemented. |
+
+Inventory work found and repaired a production gap: Print/Inline/RPC/TUI previously
+constructed scheduler tools locally but passed them through generic external registration.
+The new internal factory creates and registers the instances together; it accepts no
+caller-supplied tools. Generic registry constructors preserve external ownership semantics.
+Desktop-specific extensions, conditional skills, process capabilities and complete feature/host
+coverage still require separate verification; the table does not declare acceptance 1 complete.
+
+Validation: locked CLI `builtin_registration_tests` passed 5/5, including rejection
+of external scheduler collisions without relabeling. The CLI bin suite passed
+375/375 before the final collision test was added; CLI Clippy passed with warnings
+denied. Independent incremental ownership/security review found no new concrete
+blocker and confirmed registration failure starts no scheduler actor. This is static
+incremental review, not final exact-head approval or full T8 validation.
+
+### Exact-input creation checkpoint
+
+Trusted ordinary `write` now uses an additive, default-unsupported
+`assess_builtin_invocation` assessor method. The provider receives exact bounded
+contents, complete facets, current user intent, the existing capability-bound create
+projection and a fresh nonce/digest. High-confidence matching responses return Once;
+explicit human/Deny policy and admission checks remain authoritative. Existing
+third-party assessors do not automatically acquire this capability. The complete
+encoded input is checked before cloning and the complete model payload is capped at
+16 KiB; oversized or secret-like evidence falls back to human approval. This narrows
+the model-reviewed payload relative to the legacy 64 KiB content-shape classifier.
+
+Real Agent tests use `WriteTool` and `CapStdAtomicCreateCapability`, not a logging
+tool: allow creates the exact file, while uncertainty, provider error, Auto cancellation,
+session rebinding and oversized input create no file and no persistent grant. Final
+locked Agent library tests passed 492/492 and Agent Clippy including tests passed
+with warnings denied. Independent incremental static review identified the pre-clone limit correction
+and otherwise found no concrete new blocker. This stage does not enable existing-file
+edits/deletes, expand network authorization or complete T8. Ordinary Execute and the
+remaining H/G coverage remain unimplemented.
+
+### Creation stage validation checkpoint
+
+- Local implementation `9852b65b3` adds exact-content creation assessment;
+  `75ffc8f9f` adds real Agent refusal cases for low confidence, mismatched digest,
+  wrong schema, extra response fields, malformed JSON and oversized responses.
+  All cases prove no file creation and no persistent grant; the focused test passed.
+- Independent incremental static re-review confirmed the pre-clone input limit
+  finding is resolved and found no new concrete blocker. It is not final whole-stage
+  exact-head approval, and the reviewer did not independently rerun tests.
+- Standard locked preflight at `75ffc8f9f` passed exit 0, including workspace checks,
+  Clippy, tests (Tools 951/951) and both Runtime SDK consumers. Log:
+  `/private/tmp/i308-creation-stage-preflight-authorized.log`. The preceding sandboxed
+  run failed one process-observation test with EPERM; the authorized rerun passed.
+- These commits remain local. Native Windows evidence, complete ordinary
+  Write/Network/Execute coverage, full higher-risk recovery, final review, CI and
+  merge are outstanding. This checkpoint does not complete T8 or any later task.
+
+### Recoverable deletion local checkpoint — 2026-10-26
+
+- Added optional regular-file `delete` backup/recovery without changing public
+  `DeleteInput` struct literals. Backup capture declares and checks Read in addition
+  to Write; restoration requires Write and never overwrites a recreated path.
+  Instance/path-bound, expiring receipts reuse the existing edit store limits.
+- Unix backup opening uses the existing Git integration pattern with libc
+  O_NOFOLLOW/O_NONBLOCK; Windows uses the existing windows-sys reparse-point flag
+  and rejects reparse metadata. The file-write feature now explicitly enables these
+  already-declared system dependencies; no dependency package or unsafe code added.
+- Locked file-write file-tool tests passed 86/86 and scoped tests Clippy passed with
+  warnings denied. An initial default-feature run selected zero tests and is not
+  evidence; a subsequent missing test import was fixed before the passing run.
+- Independent incremental review identified the original blocking/FIFO and symlink
+  backup-open race; the revised no-follow/nonblocking handle check closed that finding.
+  It did not grant whole-stage or merge approval. Ancestor/open-to-delete external
+  path races remain a limitation; no atomic rollback or concurrency isolation claimed.
+- README documents actual recovery limits. Auto deletion and full G coverage remain
+  unimplemented. Final full preflight, xwin/native Windows, exact-head review/CI and
+  merge remain outstanding. This local checkpoint does not complete T8.
+
+### Bounded recoverable edit follow-up — 2026-10-26
+
+- Recoverable legacy/anchored edits now declare Read alongside Write and require
+  matching resolved targets before backup capture. Original content is read through
+  the shared no-follow/nonblocking regular-file handle with a 2 MiB maximum.
+- Atomic revision validation uses the same bounded handle read and its permissions,
+  eliminating its previous full-file read. Recoverable edits reject either before
+  or after content above 2 MiB before backup insertion/mutation, so admitted backups
+  remain restorable within the bound. External concurrent path replacement is still
+  not isolated; this is not a general transactional rollback guarantee.
+- Locked file-write file-tool tests pass 90/90, including external Read/Write
+  authorization, oversized originals/replacements and enlarged revision targets.
+  Log: `/private/tmp/i308-bounded-edit-tests.log`. Final-source cargo-xwin locked
+  MSVC test-target checking passes; log:
+  `/private/tmp/i308-file-recovery-xwin-authorized.log`. This is compilation, not
+  native Windows runtime evidence. The first sandboxed xwin attempt failed cache
+  permission; the authorized rerun supplied compilation evidence.
+- Full H/G model review/execution coverage and final platform/review/CI/merge remain
+  outstanding. No Auto edit/delete allowance or T8 completion is claimed here.
+
+### Recovery stage full validation — 2026-10-26
+
+- Implementation candidate `c924a3ee6` passed the complete standard preflight:
+  `CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_DEV_DEBUG=0 ./scripts/release_preflight.sh`.
+  Authorized run exited 0; log:
+  `/private/tmp/i308-recovery-stage-preflight-authorized.log`.
+  This includes both governance validators, formatting, locked workspace check,
+  Clippy with warnings denied, workspace tests and both external Runtime SDK fixtures.
+- The preceding sandbox run exited 101 with 959 tools tests passing and one
+  process-observation EPERM in `prepared_local_push_runs_all_eight_admitted_stages`.
+  The authorized complete rerun passed; the sandbox result is not a product pass
+  and was not bypassed by excluding the test.
+- This verifies the local recovery implementation stage only. Auto edit/delete
+  review and execution, ordinary effectful Execute/Network coverage, remaining
+  host evidence, final independent review, exact-head CI and merge are outstanding.
+  T8 remains Active; no later handoff task is completed by this evidence.
+
+### Stable foundation stage submission — 2026-10-26
+
+- Stage delivery state: Review; the complete iteration remains Active and partial.
+  The candidate contains built-in ownership/registration, retained network review,
+  exact-input creation review, bounded edit/delete recovery and HTTP boundary fixes.
+  This is a stable implementation stage under the existing #765 claim, not a new
+  requirement or completion of H/G.
+- Refreshed main to `fef542c0186dc8a3413a66396d2e77d8d8eaa666` and rebased all
+  18 local commits without conflict. `git range-diff` reports every patch unchanged
+  from the previous `8f0ce2340..d56feeb3a` series. New base adds the dormant I293
+  SearchRouter core; the rebased stage requires fresh full validation and review.
+- Previous independent security/API review found no concrete blocking issue, but
+  it is not the new candidate's exact-head approval. Fresh stage CI/review and
+  merge-time CAS remain required; native Windows runtime remains outstanding.
+- Remaining implementation: higher-risk edit/delete model evidence and actual Auto
+  execution, ordinary effectful Execute/Network admission under resolved contracts,
+  complete tool/profile/host dispositions and full I308 acceptance. No later
+  handoff item is completed or waived by this submission.
+
+### 2026-10-26 Current-head validation failures and fixture isolation
+
+At `99c828313`, two authorized parallel standard preflights each failed one
+unchanged search refusal socket fixture (Tools 970 passed / 1 failed). An isolated
+workspace-feature rerun passed. A temporary test-only error-chain diagnostic in
+a complete library run captured `ConnectionReset` / errno 54 with
+`is_connect=false`; it was removed. No production classifier change or root-cause
+fix is claimed. Issue #768 owns this independent validation residual; the earlier
+I300 BrokenPipe observation and this reset must not be relabelled as typed
+ConnectionRefused or used to broaden failover.
+
+The serial standard preflight then failed earlier at this stage's new CLI
+inventory assertion: Print lacked all Todo tools. `default_sessions_dir()` depends
+on process-global home environment, and existing init-wizard tests remove HOME.
+The inventory fixture now uses the existing explicit Todo-contribution builders
+with a temporary sessions directory, preserving the full expected inventory and
+instance-ownership assertions without depending on ambient home state. Focused
+registry tests pass; full post-fix preflight, renewed exact-head review and remote
+platform evidence remain outstanding. No T8 completion or merged stage is claimed.
+
+Local logs: `/private/tmp/i308-foundation-rebased-preflight.log`,
+`/private/tmp/i308-foundation-preflight-retry.log`,
+`/private/tmp/i308-search-classification-diagnostic.log`,
+`/private/tmp/i308-foundation-preflight-serial.log`, and
+`/private/tmp/i308-registry-isolation.log`. Serial scheduling is a diagnostic and
+validation alternative, not a fix for #768 or evidence of parallel reliability.
+
+### Foundation candidate published — 2026-10-26
+
+- Source Issue #768 is the independent search-fixture validation residual discovered
+  while validating this stage. This owner retains the evidence and index mapping;
+  fixture implementation remains outside the I308 Work Slice and requires its own
+  effective ownership before changes.
+- Candidate `aed967c4322f942a239c4b12cd1ab9747203adfb` passed complete standard
+  preflight with `RUST_TEST_THREADS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0
+  CARGO_PROFILE_DEV_DEBUG=0 ./scripts/release_preflight.sh`: exit 0 and final
+  `release preflight: passed`. CLI 376/376, Tools 971/971 and both external Runtime
+  SDK fixtures passed. Log: `/private/tmp/i308-foundation-preflight-serial-fixed.log`.
+  This proves this serial execution, not parallel reliability or repair of #768.
+- Independent read-only Agent static permission/security/API review approved that
+  exact candidate without blocking findings; it did not rerun the tests and shares
+  the session's tool/GitHub identity, not a separate natural-person account.
+- Pushed the stable stage and opened Draft implementation PR #769. Remote CI is
+  running. The initial remote reconciliation failure was the missing #768 index
+  row, now synchronized here; no functional test failure is inferred from it.
+- Stage remains Review; I308/T8 remains Active / partial. Native Windows runtime,
+  final exact-head CI/review/CAS and all remaining H/G implementation are open.

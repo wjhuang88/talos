@@ -4,8 +4,56 @@ use talos_permission::PermissionEngine;
 
 struct InputResolver;
 
+// Models an existing adapter which implements only the exact-input extension.
+struct LegacyInputResolver;
+
+#[async_trait]
+impl ApprovalResolver for LegacyInputResolver {
+    async fn resolve(
+        &self,
+        request: PermissionApprovalRequest,
+        remaining: Duration,
+    ) -> Result<ApprovalChoice, ApprovalResolverError> {
+        InputResolver.resolve(request, remaining).await
+    }
+
+    async fn resolve_with_execution_input(
+        &self,
+        request: PermissionApprovalRequest,
+        input: &serde_json::Value,
+        remaining: Duration,
+        auto_allowed: bool,
+        intent: Option<&str>,
+    ) -> Result<ApprovalChoice, ApprovalResolverError> {
+        InputResolver
+            .resolve_with_execution_input(request, input, remaining, auto_allowed, intent)
+            .await
+    }
+}
+
 #[async_trait]
 impl ApprovalResolver for InputResolver {
+    async fn resolve_builtin_invocation(
+        &self,
+        request: PermissionApprovalRequest,
+        evidence: BuiltinInvocationReviewEvidence<'_>,
+        remaining: Duration,
+        auto_assessment_allowed: bool,
+        user_intent: Option<&str>,
+    ) -> Result<ApprovalChoice, ApprovalResolverError> {
+        assert_eq!(evidence.description(), "Update the current repository");
+        assert_eq!(evidence.profile().len(), 1);
+        assert_eq!(evidence.profile()[0].nature, ToolNature::Execute);
+        assert!(evidence.working_directory().is_some());
+        self.resolve_with_execution_input(
+            request,
+            evidence.input(),
+            remaining,
+            auto_assessment_allowed,
+            user_intent,
+        )
+        .await
+    }
     async fn resolve(
         &self,
         request: PermissionApprovalRequest,
@@ -37,7 +85,7 @@ impl ApprovalResolver for InputResolver {
 
 #[tokio::test]
 async fn native_and_prepared_requests_separate_execution_input_from_presentation() {
-    for prepared in [false, true] {
+    for route in ["ordinary", "prepared", "registered", "registered_legacy"] {
         let root = tempfile::tempdir().expect("workspace");
         let state = Arc::new(PermissionSessionState::new(
             PermissionEngine::with_workspace_root(root.path().to_owned()),
@@ -48,7 +96,11 @@ async fn native_and_prepared_requests_separate_execution_input_from_presentation
                 PermissionMode::Interactive,
                 InteractionCapability::Available,
             ),
-            Some(Arc::new(InputResolver)),
+            Some(if route == "registered_legacy" {
+                Arc::new(LegacyInputResolver) as Arc<dyn ApprovalResolver>
+            } else {
+                Arc::new(InputResolver)
+            }),
         );
         let input = serde_json::json!({"remote": "origin"});
         let facets = [ToolPermissionFacet::with_resource(
@@ -65,7 +117,7 @@ async fn native_and_prepared_requests_separate_execution_input_from_presentation
             summary_fields: vec!["remote".into()],
             deadline: Duration::from_secs(2),
         };
-        if prepared {
+        if route == "prepared" {
             let plan = PreparedPlanIdentity::new();
             let admitted = pipeline
                 .authorize_prepared_plan(authorization, Some("update this repository"), &plan)
@@ -76,6 +128,16 @@ async fn native_and_prepared_requests_separate_execution_input_from_presentation
             admitted
                 .consume_for_prepared(&request, &plan)
                 .expect("exact proof");
+        } else if route.starts_with("registered") {
+            pipeline
+                .authorize_registered_invocation(
+                    authorization,
+                    Some("update this repository"),
+                    Some(root.path()),
+                    "Update the current repository",
+                )
+                .await
+                .expect("builtin approval");
         } else {
             pipeline
                 .authorize_with_user_intent(authorization, Some("update this repository"))
@@ -161,4 +223,129 @@ async fn shortened_presentation_cannot_hide_oversized_write_from_auto() {
     assert!(matches!(result, Err(PermissionPipelineError::Denied(_))));
     assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 0);
     assert!(!root.path().join("new.txt").exists());
+}
+
+#[tokio::test]
+async fn network_manifest_reaches_resolver_without_replacing_exact_input() {
+    use talos_core::tool::{ToolNetworkEndpoint, ToolNetworkScope};
+
+    struct NetworkResolver(ToolNetworkManifest);
+    #[async_trait]
+    impl ApprovalResolver for NetworkResolver {
+        async fn resolve(
+            &self,
+            _: PermissionApprovalRequest,
+            _: Duration,
+        ) -> Result<ApprovalChoice, ApprovalResolverError> {
+            panic!("network evidence must reach the dedicated resolver")
+        }
+
+        async fn resolve_network_invocation(
+            &self,
+            request: PermissionApprovalRequest,
+            input: &serde_json::Value,
+            manifest: &ToolNetworkManifest,
+            _: Duration,
+            auto_allowed: bool,
+            intent: Option<&str>,
+        ) -> Result<ApprovalChoice, ApprovalResolverError> {
+            assert_eq!(manifest, &self.0);
+            assert_eq!(input["query"], "private query");
+            assert_eq!(request.arguments["query"], "<redacted>");
+            assert!(auto_allowed);
+            assert_eq!(intent, Some("search documentation"));
+            Ok(ApprovalChoice::Deny)
+        }
+    }
+
+    let endpoint =
+        ToolNetworkEndpoint::new("https", "example.com", 443, "GET", "/search").expect("endpoint");
+    let manifest = ToolNetworkManifest::new(
+        ToolNetworkScope::new(uuid::Uuid::new_v4(), 0, vec![endpoint], None, vec![], 0)
+            .expect("scope"),
+    );
+    let root = tempfile::tempdir().expect("workspace");
+    let state = Arc::new(PermissionSessionState::new(
+        PermissionEngine::with_workspace_root(root.path().to_owned()),
+    ));
+    let pipeline = PermissionPipeline::new(
+        state.clone(),
+        PermissionContext::new(
+            PermissionMode::Interactive,
+            InteractionCapability::Available,
+        ),
+        Some(Arc::new(NetworkResolver(manifest.clone()))),
+    );
+    let input = serde_json::json!({"query": "private query"});
+    let facets = [ToolPermissionFacet::with_resource(
+        ToolNature::Network,
+        "example.com",
+        ToolResourceKind::Domain,
+    )];
+    let result = pipeline
+        .authorize_network(
+            PermissionAuthorizationRequest {
+                tool_name: "web_search",
+                provenance: ToolProvenance::Native,
+                profile: &facets,
+                input: &input,
+                presentation_input: serde_json::json!({"query": "<redacted>"}),
+                summary_fields: vec![],
+                deadline: Duration::from_secs(2),
+            },
+            &manifest,
+            Some("search documentation"),
+        )
+        .await;
+    assert!(
+        matches!(result, Err(PermissionPipelineError::Denied(_))),
+        "{}",
+        result.err().map(|e| e.to_string()).unwrap_or_default()
+    );
+    assert_eq!(state.grant_count().expect("grants"), 0);
+}
+
+#[tokio::test]
+async fn legacy_resolver_preserves_exact_input_network_fallback() {
+    use talos_core::tool::{ToolNetworkEndpoint, ToolNetworkScope};
+    let endpoint =
+        ToolNetworkEndpoint::new("https", "example.com", 443, "GET", "/").expect("endpoint");
+    let manifest = ToolNetworkManifest::new(
+        ToolNetworkScope::new(uuid::Uuid::new_v4(), 0, vec![endpoint], None, vec![], 0)
+            .expect("scope"),
+    );
+    let root = tempfile::tempdir().expect("workspace");
+    let state = Arc::new(PermissionSessionState::new(
+        PermissionEngine::with_workspace_root(root.path().to_owned()),
+    ));
+    let pipeline = PermissionPipeline::new(
+        state,
+        PermissionContext::new(
+            PermissionMode::Interactive,
+            InteractionCapability::Available,
+        ),
+        Some(Arc::new(InputResolver)),
+    );
+    let input = serde_json::json!({"remote": "origin"});
+    let facets = [ToolPermissionFacet::with_resource(
+        ToolNature::Network,
+        "example.com",
+        ToolResourceKind::Domain,
+    )];
+    pipeline
+        .authorize_network(
+            PermissionAuthorizationRequest {
+                tool_name: "legacy_network",
+                provenance: ToolProvenance::Native,
+                profile: &facets,
+                input: &input,
+                presentation_input: serde_json::json!({"remote": "<redacted>"}),
+                summary_fields: vec![],
+                deadline: Duration::from_secs(2),
+            },
+            &manifest,
+            Some("update this repository"),
+        )
+        .await
+        .expect("legacy adapter still approves through its original method");
 }

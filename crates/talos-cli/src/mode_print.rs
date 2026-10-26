@@ -54,8 +54,8 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
     let prompt = resolve_prompt(cli.prompt.clone())?;
 
     let hooks = build_hook_registry(true);
-    let (sched_tools, sched_pending) = talos_agent::create_scheduler_tools();
-    let mut registry = build_print_tool_registry(sched_tools);
+    let mut registry = build_print_tool_registry(Vec::new());
+    let sched_pending = crate::registry::register_builtin_scheduler(&mut registry)?;
 
     #[cfg(debug_assertions)]
     let fixture_mode = cli.mcp_server_fixture.is_some();

@@ -9,6 +9,7 @@ use talos_core::tool::{
     ToolPermissionFacet, ToolResourceKind, ToolResult,
 };
 use talos_core::tool_parameters;
+use tokio::io::AsyncWriteExt;
 
 use super::{FileSnapshotRegistry, FileToolError, resolve_authorized_path};
 use crate::file_tools::snapshot::{atomic_replace, digest, line_spans};
@@ -117,9 +118,41 @@ impl WriteTool {
             tokio::fs::create_dir_all(parent).await?;
         }
 
-        tokio::fs::write(&path, &write_input.content).await?;
+        let mut file = tokio::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+            .await
+            .map_err(|error| {
+                if error.kind() == std::io::ErrorKind::AlreadyExists {
+                    FileToolError::FileExists(write_input.path.clone())
+                } else {
+                    FileToolError::Io(error)
+                }
+            })?;
         if let Some(registry) = &self.snapshots {
-            registry.invalidate_path(&path)?;
+            registry.invalidate_path(&path).map_err(|error| {
+                FileToolError::AtomicWriteFailed(format!(
+                    "file was created but snapshot invalidation failed: {error}"
+                ))
+            })?;
+        }
+        async {
+            file.write_all(write_input.content.as_bytes()).await?;
+            file.flush().await
+        }
+        .await
+        .map_err(|error: std::io::Error| {
+            FileToolError::AtomicWriteFailed(format!(
+                "file was created and may contain partial content: {error}"
+            ))
+        })?;
+        if let Some(registry) = &self.snapshots {
+            registry.invalidate_path(&path).map_err(|error| {
+                FileToolError::AtomicWriteFailed(format!(
+                    "file content was written but snapshot invalidation failed: {error}"
+                ))
+            })?;
         }
 
         Ok(format!(
@@ -202,6 +235,7 @@ pub struct EditInput {
 pub struct EditTool {
     workspace_root: PathBuf,
     snapshots: Option<FileSnapshotRegistry>,
+    recovery: super::recovery::FileRecoveryStore,
 }
 
 impl EditTool {
@@ -209,6 +243,7 @@ impl EditTool {
         Self {
             workspace_root,
             snapshots: None,
+            recovery: Default::default(),
         }
     }
 
@@ -221,6 +256,7 @@ impl EditTool {
         Self {
             workspace_root,
             snapshots: Some(snapshots),
+            recovery: Default::default(),
         }
     }
 
@@ -229,8 +265,64 @@ impl EditTool {
         input: Value,
         authorizations: &[ToolExecutionAuthorization],
     ) -> Result<String, FileToolError> {
+        if let Some(id) = input.get("recovery_id") {
+            let id = id
+                .as_str()
+                .filter(|id| id.len() <= 64)
+                .ok_or_else(|| FileToolError::InvalidInput("invalid recovery id".into()))?;
+            if [
+                "old_string",
+                "new_string",
+                "snapshot_id",
+                "operations",
+                "retain_backup",
+            ]
+            .iter()
+            .any(|field| input.get(field).is_some())
+            {
+                return Err(FileToolError::InvalidInput(
+                    "recovery cannot be combined with edit fields".into(),
+                ));
+            }
+            let requested = input
+                .get("path")
+                .and_then(Value::as_str)
+                .ok_or_else(|| FileToolError::InvalidInput("missing recovery path".into()))?;
+            let path = resolve_authorized_path(
+                &self.workspace_root,
+                requested,
+                "edit",
+                ToolNature::Write,
+                authorizations,
+            )?;
+            let path_lock = self
+                .snapshots
+                .as_ref()
+                .map(|registry| registry.path_lock(&path))
+                .transpose()?;
+            self.recovery.restore(&path, id, path_lock.as_deref())?;
+            if let Some(registry) = &self.snapshots {
+                registry.invalidate_path(&path).map_err(|error| {
+                    FileToolError::AtomicWriteFailed(format!(
+                        "file restored and recovery id consumed; snapshot invalidation failed: {error}"
+                    ))
+                })?;
+            }
+            return Ok(format!("restored {requested}; recovery id consumed"));
+        }
+        let retain_backup = match input.get("retain_backup") {
+            None => false,
+            Some(Value::Bool(value)) => *value,
+            _ => {
+                return Err(FileToolError::InvalidInput(
+                    "retain_backup must be a boolean".into(),
+                ));
+            }
+        };
         if input.get("snapshot_id").is_some() {
-            return self.execute_anchored(input, authorizations).await;
+            return self
+                .execute_anchored(input, authorizations, retain_backup)
+                .await;
         }
         let edit_input: EditInput = serde_json::from_value(input)
             .map_err(|e| FileToolError::InvalidInput(e.to_string()))?;
@@ -243,11 +335,27 @@ impl EditTool {
             authorizations,
         )?;
 
+        if retain_backup
+            && resolve_authorized_path(
+                &self.workspace_root,
+                &edit_input.path,
+                "edit",
+                ToolNature::Read,
+                authorizations,
+            )? != path
+        {
+            return Err(FileToolError::PathIdentityChanged);
+        }
         if !path.exists() {
             return Err(FileToolError::FileNotFound(edit_input.path));
         }
 
-        let content = tokio::fs::read_to_string(&path).await?;
+        let content = if retain_backup {
+            String::from_utf8(super::recovery::read_bounded_regular_file(&path)?.0)
+                .map_err(|_| FileToolError::BinaryFile(edit_input.path.clone()))?
+        } else {
+            tokio::fs::read_to_string(&path).await?
+        };
 
         let Some(first_match_start) = content.find(&edit_input.old_string) else {
             return Err(FileToolError::StringNotFound(edit_input.old_string));
@@ -261,13 +369,32 @@ impl EditTool {
         new_content.push_str(&edit_input.new_string);
         new_content.push_str(&content[first_match_end..]);
 
-        tokio::fs::write(&path, &new_content).await?;
+        let path_lock = self
+            .snapshots
+            .as_ref()
+            .map(|registry| registry.path_lock(&path))
+            .transpose()?;
+        let recovery = if retain_backup {
+            recovery_receipt(self.recovery.replace(
+                &path,
+                content.as_bytes(),
+                new_content.as_bytes(),
+                path_lock.as_deref(),
+            )?)
+        } else {
+            tokio::fs::write(&path, &new_content).await?;
+            String::new()
+        };
         if let Some(registry) = &self.snapshots {
-            registry.invalidate_path(&path)?;
+            registry.invalidate_path(&path).map_err(|error| {
+                FileToolError::AtomicWriteFailed(format!(
+                    "file edited{recovery}; snapshot invalidation failed: {error}"
+                ))
+            })?;
         }
 
         Ok(format!(
-            "edited {}\ndiff:\n{}",
+            "edited {}{recovery}\ndiff:\n{}",
             edit_input.path,
             bounded_replacement_diff(&edit_input.old_string, &edit_input.new_string)
         ))
@@ -277,6 +404,7 @@ impl EditTool {
         &self,
         input: Value,
         authorizations: &[ToolExecutionAuthorization],
+        retain_backup: bool,
     ) -> Result<String, FileToolError> {
         validate_anchored_field_types(&input)?;
         let anchored: AnchoredEditInput = serde_json::from_value(input)
@@ -297,11 +425,26 @@ impl EditTool {
             ToolNature::Write,
             authorizations,
         )?;
+        if retain_backup
+            && resolve_authorized_path(
+                &self.workspace_root,
+                &anchored.path,
+                "edit",
+                ToolNature::Read,
+                authorizations,
+            )? != path
+        {
+            return Err(FileToolError::PathIdentityChanged);
+        }
         if !path.exists() {
             return Err(FileToolError::FileNotFound(anchored.path));
         }
         let snapshot = registry.get(&anchored.snapshot_id, &path)?;
-        let current = tokio::fs::read(&path).await?;
+        let current = if retain_backup {
+            super::recovery::read_bounded_regular_file(&path)?.0
+        } else {
+            tokio::fs::read(&path).await?
+        };
         if digest(&current) != snapshot.file_revision {
             return Err(FileToolError::FileRevisionMismatch);
         }
@@ -335,10 +478,28 @@ impl EditTool {
             );
         }
         let path_lock = registry.path_lock(&path)?;
-        atomic_replace(&path, &updated, snapshot.file_revision, &path_lock)?;
-        registry.invalidate_path(&path)?;
-        Ok(format!("edited {}\ndiff:\n{diff}", anchored.path))
+        let recovery = if retain_backup {
+            recovery_receipt(
+                self.recovery
+                    .replace(&path, &current, &updated, Some(&path_lock))?,
+            )
+        } else {
+            atomic_replace(&path, &updated, snapshot.file_revision, &path_lock)?;
+            String::new()
+        };
+        registry.invalidate_path(&path).map_err(|error| {
+            FileToolError::AtomicWriteFailed(format!(
+                "file edited{recovery}; snapshot invalidation failed: {error}"
+            ))
+        })?;
+        Ok(format!("edited {}{recovery}\ndiff:\n{diff}", anchored.path))
     }
+}
+
+fn recovery_receipt(id: String) -> String {
+    format!(
+        "\nrecovery_id: {id}\nBackup is instance-local, expires after 15 minutes, and is lost on shutdown. Restore using edit with path and recovery_id; restoration rejects changed content."
+    )
 }
 
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
@@ -444,7 +605,7 @@ impl AgentTool for EditTool {
     }
 
     fn parameters(&self) -> Value {
-        if self.snapshots.is_some() {
+        let mut schema = if self.snapshots.is_some() {
             let legacy = tool_parameters!(EditInput);
             let mut anchored = tool_parameters!(AnchoredEditInput);
             let definitions = anchored
@@ -475,7 +636,24 @@ impl AgentTool for EditTool {
             schema
         } else {
             tool_parameters!(EditInput)
+        };
+        schema["properties"]["retain_backup"] = serde_json::json!({
+            "type": "boolean", "description": "Retain an instance-local pre-edit backup for up to 15 minutes (before and after contents each at most 2 MiB; 16 MiB and 64 backups total). Fails before mutation if capacity is unavailable."
+        });
+        schema["properties"]["recovery_id"] = serde_json::json!({
+            "type": "string", "minLength": 1, "maxLength": 64,
+            "description": "Restore a backup returned by this edit instance. Supply only path and recovery_id. Current content must match the saved post-edit digest."
+        });
+        schema["required"] = serde_json::json!(["path"]);
+        let mut modes = vec![
+            serde_json::json!({"required": ["old_string", "new_string"]}),
+            serde_json::json!({"required": ["recovery_id"]}),
+        ];
+        if self.snapshots.is_some() {
+            modes.push(serde_json::json!({"required": ["snapshot_id", "operations"]}));
         }
+        schema["anyOf"] = Value::Array(modes);
+        schema
     }
 
     async fn execute(&self, input: Value) -> ToolResult {
@@ -501,11 +679,22 @@ impl AgentTool for EditTool {
             .get("path")
             .and_then(Value::as_str)
             .map(|path| {
-                vec![ToolPermissionFacet::with_resource(
+                let mut facets = vec![ToolPermissionFacet::with_resource(
                     ToolNature::Write,
                     path,
                     ToolResourceKind::Path,
-                )]
+                )];
+                if input.get("retain_backup").and_then(Value::as_bool) == Some(true) {
+                    facets.push(
+                        ToolPermissionFacet::with_resource(
+                            ToolNature::Read,
+                            path,
+                            ToolResourceKind::Path,
+                        )
+                        .with_description("read original bytes for edit backup"),
+                    );
+                }
+                facets
             })
             .unwrap_or_else(|| vec![ToolPermissionFacet::new(ToolNature::Write)])
     }

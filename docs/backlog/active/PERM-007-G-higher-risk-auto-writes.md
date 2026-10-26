@@ -4,10 +4,19 @@
 |---|---|
 | Story ID | PERM-007-G |
 | Type | Permission / Safety Story |
-| Status | In Progress (proposed by #765; effective only on merge) |
+| Status | In Progress (#765 merged; I308 active) |
 | Source | [GitHub Issue #563](https://github.com/wjhuang88/talos/issues/563) |
-| Selected Iteration | I308 / #765, proposed activation only |
-| Collaboration Claim | Delegated to the single I308 claim in #765; ineffective until merge |
+| Selected Iteration | I308 / #765, activated at `8f0ce2340` |
+| Collaboration Claim | Delegated to the effective I308 claim in merged #765 |
+
+## Current Execution — 2026-10-26
+
+Activation #765 is merged at `8f0ce2340`. [I308](../../iterations/I308-builtin-auto-review.md)
+records local implementation and validation; full H/G acceptance remains incomplete.
+Opt-in bounded edit/delete backup/recovery is implemented locally and passed full
+workspace preflight. Higher-risk diff/impact model review and Auto execution remain
+unimplemented; backup/recovery alone does not complete this Story.
+The selection-proposal paragraphs below preserve the published baseline and are historical.
 
 Issue #563 tracks future diff-aware writes, rollback/backup gates, and impact analysis for
 higher-risk automatic permission decisions. This owner is intake-only; W0/W1 behavior remains

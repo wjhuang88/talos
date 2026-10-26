@@ -12,6 +12,8 @@ mod delete_tool;
 mod ls_tool;
 #[cfg(feature = "file-read")]
 mod read_tool;
+#[cfg(feature = "file-write")]
+mod recovery;
 #[cfg(feature = "file-read")]
 mod snapshot;
 #[cfg(feature = "file-write")]

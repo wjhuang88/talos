@@ -347,3 +347,19 @@ continue to require a human (or refuse headlessly). Independent security/API
 review, actual entrypoint success/failure tests and native Windows validation
 remain required before activation. This records implementation constraints, not
 a claim that the API or end-to-end support already exists.
+
+### I308 implementation API note — 2026-10-26
+
+The additive `ToolRegistry::register_builtin_contributions` entry point records an
+explicit composition-root ownership decision for the actual registered instances.
+Ordinary `register`/`register_contribution(s)` do not infer ownership from tool names,
+default `Native` provenance, or diagnostic sources. Unchecked same-name replacement
+clears ownership; checked duplicate batches leave it unchanged. Hosts must not use the
+built-in entry point for plugin, external MCP or custom embedder implementations.
+This marker is not an execution permission or an automatic approval: all facets still
+pass the permission pipeline and require bound evidence and admission.
+
+Existing registration APIs and struct literals remain source compatible. Product
+composition opts into the new API only for product-owned implementations/wrappers;
+external registrations retain their prior behavior. This note does not claim complete
+I308 coverage or relax the higher-risk recovery requirements.

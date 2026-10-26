@@ -1427,8 +1427,8 @@ impl RuntimeBuilder {
     /// host must observe terminal cleanup.
     pub fn build(mut self) -> RuntimeResult<RuntimeHandle> {
         let provider = self.provider.ok_or(RuntimeError::MissingProvider)?;
-        #[allow(unused_mut)]
-        let mut tools = self.tools;
+        let tools = self.tools;
+        let mut builtin_contributions = Vec::new();
         if matches!(self.preset, Some(RuntimePreset::Coding)) {
             #[cfg(feature = "shared-composition")]
             {
@@ -1438,11 +1438,10 @@ impl RuntimeBuilder {
                     .iter()
                     .map(|tool| tool.name().to_owned())
                     .collect::<HashSet<_>>();
-                tools.extend(
+                builtin_contributions.extend(
                     composition::runtime_tool_contributions(self.workspace_root.clone())
                         .into_iter()
-                        .filter(|contribution| !caller_tool_names.contains(contribution.name()))
-                        .map(|contribution| contribution.tool().clone()),
+                        .filter(|contribution| !caller_tool_names.contains(contribution.name())),
                 );
             }
             #[cfg(not(feature = "shared-composition"))]
@@ -1453,10 +1452,13 @@ impl RuntimeBuilder {
                 .iter()
                 .any(|tool| tool.name() == skill_read::SKILL_READ_TOOL_NAME)
         {
-            tools.push(Arc::new(skill_read::SkillReadTool::new(
-                std::mem::take(&mut self.skill_read_skills),
-                talos_skill::SkillReadLimits::default(),
-            )));
+            builtin_contributions.push(talos_core::tool::ToolContribution::new(
+                talos_core::tool::ToolContributionSource::new("talos-runtime:skill"),
+                Arc::new(skill_read::SkillReadTool::new(
+                    std::mem::take(&mut self.skill_read_skills),
+                    talos_skill::SkillReadLimits::default(),
+                )),
+            ));
         }
         let agent_engine = Arc::new(build_permission_engine(
             self.workspace_root.clone(),
@@ -1467,6 +1469,9 @@ impl RuntimeBuilder {
         for tool in tools {
             registry.register(tool);
         }
+        registry
+            .register_builtin_contributions(builtin_contributions)
+            .map_err(|error| RuntimeError::Agent(AgentError::ToolError(error.to_string())))?;
         let owners = registry.cleanup_receipts();
         if !owners.is_empty() {
             self.shutdown_finalizers

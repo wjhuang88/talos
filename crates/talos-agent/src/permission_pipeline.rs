@@ -99,9 +99,128 @@ pub struct PermissionAuthorizationRequest<'a> {
     pub deadline: Duration,
 }
 
+/// Retained network evidence constructed by dispatch for a registered built-in instance.
+pub struct BuiltinNetworkReviewEvidence<'a> {
+    input: &'a serde_json::Value,
+    profile: &'a [ToolPermissionFacet],
+    manifest: &'a ToolNetworkManifest,
+}
+
+impl BuiltinNetworkReviewEvidence<'_> {
+    /// Exact normalized execution input; private assessment material, not display text.
+    pub fn input(&self) -> &serde_json::Value {
+        self.input
+    }
+    /// Complete evaluated facets, all of which must be admitted together.
+    pub fn profile(&self) -> &[ToolPermissionFacet] {
+        self.profile
+    }
+    /// Retained transport-enforced network plan.
+    pub fn manifest(&self) -> &ToolNetworkManifest {
+        self.manifest
+    }
+}
+
+enum InvocationReviewSource<'a> {
+    Network(&'a ToolNetworkManifest, bool),
+    Builtin(&'a str),
+}
+
+/// Evidence constructed only by dispatch for an explicitly registered built-in.
+pub struct BuiltinInvocationReviewEvidence<'a> {
+    input: &'a serde_json::Value,
+    profile: &'a [ToolPermissionFacet],
+    description: &'a str,
+    working_directory: Option<&'a std::path::Path>,
+}
+
+impl BuiltinInvocationReviewEvidence<'_> {
+    /// Exact normalized execution arguments, never presentation projections.
+    pub fn input(&self) -> &serde_json::Value {
+        self.input
+    }
+    /// Complete permission facets evaluated atomically by the pipeline.
+    pub fn profile(&self) -> &[ToolPermissionFacet] {
+        self.profile
+    }
+    /// Description supplied by the registered implementation, not caller JSON.
+    pub fn description(&self) -> &str {
+        self.description
+    }
+    /// Implementation-supplied execution directory, when available.
+    pub fn working_directory(&self) -> Option<&std::path::Path> {
+        self.working_directory
+    }
+}
+
 /// Surface adapter that resolves an already-evaluated `Ask`.
 #[async_trait]
 pub trait ApprovalResolver: Send + Sync {
+    /// Reviews an ordinary product-owned invocation. This evidence does not assert
+    /// transport isolation or a retained execution plan. Legacy adapters preserve
+    /// their existing resolution behavior.
+    async fn resolve_builtin_invocation(
+        &self,
+        request: PermissionApprovalRequest,
+        evidence: BuiltinInvocationReviewEvidence<'_>,
+        remaining: Duration,
+        auto_assessment_allowed: bool,
+        user_intent: Option<&str>,
+    ) -> Result<ApprovalChoice, ApprovalResolverError> {
+        self.resolve_with_execution_context(
+            request,
+            evidence.input,
+            evidence.working_directory,
+            remaining,
+            auto_assessment_allowed,
+            user_intent,
+        )
+        .await
+    }
+    /// Reviews a network invocation whose implementation ownership was explicitly
+    /// registered by the product. Evidence is constructed only by the Agent pipeline.
+    async fn resolve_builtin_network(
+        &self,
+        request: PermissionApprovalRequest,
+        evidence: BuiltinNetworkReviewEvidence<'_>,
+        remaining: Duration,
+        auto_assessment_allowed: bool,
+        user_intent: Option<&str>,
+    ) -> Result<ApprovalChoice, ApprovalResolverError> {
+        self.resolve_network_invocation(
+            request,
+            evidence.input,
+            evidence.manifest,
+            remaining,
+            auto_assessment_allowed,
+            user_intent,
+        )
+        .await
+    }
+    /// Reviews the retained network plan separately from caller-controlled arguments.
+    ///
+    /// The manifest describes transport-enforced destinations, not native implementation
+    /// ownership. Implementors must establish eligibility independently and redact/bound
+    /// private input before model review. Existing adapters preserve their resolution path.
+    async fn resolve_network_invocation(
+        &self,
+        request: PermissionApprovalRequest,
+        execution_input: &serde_json::Value,
+        _manifest: &ToolNetworkManifest,
+        remaining: Duration,
+        auto_assessment_allowed: bool,
+        user_intent: Option<&str>,
+    ) -> Result<ApprovalChoice, ApprovalResolverError> {
+        self.resolve_with_execution_input(
+            request,
+            execution_input,
+            remaining,
+            auto_assessment_allowed,
+            user_intent,
+        )
+        .await
+    }
+
     /// Reviews implementation-owned command evidence. Legacy adapters retain
     /// their human resolution path and do not acquire automatic command approval.
     async fn resolve_prepared_command(
@@ -404,8 +523,25 @@ impl PermissionPipeline {
         manifest: &ToolNetworkManifest,
         user_intent: Option<&str>,
     ) -> Result<Arc<dyn ToolNetworkAuthority>, PermissionPipelineError> {
+        self.authorize_registered_network(authorization, manifest, user_intent, false)
+            .await
+    }
+
+    pub(crate) async fn authorize_registered_network(
+        &self,
+        authorization: PermissionAuthorizationRequest<'_>,
+        manifest: &ToolNetworkManifest,
+        user_intent: Option<&str>,
+        builtin: bool,
+    ) -> Result<Arc<dyn ToolNetworkAuthority>, PermissionPipelineError> {
         match self
-            .authorize_inner(authorization, user_intent, None, None, Some(manifest))
+            .authorize_inner(
+                authorization,
+                user_intent,
+                None,
+                None,
+                Some(InvocationReviewSource::Network(manifest, builtin)),
+            )
             .await?
         {
             PermissionAdmission::Network(authority) => Ok(authority),
@@ -413,6 +549,24 @@ impl PermissionPipeline {
                 "network admission unavailable".into(),
             )),
         }
+    }
+
+    pub(crate) async fn authorize_registered_invocation(
+        &self,
+        authorization: PermissionAuthorizationRequest<'_>,
+        user_intent: Option<&str>,
+        working_directory: Option<&std::path::Path>,
+        description: &str,
+    ) -> Result<Vec<ToolExecutionAuthorization>, PermissionPipelineError> {
+        self.authorize_inner(
+            authorization,
+            user_intent,
+            working_directory,
+            None,
+            Some(InvocationReviewSource::Builtin(description)),
+        )
+        .await?
+        .into_paths()
     }
 
     async fn authorize_inner(
@@ -424,8 +578,16 @@ impl PermissionPipeline {
             &talos_core::tool::PreparedPlanIdentity,
             Option<&talos_core::tool::PreparedCommandEvidence>,
         )>,
-        network_manifest: Option<&ToolNetworkManifest>,
+        review_source: Option<InvocationReviewSource<'_>>,
     ) -> Result<PermissionAdmission, PermissionPipelineError> {
+        let (network_context, builtin_description) = match review_source {
+            Some(InvocationReviewSource::Network(manifest, builtin)) => {
+                (Some((manifest, builtin)), None)
+            }
+            Some(InvocationReviewSource::Builtin(description)) => (None, Some(description)),
+            None => (None, None),
+        };
+        let network_manifest = network_context.map(|(manifest, _)| manifest);
         let PermissionAuthorizationRequest {
             tool_name,
             provenance,
@@ -492,6 +654,43 @@ impl PermissionPipeline {
                     std::panic::AssertUnwindSafe(resolver.resolve_prepared_command(
                         approval,
                         evidence,
+                        remaining,
+                        auto_assessment_allowed,
+                        user_intent,
+                    ))
+                    .catch_unwind()
+                } else if let Some((manifest, true)) = network_context {
+                    std::panic::AssertUnwindSafe(resolver.resolve_builtin_network(
+                        approval,
+                        BuiltinNetworkReviewEvidence {
+                            input,
+                            profile,
+                            manifest,
+                        },
+                        remaining,
+                        auto_assessment_allowed,
+                        user_intent,
+                    ))
+                    .catch_unwind()
+                } else if let Some(manifest) = network_manifest {
+                    std::panic::AssertUnwindSafe(resolver.resolve_network_invocation(
+                        approval,
+                        input,
+                        manifest,
+                        remaining,
+                        auto_assessment_allowed,
+                        user_intent,
+                    ))
+                    .catch_unwind()
+                } else if let Some(description) = builtin_description {
+                    std::panic::AssertUnwindSafe(resolver.resolve_builtin_invocation(
+                        approval,
+                        BuiltinInvocationReviewEvidence {
+                            input,
+                            profile,
+                            description,
+                            working_directory,
+                        },
                         remaining,
                         auto_assessment_allowed,
                         user_intent,

@@ -1,16 +1,17 @@
-## Proposed T8 selection — 2026-10-26
+## Active T8 implementation — 2026-10-26
 
-[I308](I308-builtin-auto-review.md) proposes full PERM-007-H/G Auto coverage in #765.
-Claimed/Active values are ineffective until the reviewed, validated governance record merges.
-Implementation must start from that merge or later main. T7 is Complete; later handoff tasks remain incomplete.
+[I308](I308-builtin-auto-review.md) is Active after #765 merged at `8f0ce2340`.
+Local ownership and evidence stages are implemented; full H/G Auto behavior remains incomplete.
+Default network admission, higher-risk recovery and final delivery gates remain open.
+T7 is Complete; later handoff tasks remain incomplete.
 
 ## Current I300/T7 closure — 2026-10-26
 
 [I300](I300-structured-git-repair.md) is Complete / Closed at #735 (`ee84889fd`).
 Owner records existing Completion Commit, all-success exact-head CI 40251434249,
 full locked preflight and independent security/API review. Earlier I300 Active or
-pending integration checkpoints below are historical. PERM-007-H/T8 remains
-Refinement / Unclaimed; all later handoff tasks remain incomplete.
+pending integration checkpoints below are historical. PERM-007-H/G is Active in I308;
+all later handoff tasks remain incomplete.
 
 # Iterations
 

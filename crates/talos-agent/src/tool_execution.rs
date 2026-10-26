@@ -762,7 +762,12 @@ impl Agent {
                 };
                 let authorization = if let Some(network) = prepared_network.as_ref() {
                     pipeline
-                        .authorize_network(authorization_request, network.manifest(), user_intent)
+                        .authorize_registered_network(
+                            authorization_request,
+                            network.manifest(),
+                            user_intent,
+                            registry.is_builtin_instance(&call.name),
+                        )
                         .await
                         .map(|authority| {
                             network_authority = Some(authority);
@@ -797,6 +802,15 @@ impl Agent {
                             authorization_request,
                             user_intent,
                             Some(working_directory),
+                        )
+                        .await
+                } else if registry.is_builtin_instance(&call.name) {
+                    pipeline
+                        .authorize_registered_invocation(
+                            authorization_request,
+                            user_intent,
+                            working_directory.as_deref(),
+                            tool.description(),
                         )
                         .await
                 } else {

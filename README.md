@@ -312,6 +312,14 @@ their existing fail-closed behavior for unresolved `Ask` decisions; enabling `au
 not silently grant those surfaces model authority. Disabling auto always returns an interactive
 surface to human approval and a headless surface to denial.
 
+Product-owned new-file `write` requests now send the exact bounded contents and current
+user intent to a separate tool-free Auto review. The existing direct-workspace-child,
+text-file and atomic-create capability restrictions remain. The complete review payload
+must fit 16 KiB; secret-like or oversized input requires human approval. A matching
+high-confidence decision permits that invocation once. Custom assessors must implement
+`assess_builtin_invocation` to support this path; the default is unsupported. This does
+not enable Auto approval of existing-file edits or deletes.
+
 ## Development
 
 ### Build From Source
@@ -714,6 +722,10 @@ Talos ships with built-in tools for common coding-agent work:
 - Code intelligence: `find_symbol`, `find_references`, `list_symbols`, `list_imports`
 - Git: `git_status`, `git_diff`, `git_log`, `git_show`, `git_branch_list`, `git_add`, `git_commit`, `git_push`, `git_pull`, `git_checkout`
 - Network: `fetch_url` (bounded URL context — public pages, HTML extraction, JSON), `http_request` (advanced HTTP/API inspection — custom methods/headers/bodies, disclosed on demand via continuation), `save_url` (download URL to local file — dual network+write permission), `web_search` (DuckDuckGo + Tavily + SearXNG + Wikipedia)
+
+`http_request` stops reading the response once its body limit is exceeded (64 KiB
+by default). Truncated responses report a lower bound on the received size;
+the remaining body is not downloaded to calculate a total.
 - Document extraction: `document_extract` (read-only bounded text extraction from local text/HTML/JSON/CSV/Markdown/XML files)
 - Image reading: `read_image` (model-invoked image read for vision-capable models; validates PNG/JPEG/GIF/WebP through shared ingestion; exact-path authorization; returns a safe summary and a one-shot provider continuation artifact per ADR-051; only presented when the active model's catalog metadata confirms `image_input = true`)
 - Process execution: `exec` (argv-only single process, no shell parsing), plus the
@@ -737,6 +749,27 @@ are transient model coordination data: they are omitted from hooks, approval pre
 history, exports, transcripts, and TLOG. Display/history retain ordinary sanitized file content; a
 resumed or rebuilt Runtime must read the file again, and every write still passes the current
 permission policy.
+
+For an existing-file edit, add `"retain_backup": true` to retain the original contents.
+The result returns a `recovery_id`; restore with
+`{"path":"src/example.rs","recovery_id":"<returned-id>"}` through the same `edit`
+tool instance and current Write permission. Restoration refuses a different path or
+contents changed since the edit and consumes the ID after success. Backups expire after
+15 minutes, disappear on tool/runtime replacement or shutdown, and are limited to 2 MiB
+per file (both before and after an edit), 16 MiB and 64 records per instance.
+Backup capture also requires Read permission. A full store refuses the edit before mutation.
+This restores file contents only, not historical metadata, deleted files or directories;
+it is not durable recovery or protection against concurrent external writers.
+
+For a single regular-file deletion, `delete` also accepts `"retain_backup": true`.
+It requires Read permission for backup capture as well as Write permission for deletion.
+Use the returned ID with `{"path":"file.txt","recovery_id":"<returned-id>"}` on the
+same `delete` instance to restore under current Write permission. Restoration creates the
+file exclusively and refuses to overwrite any recreated file or link. The same memory,
+size and expiry limits apply; directories cannot be backed up. This restores bytes and
+basic permissions, not ownership, ACLs or timestamps. Failures can leave a partially
+restored file; inspect the reported effect before retrying. It does not provide isolation
+from concurrent external path replacement or make destructive operations Auto-eligible.
 
 File tools remain workspace-confined by default. When an interactive permission-aware mode requests
 an external path, Talos asks the operator; approval carries only the selected tool operation and
