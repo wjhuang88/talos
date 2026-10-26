@@ -1,3 +1,64 @@
+## T7 delivery closure — 2026-10-26
+
+I300/T7 is **Complete / Closed**. PR [#735](https://github.com/wjhuang88/talos/pull/735)
+merged as `ee84889fd19c590fdcc125cb971143dffd3cfb94` after all six exact-head CI jobs,
+independent Agent security/API approval and merge-time CAS passed.
+Completion Commit: ee84889fd19c590fdcc125cb971143dffd3cfb94
+
+This is the authoritative current state; dated checkpoints below preserve execution
+history and their pending/blocker statements do not override this closure.
+The published baseline and original acceptance remain unchanged.
+
+### Final acceptance evidence
+
+- Candidate `65b78ecaa01f6a81f4022a42df0b9cbcc00595ba`, base
+  `34af9ba9a4ded3a9950d563a60e2ce74c1e5bb75`: CI
+  [40251434249](https://github.com/wjhuang88/talos/actions/runs/40251434249)
+  terminal success across all six jobs, including macOS full validation, native
+  Windows workspace and Linux Bubblewrap/Desktop validation.
+- Standard locked local preflight exited 0: workspace check, Clippy, tests,
+  Tools 934/934 and both external Runtime SDK consumers; log
+  `/private/tmp/i300-post-i307-preflight.log`. Native Windows Tools passed
+  891/891; platform-specific test counts are not interchangeable.
+- Original production admission characterization and cause, literal Add paths,
+  metadata/configuration resources, same-family Commit/Checkout/Push/Pull,
+  stale/exchanged/one-use authority and full ADR-089 diff assertions are mapped
+  in the final-candidate audit below. That audit's final-head validation gates
+  are now satisfied by this run; it is not an exhaustive entrypoint matrix.
+- Final Windows log `/private/tmp/i300-65b-windows-native.log`: MCP
+  `git_prepared` 30/30 includes configured real Push success/replay and Network
+  denial; `git_pull_prepared` 3/3 proves real fetch and EOF/read-error cleanup;
+  Runtime `i300_native_pull` 3/3 covers Auto/human fallback/explicit policy,
+  initialized recursion and cancellation with retained completed effects.
+- Original two-document approved/discovery-denied/mutation-denied Agent cases
+  preserve unrelated index/worktree bytes. Publication
+  `e58e26783e2f48416b871a394b17ac79b642bb1f` already contains exactly those two
+  documents and is on main; no duplicate publication was needed.
+- Independent review APPROVE binds the exact candidate and base: PR comments
+  [6405833104](https://github.com/wjhuang88/talos/pull/735#issuecomment-6405833104)
+  and [6406106008](https://github.com/wjhuang88/talos/pull/735#issuecomment-6406106008).
+  Shared GitHub identity represents independent Agent review, not a separate human.
+  Final validation receipt is comment 6406275431. Final CAS confirmed unchanged
+  main/head, effective #755 claim/actor/slice, no overlapping PR or unresolved thread.
+- I307 prerequisite #762/#763 is merged and closed; its former blocker is resolved.
+
+### Delivered boundaries and remaining ownership
+
+Pull uses separately approved bounded configuration discovery, then one frozen
+whole-command authorization with transitive effects, preserving explicit Deny
+and human-only policy. It does not promise per-path/endpoint confinement. Conflicts
+and interruptions can retain completed effects; there is no automatic reset/retry.
+Configured Windows git:// Push passes; the accepted default-sideband host Git
+limitation remains, and Talos does not inject an override. Add/Commit/nonrecursive
+Checkout/limited Push retain their documented supported boundaries. Review is
+not formal parser verification; canonicalization-to-spawn TOCTOU is not claimed
+eliminated. Cross-entry coverage limits remain disclosed in the migration inventory.
+
+T8 all-built-in Auto remains PERM-007-H Refinement / Unclaimed, with PERM-007-G/#563
+reconciliation required before activation. T2/T3, T4, T5, T1 and T6 remain incomplete
+in the session handoff. Advanced GIT-001 P3 work and gix replacement/applicability
+tracking remain with GIT-001; none is silently closed by T7.
+
 ## Sandbox prerequisite integrated — 2026-10-26
 
 I307 protected-mount repair #762 and owner closure #763 are merged on main
@@ -2627,7 +2688,7 @@ Reviewed Pull graph checkpoint (2026-10-14): independent git_plan_review found n
 
 Pull replacement-symbolic correction (2026-10-14): early sparse ls-tree now requires the complete refs subtree in both metadata roots and current exact Read tokens, because replacement symbolic refs can target deep branch refs. Move the already-admitted inventory advance before readiness evaluation; unchanged six-stage sparse reservation test passes (78384). Added deep symbolic-target frontier regression (40928); focused log confirms pass. Broader Pull regression running in /private/tmp/i300-full-refs-pull.log. Standard preflight 48514 ended exit 1: workspace tests passed, external SDK fixture failed stale locked gix-hash SHA-256 dependency. Updated fixture lock offline without version upgrades; SDK validation retry 97926 remains running at /private/tmp/i300-sdk-lock-repair.log. No full preflight success or production Pull completion claimed. Pending Pull metadata decision unchanged.
 
-> Document status: Active
+> Document status: Complete
 > Published plan date: 2026-10-11
 > Planned objective: deliver the complete T7 structured Git repair from the session handoff.
 > MVP deliverable: approved literal two-file staging through real Agent admission and faithful staged/unstaged built-in diffs.
@@ -2672,7 +2733,7 @@ Execution checkpoint (2026-10-14): Pull prefetch retains admitted tracked-source
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | T7 structured Git typed effect resources, same-family scope defects and staged/unstaged diff fidelity; shared Auto prepared-command admission required for native Pull activation, with associated tests and documentation. Other built-in Auto coverage remains PERM-007-H. |
@@ -2681,8 +2742,8 @@ Execution checkpoint (2026-10-14): Pull prefetch retains admitted tracked-source
 | Governance Claim PR | #755 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer authorized serial implementation and gated merges, accepted ADR-089, and permitted non-overlap with I293/I294. No separate maintainer reviewer is available; independent Agent security/API review, exact-head CI, validators and CAS are required. |
-| Implementation PR | #735 (Draft; T7 incomplete) |
-| Last Updated | 2026-10-23 |
+| Implementation PR | #735 merged as `ee84889fd19c590fdcc125cb971143dffd3cfb94` |
+| Last Updated | 2026-10-26 |
 | Handoff / Release Condition | No implementation before accepted contract and target-branch claim. |
 
 ## Published Baseline

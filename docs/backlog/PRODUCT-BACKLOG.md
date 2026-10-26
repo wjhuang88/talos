@@ -11,14 +11,15 @@ That snapshot is historical evidence, not current activation authority.
 
 [SANDBOX-001](active/SANDBOX-001-bubblewrap-workspace-visibility.md) / #757 is
 Complete in I307 at #762 (`f643d8775`), including protected-root/alias isolation.
-Exact-head platform CI and independent security review passed. T7 remains open
-for integration and its own final validation.
+Exact-head platform CI and independent security review passed. T7 is Complete / Closed
+at #735 (`ee84889fd`); its final platform CI and review passed.
 
 2026-10-11 session-handoff addition: [PERM-007-H](active/PERM-007-H-all-builtin-auto-review.md)
 will extend Auto review to all built-in tools after I300 Git repair. Refinement /
 Unclaimed; reconcile higher-risk PERM-007-G/#563 policy before implementation.
 ADR-089 and its API amendment are accepted; #704 merged as `55fef9f9` and
-I300's claim is effective on main. Its implementation is still incomplete.
+I300 is Complete / Closed; implementation #735 merged as `ee84889fd`, with completion
+evidence in its owner.
 PERM-007-H remains Unclaimed and requires a separate iteration.
 
 Current cycle selected 2026-09-21: [I281](../iterations/I281-auto-shell-review-and-windows-timing.md)

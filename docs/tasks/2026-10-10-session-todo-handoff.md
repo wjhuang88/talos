@@ -1,3 +1,15 @@
+## T7 merged and closed — 2026-10-26
+
+T7/I300 is Complete / Closed at #735, merge `ee84889fd19c590fdcc125cb971143dffd3cfb94`.
+Completion Commit: ee84889fd19c590fdcc125cb971143dffd3cfb94
+
+The [I300 owner](../iterations/I300-structured-git-repair.md) records original
+acceptance, final all-success CI 40251434249, full locked preflight, independent
+exact-head/base review and CAS. I307's blocker is resolved. Earlier dated
+checkpoints below are historical and do not override this current state.
+The full objective remains incomplete: next is T8, then T2/T3 → T4 → T5 → T1 → T6.
+No later item is activated or waived by T7 completion.
+
 ## Sandbox prerequisite integrated — 2026-10-26
 
 I307 protected-mount repair #762 and owner closure #763 are merged on main
@@ -3338,7 +3350,7 @@ Synchronize product owners before derived Backlog, Board and iteration indexes.
 | Item | Current execution state | Required closure evidence |
 |---|---|---|
 | C0 preserved TUI/process candidate | Complete; I299 owner closed | #701 merge `69092675`; full preflight, all native observations, exact-head CI/review and CAS recorded in I299 |
-| T7 structured Git resources/diff | [I300](../iterations/I300-structured-git-repair.md) Active / Claimed after #704 merged as `55fef9f9`; ADR-089 and API amendment accepted | Real-wrapper reproduction, cause, approved/denied/escape tests, diff fidelity, protected-boundary review and delivered repair |
+| T7 structured Git resources/diff | [I300](../iterations/I300-structured-git-repair.md) Complete / Closed; #735 merged as `ee84889fd19c590fdcc125cb971143dffd3cfb94` | Real-wrapper reproduction, cause, approved/denied/escape tests, diff fidelity, protected-boundary review and delivered repair |
 | T8 all-built-in Auto approval (accepted 2026-10-11) | [PERM-007-H](../backlog/active/PERM-007-H-all-builtin-auto-review.md) Refinement / Unclaimed; immediately after T7 | Complete registered native-tool inventory, shared effect-aware model review, real admission/execution tests, policy reconciliation, visible decisions, independent security review and merged evidence |
 | T2/T3 MODEL-014 | Unactivated; consolidated implementation/test slice | Accepted authority/schema decisions, inference/override/variant/adapter tests, walkthrough, docs and merged evidence |
 | T4 compaction policy/controls | Unactivated | Whole-request policy, safe summary replacement, failure/cancellation tests, observable status, runnable manual command and integrated evidence |

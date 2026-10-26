@@ -1,3 +1,11 @@
+## Current I300/T7 closure — 2026-10-26
+
+[I300](I300-structured-git-repair.md) is Complete / Closed at #735 (`ee84889fd`).
+Owner records existing Completion Commit, all-success exact-head CI 40251434249,
+full locked preflight and independent security/API review. Earlier I300 Active or
+pending integration checkpoints below are historical. PERM-007-H/T8 remains
+Refinement / Unclaimed; all later handoff tasks remain incomplete.
+
 # Iterations
 
 [I307](I307-bubblewrap-workspace-visibility.md) is Complete for #757 at #762
