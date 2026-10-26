@@ -80,6 +80,7 @@
 | [#719](https://github.com/wjhuang88/talos/issues/719) | Embedded Skill Level 1/2 progressive disclosure | [SKILL-006](../backlog/active/SKILL-006-embedded-skill-progressive-disclosure.md) | Complete / Closed | #721 merged as 6d72975e; closeout records Completion Commit. |
 | [#724](https://github.com/wjhuang88/talos/issues/724) | Complete wire-protocol family coverage (Responses, Gemini, Azure, Bedrock) | [PROVIDER-008](../backlog/active/PROVIDER-008-openai-responses-api-support.md) | Refinement / Unclaimed | Parent epic remains unclaimed; child A/#748 is proposed separately in governance PR #747. |
 | [#748](https://github.com/wjhuang88/talos/issues/748) | Protocol architecture + OpenAI Responses adapter | [PROVIDER-008-A](../backlog/active/PROVIDER-008-A-openai-responses-protocol.md) | Active / Claimed (proposed; ineffective until #747 merges) | Child A of #724; governance-only #747 establishes the claim/activation. Production implementation starts only after that merge. |
+| [#768](https://github.com/wjhuang88/talos/issues/768) | macOS parallel search refusal fixture validation residual | [I308](../iterations/I308-builtin-auto-review.md) | Open / validation residual | Discovered during I308 validation; two parallel preflights failed, serial standard preflight passed. Root cause and fixture repair remain open; no search transport ownership or policy change is authorized. |
 
 ## Synchronization Notes
 

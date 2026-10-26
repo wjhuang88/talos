@@ -19,7 +19,7 @@
 | Governance Claim PR | #765 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer authorized continued full handoff delivery; #765 requires independent permission/security/API review, exact-head CI, both validators and final merge-time CAS before merge. |
-| Implementation PR | Not started |
+| Implementation PR | #769 |
 | Last Updated | 2026-10-26 |
 | Handoff / Release Condition | Satisfy full H/G acceptance with existing implementation commits, independent permission/security/API review and platform evidence; no release authorized. |
 
@@ -470,3 +470,24 @@ Local logs: `/private/tmp/i308-foundation-rebased-preflight.log`,
 `/private/tmp/i308-foundation-preflight-serial.log`, and
 `/private/tmp/i308-registry-isolation.log`. Serial scheduling is a diagnostic and
 validation alternative, not a fix for #768 or evidence of parallel reliability.
+
+### Foundation candidate published — 2026-10-26
+
+- Source Issue #768 is the independent search-fixture validation residual discovered
+  while validating this stage. This owner retains the evidence and index mapping;
+  fixture implementation remains outside the I308 Work Slice and requires its own
+  effective ownership before changes.
+- Candidate `aed967c4322f942a239c4b12cd1ab9747203adfb` passed complete standard
+  preflight with `RUST_TEST_THREADS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0
+  CARGO_PROFILE_DEV_DEBUG=0 ./scripts/release_preflight.sh`: exit 0 and final
+  `release preflight: passed`. CLI 376/376, Tools 971/971 and both external Runtime
+  SDK fixtures passed. Log: `/private/tmp/i308-foundation-preflight-serial-fixed.log`.
+  This proves this serial execution, not parallel reliability or repair of #768.
+- Independent read-only Agent static permission/security/API review approved that
+  exact candidate without blocking findings; it did not rerun the tests and shares
+  the session's tool/GitHub identity, not a separate natural-person account.
+- Pushed the stable stage and opened Draft implementation PR #769. Remote CI is
+  running. The initial remote reconciliation failure was the missing #768 index
+  row, now synchronized here; no functional test failure is inferred from it.
+- Stage remains Review; I308/T8 remains Active / partial. Native Windows runtime,
+  final exact-head CI/review/CAS and all remaining H/G implementation are open.
