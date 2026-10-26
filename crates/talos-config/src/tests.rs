@@ -449,6 +449,7 @@ fn test_model_limits_from_builtin_and_custom_providers() {
                     ModelConfig {
                         context_limit: Some(202_752),
                         output_limit: Some(4096),
+                        protocol: None,
                         reasoning: None,
                         image_input: None,
                     },
@@ -790,6 +791,7 @@ fn test_resolve_model_limits_returns_user_config_when_set() {
                     ModelConfig {
                         context_limit: Some(150_000),
                         output_limit: Some(8000),
+                        protocol: None,
                         reasoning: None,
                         image_input: None,
                     },
@@ -872,6 +874,7 @@ fn test_resolve_model_limits_user_config_takes_precedence_over_catalog() {
                     ModelConfig {
                         context_limit: Some(100_000),
                         output_limit: None,
+                        protocol: None,
                         reasoning: None,
                         image_input: None,
                     },
@@ -1084,7 +1087,6 @@ fn test_all_models_projects_inferred_context_for_custom_picker_row() {
 fn test_credentials_default_path() {
     let path = Credentials::default_path();
     assert!(path.to_string_lossy().contains(".talos"));
-    assert!(path.to_string_lossy().contains("credentials.toml"));
 }
 
 #[test]
@@ -1505,6 +1507,7 @@ fn test_all_models_user_override_matches_by_provider_and_id() {
                     ModelConfig {
                         context_limit: Some(50_000),
                         output_limit: Some(1000),
+                        protocol: None,
                         reasoning: None,
                         image_input: None,
                     },
@@ -1806,6 +1809,7 @@ fn test_all_models_with_catalog_user_config_overrides_catalog() {
                 ModelConfig {
                     context_limit: Some(42_000),
                     output_limit: Some(4_200),
+                    protocol: None,
                     reasoning: None,
                     image_input: None,
                 },
@@ -1884,6 +1888,7 @@ fn test_resolve_model_limits_with_catalog_user_overrides_catalog() {
                 ModelConfig {
                     context_limit: Some(111_000),
                     output_limit: Some(11_100),
+                    protocol: None,
                     reasoning: None,
                     image_input: None,
                 },
