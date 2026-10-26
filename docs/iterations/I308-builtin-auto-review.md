@@ -223,3 +223,18 @@ No implementation completion evidence exists. Do not mark H, G or T8 Complete fr
   local and unreviewed; they do not enable default HTTP/WebSearch Auto execution or
   implement G recovery. Complete production inventory, common admission, final platform
   validation and independent review remain open.
+- Ordinary invocation evidence plumbing: dispatch now conveys exact arguments, complete
+  evaluated facets, implementation description and optional implementation-owned working
+  directory for explicitly registered ordinary built-ins. Prepared network, prepared Git
+  and shell routes retain precedence. The additive resolver default delegates to the
+  existing execution-context/exact-input methods; external adapters cannot construct the
+  evidence, and no ordinary-tool model AllowOnce implementation is enabled by this change.
+- Locked `talos-agent --lib permission_pipeline::execution_input_tests` passed 4/4,
+  including registered evidence delivery and legacy-adapter delegation. The Auto resolver
+  suite passed 71/71 before the private context-enum cleanup; focused input tests passed
+  again after cleanup. Independent working-tree review found no blocker in ownership,
+  routing or API compatibility; this is not final exact-head delivery approval.
+- Registration follow-up is committed locally as `06aa93f3e`; no push/merge claimed.
+  Both governance validators passed with zero warnings before the ordinary evidence
+  extension. Default HTTP/WebSearch model execution and G backup/recovery remain
+  unimplemented, so H/G/T8 remain Active and incomplete.

@@ -4,8 +4,56 @@ use talos_permission::PermissionEngine;
 
 struct InputResolver;
 
+// Models an existing adapter which implements only the exact-input extension.
+struct LegacyInputResolver;
+
+#[async_trait]
+impl ApprovalResolver for LegacyInputResolver {
+    async fn resolve(
+        &self,
+        request: PermissionApprovalRequest,
+        remaining: Duration,
+    ) -> Result<ApprovalChoice, ApprovalResolverError> {
+        InputResolver.resolve(request, remaining).await
+    }
+
+    async fn resolve_with_execution_input(
+        &self,
+        request: PermissionApprovalRequest,
+        input: &serde_json::Value,
+        remaining: Duration,
+        auto_allowed: bool,
+        intent: Option<&str>,
+    ) -> Result<ApprovalChoice, ApprovalResolverError> {
+        InputResolver
+            .resolve_with_execution_input(request, input, remaining, auto_allowed, intent)
+            .await
+    }
+}
+
 #[async_trait]
 impl ApprovalResolver for InputResolver {
+    async fn resolve_builtin_invocation(
+        &self,
+        request: PermissionApprovalRequest,
+        evidence: BuiltinInvocationReviewEvidence<'_>,
+        remaining: Duration,
+        auto_assessment_allowed: bool,
+        user_intent: Option<&str>,
+    ) -> Result<ApprovalChoice, ApprovalResolverError> {
+        assert_eq!(evidence.description(), "Update the current repository");
+        assert_eq!(evidence.profile().len(), 1);
+        assert_eq!(evidence.profile()[0].nature, ToolNature::Execute);
+        assert!(evidence.working_directory().is_some());
+        self.resolve_with_execution_input(
+            request,
+            evidence.input(),
+            remaining,
+            auto_assessment_allowed,
+            user_intent,
+        )
+        .await
+    }
     async fn resolve(
         &self,
         request: PermissionApprovalRequest,
@@ -37,7 +85,7 @@ impl ApprovalResolver for InputResolver {
 
 #[tokio::test]
 async fn native_and_prepared_requests_separate_execution_input_from_presentation() {
-    for prepared in [false, true] {
+    for route in ["ordinary", "prepared", "registered", "registered_legacy"] {
         let root = tempfile::tempdir().expect("workspace");
         let state = Arc::new(PermissionSessionState::new(
             PermissionEngine::with_workspace_root(root.path().to_owned()),
@@ -48,7 +96,11 @@ async fn native_and_prepared_requests_separate_execution_input_from_presentation
                 PermissionMode::Interactive,
                 InteractionCapability::Available,
             ),
-            Some(Arc::new(InputResolver)),
+            Some(if route == "registered_legacy" {
+                Arc::new(LegacyInputResolver) as Arc<dyn ApprovalResolver>
+            } else {
+                Arc::new(InputResolver)
+            }),
         );
         let input = serde_json::json!({"remote": "origin"});
         let facets = [ToolPermissionFacet::with_resource(
@@ -65,7 +117,7 @@ async fn native_and_prepared_requests_separate_execution_input_from_presentation
             summary_fields: vec!["remote".into()],
             deadline: Duration::from_secs(2),
         };
-        if prepared {
+        if route == "prepared" {
             let plan = PreparedPlanIdentity::new();
             let admitted = pipeline
                 .authorize_prepared_plan(authorization, Some("update this repository"), &plan)
@@ -76,6 +128,16 @@ async fn native_and_prepared_requests_separate_execution_input_from_presentation
             admitted
                 .consume_for_prepared(&request, &plan)
                 .expect("exact proof");
+        } else if route.starts_with("registered") {
+            pipeline
+                .authorize_registered_invocation(
+                    authorization,
+                    Some("update this repository"),
+                    Some(root.path()),
+                    "Update the current repository",
+                )
+                .await
+                .expect("builtin approval");
         } else {
             pipeline
                 .authorize_with_user_intent(authorization, Some("update this repository"))

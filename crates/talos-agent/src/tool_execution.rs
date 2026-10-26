@@ -804,6 +804,15 @@ impl Agent {
                             Some(working_directory),
                         )
                         .await
+                } else if registry.is_builtin_instance(&call.name) {
+                    pipeline
+                        .authorize_registered_invocation(
+                            authorization_request,
+                            user_intent,
+                            working_directory.as_deref(),
+                            tool.description(),
+                        )
+                        .await
                 } else {
                     pipeline
                         .authorize_with_user_intent(authorization_request, user_intent)
