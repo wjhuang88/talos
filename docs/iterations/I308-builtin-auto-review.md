@@ -491,3 +491,22 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
   row, now synchronized here; no functional test failure is inferred from it.
 - Stage remains Review; I308/T8 remains Active / partial. Native Windows runtime,
   final exact-head CI/review/CAS and all remaining H/G implementation are open.
+
+
+### File mutation review implementation started — 2026-10-26
+
+- Local continuation branch `feat/i308-file-mutation-auto` starts at the published
+  foundation head `ffa35973022c18f752cacad1922325e15c648379`; #769 stays unchanged.
+- Added a compatible default prepared-invocation file evidence hook and a separate
+  plan-bound before/after text carrier. Each image is bounded to 2 MiB without
+  truncation; relative targets are rejected and Debug hides contents. The carrier
+  is not authority; dispatch must independently check built-in instance ownership.
+- `cargo test --locked -p talos-core` with incremental/debug disabled passed:
+  122 unit tests plus all eight integration tests. Existing downstream trait
+  defaults compile. The two new tests cover plan rebinding/private Debug and both
+  over-limit images. No new dependency or changed existing public struct shape.
+- This is local implementation plumbing only: no file producer, dispatcher or
+  Auto assessor consumes it yet. Edit/delete Auto execution is still unimplemented.
+  Next implement read-admitted content capture, identity-bound mutation review,
+  fresh-state checks and mandatory bounded recovery through the normal pipeline,
+  then end-to-end outcome tests and independent review before publication.

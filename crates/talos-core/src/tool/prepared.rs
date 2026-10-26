@@ -125,6 +125,13 @@ pub trait PreparedNormalToolInvocation: Send {
         None
     }
 
+    /// Returns complete private before/after evidence captured after read admission.
+    /// Dispatch must verify native instance ownership and the exact plan binding;
+    /// evidence alone cannot authorize a mutation. Legacy producers return None.
+    fn prepared_file_mutation_evidence(&self) -> Option<super::PreparedFileMutationEvidence> {
+        None
+    }
+
     /// The complete set of effects to admit as one invocation.
     fn permission_profile(&self) -> &[ToolPermissionFacet];
 

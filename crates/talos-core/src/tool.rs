@@ -11,6 +11,7 @@ mod cleanup;
 mod network;
 mod prepared;
 mod prepared_command;
+mod prepared_file_mutation;
 mod protocol;
 mod registry;
 mod result_presentation;
@@ -29,6 +30,9 @@ pub use prepared::{
 pub use prepared_command::{
     PreparedCommandDescription, PreparedCommandEffect, PreparedCommandEvidence,
     PreparedCommandTargets,
+};
+pub use prepared_file_mutation::{
+    MAX_FILE_MUTATION_REVIEW_BYTES, PreparedFileMutationDescription, PreparedFileMutationEvidence,
 };
 pub use todo_presentation::{
     TodoDisplaySpan, TodoDisplayStatus, TodoPresentation, VisibleTodoPresentation,
