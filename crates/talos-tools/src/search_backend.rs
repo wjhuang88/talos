@@ -2,7 +2,7 @@
 //!
 //! Typed contracts and dormant controlled compatibility infrastructure. The existing
 //! `WebSearchTool` remains the compatibility composition until SEARCH-001-C
-//! introduces Talos-owned routing behavior.
+//! explicitly activates Talos-owned routing behavior.
 //!
 //! The seam is intentionally staged before adapter wiring; the allowlist keeps this
 //! intermediate contract from becoming a production behavior change.
@@ -15,6 +15,8 @@ use thiserror::Error;
 // Staged, private transport infrastructure. Not wired into WebSearchTool before
 // ADR-090's protocol/parity/D activation gates. Uses the existing staged seam.
 mod transport;
+// Dormant Talos-owned routing core; no WebSearchTool/registry/default activation.
+mod router;
 // Dormant response parsing prerequisite; activation still requires ADR-090 parity/D gates.
 mod bing_parser;
 mod ddg_parser;
