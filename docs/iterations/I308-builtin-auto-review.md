@@ -647,3 +647,17 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
   sandbox attempt could not update the cargo-xwin cache link; the authorized
   outside-sandbox rerun succeeded. Fetch of `origin/main` found no upstream-only
   commits at this checkpoint; no rebase was necessary.
+- Locked Agent test-target cargo-xwin checking also passes for
+  `x86_64-pc-windows-msvc`; log: `/private/tmp/i308-agent-mutation-xwin.log`.
+- Independent read-only Agent permission/security/API static review APPROVE:
+  base `ffa35973022c18f752cacad1922325e15c648379`, head
+  `099e6bd4754e79e0eca7e8cbb4a86c09c5d15a46`. No blocking findings remain;
+  the earlier NUL boundary issue is closed. Reviewer shares this session's tool
+  and GitHub identity, is not an independent human, and did not independently run
+  tests. Approval covers this file-mutation stage only; full preflight, native
+  Windows, remote CI and merge-time CAS remain pending. No external-writer
+  isolation or universal secret detection is claimed.
+- Current full preflight has passed Tools 976/976, including the formerly
+  sandbox-blocked eight-stage local Push test, and workspace doctests. Runtime
+  SDK consumer checks are still running; no complete preflight pass is claimed.
+  Both governance validators pass after the evidence update.
