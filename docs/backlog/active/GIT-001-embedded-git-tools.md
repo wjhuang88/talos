@@ -1,5 +1,41 @@
 # GIT-001: Built-in Git Tools — Native Git Support
 
+## Current corrective delivery — 2026-10-26
+
+I300/T7 is Complete / Closed at #735, merge `ee84889fd19c590fdcc125cb971143dffd3cfb94`.
+Completion Commit: ee84889fd19c590fdcc125cb971143dffd3cfb94
+
+The [I300 closure](../../iterations/I300-structured-git-repair.md) records the
+original acceptance mapping, full local locked preflight, final all-success
+three-platform CI 40251434249 and independent exact-head/base review.
+Prepared Add, Commit, nonrecursive Checkout, limited Push and native Pull are
+merged; configuration discovery and final mutation/whole-command authority stay
+separate. Explicit Deny/human policy and process supervision remain binding.
+Default Windows git:// Push remains the accepted host limitation; configured
+Push passed natively, and production does not alter sideband configuration.
+T8/PERM-007-H and advanced P3 scope remain incomplete. Earlier candidate and
+blocker sections below are historical, superseded by this delivery record.
+
+### Standing gix tracking — 2026-10-26
+
+The live [crates.io sparse index](https://index.crates.io/3/g/gix) reports latest
+non-yanked **gix 0.90.0**, published 2026-10-22, MSRV 1.88; Talos remains locked
+to 0.87.1. The [exact upstream release](https://github.com/GitoxideLabs/gitoxide/releases/tag/gix-v0.90.0)
+adds linked-worktree lock/unlock and separate registration/initial checkout,
+submodule resolved URLs, global attribute-path selection, absolute-path helpers
+and offline default-branch lookup. Fixes cover linked-worktree submodule gitdirs,
+replacement refs/commit-graph and clone config/ref parity. Upstream also cites
+GHSA-q54r-jf2p-rfr2 for configuration section-trust filtering.
+
+This is release-note/API discovery, not an upgrade or Talos security-applicability
+assessment. **Open residual owned here:** assess the advisory against Talos 0.87.1
+and evaluate operation-specific parity before selecting an upgrade/replacement
+iteration. Release additions do not demonstrate complete native Push or Pull
+merge/rebase orchestration replacement; source and runtime parity verification
+remain required. No date for removing host Git is established. This tracking
+supersedes the older 0.89 availability checkpoint without changing Cargo.lock.
+
+
 2026-10-26 merge blocker: PR #735 CAS exposed an I307 protected-mount overlap
 finding for broad/canonical workspace roots. Independent merge readiness was
 withdrawn; green narrow-root CI does not cover it. I300's top checkpoint owns
@@ -24,7 +60,7 @@ Git implementation), eliminating the need for a host `git` binary for common rep
 operations. The agent can inspect, navigate, and (with explicit approval) modify Git state
 through structured tool calls.
 
-## I300 Corrective Candidate — Not Yet Delivered
+## Historical I300 corrective candidate — before delivery
 
 Historical I026/I094 acceptance below does not prove closure of the current
 permission and diff defects. [I300](../../iterations/I300-structured-git-repair.md)

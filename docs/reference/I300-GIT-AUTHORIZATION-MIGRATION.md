@@ -1,5 +1,28 @@
 # I300 Git Authorization Migration Inventory
 
+## Current delivery — 2026-10-26
+
+I300/T7 is Complete / Closed. #735 merged as `ee84889fd19c590fdcc125cb971143dffd3cfb94`.
+The [owner closure](../iterations/I300-structured-git-repair.md) binds all original
+requirements to final-head CI 40251434249 (all six jobs successful), local full
+locked preflight and independent security/API review against the exact base.
+Native Windows MCP configured Push, real Pull, disconnect/read-error cleanup,
+Runtime Auto/human/policy, recursion and cancellation all passed at this head.
+The table and dated checkpoints below preserve earlier evidence and coverage
+limits; their pending-final-head/blocker statements are superseded by this record.
+
+Delivered operations are prepared Add/Commit, nonrecursive Checkout, limited Push
+and native Pull. Pull retains bounded configuration discovery then one frozen
+whole-command approval, including transitive effects. Explicit Deny/human policy
+remain binding; no per-path/endpoint confinement or automatic failure rollback is
+promised. Direct mutation calls without prepared admission remain refused.
+Default Windows git:// Push is still the accepted host Git limitation; success
+fixtures explicitly configure sideband and product preserves user settings.
+Synthetic assessors do not establish live model quality; the suite is not an
+exhaustive entrypoint/operation matrix. T8 all-built-in Auto and advanced P3 Git
+work remain outside this completed corrective slice.
+
+
 2026-10-26 merge blocker: PR #735 CAS exposed an I307 protected-mount overlap
 finding for broad/canonical workspace roots. Independent merge readiness was
 withdrawn; green narrow-root CI does not cover it. I300's top checkpoint owns
