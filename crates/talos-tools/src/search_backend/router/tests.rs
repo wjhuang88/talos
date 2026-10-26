@@ -219,14 +219,8 @@ async fn hedge_is_bounded_and_winner_drops_pending_loser_without_starting_third(
 #[tokio::test(start_paused = true)]
 async fn mixed_results_filter_invalid_urls_before_truncation() {
     let counts = SharedCounts::default();
-    let expected_first = result(
-        SearchBackendId::DuckDuckGo,
-        "https://example.invalid/first",
-    );
-    let expected_second = result(
-        SearchBackendId::DuckDuckGo,
-        "http://example.invalid/second",
-    );
+    let expected_first = result(SearchBackendId::DuckDuckGo, "https://example.invalid/first");
+    let expected_second = result(SearchBackendId::DuckDuckGo, "http://example.invalid/second");
     let router = SearchRouter::new(
         vec![backend(
             SearchBackendId::DuckDuckGo,
@@ -236,10 +230,7 @@ async fn mixed_results_filter_invalid_urls_before_truncation() {
                 expected_first.clone(),
                 result(SearchBackendId::DuckDuckGo, "/relative"),
                 expected_second.clone(),
-                result(
-                    SearchBackendId::DuckDuckGo,
-                    "https://example.invalid/third",
-                ),
+                result(SearchBackendId::DuckDuckGo, "https://example.invalid/third"),
             ]),
             &counts,
         )],
@@ -532,18 +523,8 @@ fn router_rejects_zero_bounds_and_duplicate_backend_ids() {
 
     let counts = SharedCounts::default();
     let candidates = vec![
-        backend(
-            SearchBackendId::DuckDuckGo,
-            0,
-            Ok(Vec::new()),
-            &counts,
-        ),
-        backend(
-            SearchBackendId::DuckDuckGo,
-            0,
-            Ok(Vec::new()),
-            &counts,
-        ),
+        backend(SearchBackendId::DuckDuckGo, 0, Ok(Vec::new()), &counts),
+        backend(SearchBackendId::DuckDuckGo, 0, Ok(Vec::new()), &counts),
     ];
     assert!(matches!(
         SearchRouter::new(candidates, policy(10, 1)),
