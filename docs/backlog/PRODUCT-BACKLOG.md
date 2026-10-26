@@ -17,7 +17,8 @@ for integration and its own final validation.
 2026-10-11 session-handoff addition: [PERM-007-H](active/PERM-007-H-all-builtin-auto-review.md)
 will extend Auto review to all built-in tools after I300 Git repair. Refinement /
 Unclaimed; reconcile higher-risk PERM-007-G/#563 policy before implementation.
-ADR-089 for I300 is accepted; its claim becomes effective upon #704 merge.
+ADR-089 and its API amendment are accepted; #704 merged as `55fef9f9` and
+I300's claim is effective on main. Its implementation is still incomplete.
 PERM-007-H remains Unclaimed and requires a separate iteration.
 
 Current cycle selected 2026-09-21: [I281](../iterations/I281-auto-shell-review-and-windows-timing.md)

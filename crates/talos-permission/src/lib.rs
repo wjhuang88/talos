@@ -71,6 +71,7 @@
 mod access_evidence;
 mod decision;
 mod grant;
+mod native_pull_command;
 mod resource;
 mod rule;
 mod session;
@@ -87,8 +88,8 @@ pub use grant::{
     GrantError, GrantId, GrantPreview, GrantPreviewFacet, GrantScope, GrantSource, ProposedGrant,
 };
 pub use session::{
-    PendingInvocation, PermissionEvaluation, PermissionInvocation, PermissionSessionId,
-    PermissionSessionState, PermissionStateRevisions, PermissionStateSnapshot,
+    AdmittedInvocation, PendingInvocation, PermissionEvaluation, PermissionInvocation,
+    PermissionSessionId, PermissionSessionState, PermissionStateRevisions, PermissionStateSnapshot,
 };
 pub use workspace_trust::{WorkspaceTrustStore, is_git_workspace, is_within_repo};
 
@@ -100,6 +101,7 @@ use serde_json::Value;
 use std::path::{Path, PathBuf};
 use talos_core::tool::{
     ToolAuthorizationScope, ToolExecutionAuthorization, ToolNature, ToolPermissionFacet,
+    ToolResourceKind,
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -396,6 +398,9 @@ impl PermissionEngine {
         input: &Value,
     ) -> (PermissionDecision, PermissionDecisionSource) {
         debug_assert_eq!(self.rules.len(), self.rule_metadata.len());
+        if let Some(restriction) = self.native_pull_command_restriction(tool_name, facet) {
+            return restriction;
+        }
         let nature = facet.nature;
 
         let mut matched_rule = None;
@@ -498,7 +503,7 @@ impl PermissionEngine {
     /// Builds exact path authorizations after a permission decision has been
     /// resolved by a composition root.
     ///
-    /// Non-path facets do not produce an authorization. This method does not
+    /// Only path facets and dedicated Git capabilities produce authorizations. This method does not
     /// evaluate permission and must only be called after `Allow` or explicit
     /// user approval.
     pub fn execution_authorizations(
@@ -513,6 +518,25 @@ impl PermissionEngine {
         };
         let mut authorizations = Vec::new();
         for facet in profile {
+            if tool_name == "git_pull"
+                && facet.nature == ToolNature::Read
+                && facet.resource_kind == Some(ToolResourceKind::Remote)
+                && facet.resource.as_deref() == Some("git:pull-bounded-discovery")
+            {
+                authorizations.push(ToolExecutionAuthorization::for_git_pull_bounded_discovery(
+                    scope,
+                ));
+                continue;
+            }
+            if facet.nature == ToolNature::Read
+                && facet.resource_kind == Some(ToolResourceKind::Remote)
+                && facet.resource.as_deref() == Some("git:auxiliary-path-resolution")
+            {
+                authorizations.push(
+                    ToolExecutionAuthorization::for_git_auxiliary_path_resolution(tool_name, scope),
+                );
+                continue;
+            }
             if !facet_uses_path_resource(facet, input) {
                 continue;
             }

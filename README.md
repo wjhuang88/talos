@@ -672,6 +672,39 @@ install does not need a manual catalog initialization step: Talos does not creat
 `catalog.db` for model metadata. Model/provider metadata updates are build-time only through
 `BUILD_MODELS=1`; the legacy `--import-models` flag is kept as a no-op compatibility notice.
 
+The current I300 development candidate treats `git_add` paths literally, relative to
+the workspace. It first requests dedicated Git configuration-chain discovery
+permission, then separately authorizes the resulting staging plan. Configuration
+values remain internal. Discovery requires host Git support for `git var
+GIT_ATTR_SYSTEM` and `GIT_ATTR_GLOBAL`. Unsupported filters, hooks, fsmonitor,
+object alternates, and split indexes are refused; any fallback requires separate
+authorization. The unpublished Unix candidate includes prepared Add, Commit,
+nonrecursive Checkout, limited Push and native Pull execution. Pull first authorizes
+configuration discovery, then one frozen command and its transitive effects
+(including network, merge/rebase, recursion and configured programs). It does not
+promise per-path or endpoint confinement. Compatible Auto review can approve the
+whole command once; explicit Deny and human-only policies retain authority.
+Conflicts and failures may leave fetched objects and partial integration state;
+Talos does not automatically reset or repair them. This remains an unpublished
+candidate pending final security, CI and native Windows acceptance.
+The Windows production preparation gate is removed in this candidate and the MSVC
+test targets cross-compile with `cargo xwin`; native Windows execution and exact-head
+CI are still unverified. T7 is not complete. See the [I300 migration inventory](docs/reference/I300-GIT-AUTHORIZATION-MIGRATION.md).
+
+On the tested Git for Windows build, default `git://` Push hangs even outside
+Talos. Explicit repository configuration `git config sendpack.sideband false`
+completes the tested transfer. Talos preserves your configuration and does not
+automatically apply this workaround. A timeout can leave partial remote effects.
+The candidate's nonrecursive checkout can replace a nonempty submodule directory
+only after discovering its entries and obtaining explicit deletion permission for
+each one, including untracked files and Unix FIFO/socket entries. Effective
+configuration sources remain protected; symbolic links and unsupported special
+entries are refused. Failures can leave partial Git effects.
+Direct mutation calls without the prepared authorization plan are refused.
+Admitted execution keeps automatic maintenance in the
+foreground (`maintenance.autoDetach=false`, `gc.autoDetach=false`) so maintenance
+shares the invocation lifetime; maintenance work is not disabled.
+
 ## Built-In Capabilities
 
 Talos ships with built-in tools for common coding-agent work:

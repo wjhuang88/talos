@@ -535,10 +535,39 @@ impl Agent {
         } else {
             None
         };
-        let permission_profile = prepared_network.as_ref().map_or_else(
-            || tool.permission_profile(&call.input),
-            |prepared| prepared.permission_profile().to_vec(),
-        );
+        let mut prepared = if prepared_network.is_some() {
+            None
+        } else {
+            match tool.prepare_normalized_with_provenance(&call.input, tool.provenance()) {
+                Ok(prepared) => prepared,
+                Err(error) => return Ok((ToolExecutionResult::error(error), Vec::new())),
+            }
+        };
+        if prepared.is_some() && call.name == "bash" {
+            return Ok((
+                ToolExecutionResult::error(
+                    "prepared operation cannot replace bash sandbox dispatch",
+                ),
+                Vec::new(),
+            ));
+        }
+        if prepared.is_some() && self.permission_pipeline.is_none() {
+            return Ok((
+                ToolExecutionResult::error(
+                    "prepared operation requires the Agent permission pipeline",
+                ),
+                Vec::new(),
+            ));
+        }
+        // Prepared profiles are reserved by the stage budget before any cloning below.
+        // Prepared operations cannot use background dispatch.
+        let permission_profile = if let Some(network) = prepared_network.as_ref() {
+            network.permission_profile().to_vec()
+        } else if prepared.is_none() {
+            tool.permission_profile(&call.input)
+        } else {
+            Vec::new()
+        };
         let background_start_resource = permission_profile.iter().find_map(|facet| {
             facet
                 .resource
@@ -551,10 +580,10 @@ impl Agent {
         {
             Ok(ToolExecutionAdmission::Foreground) => None,
             Ok(ToolExecutionAdmission::Background(request)) => {
-                if prepared_network.is_some() {
+                if prepared.is_some() {
                     return Ok((
                         ToolExecutionResult::error(
-                            "protected network invocation requires foreground execution",
+                            "prepared operation cannot use background dispatch",
                         ),
                         Vec::new(),
                     ));
@@ -601,149 +630,6 @@ impl Agent {
             Err(error) => return Ok((ToolExecutionResult::error(error), Vec::new())),
         };
 
-        let mut authorizations: Option<Vec<ToolExecutionAuthorization>> = None;
-        let mut network_authority = None;
-        let permission_allowed = if let Some(pipeline) = self.permission_pipeline.as_deref() {
-            let permission_deadline_at = tokio::time::Instant::now() + self.permission_deadline;
-            let mut permission_call = ToolCall {
-                id: call.id.clone(),
-                name: call.name.clone(),
-                input: crate::permission_pipeline::project_permission_input(&call.input),
-            };
-            private_tokens.project_value(&mut permission_call.input);
-            for event in [
-                HookEvent::OnToolCallProposed {
-                    call: &permission_call,
-                },
-                HookEvent::BeforePermissionCheck {
-                    call: &permission_call,
-                },
-            ] {
-                match tokio::time::timeout_at(
-                    permission_deadline_at,
-                    self.hook_registry.dispatch_permission_gate(hook_ctx, event),
-                )
-                .await
-                {
-                    Ok(HookOutcome::Continue(_)) => {}
-                    Ok(HookOutcome::Deny { reason, .. }) => {
-                        return Ok((
-                            ToolExecutionResult::error(format!("Permission denied: {reason}")),
-                            Vec::new(),
-                        ));
-                    }
-                    Ok(HookOutcome::Skip(_)) => {
-                        return Ok((
-                            ToolExecutionResult::error(
-                                "Permission denied: permission hook failed closed",
-                            ),
-                            Vec::new(),
-                        ));
-                    }
-                    Err(_) => {
-                        return Ok((
-                            ToolExecutionResult::error(
-                                "Permission denied: approval deadline exceeded",
-                            ),
-                            Vec::new(),
-                        ));
-                    }
-                }
-            }
-
-            let working_directory = tool.execution_working_directory();
-            let mut presentation_input = tool.project_input(&call.input);
-            private_tokens.project_value(&mut presentation_input);
-            let authorization_request = PermissionAuthorizationRequest {
-                tool_name: &call.name,
-                provenance: tool.provenance(),
-                profile: &permission_profile,
-                input: &call.input,
-                presentation_input,
-                summary_fields: tool
-                    .summary_fields()
-                    .iter()
-                    .map(|field| (*field).to_string())
-                    .collect(),
-                deadline: permission_deadline_at
-                    .saturating_duration_since(tokio::time::Instant::now()),
-            };
-            let authorization = if let Some(prepared) = prepared_network.as_ref() {
-                pipeline
-                    .authorize_network(authorization_request, prepared.manifest(), user_intent)
-                    .await
-                    .map(|authority| {
-                        network_authority = Some(authority);
-                        Vec::new()
-                    })
-            } else if matches!(call.name.as_str(), "bash" | "powershell")
-                && working_directory.is_some()
-            {
-                let working_directory = working_directory.as_deref().expect("checked above");
-                pipeline
-                    .authorize_with_execution_context(
-                        authorization_request,
-                        user_intent,
-                        Some(working_directory),
-                    )
-                    .await
-            } else {
-                pipeline
-                    .authorize_with_user_intent(authorization_request, user_intent)
-                    .await
-            };
-            let decision = authorization
-                .as_ref()
-                .err()
-                .map_or(PermissionDecision::Allow, |error| error.final_decision());
-
-            match tokio::time::timeout_at(
-                permission_deadline_at,
-                self.hook_registry.dispatch_permission_gate(
-                    hook_ctx,
-                    HookEvent::AfterPermissionCheck {
-                        call: &permission_call,
-                        decision: decision.clone(),
-                    },
-                ),
-            )
-            .await
-            {
-                Ok(HookOutcome::Continue(_)) => {}
-                Ok(HookOutcome::Deny { reason, .. }) => {
-                    return Ok((
-                        ToolExecutionResult::error(format!("Permission denied: {reason}")),
-                        Vec::new(),
-                    ));
-                }
-                Ok(HookOutcome::Skip(_)) => {
-                    return Ok((
-                        ToolExecutionResult::error("Permission denied: final hook failed closed"),
-                        Vec::new(),
-                    ));
-                }
-                Err(_) => {
-                    return Ok((
-                        ToolExecutionResult::error("Permission denied: approval deadline exceeded"),
-                        Vec::new(),
-                    ));
-                }
-            }
-
-            match authorization {
-                Ok(grants) => authorizations = Some(grants),
-                Err(error) => {
-                    return Ok((
-                        ToolExecutionResult::error(format!("Permission denied: {error}")),
-                        Vec::new(),
-                    ));
-                }
-            }
-            true
-        } else {
-            true
-        };
-
         if call.name == "read_image" && !self.image_input_supported {
             return Ok((
                 ToolExecutionResult::error(
@@ -768,11 +654,285 @@ impl Agent {
             }
         }
 
+        let mut prepared_output = None;
+        let mut prepared_reserved = false;
+        let mut stage_history = talos_core::tool::PreparedStageHistory::default();
+        let prepared_deadline_at = prepared
+            .as_ref()
+            .map(|_| tokio::time::Instant::now() + self.permission_deadline);
+        let prepared_invocation_deadline_at = prepared
+            .as_ref()
+            .map(|_| tokio::time::Instant::now() + talos_core::tool::PREPARED_INVOCATION_TIMEOUT);
+        let mut authorizations: Option<Vec<ToolExecutionAuthorization>> = None;
+        let mut network_authority = None;
+        let permission_allowed = loop {
+            if let Some(operation) = prepared.as_ref() {
+                let Some(identity) = operation.plan_identity().cloned() else {
+                    return Ok((
+                        ToolExecutionResult::error("prepared plan identity required"),
+                        Vec::new(),
+                    ));
+                };
+                if !stage_history.record_profile(&identity, operation.permission_profile()) {
+                    return Ok((
+                        ToolExecutionResult::error(
+                            "prepared stage limit or reused identity; authorization profile budget may be exhausted",
+                        ),
+                        Vec::new(),
+                    ));
+                }
+            }
+
+            let permission_profile = prepared.as_ref().map_or_else(
+                || permission_profile.clone(),
+                |operation| operation.permission_profile().to_vec(),
+            );
+            let mut prepared_admission: Option<talos_permission::AdmittedInvocation> = None;
+            let permission_allowed = if let Some(pipeline) = self.permission_pipeline.as_deref() {
+                let permission_deadline_at = prepared_deadline_at
+                    .unwrap_or_else(|| tokio::time::Instant::now() + self.permission_deadline);
+                if tokio::time::Instant::now() >= permission_deadline_at {
+                    return Ok((
+                        ToolExecutionResult::error("Permission denied: approval deadline exceeded"),
+                        Vec::new(),
+                    ));
+                }
+                let mut permission_call = ToolCall {
+                    id: call.id.clone(),
+                    name: call.name.clone(),
+                    input: crate::permission_pipeline::project_permission_input(&call.input),
+                };
+                private_tokens.project_value(&mut permission_call.input);
+                for event in [
+                    HookEvent::OnToolCallProposed {
+                        call: &permission_call,
+                    },
+                    HookEvent::BeforePermissionCheck {
+                        call: &permission_call,
+                    },
+                ] {
+                    match tokio::time::timeout_at(
+                        permission_deadline_at,
+                        self.hook_registry.dispatch_permission_gate(hook_ctx, event),
+                    )
+                    .await
+                    {
+                        Ok(HookOutcome::Continue(_)) => {}
+                        Ok(HookOutcome::Deny { reason, .. }) => {
+                            return Ok((
+                                ToolExecutionResult::error(format!("Permission denied: {reason}")),
+                                Vec::new(),
+                            ));
+                        }
+                        Ok(HookOutcome::Skip(_)) => {
+                            return Ok((
+                                ToolExecutionResult::error(
+                                    "Permission denied: permission hook failed closed",
+                                ),
+                                Vec::new(),
+                            ));
+                        }
+                        Err(_) => {
+                            return Ok((
+                                ToolExecutionResult::error(
+                                    "Permission denied: approval deadline exceeded",
+                                ),
+                                Vec::new(),
+                            ));
+                        }
+                    }
+                }
+
+                let working_directory = tool.execution_working_directory();
+                let mut presentation_input = tool.project_input(&call.input);
+                private_tokens.project_value(&mut presentation_input);
+                let authorization_request = PermissionAuthorizationRequest {
+                    tool_name: &call.name,
+                    provenance: tool.provenance(),
+                    profile: &permission_profile,
+                    input: &call.input,
+                    presentation_input,
+                    summary_fields: tool
+                        .summary_fields()
+                        .iter()
+                        .map(|field| (*field).to_string())
+                        .collect(),
+                    deadline: permission_deadline_at
+                        .saturating_duration_since(tokio::time::Instant::now()),
+                };
+                let authorization = if let Some(network) = prepared_network.as_ref() {
+                    pipeline
+                        .authorize_network(authorization_request, network.manifest(), user_intent)
+                        .await
+                        .map(|authority| {
+                            network_authority = Some(authority);
+                            Vec::new()
+                        })
+                } else if let Some(operation) = prepared.as_ref() {
+                    let Some(plan) = operation.plan_identity() else {
+                        return Ok((
+                            ToolExecutionResult::error("prepared plan identity required"),
+                            Vec::new(),
+                        ));
+                    };
+                    let evidence = operation.prepared_command_evidence();
+                    pipeline
+                        .authorize_prepared_plan_with_evidence(
+                            authorization_request,
+                            user_intent,
+                            plan,
+                            evidence.as_ref(),
+                        )
+                        .await
+                        .map(|admission| {
+                            prepared_admission = Some(admission);
+                            Vec::new()
+                        })
+                } else if matches!(call.name.as_str(), "bash" | "powershell")
+                    && working_directory.is_some()
+                {
+                    let working_directory = working_directory.as_deref().expect("checked above");
+                    pipeline
+                        .authorize_with_execution_context(
+                            authorization_request,
+                            user_intent,
+                            Some(working_directory),
+                        )
+                        .await
+                } else {
+                    pipeline
+                        .authorize_with_user_intent(authorization_request, user_intent)
+                        .await
+                };
+                let decision = authorization
+                    .as_ref()
+                    .err()
+                    .map_or(PermissionDecision::Allow, |error| error.final_decision());
+
+                match tokio::time::timeout_at(
+                    permission_deadline_at,
+                    self.hook_registry.dispatch_permission_gate(
+                        hook_ctx,
+                        HookEvent::AfterPermissionCheck {
+                            call: &permission_call,
+                            decision: decision.clone(),
+                        },
+                    ),
+                )
+                .await
+                {
+                    Ok(HookOutcome::Continue(_)) => {}
+                    Ok(HookOutcome::Deny { reason, .. }) => {
+                        return Ok((
+                            ToolExecutionResult::error(format!("Permission denied: {reason}")),
+                            Vec::new(),
+                        ));
+                    }
+                    Ok(HookOutcome::Skip(_)) => {
+                        return Ok((
+                            ToolExecutionResult::error(
+                                "Permission denied: final hook failed closed",
+                            ),
+                            Vec::new(),
+                        ));
+                    }
+                    Err(_) => {
+                        return Ok((
+                            ToolExecutionResult::error(
+                                "Permission denied: approval deadline exceeded",
+                            ),
+                            Vec::new(),
+                        ));
+                    }
+                }
+
+                match authorization {
+                    Ok(grants) => authorizations = Some(grants),
+                    Err(error) => {
+                        return Ok((
+                            ToolExecutionResult::error(format!("Permission denied: {error}")),
+                            Vec::new(),
+                        ));
+                    }
+                }
+                true
+            } else {
+                true
+            };
+
+            let Some(operation) = prepared.take() else {
+                break permission_allowed;
+            };
+            if !prepared_reserved {
+                if self
+                    .execution_ledger
+                    .reserve(hook_ctx.turn_id, &call)
+                    .is_err()
+                {
+                    return Ok((
+                        ToolExecutionResult::error(
+                            "tool call was already admitted or may have started; refusing replay",
+                        ),
+                        Vec::new(),
+                    ));
+                }
+                prepared_reserved = true;
+            }
+            let Some(admission) = prepared_admission.take() else {
+                return Ok((
+                    ToolExecutionResult::error("prepared operation has no permission admission"),
+                    Vec::new(),
+                ));
+            };
+            if let Some(receipt) = operation.cleanup_receipt() {
+                self.tool_cleanup.register(hook_ctx.turn_id, receipt);
+            }
+            let Some(deadline_at) = prepared_invocation_deadline_at else {
+                return Ok((
+                    ToolExecutionResult::error("prepared invocation deadline unavailable"),
+                    Vec::new(),
+                ));
+            };
+            if tokio::time::Instant::now() >= deadline_at {
+                return Ok((
+                    ToolExecutionResult::error(
+                        "prepared invocation deadline exceeded; effects may be incomplete",
+                    ),
+                    Vec::new(),
+                ));
+            }
+            let stage = match tokio::time::timeout_at(
+                deadline_at,
+                operation.execute_stage(Box::new(admission)),
+            )
+            .await
+            {
+                Ok(stage) => stage,
+                Err(_) => {
+                    return Ok((
+                        ToolExecutionResult::error(
+                            "prepared invocation deadline exceeded; effects may be incomplete",
+                        ),
+                        Vec::new(),
+                    ));
+                }
+            };
+            match stage {
+                talos_core::tool::PreparedNormalStage::Complete(output) => {
+                    prepared_output = Some(output);
+                    break permission_allowed;
+                }
+                talos_core::tool::PreparedNormalStage::Continue(next) => prepared = Some(next),
+            }
+        };
+
         // Reserve the logical call only after final permission admission and
         // before crossing the actual tool execution boundary. If execution is
         // cancelled or times out after this point, retaining the reservation is
         // intentional: the side effect may already have reached the tool.
-        if let Err(error) = self.execution_ledger.reserve(hook_ctx.turn_id, &call) {
+        if !prepared_reserved
+            && let Err(error) = self.execution_ledger.reserve(hook_ctx.turn_id, &call)
+        {
             let message = match error {
                 crate::execution_ledger::ReservationError::AlreadyReserved => {
                     "tool call was already admitted or may have started; refusing replay"
@@ -786,14 +946,16 @@ impl Agent {
 
         let normalized_input = call.input.clone();
 
-        let (mut result, parts) = if let Some(prepared) = prepared_network {
+        let (mut result, parts) = if let Some(network) = prepared_network {
             let Some(authority) = network_authority else {
                 return Ok((
                     ToolExecutionResult::error("network_authority_unavailable"),
                     Vec::new(),
                 ));
             };
-            let output = prepared.execute(authority).await;
+            let output = network.execute(authority).await;
+            (output.result, output.next_provider_parts)
+        } else if let Some(output) = prepared_output {
             (output.result, output.next_provider_parts)
         } else if call.name == "bash" {
             if let Some(sb) = self.sandbox.as_deref() {

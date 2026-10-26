@@ -15,8 +15,30 @@ Auto mode evaluates built-in tool requests consistently by their actual effects,
 user intent and bound resources. Do not force an otherwise assessable operation
 to manual approval solely because its tool name is absent from a shell-specific
 allowlist. This is an implementation requirement, not only an inventory task.
+The maintainer accepted this full native-tool scope. An operation requiring a
+human-only boundary remains visible in the inventory with its precise reason;
+the acceptance does not authorize a model to override explicit Deny, an
+unenforceable effect boundary, or a hard safety constraint.
 
 ## Current Evidence
+
+### Maintainer clarification — 2026-10-22
+
+Auto must perform model-assisted safety assessment **and actual invocation-local
+approval**, including operations with Network, Write and Execute effects. These
+effect classes alone must not force human approval. The existing read-only-first
+implementation is historical containment, not the desired final acceptance.
+Assess the concrete operation, user intent, destinations and impact together;
+escalate concrete unresolved risks, missing intent or assessment failure to the
+human. Explicit Deny and user-selected mandatory-human checkpoints remain binding.
+
+Pull is the concrete motivating case: preserve native Git command behavior and
+review the operation as a whole, rather than exhaustively predicting Git's
+internal file changes. An advisory-only model response followed unconditionally
+by human approval does not satisfy this requirement. Reconcile ADR-064/070/089
+and PERM-007-G as part of delivery; do not treat their initial implementation
+restrictions as grounds to reject this accepted requirement. This clarification
+records the target, not evidence that the policy or runtime has been implemented.
 
 `talos-agent/src/auto_resolver.rs::project_auto_request` currently dispatches only
 to `eligible`, `eligible_exec` and `eligible_bash`. The first permits a narrow
@@ -52,6 +74,10 @@ registration and all approval entrypoints before final design.
   allow/deny/uncertain/error/cancel/stale-evidence tests, across applicable hosts.
   Include representative non-shell operations and a coverage check detecting new
   built-ins that lack a declared/tested disposition.
+- Treat coverage as a registry-level invariant, including feature-gated production
+  registrations: a newly registered built-in without review evidence/disposition
+  must fail the coverage check, not silently fall back to a shell-only allowlist.
+  Existing policy-allowed read-only calls must remain free of extra model latency.
 - Update Auto user documentation and tool behavior/migration notes; independent
   permission/security/API review and normal exact-head gates remain mandatory.
 
@@ -65,8 +91,12 @@ All built-ins enter the coverage inventory; permanently excluding higher-risk
 families simply to claim universal coverage is not acceptable.
 
 Existing per-operation mandatory-human policies require an explicit reviewed
-policy decision before model-assisted allowance can replace them. Record the
-concrete policy/API delta after investigation, not a speculative blanket waiver.
+policy decision before model-assisted allowance can replace them. ADR-064's
+2026-10-22 maintainer amendment already accepts invocation-local model approval
+for suitable Network, Write and Execute requests; PERM-007-H must implement
+and independently review the concrete typed boundaries rather than repeat the
+old category-wide refusal. Preserve explicit Deny, explicit human-only choices,
+and human fallback for concrete uncertainty or inadequate evidence.
 MCP/plugin tools are not automatically included by this native-tool request.
 No release, new dependency, new unsafe code or arbitrary permanent grant is
 authorized by this intake. The complete handoff retains this added deliverable.

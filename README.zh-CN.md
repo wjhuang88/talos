@@ -495,6 +495,28 @@ Skill 主体和引用内容不会被直接打印到滚动历史、诊断信息�
 
 `SkillManager::load_reference` 也采用相同的路径限制和大小检查。
 
+当前 I300 开发候选将 `git_add` 路径作为工作区相对路径按字面处理。
+工具先申请专用的 Git 配置链发现授权，再单独审批生成的暂存计划；配置值仅供内部使用。
+发现阶段要求主机 Git 支持 `git var GIT_ATTR_SYSTEM` 和 `GIT_ATTR_GLOBAL`。
+不支持的过滤器、钩子、fsmonitor、对象 alternates 和 split index 会被拒绝，
+兜底执行需另行授权。尚未发布的候选已实现经过计划审批的 Add、Commit、
+非递归 Checkout、受限 Push 和原生 Pull。Pull 先审批配置发现，再以 Bash 粒度
+一次审批冻结的完整命令及其传递效果；Auto 可通过专用模型审查批准最终命令，
+显式 Deny 和仅人类审批策略仍然有效。这不提供逐路径或端点隔离，失败可能留下部分效果。
+Windows 候选已启用生产准备及 Job 监督，相关 MSVC 测试目标通过 cargo xwin 编译；
+Windows 原生执行、当前提交 CI 和完整验收仍待验证。T7 尚未完成。
+
+已验证的 Git for Windows 版本在 Talos 外执行默认 `git://` Push 也会挂起；
+显式仓库配置 `git config sendpack.sideband false` 可完成该传输测试。
+Talos 保留用户配置，不自动应用这一兼容配置；超时可能留下部分远端效果。
+详见 [I300 迁移清单](docs/reference/I300-GIT-AUTHORIZATION-MIGRATION.md)。
+候选版的非递归 checkout 替换非空子模块目录时，先发现目录条目，再逐项申请删除权限，
+其中包括未跟踪文件和 Unix FIFO/socket 条目。有效配置源仍受保护；符号链接和不支持的特殊条目
+会被拒绝。执行失败可能留下部分 Git 效果。
+未经过计划审批的直接变更调用会被拒绝。已授权执行
+会显式固定 `maintenance.autoDetach=false`、`gc.autoDetach=false`，让自动维护在前台
+共享调用生命周期；不会禁用维护工作。
+
 ## 内置能力
 
 Talos 自带一组面向编码 Agent 工作流的工具：

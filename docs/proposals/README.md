@@ -43,6 +43,7 @@ docs/proposals/
 
 ## Current Proposals
 
+- [I300 Native Pull Command Authorization](i300-native-pull-command-authorization.md) — accepted Bash-granularity command approval; implementation and activation tracked by I300 / ADR-089.
 - [Autonomous Validation Loop](autonomous-validation-loop.md) — proposed Phase 1/2/3 boundary for
   self-bootstrap validation planning, evidence, and no-hidden-pass rules.
 - [Built-in Workspace Search Tools](builtin-workspace-search-tools.md) — detailed design for

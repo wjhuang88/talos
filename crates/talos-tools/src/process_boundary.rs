@@ -1,20 +1,31 @@
 //! Shared non-interactive process boundary for command tools.
 
+#[cfg(all(windows, feature = "git"))]
+pub(crate) mod windows_foreground;
+
+#[cfg(any(windows, test))]
+mod windows_command_line;
+
+#[cfg(any(windows, test))]
+mod windows_environment;
+
+#[cfg(feature = "shell")]
 use std::process::Stdio;
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "shell"))]
 use std::sync::Arc;
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "shell"))]
 use async_trait::async_trait;
-#[cfg(unix)]
+#[cfg(all(unix, feature = "shell"))]
 use talos_core::background_job::{
     BACKGROUND_PROCESS_EVENT_CAPACITY, BackgroundJobLauncher, BackgroundOutputChunk,
     BackgroundOutputStream, BackgroundProcessControl, BackgroundProcessEvent,
     BackgroundProcessExit, LaunchedBackgroundJob,
 };
-#[cfg(unix)]
+#[cfg(all(unix, feature = "shell"))]
 use tokio::io::{AsyncRead, AsyncReadExt};
+#[cfg(any(unix, feature = "shell"))]
 use tokio::process::Command;
 
 #[cfg(windows)]
@@ -33,6 +44,7 @@ use talos_core::background_job::{
 /// Pipeline callers may explicitly request a piped stdin. Every other child receives EOF. On
 /// Unix, a new session also prevents programs such as `sudo` and `ssh` from bypassing stdin and
 /// opening Talos's controlling terminal through `/dev/tty`.
+#[cfg(feature = "shell")]
 pub(crate) fn isolate_terminal_input(cmd: &mut Command, pipe_stdin: bool) {
     if pipe_stdin {
         cmd.stdin(Stdio::piped());
@@ -92,24 +104,24 @@ pub(crate) fn apply_process_hardening(cmd: &mut Command) {
 }
 
 /// Unix launcher for one already validated shell or direct-exec command.
-#[cfg(unix)]
+#[cfg(all(unix, feature = "shell"))]
 pub(crate) struct UnixBackgroundLauncher {
     command: Command,
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "shell"))]
 impl UnixBackgroundLauncher {
     pub(crate) fn new(command: Command) -> Self {
         Self { command }
     }
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "shell"))]
 struct UnixProcessGroupControl {
     pgid: i32,
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "shell"))]
 #[async_trait]
 impl BackgroundProcessControl for UnixProcessGroupControl {
     async fn terminate(&self) -> Result<(), String> {
@@ -121,7 +133,7 @@ impl BackgroundProcessControl for UnixProcessGroupControl {
     }
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "shell"))]
 fn signal_process_group(pgid: i32, signal: i32) -> Result<(), String> {
     if pgid <= 0 {
         return Err("refusing to signal a non-positive process group id".to_owned());
@@ -140,7 +152,7 @@ fn signal_process_group(pgid: i32, signal: i32) -> Result<(), String> {
     }
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "shell"))]
 #[async_trait]
 impl BackgroundJobLauncher for UnixBackgroundLauncher {
     async fn launch(mut self: Box<Self>) -> Result<LaunchedBackgroundJob, String> {
@@ -202,7 +214,7 @@ impl BackgroundJobLauncher for UnixBackgroundLauncher {
     }
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "shell"))]
 async fn pump_output<R>(
     mut reader: R,
     stream: BackgroundOutputStream,
@@ -231,7 +243,7 @@ where
     }
 }
 
-#[cfg(all(test, unix))]
+#[cfg(all(test, unix, feature = "shell"))]
 mod tests {
     use super::*;
     use talos_core::background_job::{BackgroundJobLauncher, BackgroundProcessEvent};
@@ -320,17 +332,60 @@ unsafe impl Sync for WindowsJobControl {}
 #[async_trait]
 impl BackgroundProcessControl for WindowsJobControl {
     async fn terminate(&self) -> Result<(), String> {
-        // A Job Object is the ownership boundary; terminating the job cannot leave descendants.
+        if self.job.is_null() {
+            return Err("Windows Job control has no owned handle".into());
+        }
+        // Termination acceptance is not proof that all descendants have exited.
         let ok = unsafe { windows_sys::Win32::System::JobObjects::TerminateJobObject(self.job, 1) };
         if ok == 0 {
-            Err(last_windows_error("TerminateJobObject"))
-        } else {
-            Ok(())
+            return Err(last_windows_error("TerminateJobObject"));
+        }
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
+        loop {
+            if self.active_processes()? == 0 {
+                return Ok(());
+            }
+            if tokio::time::Instant::now() >= deadline {
+                return Err("Windows Job cleanup unconfirmed after 5 seconds".into());
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
         }
     }
 
     async fn force_terminate(&self) -> Result<(), String> {
         self.terminate().await
+    }
+}
+
+#[cfg(windows)]
+impl WindowsJobControl {
+    fn active_processes(&self) -> Result<u32, String> {
+        // NULL queries the calling process's Job, not our owned Job. Reject it
+        // explicitly so a missing handle cannot produce unrelated cleanup proof.
+        if self.job.is_null() {
+            return Err("Windows Job control has no owned handle".into());
+        }
+        use windows_sys::Win32::System::JobObjects::{
+            JOBOBJECT_BASIC_ACCOUNTING_INFORMATION, JobObjectBasicAccountingInformation,
+            QueryInformationJobObject,
+        };
+        // SAFETY: this POD output is initialized, correctly sized, and exclusively
+        // borrowed. The Job handle remains owned by self for the entire query.
+        let mut accounting: JOBOBJECT_BASIC_ACCOUNTING_INFORMATION = unsafe { std::mem::zeroed() };
+        let ok = unsafe {
+            QueryInformationJobObject(
+                self.job,
+                JobObjectBasicAccountingInformation,
+                std::ptr::from_mut(&mut accounting).cast(),
+                std::mem::size_of_val(&accounting) as u32,
+                std::ptr::null_mut(),
+            )
+        };
+        if ok == 0 {
+            Err(last_windows_error("QueryInformationJobObject"))
+        } else {
+            Ok(accounting.ActiveProcesses)
+        }
     }
 }
 
@@ -349,6 +404,8 @@ impl Drop for WindowsJobControl {
 impl BackgroundJobLauncher for WindowsBackgroundLauncher {
     async fn launch(self: Box<Self>) -> Result<LaunchedBackgroundJob, String> {
         let launched = create_windows_job(&self.program, &self.args, &self.cwd, &self.env)?;
+        // Background calls request no finite input.
+        drop(launched.stdin);
         let control = Arc::new(WindowsJobControl { job: launched.job });
         let (tx, rx) = tokio::sync::mpsc::channel(BACKGROUND_PROCESS_EVENT_CAPACITY);
         let stdout = launched.stdout;
@@ -435,6 +492,7 @@ struct WindowsLaunchHandles {
     process: windows_sys::Win32::Foundation::HANDLE,
     stdout: tokio::fs::File,
     stderr: tokio::fs::File,
+    stdin: Option<tokio::fs::File>,
 }
 
 #[cfg(windows)]
@@ -492,6 +550,168 @@ fn create_windows_job_with_hooks(
     args: &[String],
     cwd: &std::path::Path,
     extra_env: &std::collections::BTreeMap<String, String>,
+    #[cfg(test)] hooks: WindowsLaunchTestHooks<'_>,
+) -> Result<WindowsLaunchHandles, String> {
+    let executable = resolve_windows_program(program)?;
+    let args = args
+        .iter()
+        .map(std::ffi::OsString::from)
+        .collect::<Vec<_>>();
+    let command = WindowsLaunchCommand::new(
+        &executable,
+        std::ffi::OsStr::new(program),
+        &args,
+        cwd,
+        windows_environment(extra_env)?,
+        false,
+    )?;
+    create_windows_job_native(
+        command,
+        #[cfg(test)]
+        hooks,
+    )
+}
+
+/// Fully encoded launch inputs. Native resource ownership never re-reads PATH
+/// or the environment; foreground callers can supply their approved snapshot.
+#[cfg(windows)]
+struct WindowsLaunchCommand {
+    executable: Vec<u16>,
+    command: Vec<u16>,
+    cwd: Vec<u16>,
+    environment: Vec<u16>,
+    input: WindowsInput,
+}
+
+#[cfg(windows)]
+impl WindowsLaunchCommand {
+    fn new(
+        executable: &std::path::Path,
+        arg0: &std::ffi::OsStr,
+        args: &[std::ffi::OsString],
+        cwd: &std::path::Path,
+        environment: Vec<u16>,
+        pipe_stdin: bool,
+    ) -> Result<Self, String> {
+        use std::os::windows::ffi::OsStrExt;
+        let executable = wide(executable.as_os_str());
+        let cwd = wide(cwd.as_os_str());
+        let arg0 = arg0.encode_wide().collect::<Vec<_>>();
+        if executable[..executable.len() - 1].contains(&0)
+            || cwd[..cwd.len() - 1].contains(&0)
+            || arg0.iter().any(|unit| matches!(*unit, 0 | 34))
+        {
+            return Err("Windows launch path contains NUL or an unsupported program quote".into());
+        }
+        let arguments = std::iter::once(arg0)
+            .chain(args.iter().map(|arg| arg.encode_wide().collect()))
+            .collect::<Vec<_>>();
+        if !environment.ends_with(&[0, 0]) {
+            return Err("Windows environment block is not terminated".into());
+        }
+        Ok(Self {
+            executable,
+            command: windows_command_line::encode(&arguments)?,
+            cwd,
+            environment,
+            input: if pipe_stdin {
+                WindowsInput::Pipe(WindowsInputPipe::create()?)
+            } else {
+                WindowsInput::null()?
+            },
+        })
+    }
+}
+
+#[cfg(windows)]
+enum WindowsInput {
+    Pipe(WindowsInputPipe),
+    Null(std::fs::File),
+}
+
+#[cfg(windows)]
+impl WindowsInput {
+    fn child(&self) -> windows_sys::Win32::Foundation::HANDLE {
+        use std::os::windows::io::AsRawHandle;
+        match self {
+            Self::Pipe(pipe) => pipe.child.as_raw_handle() as _,
+            Self::Null(file) => file.as_raw_handle() as _,
+        }
+    }
+
+    fn into_writer(self) -> Option<tokio::fs::File> {
+        match self {
+            Self::Pipe(pipe) => {
+                drop(pipe.child);
+                Some(tokio::fs::File::from_std(pipe.parent))
+            }
+            Self::Null(_) => None,
+        }
+    }
+
+    fn null() -> Result<Self, String> {
+        use std::os::windows::io::AsRawHandle;
+        use windows_sys::Win32::Foundation::{HANDLE_FLAG_INHERIT, SetHandleInformation};
+        let input = std::fs::File::open(r"\\.\NUL")
+            .map_err(|error| format!("open Windows stdin NUL: {error}"))?;
+        // SAFETY: uniquely owned live handle; only this handle's inheritance flag
+        // changes. The native launcher includes it in its explicit allowlist.
+        if unsafe {
+            SetHandleInformation(
+                input.as_raw_handle() as _,
+                HANDLE_FLAG_INHERIT,
+                HANDLE_FLAG_INHERIT,
+            )
+        } == 0
+        {
+            return Err(last_windows_error("SetHandleInformation(stdin NUL)"));
+        }
+        Ok(Self::Null(input))
+    }
+}
+
+/// Pipe endpoints are RAII-owned before entering the raw launch boundary.
+#[cfg(windows)]
+struct WindowsInputPipe {
+    child: std::fs::File,
+    parent: std::fs::File,
+}
+
+#[cfg(windows)]
+impl WindowsInputPipe {
+    fn create() -> Result<Self, String> {
+        use std::os::windows::io::FromRawHandle;
+        use windows_sys::Win32::Foundation::{HANDLE_FLAG_INHERIT, SetHandleInformation};
+        use windows_sys::Win32::Security::SECURITY_ATTRIBUTES;
+        let security = SECURITY_ATTRIBUTES {
+            nLength: std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32,
+            lpSecurityDescriptor: std::ptr::null_mut(),
+            bInheritHandle: 1,
+        };
+        let mut read = std::ptr::null_mut();
+        let mut write = std::ptr::null_mut();
+        // SAFETY: ADR-068's accepted I300 extension permits the same native
+        // pipe/allowlist boundary for finite foreground stdin. Each successful
+        // endpoint is immediately transferred to a unique RAII file owner.
+        unsafe {
+            if windows_sys::Win32::System::Pipes::CreatePipe(&mut read, &mut write, &security, 0)
+                == 0
+            {
+                return Err(last_windows_error("CreatePipe(stdin)"));
+            }
+            let child = std::fs::File::from_raw_handle(read as _);
+            let parent = std::fs::File::from_raw_handle(write as _);
+            if SetHandleInformation(write, HANDLE_FLAG_INHERIT, 0) == 0 {
+                return Err(last_windows_error("SetHandleInformation(stdin)"));
+            }
+            Ok(Self { child, parent })
+        }
+    }
+}
+
+#[cfg(windows)]
+fn create_windows_job_native(
+    mut command: WindowsLaunchCommand,
     #[cfg(test)] mut hooks: WindowsLaunchTestHooks<'_>,
 ) -> Result<WindowsLaunchHandles, String> {
     use std::mem::{size_of, zeroed};
@@ -540,9 +760,9 @@ fn create_windows_job_with_hooks(
     let mut attr_storage = Vec::<usize>::new();
     #[cfg(test)]
     let mut attrs_initialized = false;
-    // Keep native-borrowed list storage alive through audited Delete, including negatives.
-    #[cfg(test)]
-    let mut audit_handle_list = [std::ptr::null_mut(); 2];
+    // UpdateProcThreadAttribute borrows this storage until Delete, including
+    // failure cleanup outside the launch closure in production and tests.
+    let mut inherited_handle_list = Vec::with_capacity(3);
     #[cfg(test)]
     macro_rules! acquired {
         ($role:ident, $value:expr) => {
@@ -577,7 +797,9 @@ fn create_windows_job_with_hooks(
             }
         };
     }
-    let result = (|| unsafe {
+    // Keep raw owners in this scope so an unwind takes the same cleanup path
+    // as an ordinary launch failure. Attribute backing storage also stays live.
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| unsafe {
         #[cfg(test)]
         observe!("before_pipe");
         if CreatePipe(&mut out_read, &mut out_write, &security, 0) == 0 {
@@ -631,11 +853,13 @@ fn create_windows_job_with_hooks(
         let _ = InitializeProcThreadAttributeList(std::ptr::null_mut(), 1, 0, &mut attr_size);
         let attr_words = attr_size.div_ceil(size_of::<usize>());
         attr_storage = vec![0usize; attr_words];
-        attrs = attr_storage.as_mut_ptr()
+        let pending_attrs = attr_storage.as_mut_ptr()
             as windows_sys::Win32::System::Threading::LPPROC_THREAD_ATTRIBUTE_LIST;
-        if InitializeProcThreadAttributeList(attrs, 1, 0, &mut attr_size) == 0 {
+        if InitializeProcThreadAttributeList(pending_attrs, 1, 0, &mut attr_size) == 0 {
             return Err(last_windows_error("InitializeProcThreadAttributeList"));
         }
+        // Publish only initialized lists to the shared failure cleanup.
+        attrs = pending_attrs;
         #[cfg(test)]
         {
             attrs_initialized = true;
@@ -645,56 +869,39 @@ fn create_windows_job_with_hooks(
         if hooks.fault == Some(WindowsLaunchFault::AttributeList) {
             return Err("injected attribute-list setup failure".to_owned());
         }
-        #[cfg(not(test))]
-        let handles = [out_write, err_write];
-        #[cfg(test)]
-        let handles = {
-            audit_handle_list.copy_from_slice(&[out_write, err_write]);
-            &audit_handle_list
-        };
+        inherited_handle_list.extend([out_write, err_write, command.input.child()]);
+        let handles = &inherited_handle_list;
         if UpdateProcThreadAttribute(
             attrs,
             0,
             PROC_THREAD_ATTRIBUTE_HANDLE_LIST as usize,
             handles.as_ptr() as *const _,
-            size_of::<[HANDLE; 2]>(),
+            handles.len() * size_of::<HANDLE>(),
             std::ptr::null_mut(),
             std::ptr::null_mut(),
         ) == 0
         {
             return Err(last_windows_error("UpdateProcThreadAttribute"));
         }
-        if program.contains(['\0', '"']) {
-            return Err("Windows program path contains an unsupported quote or NUL".to_owned());
-        }
-        let resolved_program = resolve_windows_program(program)?;
-        let mut program_w = wide(resolved_program.as_os_str());
-        let mut command = quote_windows_arg(program);
-        for arg in args {
-            command.push(' ');
-            command.push_str(&quote_windows_arg(arg));
-        }
-        let mut command_w = wide(std::ffi::OsStr::new(&command));
-        let cwd_w = wide(cwd.as_os_str());
-        let mut environment = windows_environment(extra_env);
         let mut startup: STARTUPINFOEXW = zeroed();
         startup.StartupInfo.cb = size_of::<STARTUPINFOEXW>() as u32;
         startup.lpAttributeList = attrs;
         startup.StartupInfo.dwFlags = 0x00000100;
         startup.StartupInfo.hStdOutput = out_write;
         startup.StartupInfo.hStdError = err_write;
+        startup.StartupInfo.hStdInput = command.input.child();
         let mut info: PROCESS_INFORMATION = zeroed();
         #[cfg(test)]
         observe!("before_process");
         if CreateProcessW(
-            program_w.as_mut_ptr(),
-            command_w.as_mut_ptr(),
+            command.executable.as_mut_ptr(),
+            command.command.as_mut_ptr(),
             std::ptr::null_mut(),
             std::ptr::null_mut(),
             1,
             CREATE_SUSPENDED | EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT,
-            environment.as_mut_ptr() as *mut _,
-            cwd_w.as_ptr(),
+            command.environment.as_mut_ptr() as *mut _,
+            command.cwd.as_ptr(),
             &startup as *const STARTUPINFOEXW as *const _,
             &mut info,
         ) == 0
@@ -744,17 +951,21 @@ fn create_windows_job_with_hooks(
         out_write = std::ptr::null_mut();
         CloseHandle(err_write);
         err_write = std::ptr::null_mut();
-        let stdout = tokio::fs::File::from_std(std::fs::File::from_raw_handle(out_read as _));
+        let stdout = std::fs::File::from_raw_handle(out_read as _);
         out_read = std::ptr::null_mut();
-        let stderr = tokio::fs::File::from_std(std::fs::File::from_raw_handle(err_read as _));
+        let stdout = tokio::fs::File::from_std(stdout);
+        let stderr = std::fs::File::from_raw_handle(err_read as _);
         err_read = std::ptr::null_mut();
+        let stderr = tokio::fs::File::from_std(stderr);
         Ok(WindowsLaunchHandles {
             job,
             process,
             stdout,
             stderr,
+            stdin: command.input.into_writer(),
         })
-    })();
+    }))
+    .unwrap_or_else(|_| Err("Windows native launch panicked; cleanup required".to_owned()));
     if result.is_err() {
         #[cfg(test)]
         observe!("before_cleanup");
@@ -859,37 +1070,22 @@ fn create_windows_job_with_hooks(
 }
 
 #[cfg(windows)]
-fn windows_environment(extra: &std::collections::BTreeMap<String, String>) -> Vec<u16> {
-    use std::os::windows::ffi::OsStrExt;
+fn windows_environment(
+    extra: &std::collections::BTreeMap<String, String>,
+) -> Result<Vec<u16>, String> {
     let dangerous = talos_sandbox::hardening::ProcessHardening::dangerous_env_var_names();
-    let mut values = std::collections::BTreeMap::<String, String>::new();
-    for (name, value) in std::env::vars() {
-        if !dangerous
-            .iter()
-            .any(|item| item.eq_ignore_ascii_case(&name))
-        {
-            values.insert(name, value);
-        }
-    }
-    values.extend(
-        extra
-            .iter()
-            .filter(|(name, _)| {
-                !dangerous
-                    .iter()
-                    .any(|item| item.eq_ignore_ascii_case(name.as_str()))
-            })
-            .map(|(name, value)| (name.clone(), value.clone())),
-    );
-    let mut block = Vec::new();
-    for (name, value) in values {
-        std::ffi::OsStr::new(&format!("{name}={value}"))
-            .encode_wide()
-            .for_each(|unit| block.push(unit));
-        block.push(0);
-    }
-    block.push(0);
-    block
+    let entries = std::env::vars_os().chain(extra.iter().map(|(name, value)| {
+        (
+            std::ffi::OsString::from(name),
+            std::ffi::OsString::from(value),
+        )
+    }));
+    windows_environment::snapshot(entries.filter(|(name, _)| {
+        !dangerous.iter().any(|item| {
+            name.to_str()
+                .is_some_and(|name| item.eq_ignore_ascii_case(name))
+        })
+    }))
 }
 
 #[cfg(windows)]
@@ -919,39 +1115,14 @@ fn resolve_windows_program(program: &str) -> Result<std::path::PathBuf, String> 
     ))
 }
 
-#[cfg(windows)]
-fn quote_windows_arg(value: &str) -> String {
-    if !value.is_empty() && !value.contains([' ', '\t', '"']) {
-        return value.to_owned();
-    }
-    let mut quoted = String::with_capacity(value.len() + 2);
-    quoted.push('"');
-    let mut backslashes = 0usize;
-    for character in value.chars() {
-        match character {
-            '\\' => backslashes += 1,
-            '"' => {
-                quoted.extend(std::iter::repeat_n('\\', backslashes * 2 + 1));
-                quoted.push('"');
-                backslashes = 0;
-            }
-            _ => {
-                quoted.extend(std::iter::repeat_n('\\', backslashes));
-                quoted.push(character);
-                backslashes = 0;
-            }
-        }
-    }
-    quoted.extend(std::iter::repeat_n('\\', backslashes * 2));
-    quoted.push('"');
-    quoted
-}
-
 #[cfg(test)]
 mod native_inventory;
 
 #[cfg(all(test, windows))]
 mod resource_acceptance;
+
+#[cfg(all(test, windows))]
+mod windows_launch_command_tests;
 
 #[cfg(all(test, windows))]
 mod handle_snapshot;
@@ -1098,18 +1269,6 @@ mod windows_tests {
     }
 
     #[test]
-    fn windows_argument_quoting_preserves_backslashes_and_quotes() {
-        assert_eq!(quote_windows_arg("plain"), "plain");
-        assert_eq!(quote_windows_arg(""), "\"\"");
-        assert_eq!(quote_windows_arg("two words"), "\"two words\"");
-        let quoted = quote_windows_arg("a\"b");
-        assert!(quoted.starts_with('"') && quoted.ends_with('"'));
-        assert!(quoted.contains("\\\""));
-        let trailing = quote_windows_arg(r#"C:\path with space\"#);
-        assert!(trailing.starts_with('"') && trailing.ends_with('"'));
-    }
-
-    #[test]
     fn windows_environment_filters_dangerous_names_case_insensitively() {
         let dangerous = talos_sandbox::hardening::ProcessHardening::dangerous_env_var_names();
         let Some(name) = dangerous.first() else {
@@ -1117,7 +1276,8 @@ mod windows_tests {
         };
         let mut extra = BTreeMap::new();
         extra.insert(name.to_ascii_lowercase(), "must-not-appear".to_owned());
-        let block = String::from_utf16_lossy(&windows_environment(&extra));
+        let block =
+            String::from_utf16_lossy(&windows_environment(&extra).expect("valid environment"));
         assert!(!block.contains("must-not-appear"));
     }
 
@@ -1690,19 +1850,15 @@ mod windows_tests {
                     "injected pipe setup failure",
                 );
                 record_handle_stage("first_pipe_cleanup", &mut phases, &mut observations);
-                // Existing input rejection is AFTER UpdateProcThreadAttribute and BEFORE
-                // resolve/environment/CreateProcessW. No new hook/native/unsafe is needed.
+                // Fail after initializing the attribute list so this stage measures
+                // cleanup of acquired native resources, not early input rejection.
                 assert_handle_stage_failure(
                     &launcher,
-                    "invalid\"program",
-                    None,
-                    "Windows program path contains an unsupported quote or NUL",
+                    &launcher.program,
+                    Some(WindowsLaunchFault::AttributeList),
+                    "injected attribute-list setup failure",
                 );
-                record_handle_stage(
-                    "attributes_prepared_then_rejected",
-                    &mut phases,
-                    &mut observations,
-                );
+                record_handle_stage("attribute_list_cleanup", &mut phases, &mut observations);
             } else {
                 let resolved =
                     resolve_windows_program(&launcher.program).expect("known fixture program");
@@ -1928,7 +2084,7 @@ mod windows_tests {
                     3 => [
                         "control_baseline",
                         "first_pipe_cleanup",
-                        "attributes_prepared_then_rejected",
+                        "attribute_list_cleanup",
                         "suspended_process_cleanup",
                     ],
                     4 => [
@@ -2100,7 +2256,7 @@ mod windows_tests {
         let pid = std::process::id().wrapping_add(1).max(1);
         let mut data = serde_json::json!({"child_pid":pid,"snapshots":4,"changes":[],
             "phase_sizes":[["control_baseline",73],["first_pipe_cleanup",74],
-                ["attributes_prepared_then_rejected",74],["suspended_process_cleanup",76]]});
+                ["attribute_list_cleanup",74],["suspended_process_cleanup",76]]});
         std::fs::write(&path, serde_json::to_vec(&data).expect("fixture JSON"))
             .expect("fixture write");
         assert!(validate_handle_receipt(&path, 3).is_ok());
