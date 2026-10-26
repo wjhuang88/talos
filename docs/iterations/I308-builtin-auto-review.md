@@ -640,3 +640,10 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
   (`Operation not permitted`) to observe maintenance descendants under the sandbox.
   A full serial preflight is now running outside that sandbox with stable source;
   log: `/private/tmp/i308-mutation-preflight-final.log`. Its outcome is pending.
+- Anchored continuation committed as `037bf5e55`. Locked cargo-xwin checking of
+  `talos-tools --no-default-features --features file-write --tests` for
+  `x86_64-pc-windows-msvc` passes; log: `/private/tmp/i308-anchored-xwin.log`.
+  This proves test-target compilation only, not native Windows execution. The
+  sandbox attempt could not update the cargo-xwin cache link; the authorized
+  outside-sandbox rerun succeeded. Fetch of `origin/main` found no upstream-only
+  commits at this checkpoint; no rebase was necessary.
