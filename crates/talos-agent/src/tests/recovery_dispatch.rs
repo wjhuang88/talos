@@ -2,10 +2,24 @@
 use super::*;
 use talos_core::tool::{ToolContribution, ToolContributionSource};
 
+struct PendingRecoveryApproval(Arc<tokio::sync::Notify>);
+
+#[async_trait]
+impl ApprovalResolver for PendingRecoveryApproval {
+    async fn resolve(
+        &self,
+        _: PermissionApprovalRequest,
+        _: std::time::Duration,
+    ) -> Result<talos_core::ApprovalChoice, ApprovalResolverError> {
+        self.0.notify_one();
+        std::future::pending().await
+    }
+}
+
 #[tokio::test]
 async fn recovery_dispatch_rechecks_policy_and_preserves_concurrent_changes() {
     for delete in [false, true] {
-        for scenario in ["allow", "deny", "ask", "changed"] {
+        for scenario in ["allow", "deny", "ask", "changed", "cancel"] {
             let root = tempfile::tempdir().expect("workspace");
             let path = root.path().join("file.txt");
             std::fs::write(&path, "before").expect("fixture");
@@ -47,7 +61,7 @@ async fn recovery_dispatch_rechecks_policy_and_preserves_concurrent_changes() {
                 None,
                 match scenario {
                     "deny" => PermissionDecision::Deny("recovery denied".into()),
-                    "ask" => PermissionDecision::Ask,
+                    "ask" | "cancel" => PermissionDecision::Ask,
                     _ => PermissionDecision::Allow,
                 },
             ));
@@ -70,6 +84,12 @@ async fn recovery_dispatch_rechecks_policy_and_preserves_concurrent_changes() {
                 ],
                 text_done_events("done"),
             ];
+            let approval_started = Arc::new(tokio::sync::Notify::new());
+            let resolver: Arc<dyn ApprovalResolver> = if scenario == "cancel" {
+                Arc::new(PendingRecoveryApproval(approval_started.clone()))
+            } else {
+                Arc::new(AutoDenyFallback)
+            };
             let agent = Agent::with_security(
                 Arc::new(MockModel::new(responses)),
                 registry,
@@ -83,13 +103,29 @@ async fn recovery_dispatch_rechecks_policy_and_preserves_concurrent_changes() {
                     talos_permission::PermissionMode::Interactive,
                     talos_permission::InteractionCapability::Available,
                 ),
-                Some(Arc::new(AutoDenyFallback)),
+                Some(resolver),
             );
             let (tx, mut rx) = mpsc::unbounded_channel();
-            agent
-                .run_streaming("restore the retained backup".into(), vec![], tx)
+            if scenario == "cancel" {
+                let task = tokio::spawn(async move {
+                    agent
+                        .run_streaming("restore the retained backup".into(), vec![], tx)
+                        .await
+                });
+                tokio::time::timeout(
+                    std::time::Duration::from_secs(2),
+                    approval_started.notified(),
+                )
                 .await
-                .expect("run");
+                .expect("restore reaches approval before cancellation");
+                task.abort();
+                assert!(task.await.expect_err("cancelled caller").is_cancelled());
+            } else {
+                agent
+                    .run_streaming("restore the retained backup".into(), vec![], tx)
+                    .await
+                    .expect("run");
+            }
             let mut results = 0;
             while let Ok(event) = rx.try_recv() {
                 if let AgentEvent::ToolResult { result, .. } = event {
@@ -102,7 +138,7 @@ async fn recovery_dispatch_rechecks_policy_and_preserves_concurrent_changes() {
                     );
                 }
             }
-            assert_eq!(results, 1);
+            assert_eq!(results, usize::from(scenario != "cancel"));
             assert_eq!(state.grant_count().expect("grants"), 0);
             match scenario {
                 "allow" => {
@@ -121,7 +157,7 @@ async fn recovery_dispatch_rechecks_policy_and_preserves_concurrent_changes() {
                     } else {
                         assert_eq!(std::fs::read_to_string(&path).expect("edited"), "after");
                     }
-                    // A denied dispatch cannot consume the receipt. An explicitly
+                    // Denied or cancelled dispatch cannot consume the receipt. An explicitly
                     // invoked tool restore proves it remains usable afterwards.
                     let retry = tool.execute(input).await;
                     assert!(!retry.is_error, "{}", retry.content);

@@ -978,3 +978,17 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
   The reviewer did not independently rerun tests and is not a human reviewer.
 - This local success does not repair or explain the previous macOS CI Checkout
   drift. Fresh exact-head CI and merge gates remain mandatory; T8 remains Partial.
+
+### Recovery caller-cancellation evidence — 2026-10-26
+
+- Real edit and delete restoration dispatch now also waits in the production
+  approval pipeline, then aborts the owning caller after observing approval
+  entry. Neither file state nor the reusable recovery receipt changes, no
+  ToolResult is fabricated and no persistent grant remains. A direct restore
+  afterwards verifies the receipt was not consumed. This proves cancellation
+  before admission, not rollback of an already-started filesystem mutation.
+- Locked focused Agent tests passed 2/2 (including ten recovery dispatch
+  combinations); Agent library/test Clippy with warnings denied and formatting
+  passed. Logs: `/private/tmp/i308-recovery-cancellation.log` and
+  `/private/tmp/i308-recovery-cancel-clippy.log`. This local extension is not
+  covered by the already-running CI for `6f56cb939`; fresh review/CI remains due.
