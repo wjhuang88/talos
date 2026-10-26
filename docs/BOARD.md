@@ -1,4 +1,15 @@
+## Active T8 implementation — 2026-10-26
+
+[I308](iterations/I308-builtin-auto-review.md) is Active after #765 merged at `8f0ce2340`.
+Local ownership and evidence stages are implemented; full H/G Auto behavior remains incomplete.
+Default network admission, higher-risk recovery and final delivery gates remain open.
+T7 is Complete; later handoff tasks remain incomplete.
+
 # Talos Board
+
+[I307](iterations/I307-bubblewrap-workspace-visibility.md) / #757 is Complete
+at #762 (`f643d8775`) with native isolation evidence. I300/T7 is also Complete / Closed
+at #735 (`ee84889fd`); its owner records final validation and review.
 
 This board is a derived operating view. It is not the source of truth for story scope,
 acceptance criteria, verification evidence, or iteration state.
@@ -33,8 +44,8 @@ PR #682 merged as `a3a4753d6e42123e33ead1d7e6f769a96f85f37e`, with final accepta
 | Embedded Skill progressive disclosure | Complete / Closed | [SKILL-006](backlog/active/SKILL-006-embedded-skill-progressive-disclosure.md) / [I303](iterations/I303-embedded-skill-progressive-disclosure.md) / #719 | #721 merged as `6d72975e`; exact-head CI, independent security/API review and CAS passed. |
 | Windows self-only handle evidence | Review / Claimed | [TEST-003](backlog/active/TEST-003-windows-owned-handle-evidence.md) / [I302](iterations/I302-windows-owned-handle-evidence.md) / #717 | #718 merged f4313237; CI3213 failed cold73→76 while modes1–7 passed, direct mode7 counts73/74/76/76. #716 mergedb5b8241e; CI3221 known-resource gate passed. I305 narrow criterion closed; unexplained resources remain OPEN. |
 | Missing pending-sidecar startup recovery | Complete / Closed | [RUNTIME-010](backlog/active/RUNTIME-010-missing-pending-sidecar-startup.md) / [I301](iterations/I301-missing-pending-sidecar-startup.md) | #711 implementation98fa04cb merged9cad344b after CI3161/review/CAS; post-merge startup comparisons recorded in I301. Broader timeout residuals remain#705. |
-| I300 structured Git repair / T7 | Active / Claimed (proposed) | [I300](iterations/I300-structured-git-repair.md) | #704 proposes atomic claim/activation under accepted ADR-089; ineffective until merge, no implementation yet. |
-| All-built-in Auto review | Refinement / Unclaimed | [PERM-007-H](backlog/active/PERM-007-H-all-builtin-auto-review.md) | Added by maintainer; next serial slice after I300, reconcile higher-risk #563 scope before activation. |
+| I300 structured Git repair / T7 | Complete / Closed | [I300](iterations/I300-structured-git-repair.md) | #735 merged `ee84889fd`; existing Completion Commit, final all-success CI 40251434249, full locked preflight and independent exact-head/base review recorded in owner. |
+| All-built-in Auto review | Active / I308 | [I308](iterations/I308-builtin-auto-review.md) | #765 activation merged at `8f0ce2340`; H/G implementation partial, default network Auto and recovery remain open. |
 | I299 preserved presentation recovery / C0 | Complete / Closed | [I299](iterations/I299-preserved-presentation-recovery.md) | #701 merged as `69092675`; full preflight, independent API/privacy review, all four native observations, exact-head CI and CAS passed. Seven handoff requirements remain incomplete and separately scheduled. |
 | I298 context budget recovery / MEM-005-A | Complete / Closed | [I298](iterations/I298-context-budget-recovery.md) | #691 merged as `8d4ad50e`; full preflight, six CI jobs, independent Agent review and CAS passed; next-minor only, no parent MEM-005 completion. |
 | I292 Search compatible backend boundary / SEARCH-001-B | Complete / Claimed | [I292](iterations/I292-search-compatible-backend-boundary.md) / [SEARCH-001-B](backlog/active/SEARCH-001-B-compatible-search-backends.md) / #642 | PR #660 merged as `7728f7681df11a9d715a0e479590c1002c53a26f`; exact-head CI run `37409618084`; no production routing change. |
@@ -180,3 +191,9 @@ independent Agent/API/security review and CAS. [Story](backlog/active/AUTO-UX-00
 [I290](iterations/I290-auto-review-conversation-locale.md) and
 [I291 final matrix](iterations/I291-auto-review-locale-product-followup.md#final-product-acceptance-and-closure)
 record all published acceptance and measured cost boundaries. #630 remains historical draft evidence.
+
+I300 Auto prerequisite amendment (2026-10-23): the governance candidate proposes
+only shared prepared-command assessment and Pull integration before T7 activation.
+It is ineffective until target-branch merge. I300 remains Active; PERM-007-H's
+remaining full built-in coverage stays unclaimed and subsequent. See the I300
+owner for scope, acceptance and complete active/review/planned inventory.

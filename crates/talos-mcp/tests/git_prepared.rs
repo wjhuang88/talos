@@ -1,0 +1,335 @@
+#[path = "support/git_daemon.rs"]
+mod git_daemon;
+
+use rmcp::ServiceExt;
+use serde_json::{Value, json};
+use std::sync::Arc;
+use std::time::Duration;
+use talos_core::tool::{ToolNature, ToolRegistry};
+use talos_mcp::server::{McpPermissionGate, TalosMcpHandler};
+use talos_permission::{PermissionDecision, PermissionEngine, PermissionRule};
+use talos_plugin::HookRegistry;
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+
+#[path = "support/git_checkout_cases.rs"]
+mod checkout;
+
+#[tokio::test]
+async fn real_git_transport_write_denial_and_replay_preserve_index() {
+    tokio::time::timeout(Duration::from_secs(30), async {
+        for allow_write in [false, true] {
+            let root = tempfile::tempdir().expect("workspace");
+            let git = |args: &[&str]| {
+                let out = std::process::Command::new("git").args(args)
+                    .current_dir(root.path()).output().expect("Git fixture");
+                assert!(out.status.success(), "{out:?}");
+                out.stdout
+            };
+            git(&["init"]);
+            std::fs::write(root.path().join("unrelated.txt"), "staged before\n").expect("fixture");
+            git(&["add", "unrelated.txt"]);
+            let before = std::fs::read(root.path().join(".git/index")).expect("index");
+            std::fs::write(root.path().join("unrelated.txt"), "unstaged after\n").expect("fixture");
+            std::fs::write(root.path().join("selected.txt"), "first\n").expect("fixture");
+            let mut engine = PermissionEngine::empty();
+            engine.set_workspace_root(root.path().to_path_buf());
+            for nature in [ToolNature::Read, ToolNature::Execute, ToolNature::Write] {
+                engine.add_rule(PermissionRule::new_nature(nature, Some("*".into()), None,
+                    if nature == ToolNature::Write && !allow_write { PermissionDecision::Deny("fixture write denial".into()) }
+                    else { PermissionDecision::Allow }));
+            }
+            let mut registry = ToolRegistry::new();
+            registry.register(Arc::new(talos_tools::git::GitAddTool::new(root.path().to_path_buf())));
+            let handler = TalosMcpHandler::new(Arc::new(registry), Arc::new(McpPermissionGate::new(
+                Arc::new(engine), Arc::new(HookRegistry::new()))));
+            let (client, server) = tokio::io::duplex(65536);
+            let task = tokio::spawn(async move {
+                handler.serve(server).await.expect("handshake").waiting().await.expect("shutdown");
+            });
+            let (read, mut write) = tokio::io::split(client);
+            let mut read = BufReader::new(read);
+            let init = json!({"jsonrpc":"2.0","id":0,"method":"initialize","params":{
+                "protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"git-test","version":"1"}}});
+            write.write_all(format!("{init}\n").as_bytes()).await.expect("init");
+            let mut line = String::new();
+            read.read_line(&mut line).await.expect("initialize response");
+            assert!(serde_json::from_str::<Value>(&line).expect("json").get("result").is_some());
+            write.write_all(b"{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n").await.expect("initialized");
+            for (attempt, id) in [1, 1, 2].into_iter().enumerate() {
+                let call = json!({"jsonrpc":"2.0","id":id,"method":"tools/call","params":{
+                    "name":"git_add","arguments":{"paths":["selected.txt"]}}});
+                write.write_all(format!("{call}\n").as_bytes()).await.expect("call");
+                line.clear();
+                read.read_line(&mut line).await.expect("response");
+                let response: Value = serde_json::from_str(&line).expect("json");
+                assert_eq!(response["id"], id);
+                if allow_write && attempt == 0 {
+                    assert!(response.get("result").is_some(), "{response}");
+                    assert_ne!(response["result"]["isError"], true, "{response}");
+                    assert_eq!(git(&["show", ":selected.txt"]), b"first\n");
+                    std::fs::write(root.path().join("selected.txt"), "second\n").expect("edit");
+                } else if allow_write && id == 1 {
+                    assert!(response["error"]["message"].as_str().expect("error").contains("already used"));
+                    assert_eq!(git(&["show", ":selected.txt"]), b"first\n");
+                } else if allow_write {
+                    assert!(response.get("result").is_some(), "{response}");
+                    assert_ne!(response["result"]["isError"], true, "{response}");
+                    assert_eq!(git(&["show", ":selected.txt"]), b"second\n");
+                } else {
+                    assert_eq!(response["id"], id);
+                    let message = response["error"]["message"].as_str().expect("permission error");
+                    assert!(message.contains(if attempt == 1 { "already used" } else { "permission denied: approval denied" }), "{response}");
+                    assert_eq!(std::fs::read(root.path().join(".git/index")).expect("index"), before);
+                }
+                assert_eq!(git(&["show", ":unrelated.txt"]), b"staged before\n");
+            }
+            drop(read);
+            drop(write);
+            task.await.expect("server task");
+        }
+    }).await.expect("deadline");
+}
+
+#[tokio::test]
+async fn real_commit_transport_requires_write_admission_and_never_replays() {
+    tokio::time::timeout(Duration::from_secs(30), async {
+        for allowed in [false, true] {
+            let root = tempfile::tempdir().expect("workspace");
+            let git = |args: &[&str]| {
+                std::process::Command::new("git").args(args).current_dir(root.path()).output().expect("git")
+            };
+            for args in [vec!["init"], vec!["config", "user.name", "Fixture"], vec!["config", "user.email", "fixture@example.invalid"], vec!["config", "commit.gpgSign", "false"]] {
+                assert!(git(&args).status.success());
+            }
+            std::fs::write(root.path().join("file"), "staged").expect("file");
+            assert!(git(&["add", "file"]).status.success());
+            let index = std::fs::read(root.path().join(".git/index")).expect("index");
+            std::fs::write(root.path().join("file"), "unstaged").expect("edit");
+            let mut engine = PermissionEngine::empty();
+            engine.set_workspace_root(root.path().into());
+            for nature in [ToolNature::Read, ToolNature::Execute, ToolNature::Write] {
+                engine.add_rule(PermissionRule::new_nature(nature, Some("*".into()), None,
+                    if nature == ToolNature::Write && !allowed { PermissionDecision::Deny("fixture denial".into()) } else { PermissionDecision::Allow }));
+            }
+            let mut registry = ToolRegistry::new();
+            registry.register(Arc::new(talos_tools::git::GitCommitTool::new(root.path().into())));
+            let handler = Arc::new(TalosMcpHandler::new_with_owner_lifecycle(Arc::new(registry), Arc::new(McpPermissionGate::new(Arc::new(engine), Arc::new(HookRegistry::new()))), true));
+            let (client, server) = tokio::io::duplex(65536);
+            let task = tokio::spawn(async move {
+                handler.clone().serve(server).await.expect("handshake").waiting().await.expect("transport");
+                handler.shutdown(Duration::from_secs(5)).await.expect("cleanup");
+            });
+            let (read, mut write) = tokio::io::split(client);
+            let mut read = BufReader::new(read);
+            let init = json!({"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"commit-test","version":"1"}}});
+            write.write_all(format!("{init}\n").as_bytes()).await.expect("init");
+            let mut line = String::new();
+            read.read_line(&mut line).await.expect("response");
+            assert!(serde_json::from_str::<Value>(&line).expect("json").get("result").is_some());
+            write.write_all(b"{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n").await.expect("initialized");
+            let mut first_head = None;
+            for attempt in 0..2 {
+                let call = json!({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"git_commit","arguments":{"message":"MCP commit"}}});
+                write.write_all(format!("{call}\n").as_bytes()).await.expect("call");
+                line.clear();
+                read.read_line(&mut line).await.expect("response");
+                let response: Value = serde_json::from_str(&line).expect("json");
+                if attempt == 1 {
+                    assert!(response["error"]["message"].as_str().expect("replay error").contains("already used"), "{response}");
+                } else if allowed {
+                    assert!(response.get("result").is_some(), "{response}");
+                    assert_ne!(response["result"]["isError"], true, "{response}");
+                    let head = git(&["rev-parse", "HEAD"]);
+                    assert!(head.status.success());
+                    first_head = Some(head.stdout);
+                } else {
+                    assert!(response["error"]["message"].as_str().expect("denial").contains("permission denied"), "{response}");
+                }
+                if allowed {
+                    assert_eq!(git(&["rev-parse", "HEAD"]).stdout, *first_head.as_ref().expect("head"));
+                    assert_eq!(git(&["show", "HEAD:file"]).stdout, b"staged");
+                } else {
+                    assert!(!git(&["rev-parse", "--verify", "HEAD"]).status.success());
+                    assert_eq!(std::fs::read(root.path().join(".git/index")).expect("index"), index);
+                    assert!(!root.path().join(".git/COMMIT_EDITMSG").exists());
+                }
+                assert_eq!(std::fs::read_to_string(root.path().join("file")).expect("worktree"), "unstaged");
+            }
+            drop(read); drop(write);
+            task.await.expect("joined");
+        }
+    }).await.expect("test deadline");
+}
+
+#[tokio::test]
+async fn real_push_transport_network_denial_never_connects_or_replays() {
+    tokio::time::timeout(Duration::from_secs(30), async {
+        let root = tempfile::tempdir().expect("workspace");
+        assert!(std::process::Command::new("git").arg("init").current_dir(root.path()).output().expect("git").status.success());
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("listener");
+        listener.set_nonblocking(true).expect("nonblocking");
+        let remote = format!("git://{}/repository", listener.local_addr().expect("address"));
+        let mut engine = PermissionEngine::empty();
+        engine.set_workspace_root(root.path().into());
+        for nature in [ToolNature::Read, ToolNature::Execute, ToolNature::Write, ToolNature::Network] {
+            engine.add_rule(PermissionRule::new_nature(nature, Some("*".into()), None,
+                if nature == ToolNature::Network { PermissionDecision::Deny("network fixture denial".into()) } else { PermissionDecision::Allow }));
+        }
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(talos_tools::git::GitPushTool::new(root.path().into())));
+        let handler = Arc::new(TalosMcpHandler::new_with_owner_lifecycle(Arc::new(registry), Arc::new(McpPermissionGate::new(Arc::new(engine), Arc::new(HookRegistry::new()))), true));
+        let (client, server) = tokio::io::duplex(65536);
+        let task = tokio::spawn(async move {
+            handler.clone().serve(server).await.expect("handshake").waiting().await.expect("transport");
+            handler.shutdown(Duration::from_secs(5)).await.expect("cleanup");
+        });
+        let (read, mut write) = tokio::io::split(client);
+        let mut read = BufReader::new(read);
+        let init = json!({"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"push-test","version":"1"}}});
+        write.write_all(format!("{init}\n").as_bytes()).await.expect("init");
+        let mut line = String::new();
+        read.read_line(&mut line).await.expect("response");
+        assert!(serde_json::from_str::<Value>(&line).expect("json").get("result").is_some());
+        write.write_all(b"{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n").await.expect("initialized");
+        for attempt in 0..2 {
+            let call = json!({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"git_push","arguments":{"remote":remote}}});
+            write.write_all(format!("{call}\n").as_bytes()).await.expect("call");
+            line.clear();
+            read.read_line(&mut line).await.expect("response");
+            let response: Value = serde_json::from_str(&line).expect("json");
+            let message = response["error"]["message"].as_str().expect("denied");
+            assert!(message.contains(if attempt == 0 { "permission denied" } else { "already used" }), "{response}");
+            assert_eq!(listener.accept().expect_err("no network connection").kind(), std::io::ErrorKind::WouldBlock);
+            assert!(!root.path().join(".git/index").exists());
+        }
+        drop(read); drop(write);
+        task.await.expect("joined");
+    }).await.expect("deadline");
+}
+
+#[tokio::test]
+async fn real_push_transport_success_and_replay_preserve_remote_head() {
+    async {
+        let root = tempfile::tempdir().expect("workspace");
+        let receiver = tempfile::tempdir().expect("receiver");
+        let git = |cwd: &std::path::Path, args: &[&str]| {
+            let output = std::process::Command::new("git").current_dir(cwd).args(args).output().expect("git");
+            assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+            output.stdout
+        };
+        git(root.path(), &["init", "-b", "main"]);
+        #[cfg(windows)]
+        git(root.path(), &["config", "sendpack.sideband", "false"]);
+        git(receiver.path(), &["init", "--bare"]);
+        for (key, value) in [("user.name", "Fixture"), ("user.email", "fixture@example.invalid"), ("commit.gpgSign", "false")] {
+            git(root.path(), &["config", key, value]);
+        }
+        git(root.path(), &["commit", "--allow-empty", "-m", "first"]);
+        let expected = git(root.path(), &["rev-parse", "HEAD"]);
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("port");
+        let port = listener.local_addr().expect("address").port();
+        drop(listener);
+        git_daemon::with_daemon(receiver.path(), port, async {
+        let remote = format!("git://127.0.0.1:{port}/{}", receiver.path().file_name().expect("name").to_string_lossy());
+        let mut engine = PermissionEngine::empty();
+        engine.set_workspace_root(root.path().into());
+        for nature in [ToolNature::Read, ToolNature::Execute, ToolNature::Write, ToolNature::Network] {
+            engine.add_rule(PermissionRule::new_nature(nature, Some("*".into()), None, PermissionDecision::Allow));
+        }
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(talos_tools::git::GitPushTool::new(root.path().into())));
+        let handler = Arc::new(TalosMcpHandler::new_with_owner_lifecycle(Arc::new(registry), Arc::new(McpPermissionGate::new(Arc::new(engine), Arc::new(HookRegistry::new()))), true));
+        let (client, server) = tokio::io::duplex(65536);
+        let task = tokio::spawn(async move {
+            handler.clone().serve(server).await.expect("handshake").waiting().await.expect("transport");
+            handler.shutdown(Duration::from_secs(5)).await.expect("cleanup");
+        });
+        let (read, mut write) = tokio::io::split(client);
+        let mut read = BufReader::new(read);
+        let init = json!({"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"push-success","version":"1"}}});
+        write.write_all(format!("{init}\n").as_bytes()).await.expect("init");
+        let mut line = String::new();
+        read.read_line(&mut line).await.expect("response");
+        assert!(serde_json::from_str::<Value>(&line).expect("json").get("result").is_some());
+        write.write_all(b"{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n").await.expect("initialized");
+        for attempt in 0..2 {
+            let call = json!({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"git_push","arguments":{"remote":remote,"branch":"HEAD:refs/heads/main"}}});
+            write.write_all(format!("{call}\n").as_bytes()).await.expect("call");
+            line.clear();
+            read.read_line(&mut line).await.expect("response");
+            let response: Value = serde_json::from_str(&line).expect("json");
+            if attempt == 0 {
+                assert!(response.get("result").is_some() && response["result"]["isError"] != true, "{response}");
+                git(root.path(), &["commit", "--allow-empty", "-m", "must not replay"]);
+            } else {
+                assert!(response["error"]["message"].as_str().expect("replay").contains("already used"), "{response}");
+            }
+            assert_eq!(git(receiver.path(), &["rev-parse", "refs/heads/main"]), expected);
+        }
+        drop(read); drop(write);
+        task.await.expect("joined");
+        }).await;
+    }.await;
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn real_local_push_transport_success_denial_and_replay() {
+    tokio::time::timeout(Duration::from_secs(30), async {
+        for allowed in [false, true] {
+        let root = tempfile::tempdir().expect("workspace");
+        let receiver = tempfile::tempdir().expect("receiver");
+        let git = |cwd: &std::path::Path, args: &[&str]| {
+            let output = std::process::Command::new("git").current_dir(cwd).args(args).output().expect("git");
+            assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+            output.stdout
+        };
+        git(root.path(), &["init", "-b", "main"]);
+        git(receiver.path(), &["init", "--bare"]);
+        for (key, value) in [("user.name", "Fixture"), ("user.email", "fixture@example.invalid"), ("commit.gpgSign", "false")] {
+            git(root.path(), &["config", key, value]);
+        }
+        git(root.path(), &["commit", "--allow-empty", "-m", "first"]);
+        let expected = git(root.path(), &["rev-parse", "HEAD"]);
+        let remote = receiver.path().to_string_lossy().into_owned();
+        let mut engine = PermissionEngine::empty();
+        engine.set_workspace_root(root.path().into());
+        for nature in [ToolNature::Read, ToolNature::Execute, ToolNature::Write, ToolNature::Network] {
+            engine.add_rule(PermissionRule::new_nature(nature, Some("*".into()), None, if nature == ToolNature::Write && !allowed { PermissionDecision::Deny("fixture receiver write denial".into()) } else { PermissionDecision::Allow }));
+        }
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(talos_tools::git::GitPushTool::new(root.path().into())));
+        let handler = Arc::new(TalosMcpHandler::new_with_owner_lifecycle(Arc::new(registry), Arc::new(McpPermissionGate::new(Arc::new(engine), Arc::new(HookRegistry::new()))), true));
+        let (client, server) = tokio::io::duplex(65536);
+        let task = tokio::spawn(async move {
+            handler.clone().serve(server).await.expect("handshake").waiting().await.expect("transport");
+            handler.shutdown(Duration::from_secs(5)).await.expect("cleanup");
+        });
+        let (read, mut write) = tokio::io::split(client);
+        let mut read = BufReader::new(read);
+        let init = json!({"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"push-success","version":"1"}}});
+        write.write_all(format!("{init}\n").as_bytes()).await.expect("init");
+        let mut line = String::new();
+        read.read_line(&mut line).await.expect("response");
+        assert!(serde_json::from_str::<Value>(&line).expect("json").get("result").is_some());
+        write.write_all(b"{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n").await.expect("initialized");
+        for attempt in 0..2 {
+            let call = json!({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"git_push","arguments":{"remote":remote,"branch":"HEAD:refs/heads/main"}}});
+            write.write_all(format!("{call}\n").as_bytes()).await.expect("call");
+            line.clear();
+            read.read_line(&mut line).await.expect("response");
+            let response: Value = serde_json::from_str(&line).expect("json");
+            if attempt == 0 && allowed {
+                assert!(response.get("result").is_some() && response["result"]["isError"] != true, "{response}");
+                git(root.path(), &["commit", "--allow-empty", "-m", "must not replay"]);
+            } else {
+                assert!(response["error"]["message"].as_str().expect("denial or replay").contains(if attempt == 0 { "permission denied" } else { "already used" }), "{response}");
+            }
+            if allowed { assert_eq!(git(receiver.path(), &["rev-parse", "refs/heads/main"]), expected); }
+            else { assert!(!receiver.path().join("refs/heads/main").exists()); assert!(!receiver.path().join("objects/pack").read_dir().expect("pack").any(|entry| entry.is_ok())); }
+        }
+        drop(read); drop(write);
+        task.await.expect("joined");
+        }
+    }).await.expect("deadline");
+}

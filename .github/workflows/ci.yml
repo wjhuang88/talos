@@ -225,6 +225,30 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
+      - name: Record native Git transport executables
+        shell: pwsh
+        run: |
+          git version --build-options
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $gitExecPath = git --exec-path
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Write-Host "Git exec-path: $gitExecPath"
+          foreach ($name in @('git.exe', 'git-receive-pack.exe', 'git-upload-pack.exe')) {
+            $candidate = Join-Path $gitExecPath $name
+            if (Test-Path -LiteralPath $candidate) {
+              Get-Item -LiteralPath $candidate -ErrorAction Stop |
+                Select-Object FullName, LinkType, Target
+            } else {
+              Write-Host "Git exec-path entry absent: $candidate"
+            }
+          }
+          $transportShell = git var GIT_SHELL_PATH
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Write-Host "Git transport shell: $transportShell"
+          Get-Command git, sh -CommandType Application | Select-Object Name, Source
+          Get-Item -LiteralPath $transportShell -ErrorAction Stop |
+            Select-Object FullName, LinkType, Target
+
       - name: Format
         run: cargo fmt --all -- --check
 
@@ -247,6 +271,68 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cargo test -p talos-desktop --features desktop-ui --locked
           exit $LASTEXITCODE
+
+      - name: Structured Git executable and path identity guard tests
+        # Independent evidence must still run after a Desktop failure.
+        # Earlier failures remain failures of the job.
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          $tests = @(
+            'process_boundary::windows_foreground::tests::panicked_io_worker_never_confirms_cleanup',
+            'process_boundary::windows_foreground::tests::ordinary_io_error_has_completed_resource_ownership',
+            'process_boundary::windows_foreground::tests::dropped_reservation_is_sticky_but_other_operations_are_isolated',
+            'process_boundary::windows_foreground::tests::foreground_finite_binary_input_reaches_eof_and_returns_exact_output',
+            'process_boundary::windows_foreground::tests::foreground_large_input_drains_both_output_pipes_concurrently',
+            'process_boundary::windows_foreground::tests::foreground_timeout_confirms_job_and_io_cleanup',
+            'process_boundary::windows_foreground::tests::foreground_output_limit_terminates_writer_and_confirms_cleanup',
+            'process_boundary::windows_foreground::tests::foreground_leader_exit_reaps_descendant_with_redirected_stdio',
+            'process_boundary::windows_foreground::tests::dropped_foreground_wait_keeps_cleanup_owned',
+            'process_boundary::windows_foreground::tests::cancelling_one_foreground_operation_preserves_another_live_job',
+            'git::git_write::prepared_add::tests::windows_program_guard_allows_real_git_startup',
+            'git::git_write::prepared_add::host_path::tests::explicit_git_directory_argument_preserves_canonical_identity',
+            'git::git_write::prepared_add::host_path::tests::explicit_git_directory_arguments_run_native_git',
+            'git::git_write::prepared_add::tests::program_evidence_retains_windows_replacement_guard',
+            'git::git_write::prepared_add::tests::sender_program_binding_requires_new_exact_read_admission',
+            'git::git_write::prepared_add::tests::sender_configuration_sources_remain_readable_after_rebinding',
+            'git::git_write::prepared_add::tests::sender_program_binding_preserves_invocation_budget',
+            'git::git_write::prepared_add::tests::windows_internal_program_report_matches_only_retained_canonical_spelling',
+            'git::git_write::prepared_add::tests::internal_program_validation_distinguishes_unadmitted_path_from_target_drift',
+            'git::git_write::prepared_add::tests::push_program_rebind_preserves_sender_effects_without_receiver_reads',
+            'git::git_write::prepared_add::tests::push_program_rebind_rejects_changed_destination_plan',
+            'git::git_write::snapshot::tests::path_identity_retains_leaf_and_ancestor_identity',
+            'git::git_write::snapshot::tests::regular_evidence_rejects_identical_byte_inode_replacement',
+            'git::git_write::prepared_add::tests::pull_command::native_command_refuses_frozen_invocation_substitution_before_fetch',
+            'git::git_write::prepared_add::tests::pull_command::native_command_refuses_configuration_drift_before_fetch',
+            'git::git_write::prepared_add::tests::exact_approved_plan_stages_selected_file',
+            'git::git_write::prepared_add::tests::direct_and_forged_or_exchanged_proofs_cannot_stage',
+            'git::git_write::prepared_add::tests::approval_is_bound_to_prepared_source_and_index',
+            'git::git_write::prepared_add::tests::real_commit_preserves_index_semantics_and_all_excludes_untracked',
+            'git::git_write::prepared_add::tests::commit_plan_binds_tracked_sources_and_rejects_add_proof',
+            'git::git_write::prepared_add::tests::checkout_nonrecursive_gitlink_preserves_dirty_child_worktree',
+            'git::git_write::prepared_add::tests::prepared_push_transfers_objects_with_explicit_sideband_disabled',
+            'git::git_write::prepared_add::tests::checkout_ref_movement_after_discovery_invalidates_plan'
+          )
+          $listed = @(cargo test -p talos-tools --features git --locked --lib -- --list)
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $gateTests = @(cargo test -p talos-tools --features git --locked --test windows_git_preparation_gate -- --list)
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($gateTests -notcontains 'production_prepared_add_requires_proof_and_stages_exact_path: test') {
+            throw 'Required production Windows prepared Add execution regression is missing'
+          }
+          cargo test -p talos-tools --features git --locked --test windows_git_preparation_gate
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo test -p talos-runtime --locked --test i300_native_pull
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo test -p talos-mcp --locked --test git_pull_prepared
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          foreach ($test in $tests) {
+            if ($listed -notcontains "${test}: test") {
+              throw "Required Windows Git regression is missing: $test"
+            }
+            cargo test -p talos-tools --features git --locked --lib $test -- --exact --nocapture
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
 
       - name: Focused PowerShell process, permission, and timeout tests
         run: |
@@ -288,6 +374,9 @@ jobs:
           retention-days: 14
 
       - name: Test workspace
+        # Preserve cross-crate evidence after an independent Desktop/guard failure.
+        # This does not suppress the earlier failure or run after cancellation.
+        if: ${{ !cancelled() }}
         timeout-minutes: 20
         shell: pwsh
         run: |
@@ -360,8 +449,32 @@ jobs:
             }
             Write-Host ('I302_INSTALLED_MODULE ' + ($record | ConvertTo-Json -Compress))
           }
-          cargo test --workspace --locked --no-fail-fast 2>&1 | Tee-Object -FilePath windows-workspace-tests.log
-          $testExit = $LASTEXITCODE
+          # Preserve panic diagnostics even if a later test hangs until the step timeout.
+          # I300: distinguish live Cargo/test processes from inherited output handles
+          # after Cargo prints its final summary. No command lines or environment values.
+          $processLog = Join-Path $PWD 'windows-workspace-processes.jsonl'
+          $observer = Start-Job -ArgumentList $processLog -ScriptBlock {
+            param($logPath)
+            for ($sample = 0; $sample -lt 20; $sample++) {
+              try {
+                $processes = @(Get-CimInstance Win32_Process -OperationTimeoutSec 5 |
+                  Select-Object -First 256 Name, ProcessId, ParentProcessId, HandleCount, ThreadCount, CreationDate)
+                @{ utc = [DateTime]::UtcNow.ToString('o'); sample = $sample; processes = $processes } |
+                  ConvertTo-Json -Depth 4 -Compress | Add-Content -LiteralPath $logPath
+              } catch {
+                @{ utc = [DateTime]::UtcNow.ToString('o'); sample = $sample; status = 'observation_failed' } |
+                  ConvertTo-Json -Compress | Add-Content -LiteralPath $logPath
+              }
+              Start-Sleep -Seconds 60
+            }
+          }
+          try {
+            cargo test --workspace --locked --no-fail-fast -- --nocapture 2>&1 | Tee-Object -FilePath windows-workspace-tests.log
+            $testExit = $LASTEXITCODE
+          } finally {
+            Stop-Job -Job $observer -ErrorAction SilentlyContinue
+            Remove-Job -Job $observer -Force -ErrorAction SilentlyContinue
+          }
           if ($testExit -ne 0) {
             Write-Host "=== Windows workspace failure summary ==="
             Select-String -Path windows-workspace-tests.log -Pattern "FAILED|failures:|test result: FAILED|error: test failed|panicked at" -Context 3,8 |
@@ -381,6 +494,7 @@ jobs:
           path: |
             windows-workspace-failures.log
             windows-workspace-tests.log
+            windows-workspace-processes.jsonl
           if-no-files-found: warn
           retention-days: 3
 
@@ -425,7 +539,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y clang libclang-dev pkg-config libfontconfig1-dev libfreetype6-dev \
             libx11-dev libx11-xcb-dev libxcb1-dev libxcb-shape0-dev libxcb-xfixes0-dev \
-            libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libegl1-mesa-dev libvulkan-dev
+            libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libegl1-mesa-dev libvulkan-dev bubblewrap
+      - name: Native Bubblewrap isolation regressions
+        run: cargo test -p talos-sandbox --features bwrap_installed --locked
       - name: Desktop explicit feature validation
         shell: bash
         run: |
@@ -433,7 +549,52 @@ jobs:
           unset RXCB_EXPORT RING_PREGENERATE_ASM
           cargo clippy -p talos-desktop --features desktop-ui --all-targets --locked -- -D warnings
           cargo test -p talos-desktop --features desktop-ui --locked
-
+      - name: Record Linux Desktop diagnostic environment
+        if: ${{ !cancelled() && github.event.pull_request.number == 735 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat /etc/os-release
+          printf 'runner image: %s / %s\n' "${ImageOS:-unknown}" "${ImageVersion:-unknown}"
+          if command -v bwrap >/dev/null 2>&1; then
+            if ! bwrap --version; then echo 'bwrap version command failed'; fi
+          else
+            echo 'bwrap unavailable; sandbox availability check should be false'
+          fi
+          rustc -o "${RUNNER_TEMP}/talos-auto-temp-diagnostic" - <<'RS'
+          fn main() {
+              let temp = std::env::temp_dir();
+              println!("Rust temp directory is absolute: {}", temp.is_absolute());
+              match temp.canonicalize() {
+                  Ok(root) => println!("Rust canonical temp directory is /tmp or below: {}", root.starts_with("/tmp")),
+                  Err(error) => println!("Rust temp canonicalization failed: {:?}", error.kind()),
+              }
+          }
+          RS
+          "${RUNNER_TEMP}/talos-auto-temp-diagnostic"
+          if command -v bwrap >/dev/null 2>&1; then
+            probe_root=$(mktemp -d /tmp/talos-bwrap-order.XXXXXX)
+            trap 'rm -rf -- "$probe_root"' EXIT
+            mkdir "$probe_root/workspace"
+            printf 'workspace marker\n' > "$probe_root/workspace/marker"
+            cd "$probe_root/workspace"
+            # Compare native mount semantics without changing Talos production behavior.
+            for layout in current workspace-last; do
+              args=(--ro-bind / /)
+              if [[ "$layout" == current ]]; then
+                args+=(--bind "$PWD" "$PWD" --dev /dev --proc /proc --tmpfs /tmp)
+              else
+                args+=(--dev /dev --proc /proc --tmpfs /tmp --bind "$PWD" "$PWD" --chdir "$PWD")
+              fi
+              echo "Bubblewrap mount-order probe: $layout"
+              if bwrap "${args[@]}" --unshare-net --die-with-parent -- sh -c 'pwd; test -f ./marker'; then
+                echo 'workspace marker visible: yes'
+              else
+                echo "workspace marker probe failed: exit $? (inspect stderr for namespace or mount failure)"
+              fi
+            done
+          fi
+          echo 'Source factory is ManagedSandbox/BubblewrapSandbox; selected backend and namespace visibility are not observed here'
   remote-governance-reconciliation:
     name: Remote issue / owner reconciliation
     continue-on-error: true

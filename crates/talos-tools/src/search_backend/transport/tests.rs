@@ -1,4 +1,5 @@
 use super::*;
+mod connect;
 mod headers;
 mod prepared;
 mod tls;

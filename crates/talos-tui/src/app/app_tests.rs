@@ -3014,13 +3014,13 @@ fn provider_protocol_cursor_hidden_when_selected_row_is_clipped() {
         panic!("provider wizard panel expected");
     };
     *step = WizardStep::Protocol;
-    *protocol = "anthropic-messages".into();
+    *protocol = "openai-responses".into();
 
-    for height in [1, 2, 3, 4] {
+    for height in [1, 2, 3, 4, 5] {
         let tui = render_modal_for_cursor(panel.clone(), 40, height);
         assert!(
             !tui.terminal.test_cursor_visible(),
-            "second protocol option must hide at terminal height {height}"
+            "third protocol option must hide at terminal height {height}"
         );
     }
 
@@ -3028,7 +3028,7 @@ fn provider_protocol_cursor_hidden_when_selected_row_is_clipped() {
     assert_eq!(
         tui.terminal.test_cursor_position().map(|pos| pos.y),
         Some(7),
-        "the second protocol option must remain at local row 3"
+        "the third protocol option must remain at local row 4"
     );
 }
 

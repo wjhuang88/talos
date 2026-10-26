@@ -4,10 +4,19 @@
 |---|---|
 | Story ID | PERM-007-H |
 | Type | Permission / Security Story |
-| Status | Refinement / Unclaimed |
+| Status | In Progress (#765 merged; I308 active) |
 | Source | Maintainer request 2026-10-11: automatic approval must cover all built-in tools, not only script execution |
-| Selected Iteration | Next serial iteration after I300; not activated |
+| Selected Iteration | I308 / #765, activated at `8f0ce2340` |
 | Depends On | I300 truthful Git effects; existing Agent-owned permission pipeline and shared evaluator |
+
+## Current Execution — 2026-10-26
+
+Activation #765 is merged at `8f0ce2340`. [I308](../../iterations/I308-builtin-auto-review.md)
+records local implementation and validation; full H/G acceptance remains incomplete.
+Exact-input creation review and opt-in bounded edit/delete backup/recovery are
+implemented locally. Default HTTP/WebSearch, ordinary effectful exec and higher-risk
+edit/delete Auto admission remain unimplemented; recovery alone does not satisfy G.
+The selection-proposal paragraphs below preserve the published baseline and are historical.
 
 ## Outcome
 
@@ -15,8 +24,30 @@ Auto mode evaluates built-in tool requests consistently by their actual effects,
 user intent and bound resources. Do not force an otherwise assessable operation
 to manual approval solely because its tool name is absent from a shell-specific
 allowlist. This is an implementation requirement, not only an inventory task.
+The maintainer accepted this full native-tool scope. An operation requiring a
+human-only boundary remains visible in the inventory with its precise reason;
+the acceptance does not authorize a model to override explicit Deny, an
+unenforceable effect boundary, or a hard safety constraint.
 
 ## Current Evidence
+
+### Maintainer clarification — 2026-10-22
+
+Auto must perform model-assisted safety assessment **and actual invocation-local
+approval**, including operations with Network, Write and Execute effects. These
+effect classes alone must not force human approval. The existing read-only-first
+implementation is historical containment, not the desired final acceptance.
+Assess the concrete operation, user intent, destinations and impact together;
+escalate concrete unresolved risks, missing intent or assessment failure to the
+human. Explicit Deny and user-selected mandatory-human checkpoints remain binding.
+
+Pull is the concrete motivating case: preserve native Git command behavior and
+review the operation as a whole, rather than exhaustively predicting Git's
+internal file changes. An advisory-only model response followed unconditionally
+by human approval does not satisfy this requirement. Reconcile ADR-064/070/089
+and PERM-007-G as part of delivery; do not treat their initial implementation
+restrictions as grounds to reject this accepted requirement. This clarification
+records the target, not evidence that the policy or runtime has been implemented.
 
 `talos-agent/src/auto_resolver.rs::project_auto_request` currently dispatches only
 to `eligible`, `eligible_exec` and `eligible_bash`. The first permits a narrow
@@ -52,6 +83,10 @@ registration and all approval entrypoints before final design.
   allow/deny/uncertain/error/cancel/stale-evidence tests, across applicable hosts.
   Include representative non-shell operations and a coverage check detecting new
   built-ins that lack a declared/tested disposition.
+- Treat coverage as a registry-level invariant, including feature-gated production
+  registrations: a newly registered built-in without review evidence/disposition
+  must fail the coverage check, not silently fall back to a shell-only allowlist.
+  Existing policy-allowed read-only calls must remain free of extra model latency.
 - Update Auto user documentation and tool behavior/migration notes; independent
   permission/security/API review and normal exact-head gates remain mandatory.
 
@@ -65,8 +100,35 @@ All built-ins enter the coverage inventory; permanently excluding higher-risk
 families simply to claim universal coverage is not acceptable.
 
 Existing per-operation mandatory-human policies require an explicit reviewed
-policy decision before model-assisted allowance can replace them. Record the
-concrete policy/API delta after investigation, not a speculative blanket waiver.
+policy decision before model-assisted allowance can replace them. ADR-064's
+2026-10-22 maintainer amendment already accepts invocation-local model approval
+for suitable Network, Write and Execute requests; PERM-007-H must implement
+and independently review the concrete typed boundaries rather than repeat the
+old category-wide refusal. Preserve explicit Deny, explicit human-only choices,
+and human fallback for concrete uncertainty or inadequate evidence.
 MCP/plugin tools are not automatically included by this native-tool request.
 No release, new dependency, new unsafe code or arbitrary permanent grant is
 authorized by this intake. The complete handoff retains this added deliverable.
+
+## I300 prerequisite sequencing amendment — 2026-10-23
+
+I300 proposes ownership of only shared prepared-command assessment and native
+Pull admission needed to satisfy its existing Auto activation acceptance. This
+amendment takes effect only on target-branch merge of the governance candidate.
+It removes the T7-before-T8 dependency cycle without reducing this Story's full
+registry coverage, other built-in operations, or higher-risk policy requirements.
+PERM-007-H remains Refinement / Unclaimed; reuse and verify I300's shared path
+when this Story is activated. No generic all-built-in Auto success is claimed.
+
+## I308 Selection Proposal — 2026-10-26
+
+[I308](../../iterations/I308-builtin-auto-review.md) proposes joint ownership of H and G
+for handoff T8. Proposed claim/activation in #765 is ineffective until target-branch merge.
+It preserves the complete existing acceptance, including actual invocation-local effectful
+approval and G's diff/impact/backup/recovery requirements. Historical higher-risk human gates
+remain until concrete implementation is independently reviewed and validated. No implementation
+or universal Auto coverage is claimed by selection. The iteration holds the single claim record;
+these Story owners delegate execution tracking to it once effective.
+
+Current proposal supersedes historical Unclaimed/intake-only descriptions only upon #765 merge.
+No runtime policy changes occur in this governance PR; higher-risk eligibility still requires implementation.

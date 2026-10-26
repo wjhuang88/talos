@@ -1036,6 +1036,26 @@ impl RuntimeHost {
         durable_identity: Option<DurableBinding>,
         evaluation_harness: Option<EvaluationHarness>,
     ) -> Result<Self, String> {
+        Self::start_with_evaluation_observed(
+            provider,
+            workspace_root,
+            durable_identity,
+            evaluation_harness,
+            #[cfg(test)]
+            None,
+        )
+    }
+
+    fn start_with_evaluation_observed(
+        provider: impl FnOnce() -> Result<(Arc<dyn LanguageModel>, u32, bool), String> + Send + 'static,
+        workspace_root: impl Into<PathBuf>,
+        durable_identity: Option<DurableBinding>,
+        evaluation_harness: Option<EvaluationHarness>,
+        #[cfg(test)] observer: Option<Arc<dyn talos_plugin::HookHandler>>,
+    ) -> Result<Self, String> {
+        // This test observer must not replace a durable session's artifact hooks.
+        #[cfg(test)]
+        assert!(observer.is_none() || durable_identity.is_none());
         let workspace_root = workspace_root.into();
         let (commands, command_rx) = mpsc::channel(COMMAND_CAPACITY);
         let (outputs, output_rx) = mpsc::channel(EVENT_CAPACITY);
@@ -1165,6 +1185,12 @@ impl RuntimeHost {
                                         evaluator: report.evaluator,
                                     });
                                 }));
+                            #[cfg(test)]
+                            if let Some(observer) = observer {
+                                let mut hooks = talos_runtime::RuntimeHookRegistry::new();
+                                hooks.register(observer);
+                                builder = builder.hook_registry(Arc::new(hooks));
+                            }
                             if let Some((sessions_dir, session_id)) = &work_source {
                                 for contribution in
                                     talos_session::todo_tool_contributions_for_sessions_dir(

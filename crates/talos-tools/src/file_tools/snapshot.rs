@@ -273,6 +273,12 @@ pub(crate) fn digest(bytes: &[u8]) -> [u8; 32] {
 }
 
 #[cfg(feature = "file-write")]
+#[cfg(test)]
+thread_local! {
+    pub(super) static FAIL_AFTER_RENAME: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+#[cfg(feature = "file-write")]
 pub(crate) fn atomic_replace(
     path: &Path,
     bytes: &[u8],
@@ -283,7 +289,7 @@ pub(crate) fn atomic_replace(
         .lock()
         .map_err(|_| FileToolError::SnapshotRegistryUnavailable)?;
     verify_path_identity(path)?;
-    let current = fs::read(path)?;
+    let (current, permissions) = super::recovery::read_bounded_regular_file(path)?;
     verify_path_identity(path)?;
     if digest(&current) != expected_revision {
         return Err(FileToolError::FileRevisionMismatch);
@@ -304,10 +310,16 @@ pub(crate) fn atomic_replace(
             .open(&temp)?;
         file.write_all(bytes)?;
         file.sync_all()?;
-        file.set_permissions(fs::metadata(path)?.permissions())?;
+        file.set_permissions(permissions)?;
         drop(file);
         verify_path_identity(path)?;
         fs::rename(&temp, path)?;
+        #[cfg(test)]
+        if FAIL_AFTER_RENAME.replace(false) {
+            return Err(FileToolError::AtomicWriteFailed(
+                "injected post-rename sync failure".into(),
+            ));
+        }
         #[cfg(unix)]
         fs::File::open(parent)?.sync_all()?;
         Ok(())

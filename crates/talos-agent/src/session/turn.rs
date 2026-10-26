@@ -171,6 +171,8 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
         }
     });
 
+    let cleanup_turn_id = prepared.hook_ctx.turn_id;
+    let tool_cleanup = agent.tool_cleanup.clone();
     let cleanup_receipt = agent
         .sandbox
         .as_ref()
@@ -196,11 +198,13 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
             let _ = agent_task.await;
             // Dropping execution only requests supervisor cancellation. The
             // receipt establishes cleanup before a terminal event is published.
+            let cleanup_deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
             let cleanup_error = if let Some(receipt) = &cleanup_receipt {
                 receipt.wait(std::time::Duration::from_secs(5)).await.err()
             } else {
                 None
             };
+            let tool_cleanup_error = tool_cleanup.wait(cleanup_turn_id, cleanup_deadline.saturating_duration_since(tokio::time::Instant::now())).await.err();
             let _ = forwarder.await;
             let mut stable_prefix = Vec::new();
             while let Ok(snapshot) = snapshot_rx.try_recv() {
@@ -218,6 +222,9 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
             let mut cancellation_error = cleanup_error.map(|error| {
                 format!("sandbox command cleanup was not confirmed after cancellation: {error}")
             });
+            if tool_cleanup_error.is_some() {
+                cancellation_error = Some("tool command cleanup was not confirmed after cancellation".into());
+            }
             if !stable_prefix.is_empty()
                 && let Some(persistence) = &persistence
                 && let Err(error) = persist_turn_messages(
@@ -310,12 +317,20 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
 
     // Panic/error completion can also drop an in-flight execution future.
     // Do not announce even a successful turn until its owned cleanup is known.
-    if let Some(receipt) = &cleanup_receipt
-        && receipt
-            .wait(std::time::Duration::from_secs(5))
+    let cleanup_deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
+    let tool_cleanup_failed = tool_cleanup
+        .wait(cleanup_turn_id, std::time::Duration::from_secs(5))
+        .await
+        .is_err();
+    let sandbox_cleanup_failed = if let Some(receipt) = &cleanup_receipt {
+        receipt
+            .wait(cleanup_deadline.saturating_duration_since(tokio::time::Instant::now()))
             .await
             .is_err()
-    {
+    } else {
+        false
+    };
+    if tool_cleanup_failed || sandbox_cleanup_failed {
         let messages = match agent_result {
             Ok((_, messages)) => messages,
             Err(_) => Vec::new(),

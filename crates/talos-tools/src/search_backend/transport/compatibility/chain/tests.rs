@@ -66,9 +66,18 @@ pub(in crate::search_backend::transport::compatibility) fn relocate(
 }
 
 fn relocate_with_hosts(
+    chain: PreparedCompatibilityChain,
+    server: &Server,
+    distinct: bool,
+) -> (PreparedCompatibilityChain, ToolNetworkManifest) {
+    relocate_with_ports(chain, server, distinct, None)
+}
+
+fn relocate_with_ports(
     mut chain: PreparedCompatibilityChain,
     server: &Server,
     distinct: bool,
+    ports: Option<[u16; 4]>,
 ) -> (PreparedCompatibilityChain, ToolNetworkManifest) {
     let urls: Vec<_> = chain
         .sources
@@ -76,6 +85,9 @@ fn relocate_with_hosts(
         .enumerate()
         .map(|(index, source)| {
             let mut url = server.url(source.request.url.path());
+            if let Some(ports) = ports {
+                url.set_port(Some(ports[index])).expect("fixture port");
+            }
             if distinct {
                 url.set_host(Some(&format!("source-{index}.invalid")))
                     .expect("synthetic host");
@@ -249,10 +261,10 @@ fn frozen_chain_owns_four_headers_query_and_count_and_stops_capture_on_error() {
 }
 
 #[test]
-fn continuation_table_allows_only_dns_and_semantic_failures() {
-    assert!(may_continue(CompatibilityError::Transport(
-        TransportError::Dns
-    )));
+fn continuation_table_allows_only_typed_availability_and_semantic_failures() {
+    for error in [TransportError::Dns, TransportError::ConnectionRefused] {
+        assert!(may_continue(CompatibilityError::Transport(error)));
+    }
     for error in [
         DdgParseError::Empty,
         DdgParseError::Status,

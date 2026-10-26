@@ -53,6 +53,17 @@ impl ProviderProtocol {
     }
 }
 
+impl std::fmt::Display for ProviderProtocol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Unspecified => "unspecified",
+            Self::AnthropicMessages => "anthropic-messages",
+            Self::OpenAIChat => "openai-chat",
+            Self::OpenAIResponses => "openai-responses",
+        })
+    }
+}
+
 /// Per-model runtime limits and capability overrides.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
 pub struct ModelConfig {

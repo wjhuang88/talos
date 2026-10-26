@@ -33,10 +33,11 @@ uuid = { version = "1.26.0", features = ["v4"] }
 [dev-dependencies]
 serde_json = "1"
 tempfile = "3"
+talos-tools = { version = "0.10.1", path = "../talos-tools", default-features = false, features = ["git", "file-write"] }
 tokio = { version = "1.53.1", features = ["test-util", "macros", "rt"] }
 
 [target.'cfg(windows)'.dev-dependencies]
-talos-tools = { version = "0.10.1", path = "../talos-tools", default-features = false, features = ["shell"] }
+talos-tools = { version = "0.10.1", path = "../talos-tools", default-features = false, features = ["shell", "git"] }
 
 [lints]
 workspace = true

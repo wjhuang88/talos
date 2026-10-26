@@ -1873,6 +1873,7 @@ dependencies = [
  "faster-hex",
  "gix-features",
  "sha1-checked",
+ "sha2 0.11.0",
  "thiserror",
 ]
 
@@ -4654,6 +4655,7 @@ dependencies = [
  "regex",
  "reqwest 0.13.5",
  "rust-websearch",
+ "same-file",
  "schemars",
  "scraper 0.27.0",
  "serde",
@@ -4661,6 +4663,7 @@ dependencies = [
  "sha2 0.11.0",
  "similar",
  "talos-core",
+ "talos-permission",
  "talos-sandbox",
  "talos-text",
  "thiserror",

@@ -12,6 +12,7 @@ pub(in crate::search_backend) mod chain;
 pub(super) mod headers;
 pub(in crate::search_backend) mod invocation;
 pub(in crate::search_backend) mod plan;
+pub(in crate::search_backend) mod searxng;
 
 use crate::search_backend::{SearchBackendId, bing_parser, ddg_parser, instant_answer};
 use thiserror::Error;

@@ -242,12 +242,16 @@ fn apply_provider_setup(
                 anyhow::bail!("base URL is required for custom provider setup");
             };
             let (protocol, base_url) = normalize_row_endpoint(row, &default_base_url);
-            provider_entry.protocol = protocol;
+            if provider_entry.protocol.is_unspecified() {
+                provider_entry.protocol = protocol;
+            }
             provider_entry.base_url = Some(base_url);
         }
     } else {
         let (protocol, base_url) = normalize_row_endpoint(row, typed_base_url.trim());
-        provider_entry.protocol = protocol;
+        if provider_entry.protocol.is_unspecified() {
+            provider_entry.protocol = protocol;
+        }
         provider_entry.base_url = Some(base_url);
     }
     config.set_active_model(&row.qualified)?;
@@ -321,6 +325,10 @@ fn build_browser_rows(config: &Config) -> Vec<CatalogBrowserRow> {
                 current: config.provider == provider && config.model == model.id,
                 context: ctx,
                 pricing,
+                effective_protocol: {
+                    let resolved = config.resolve_model_protocol(&provider, &model.id);
+                    format!("{} ({})", resolved.protocol, resolved.source)
+                },
                 api_base_url: meta.and_then(|p| p.api_base_url.clone()),
                 env_var: meta.and_then(|p| p.env_var.clone()),
                 protocol: meta.and_then(|p| p.protocol.clone()),
@@ -346,6 +354,7 @@ struct CatalogBrowserRow {
     current: bool,
     context: String,
     pricing: String,
+    effective_protocol: String,
     api_base_url: Option<String>,
     env_var: Option<String>,
     protocol: Option<ProviderProtocol>,
@@ -491,6 +500,12 @@ impl CatalogBrowserState {
             ),
             color: Color::DarkGrey,
         });
+        if let Some(row) = self.selected_row() {
+            lines.push(RenderLine {
+                text: fit(&format!("Protocol: {}", row.effective_protocol), width),
+                color: Color::DarkGrey,
+            });
+        }
         if !self.message.is_empty() {
             lines.push(RenderLine {
                 text: fit(&self.message, width),
@@ -545,8 +560,8 @@ impl CatalogBrowserState {
             lines.push(RenderLine {
                 text: fit(
                     &format!(
-                        "{marker} {current} {:<44} {:<6} ctx:{}{}",
-                        row.qualified, auth, row.context, pricing
+                        "{marker} {current} {:<44} {:<6} ctx:{}  {}{}",
+                        row.qualified, auth, row.context, row.effective_protocol, pricing
                     ),
                     width,
                 ),
@@ -605,6 +620,7 @@ mod tests {
                 authenticated: true,
                 current: true,
                 context: "200K".to_string(),
+                effective_protocol: "openai-chat (Default)".into(),
                 pricing: "$3.00/$15.00/1M".to_string(),
                 api_base_url: None,
                 env_var: Some("ANTHROPIC_API_KEY".to_string()),
@@ -618,6 +634,7 @@ mod tests {
                 authenticated: false,
                 current: false,
                 context: "128K".to_string(),
+                effective_protocol: "openai-chat (Default)".into(),
                 pricing: String::new(),
                 api_base_url: Some("https://api.openai.com/v1".to_string()),
                 env_var: Some("OPENAI_API_KEY".to_string()),
@@ -758,6 +775,7 @@ mod tests {
             authenticated: false,
             current: false,
             context: "204K".to_string(),
+            effective_protocol: "openai-chat (Default)".into(),
             pricing: String::new(),
             api_base_url: Some("https://api.minimax.io/anthropic/v1".to_string()),
             env_var: Some("MINIMAX_API_KEY".to_string()),
@@ -794,6 +812,7 @@ mod tests {
             authenticated: false,
             current: false,
             context: "256K".to_string(),
+            effective_protocol: "openai-chat (Default)".into(),
             pricing: String::new(),
             api_base_url: Some("https://api.kimi.com/coding/v1".to_string()),
             env_var: Some("KIMI_API_KEY".to_string()),
@@ -842,6 +861,7 @@ mod tests {
                 authenticated: true,
                 current: false,
                 context: "128K".to_string(),
+                effective_protocol: "openai-chat (Default)".into(),
                 pricing: String::new(),
                 api_base_url: Some("https://api.openai.com/v1".to_string()),
                 env_var: Some("OPENAI_API_KEY".to_string()),

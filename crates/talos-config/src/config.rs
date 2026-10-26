@@ -1,7 +1,7 @@
 use crate::{
     Config, ConfigError, ConfigStore, ConfigUnsetOutcome, Credentials, ModelConfig,
     ProtocolResolution, ProviderConfig, ProviderProtocol, builtin_provider_config, home_dir, model,
-    normalize_provider_endpoint, opencode, resolve_protocol,
+    normalize_provider_endpoint, opencode, resolve_config_provider_protocol,
 };
 use std::env;
 use std::path::PathBuf;
@@ -152,59 +152,29 @@ impl Config {
         self.active_provider_config().base_url
     }
 
-    /// Returns the active provider protocol using the legacy merged-config behavior.
-    ///
-    /// Runtime activation of the new resolver is intentionally a later atomic step with the
-    /// Responses provider factory. Call [`Config::resolve_provider_protocol`] to inspect the future
-    /// effective protocol and provenance without changing dispatch behavior yet.
+    /// Returns the effective wire protocol used by provider construction.
     #[must_use]
     pub fn provider_protocol(&self) -> ProviderProtocol {
-        self.active_provider_config().protocol
+        self.resolve_provider_protocol().protocol
     }
 
     /// Resolves the provider wire protocol without endpoint probing or cross-protocol retry.
     ///
-    /// This stage wires provider-explicit intent and confirmed provider defaults into the shared
-    /// resolver. Model-explicit and catalog-model candidates are added by the subsequent catalog
-    /// stage, so their positions are intentionally passed as `None` here rather than approximated.
+    /// Model and provider overrides, catalog evidence and confirmed defaults use the same
+    /// precedence as the runtime adapter factory.
     #[must_use]
     pub fn resolve_provider_protocol(&self) -> ProtocolResolution<ProviderProtocol> {
-        let user_provider = self.providers.get(&self.provider);
-        let provider_explicit = user_provider
-            .map(|provider| provider.protocol.clone())
-            .filter(|protocol| !protocol.is_unspecified());
+        resolve_config_provider_protocol(self)
+    }
 
-        let endpoint_signal = user_provider
-            .and_then(|provider| provider.base_url.as_deref())
-            .map(normalize_provider_endpoint)
-            .and_then(|endpoint| {
-                (endpoint.protocol == ProviderProtocol::AnthropicMessages)
-                    .then_some(ProviderProtocol::AnthropicMessages)
-            });
-
-        let confirmed_provider_default = if self.provider == "openai" {
-            let official_endpoint = user_provider
-                .and_then(|provider| provider.base_url.as_deref())
-                .is_none_or(|url| url.trim().trim_end_matches('/') == "https://api.openai.com/v1");
-            if official_endpoint {
-                Some(ProviderProtocol::OpenAIResponses)
-            } else {
-                endpoint_signal
-            }
-        } else {
-            builtin_provider_config(&self.provider)
-                .map(|provider| provider.protocol)
-                .filter(|protocol| !protocol.is_unspecified())
-                .or(endpoint_signal)
-        };
-
-        resolve_protocol(
-            None,
-            provider_explicit,
-            None,
-            confirmed_provider_default,
-            ProviderProtocol::OpenAIChat,
-        )
+    /// Resolves another model's protocol for selection previews without changing the active model.
+    #[must_use]
+    pub fn resolve_model_protocol(
+        &self,
+        provider: &str,
+        model: &str,
+    ) -> ProtocolResolution<ProviderProtocol> {
+        crate::protocol_resolution::resolve_model_provider_protocol(self, provider, model)
     }
 
     #[must_use]
@@ -678,17 +648,10 @@ impl Config {
         self.provider = meta.provider.clone();
 
         if !self.providers.contains_key(&meta.provider) {
-            if let Some(builtin) = builtin_provider_config(&meta.provider) {
-                self.providers.insert(meta.provider.clone(), builtin);
-            } else {
-                self.providers.insert(
-                    meta.provider.clone(),
-                    ProviderConfig {
-                        protocol: ProviderProtocol::OpenAIChat,
-                        ..Default::default()
-                    },
-                );
-            }
+            self.providers.insert(
+                meta.provider.clone(),
+                new_provider_overrides(&meta.provider),
+            );
         }
 
         Ok(())
@@ -700,16 +663,10 @@ impl Config {
     /// exist in `self.providers`. The key is stored in the in-memory
     /// `api_key` field for immediate runtime use.
     pub fn set_provider_credential(&mut self, name: &str, api_key: &str) {
-        let entry = self.providers.entry(name.to_string()).or_insert_with(|| {
-            if let Some(builtin) = builtin_provider_config(name) {
-                builtin
-            } else {
-                ProviderConfig {
-                    protocol: ProviderProtocol::OpenAIChat,
-                    ..Default::default()
-                }
-            }
-        });
+        let entry = self
+            .providers
+            .entry(name.to_string())
+            .or_insert_with(|| new_provider_overrides(name));
         entry.api_key = Some(api_key.to_string());
     }
 
@@ -787,14 +744,18 @@ impl Config {
                     provider.api_key = Some(key.clone());
                 }
             } else {
-                let mut provider =
-                    builtin_provider_config(name).unwrap_or_else(|| ProviderConfig {
-                        protocol: ProviderProtocol::OpenAIChat,
-                        ..Default::default()
-                    });
+                let mut provider = new_provider_overrides(name);
                 provider.api_key = Some(key.clone());
                 self.providers.insert(name.clone(), provider);
             }
         }
     }
+}
+
+// Copying built-in connection defaults must not turn an omitted protocol into user intent.
+// The resolver can still consult built-in defaults; only an actual protocol edit is explicit.
+fn new_provider_overrides(name: &str) -> ProviderConfig {
+    let mut provider = builtin_provider_config(name).unwrap_or_default();
+    provider.protocol = ProviderProtocol::Unspecified;
+    provider
 }

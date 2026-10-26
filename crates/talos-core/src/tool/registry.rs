@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use serde_json::Value;
@@ -112,9 +112,29 @@ const LEGACY_TOOL_REGISTRATION_SOURCE: &str = "legacy:unchecked";
 pub struct ToolRegistry {
     tools: HashMap<String, Arc<dyn AgentTool>>,
     contribution_sources: HashMap<String, ToolContributionSource>,
+    builtin_instances: HashSet<String>,
+    cleanup_owners: Vec<Arc<dyn super::ToolCleanupOwner>>,
 }
 
 impl ToolRegistry {
+    /// Retained cleanup owners, including tools replaced through registration.
+    /// Composition roots snapshot these after registration and before dispatch.
+    /// Holding these handles does not seal, cancel or authorize any operation.
+    pub fn cleanup_receipts(&self) -> Vec<Arc<dyn super::ToolCleanupOwner>> {
+        self.cleanup_owners.clone()
+    }
+
+    fn retain_cleanup_owner(&mut self, tool: &dyn AgentTool) {
+        if let Some(owner) = tool.cleanup_receipt()
+            && !self
+                .cleanup_owners
+                .iter()
+                .any(|existing| Arc::ptr_eq(existing, &owner))
+        {
+            self.cleanup_owners.push(owner);
+        }
+    }
+
     /// Creates a new empty tool registry.
     pub fn new() -> Self {
         Self::default()
@@ -127,7 +147,9 @@ impl ToolRegistry {
     /// during I158 migration. New product composition should use
     /// [`register_contribution`](Self::register_contribution).
     pub fn register(&mut self, tool: Arc<dyn AgentTool>) {
+        self.retain_cleanup_owner(tool.as_ref());
         let name = tool.name().to_owned();
+        self.builtin_instances.remove(&name);
         self.contribution_sources.remove(&name);
         self.tools.insert(name, tool);
     }
@@ -152,6 +174,7 @@ impl ToolRegistry {
             });
         }
 
+        self.retain_cleanup_owner(tool.as_ref());
         self.contribution_sources.insert(tool_name.clone(), source);
         self.tools.insert(tool_name, tool);
         Ok(())
@@ -189,11 +212,40 @@ impl ToolRegistry {
         }
 
         for ToolContribution { source, tool } in contributions {
+            self.retain_cleanup_owner(tool.as_ref());
             let tool_name = tool.name().to_owned();
             self.contribution_sources.insert(tool_name.clone(), source);
             self.tools.insert(tool_name, tool);
         }
         Ok(())
+    }
+
+    /// Registers product-owned built-in implementations for model-assisted review.
+    ///
+    /// This is an explicit composition-root trust decision, not source/name inference.
+    /// Call only with implementations and wrappers owned by the product. Plugin, MCP
+    /// and embedder-supplied tools must use ordinary registration. This designation
+    /// grants no permission: policy and invocation-local admission remain mandatory.
+    /// A failed batch changes neither registrations nor built-in designations.
+    pub fn register_builtin_contributions(
+        &mut self,
+        contributions: impl IntoIterator<Item = ToolContribution>,
+    ) -> Result<(), ToolRegistrationError> {
+        let contributions = contributions.into_iter().collect::<Vec<_>>();
+        let names = contributions
+            .iter()
+            .map(|contribution| contribution.name().to_owned())
+            .collect::<Vec<_>>();
+        self.register_contributions(contributions)?;
+        self.builtin_instances.extend(names);
+        Ok(())
+    }
+
+    /// Reports explicit product ownership of the currently registered instance.
+    /// Ordinary replacement clears this designation, even for an identical name.
+    #[must_use]
+    pub fn is_builtin_instance(&self, name: &str) -> bool {
+        self.builtin_instances.contains(name)
     }
 
     fn registered_source(&self, tool_name: &str) -> Option<ToolContributionSource> {
@@ -268,3 +320,68 @@ fn input_type_name(value: &Value) -> &'static str {
         Value::Object(_) => "object",
     }
 }
+
+#[cfg(test)]
+mod cleanup_tests {
+    use super::*;
+    use crate::tool::{ToolCleanupError, ToolCleanupOwner, ToolCleanupReceipt, ToolResult};
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    #[derive(Default)]
+    struct Owner(AtomicBool);
+
+    #[async_trait::async_trait]
+    impl ToolCleanupReceipt for Owner {
+        async fn wait(&self, _: std::time::Duration) -> Result<(), ToolCleanupError> {
+            Ok(())
+        }
+    }
+    impl ToolCleanupOwner for Owner {
+        fn seal(&self) {
+            self.0.store(true, Ordering::SeqCst);
+        }
+    }
+    struct Tool(Arc<Owner>);
+    #[async_trait::async_trait]
+    impl AgentTool for Tool {
+        fn name(&self) -> &str {
+            "replacement"
+        }
+        fn description(&self) -> &str {
+            "fixture"
+        }
+        fn parameters(&self) -> Value {
+            serde_json::json!({"type":"object"})
+        }
+        fn cleanup_receipt(&self) -> Option<Arc<dyn ToolCleanupOwner>> {
+            Some(self.0.clone())
+        }
+        async fn execute(&self, _: Value) -> ToolResult {
+            ToolResult::success("fixture")
+        }
+    }
+
+    #[test]
+    fn replacement_retains_prior_owner_and_deduplicates_shared_owner() {
+        let first = Arc::new(Owner::default());
+        let second = Arc::new(Owner::default());
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(Tool(first.clone())));
+        registry.register(Arc::new(Tool(second.clone())));
+        registry.register(Arc::new(Tool(second.clone())));
+        let retained = registry.cleanup_receipts();
+        assert_eq!(retained.len(), 2);
+        drop(registry);
+        assert!(!first.0.load(Ordering::SeqCst));
+        assert!(!second.0.load(Ordering::SeqCst));
+        for owner in retained {
+            owner.seal();
+        }
+        assert!(first.0.load(Ordering::SeqCst));
+        assert!(second.0.load(Ordering::SeqCst));
+    }
+}
+
+#[cfg(test)]
+#[path = "registry_builtin_tests.rs"]
+mod builtin_tests;

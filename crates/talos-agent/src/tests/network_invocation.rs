@@ -1,5 +1,6 @@
 //! Real Agent-loop dispatch fixtures for the ADR-090 opt-in carrier; no HTTP/DNS.
 use super::*;
+mod auto_review;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use talos_core::tool::{
     PreparedNetworkToolInvocation, ToolNetworkAuthority, ToolNetworkEndpoint, ToolNetworkManifest,

@@ -552,6 +552,52 @@ struct SandboxRuntimeFinalizer {
     receipt: talos_sandbox::SandboxCleanupReceipt,
 }
 
+struct ToolCleanupRuntimeFinalizer {
+    owners: Vec<Arc<dyn talos_core::tool::ToolCleanupOwner>>,
+    seal_failed: std::sync::atomic::AtomicBool,
+}
+
+impl RuntimeFinalizer for ToolCleanupRuntimeFinalizer {
+    fn seal_admission(&self) {
+        for owner in &self.owners {
+            if std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| owner.seal())).is_err() {
+                self.seal_failed
+                    .store(true, std::sync::atomic::Ordering::SeqCst);
+            }
+        }
+    }
+
+    fn identifier(&self) -> ShutdownFinalizerId {
+        ShutdownFinalizerId::new("tool_commands")
+    }
+
+    fn order(&self) -> u16 {
+        85
+    }
+
+    fn cap(&self) -> std::time::Duration {
+        std::time::Duration::from_secs(5)
+    }
+
+    fn finalize(&self) -> shutdown::RuntimeFinalizerFuture {
+        let owners = self.owners.clone();
+        let seal_failed = self.seal_failed.load(std::sync::atomic::Ordering::SeqCst);
+        Box::pin(async move {
+            if seal_failed {
+                return Err(shutdown::RuntimeFinalizerError);
+            }
+            let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
+            for owner in owners {
+                owner
+                    .wait(deadline.saturating_duration_since(tokio::time::Instant::now()))
+                    .await
+                    .map_err(|_| shutdown::RuntimeFinalizerError)?;
+            }
+            Ok(())
+        })
+    }
+}
+
 impl RuntimeFinalizer for SandboxRuntimeFinalizer {
     fn identifier(&self) -> ShutdownFinalizerId {
         ShutdownFinalizerId::new("sandbox_commands")
@@ -940,6 +986,7 @@ pub trait ApprovalHandler: Send + Sync {
     /// the projection-only default implementation for legacy scopes. An invocation-bound
     /// network scope requires overriding this method and inspecting its complete preview;
     /// the old argument-only callback cannot silently approve the new authority.
+    /// Prepared native Pull command notes likewise require a scope-aware host.
     async fn request_scoped_approval(
         &self,
         tool_name: &str,
@@ -947,7 +994,12 @@ pub trait ApprovalHandler: Send + Sync {
         summary_fields: &[String],
         preview: &GrantPreview,
     ) -> ApprovalChoice {
-        if preview.network_scope().is_some() {
+        if preview.network_scope().is_some()
+            || preview
+                .facets()
+                .iter()
+                .any(|facet| facet.normalized_scope == "git:pull-command")
+        {
             return ApprovalChoice::Deny;
         }
         self.request_approval(tool_name, arguments, summary_fields)
@@ -1375,8 +1427,8 @@ impl RuntimeBuilder {
     /// host must observe terminal cleanup.
     pub fn build(mut self) -> RuntimeResult<RuntimeHandle> {
         let provider = self.provider.ok_or(RuntimeError::MissingProvider)?;
-        #[allow(unused_mut)]
-        let mut tools = self.tools;
+        let tools = self.tools;
+        let mut builtin_contributions = Vec::new();
         if matches!(self.preset, Some(RuntimePreset::Coding)) {
             #[cfg(feature = "shared-composition")]
             {
@@ -1386,11 +1438,10 @@ impl RuntimeBuilder {
                     .iter()
                     .map(|tool| tool.name().to_owned())
                     .collect::<HashSet<_>>();
-                tools.extend(
+                builtin_contributions.extend(
                     composition::runtime_tool_contributions(self.workspace_root.clone())
                         .into_iter()
-                        .filter(|contribution| !caller_tool_names.contains(contribution.name()))
-                        .map(|contribution| contribution.tool().clone()),
+                        .filter(|contribution| !caller_tool_names.contains(contribution.name())),
                 );
             }
             #[cfg(not(feature = "shared-composition"))]
@@ -1401,10 +1452,13 @@ impl RuntimeBuilder {
                 .iter()
                 .any(|tool| tool.name() == skill_read::SKILL_READ_TOOL_NAME)
         {
-            tools.push(Arc::new(skill_read::SkillReadTool::new(
-                std::mem::take(&mut self.skill_read_skills),
-                talos_skill::SkillReadLimits::default(),
-            )));
+            builtin_contributions.push(talos_core::tool::ToolContribution::new(
+                talos_core::tool::ToolContributionSource::new("talos-runtime:skill"),
+                Arc::new(skill_read::SkillReadTool::new(
+                    std::mem::take(&mut self.skill_read_skills),
+                    talos_skill::SkillReadLimits::default(),
+                )),
+            ));
         }
         let agent_engine = Arc::new(build_permission_engine(
             self.workspace_root.clone(),
@@ -1414,6 +1468,17 @@ impl RuntimeBuilder {
         let approval_handler = self.approval_handler.clone();
         for tool in tools {
             registry.register(tool);
+        }
+        registry
+            .register_builtin_contributions(builtin_contributions)
+            .map_err(|error| RuntimeError::Agent(AgentError::ToolError(error.to_string())))?;
+        let owners = registry.cleanup_receipts();
+        if !owners.is_empty() {
+            self.shutdown_finalizers
+                .push(Arc::new(ToolCleanupRuntimeFinalizer {
+                    owners,
+                    seal_failed: std::sync::atomic::AtomicBool::new(false),
+                }));
         }
 
         let fallback_handler = self.approval_handler.as_ref().map(|handler| {
@@ -4117,6 +4182,256 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn i300_runtime_real_git_approval_and_denial_preserve_unrelated_index() {
+        struct DiscoveryOnlyApproval {
+            records: Arc<StdMutex<Vec<ApprovalRecord>>>,
+        }
+        #[async_trait]
+        impl ApprovalHandler for DiscoveryOnlyApproval {
+            async fn request_approval(
+                &self,
+                tool_name: &str,
+                arguments: &Value,
+                summary_fields: &[String],
+            ) -> ApprovalChoice {
+                let mut records = self.records.lock().expect("records");
+                let first = records.is_empty();
+                records.push(ApprovalRecord {
+                    tool_name: tool_name.into(),
+                    arguments: arguments.clone(),
+                    summary_fields: summary_fields.to_vec(),
+                });
+                if first {
+                    ApprovalChoice::ApproveOnce
+                } else {
+                    ApprovalChoice::Deny
+                }
+            }
+        }
+        for (approve, discovery_only) in [(false, false), (false, true), (true, false)] {
+            let root = tempfile::tempdir().expect("workspace");
+            let git = |args: &[&str]| {
+                let output = std::process::Command::new("git")
+                    .args(args)
+                    .current_dir(root.path())
+                    .output()
+                    .expect("Git fixture");
+                assert!(output.status.success(), "{output:?}");
+                output.stdout
+            };
+            git(&["init"]);
+            std::fs::write(root.path().join("unrelated.txt"), "staged before\n").expect("fixture");
+            git(&["add", "unrelated.txt"]);
+            let before = std::fs::read(root.path().join(".git/index")).expect("index");
+            std::fs::write(root.path().join("unrelated.txt"), "unstaged after\n").expect("fixture");
+            for name in ["first.txt", "second.txt"] {
+                std::fs::write(root.path().join(name), "selected\n").expect("fixture");
+            }
+            let records = Arc::new(StdMutex::new(Vec::new()));
+            let provider = Arc::new(
+                MockProvider::new()
+                    .with_tool_call(
+                        "git_add",
+                        serde_json::json!({"paths": ["first.txt", "second.txt"]}),
+                    )
+                    .with_response("done"),
+            );
+            let handler: Arc<dyn ApprovalHandler> = if discovery_only {
+                Arc::new(DiscoveryOnlyApproval {
+                    records: records.clone(),
+                })
+            } else {
+                Arc::new(RecordingApprovalHandler::new(
+                    if approve {
+                        ApprovalChoice::ApproveOnce
+                    } else {
+                        ApprovalChoice::Deny
+                    },
+                    records.clone(),
+                ))
+            };
+            let mut runtime = RuntimeBuilder::new()
+                .provider(provider)
+                .workspace_root(root.path())
+                .approval_handler(handler)
+                .tool(Arc::new(talos_tools::git::GitAddTool::new(
+                    root.path().to_path_buf(),
+                )))
+                .build()
+                .expect("runtime");
+            runtime
+                .submit("stage selected files")
+                .await
+                .expect("submit");
+            let mut result = None;
+            let mut completed = false;
+            while let Some(event) = runtime.next_event().await {
+                match event {
+                    SessionEvent::TurnEvent {
+                        payload:
+                            talos_core::session::TurnEventPayload::Progress {
+                                event:
+                                    AgentEvent::ToolResult {
+                                        result: tool_result,
+                                        ..
+                                    },
+                            },
+                        ..
+                    } => result = Some(tool_result),
+                    SessionEvent::TurnEvent {
+                        payload: talos_core::session::TurnEventPayload::Completed { .. },
+                        ..
+                    } => {
+                        completed = true;
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+            assert!(completed, "turn must complete");
+            let result = result.expect("Git tool result");
+            assert_eq!(result.is_error, !approve, "{}", result.content);
+            if !approve {
+                assert!(
+                    result.content.to_lowercase().contains("permission denied"),
+                    "{}",
+                    result.content
+                );
+            }
+            runtime.shutdown().await.expect("shutdown");
+            assert_eq!(
+                records.lock().expect("records").len(),
+                if approve || discovery_only { 2 } else { 1 }
+            );
+            if approve {
+                assert_eq!(
+                    git(&["ls-files", "-z"]),
+                    b"first.txt\0second.txt\0unrelated.txt\0"
+                );
+                assert_eq!(git(&["show", ":unrelated.txt"]), b"staged before\n");
+                assert_eq!(git(&["show", ":first.txt"]), b"selected\n");
+                assert_eq!(git(&["show", ":second.txt"]), b"selected\n");
+            } else {
+                assert_eq!(
+                    std::fs::read(root.path().join(".git/index")).expect("index"),
+                    before
+                );
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn i300_runtime_target_conditional_checkout_approval_and_denial() {
+        for allowed in [false, true] {
+            let root = tempfile::tempdir().expect("workspace");
+            let git = |args: &[&str]| {
+                let output = std::process::Command::new("git")
+                    .args(args)
+                    .current_dir(root.path())
+                    .output()
+                    .expect("Git");
+                assert!(output.status.success(), "{args:?}: {output:?}");
+                output.stdout
+            };
+            git(&["init", "-qb", "base"]);
+            git(&["config", "user.name", "Fixture"]);
+            git(&["config", "user.email", "fixture@example.invalid"]);
+            git(&["config", "commit.gpgSign", "false"]);
+            std::fs::write(root.path().join("file"), b"retained\n").expect("file");
+            git(&["add", "file"]);
+            git(&["commit", "-qm", "initial"]);
+            git(&["config", "includeIf.onbranch:topic.path", "target.conf"]);
+            std::fs::write(
+                root.path().join(".git/target.conf"),
+                b"[fixture]\nmarker=topic\n",
+            )
+            .expect("config");
+            let index = std::fs::read(root.path().join(".git/index")).expect("index");
+            let records = Arc::new(StdMutex::new(Vec::new()));
+            let provider = Arc::new(
+                MockProvider::new()
+                    .with_tool_call(
+                        "git_checkout",
+                        serde_json::json!({"branch":"topic", "create":true}),
+                    )
+                    .with_response("done"),
+            );
+            let mut runtime = RuntimeBuilder::new()
+                .provider(provider)
+                .workspace_root(root.path())
+                .approval_handler(Arc::new(RecordingApprovalHandler::new(
+                    if allowed {
+                        ApprovalChoice::ApproveOnce
+                    } else {
+                        ApprovalChoice::Deny
+                    },
+                    records.clone(),
+                )))
+                .tool(Arc::new(talos_tools::git::GitCheckoutTool::new(
+                    root.path().into(),
+                )))
+                .build()
+                .expect("runtime");
+            runtime.submit("create topic").await.expect("submit");
+            let mut result = None;
+            let mut completed = false;
+            while let Some(event) = runtime.next_event().await {
+                match event {
+                    SessionEvent::TurnEvent {
+                        payload:
+                            talos_core::session::TurnEventPayload::Progress {
+                                event:
+                                    AgentEvent::ToolResult {
+                                        result: tool_result,
+                                        ..
+                                    },
+                            },
+                        ..
+                    } => result = Some(tool_result),
+                    SessionEvent::TurnEvent {
+                        payload: talos_core::session::TurnEventPayload::Completed { .. },
+                        ..
+                    } => {
+                        completed = true;
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+            assert!(completed);
+            let result = result.expect("tool result");
+            assert_eq!(result.is_error, !allowed, "{}", result.content);
+            runtime.shutdown().await.expect("shutdown");
+            let requests = records.lock().expect("records");
+            if allowed {
+                assert!(
+                    requests.len() > 2,
+                    "target discovery needs separate approvals"
+                );
+            } else {
+                assert_eq!(requests.len(), 1);
+            }
+            assert_eq!(
+                git(&["branch", "--show-current"]),
+                if allowed {
+                    b"topic\n".as_slice()
+                } else {
+                    b"base\n".as_slice()
+                }
+            );
+            assert_eq!(root.path().join(".git/refs/heads/topic").exists(), allowed);
+            assert_eq!(
+                std::fs::read(root.path().join(".git/index")).expect("index"),
+                index
+            );
+            assert_eq!(
+                std::fs::read(root.path().join("file")).expect("file"),
+                b"retained\n"
+            );
+        }
+    }
+
+    #[tokio::test]
     async fn runtime_approval_handler_can_approve_ask_tool() {
         let provider = Arc::new(
             MockProvider::new()
@@ -4749,5 +5064,201 @@ mod tests {
         }
 
         runtime.shutdown().await.expect("shutdown succeeds");
+    }
+}
+
+#[cfg(test)]
+#[path = "native_pull_approval_tests.rs"]
+mod native_pull_approval_tests;
+
+#[cfg(test)]
+mod tool_cleanup_finalizer_tests {
+    use super::*;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use talos_core::tool::{ToolCleanupError, ToolCleanupOwner, ToolCleanupReceipt};
+
+    struct Owner {
+        sealed: AtomicBool,
+        fail: bool,
+    }
+    #[async_trait::async_trait]
+    impl ToolCleanupReceipt for Owner {
+        async fn wait(&self, _: std::time::Duration) -> Result<(), ToolCleanupError> {
+            assert!(self.sealed.load(Ordering::SeqCst), "seal must precede wait");
+            if self.fail {
+                Err(ToolCleanupError::Unconfirmed)
+            } else {
+                Ok(())
+            }
+        }
+    }
+    impl ToolCleanupOwner for Owner {
+        fn seal(&self) {
+            self.sealed.store(true, Ordering::SeqCst);
+        }
+    }
+
+    #[tokio::test]
+    async fn retained_tool_owner_is_sealed_and_cleanup_failure_is_reported() {
+        for fail in [false, true] {
+            let owner = Arc::new(Owner {
+                sealed: AtomicBool::new(false),
+                fail,
+            });
+            let finalizer = ToolCleanupRuntimeFinalizer {
+                owners: vec![owner.clone()],
+                seal_failed: AtomicBool::new(false),
+            };
+            assert!(!owner.sealed.load(Ordering::SeqCst));
+            finalizer.seal_admission();
+            finalizer.seal_admission();
+            assert_eq!(finalizer.finalize().await.is_err(), fail);
+        }
+    }
+}
+
+#[cfg(all(test, unix))]
+mod owned_process_shutdown_tests {
+    use super::*;
+    use async_trait::async_trait;
+    use serde_json::{Value, json};
+    use std::time::Duration;
+    use talos_core::tool::*;
+    use talos_permission::{AdmittedInvocation, PermissionRequest};
+    use talos_provider::mock::MockProvider;
+    use talos_sandbox::{OwnedCommandExecutor, OwnedCommandOperation};
+    struct ProcessTool {
+        root: PathBuf,
+        owner: Arc<OwnedCommandExecutor>,
+    }
+    struct ProcessPlan {
+        root: PathBuf,
+        operation: OwnedCommandOperation,
+        identity: PreparedPlanIdentity,
+        provenance: ToolProvenance,
+        facets: Vec<ToolPermissionFacet>,
+        input: Value,
+    }
+    #[async_trait]
+    impl AgentTool for ProcessTool {
+        fn name(&self) -> &str {
+            "process_fixture"
+        }
+        fn description(&self) -> &str {
+            "owned process cancellation fixture"
+        }
+        fn parameters(&self) -> Value {
+            json!({"type":"object"})
+        }
+        fn cleanup_receipt(&self) -> Option<Arc<dyn ToolCleanupOwner>> {
+            Some(self.owner.clone())
+        }
+        async fn execute(&self, _: Value) -> ToolResult {
+            panic!("prepared route required")
+        }
+        fn prepare_normalized_with_provenance(
+            &self,
+            input: &Value,
+            provenance: ToolProvenance,
+        ) -> Result<Option<Box<dyn PreparedNormalToolInvocation>>, String> {
+            Ok(Some(Box::new(ProcessPlan {
+                root: self.root.clone(),
+                operation: self.owner.operation(),
+                identity: PreparedPlanIdentity::new(),
+                provenance,
+                // Test-only auto-admission permits exercising the real execution path.
+                facets: vec![ToolPermissionFacet::new(ToolNature::Read)],
+                input: input.clone(),
+            })))
+        }
+    }
+    #[async_trait]
+    impl PreparedNormalToolInvocation for ProcessPlan {
+        fn plan_identity(&self) -> Option<&PreparedPlanIdentity> {
+            Some(&self.identity)
+        }
+        fn permission_profile(&self) -> &[ToolPermissionFacet] {
+            &self.facets
+        }
+        fn cleanup_receipt(&self) -> Option<Arc<dyn ToolCleanupReceipt>> {
+            Some(Arc::new(self.operation.cleanup_receipt()))
+        }
+        async fn execute(
+            self: Box<Self>,
+            admission: Box<dyn std::any::Any + Send>,
+        ) -> ToolExecutionOutput {
+            let proof = admission
+                .downcast::<AdmittedInvocation>()
+                .expect("real admission");
+            proof
+                .consume_for_prepared(
+                    &PermissionRequest::new(
+                        "process_fixture",
+                        self.provenance.clone(),
+                        &self.facets,
+                        &self.input,
+                    ),
+                    &self.identity,
+                )
+                .expect("bound proof");
+            let mut command = std::process::Command::new("sh");
+            command.current_dir(&self.root).args([
+                "-c",
+                "(sleep 2; printf forbidden > delayed) & printf ready > ready; wait",
+            ]);
+            let result = self
+                .operation
+                .execute(command, Duration::from_secs(20), 1024)
+                .await;
+            ToolExecutionOutput::error(format!("fixture result: {result:?}"))
+        }
+    }
+
+    #[tokio::test]
+    async fn runtime_shutdown_reaps_descendants_and_seals_owner() {
+        for options in [
+            ShutdownOptions::interrupt(Duration::from_secs(5)).expect("interrupt"),
+            ShutdownOptions::finish_current(Duration::from_secs(5), Duration::from_millis(50))
+                .expect("finish current"),
+        ] {
+            tokio::time::timeout(Duration::from_secs(15), async {
+                let root = tempfile::tempdir().expect("tempdir");
+                let owner = Arc::new(OwnedCommandExecutor::default());
+                let provider = MockProvider::new().with_tool_call("process_fixture", json!({}));
+                let runtime = RuntimeBuilder::new()
+                    .provider(Arc::new(provider))
+                    .tool(Arc::new(ProcessTool {
+                        root: root.path().into(),
+                        owner: owner.clone(),
+                    }))
+                    .build()
+                    .expect("runtime");
+                runtime.submit("run fixture").await.expect("submit");
+                while !root.path().join("ready").exists() {
+                    tokio::time::sleep(Duration::from_millis(5)).await;
+                }
+                let report = runtime
+                    .shutdown_with(options)
+                    .await
+                    .expect("shutdown report");
+                assert!(report.is_complete(), "{report:?}");
+                let mut command = std::process::Command::new("sh");
+                command
+                    .current_dir(root.path())
+                    .args(["-c", "printf forbidden > after_shutdown"]);
+                assert!(
+                    owner
+                        .operation()
+                        .execute(command, Duration::from_secs(1), 1024)
+                        .await
+                        .is_err()
+                );
+                tokio::time::sleep(Duration::from_millis(2100)).await;
+                assert!(!root.path().join("delayed").exists());
+                assert!(!root.path().join("after_shutdown").exists());
+            })
+            .await
+            .expect("runtime deadline");
+        }
     }
 }

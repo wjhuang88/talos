@@ -1,11 +1,112 @@
 # GIT-001: Built-in Git Tools — Native Git Support
 
+## Current corrective delivery — 2026-10-26
+
+I300/T7 is Complete / Closed at #735, merge `ee84889fd19c590fdcc125cb971143dffd3cfb94`.
+Completion Commit: ee84889fd19c590fdcc125cb971143dffd3cfb94
+
+The [I300 closure](../../iterations/I300-structured-git-repair.md) records the
+original acceptance mapping, full local locked preflight, final all-success
+three-platform CI 40251434249 and independent exact-head/base review.
+Prepared Add, Commit, nonrecursive Checkout, limited Push and native Pull are
+merged; configuration discovery and final mutation/whole-command authority stay
+separate. Explicit Deny/human policy and process supervision remain binding.
+Default Windows git:// Push remains the accepted host limitation; configured
+Push passed natively, and production does not alter sideband configuration.
+T8/PERM-007-H and advanced P3 scope remain incomplete. Earlier candidate and
+blocker sections below are historical, superseded by this delivery record.
+
+### Standing gix tracking — 2026-10-26
+
+The live [crates.io sparse index](https://index.crates.io/3/g/gix) reports latest
+non-yanked **gix 0.90.0**, published 2026-10-22, MSRV 1.88; Talos remains locked
+to 0.87.1. The [exact upstream release](https://github.com/GitoxideLabs/gitoxide/releases/tag/gix-v0.90.0)
+adds linked-worktree lock/unlock and separate registration/initial checkout,
+submodule resolved URLs, global attribute-path selection, absolute-path helpers
+and offline default-branch lookup. Fixes cover linked-worktree submodule gitdirs,
+replacement refs/commit-graph and clone config/ref parity. Upstream also cites
+GHSA-q54r-jf2p-rfr2 for configuration section-trust filtering.
+
+This is release-note/API discovery, not an upgrade or Talos security-applicability
+assessment. **Open residual owned here:** assess the advisory against Talos 0.87.1
+and evaluate operation-specific parity before selecting an upgrade/replacement
+iteration. Release additions do not demonstrate complete native Push or Pull
+merge/rebase orchestration replacement; source and runtime parity verification
+remain required. No date for removing host Git is established. This tracking
+supersedes the older 0.89 availability checkpoint without changing Cargo.lock.
+
+
+2026-10-26 merge blocker: PR #735 CAS exposed an I307 protected-mount overlap
+finding for broad/canonical workspace roots. Independent merge readiness was
+withdrawn; green narrow-root CI does not cover it. I300's top checkpoint owns
+this prerequisite and the required sandbox follow-up. T7 is not Complete.
+
+
+Tracking recheck (2026-10-17): the live crates.io sparse index at
+`https://index.crates.io/3/g/gix` still ends at non-yanked `gix 0.89.0`
+(MSRV 1.88), while the Talos lockfile remains at 0.87.1. This is a release
+availability check, not a new API or parity review. The 0.89.0 source audit
+below remains the capability evidence: fetch, merge primitives and some
+worktree operations are available, but it did not establish complete
+checkout/switch, push, or Pull merge/rebase orchestration. Keep the existing
+host-Git bridges and their separate Read/Write/Execute and network admission
+until each replacement passes operation-specific parity, security, unavailable-
+host, and runtime tests. No Git-removal date can be inferred from this recheck.
+
 ## Outcome
 
 Talos provides a comprehensive set of built-in Git tools powered by the `gix` crate (pure Rust
 Git implementation), eliminating the need for a host `git` binary for common repository
 operations. The agent can inspect, navigate, and (with explicit approval) modify Git state
 through structured tool calls.
+
+## Historical I300 corrective candidate — before delivery
+
+Historical I026/I094 acceptance below does not prove closure of the current
+permission and diff defects. [I300](../../iterations/I300-structured-git-repair.md)
+owns the active repair; no implementation merge or completion SHA exists yet.
+
+2026-10-25 evidence: pushed candidate `a51d44b27` (PR #735) has the original
+two-document paths in the production Agent regression, including preservation
+of unrelated staged and unstaged bytes (3/3 approved/denied cases pass).
+I300's top audit maps the complete ADR diff matrix and distinguishes shared
+proof replay protection from MCP protocol request-ID reservation. Independent
+whole-T7 source review found no new concrete permission/process/API blocker;
+final full validation, platform CI, governance/CAS and merge remain required.
+Prior native Windows configured MCP Push passed; default git:// Push remains
+an accepted host limitation, and production preserves the user's sideband setting.
+The previous full preflight passed Tools 934/934 before the last test correction;
+current executable source now also passes the full authorized standard preflight
+(exit 0; Tools 934/934 and both SDK consumers). Current macOS/Linux CI passes;
+Windows also passed; this run is terminal success. The sandboxed attempt failed EPERM and one Search
+classification case; no intermittent Search cause or repair is claimed. No completion
+or exhaustive cross-entry test coverage is claimed.
+
+The local `git_add` candidate interprets selected paths literally and separately
+authorizes fixed Git configuration-chain discovery and the resulting exact
+repository mutation plan. Configuration values remain internal. Unsupported
+filters/hooks/fsmonitor and object-alternate/split-index layouts refuse with an
+explicit separately authorized fallback; there is no silent helper bypass.
+Ordinary custom Git installations require support for the fixed attribute-path
+queries. The unpublished candidate also implements prepared Commit,
+nonrecursive Checkout, limited Push and native Pull. Pull retains separate
+configuration discovery, followed by one whole-command authorization; dedicated
+Auto review can approve the final command, while explicit Deny and human-only
+policies remain authoritative. This grants transitive command effects rather
+than per-path/endpoint confinement, and failures may leave partial effects.
+Unix process-group and Windows Job supervision are connected; affected MSVC
+test targets cross-compile with cargo xwin. Native Windows execution, exact-head
+CI and the complete acceptance mapping remain open; see the
+[migration inventory](../../reference/I300-GIT-AUTHORIZATION-MIGRATION.md).
+
+Local diff repairs compare HEAD/index for staged changes and index/worktree for
+unstaged changes, preserve additions/deletions/binary/mode/symlink distinctions,
+and render staged gitlinks from object IDs without loading child commit objects.
+`core.fileMode=false` suppresses only ordinary worktree executable-bit differences;
+staged mode changes remain visible. Unstaged submodule OID/dirty/ignore behavior
+is covered by native gix state and host comparison fixtures. Absent/empty checkout and ordinary-file replacement fixtures also pass; broader
+deinitialization, cross-platform/publication validation remain open. Current
+focused Git tests pass 23/23; this bounded evidence does not reopen or replace historical acceptance.
 
 ## Status
 
@@ -128,17 +229,23 @@ List branches.
 
 #### 6. `git_checkout`
 
-Switch branches or restore files.
+Switch branches. The `branch` parameter does not select files to restore.
 
 | | |
 |---|---|
 | **Nature** | Write (changes working tree) |
-| **Parameters** | `branch` (string, required) |
+| **Parameters** | `branch` (string, required), `create` (boolean, default false) |
 | **Output** | `switched to branch {branch}` |
 | **Implementation** | `gix` checkout API (if supported) or host `git checkout` fallback |
 
 Delivered in I026 via host `git checkout` fallback because `gix` does not provide porcelain
 checkout/switch orchestration.
+
+The I300 development candidate explicitly separates the branch argument from
+pathspecs: a missing branch matching a tracked filename fails without restoring
+that file. Previous-branch `-`, branch creation and unique remote-tracking branch
+guessing remain supported. Broader prepared authorization/lifecycle migration
+is still incomplete.
 
 #### 7. `git_stash_list`
 
@@ -211,7 +318,20 @@ Pull from remote.
 
 ## Implementation Strategy
 
-### gix API Coverage (v0.85.0, verified 2026-07-04)
+### gix API Coverage (registry and release rechecked 2026-10-13; latest published 0.89.0)
+
+Registry recheck on 2026-10-13 against `https://index.crates.io/3/g/gix`
+still reports 0.89.0, non-yanked, with Rust 1.88 as its MSRV. The
+[0.89.0 release notes](https://github.com/GitoxideLabs/gitoxide/releases/tag/gix-v0.89.0)
+add safe linked-worktree creation, checkout and removal, including branch
+protection and rollback. That is a narrower workflow than switching the current
+worktree, which remains unchecked in upstream's development-status survey.
+No dependency upgrade or new host-Git removal date is implied.
+
+Talos currently requests and locks **0.87.1**. The registry lists **0.89.0** as
+the latest published, non-yanked version; 0.88/0.89 require Rust 1.88, below our
+pinned 1.99.0. This survey does not upgrade dependencies. The table describes
+upstream capability status, not a successful Talos integration of 0.89.0.
 
 Based on the gitoxide crate-status survey:
 
@@ -232,6 +352,7 @@ Based on the gitoxide crate-status survey:
 | Index read/write | ✅ | `gix::index` — can stage/unstage via index manipulation |
 | **Push** | ❌ | `gix-protocol` push not implemented |
 | **Checkout / switch** | ❌ | No porcelain orchestration |
+| Linked worktree add/remove | ✅ in 0.89.0 | New `worktree-mutation` APIs create and check out a *new linked worktree* or remove one; Talos has not integrated them and they do not replace current-worktree branch switching. |
 | **Stash** | ❌ | `gix-stash` is placeholder |
 | **Reset** | ❌ | Not implemented |
 | **Rebase** | ❌ | `gix-rebase` is placeholder |
@@ -244,7 +365,7 @@ Based on the gitoxide crate-status survey:
 Use `gix` with minimal features for all read-only operations. No host `git` dependency.
 
 ```toml
-gix = { version = "0.85", default-features = false, features = [
+gix = { version = "0.87.1", default-features = false, features = [
     "basic", "status", "revision", "blob-diff", "index", "sha1"
 ] }
 ```
@@ -265,9 +386,9 @@ Operations using host `git` fallback:
 - `git_pull` — gix fetch works, but no worktree update after fetch
 - `git_stash_list` — gix stash is placeholder (not delivered in I026)
 
-Operations using native `gix`:
-- `git_add` — via `gix::index` manipulation
-- `git_commit` — via `gix::Repository::commit()`
+Native write migration targets (not the current implementation):
+- `git_add` — investigate `gix::index` manipulation
+- `git_commit` — investigate `gix::Repository::commit()` and required hook/signing parity
 
 I026 implementation note: `git_add` and `git_commit` are delivered through the same structured
 host-git adapter as the other write operations while native gix write orchestration remains under
@@ -282,6 +403,54 @@ to `gix` implementations. Track gix releases for:
 - Stash support
 
 ### Standing gix Tracking Requirement
+
+2026-10-15 release/source recheck: `cargo info gix` reports locked 0.87.1
+and latest 0.89.0; `cargo info gix@0.89.0` successfully downloaded the
+published crate and reports MSRV 1.88. The annotated `gix-v0.89.0` tag
+dates to 2026-10-08 and targets `0115e902fd0334b8f370766993eb17babed3157f`.
+Its release notes confirm linked-worktree addition/checkout/removal and the
+breaking public `gix::Result` migration. These are not ordinary branch-switch
+or push/rebase workflow parity. Development sources inspected at
+`8dc7afdeed215558e89f0c49fd87621d46a98307` (2026-10-14) still mark push
+client/server plumbing, rebase, and checkout/switch orchestration incomplete.
+The config include implementation still documents section-end insertion order
+and hasconfig URL-prohibition deviations and directly opens included files.
+Thus upgrading alone does not replace I300's exact-admission target evaluator.
+Keep existing host bridges pending operation-specific parity/security gates;
+no dependency upgrade or removal date is claimed. The HTTP registry API returned
+403; availability evidence is Cargo plus the matching annotated release tag.
+Sources: [0.89.0 release](https://github.com/GitoxideLabs/gitoxide/releases/tag/gix-v0.89.0),
+[pinned development status](https://github.com/GitoxideLabs/gitoxide/blob/8dc7afdeed215558e89f0c49fd87621d46a98307/crate-status.md),
+[pinned include implementation](https://github.com/GitoxideLabs/gitoxide/blob/8dc7afdeed215558e89f0c49fd87621d46a98307/gix-config/src/file/includes/mod.rs).
+
+Published-crate source audit (2026-10-15): inspected the downloaded `gix 0.89.0`
+crate source in addition to its release notes. Its public remote API exposes
+fetch under explicit blocking/async network features; merge exposes tree and
+commit merge primitives; and linked-worktree add/remove are behind
+`worktree-mutation`. `fetch_then_checkout` is present in the clone workflow, but
+it constructs a clone checkout continuation and does not implement pull's
+current-branch reconciliation, index/worktree safety, merge/rebase state, or
+conflict continuation. The public checkout module supplies checkout options,
+not porcelain branch-switch orchestration. No push workflow was found in this
+crate audit. These findings refine the earlier broad phrase “fetch + update”:
+fetch and low-level merge/worktree ingredients exist, while Talos-equivalent
+Pull and branch-switch workflows remain absent. The release crate's network and
+worktree mutation features also expand dependency effects and are not enabled by
+this audit. Talos remains on locked 0.87.1; 0.89.0 requires Rust 1.88 and has
+the recorded breaking `gix::Result` migration. No upgrade or host-Git removal
+date follows from API presence alone.
+
+Audit sources: `cargo info gix@0.89.0` (published version/MSRV/features);
+downloaded `gix-0.89.0/src/remote/fetch.rs`, `src/repository/merge.rs`,
+`src/repository/checkout.rs`, `src/clone/fetch/mod.rs`, `src/worktree/add.rs`,
+and `src/worktree/remove.rs`; current `Cargo.lock` resolves 0.87.1.
+
+2026-10-14 registry recheck after Checkout changes: crates.io sparse index still
+reports latest non-yanked stable `gix 0.89.0` (Rust 1.88); Talos remains locked to
+0.87.1. No newer published version was found. This registry check establishes
+release availability only, not new checkout/push parity or a Git-removal date.
+Source: https://index.crates.io/3/g/gix; local evidence
+`/private/tmp/i300-gix-index-current.jsonl`.
 
 Track `gix` continuously until every host-`git` fallback has an explicit keep/replace decision.
 This is not an implementation authorization by itself; each replacement still needs a scoped
@@ -308,6 +477,107 @@ Each tracking update must record:
 - Tests required before replacement, including unavailable-host behavior for any retained fallback.
 
 Current tracking baseline:
+
+Tracking recheck (2026-10-15): successful live sparse-index response still
+reports non-yanked gix 0.89.0, Rust 1.88 minimum; Talos remains locked to 0.87.1.
+The upstream development `crate-status.md`, retrieved through GitHub API, still
+marks branch checkout/switch orchestration, merge/rebase workflows, push,
+self-contained file/SSH clone/fetch, hooks and signed commits incomplete.
+Low-level checkout and fetch being checked does not establish full command
+parity. No new release or capability changes the operation replacement gates
+below, and no supported full Git-removal date is available. The crates.io HTTP
+API returned 403 again; the version claim uses the successful sparse index.
+Sources: [registry](https://index.crates.io/3/g/gix),
+[upstream status](https://github.com/GitoxideLabs/gitoxide/blob/main/crate-status.md).
+No dependency upgrade or background monitoring service was introduced.
+
+Tracking recheck (2026-10-21): the live [sparse index](https://index.crates.io/3/g/gix)
+still reports non-yanked gix 0.89.0 / MSRV 1.88; Cargo.lock remains 0.87.1.
+The [0.89.0 release](https://github.com/GitoxideLabs/gitoxide/releases/tag/gix-v0.89.0)
+is dated 2026-10-08 and adds linked-worktree creation/removal, already tracked
+below; no newer top-level gix release was found in the registry. The immutable
+[upstream status at 59ba38b8](https://github.com/GitoxideLabs/gitoxide/blob/59ba38b89a4dcaa829f21db437306facbddd7ae7/crate-status.md)
+still leaves push protocol, rebase orchestration, Git-compatible hooks,
+switch/restore orchestration and persistent merge continuation/abort unchecked.
+It is development-tree evidence, not a released parity test. No new evidence
+supports removing host Git or assigning a removal date. Keep the operation-level
+replacement gates below; no upgrade or background monitor was introduced.
+Evidence retained in /private/tmp/i300-gix-index-20261021.jsonl,
+/private/tmp/i300-gix-status-20261021.md and
+/private/tmp/i300-gix-release-089-20261021.json. The crates.io HTTP API again
+returned 403; the version claim uses the successful sparse-index response.
+
+Tracking recheck (2026-10-14): the live crates.io sparse index still reports
+non-yanked stable gix 0.89.0 (MSRV 1.88), versus Cargo.lock 0.87.1. The crates.io
+HTTP API returned 403; version evidence comes from the successful sparse-index
+response, not that API. Current upstream README and crate-status still list
+push, rebase and checkout/switch orchestration as incomplete, including fully
+self-contained file/SSH clone/fetch. These development-tree observations do
+not establish release parity. No newly available replacement or removal date
+is established; no dependency versions or background monitor were changed.
+Sources: [registry](https://index.crates.io/3/g/gix),
+[status](https://github.com/GitoxideLabs/gitoxide/blob/main/crate-status.md).
+
+Tracking recheck (2026-10-13, maintainer request): the sparse registry index
+and [gix 0.89.0 release](https://github.com/GitoxideLabs/gitoxide/releases/tag/gix-v0.89.0)
+report non-yanked gix 0.89.0 with Rust 1.88 minimum; Talos still locks 0.87.1.
+0.89.0 adds linked-worktree add/checkout/remove with safety checks, while 0.88.0
+introduced configuration-path discovery and return values for branch deletion
+([release notes](https://github.com/GitoxideLabs/gitoxide/releases/tag/gix-v0.88.0)).
+The new linked-worktree workflow could support a future dedicated tool, but
+cannot replace Talos's current `git_checkout` branch-switch contract. The
+0.89.0 public `gix::Result` migration is breaking for downstream APIs, so a
+Talos dependency upgrade needs its own compile and parity review.
+The upstream [development status](https://github.com/GitoxideLabs/gitoxide/blob/main/crate-status.md)
+was fetched again on this date: fetch, low-level commit/ref/index writes and
+checkout primitives are checked, while push, checkout/switch orchestration,
+client hooks, signed commits and persistent merge continuation/abort remain
+unchecked. The release notes establish the new linked-worktree capability;
+the development survey describes broader outstanding workflows, not released
+0.89.0 compatibility. This confirms the blockers below.
+There is no defensible Git-removal date. Track release changes against these
+operation gates and migrate individual operations only after parity and
+permission tests; no automatic background monitor or dependency upgrade was
+created by this recheck.
+
+Tracking update (2026-10-12, I300 follow-up):
+
+- Evidence: [crates.io sparse index](https://index.crates.io/3/g/gix), current
+  Talos manifest/lockfile, and upstream
+  [crate-status at cd317d380ea10385aad4d87fbf995f0bdd70375c](https://github.com/GitoxideLabs/gitoxide/blob/cd317d380ea10385aad4d87fbf995f0bdd70375c/crate-status.md).
+  The status is a development-tree survey, not a release-specific compatibility
+  test. Component release tags must not be mistaken for top-level gix releases.
+- Confirmed upstream inventory: low-level checkout, index/ref/object writing,
+  commit creation, fetch and merge primitives exist. Push protocol/workflow,
+  checkout/switch orchestration, hook execution, and persistent merge
+  continuation/abort workflows remain unchecked. A `push` module or a merge API
+  does not establish equivalent porcelain behavior.
+- Decision: keep native local read tools; retain the structured host Git bridge
+  for add/commit (configuration, filters, hooks and signing semantics), checkout
+  (dirty files, branch/ref/index/worktree coordination), push (transport and
+  remote updates), and pull (fetch plus merge/rebase/worktree state). I300 push
+  transport admission remains unfinished; this survey does not claim delivery.
+- Dependency surface: retain `basic`, `status`, `revision`, `blob-diff`, `index`,
+  `sha1`, with defaults disabled. Fetch/network and `worktree-mutation` would
+  require explicit feature/dependency review. Native library APIs alone do not
+  prove subprocess freedom: credentials, filters, hooks and SSH may execute
+  helpers, and upstream still tracks self-contained file/SSH fetch separately.
+- Replacement gates: test each replacement against Git for configuration and
+  attributes, dirty/conflicted worktrees, linked worktrees/submodules, hooks and
+  helper effects, credential/URL routing, denied/replayed approval, cancellation
+  and unavailable-host behavior. Preserve read/write/execute/network permission
+  effects even when the backend becomes Rust-native.
+- No supported removal date is known. Reassess on every relevant gix release
+  and Git-tool change using the standing triggers above; push and branch-switch
+  orchestration are the primary blockers, followed by behavior and authorization
+  parity. Partial migrations can precede full removal. Merely upgrading to
+  0.89.0 does not remove the host Git dependency.
+- Follow-up owner remains GIT-001; no new iteration activation, completion claim,
+  dependency upgrade or background monitoring service is implied by this update.
+- Validation: project governance and collaboration-claim validators passed with
+  zero warnings; `git diff --check` passed. Existing candidate tests passed:
+  `talos-tools --features git --lib` 177/177 and MCP `git_prepared` 3/3, both
+  with `--locked`. These tests validate the current 0.87.1 candidate, not 0.89.0.
 
 | Operation family | Current Talos posture | Tracking decision |
 |---|---|---|

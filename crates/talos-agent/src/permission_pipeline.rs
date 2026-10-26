@@ -99,9 +99,184 @@ pub struct PermissionAuthorizationRequest<'a> {
     pub deadline: Duration,
 }
 
+/// Retained network evidence constructed by dispatch for a registered built-in instance.
+pub struct BuiltinNetworkReviewEvidence<'a> {
+    input: &'a serde_json::Value,
+    profile: &'a [ToolPermissionFacet],
+    manifest: &'a ToolNetworkManifest,
+}
+
+impl BuiltinNetworkReviewEvidence<'_> {
+    /// Exact normalized execution input; private assessment material, not display text.
+    pub fn input(&self) -> &serde_json::Value {
+        self.input
+    }
+    /// Complete evaluated facets, all of which must be admitted together.
+    pub fn profile(&self) -> &[ToolPermissionFacet] {
+        self.profile
+    }
+    /// Retained transport-enforced network plan.
+    pub fn manifest(&self) -> &ToolNetworkManifest {
+        self.manifest
+    }
+}
+
+enum InvocationReviewSource<'a> {
+    Network(&'a ToolNetworkManifest, bool),
+    Builtin(&'a str),
+    FileMutation(&'a talos_core::tool::PreparedFileMutationEvidence),
+}
+
+/// Private file-change evidence supplied only for a registered built-in instance.
+pub struct BuiltinFileMutationReviewEvidence<'a> {
+    input: &'a serde_json::Value,
+    profile: &'a [ToolPermissionFacet],
+    mutation: &'a talos_core::tool::PreparedFileMutationEvidence,
+}
+
+impl BuiltinFileMutationReviewEvidence<'_> {
+    /// Exact normalized execution arguments, not a display projection.
+    pub fn input(&self) -> &serde_json::Value {
+        self.input
+    }
+    /// Complete permission profile to admit atomically.
+    pub fn profile(&self) -> &[ToolPermissionFacet] {
+        self.profile
+    }
+    /// Complete before/after content bound to the retained prepared operation.
+    pub fn mutation(&self) -> &talos_core::tool::PreparedFileMutationEvidence {
+        self.mutation
+    }
+}
+
+/// Evidence constructed only by dispatch for an explicitly registered built-in.
+pub struct BuiltinInvocationReviewEvidence<'a> {
+    input: &'a serde_json::Value,
+    profile: &'a [ToolPermissionFacet],
+    description: &'a str,
+    working_directory: Option<&'a std::path::Path>,
+}
+
+impl BuiltinInvocationReviewEvidence<'_> {
+    /// Exact normalized execution arguments, never presentation projections.
+    pub fn input(&self) -> &serde_json::Value {
+        self.input
+    }
+    /// Complete permission facets evaluated atomically by the pipeline.
+    pub fn profile(&self) -> &[ToolPermissionFacet] {
+        self.profile
+    }
+    /// Description supplied by the registered implementation, not caller JSON.
+    pub fn description(&self) -> &str {
+        self.description
+    }
+    /// Implementation-supplied execution directory, when available.
+    pub fn working_directory(&self) -> Option<&std::path::Path> {
+        self.working_directory
+    }
+}
+
 /// Surface adapter that resolves an already-evaluated `Ask`.
 #[async_trait]
 pub trait ApprovalResolver: Send + Sync {
+    /// Reviews a trusted retained file mutation. Legacy surfaces preserve their
+    /// ordinary exact-input approval behavior; this default adds no Auto allowance.
+    async fn resolve_builtin_file_mutation(
+        &self,
+        request: PermissionApprovalRequest,
+        evidence: BuiltinFileMutationReviewEvidence<'_>,
+        remaining: Duration,
+        auto_assessment_allowed: bool,
+        user_intent: Option<&str>,
+    ) -> Result<ApprovalChoice, ApprovalResolverError> {
+        self.resolve_with_execution_context(
+            request,
+            evidence.input(),
+            None,
+            remaining,
+            auto_assessment_allowed,
+            user_intent,
+        )
+        .await
+    }
+    /// Reviews an ordinary product-owned invocation. This evidence does not assert
+    /// transport isolation or a retained execution plan. Legacy adapters preserve
+    /// their existing resolution behavior.
+    async fn resolve_builtin_invocation(
+        &self,
+        request: PermissionApprovalRequest,
+        evidence: BuiltinInvocationReviewEvidence<'_>,
+        remaining: Duration,
+        auto_assessment_allowed: bool,
+        user_intent: Option<&str>,
+    ) -> Result<ApprovalChoice, ApprovalResolverError> {
+        self.resolve_with_execution_context(
+            request,
+            evidence.input,
+            evidence.working_directory,
+            remaining,
+            auto_assessment_allowed,
+            user_intent,
+        )
+        .await
+    }
+    /// Reviews a network invocation whose implementation ownership was explicitly
+    /// registered by the product. Evidence is constructed only by the Agent pipeline.
+    async fn resolve_builtin_network(
+        &self,
+        request: PermissionApprovalRequest,
+        evidence: BuiltinNetworkReviewEvidence<'_>,
+        remaining: Duration,
+        auto_assessment_allowed: bool,
+        user_intent: Option<&str>,
+    ) -> Result<ApprovalChoice, ApprovalResolverError> {
+        self.resolve_network_invocation(
+            request,
+            evidence.input,
+            evidence.manifest,
+            remaining,
+            auto_assessment_allowed,
+            user_intent,
+        )
+        .await
+    }
+    /// Reviews the retained network plan separately from caller-controlled arguments.
+    ///
+    /// The manifest describes transport-enforced destinations, not native implementation
+    /// ownership. Implementors must establish eligibility independently and redact/bound
+    /// private input before model review. Existing adapters preserve their resolution path.
+    async fn resolve_network_invocation(
+        &self,
+        request: PermissionApprovalRequest,
+        execution_input: &serde_json::Value,
+        _manifest: &ToolNetworkManifest,
+        remaining: Duration,
+        auto_assessment_allowed: bool,
+        user_intent: Option<&str>,
+    ) -> Result<ApprovalChoice, ApprovalResolverError> {
+        self.resolve_with_execution_input(
+            request,
+            execution_input,
+            remaining,
+            auto_assessment_allowed,
+            user_intent,
+        )
+        .await
+    }
+
+    /// Reviews implementation-owned command evidence. Legacy adapters retain
+    /// their human resolution path and do not acquire automatic command approval.
+    async fn resolve_prepared_command(
+        &self,
+        request: PermissionApprovalRequest,
+        _evidence: &talos_core::tool::PreparedCommandEvidence,
+        remaining: Duration,
+        _auto_assessment_allowed: bool,
+        user_intent: Option<&str>,
+    ) -> Result<ApprovalChoice, ApprovalResolverError> {
+        self.resolve_with_auto_assessment(request, remaining, false, user_intent)
+            .await
+    }
     /// Observes bounded user-authored messages for presentation-only session context.
     fn observe_user_messages(&self, _messages: &[String]) {}
 
@@ -307,9 +482,9 @@ impl PermissionPipeline {
         &self,
         authorization: PermissionAuthorizationRequest<'_>,
     ) -> Result<Vec<ToolExecutionAuthorization>, PermissionPipelineError> {
-        self.authorize_inner(authorization, None, None, None)
+        self.authorize_inner(authorization, None, None, None, None)
             .await?
-            .paths()
+            .into_paths()
     }
 
     /// Evaluates, resolves and admits one request with bounded current-turn intent available to
@@ -319,9 +494,9 @@ impl PermissionPipeline {
         authorization: PermissionAuthorizationRequest<'_>,
         user_intent: Option<&str>,
     ) -> Result<Vec<ToolExecutionAuthorization>, PermissionPipelineError> {
-        self.authorize_inner(authorization, user_intent, None, None)
+        self.authorize_inner(authorization, user_intent, None, None, None)
             .await?
-            .paths()
+            .into_paths()
     }
 
     /// Evaluates a request with trusted execution context supplied by its registered tool.
@@ -331,27 +506,134 @@ impl PermissionPipeline {
         user_intent: Option<&str>,
         working_directory: Option<&std::path::Path>,
     ) -> Result<Vec<ToolExecutionAuthorization>, PermissionPipelineError> {
-        self.authorize_inner(authorization, user_intent, working_directory, None)
+        self.authorize_inner(authorization, user_intent, working_directory, None, None)
             .await?
-            .paths()
+            .into_paths()
     }
 
-    /// Approves and admits the exact trusted prepared plan without changing legacy request literals.
+    /// Legacy entrypoint: refuses preparation without a bound plan identity.
+    pub async fn authorize_prepared_with_user_intent(
+        &self,
+        authorization: PermissionAuthorizationRequest<'_>,
+        user_intent: Option<&str>,
+    ) -> Result<talos_permission::AdmittedInvocation, PermissionPipelineError> {
+        let _ = (authorization, user_intent);
+        Err(PermissionPipelineError::State(
+            "prepared plan identity required".into(),
+        ))
+    }
+
+    /// Admits the exact prepared plan, including its trusted request provenance.
+    pub async fn authorize_prepared_plan(
+        &self,
+        authorization: PermissionAuthorizationRequest<'_>,
+        user_intent: Option<&str>,
+        plan: &talos_core::tool::PreparedPlanIdentity,
+    ) -> Result<talos_permission::AdmittedInvocation, PermissionPipelineError> {
+        self.authorize_inner(authorization, user_intent, None, Some((plan, None)), None)
+            .await?
+            .into_prepared()
+    }
+
+    /// Admits a retained command with producer evidence bound to the same plan.
+    pub async fn authorize_prepared_plan_with_evidence(
+        &self,
+        authorization: PermissionAuthorizationRequest<'_>,
+        user_intent: Option<&str>,
+        plan: &talos_core::tool::PreparedPlanIdentity,
+        evidence: Option<&talos_core::tool::PreparedCommandEvidence>,
+    ) -> Result<talos_permission::AdmittedInvocation, PermissionPipelineError> {
+        if evidence.is_some_and(|evidence| !evidence.belongs_to(plan)) {
+            return Err(PermissionPipelineError::State(
+                "command evidence plan mismatch".into(),
+            ));
+        }
+        self.authorize_inner(
+            authorization,
+            user_intent,
+            None,
+            Some((plan, evidence)),
+            None,
+        )
+        .await?
+        .into_prepared()
+    }
+
+    pub(crate) async fn authorize_registered_file_mutation(
+        &self,
+        authorization: PermissionAuthorizationRequest<'_>,
+        user_intent: Option<&str>,
+        plan: &talos_core::tool::PreparedPlanIdentity,
+        evidence: &talos_core::tool::PreparedFileMutationEvidence,
+        builtin: bool,
+    ) -> Result<talos_permission::AdmittedInvocation, PermissionPipelineError> {
+        if !evidence.belongs_to(plan) {
+            return Err(PermissionPipelineError::State(
+                "file mutation evidence plan mismatch".into(),
+            ));
+        }
+        self.authorize_inner(
+            authorization,
+            user_intent,
+            None,
+            Some((plan, None)),
+            builtin.then_some(InvocationReviewSource::FileMutation(evidence)),
+        )
+        .await?
+        .into_prepared()
+    }
+
+    /// Approves and admits a protected network invocation with its trusted manifest.
     pub async fn authorize_network(
         &self,
         authorization: PermissionAuthorizationRequest<'_>,
         manifest: &ToolNetworkManifest,
         user_intent: Option<&str>,
     ) -> Result<Arc<dyn ToolNetworkAuthority>, PermissionPipelineError> {
+        self.authorize_registered_network(authorization, manifest, user_intent, false)
+            .await
+    }
+
+    pub(crate) async fn authorize_registered_network(
+        &self,
+        authorization: PermissionAuthorizationRequest<'_>,
+        manifest: &ToolNetworkManifest,
+        user_intent: Option<&str>,
+        builtin: bool,
+    ) -> Result<Arc<dyn ToolNetworkAuthority>, PermissionPipelineError> {
         match self
-            .authorize_inner(authorization, user_intent, None, Some(manifest))
+            .authorize_inner(
+                authorization,
+                user_intent,
+                None,
+                None,
+                Some(InvocationReviewSource::Network(manifest, builtin)),
+            )
             .await?
         {
-            InvocationAuthorization::Network(authority) => Ok(authority),
-            InvocationAuthorization::Paths(_) => Err(PermissionPipelineError::State(
+            PermissionAdmission::Network(authority) => Ok(authority),
+            _ => Err(PermissionPipelineError::State(
                 "network admission unavailable".into(),
             )),
         }
+    }
+
+    pub(crate) async fn authorize_registered_invocation(
+        &self,
+        authorization: PermissionAuthorizationRequest<'_>,
+        user_intent: Option<&str>,
+        working_directory: Option<&std::path::Path>,
+        description: &str,
+    ) -> Result<Vec<ToolExecutionAuthorization>, PermissionPipelineError> {
+        self.authorize_inner(
+            authorization,
+            user_intent,
+            working_directory,
+            None,
+            Some(InvocationReviewSource::Builtin(description)),
+        )
+        .await?
+        .into_paths()
     }
 
     async fn authorize_inner(
@@ -359,8 +641,21 @@ impl PermissionPipeline {
         authorization: PermissionAuthorizationRequest<'_>,
         user_intent: Option<&str>,
         working_directory: Option<&std::path::Path>,
-        network_manifest: Option<&ToolNetworkManifest>,
-    ) -> Result<InvocationAuthorization, PermissionPipelineError> {
+        prepared: Option<(
+            &talos_core::tool::PreparedPlanIdentity,
+            Option<&talos_core::tool::PreparedCommandEvidence>,
+        )>,
+        review_source: Option<InvocationReviewSource<'_>>,
+    ) -> Result<PermissionAdmission, PermissionPipelineError> {
+        let (network_context, builtin_description, file_mutation) = match review_source {
+            Some(InvocationReviewSource::Network(manifest, builtin)) => {
+                (Some((manifest, builtin)), None, None)
+            }
+            Some(InvocationReviewSource::Builtin(description)) => (None, Some(description), None),
+            Some(InvocationReviewSource::FileMutation(evidence)) => (None, None, Some(evidence)),
+            None => (None, None, None),
+        };
+        let network_manifest = network_context.map(|(manifest, _)| manifest);
         let PermissionAuthorizationRequest {
             tool_name,
             provenance,
@@ -423,7 +718,66 @@ impl PermissionPipeline {
                     },
                 };
                 let remaining = deadline_at.saturating_duration_since(Instant::now());
-                let resolver_future = if matches!(tool_name, "bash" | "powershell") {
+                let resolver_future = if let Some(mutation) = file_mutation {
+                    std::panic::AssertUnwindSafe(resolver.resolve_builtin_file_mutation(
+                        approval,
+                        BuiltinFileMutationReviewEvidence {
+                            input,
+                            profile,
+                            mutation,
+                        },
+                        remaining,
+                        auto_assessment_allowed,
+                        user_intent,
+                    ))
+                    .catch_unwind()
+                } else if let Some((_, Some(evidence))) = prepared {
+                    std::panic::AssertUnwindSafe(resolver.resolve_prepared_command(
+                        approval,
+                        evidence,
+                        remaining,
+                        auto_assessment_allowed,
+                        user_intent,
+                    ))
+                    .catch_unwind()
+                } else if let Some((manifest, true)) = network_context {
+                    std::panic::AssertUnwindSafe(resolver.resolve_builtin_network(
+                        approval,
+                        BuiltinNetworkReviewEvidence {
+                            input,
+                            profile,
+                            manifest,
+                        },
+                        remaining,
+                        auto_assessment_allowed,
+                        user_intent,
+                    ))
+                    .catch_unwind()
+                } else if let Some(manifest) = network_manifest {
+                    std::panic::AssertUnwindSafe(resolver.resolve_network_invocation(
+                        approval,
+                        input,
+                        manifest,
+                        remaining,
+                        auto_assessment_allowed,
+                        user_intent,
+                    ))
+                    .catch_unwind()
+                } else if let Some(description) = builtin_description {
+                    std::panic::AssertUnwindSafe(resolver.resolve_builtin_invocation(
+                        approval,
+                        BuiltinInvocationReviewEvidence {
+                            input,
+                            profile,
+                            description,
+                            working_directory,
+                        },
+                        remaining,
+                        auto_assessment_allowed,
+                        user_intent,
+                    ))
+                    .catch_unwind()
+                } else if matches!(tool_name, "bash" | "powershell") {
                     std::panic::AssertUnwindSafe(resolver.resolve_with_execution_context(
                         approval,
                         input,
@@ -434,8 +788,13 @@ impl PermissionPipeline {
                     ))
                     .catch_unwind()
                 } else {
-                    std::panic::AssertUnwindSafe(resolver.resolve_with_auto_assessment(
+                    // Automatic assessors receive the exact normalized input as private
+                    // assessment material. Human-facing fallbacks retain the separate safe
+                    // presentation request above. Resolvers must project and redact before
+                    // forwarding any assessment to a model.
+                    std::panic::AssertUnwindSafe(resolver.resolve_with_execution_input(
                         approval,
+                        input,
                         remaining,
                         auto_assessment_allowed,
                         user_intent,
@@ -473,35 +832,64 @@ impl PermissionPipeline {
 
         ensure_before(deadline_at)?;
 
-        let authorization = if network_manifest.is_some() {
-            self.state
+        if network_manifest.is_some() {
+            return self
+                .state
                 .try_admit_network(pending, &request, &self.context)
-                .map(InvocationAuthorization::Network)
+                .map(PermissionAdmission::Network)
+                .map_err(|error| PermissionPipelineError::State(error.to_string()));
+        }
+        let admission = match prepared {
+            Some((plan, _)) => {
+                self.state
+                    .try_admit_prepared_invocation(pending, &request, &self.context, plan)
+            }
+            None => self
+                .state
+                .try_admit_invocation(pending, &request, &self.context),
+        }
+        .map_err(|error| PermissionPipelineError::State(error.to_string()))?;
+        ensure_before(deadline_at)?;
+        if prepared.is_some() {
+            Ok(PermissionAdmission::Prepared(Box::new(admission)))
         } else {
-            self.state
-                .try_admit(pending, &request, &self.context)
-                .map(InvocationAuthorization::Paths)
-        };
-        authorization
-            .map_err(|error| PermissionPipelineError::State(error.to_string()))
-            .and_then(|authorization| {
-                ensure_before(deadline_at)?;
-                Ok(authorization)
-            })
+            admission
+                .consume_for(&request)
+                .map(PermissionAdmission::Paths)
+                .map_err(|error| PermissionPipelineError::State(error.to_string()))
+        }
     }
 }
 
-enum InvocationAuthorization {
+enum PermissionAdmission {
     Paths(Vec<ToolExecutionAuthorization>),
+    Prepared(Box<talos_permission::AdmittedInvocation>),
     Network(Arc<dyn ToolNetworkAuthority>),
 }
 
-impl InvocationAuthorization {
-    fn paths(self) -> Result<Vec<ToolExecutionAuthorization>, PermissionPipelineError> {
+impl PermissionAdmission {
+    fn into_paths(self) -> Result<Vec<ToolExecutionAuthorization>, PermissionPipelineError> {
         match self {
             Self::Paths(paths) => Ok(paths),
+            Self::Prepared(_) => Err(PermissionPipelineError::State(
+                "admission route mismatch".into(),
+            )),
             Self::Network(_) => Err(PermissionPipelineError::State(
-                "path admission unavailable".into(),
+                "admission route mismatch".into(),
+            )),
+        }
+    }
+
+    fn into_prepared(
+        self,
+    ) -> Result<talos_permission::AdmittedInvocation, PermissionPipelineError> {
+        match self {
+            Self::Prepared(admission) => Ok(*admission),
+            Self::Paths(_) => Err(PermissionPipelineError::State(
+                "admission route mismatch".into(),
+            )),
+            Self::Network(_) => Err(PermissionPipelineError::State(
+                "admission route mismatch".into(),
             )),
         }
     }
@@ -524,6 +912,21 @@ pub fn headless_pipeline(engine: talos_permission::PermissionEngine) -> Permissi
         None,
     )
 }
+
+#[cfg(test)]
+#[path = "permission_pipeline/execution_input_tests.rs"]
+mod execution_input_tests;
+
+#[cfg(test)]
+mod file_mutation_tests;
+
+#[cfg(test)]
+#[path = "permission_pipeline/native_pull_command_tests.rs"]
+mod native_pull_command_tests;
+
+#[cfg(test)]
+#[path = "permission_pipeline/prepared_command_tests.rs"]
+mod prepared_command_tests;
 
 #[cfg(test)]
 mod tests {

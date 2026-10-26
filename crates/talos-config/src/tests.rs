@@ -61,6 +61,23 @@ fn test_default_config() {
 }
 
 #[test]
+fn merging_credentials_does_not_turn_builtin_chat_into_explicit_user_intent() {
+    let mut config = Config {
+        provider: "openai".into(),
+        model: "o3".into(),
+        ..Default::default()
+    };
+    config.merge_credentials(&Credentials {
+        keys: HashMap::from([("openai".into(), "test-key".into())]),
+    });
+    assert!(config.providers["openai"].protocol.is_unspecified());
+    assert_eq!(
+        config.provider_protocol(),
+        ProviderProtocol::OpenAIResponses
+    );
+}
+
+#[test]
 fn auto_config_defaults_enabled_and_parses_explicit_values() {
     let missing: Config = toml::from_str("provider = \"anthropic\"\nmodel = \"test\"\n")
         .expect("operation should succeed");

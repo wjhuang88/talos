@@ -246,6 +246,49 @@ mod tests {
         )));
     }
 
+    proptest::proptest! {
+        #[test]
+        fn arbitrary_transport_partitions_preserve_semantic_events(
+            text in ".{0,128}",
+            cuts in proptest::collection::vec(0usize..4096, 0..64),
+            crlf in proptest::bool::ANY,
+            complete in proptest::bool::ANY,
+        ) {
+            let delta = serde_json::json!({"type": "response.output_text.delta", "delta": text});
+            let newline = if crlf { "\r\n" } else { "\n" };
+            let mut wire = format!(
+                "data: {{\"type\":\"response.created\"}}{newline}{newline}data: {delta}{newline}{newline}"
+            );
+            if complete {
+                wire.push_str(&format!(
+                    "data: {{\"type\":\"response.completed\",\"response\":{{}}}}{newline}{newline}"
+                ));
+            }
+            let bytes = wire.as_bytes();
+            let mut baseline = ResponsesSseDecoder::new();
+            let mut expected = baseline.push(bytes);
+            expected.extend(baseline.finish());
+
+            let mut cuts: Vec<_> = cuts.into_iter().map(|cut| cut % (bytes.len() + 1)).collect();
+            cuts.extend([0, bytes.len()]);
+            cuts.sort_unstable();
+            cuts.dedup();
+            let mut decoder = ResponsesSseDecoder::new();
+            let mut actual = Vec::new();
+            for window in cuts.windows(2) {
+                actual.extend(decoder.push(&bytes[window[0]..window[1]]));
+            }
+            actual.extend(decoder.finish());
+            proptest::prop_assert_eq!(&actual, &expected);
+            let terminal = actual.last();
+            if complete {
+                proptest::prop_assert!(matches!(terminal, Some(ResponsesStreamOutput::Agent(AgentEvent::TurnEnd { .. }))), "complete stream must end successfully");
+            } else {
+                proptest::prop_assert!(matches!(terminal, Some(ResponsesStreamOutput::Agent(AgentEvent::Error { .. }))), "unterminated stream must fail");
+            }
+        }
+    }
+
     #[test]
     fn accepts_crlf_and_multiline_data_records() {
         let mut decoder = ResponsesSseDecoder::new();

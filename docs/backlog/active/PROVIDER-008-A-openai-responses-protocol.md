@@ -12,15 +12,15 @@
 |---|---|
 | Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
-| Executing Agent | GPT-5.6 Sol / talos开发 session |
+| Executing Agent | Codex / GPT-6 / talos开发 #724 continuation 2026-10-26 |
 | Work Slice | PROVIDER-008-A protocol architecture plus OpenAI Responses only; Gemini, Azure and Bedrock remain separate children. |
 | Claimed At | 2026-10-22 |
 | Source Issue | #748 |
 | Governance Claim PR | #747 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer requested implementation of parent #724 in the 2026-10-22 talos开发 session; child requirement #748 records this bounded slice. Governance-only #747 must pass exact-head applicable CI, both governance validators, provider/API technical review and merge-time CAS before this claim is effective. |
-| Implementation PR | Not started |
-| Last Updated | 2026-10-22 |
+| Implementation PR | #749 |
+| Last Updated | 2026-10-26 |
 | Handoff / Release Condition | Claim activates only when #747 reaches main with accepted ADR-093. Sibling families remain unclaimed; Complete requires existing implementation commit evidence. |
 
 ## Goal
@@ -150,3 +150,16 @@ value remains compatibility-only. Function-call results remain `function_call_ou
 `call_id`, and the core streaming lifecycle still includes `response.created`,
 `response.output_text.delta`, `response.completed` and `error`. Recorded fixtures and implementation
 must follow the current API contract rather than older examples.
+
+## Execution Checkpoint — 2026-10-26
+
+Governance #747 is effective at merge `4722fee827c71b807bb58458a08d67abe32050e4`; Draft implementation
+#749 is active. The maintainer requested continuation after the previous session became overlong.
+The same claimant and bounded child-A scope remain in force. Runtime/config resolver convergence,
+interactive configuration, omission preservation, protocol provenance, reasoning-preview redaction,
+binary regressions and property tests are recorded in the
+[I306 continuation checkpoint](../../iterations/I306-provider008a-openai-responses.md#continuation-checkpoint--2026-10-26).
+
+Status remains Active / Claimed. Catalog regeneration, complete validation, recorded-fixture audit,
+current-head CI and independent API review remain acceptance gates. No completion or release is
+claimed; the non-exhaustive public enum must ship only in a pre-1.0 minor release.

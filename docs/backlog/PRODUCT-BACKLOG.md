@@ -1,3 +1,9 @@
+## Proposed T8 selection — 2026-10-26
+
+[I308](../iterations/I308-builtin-auto-review.md) proposes full PERM-007-H/G Auto coverage in #765.
+Claimed/Active values are ineffective until the reviewed, validated governance record merges.
+Implementation must start from that merge or later main. T7 is Complete; later handoff tasks remain incomplete.
+
 # Product Backlog
 
 This file is the compact current-state backlog entrypoint. Story scope, acceptance criteria,
@@ -9,10 +15,17 @@ That snapshot is historical evidence, not current activation authority.
 
 ## Current Priorities
 
+[SANDBOX-001](active/SANDBOX-001-bubblewrap-workspace-visibility.md) / #757 is
+Complete in I307 at #762 (`f643d8775`), including protected-root/alias isolation.
+Exact-head platform CI and independent security review passed. T7 is Complete / Closed
+at #735 (`ee84889fd`); its final platform CI and review passed.
+
 2026-10-11 session-handoff addition: [PERM-007-H](active/PERM-007-H-all-builtin-auto-review.md)
 will extend Auto review to all built-in tools after I300 Git repair. Refinement /
 Unclaimed; reconcile higher-risk PERM-007-G/#563 policy before implementation.
-ADR-089 for I300 is accepted; its claim becomes effective upon #704 merge.
+ADR-089 and its API amendment are accepted; #704 merged as `55fef9f9` and
+I300 is Complete / Closed; implementation #735 merged as `ee84889fd`, with completion
+evidence in its owner.
 PERM-007-H remains Unclaimed and requires a separate iteration.
 
 Current cycle selected 2026-09-21: [I281](../iterations/I281-auto-shell-review-and-windows-timing.md)

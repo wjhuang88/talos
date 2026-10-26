@@ -58,7 +58,22 @@ fn setup(
     Arc<Resolver>,
     Arc<TransportBudget>,
 ) {
-    let (chain, manifest) = relocate_with_hosts(prepare(), server, true);
+    setup_with_ports(server, failures, requests, after, None)
+}
+
+fn setup_with_ports(
+    server: &Server,
+    failures: Vec<usize>,
+    requests: usize,
+    after: AfterFailure,
+    ports: Option<[u16; 4]>,
+) -> (
+    PreparedCompatibilityChain,
+    SearchTransport,
+    Arc<Resolver>,
+    Arc<TransportBudget>,
+) {
+    let (chain, manifest) = relocate_with_ports(prepare(), server, true, ports);
     let profile: Vec<_> = manifest
         .scope()
         .endpoints()
@@ -101,6 +116,8 @@ fn setup(
         .expect("transport");
     (chain, transport, resolver, budget)
 }
+
+mod connection_tests;
 
 fn hosts(resolver: &Resolver) -> Vec<String> {
     resolver.hosts.lock().expect("observations").clone()

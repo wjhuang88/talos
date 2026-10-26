@@ -515,6 +515,29 @@ mod file_tool_tests {
     }
 
     #[tokio::test]
+    async fn concurrent_creates_do_not_overwrite_the_winner() {
+        let temp_dir = tempfile::tempdir().expect("workspace");
+        let tool = WriteTool::new(temp_dir.path().to_path_buf());
+        let first = "a".repeat(128 * 1024);
+        let second = "b".repeat(128 * 1024);
+        let (left, right) = tokio::join!(
+            tool.execute(json!({"path": "nested/new.txt", "content": first})),
+            tool.execute(json!({"path": "nested/new.txt", "content": second})),
+        );
+        assert_ne!(left.is_error, right.is_error, "exactly one create succeeds");
+        let (winner, loser) = if left.is_error {
+            (&second, left)
+        } else {
+            (&first, right)
+        };
+        assert!(loser.content.contains("already exists"));
+        assert_eq!(
+            fs::read_to_string(temp_dir.path().join("nested/new.txt")).expect("read"),
+            *winner
+        );
+    }
+
+    #[tokio::test]
     async fn test_write_tool_create_parent_dirs() {
         let temp_dir = tempfile::tempdir().expect("operation should succeed");
         let tool = WriteTool::new(temp_dir.path().to_path_buf());

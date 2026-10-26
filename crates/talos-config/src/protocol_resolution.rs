@@ -20,6 +20,16 @@ pub enum ProtocolResolutionSource {
     Default,
 }
 
+impl std::fmt::Display for ProtocolResolutionSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Configured => "Configured",
+            Self::CatalogInferred => "CatalogInferred",
+            Self::Default => "Default",
+        })
+    }
+}
+
 /// Effective protocol plus the evidence class that selected it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProtocolResolution<T> {
@@ -111,17 +121,40 @@ pub fn resolve_protocol<T: Clone>(
 /// explicit `openai-chat` rollback.
 #[must_use]
 pub fn resolve_config_provider_protocol(config: &Config) -> ProtocolResolution<ProviderProtocol> {
-    let catalog_model = builtin_model_protocol(&config.provider, &config.model);
-    resolve_config_provider_protocol_with_catalog_signal(config, catalog_model)
+    resolve_model_provider_protocol(config, &config.provider, &config.model)
 }
 
+pub(crate) fn resolve_model_provider_protocol(
+    config: &Config,
+    provider: &str,
+    model: &str,
+) -> ProtocolResolution<ProviderProtocol> {
+    let catalog_model = builtin_model_protocol(provider, model);
+    resolve_model_protocol_with_catalog_signal(config, provider, model, catalog_model)
+}
+
+#[cfg(test)]
 fn resolve_config_provider_protocol_with_catalog_signal(
     config: &Config,
     catalog_model: Option<ProviderProtocol>,
 ) -> ProtocolResolution<ProviderProtocol> {
-    let user_provider = config.providers.get(&config.provider);
+    resolve_model_protocol_with_catalog_signal(
+        config,
+        &config.provider,
+        &config.model,
+        catalog_model,
+    )
+}
+
+fn resolve_model_protocol_with_catalog_signal(
+    config: &Config,
+    provider: &str,
+    model: &str,
+    catalog_model: Option<ProviderProtocol>,
+) -> ProtocolResolution<ProviderProtocol> {
+    let user_provider = config.providers.get(provider);
     let model_explicit = user_provider
-        .and_then(|provider| provider.models.get(&config.model))
+        .and_then(|provider| provider.models.get(model))
         .and_then(|model| model.protocol.clone())
         .filter(|protocol| !protocol.is_unspecified());
     let provider_explicit = user_provider
@@ -136,7 +169,7 @@ fn resolve_config_provider_protocol_with_catalog_signal(
                 .then_some(ProviderProtocol::AnthropicMessages)
         });
 
-    let confirmed_provider_default = if config.provider == "openai" {
+    let confirmed_provider_default = if provider == "openai" {
         let official_endpoint = user_provider
             .and_then(|provider| provider.base_url.as_deref())
             .is_none_or(|url| url.trim().trim_end_matches('/') == "https://api.openai.com/v1");
@@ -146,7 +179,7 @@ fn resolve_config_provider_protocol_with_catalog_signal(
             endpoint_signal
         }
     } else {
-        builtin_provider_config(&config.provider)
+        builtin_provider_config(provider)
             .map(|provider| provider.protocol)
             .filter(|protocol| !protocol.is_unspecified())
             .or(endpoint_signal)

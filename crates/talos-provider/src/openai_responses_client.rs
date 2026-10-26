@@ -98,13 +98,23 @@ impl OpenAIResponsesClient {
         let preview_messages = crate::image_io::preview_messages(messages);
         let messages =
             replay_safe_messages(&self.provider_key, &self.model, replay, &preview_messages);
-        let body = build_request_body(
+        let mut body = build_request_body(
             &self.model,
             &messages,
             &[],
             self.reasoning.as_ref(),
             self.output_limit,
         );
+        // Replay ciphertext belongs only on the wire, never in a readable diagnostic snapshot.
+        if let Some(input) = body.get_mut("input").and_then(Value::as_array_mut) {
+            for item in input {
+                if item.get("type").and_then(Value::as_str) == Some("reasoning")
+                    && let Some(ciphertext) = item.get_mut("encrypted_content")
+                {
+                    *ciphertext = Value::String("[redacted]".into());
+                }
+            }
+        }
         json!({
             "method": "POST",
             "url": self.endpoint_url(),
@@ -386,6 +396,38 @@ mod tests {
             .as_str()
             .expect("authorization preview");
         assert!(!authorization.contains("sk-super-secret"));
+    }
+
+    #[test]
+    fn request_preview_redacts_replay_ciphertext_without_disabling_wire_replay() {
+        let item = json!({
+            "type": "reasoning", "id": "rs_test", "summary": [],
+            "encrypted_content": "CIPHERTEXT-DO-NOT-DISPLAY",
+        });
+        let data = crate::openai_responses_reasoning::encode_completed_reasoning_item(&item)
+            .expect("valid reasoning item")
+            .expect("opaque replay envelope");
+        let messages = [Message::Assistant {
+            content: "answer".into(),
+            tool_calls: vec![],
+            reasoning: Some(AssistantReasoning {
+                provider: "openai".into(),
+                model: "gpt-test".into(),
+                blocks: vec![ReasoningBlock::Redacted { data }],
+            }),
+        }];
+        let client = OpenAIResponsesClient::new("test-key", "gpt-test");
+        let preview = client.request_preview(&messages);
+        assert_eq!(
+            preview["body"]["input"][0]["encrypted_content"],
+            "[redacted]"
+        );
+        assert!(!preview.to_string().contains("CIPHERTEXT-DO-NOT-DISPLAY"));
+        let wire = build_request_body("gpt-test", &messages, &[], None, None);
+        assert_eq!(
+            wire["input"][0]["encrypted_content"],
+            "CIPHERTEXT-DO-NOT-DISPLAY"
+        );
     }
 
     #[test]

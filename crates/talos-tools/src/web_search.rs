@@ -544,6 +544,24 @@ pub(crate) fn format_compatibility_results(
     results: Vec<SearchBackendResult>,
     include_snippets: bool,
 ) -> String {
+    format_admitted_results(query, results, ResultSource::DuckDuckGo, include_snippets)
+}
+
+/// Fixed-source display conversion for already-admitted SearXNG rows, not admission.
+pub(crate) fn format_searxng_results(
+    query: &str,
+    results: Vec<SearchBackendResult>,
+    include_snippets: bool,
+) -> String {
+    format_admitted_results(query, results, ResultSource::SearXNG, include_snippets)
+}
+
+fn format_admitted_results(
+    query: &str,
+    results: Vec<SearchBackendResult>,
+    source: ResultSource,
+    include_snippets: bool,
+) -> String {
     let results: Vec<_> = results
         .into_iter()
         .map(|row| WebResult {
@@ -552,7 +570,7 @@ pub(crate) fn format_compatibility_results(
             snippet: row.snippet,
         })
         .collect();
-    format_results(query, &results, ResultSource::DuckDuckGo, include_snippets)
+    format_results(query, &results, source, include_snippets)
 }
 
 fn format_results(
@@ -707,6 +725,31 @@ impl AgentTool for WebSearchTool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn shared_searxng_formatter_preserves_legacy_bytes_and_utf8_boundary() {
+        let snippet = format!("{}中文", "a".repeat(299));
+        let legacy = [WebResult {
+            title: "Title".into(),
+            url: "https://example.invalid/".into(),
+            snippet: snippet.clone(),
+        }];
+        for include in [false, true] {
+            let rows = vec![SearchBackendResult {
+                backend: SearchBackendId::SearXng,
+                title: legacy[0].title.clone(),
+                url: legacy[0].url.clone(),
+                snippet: snippet.clone(),
+            }];
+            let output = format_searxng_results("q\"中", rows, include);
+            assert_eq!(
+                output,
+                format_results("q\"中", &legacy, ResultSource::SearXNG, include)
+            );
+            assert!(output.contains("Source: SearXNG\n"));
+            assert_eq!(output.contains(&format!("{}中…", "a".repeat(299))), include);
+        }
+    }
 
     #[test]
     fn shared_compatibility_formatter_preserves_legacy_bytes_and_utf8_boundary() {

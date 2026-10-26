@@ -7,7 +7,7 @@ use std::process::{Child, Command, Output, Stdio};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use tokio::io::{AsyncRead, AsyncReadExt};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
 use tokio::sync::{Notify, oneshot};
 
 use crate::SandboxError;
@@ -19,24 +19,60 @@ const CLEANUP_LIMIT: Duration = Duration::from_secs(2);
 struct State {
     pending: usize,
     failure: Option<String>,
+    sealed: bool,
 }
 
 #[derive(Default)]
 pub(crate) struct Cleanup {
     state: Mutex<State>,
     changed: Notify,
+    parent: Option<Arc<Cleanup>>,
 }
 
 impl Cleanup {
-    fn register(self: &Arc<Self>) -> Receipt {
-        self.state.lock().unwrap_or_else(|e| e.into_inner()).pending += 1;
-        Receipt {
-            owner: self.clone(),
-            finished: false,
+    pub(crate) fn child(parent: Arc<Self>) -> Self {
+        Self {
+            parent: Some(parent),
+            ..Self::default()
         }
     }
 
+    pub(crate) fn seal(&self) {
+        self.state.lock().unwrap_or_else(|e| e.into_inner()).sealed = true;
+    }
+
+    fn register(self: &Arc<Self>) -> Result<Receipt, SandboxError> {
+        let parent = self
+            .parent
+            .as_ref()
+            .map(|parent| parent.register())
+            .transpose()?;
+        let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        if state.sealed {
+            // Nothing spawned: release any parent reservation without failure.
+            if let Some(mut parent) = parent {
+                parent.finish(None);
+            }
+            return Err(failed("sandbox command admission is sealed"));
+        }
+        state.pending += 1;
+        Ok(Receipt {
+            owner: self.clone(),
+            finished: false,
+            parent: parent.map(Box::new),
+        })
+    }
+
     pub(crate) async fn wait(&self, timeout: Duration) -> Result<(), SandboxError> {
+        self.wait_confirmed(timeout)
+            .await
+            .map_err(|error| failed(error.to_string()))
+    }
+
+    pub(crate) async fn wait_confirmed(
+        &self,
+        timeout: Duration,
+    ) -> Result<(), talos_core::tool::ToolCleanupError> {
         tokio::time::timeout(timeout, async {
             loop {
                 let changed = self.changed.notified();
@@ -46,7 +82,7 @@ impl Cleanup {
                     let state = self.state.lock().unwrap_or_else(|e| e.into_inner());
                     if state.pending == 0 {
                         return match &state.failure {
-                            Some(error) => Err(failed(error)),
+                            Some(_) => Err(talos_core::tool::ToolCleanupError::Unconfirmed),
                             None => Ok(()),
                         };
                     }
@@ -55,17 +91,21 @@ impl Cleanup {
             }
         })
         .await
-        .map_err(|_| failed("sandbox cleanup receipt deadline exceeded"))?
+        .map_err(|_| talos_core::tool::ToolCleanupError::Timeout)?
     }
 }
 
 struct Receipt {
     owner: Arc<Cleanup>,
     finished: bool,
+    parent: Option<Box<Receipt>>,
 }
 
 impl Receipt {
     fn finish(&mut self, error: Option<String>) {
+        if let Some(parent) = &mut self.parent {
+            parent.finish(error.clone());
+        }
         let mut state = self.owner.state.lock().unwrap_or_else(|e| e.into_inner());
         state.pending -= 1;
         if state.failure.is_none() {
@@ -245,15 +285,40 @@ impl Drop for OwnedChild {
 }
 
 pub(crate) async fn execute(
-    mut command: Command,
+    command: Command,
     cleanup: Arc<Cleanup>,
     deadline: Duration,
     resources: impl Send + 'static,
 ) -> Result<Output, SandboxError> {
+    execute_with_limit(command, cleanup, deadline, resources, usize::MAX).await
+}
+
+pub(crate) async fn execute_with_limit(
+    command: Command,
+    cleanup: Arc<Cleanup>,
+    deadline: Duration,
+    resources: impl Send + 'static,
+    output_limit: usize,
+) -> Result<Output, SandboxError> {
+    execute_with_input(command, cleanup, deadline, resources, output_limit, None).await
+}
+
+pub(crate) async fn execute_with_input(
+    mut command: Command,
+    cleanup: Arc<Cleanup>,
+    deadline: Duration,
+    resources: impl Send + 'static,
+    output_limit: usize,
+    input: Option<Vec<u8>>,
+) -> Result<Output, SandboxError> {
     let started = tokio::time::Instant::now();
-    let mut receipt = cleanup.register();
+    let mut receipt = cleanup.register()?;
     command
-        .stdin(Stdio::null())
+        .stdin(if input.is_some() {
+            Stdio::piped()
+        } else {
+            Stdio::null()
+        })
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     // SAFETY: the post-fork hook invokes only the async-signal-safe setsid and
@@ -305,7 +370,14 @@ pub(crate) async fn execute(
     let cancel = CancelOnDrop(Some(cancel_tx));
     let task = tokio::spawn(async move {
         let _resources = resources;
-        let result = supervise(owner, cancel_rx, deadline.saturating_sub(started.elapsed())).await;
+        let result = supervise_limited_with_input(
+            owner,
+            cancel_rx,
+            deadline.saturating_sub(started.elapsed()),
+            output_limit,
+            input,
+        )
+        .await;
         receipt.finish(result.1);
         result.0
     });
@@ -316,11 +388,41 @@ pub(crate) async fn execute(
     result
 }
 
+#[cfg(test)]
 async fn supervise(
-    mut owner: OwnedChild,
+    owner: OwnedChild,
     cancel: oneshot::Receiver<()>,
     deadline: Duration,
 ) -> (Result<Output, SandboxError>, Option<String>) {
+    supervise_limited(owner, cancel, deadline, usize::MAX).await
+}
+
+#[cfg(test)]
+async fn supervise_limited(
+    owner: OwnedChild,
+    cancel: oneshot::Receiver<()>,
+    deadline: Duration,
+    output_limit: usize,
+) -> (Result<Output, SandboxError>, Option<String>) {
+    supervise_limited_with_input(owner, cancel, deadline, output_limit, None).await
+}
+
+async fn supervise_limited_with_input(
+    mut owner: OwnedChild,
+    cancel: oneshot::Receiver<()>,
+    deadline: Duration,
+    output_limit: usize,
+    input: Option<Vec<u8>>,
+) -> (Result<Output, SandboxError>, Option<String>) {
+    let stdin = owner.child.stdin.take();
+    let input = async move {
+        if let Some(input) = input {
+            let stdin = stdin.ok_or_else(|| io::Error::other("missing stdin"))?;
+            let mut stdin = tokio::process::ChildStdin::from_std(stdin)?;
+            stdin.write_all(&input).await?;
+        }
+        Ok::<(), io::Error>(())
+    };
     let stdout = owner
         .child
         .stdout
@@ -351,16 +453,46 @@ async fn supervise(
             return (Err(failed(detail)), cleanup);
         }
     };
-    supervise_io(owner, cancel, deadline, stdout, stderr).await
+    supervise_io_limited(
+        owner,
+        cancel,
+        deadline,
+        (stdout, stderr),
+        output_limit,
+        input,
+    )
+    .await
 }
 
+#[cfg(test)]
 async fn supervise_io(
+    owner: OwnedChild,
+    cancel: oneshot::Receiver<()>,
+    deadline: Duration,
+    stdout: impl AsyncRead + Unpin,
+    stderr: impl AsyncRead + Unpin,
+) -> (Result<Output, SandboxError>, Option<String>) {
+    supervise_io_limited(
+        owner,
+        cancel,
+        deadline,
+        (stdout, stderr),
+        usize::MAX,
+        async { Ok(()) },
+    )
+    .await
+}
+
+async fn supervise_io_limited(
     mut owner: OwnedChild,
     mut cancel: oneshot::Receiver<()>,
     deadline: Duration,
-    mut stdout: impl AsyncRead + Unpin,
-    mut stderr: impl AsyncRead + Unpin,
+    (mut stdout, mut stderr): (impl AsyncRead + Unpin, impl AsyncRead + Unpin),
+    output_limit: usize,
+    input: impl std::future::Future<Output = io::Result<()>>,
 ) -> (Result<Output, SandboxError>, Option<String>) {
+    tokio::pin!(input);
+    let mut input_done = false;
     let mut out = Vec::new();
     let mut err = Vec::new();
     let mut out_eof = false;
@@ -371,33 +503,46 @@ async fn supervise_io(
     tokio::pin!(deadline);
     let reason = loop {
         match owner.observe() {
-            Ok(true) if out_eof && err_eof => break None,
+            Ok(true) if out_eof && err_eof && input_done => break None,
             Ok(_) => {}
             Err(error) => break Some(format!("sandbox exit observation failed: {error}")),
         }
         tokio::select! {
+            written = &mut input, if !input_done => match written {
+                Ok(()) => input_done = true,
+                Err(error) => break Some(format!("sandbox stdin write failed: {error}")),
+            },
             _ = &mut cancel => break Some("sandbox execution cancelled".into()),
             _ = &mut deadline => break Some("sandbox execution timed out".into()),
             read = stdout.read(&mut out_buf), if !out_eof => match read {
                 Ok(0) => out_eof = true,
-                Ok(n) => out.extend_from_slice(&out_buf[..n]),
+                Ok(n) => {
+                    if out.len().saturating_add(n) > output_limit { break Some("command output limit exceeded".into()); }
+                    out.extend_from_slice(&out_buf[..n]);
+                },
                 Err(error) => break Some(format!("sandbox stdout read failed: {error}")),
             },
             read = stderr.read(&mut err_buf), if !err_eof => match read {
                 Ok(0) => err_eof = true,
-                Ok(n) => err.extend_from_slice(&err_buf[..n]),
+                Ok(n) => {
+                    if err.len().saturating_add(n) > output_limit { break Some("command output limit exceeded".into()); }
+                    err.extend_from_slice(&err_buf[..n]);
+                },
                 Err(error) => break Some(format!("sandbox stderr read failed: {error}")),
             },
             _ = tokio::time::sleep(POLL) => {},
         }
     };
     if let Err(error) = owner.terminate_group() {
-        let detail = format!("sandbox process-group cleanup failed: {error}");
+        let detail = match reason {
+            Some(reason) => format!("{reason}; sandbox process-group cleanup failed: {error}"),
+            None => format!("sandbox process-group cleanup failed: {error}"),
+        };
         return (Err(failed(&detail)), Some(detail));
     }
     let cleanup = tokio::time::timeout(
         CLEANUP_LIMIT,
-        finish_cleanup(
+        finish_cleanup_limited(
             &mut owner,
             &mut stdout,
             &mut stderr,
@@ -405,6 +550,7 @@ async fn supervise_io(
             &mut err,
             out_eof,
             err_eof,
+            output_limit,
         ),
     )
     .await;
@@ -427,7 +573,31 @@ async fn supervise_io(
     }
 }
 
+#[cfg(test)]
 async fn finish_cleanup(
+    owner: &mut OwnedChild,
+    stdout: &mut (impl AsyncRead + Unpin),
+    stderr: &mut (impl AsyncRead + Unpin),
+    out: &mut Vec<u8>,
+    err: &mut Vec<u8>,
+    out_eof: bool,
+    err_eof: bool,
+) -> io::Result<std::process::ExitStatus> {
+    finish_cleanup_limited(
+        owner,
+        stdout,
+        stderr,
+        out,
+        err,
+        out_eof,
+        err_eof,
+        usize::MAX,
+    )
+    .await
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn finish_cleanup_limited(
     owner: &mut OwnedChild,
     stdout: &mut (impl AsyncRead + Unpin),
     stderr: &mut (impl AsyncRead + Unpin),
@@ -435,6 +605,7 @@ async fn finish_cleanup(
     err: &mut Vec<u8>,
     mut out_eof: bool,
     mut err_eof: bool,
+    output_limit: usize,
 ) -> io::Result<std::process::ExitStatus> {
     let mut out_buf = [0u8; 8192];
     let mut err_buf = [0u8; 8192];
@@ -448,12 +619,12 @@ async fn finish_cleanup(
         tokio::select! {
             read = stdout.read(&mut out_buf), if !out_eof => match read {
                 Ok(0) => out_eof = true,
-                Ok(n) => out.extend_from_slice(&out_buf[..n]),
+                Ok(n) => out.extend_from_slice(&out_buf[..n.min(output_limit.saturating_sub(out.len()))]),
                 Err(error) => return Err(error),
             },
             read = stderr.read(&mut err_buf), if !err_eof => match read {
                 Ok(0) => err_eof = true,
-                Ok(n) => err.extend_from_slice(&err_buf[..n]),
+                Ok(n) => err.extend_from_slice(&err_buf[..n.min(output_limit.saturating_sub(err.len()))]),
                 Err(error) => return Err(error),
             },
             _ = tokio::time::sleep(POLL) => owner.terminate_group()?,
@@ -465,6 +636,119 @@ async fn finish_cleanup(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn finite_input_drains_output_and_closes_the_pipe() {
+        let directory = tempfile::tempdir().expect("workspace");
+        let cleanup = Arc::new(Cleanup::default());
+        // Exceeds pipe capacity in both directions: serial delivery would hang.
+        let input = vec![b'x'; 256 * 1024];
+        let output = execute_with_input(
+            shell("cat", directory.path()),
+            cleanup.clone(),
+            Duration::from_secs(3),
+            (),
+            input.len(),
+            Some(input.clone()),
+        )
+        .await
+        .expect("duplex delivery and EOF");
+        assert!(output.status.success());
+        assert_eq!(output.stdout, input);
+        cleanup.wait(Duration::from_secs(1)).await.expect("cleanup");
+    }
+
+    #[tokio::test]
+    async fn blocked_input_obeys_deadline_and_cancellation() {
+        let directory = tempfile::tempdir().expect("workspace");
+        for cancel in [false, true] {
+            let cleanup = Arc::new(Cleanup::default());
+            let task = tokio::spawn(execute_with_input(
+                shell("sleep 30", directory.path()),
+                cleanup.clone(),
+                Duration::from_millis(100),
+                (),
+                1024,
+                Some(vec![0; 1024 * 1024]),
+            ));
+            if cancel {
+                tokio::time::sleep(Duration::from_millis(30)).await;
+                task.abort();
+                let _ = task.await;
+            } else {
+                assert!(
+                    task.await
+                        .expect("task")
+                        .expect_err("timeout")
+                        .to_string()
+                        .contains("timed out")
+                );
+            }
+            cleanup.wait(Duration::from_secs(3)).await.expect("cleanup");
+        }
+    }
+
+    #[tokio::test]
+    async fn early_exit_cannot_report_undelivered_input_as_success() {
+        let directory = tempfile::tempdir().expect("workspace");
+        let cleanup = Arc::new(Cleanup::default());
+        let error = execute_with_input(
+            shell("exit 0", directory.path()),
+            cleanup.clone(),
+            Duration::from_secs(2),
+            (),
+            1024,
+            Some(vec![0; 1024 * 1024]),
+        )
+        .await
+        .expect_err("undelivered input");
+        assert!(error.to_string().contains("stdin write failed"));
+        if let Err(cleanup_error) = cleanup.wait(Duration::from_secs(1)).await {
+            let state = cleanup
+                .state
+                .lock()
+                .unwrap_or_else(|error| error.into_inner());
+            panic!(
+                "{cleanup_error}; execution={error}; pending={}; failure={:?}",
+                state.pending, state.failure
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn bounded_output_accepts_exact_limit_and_cleans_overflow() {
+        let directory = tempfile::tempdir().expect("workspace");
+        for (script, succeeds) in [
+            ("printf 1234; printf 5678 >&2", true),
+            ("while :; do printf 12345; done", false),
+        ] {
+            let cleanup = Arc::new(Cleanup::default());
+            let result = execute_with_limit(
+                shell(script, directory.path()),
+                cleanup.clone(),
+                Duration::from_secs(2),
+                (),
+                4,
+            )
+            .await;
+            if succeeds {
+                let output = result.expect("exact cap");
+                assert_eq!(output.stdout, b"1234");
+                assert_eq!(output.stderr, b"5678");
+            } else {
+                assert!(
+                    result
+                        .expect_err("overflow")
+                        .to_string()
+                        .contains("output limit")
+                );
+            }
+            cleanup
+                .wait(Duration::from_secs(1))
+                .await
+                .expect("confirmed cleanup");
+        }
+    }
 
     fn shell(script: &str, directory: &std::path::Path) -> Command {
         let mut command = Command::new("sh");
@@ -752,10 +1036,95 @@ mod tests {
     #[tokio::test]
     async fn abandoned_receipt_is_sticky_failure() {
         let cleanup = Arc::new(Cleanup::default());
-        drop(cleanup.register());
+        drop(cleanup.register().expect("register"));
         assert!(cleanup.wait(Duration::from_secs(1)).await.is_err());
-        cleanup.register().finish(None);
+        cleanup.register().expect("register").finish(None);
         assert!(cleanup.wait(Duration::from_secs(1)).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn operation_receipts_are_isolated_but_owner_waits_for_all() {
+        let owner = Arc::new(Cleanup::default());
+        let first = Arc::new(Cleanup::child(owner.clone()));
+        let second = Arc::new(Cleanup::child(owner.clone()));
+        let mut first_work = first.register().expect("first registration");
+        let mut second_work = second.register().expect("second registration");
+        first_work.finish(None);
+        first
+            .wait(Duration::from_secs(1))
+            .await
+            .expect("first complete");
+        assert!(owner.wait(Duration::from_millis(1)).await.is_err());
+        assert_eq!(
+            owner.wait_confirmed(Duration::from_millis(1)).await,
+            Err(talos_core::tool::ToolCleanupError::Timeout)
+        );
+        second_work.finish(None);
+        owner
+            .wait(Duration::from_secs(1))
+            .await
+            .expect("all complete");
+        // Waiting is observation, not sealing.
+        first.register().expect("later stage").finish(None);
+        owner.seal();
+        owner.seal();
+        assert!(first.register().is_err());
+        assert!(second.register().is_err());
+        let late = Arc::new(Cleanup::child(owner.clone()));
+        assert!(late.register().is_err());
+        owner
+            .wait(Duration::from_secs(1))
+            .await
+            .expect("refusal adds no work");
+    }
+
+    #[tokio::test]
+    async fn operation_failure_is_sticky_in_owner_but_not_other_operations() {
+        let owner = Arc::new(Cleanup::default());
+        let failed_call = Arc::new(Cleanup::child(owner.clone()));
+        let healthy_call = Arc::new(Cleanup::child(owner.clone()));
+        drop(failed_call.register().expect("registration"));
+        healthy_call.register().expect("healthy call").finish(None);
+        healthy_call
+            .wait(Duration::from_secs(1))
+            .await
+            .expect("isolated success");
+        for _ in 0..2 {
+            assert_eq!(
+                owner.wait_confirmed(Duration::from_secs(1)).await,
+                Err(talos_core::tool::ToolCleanupError::Unconfirmed)
+            );
+            assert!(failed_call.wait(Duration::from_secs(1)).await.is_err());
+            assert!(owner.wait(Duration::from_secs(1)).await.is_err());
+        }
+    }
+
+    #[tokio::test]
+    async fn sealed_public_executor_cannot_start_a_preexisting_operation() {
+        let directory = tempfile::tempdir().expect("workspace");
+        let owner = crate::OwnedCommandExecutor::default();
+        let operation = owner.operation();
+        owner.seal();
+        let error = operation
+            .execute(
+                shell("printf forbidden > forbidden", directory.path()),
+                Duration::from_secs(1),
+                1024,
+            )
+            .await
+            .expect_err("sealed owner");
+        assert!(error.to_string().contains("sealed"));
+        assert!(!directory.path().join("forbidden").exists());
+        operation
+            .cleanup_receipt()
+            .wait(Duration::from_secs(1))
+            .await
+            .expect("no local work");
+        owner
+            .cleanup_receipt()
+            .wait(Duration::from_secs(1))
+            .await
+            .expect("no owner work");
     }
 
     #[test]

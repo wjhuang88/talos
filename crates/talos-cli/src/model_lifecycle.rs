@@ -40,7 +40,11 @@ fn model_picker_label(
             format!("{}K{suffix}", limit / 1000)
         })
         .unwrap_or_else(|| "?".to_string());
-    format!("{}   {}   {}", model.id, model.provider, context)
+    let protocol = config.resolve_model_protocol(&model.provider, &model.id);
+    format!(
+        "{}   {}   {}   {} ({})",
+        model.id, model.provider, context, protocol.protocol, protocol.source
+    )
 }
 
 /// Constructs [`ModelPickerData`] from the given [`Config`].
@@ -795,6 +799,35 @@ mod tests {
 
         assert!(custom.label.contains("(catalog)"));
         assert!(!builtin.label.contains("(catalog)"));
+    }
+
+    #[test]
+    fn model_picker_displays_effective_protocol_and_configured_source() {
+        let mut config = Config::default();
+        config.set_provider_credential("openai", "test-key");
+        config
+            .providers
+            .get_mut("openai")
+            .expect("provider")
+            .models
+            .insert(
+                "o3".into(),
+                ModelConfig {
+                    protocol: Some(talos_config::ProviderProtocol::OpenAIChat),
+                    ..Default::default()
+                },
+            );
+        let data = build_model_picker_data(&config);
+        let row = data
+            .ready_models
+            .iter()
+            .find(|model| model.provider == "openai" && model.model_id == "o3")
+            .expect("OpenAI model row");
+        assert!(
+            row.label.contains("openai-chat (Configured)"),
+            "{}",
+            row.label
+        );
     }
 
     #[tokio::test]

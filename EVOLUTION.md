@@ -5,7 +5,71 @@
 Record reusable lessons from failures, corrections, and unexpected successes. Check here before
 repeating known mistakes.
 
+## 2026-10-23 - Research stalled designs and report implementation honestly
+
+- Trigger: Maintainer correction during prolonged I300 convergence.
+- Symptom: The maintainer identified a risk of isolated design growth and of explanations substituting for current implementation.
+- Root cause: Process guidance did not explicitly define research triggers or prohibit closing requirements through explanatory wording.
+- Fix: Require upstream/comparable implementation research at repeated failure, uncertain platform behavior or disproportionate complexity; distinguish implemented behavior from plans.
+- Prevention: Validate applicable external ideas with focused evidence. Treat comments, TODOs and promised follow-ups as unimplemented work; scope changes require an explicit decision.
+- Promoted to rule/check: `AGENTS.md`, Accuracy Over Approval and Think Before Coding.
+
+## 2026-10-19 - Use the established Windows cross-compilation route
+
+- Trigger: Maintainer correction during I300 Windows Job validation.
+- Symptom: A GNU-target check reported missing MinGW as a Windows validation blocker.
+- Root cause: The installed GNU target was mistaken for the project's intended cross-compilation route.
+- Fix: Use cargo xwin with x86_64-pc-windows-msvc and install the MSVC standard library for the pinned toolchain.
+- Prevention: Check the project build route before choosing a target; distinguish cross-compilation from native runtime evidence.
+- Promoted to rule/check: `docs/sop/LOCAL-DEV.md`, Windows Cross-Compilation From macOS/Linux.
+
+## 2026-10-18 - Bind fetch resources to its execution directory
+
+- Trigger: Native Git 2.54 probes during I300 child execution layout review.
+- Symptom: The plan approved relative hooks and local remotes under the child worktree while fetch consumed them under its gitdir.
+- Root cause: Worktree setup and process-relative resource lookup were treated as the same base; source comments about stale worktrees were overgeneralized.
+- Fix: Plan both child fetch hook waves and local remote candidates from the retained gitdir. Keep startup evidence separate.
+- Prevention: Verify actual resource consumption with native fixtures before translating configured paths into permission facets.
+- Promoted to rule/check: `native_child_fetch_uses_gitdir_for_relative_hooks_and_remote` records real hook cwd and relative-source success; the prepared child matrix refuses executable relative hooks before fetch.
+
+## 2026-10-18 - Preserve the winning Git task's recursion policy
+
+- Trigger: Native source review while implementing metadata-only Pull children.
+- Symptom: A historical `On` policy incorrectly forced fetch for a current-index `OnDemand` task whose objects were already reachable; the fixture expected that incorrect fetch.
+- Root cause: Current and historical policies were OR-combined despite Git scheduling current tasks first and deduplicating by module name.
+- Fix: Use the current task's mode when present; consult historical mode only for a historical task. Establish fixture policy before discovery, not after approval.
+- Prevention: Verify native task selection and deduplication before combining settings from multiple snapshots; tests can preserve a mistaken model.
+- Promoted to rule/check: `pull_child_fetch_has_own_write_stage_and_rebuilds_graph` checks renamed historical `On` cannot upgrade current `OnDemand`, while historical-only `On` still fetches.
+
+## 2026-10-16 - Git config write calls do not define declaration order
+
+- Trigger: Native recursive-fetch parity fixture for I300.
+- Symptom: An expected `on` policy was read as `off` despite reversed `git config --add` calls.
+- Root cause: Git inserts new keys into existing sections, so write-call order differs from configuration declaration order.
+- Fix: Append explicit sections in the intended order and compare retained policy with actual native fetch child effects.
+- Prevention: Inspect serialized configuration when testing cross-key precedence; do not infer order from mutation calls.
+- Promoted to rule/check: `pull_parent_fetch_defers_recursive_child_effects` covers four ordered recursion combinations against native Git.
+
+## 2026-10-14 - Git hooks are not limited to executable files
+
+- Trigger: Independent review of branch-conditional Checkout support against Git 2.54.
+- Symptom: A configured `hook.<name>.command` could execute even when the hooks directory had no executable file.
+- Root cause: Parent configuration inspection modeled file hooks but omitted configuration command hooks.
+- Fix: Reject active hook command entries during parent configuration capture before mutation.
+- Prevention: Inspect configuration-based execution paths alongside filesystem hook paths when auditing native Git integration.
+- Promoted to rule/check: `checkout_existing_local_branch_preserves_onbranch_configuration` covers post-checkout and reference-transaction command refusal.
+
 ## Lesson Index
+
+- [Research stalled designs and report implementation honestly](#2026-10-23---research-stalled-designs-and-report-implementation-honestly) — I300.
+
+- [Use the established Windows cross-compilation route](#2026-10-19---use-the-established-windows-cross-compilation-route) — I300.
+
+- [Bind fetch resources to its execution directory](#2026-10-18---bind-fetch-resources-to-its-execution-directory) — I300.
+- [Preserve the winning Git task's recursion policy](#2026-10-18---preserve-the-winning-git-tasks-recursion-policy) — I300.
+- [Git config write calls do not define declaration order](#2026-10-16---git-config-write-calls-do-not-define-declaration-order) — I300.
+- [Git hooks are not limited to executable files](#2026-10-14---git-hooks-are-not-limited-to-executable-files) — I300.
+- [Async decision receipts are not authorization](#2026-10-14---async-decision-receipts-are-not-authorization) — I300.
 
 | # | Area | Lesson | Added |
 |---|------|--------|-------|
@@ -77,8 +141,32 @@ repeating known mistakes.
 | 65 | Resource tests | Process-wide counters need isolated workers and owned descendant cleanup | I293 / #716 |
 | 66 | Native borrowing | Attribute value buffers need independent stable storage through native list deletion | I302 / #716 |
 | 67 | Parser compatibility | Verify the exact helper replacement set before defining entity-decoding fixtures | I293 / Instant Answer |
+| 71 | Config | Materializing connection defaults must preserve omitted protocol intent | I306 / #748 |
+
+| 67 | Permissions | 一次性授权消费也必须非阻塞；外层异步超时无法抢占同步锁等待 | I300 |
+| 68 | Agent execution | 工具可用性以实际调用结果为准，不把列表呈现差异当作不可用证据 | I300 |
+| 69 | Permissions | Git checkout 的目标树也能生成 hook 和重载配置；审批必须覆盖执行中变化 | I300 |
+| 70 | Permissions | 仓库重新发现前先验证已绑定目录身份及指针，读取后拒绝不能守住读取边界 | I300 |
 
 ## Lessons
+
+## 2026-10-14 - Async decision receipts are not authorization
+
+- Trigger: `request_user_input_async` returned an `accepted` receipt while a new Pull metadata decision was still unanswered.
+- Symptom: The receipt was briefly mistaken for maintainer approval.
+- Root cause: Submission/transport status was treated as the user's decision value.
+- Fix: Reverted the provisional capability change; only an explicit answer message can activate a new contract.
+- Prevention: Keep proposed ADR status and compiler rejection tests until the actual decision is present.
+- Promoted to rule/check: `proposed_pull_metadata_capability_remains_rejected` in `crates/talos-permission/src/grant.rs` and the handoff decision record.
+
+## 2026-10-13 - Validate Bound Repository Locations Before Rediscovery
+
+- Trigger: Independent review of I300 Pull evidence and prepared Git revalidation.
+- Symptom: Rediscovery could read a newly redirected repository before rejecting its changed snapshot.
+- Root cause: Comparing discovered content after reads does not preserve the previously admitted read boundary; location pointers alone also miss whole-directory replacement.
+- Fix: Retain workdir/gitdir/common identities and validate them and location pointers before rediscovery; reject mapped evidence parents before reading leaves.
+- Prevention: Test both commondir redirection and ordinary .git replacement, including absent evidence leaf creation. Do not describe path checks as race-free confinement.
+- Promoted to rule/check: `sender_location_redirection_refuses_before_repository_rediscovery` and `pull_evidence_refuses_reflog_escape_oversize_and_missing_leaf_creation`.
 
 ## 2026-09-29 - Intake Owner Registration Includes The Remote Matrix
 
@@ -1332,3 +1420,93 @@ visible; distinguish passed assertions from independently emitted evidence.
 - Prevention: characterize named and numeric entities, tag-cleanup order and raw sentence splitting
   against the exact helper before claiming parity.
 - Promoted to rule/check: instant_answer topic/limited-cleanup tests and the parser reference.
+
+## 2026-10-26 - Materialized provider defaults are not explicit protocol intent
+
+- Trigger: #748 continuation audited runtime routing against Config queries and connection flows.
+- Symptom: choosing/connecting an official OpenAI model could silently pin Chat, while other paths
+  resolved Responses; model overrides could also disagree with a second public resolver.
+- Root cause: built-in provider defaults were copied into user overrides and then classified as
+  explicit intent; an intermediate resolver survived after factory activation.
+- Fix: preserve protocol omission during model/credential materialization and use one resolver for
+  adapter construction, public queries and selection previews.
+- Prevention: exercise persisted configuration edits and adapter selection through the actual binary;
+  assert protocol/source after model selection and credential reload, not just pure precedence.
+- Promoted to rule/check: `responses_config` binary tests and config protocol-resolution regressions.
+## 2026-10-12 - Keep proof consumption inside the cancellation boundary
+
+- Trigger: Independent incremental I300 permission/API review.
+- Symptom: Consuming an admitted invocation could block a Tokio worker on the Session mutex.
+- Root cause: Admission used nonblocking locking, but the new final consumption step used
+  a synchronous blocking lock; an outer async deadline cannot interrupt that wait.
+- Fix: Use `try_lock` and fail closed with `StateUnavailable` on contention.
+- Prevention: Exercise actual fence contention at every authorization lifecycle boundary,
+  including final consumption for both legacy and prepared invocations.
+- Promoted to rule/check: `session::tests::invocation_proof_consumption_fails_closed_when_state_fence_is_contended`
+  in `crates/talos-permission/src/session.rs`.
+
+## 2026-10-12 - Verify tool availability by invocation
+
+- Trigger: Maintainer corrected repeated unsupported claims that workspace tools were unavailable.
+- Symptom: Automatic goal continuations repeated a blocker without attempting a tool call.
+- Root cause: The Agent treated tool-list presentation as conclusive capability evidence;
+  no failed invocation supported the reported blocker.
+- Fix: Invoked the documented `functions.exec` route; `git status --short` succeeded and
+  confirmed the existing I300 candidate remained in the workspace.
+- Prevention: Attempt the documented read-only operation before declaring a tool unavailable;
+  report the actual error if the invocation fails. A repeated status message is not progress.
+- Recurrence: The maintainer reported the same unsupported status again after successful
+  workspace calls. Fresh `pwd`, `git status` and disk inspection succeeded. Whether
+  subagent context leakage contributed is unknown; no evidence establishes that cause.
+  Treat capability statements in summaries or agent messages as historical claims,
+  not current tool results. Keep an actual failed call distinct from an unattempted call.
+- Promoted to rule/check: none; existing goal no-progress rules already require revalidation.
+
+## 2026-10-12 - Separate discovery authority from auxiliary reads and cleanup evidence
+
+- Trigger: Independent I300 permission/process review found auxiliary files read
+  during config-only discovery and a cancelled host command without an externally
+  retained cleanup receipt.
+- Root cause: Discovered paths were mistaken for admitted content reads; requesting
+  cleanup was mistaken for shutdown ownership. A bare PGID cleanup experiment also
+  reaped the leader before its final group signal, permitting identity reuse.
+- Fix: Deferred auxiliary reads to a fresh concrete Path Read admission; discovered
+  system attributes through fixed path-only Git queries; rejected unsupported
+  object links/alternates/split-index. Reused ADR-082's existing sole-owner
+  supervisor instead of a second process lifecycle implementation.
+- Remaining: Tool-owned receipts and production Agent/Runtime/MCP shutdown waiting
+  remain a proposed API amendment pending maintainer decision; cancellation tests
+  alone do not close that gate.
+- Prevention: Review every pre-admission read separately, bind actual filesystem
+  topology, and require retained, awaitable cleanup evidence before claiming
+  cancellation or shutdown completion.
+- Promoted to rule/check: no new global rule; I300 regressions and publication gates.
+
+## 2026-10-12 - Bind target-induced execution and configuration reloads
+
+- Trigger: Independent checkout security review found a target branch could create
+  an executable post-checkout hook after the pre-execution hook check passed.
+- Symptom: Current-state snapshots alone did not describe the operation's later
+  helper/configuration behavior; empty include files contributed no origin values.
+- Root cause: The reviewed input state was treated as constant throughout a command
+  that itself changes that state. Canonical paths also discarded intermediate aliases.
+- Fix: Check target effects against hooks and all effective configuration candidates,
+  including missing/empty include and system/global/local/worktree entrypoints.
+  Preserve symlink hops and traversal ancestors, and account conservatively for
+  case/normalization aliases. Refuse unsupported branch-conditional reloads.
+- Prevention: Review both initial state and states produced before later helper
+  execution. A configuration value list is not a complete file dependency graph.
+- Promoted to rule/check: checkout target-hook, configuration rewrite, alias/`..`,
+  and absent global-configuration-path regressions in prepared_add.rs; I300 retains
+  final security review and production acceptance gates.
+
+## 2026-10-19 - Compare HTTP fixture headers by protocol semantics
+
+- Trigger: I300 full preflight failed four unrelated provider registration fixtures.
+- Evidence: The same failures reproduced outside the sandbox; changing only header
+  name comparison to ASCII case-insensitive matching made all eight registration
+  tests pass. Credential values remain exact after HTTP whitespace trimming.
+- Root cause: The fixture required a lowercase wire spelling for case-insensitive
+  HTTP field names. It confused a representation choice with missing credentials.
+- Prevention/check: The shared registration fixture now compares names and values
+  separately; retain strict credential-value and empty-GET-body assertions.

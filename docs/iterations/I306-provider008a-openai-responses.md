@@ -12,15 +12,15 @@
 |---|---|
 | Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
-| Executing Agent | GPT-5.6 Sol / talos开发 session |
+| Executing Agent | Codex / GPT-6 / talos开发 #724 continuation 2026-10-26 |
 | Work Slice | PROVIDER-008-A protocol architecture plus OpenAI Responses only; no Gemini/Azure/Bedrock implementation. |
 | Claimed At | 2026-10-22 |
 | Source Issue | #748 |
 | Governance Claim PR | #747 |
-| Implementation PR | Not started |
+| Implementation PR | #749 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer requested implementation of parent #724 in the 2026-10-22 talos开发 session; child #748 records the bounded implementation requirement. Governance-only #747 must pass exact-head applicable CI, both governance validators, provider/API technical review and merge-time CAS before this claim is effective. |
-| Last Updated | 2026-10-22 |
+| Last Updated | 2026-10-26 |
 | Handoff / Release Condition | Activates only when #747 merges with accepted ADR-093. Complete only with existing implementation commit evidence; siblings B-D remain separate. |
 
 ## Published Baseline
@@ -114,3 +114,46 @@ must start from the #747 merge or a later main commit.
 No Completion Commit exists. PROVIDER-008-B/C/D and every excluded Responses feature remain residual
 under the parent epic. Do not mark I306 or PROVIDER-008-A Complete without an already-existing
 implementation/evidence commit SHA.
+
+## Continuation Checkpoint — 2026-10-26
+
+The maintainer requested handoff of the overlong #724 session and continued implementation in this
+session. Responsible Actor and Work Slice are unchanged; this is continuation of effective #747,
+not a new claim. #747 merged as `4722fee827c71b807bb58458a08d67abe32050e4`. Implementation carrier
+is Draft #749, branch `feat/provider-008a-openai-responses`; inherited head was
+`4bbae80a38e8b4c916460ba855d64d29b63cf1dc`. The earlier PR description and owner fields were stale.
+
+The inherited code already contained Responses request, semantic/SSE transport, client, reasoning,
+invocation bridge, public adapter and CLI/Desktop factory wiring. This checkpoint adds:
+
+- one effective resolver for runtime, public Config queries, model selection and model metadata;
+- omission-preserving model selection, credential insertion and credential reload (copying a built-in
+  Chat default into user overrides had incorrectly made it explicit);
+- Responses plus model-level protocol CLI edits, all three `/connect` choices, rendered cursor and
+  clipping coverage, effective protocol/source in picker/browser and model context;
+- readable-preview redaction of encrypted reasoning, retaining actual same-identity wire replay;
+- real CLI configuration/dispatch regression tests and a controlled binary Agent image/tool round;
+- proptest coverage of arbitrary byte partitioning, Unicode, CRLF and missing-terminal EOF;
+- [protocol/config migration guidance](../reference/PROVIDER-PROTOCOLS.md) and bilingual README updates.
+
+Test-only dependency decision: reuse the exact existing Cargo.lock proptest source/revision
+`3dca198a8fef1b32e3a66f1e1897c955b4dc5b5b` for the already-published mandatory property-test gate.
+There is no new runtime dependency or dependency version update. The single lockfile addition is
+Talos Provider's direct dev-dependency edge.
+
+Validation is in progress using pinned Rust 1.99.0 and locked dependencies. Initial focused testing
+exposed three session-reasoning assertions tied to Chat's JSON location; their shared helper now
+checks both adapter shapes without weakening the effort assertion. The new three-choice layout also
+required updating the existing rendered/clipped cursor expectation. A first local property-test
+compile failed because the pinned `prop_assert!` macro interpreted braces in a stringified
+`matches!` expression; explicit diagnostic messages corrected the test macro call.
+
+### Remaining Acceptance / Resume Gate
+
+Keep I306 and PROVIDER-008-A Active/Claimed, #748 open and #749 Draft. No completion is claimed.
+Before Ready/merge: finish pinned locked workspace/preflight validation; review and regenerate the
+packaged catalog as a distinct generated-data stage (the inherited catalog has no model-level
+protocol signals); obtain current-head CI and independent provider/API review; refresh current main,
+resolve branch conflicts within this slice and repeat merge-time CAS. Recorded upstream stream
+fixtures and the full acceptance matrix must be audited explicitly rather than inferred from
+synthetic fixtures. Gemini/Azure/Bedrock, #705 and Search remain outside this work.

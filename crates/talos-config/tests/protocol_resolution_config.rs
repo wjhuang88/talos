@@ -1,5 +1,56 @@
 use talos_config::{Config, ProtocolResolutionSource, ProviderConfig, ProviderProtocol};
 
+#[test]
+fn selecting_and_connecting_openai_do_not_persist_an_explicit_chat_override() {
+    let mut config = Config::default();
+    config
+        .set_active_model("openai/o3")
+        .expect("packaged model");
+    config.set_provider_credential("openai", "test-key");
+    assert!(config.providers["openai"].protocol.is_unspecified());
+    let encoded = toml::to_string(&config).expect("persist config");
+    let restored: Config = toml::from_str(&encoded).expect("load config");
+    assert_eq!(
+        restored.provider_protocol(),
+        ProviderProtocol::OpenAIResponses
+    );
+    assert_eq!(
+        restored.resolve_provider_protocol().source,
+        ProtocolResolutionSource::Default
+    );
+}
+
+#[test]
+fn preview_and_active_protocol_use_the_same_model_override_without_mutation() {
+    let mut config = Config::default();
+    config.set_provider_credential("gateway", "test-key");
+    config
+        .providers
+        .get_mut("gateway")
+        .expect("provider")
+        .protocol = ProviderProtocol::OpenAIChat;
+    config
+        .providers
+        .get_mut("gateway")
+        .expect("provider")
+        .models
+        .insert(
+            "test-model".into(),
+            talos_config::ModelConfig {
+                protocol: Some(ProviderProtocol::OpenAIResponses),
+                ..Default::default()
+            },
+        );
+    let preview = config.resolve_model_protocol("gateway", "test-model");
+    assert_eq!(preview.protocol, ProviderProtocol::OpenAIResponses);
+    assert_eq!(preview.source, ProtocolResolutionSource::Configured);
+    assert_eq!(config.provider, "anthropic");
+    config.provider = "gateway".into();
+    config.model = "test-model".into();
+    assert_eq!(config.resolve_provider_protocol(), preview);
+    assert_eq!(config.provider_protocol(), preview.protocol);
+}
+
 fn config_with_provider(name: &str, provider: ProviderConfig) -> Config {
     let mut config = Config::default();
     config.provider = name.to_string();
@@ -30,7 +81,7 @@ fn omitted_protocol_roundtrips_as_unset_without_exposing_internal_marker() {
 }
 
 #[test]
-fn official_openai_resolves_responses_without_changing_legacy_dispatch_yet() {
+fn official_openai_resolves_responses_consistently_with_runtime_dispatch() {
     let config = config_with_provider(
         "openai",
         ProviderConfig {
@@ -42,7 +93,10 @@ fn official_openai_resolves_responses_without_changing_legacy_dispatch_yet() {
     let resolved = config.resolve_provider_protocol();
     assert_eq!(resolved.protocol, ProviderProtocol::OpenAIResponses);
     assert_eq!(resolved.source, ProtocolResolutionSource::Default);
-    assert_eq!(config.provider_protocol(), ProviderProtocol::OpenAIChat);
+    assert_eq!(
+        config.provider_protocol(),
+        ProviderProtocol::OpenAIResponses
+    );
 }
 
 #[test]

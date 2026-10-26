@@ -48,6 +48,114 @@ pub mod hardening;
 #[cfg(unix)]
 mod supervisor;
 
+/// Executes an already-authorized Unix command with owned process-group cleanup.
+///
+/// This establishes lifecycle ownership, not sandboxing or permission admission.
+/// Each output stream is bounded; overflow fails and terminates the owned group.
+/// Dropping the caller signals cleanup. Application shutdown must keep the runtime
+/// alive for cleanup; runtime teardown is not evidence of successful reaping.
+#[cfg(unix)]
+pub async fn execute_owned_command(
+    command: std::process::Command,
+    deadline: std::time::Duration,
+    output_limit: usize,
+) -> Result<std::process::Output, SandboxError> {
+    let cleanup = std::sync::Arc::new(supervisor::Cleanup::default());
+    let result =
+        supervisor::execute_with_limit(command, cleanup.clone(), deadline, (), output_limit).await;
+    if let Err(cleanup_error) = cleanup.wait(std::time::Duration::from_secs(2)).await {
+        return Err(match result {
+            Err(error) => SandboxError::ExecutionFailed(format!("{error}; {cleanup_error}")),
+            Ok(_) => cleanup_error,
+        });
+    }
+    result
+}
+
+/// Unix command owner with retained aggregate cleanup evidence.
+/// Admission here controls lifecycle only; callers still authorize every command.
+#[cfg(unix)]
+#[derive(Clone, Default)]
+pub struct OwnedCommandExecutor {
+    cleanup: std::sync::Arc<supervisor::Cleanup>,
+}
+
+#[cfg(unix)]
+impl OwnedCommandExecutor {
+    /// Creates an isolated invocation scope, shared by its continuation stages.
+    /// Commands still check owner admission immediately before registration.
+    pub fn operation(&self) -> OwnedCommandOperation {
+        OwnedCommandOperation {
+            cleanup: std::sync::Arc::new(supervisor::Cleanup::child(self.cleanup.clone())),
+        }
+    }
+
+    /// Permanently rejects future command registrations, including continuations.
+    /// Commands registered before this fence remain owned and must be cancelled
+    /// and joined by the caller before waiting for cleanup.
+    pub fn seal(&self) {
+        self.cleanup.seal();
+    }
+
+    /// Returns evidence spanning all operations created by this owner.
+    pub fn cleanup_receipt(&self) -> SandboxCleanupReceipt {
+        SandboxCleanupReceipt {
+            cleanup: self.cleanup.clone(),
+        }
+    }
+}
+
+/// Invocation-local process ownership, excluding unrelated calls on the executor.
+#[cfg(unix)]
+#[derive(Clone)]
+pub struct OwnedCommandOperation {
+    cleanup: std::sync::Arc<supervisor::Cleanup>,
+}
+
+#[cfg(unix)]
+impl OwnedCommandOperation {
+    /// Executes an authorized command with finite, caller-owned standard input.
+    /// Input delivery shares output collection's deadline and cancellation scope;
+    /// the pipe closes after delivery. Input is not an authorization grant.
+    pub async fn execute_with_input(
+        &self,
+        command: std::process::Command,
+        deadline: std::time::Duration,
+        output_limit: usize,
+        input: Vec<u8>,
+    ) -> Result<std::process::Output, SandboxError> {
+        supervisor::execute_with_input(
+            command,
+            self.cleanup.clone(),
+            deadline,
+            (),
+            output_limit,
+            Some(input),
+        )
+        .await
+    }
+
+    /// Returns invocation-local cleanup evidence before any command starts.
+    pub fn cleanup_receipt(&self) -> SandboxCleanupReceipt {
+        SandboxCleanupReceipt {
+            cleanup: self.cleanup.clone(),
+        }
+    }
+
+    /// Executes one authorized command within this invocation's lifecycle scope.
+    /// A sealed owner refuses registration without spawning. Dropping execution
+    /// signals cancellation; retain the receipt to confirm the resulting cleanup.
+    pub async fn execute(
+        &self,
+        command: std::process::Command,
+        deadline: std::time::Duration,
+        output_limit: usize,
+    ) -> Result<std::process::Output, SandboxError> {
+        supervisor::execute_with_limit(command, self.cleanup.clone(), deadline, (), output_limit)
+            .await
+    }
+}
+
 /// Cleanup evidence for commands owned by a managed sandbox provider.
 ///
 /// Stop admitting commands and drop their execution futures before waiting.
@@ -59,6 +167,23 @@ pub struct SandboxCleanupReceipt {
 }
 
 impl SandboxCleanupReceipt {
+    /// Returns content-free typed evidence without parsing diagnostic strings.
+    /// Unsupported platforms do not claim managed process cleanup.
+    pub async fn wait_confirmed(
+        &self,
+        timeout: std::time::Duration,
+    ) -> Result<(), talos_core::tool::ToolCleanupError> {
+        #[cfg(unix)]
+        {
+            self.cleanup.wait_confirmed(timeout).await
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = timeout;
+            Err(talos_core::tool::ToolCleanupError::Unconfirmed)
+        }
+    }
+
     /// Wait until all registered commands have confirmed cleanup, or report the
     /// supplied deadline or a previously unconfirmed cleanup. This does not cancel
     /// running commands and does not cover intentionally escaped process groups.
@@ -72,6 +197,34 @@ impl SandboxCleanupReceipt {
             let _ = timeout;
             Ok(())
         }
+    }
+}
+
+#[async_trait]
+impl talos_core::tool::ToolCleanupReceipt for SandboxCleanupReceipt {
+    async fn wait(
+        &self,
+        timeout: std::time::Duration,
+    ) -> Result<(), talos_core::tool::ToolCleanupError> {
+        self.wait_confirmed(timeout).await
+    }
+}
+
+#[cfg(unix)]
+#[async_trait]
+impl talos_core::tool::ToolCleanupReceipt for OwnedCommandExecutor {
+    async fn wait(
+        &self,
+        timeout: std::time::Duration,
+    ) -> Result<(), talos_core::tool::ToolCleanupError> {
+        self.cleanup.wait_confirmed(timeout).await
+    }
+}
+
+#[cfg(unix)]
+impl talos_core::tool::ToolCleanupOwner for OwnedCommandExecutor {
+    fn seal(&self) {
+        OwnedCommandExecutor::seal(self);
     }
 }
 
@@ -203,6 +356,30 @@ mod linux {
         }
     }
 
+    fn checked_mount_path(path: &std::path::Path) -> Result<PathBuf, SandboxError> {
+        let resolved = std::fs::canonicalize(path).map_err(|error| {
+            SandboxError::ExecutionFailed(format!(
+                "cannot resolve sandbox mount {}: {error}",
+                path.display()
+            ))
+        })?;
+        for protected in ["/tmp", "/dev", "/proc"] {
+            let protected_path = std::path::Path::new(protected);
+            let protected_target = std::fs::canonicalize(protected_path).map_err(|error| {
+                SandboxError::ExecutionFailed(format!(
+                    "cannot resolve protected mount {protected}: {error}"
+                ))
+            })?;
+            if protected_path.starts_with(&resolved) || protected_target.starts_with(&resolved) {
+                return Err(SandboxError::PermissionDenied(format!(
+                    "sandbox mount {} would cover a protected mount",
+                    resolved.display()
+                )));
+            }
+        }
+        Ok(resolved)
+    }
+
     impl BubblewrapSandbox {
         pub(crate) async fn execute_with_cleanup(
             &self,
@@ -214,29 +391,34 @@ mod linux {
                 return Err(SandboxError::NotAvailable);
             }
 
-            let workspace = config.workspace_root.to_str().ok_or_else(|| {
+            let workspace_path = checked_mount_path(&config.workspace_root)?;
+            let workspace = workspace_path.to_str().ok_or_else(|| {
                 SandboxError::ExecutionFailed("workspace path is not valid UTF-8".into())
             })?;
+            let extra_read_paths = config
+                .extra_read_paths
+                .iter()
+                .map(|path| checked_mount_path(path))
+                .collect::<Result<Vec<_>, _>>()?;
 
             let mut cmd = Command::new("bwrap");
-            cmd.current_dir(&config.workspace_root);
+            cmd.current_dir(&workspace_path);
 
             cmd.args(["--ro-bind", "/", "/"]);
-            cmd.args(["--bind", workspace, workspace]);
             cmd.args(["--dev", "/dev"]);
             cmd.args(["--proc", "/proc"]);
             cmd.args(["--tmpfs", "/tmp"]);
+            cmd.args(["--bind", workspace, workspace]);
 
-            for path in &config.extra_read_paths {
-                if let Some(path_str) = path.to_str() {
-                    cmd.args(["--ro-bind", path_str, path_str]);
-                }
+            for path in &extra_read_paths {
+                cmd.arg("--ro-bind").arg(path).arg(path);
             }
 
             if !config.allow_network {
                 cmd.arg("--unshare-net");
             }
 
+            cmd.args(["--chdir", workspace]);
             cmd.arg("--die-with-parent");
             cmd.args(["--", "sh", "-c", command]);
 
@@ -609,8 +791,9 @@ mod tests {
         #[tokio::test]
         async fn test_bubblewrap_basic_execution() {
             let sandbox = BubblewrapSandbox::new();
+            let workspace = tempfile::tempdir().expect("operation should succeed");
             let config = SandboxConfig {
-                workspace_root: PathBuf::from("/tmp"),
+                workspace_root: workspace.path().to_path_buf(),
                 allow_network: false,
                 extra_read_paths: vec![],
             };

@@ -1,4 +1,23 @@
+## Active T8 implementation — 2026-10-26
+
+[I308](I308-builtin-auto-review.md) is Active after #765 merged at `8f0ce2340`.
+Local ownership and evidence stages are implemented; full H/G Auto behavior remains incomplete.
+Default network admission, higher-risk recovery and final delivery gates remain open.
+T7 is Complete; later handoff tasks remain incomplete.
+
+## Current I300/T7 closure — 2026-10-26
+
+[I300](I300-structured-git-repair.md) is Complete / Closed at #735 (`ee84889fd`).
+Owner records existing Completion Commit, all-success exact-head CI 40251434249,
+full locked preflight and independent security/API review. Earlier I300 Active or
+pending integration checkpoints below are historical. PERM-007-H/G is Active in I308;
+all later handoff tasks remain incomplete.
+
 # Iterations
+
+[I307](I307-bubblewrap-workspace-visibility.md) is Complete for #757 at #762
+(`f643d8775`). Native Linux isolation, full platform CI and independent security
+review passed; I300 retains integration and final T7 acceptance.
 
 ## Purpose
 
@@ -43,9 +62,10 @@ PERM-007-H retain their separate scopes.
 comparisons satisfy the bounded storage acceptance. I301 retains prior failures and #705
 retains independent broader timeout/integration residuals.
 
-[I300](I300-structured-git-repair.md) plans handoff T7 Git permission/diff repair.
-PR #704 proposes Active / Claimed under accepted ADR-089; both are ineffective
-until merge. No implementation is activated before that gate.
+[I300](I300-structured-git-repair.md) is Active / Claimed for handoff T7 Git
+permission/diff repair; #704 merged as `55fef9f9`, making the claim effective.
+ADR-089 and its additive API amendment are accepted. Implementation remains
+incomplete; PERM-007-H follows as a separate serial iteration.
 
 [I299](I299-preserved-presentation-recovery.md) is Complete / Closed through #701,
 Completion Commit `690926759229818fcec92b1487d0cffef1bf5fcb`.
@@ -353,3 +373,9 @@ replace or rewrite them.
 ### TUI-062 / I289 Closeout — 2026-10-03
 
 Complete / Closed; owner Completion Commit `1226f313e7136f4b2a3d8db6f9179c4ed52072e1` (#628 merge). Full preflight, CI `37115859644`, exact-head Agent review and maintainer native acceptance passed. No remaining slice residuals.
+
+I300 Auto prerequisite amendment (2026-10-23): the governance candidate proposes
+only shared prepared-command assessment and Pull integration before T7 activation.
+It is ineffective until target-branch merge. I300 remains Active; PERM-007-H's
+remaining full built-in coverage stays unclaimed and subsequent. See the I300
+owner for scope, acceptance and complete active/review/planned inventory.

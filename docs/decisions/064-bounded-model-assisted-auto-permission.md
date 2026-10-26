@@ -60,7 +60,7 @@ replacement resource, altered operation, policy rule, sandbox fallback or persis
 `AllowOnce` is valid only for the exact request digest, policy revision, mode generation and
 session, and is consumed once. Any Deny or hard-boundary result is terminal before the model seam.
 
-### 2. First implementation maximum authority
+### 2. Initial implementation maximum authority (ADR-064 v1)
 
 The first implementation may assess only an Ask composed entirely of workspace-local `Write`
 facets for creation of one new structured text file by an explicitly allowlisted native Talos
@@ -224,12 +224,16 @@ the adversarial and conformance fixtures specified by the threat matrix.
 
 ## Consequences
 
-- The product default can be “on” while actual authority remains narrow, typed and fail-closed.
+- At initial ADR-064 v1, the product default could be “on” while actual
+  authority remained narrow, typed and fail-closed.
 - Governed unattended creation of new text files under a typed managed-workspace lease can avoid
   repeated human prompts without coupling third-party SDK hosts to Talos governance documents.
 - Editing existing files remains human-mediated until a portable atomic compare-and-write boundary
   is separately accepted.
-- General shell, network, external-path and arbitrary-workspace Ask outcomes still require a human.
+- Under the initial v1 implementation, general shell, network, external-path
+  and arbitrary-workspace Ask outcomes required a human. The 2026-10-22
+  amendment below supersedes that category-wide restriction for eligible future
+  operations.
 - The separate evaluator adds latency and provider cost; bounded timeout/circuit behavior makes that
   visible and reversible.
 - PERM-006-A/B/C remains on the critical path; this decision removes policy ambiguity but does not
@@ -241,7 +245,10 @@ Disable or supersede this decision if adversarial testing shows scope enlargemen
 result replay, policy bypass, cross-surface divergence, unacceptable false approval, or inability
 to distinguish user/parallel-session changes. Any proposal to admit modification, Execute,
 Network, external paths, sandbox fallback, persistent grants or unmanaged workspaces requires a
-fresh decision and independent security review.
+reviewed decision amendment and independent security review. The 2026-10-22 amendment below
+accepts invocation-local Network/Write/Execute model decisions when operation-specific trusted
+eligibility and scope checks pass; it does not accept persistent grants, sandbox fallback or
+unknown/unbound effects.
 
 ## 2026-09-20 Accepted Auto Review Timing Amendment
 
@@ -263,3 +270,96 @@ Local evidence motivating this amendment: session `75ed4f7e-dff6-43b3-a24b-51242
 timed out after 8003 ms against an 8000 ms budget, with 1961 reasoning bytes and 16 text bytes,
 below its 16384-byte budget. This establishes a deadline failure, not a model safety rejection.
 Local corrective implementation and tests are not a merged-delivery or live acceptance claim.
+
+## 2026-10-22 Maintainer Amendment: Effectful Auto Decisions
+
+The maintainer clarified that Auto's intended outcome includes model-assisted
+**one-time approval** of suitable network, mutation and execution requests. The
+presence of these effect classes alone must not mechanically force a human
+checkpoint. A model response that only explains an operation while every
+effectful request still requires human approval does not meet the Auto goal.
+
+The earlier first-implementation ceiling in this ADR remains an accurate record
+of the accepted 2026-08-22 implementation boundary, but is superseded for future
+Auto work by this amendment. PERM-007-H owns implementation and must reconcile
+PERM-007-G and the present typed creation-only path before changing code. An
+eligible decision remains `AllowOnce` for one exact request; it creates no
+persistent grant and does not let the model alter the operation, targets,
+facets, mode, or policy. Deterministic Deny, explicit human-only decisions,
+unknown/unbound targets, missing intent, inadequate effect evidence, unsafe
+execution configuration, model uncertainty, malformed output, timeout and
+provider failure remain non-overridable. Such cases use the existing human or
+headless-Deny fallback.
+
+The v1 atomic no-clobber and proposed compare-and-write requirements describe
+that file-tool implementation, not a prerequisite to simulate arbitrary native
+commands. Native Git remains responsible for its own locking and conflict
+behavior; Auto assesses and authorizes the operation, without promising atomic
+rollback or absence of concurrent repository changes.
+
+Eligibility must be derived by trusted code for each registered operation and
+include the exact normalized invocation, bounded user intent, declared effects,
+target/resource identities, and evidence freshness. The model judges the
+operation and impact together; it is not required to enumerate Git's future
+conflict files, renames or replay results. For Git Pull, the user-approved
+contract is one native Git operation with an operation-level permission scope;
+the Git process reports runtime conflicts and partial failure. The concrete
+effect schema, redaction, request binding, prompt-injection tests and supported
+resource boundaries require PERM-007-H implementation and independent
+permission/security review before rollout. This amendment accepts the product
+direction; it does not claim that the expanded policy is implemented or waive
+that review.
+
+## 2026-10-23 I300 prerequisite API adaptation
+
+Claim amendment #755 (main merge 0e2abd8e3) assigns only the shared
+prepared-command/Pull prerequisite to I300. The remaining PERM-007-H scope is
+unchanged. This applies the accepted effectful Auto decision above; it is not
+production activation evidence.
+
+Before public API implementation, use the following additive migration:
+
+- Keep existing AutoPermissionRequest, AutoPermissionAssessmentContext and
+  exhaustive risk/operation/effect enums source-compatible. A prepared command
+  is not a read-only compatibility request.
+- Add a separate prepared-command evidence type and a default-None method on
+  PreparedNormalToolInvocation. The final frozen producer owns the evidence and
+  binds it to its PreparedPlanIdentity. No evidence comes from caller JSON or
+  approval prose. Do not export raw configuration/environment values or hashes
+  of low-entropy secrets; an opaque per-plan identifier binds retained state.
+- Add a permission-pipeline method accepting the same prepared identity and
+  evidence, retaining existing methods and request struct literals. Missing or
+  mismatched evidence cannot enter prepared-command Auto assessment.
+- Add a separate contextual assessor method/request with a default unsupported
+  error. Existing assessors compile unchanged and fall back to human approval;
+  they cannot silently approve a request whose new effects they never received.
+  Provider adapters opt in explicitly. No old assessor method receives a
+  mislabeled read-only carrier.
+- Reuse the existing isolated model invocation, deadline, reset/policy checks,
+  digest and fallback. The new wire response must acknowledge the disclosed
+  effect set; do not extend the legacy public exhaustive enums. New evidence
+  and tests belong in separate modules rather than growing shell-test files.
+
+Downstream migration: existing human and legacy assessor adapters require no
+source changes. To enable prepared-command Auto they must explicitly implement
+the new contextual method and preserve all identity/effect checks. Older adapters
+continue to require a human (or refuse headlessly). Independent security/API
+review, actual entrypoint success/failure tests and native Windows validation
+remain required before activation. This records implementation constraints, not
+a claim that the API or end-to-end support already exists.
+
+### I308 implementation API note — 2026-10-26
+
+The additive `ToolRegistry::register_builtin_contributions` entry point records an
+explicit composition-root ownership decision for the actual registered instances.
+Ordinary `register`/`register_contribution(s)` do not infer ownership from tool names,
+default `Native` provenance, or diagnostic sources. Unchecked same-name replacement
+clears ownership; checked duplicate batches leave it unchanged. Hosts must not use the
+built-in entry point for plugin, external MCP or custom embedder implementations.
+This marker is not an execution permission or an automatic approval: all facets still
+pass the permission pipeline and require bound evidence and admission.
+
+Existing registration APIs and struct literals remain source compatible. Product
+composition opts into the new API only for product-owned implementations/wrappers;
+external registrations retain their prior behavior. This note does not claim complete
+I308 coverage or relax the higher-risk recovery requirements.

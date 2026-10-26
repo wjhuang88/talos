@@ -24,13 +24,13 @@ permissions:
 
 jobs:
   cleanup:
-    name: Remove obsolete one-off workflow runs
+    name: Remove obsolete workflow runs
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Delete unreferenced runs from retired workflows
+      - name: Delete obsolete workflow runs
         env:
           GH_TOKEN: ${{ github.token }}
           INPUT_DRY_RUN: ${{ inputs.dry_run }}
@@ -43,31 +43,94 @@ jobs:
             dry_run="${INPUT_DRY_RUN:-true}"
           fi
 
+          retry_api() {
+            local attempt=1
+            local max_attempts=5
+            local delay=2
+
+            while ! "$@"; do
+              if (( attempt >= max_attempts )); then
+                echo "GitHub API command failed after ${attempt} attempts: $*" >&2
+                return 1
+              fi
+
+              attempt=$((attempt + 1))
+              echo "GitHub API command failed; retry ${attempt}/${max_attempts} after ${delay}s: $*" >&2
+              sleep "${delay}"
+              delay=$((delay * 2))
+            done
+          }
+
           referenced_runs="$(mktemp)"
           grep -RhoE 'actions/runs/[0-9]+' \
             docs README.md README.zh-CN.md AGENTS.md .github 2>/dev/null \
             | sed 's#actions/runs/##' \
             | sort -u > "${referenced_runs}" || true
 
+          # Build a stable inventory before deleting anything. Fetch each page
+          # independently so a transient 5xx response only retries that page.
           run_inventory="$(mktemp)"
-          gh api --paginate "/repos/${GITHUB_REPOSITORY}/actions/runs?per_page=100" \
-            --jq '.workflow_runs[] | [.id, .name, .path, .status, .created_at] | @tsv' \
-            > "${run_inventory}"
+          page=1
+          while :; do
+            page_json="$(mktemp)"
+
+            fetch_inventory_page() {
+              gh api "/repos/${GITHUB_REPOSITORY}/actions/runs?per_page=100&page=${page}" > "${page_json}"
+            }
+
+            retry_api fetch_inventory_page
+
+            page_count="$(jq '.workflow_runs | length' "${page_json}")"
+            if [[ "${page_count}" == "0" ]]; then
+              rm -f "${page_json}"
+              break
+            fi
+
+            jq -r '.workflow_runs[] | [
+              .id,
+              .name,
+              .path,
+              .event,
+              .status,
+              (.conclusion // ""),
+              .created_at,
+              (.head_branch // ""),
+              ((.pull_requests[0].number // "") | tostring)
+            ] | @tsv' "${page_json}" >> "${run_inventory}"
+
+            rm -f "${page_json}"
+            page=$((page + 1))
+          done
+
+          delete_run() {
+            local run_id="$1"
+            gh api --method DELETE "/repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}"
+          }
+
+          declare -A newest_ci_stream_run=()
 
           deleted=0
+          deleted_retired=0
+          deleted_superseded_ci=0
           preserved_evidence=0
+          preserved_latest_non_success=0
           skipped_active=0
 
-          while IFS=$'\t' read -r run_id workflow_name workflow_path status created_at; do
-            case "${workflow_path}" in
-              .github/workflows/ci.yml|.github/workflows/release.yml|.github/workflows/pages.yml|.github/workflows/actions-maintenance.yml)
-                continue
-                ;;
-            esac
-
+          while IFS=$'\t' read -r run_id workflow_name workflow_path event status conclusion created_at head_branch pr_number; do
             if [[ "${run_id}" == "${GITHUB_RUN_ID}" || "${status}" != "completed" ]]; then
               echo "skip active run ${run_id}: ${workflow_name} (${workflow_path})"
               skipped_active=$((skipped_active + 1))
+
+              if [[ "${workflow_path}" == ".github/workflows/ci.yml" ]]; then
+                if [[ -n "${pr_number}" ]]; then
+                  stream_key="pr:${pr_number}"
+                elif [[ -n "${head_branch}" ]]; then
+                  stream_key="${event}:branch:${head_branch}"
+                else
+                  stream_key="run:${run_id}"
+                fi
+                newest_ci_stream_run["${stream_key}"]="${run_id}"
+              fi
               continue
             fi
 
@@ -77,20 +140,73 @@ jobs:
               continue
             fi
 
-            if [[ "${dry_run}" == "true" ]]; then
-              echo "would delete ${run_id}: ${workflow_name} (${workflow_path}, ${created_at})"
-            else
-              echo "delete ${run_id}: ${workflow_name} (${workflow_path}, ${created_at})"
-              gh api --method DELETE "/repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}"
-              deleted=$((deleted + 1))
-            fi
+            case "${workflow_path}" in
+              .github/workflows/release.yml|.github/workflows/pages.yml|.github/workflows/actions-maintenance.yml)
+                continue
+                ;;
+
+              .github/workflows/ci.yml)
+                if [[ -n "${pr_number}" ]]; then
+                  stream_key="pr:${pr_number}"
+                elif [[ -n "${head_branch}" ]]; then
+                  stream_key="${event}:branch:${head_branch}"
+                else
+                  stream_key="run:${run_id}"
+                fi
+
+                if [[ -z "${newest_ci_stream_run[${stream_key}]+x}" ]]; then
+                  newest_ci_stream_run["${stream_key}"]="${run_id}"
+                  newest_in_stream=true
+                else
+                  newest_in_stream=false
+                fi
+
+                # Successful CI remains durable history. For non-success runs,
+                # retain the newest state of each PR/branch but remove older
+                # cancelled/failed/timed-out/etc. attempts once superseded.
+                if [[ "${conclusion}" == "success" ]]; then
+                  continue
+                fi
+
+                if [[ "${newest_in_stream}" == "true" ]]; then
+                  echo "preserve latest non-success CI run ${run_id}: ${conclusion} (${stream_key})"
+                  preserved_latest_non_success=$((preserved_latest_non_success + 1))
+                  continue
+                fi
+
+                if [[ "${dry_run}" == "true" ]]; then
+                  echo "would delete superseded CI run ${run_id}: ${conclusion} (${stream_key}, ${created_at})"
+                else
+                  echo "delete superseded CI run ${run_id}: ${conclusion} (${stream_key}, ${created_at})"
+                  retry_api delete_run "${run_id}"
+                  deleted=$((deleted + 1))
+                  deleted_superseded_ci=$((deleted_superseded_ci + 1))
+                fi
+                ;;
+
+              *)
+                # Retired one-off/test workflows are pure history unless a run
+                # is explicitly referenced as evidence in the repository.
+                if [[ "${dry_run}" == "true" ]]; then
+                  echo "would delete retired workflow run ${run_id}: ${workflow_name} (${workflow_path}, ${created_at})"
+                else
+                  echo "delete retired workflow run ${run_id}: ${workflow_name} (${workflow_path}, ${created_at})"
+                  retry_api delete_run "${run_id}"
+                  deleted=$((deleted + 1))
+                  deleted_retired=$((deleted_retired + 1))
+                fi
+                ;;
+            esac
           done < "${run_inventory}"
 
           {
             echo "## Actions maintenance"
             echo
             echo "- Dry run: \`${dry_run}\`"
-            echo "- Deleted obsolete runs: \`${deleted}\`"
+            echo "- Deleted total: \`${deleted}\`"
+            echo "- Deleted retired workflow runs: \`${deleted_retired}\`"
+            echo "- Deleted superseded non-success CI runs: \`${deleted_superseded_ci}\`"
             echo "- Preserved referenced evidence runs: \`${preserved_evidence}\`"
+            echo "- Preserved latest non-success CI runs: \`${preserved_latest_non_success}\`"
             echo "- Skipped active runs: \`${skipped_active}\`"
           } >> "${GITHUB_STEP_SUMMARY}"

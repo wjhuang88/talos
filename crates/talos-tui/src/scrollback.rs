@@ -89,10 +89,10 @@ pub(crate) fn provider_wizard_cursor_position(
     let (row, col) = match step {
         crate::state::WizardStep::Name => (PANEL_PRIMARY_INPUT_ROW, credential_cursor_col(name)),
         crate::state::WizardStep::Protocol => {
-            let row = if protocol == "anthropic-messages" {
-                PANEL_SECONDARY_INPUT_ROW
-            } else {
-                PANEL_PRIMARY_INPUT_ROW
+            let row = match protocol.as_str() {
+                "anthropic-messages" => PANEL_SECONDARY_INPUT_ROW,
+                "openai-responses" => PANEL_SECONDARY_INPUT_ROW + 1,
+                _ => PANEL_PRIMARY_INPUT_ROW,
             };
             (row, 1)
         }
@@ -1241,7 +1241,7 @@ impl ViewportComponent for BottomPanelComponent<'_> {
                 Some(crate::state::PanelKind::ProviderWizard {
                     step: crate::state::WizardStep::Protocol,
                     ..
-                }) => 4,
+                }) => 5,
                 _ if confirm => 6,
                 _ => 3,
             };
@@ -1459,6 +1459,11 @@ impl ViewportComponent for BottomPanelComponent<'_> {
                 } else {
                     " "
                 };
+                let responses_marker = if protocol == "openai-responses" {
+                    "▸"
+                } else {
+                    " "
+                };
                 lines.extend([
                     Line::from(Span::styled(
                         format!(" {openai_marker} openai-chat"),
@@ -1466,6 +1471,10 @@ impl ViewportComponent for BottomPanelComponent<'_> {
                     )),
                     Line::from(Span::styled(
                         format!(" {anthropic_marker} anthropic-messages"),
+                        primary,
+                    )),
+                    Line::from(Span::styled(
+                        format!(" {responses_marker} openai-responses"),
                         primary,
                     )),
                 ]);
@@ -2361,28 +2370,30 @@ mod modal_cursor_tests {
 
     #[test]
     fn provider_protocol_cursor_targets_the_rendered_selected_option_row() {
-        let mut menu = crate::panel_state::BottomPanelState::open_provider_wizard();
-        let Some(crate::state::PanelKind::ProviderWizard { step, protocol, .. }) =
-            menu.kind.as_mut()
-        else {
-            panic!("provider wizard panel expected");
-        };
-        *step = crate::state::WizardStep::Protocol;
-        *protocol = "anthropic-messages".to_string();
-        let component = BottomPanelComponent {
-            menu: &menu,
-            query: "",
-            max_height: u16::MAX,
-        };
-        let area = Rect::new(0, 0, 40, 4);
-        let mut buffer = Buffer::empty(area);
-        let mut frame = InlineFrame::new(area, &mut buffer);
-        component.render(&mut frame, area);
+        for (value, selected_row) in [("anthropic-messages", 3), ("openai-responses", 4)] {
+            let mut menu = crate::panel_state::BottomPanelState::open_provider_wizard();
+            let Some(crate::state::PanelKind::ProviderWizard { step, protocol, .. }) =
+                menu.kind.as_mut()
+            else {
+                panic!("provider wizard panel expected");
+            };
+            *step = crate::state::WizardStep::Protocol;
+            *protocol = value.to_string();
+            let component = BottomPanelComponent {
+                menu: &menu,
+                query: "",
+                max_height: u16::MAX,
+            };
+            let area = Rect::new(0, 0, 40, 5);
+            let mut buffer = Buffer::empty(area);
+            let mut frame = InlineFrame::new(area, &mut buffer);
+            component.render(&mut frame, area);
 
-        assert_eq!(
-            provider_wizard_local_cursor_position(&menu).map(|target| target.row),
-            Some(3)
-        );
-        assert!(rendered_row(&buffer, 40, 3).contains("anthropic-messages"));
+            assert_eq!(
+                provider_wizard_local_cursor_position(&menu).map(|target| target.row),
+                Some(selected_row)
+            );
+            assert!(rendered_row(&buffer, 40, selected_row).contains(&format!("▸ {value}")));
+        }
     }
 }

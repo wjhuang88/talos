@@ -312,6 +312,25 @@ their existing fail-closed behavior for unresolved `Ask` decisions; enabling `au
 not silently grant those surfaces model authority. Disabling auto always returns an interactive
 surface to human approval and a headless surface to denial.
 
+Product-owned new-file `write` requests now send the exact bounded contents and current
+user intent to a separate tool-free Auto review. The existing direct-workspace-child,
+text-file and atomic-create capability restrictions remain. The complete review payload
+must fit 16 KiB; secret-like or oversized input requires human approval. A matching
+high-confidence decision permits that invocation once. Custom assessors must implement
+`assess_builtin_invocation` to support this path; the default is unsupported.
+
+Registered native string and snapshot-anchored `edit` requests with `retain_backup=true` can receive
+one-use Auto approval after review of the complete captured original and replacement,
+exact arguments and user intent. The complete encoded review must fit 16 KiB;
+oversized or secret-like content requires human approval. Execution refuses a changed
+original and retains a recovery receipt on success. Anchored edits reuse existing
+anchor/overlap validation and recheck the snapshot before execution. Custom assessors must implement
+`assess_file_mutation`; the default is unsupported. Registered native text-file
+`delete` with `retain_backup=true` uses the same complete-original review and refuses
+deletion if the captured bytes have changed. Binary files remain eligible for human
+approved recoverable deletion, but not this text review. Auto approval of directory
+deletion and mutations without retained backups is not implemented.
+
 ## Development
 
 ### Build From Source
@@ -409,6 +428,13 @@ api_key_env = "OPENAI_COMPAT_API_KEY"
 context_limit = 202752
 output_limit = 4096
 ```
+
+Talos also supports `protocol = "openai-responses"` at provider or model scope. Official OpenAI
+uses Responses when the protocol is omitted and support is confirmed; unconfirmed gateways retain
+Chat. An explicit `openai-chat` override provides rollback, with no automatic cross-protocol retry.
+The model picker and catalog browser show the effective protocol and its source. See
+[wire-protocol configuration and migration](docs/reference/PROVIDER-PROTOCOLS.md) for precedence,
+model overrides and the required pre-1.0 minor public-enum migration.
 
 Set the matching environment variable before starting Talos:
 
@@ -665,12 +691,45 @@ packaged offline `models.toml`, asks for an API key, then offers an optional cus
 default endpoint submit after the API key without prompting for a URL; custom providers (or any row
 without a built-in endpoint) still require a non-empty `base_url`. The `/connect` picker also has an
 **Add custom provider** entry that opens a cancel-safe wizard: enter a provider name (1–64 char
-slug), choose a protocol (`openai-chat` or `anthropic-messages`), enter an HTTPS base URL (HTTP only
+slug), choose a protocol (`openai-chat`, `openai-responses` or `anthropic-messages`), enter an HTTPS base URL (HTTP only
 for loopback), enter an API key (masked), and confirm. The wizard saves all fields as one atomic
 config update — cancellation or any validation error leaves your existing config unchanged. A fresh
 install does not need a manual catalog initialization step: Talos does not create a runtime
 `catalog.db` for model metadata. Model/provider metadata updates are build-time only through
 `BUILD_MODELS=1`; the legacy `--import-models` flag is kept as a no-op compatibility notice.
+
+The current I300 development candidate treats `git_add` paths literally, relative to
+the workspace. It first requests dedicated Git configuration-chain discovery
+permission, then separately authorizes the resulting staging plan. Configuration
+values remain internal. Discovery requires host Git support for `git var
+GIT_ATTR_SYSTEM` and `GIT_ATTR_GLOBAL`. Unsupported filters, hooks, fsmonitor,
+object alternates, and split indexes are refused; any fallback requires separate
+authorization. The unpublished Unix candidate includes prepared Add, Commit,
+nonrecursive Checkout, limited Push and native Pull execution. Pull first authorizes
+configuration discovery, then one frozen command and its transitive effects
+(including network, merge/rebase, recursion and configured programs). It does not
+promise per-path or endpoint confinement. Compatible Auto review can approve the
+whole command once; explicit Deny and human-only policies retain authority.
+Conflicts and failures may leave fetched objects and partial integration state;
+Talos does not automatically reset or repair them. This remains an unpublished
+candidate pending final security, CI and native Windows acceptance.
+The Windows production preparation gate is removed in this candidate and the MSVC
+test targets cross-compile with `cargo xwin`; native Windows execution and exact-head
+CI are still unverified. T7 is not complete. See the [I300 migration inventory](docs/reference/I300-GIT-AUTHORIZATION-MIGRATION.md).
+
+On the tested Git for Windows build, default `git://` Push hangs even outside
+Talos. Explicit repository configuration `git config sendpack.sideband false`
+completes the tested transfer. Talos preserves your configuration and does not
+automatically apply this workaround. A timeout can leave partial remote effects.
+The candidate's nonrecursive checkout can replace a nonempty submodule directory
+only after discovering its entries and obtaining explicit deletion permission for
+each one, including untracked files and Unix FIFO/socket entries. Effective
+configuration sources remain protected; symbolic links and unsupported special
+entries are refused. Failures can leave partial Git effects.
+Direct mutation calls without the prepared authorization plan are refused.
+Admitted execution keeps automatic maintenance in the
+foreground (`maintenance.autoDetach=false`, `gc.autoDetach=false`) so maintenance
+shares the invocation lifetime; maintenance work is not disabled.
 
 ## Built-In Capabilities
 
@@ -681,6 +740,10 @@ Talos ships with built-in tools for common coding-agent work:
 - Code intelligence: `find_symbol`, `find_references`, `list_symbols`, `list_imports`
 - Git: `git_status`, `git_diff`, `git_log`, `git_show`, `git_branch_list`, `git_add`, `git_commit`, `git_push`, `git_pull`, `git_checkout`
 - Network: `fetch_url` (bounded URL context — public pages, HTML extraction, JSON), `http_request` (advanced HTTP/API inspection — custom methods/headers/bodies, disclosed on demand via continuation), `save_url` (download URL to local file — dual network+write permission), `web_search` (DuckDuckGo + Tavily + SearXNG + Wikipedia)
+
+`http_request` stops reading the response once its body limit is exceeded (64 KiB
+by default). Truncated responses report a lower bound on the received size;
+the remaining body is not downloaded to calculate a total.
 - Document extraction: `document_extract` (read-only bounded text extraction from local text/HTML/JSON/CSV/Markdown/XML files)
 - Image reading: `read_image` (model-invoked image read for vision-capable models; validates PNG/JPEG/GIF/WebP through shared ingestion; exact-path authorization; returns a safe summary and a one-shot provider continuation artifact per ADR-051; only presented when the active model's catalog metadata confirms `image_input = true`)
 - Process execution: `exec` (argv-only single process, no shell parsing), plus the
@@ -704,6 +767,27 @@ are transient model coordination data: they are omitted from hooks, approval pre
 history, exports, transcripts, and TLOG. Display/history retain ordinary sanitized file content; a
 resumed or rebuilt Runtime must read the file again, and every write still passes the current
 permission policy.
+
+For an existing-file edit, add `"retain_backup": true` to retain the original contents.
+The result returns a `recovery_id`; restore with
+`{"path":"src/example.rs","recovery_id":"<returned-id>"}` through the same `edit`
+tool instance and current Write permission. Restoration refuses a different path or
+contents changed since the edit and consumes the ID after success. Backups expire after
+15 minutes, disappear on tool/runtime replacement or shutdown, and are limited to 2 MiB
+per file (both before and after an edit), 16 MiB and 64 records per instance.
+Backup capture also requires Read permission. A full store refuses the edit before mutation.
+This restores file contents only, not historical metadata, deleted files or directories;
+it is not durable recovery or protection against concurrent external writers.
+
+For a single regular-file deletion, `delete` also accepts `"retain_backup": true`.
+It requires Read permission for backup capture as well as Write permission for deletion.
+Use the returned ID with `{"path":"file.txt","recovery_id":"<returned-id>"}` on the
+same `delete` instance to restore under current Write permission. Restoration creates the
+file exclusively and refuses to overwrite any recreated file or link. The same memory,
+size and expiry limits apply; directories cannot be backed up. This restores bytes and
+basic permissions, not ownership, ACLs or timestamps. Failures can leave a partially
+restored file; inspect the reported effect before retrying. It does not provide isolation
+from concurrent external path replacement or make destructive operations Auto-eligible.
 
 File tools remain workspace-confined by default. When an interactive permission-aware mode requests
 an external path, Talos asks the operator; approval carries only the selected tool operation and
