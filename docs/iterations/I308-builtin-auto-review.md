@@ -898,3 +898,23 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
   `17c6e458f`, without blockers or independent test reruns. It confirmed fixed
   diagnostic categories expose no captured paths/values and preserve refusal.
   This same-session Agent shares tool/GitHub identity and is not a human review.
+
+### Current-head validation checkpoint — 2026-10-26
+
+- Independent static read-only Agent review approved recovery verification
+  `c16a4548c7c163f705b6b67023140bb3e4eb4a01` against `a110a12fe`, with no
+  blockers and no independent test reruns. The review does not establish
+  exhaustive race coverage or model-assisted recovery approval.
+- The earlier serial preflight exited 101: the prepared local Push test could
+  not observe its process (`EPERM`); Tools reported 975 passed and one failed.
+  This is failed validation, not a passing final-head result.
+- A newly authorized sandbox-external serial locked preflight now covers
+  `c16a4548c7c163f705b6b67023140bb3e4eb4a01`; its log is
+  `/private/tmp/i308-read-diagnostic-preflight-authorized.log`. It remains
+  running at this checkpoint, so no final result is claimed.
+- Remote runs 40280848025 and 40285467815 were verified live with Windows
+  workspace jobs still in progress. The latter retains its macOS Runtime
+  Checkout failure; added category diagnostics are not a root-cause repair.
+  Full T8 and the later handoff queue remain incomplete.
+- Both project governance and Collaboration Claim validators passed with zero
+  warnings after this checkpoint update.
