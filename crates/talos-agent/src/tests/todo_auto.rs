@@ -20,7 +20,10 @@ impl AutoPermissionAssessor for UnexpectedAssessor {
 #[tokio::test]
 async fn real_todo_operations_preserve_internal_policy_and_session_scope() {
     for denied in [false, true] {
-        for operation in 0..9 {
+        for (operation, foreign_target) in (0..9)
+            .map(|operation| (operation, false))
+            .chain((2..8).map(|operation| (operation, true)))
+        {
             let root = tempfile::tempdir().expect("workspace");
             let db = root.path().join("todos.sqlite");
             let session = uuid::Uuid::new_v4();
@@ -89,6 +92,16 @@ async fn real_todo_operations_preserve_internal_policy_and_session_scope() {
                     serde_json::json!({}),
                 ),
             };
+            let mut input = input;
+            if foreign_target {
+                if operation == 2 {
+                    input["items"][0]["id"] = serde_json::json!(other.id);
+                } else if operation >= 6 {
+                    input["child_id"] = serde_json::json!(other.id);
+                } else {
+                    input["id"] = serde_json::json!(other.id);
+                }
+            }
             let name = tool.name().to_owned();
             let facets = tool.permission_profile(&input);
             assert_eq!(facets.len(), 1, "{name}");
@@ -158,8 +171,16 @@ async fn real_todo_operations_preserve_internal_policy_and_session_scope() {
             while let Ok(event) = rx.try_recv() {
                 if let AgentEvent::ToolResult { result, .. } = event {
                     results += 1;
-                    assert_eq!(result.is_error, denied, "{name}: {}", result.content);
+                    assert_eq!(
+                        result.is_error,
+                        denied || (foreign_target && operation != 5 && operation != 7),
+                        "{name} foreign={foreign_target}: {}",
+                        result.content
+                    );
                     assert!(!result.content.contains("other-session-item"), "{name}");
+                    if !denied && foreign_target && (operation == 5 || operation == 7) {
+                        assert!(result.content.contains("not found"), "{name}");
+                    }
                 }
             }
             assert_eq!(results, 1, "{name}");
@@ -167,7 +188,7 @@ async fn real_todo_operations_preserve_internal_policy_and_session_scope() {
             assert_eq!(state.grant_count().expect("grants"), 0, "{name}");
             let after = repo.list(session, TodoQuery::default()).expect("list");
             let dependencies = repo.list_dependencies(session).expect("dependencies");
-            if denied || operation == 8 {
+            if denied || foreign_target || operation == 8 {
                 assert_eq!(
                     serde_json::to_value(&after).expect("serialize"),
                     before,

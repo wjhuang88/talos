@@ -790,3 +790,16 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
   as success. Production/test content is `29212de48809b0147fb9f03f46df6c0e8dd18762`;
   subsequent changes record evidence only. Native Windows CI for the unpublished
   Todo/search continuation is still outstanding. I308 and T8 remain Partial.
+
+### Todo cross-session input verification — 2026-10-26
+
+- The real-Agent Todo matrix additionally supplies another session's item ID to
+  batch update, status update, update, delete, dependency addition and dependency
+  removal under default Allow and explicit Deny. Current-session rows/edges and
+  the other session's item remain unchanged; results do not disclose its title.
+  Missing-item delete and missing-edge removal preserve their existing successful
+  no-op response, explicitly asserted as `not found`; the other foreign-target
+  mutations error. Assessment and persistent-grant counts remain zero.
+- Locked Agent library tests pass 498/498 after this extension; formatting passes.
+  This establishes these concrete foreign-ID cases, not arbitrary cross-session
+  attack coverage, new production behavior or complete I308 acceptance.
