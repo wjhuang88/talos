@@ -9,6 +9,7 @@ struct Assessor {
     scenario: &'static str,
     state: Arc<talos_permission::PermissionSessionState>,
     control: AutoPermissionControl,
+    delete: bool,
 }
 #[async_trait]
 impl AutoPermissionAssessor for Assessor {
@@ -25,10 +26,22 @@ impl AutoPermissionAssessor for Assessor {
         _: std::time::Duration,
     ) -> Result<String, String> {
         self.calls.fetch_add(1, Ordering::SeqCst);
-        assert_eq!(request.input["new_string"], "hello");
+        if !self.delete {
+            assert_eq!(request.input["new_string"], "hello");
+        }
         assert_eq!(request.mutation.before, "hi");
-        assert_eq!(request.mutation.after.as_deref(), Some("hello"));
-        assert_eq!(request.user_intent, "replace hi with hello in existing.txt");
+        assert_eq!(
+            request.mutation.after.as_deref(),
+            if self.delete { None } else { Some("hello") }
+        );
+        assert_eq!(
+            request.user_intent,
+            if self.delete {
+                "delete existing.txt with a retained backup"
+            } else {
+                "replace hi with hello in existing.txt"
+            }
+        );
         assert_eq!(request.facets.len(), 2);
         match self.scenario {
             "changed_file" => std::fs::write(&request.mutation.path, "concurrent update")
@@ -57,6 +70,15 @@ impl AutoPermissionAssessor for Assessor {
 
 #[tokio::test]
 async fn trusted_edit_reviews_complete_images_before_real_execution() {
+    run_mutation_scenarios(false).await;
+}
+
+#[tokio::test]
+async fn trusted_delete_reviews_complete_image_before_real_execution() {
+    run_mutation_scenarios(true).await;
+}
+
+async fn run_mutation_scenarios(delete: bool) {
     for scenario in [
         "allow",
         "changed_file",
@@ -71,17 +93,38 @@ async fn trusted_edit_reviews_complete_images_before_real_execution() {
         "extra_field",
         "malformed",
         "oversized_response",
+        "nul_original",
+        "nul_replacement",
     ] {
+        if delete && scenario == "nul_replacement" {
+            continue;
+        }
         let allow = scenario == "allow";
         let root = tempfile::tempdir().expect("workspace");
-        std::fs::write(root.path().join("existing.txt"), "hi").expect("original");
+        std::fs::write(
+            root.path().join("existing.txt"),
+            if scenario == "nul_original" {
+                "hi\0payload".into()
+            } else if delete && scenario == "oversized" {
+                "x".repeat(20 * 1024)
+            } else {
+                "hi".into()
+            },
+        )
+        .expect("original");
         let mut registry = ToolRegistry::new();
         registry
             .register_builtin_contributions([ToolContribution::new(
                 ToolContributionSource::new("talos-tools:file"),
-                Arc::new(talos_tools::file_tools::EditTool::new(
-                    root.path().to_owned(),
-                )) as Arc<dyn AgentTool>,
+                if delete {
+                    Arc::new(talos_tools::file_tools::DeleteTool::new(
+                        root.path().to_owned(),
+                    )) as Arc<dyn AgentTool>
+                } else {
+                    Arc::new(talos_tools::file_tools::EditTool::new(
+                        root.path().to_owned(),
+                    )) as Arc<dyn AgentTool>
+                },
             )])
             .expect("registration");
         let state = Arc::new(talos_permission::PermissionSessionState::new(
@@ -95,6 +138,7 @@ async fn trusted_edit_reviews_complete_images_before_real_execution() {
                 scenario,
                 state: state.clone(),
                 control: control.clone(),
+                delete,
             }),
             Arc::new(AutoDenyFallback),
             ManagedWorkspaceLease::for_permission_session(root.path(), state.clone())
@@ -102,7 +146,9 @@ async fn trusted_edit_reviews_complete_images_before_real_execution() {
             std::time::Duration::from_secs(2),
             control,
         );
-        let content = if scenario == "oversized" {
+        let content = if scenario == "nul_replacement" {
+            "hello\0payload".into()
+        } else if scenario == "oversized" {
             "x".repeat(20 * 1024)
         } else {
             "hello".into()
@@ -112,8 +158,12 @@ async fn trusted_edit_reviews_complete_images_before_real_execution() {
                 AgentEvent::ToolCall {
                     call: ToolCall {
                         id: "create".into(),
-                        name: "edit".into(),
-                        input: serde_json::json!({"path":"existing.txt","old_string":"hi","new_string":content,"retain_backup":true}),
+                        name: if delete { "delete" } else { "edit" }.into(),
+                        input: if delete {
+                            serde_json::json!({"path":"existing.txt","retain_backup":true})
+                        } else {
+                            serde_json::json!({"path":"existing.txt","old_string":"hi","new_string":content,"retain_backup":true})
+                        },
                     },
                     provenance: Default::default(),
                     summary_fields: vec![],
@@ -141,25 +191,43 @@ async fn trusted_edit_reviews_complete_images_before_real_execution() {
             Some(Arc::new(resolver)),
         );
         agent
-            .run("replace hi with hello in existing.txt".into())
+            .run(
+                if delete {
+                    "delete existing.txt with a retained backup"
+                } else {
+                    "replace hi with hello in existing.txt"
+                }
+                .into(),
+            )
             .await
             .expect("run");
         assert_eq!(
             calls.load(Ordering::SeqCst),
-            usize::from(scenario != "oversized"),
+            usize::from(!matches!(
+                scenario,
+                "oversized" | "nul_original" | "nul_replacement"
+            )),
             "{scenario}"
         );
-        assert_eq!(
-            std::fs::read_to_string(root.path().join("existing.txt")).expect("file"),
-            if allow {
-                "hello"
-            } else if scenario == "changed_file" {
-                "concurrent update"
-            } else {
-                "hi"
-            },
-            "{scenario}"
-        );
+        if delete && allow {
+            assert!(!root.path().join("existing.txt").exists());
+        } else {
+            assert_eq!(
+                std::fs::read_to_string(root.path().join("existing.txt")).expect("file"),
+                if scenario == "nul_original" {
+                    "hi\0payload".into()
+                } else if delete && scenario == "oversized" {
+                    "x".repeat(20 * 1024)
+                } else if allow {
+                    "hello".into()
+                } else if scenario == "changed_file" {
+                    "concurrent update".into()
+                } else {
+                    "hi".into()
+                },
+                "{scenario}"
+            );
+        }
         assert_eq!(state.grant_count().expect("grants"), 0);
     }
 }

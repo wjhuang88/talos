@@ -574,3 +574,37 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
   `-D warnings` passes. These are local checks, not full workspace, native Windows
   or independent review evidence. Foundation PR #769 remains pending remotely
   (run 40274739232 has no jobs); the continuation is not pushed or merged.
+
+### Captured recoverable deletion — 2026-10-26
+
+- Added read-admitted deletion capture with a fresh final plan identity. Text files
+  expose complete-original evidence to the same invocation-local model review;
+  binary files retain human-approved backup/deletion without text-model evidence.
+  Preparation itself performs no filesystem read. Recovery and other deletion
+  modes keep their existing routes.
+- Final execution consumes exact-plan Read/Write evidence, re-resolves the target,
+  and checks the captured bytes under the recovery/path lock before creating a
+  backup and removing the file. The returned receipt restores through the owning
+  tool instance. This lock serializes participating Talos mutations; it does not
+  claim exclusion of arbitrary external writers after the final check.
+- Separate producer tests cover real text/binary deletion and restoration, changed
+  content preservation, missing admission and distinct capture/commit identities.
+  Explicit standalone file-write file-tool tests pass 94/94. Agent end-to-end
+  review tests pass for edit and delete, with 13 scenarios each. These remain local
+  tests; security review, final workspace/platform checks and merge are outstanding.
+- String-edit assessor stage committed as `81df1fc45`. Anchored-edit Auto, ordinary
+  effectful Execute and ordinary HTTP/WebSearch Auto remain unimplemented. T8 and
+  all later handoff items remain incomplete.
+- Independent static review found a binary-boundary omission: UTF-8 with NUL was
+  treated as text. The continuation now excludes captured NUL files from deletion
+  text evidence and rejects NUL in either edit image before invoking the assessor.
+  Added Agent refusal cases for NUL original/replacement and a producer case proving
+  NUL deletion remains human-admitted and recoverable. Review is not final approval;
+  the review finding and current full-preflight outcome still require verification.
+- Follow-up independent static inspection confirmed the NUL fix and found no new
+  concrete blocker in the staged continuation. Focused Agent tests pass with 15 edit
+  scenarios and 14 delete scenarios, including the zero-assessor NUL cases. The
+  complete agent library suite passed 495/495 before the final NUL fixture addition;
+  do not treat that earlier suite as exact-final evidence. Full serial locked
+  preflight is running with log `/private/tmp/i308-mutation-preflight.log`; no final
+  outcome, native Windows evidence or publication approval is claimed.

@@ -81,8 +81,8 @@ impl AutoPermissionResolver {
             && self.control.is_enabled()
             && !self.circuit_open()
             && self.command_context_current(&request)
-            && request.tool_name == "edit"
-            && description.after.is_some()
+            && ((request.tool_name == "edit" && description.after.is_some())
+                || (request.tool_name == "delete" && description.after.is_none()))
             && evidence
                 .input()
                 .get("retain_backup")
@@ -90,6 +90,11 @@ impl AutoPermissionResolver {
                 == Some(true)
             && bounded_json(evidence.input()).is_some()
             && bounded_json(description).is_some()
+            && !description.before.contains('\0')
+            && !description
+                .after
+                .as_ref()
+                .is_some_and(|text| text.contains('\0'))
             && !sensitive_json(evidence.input(), 0)
             && !sensitive_text(&description.before)
             && !description

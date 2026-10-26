@@ -324,8 +324,11 @@ one-use Auto approval after review of the complete captured original and replace
 exact arguments and user intent. The complete encoded review must fit 16 KiB;
 oversized or secret-like content requires human approval. Execution refuses a changed
 original and retains a recovery receipt on success. Custom assessors must implement
-`assess_file_mutation`; the default is unsupported. Auto approval of deletes, anchored
-edits and edits without retained backups is not implemented.
+`assess_file_mutation`; the default is unsupported. Registered native text-file
+`delete` with `retain_backup=true` uses the same complete-original review and refuses
+deletion if the captured bytes have changed. Binary files remain eligible for human
+approved recoverable deletion, but not this text review. Auto approval of directory
+deletion, anchored edits and mutations without retained backups is not implemented.
 
 ## Development
 

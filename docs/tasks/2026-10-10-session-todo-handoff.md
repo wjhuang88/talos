@@ -3,8 +3,16 @@
 I308 activation #765 merged at `8f0ce2340`; the claim is effective.
 The [I308 owner](../iterations/I308-builtin-auto-review.md) records local built-in identity,
 retained-network review and ordinary invocation evidence stages. Full T8 is incomplete:
-default HTTP/WebSearch Auto admission, higher-risk backup/recovery and final platform/CI/review
+ordinary effectful Execute, HTTP/WebSearch Auto admission, complete higher-risk mutation
+coverage and final platform/CI/review
 remain open. No T8 stage is claimed merged. T2/T3 → T4 → T5 → T1 → T6 remain incomplete.
+
+Mutation checkpoint: `81df1fc45` implements complete-image Auto review for retained
+string edits. Local deletion continuation also captures original bytes after Read
+admission, reviews text-file deletion, refuses changed content and returns a real
+owning-instance recovery receipt. Explicit standalone file-write file-tool tests
+pass 94/94; edit/delete Agent review scenarios pass locally. Anchored-edit Auto and
+final independent/platform/workspace evidence remain outstanding; see the I308 owner.
 
 Creation-stage checkpoint: local `9852b65b3` enables exact-content model review
 followed by real atomic new-file creation; `75ffc8f9f` verifies refusal of invalid
