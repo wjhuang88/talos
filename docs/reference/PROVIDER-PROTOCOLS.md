@@ -27,7 +27,10 @@ the same resolution in debug tracing.
 
 Normal builds consume the committed catalog without network access. New models.dev protocol
 metadata is produced only during explicit regeneration, whose generated diff needs separate review.
-Adding the mapper does not add signals to an older packaged catalog.
+Adding the mapper does not add signals to an older packaged catalog; generated data is reviewed
+separately. Overrides of a built-in provider to an unconfirmed endpoint suppress its packaged
+protocol evidence; explicit protocol choices retain precedence. Distinct model endpoints and
+unimplemented host transports remain gated.
 
 ## Configuration
 
@@ -72,7 +75,8 @@ PROVIDER-008-A.
 
 ## Public API Migration
 
-`ProviderProtocol` gains `OpenAIResponses` and becomes `#[non_exhaustive]`. Downstream matches must
+`ProviderProtocol` and its shared `CatalogProviderProtocol` mirror gain `OpenAIResponses` and become
+`#[non_exhaustive]`. Downstream matches must
 include a catch-all arm. This change requires the next pre-1.0 minor release under ADR-093; it must
 not be shipped as a patch release. `Config::provider_protocol()` now reports the same effective
 protocol as runtime construction; `resolve_provider_protocol()` also reports its source.

@@ -142,6 +142,7 @@ repeating known mistakes.
 | 66 | Native borrowing | Attribute value buffers need independent stable storage through native list deletion | I302 / #716 |
 | 67 | Parser compatibility | Verify the exact helper replacement set before defining entity-decoding fixtures | I293 / Instant Answer |
 | 71 | Config | Materializing connection defaults must preserve omitted protocol intent | I306 / #748 |
+| 72 | Build | Independent worktrees need independent Cargo target directories | I306 / #748 |
 
 | 67 | Permissions | 一次性授权消费也必须非阻塞；外层异步超时无法抢占同步锁等待 | I300 |
 | 68 | Agent execution | 工具可用性以实际调用结果为准，不把列表呈现差异当作不可用证据 | I300 |
@@ -1517,3 +1518,13 @@ visible; distinguish passed assertions from independently emitted evidence.
   HTTP field names. It confused a representation choice with missing credentials.
 - Prevention/check: The shared registration fixture now compares names and values
   separately; retain strict credential-value and empty-GET-body assertions.
+
+## 2026-10-26 - Separate Cargo artifacts for independent worktrees
+
+- Trigger: Validating code and generated-data worktrees under the same package versions.
+- Symptom: A shared target directory produced E0463 and colliding StableCrateId errors.
+- Root cause: Path-distinct Talos workspaces reused package artifacts and dependency metadata.
+- Fix: Use each worktree's own target directory; clean affected local package artifacts and rebuild
+  the code-side SDK consumer. Keep the original failed attempt distinct from passing source evidence.
+- Prevention: Share immutable registry/download caches, rather than build outputs across worktrees.
+- Promoted to rule/check: none; recorded in the I306 build/validation invocation contract.

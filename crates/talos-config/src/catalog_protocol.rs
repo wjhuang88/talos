@@ -38,16 +38,42 @@ static PROTOCOL_DATASET: LazyLock<ProtocolDataset> = LazyLock::new(|| {
 /// Built-in providers require an exact `(provider, model)` match. Custom providers follow the same
 /// conservative matching rule as context-limit inference: exact bare model id first, then exactly
 /// one stripped gateway prefix (`gateway/model` or `gateway:model`). Any ambiguity fails closed.
-pub(crate) fn builtin_model_protocol(provider: &str, model_id: &str) -> Option<ProviderProtocol> {
-    let provider_is_builtin = model::builtin_providers()
-        .iter()
-        .any(|entry| entry.id == provider);
+pub(crate) fn builtin_model_protocol(
+    provider: &str,
+    model_id: &str,
+    configured_endpoint: Option<&str>,
+) -> Option<ProviderProtocol> {
+    let builtin = model::builtin_providers()
+        .into_iter()
+        .find(|entry| entry.id == provider);
+    if let Some(builtin) = &builtin
+        && let Some(configured) = configured_endpoint
+    {
+        let expected = builtin.api_base_url.as_deref().or(match provider {
+            "openai" => Some("https://api.openai.com/v1"),
+            "anthropic" => Some("https://api.anthropic.com/v1"),
+            _ => None,
+        });
+        if !expected.is_some_and(|expected| endpoint_root(configured) == endpoint_root(expected)) {
+            return None;
+        }
+    }
     infer_model_protocol(
         &PROTOCOL_DATASET.models,
         provider,
         model_id,
-        provider_is_builtin,
+        builtin.is_some(),
     )
+}
+
+fn endpoint_root(url: &str) -> &str {
+    let root = url.trim().trim_end_matches('/');
+    for suffix in ["/chat/completions", "/responses", "/messages"] {
+        if let Some(root) = root.strip_suffix(suffix) {
+            return root;
+        }
+    }
+    root
 }
 
 fn infer_model_protocol(

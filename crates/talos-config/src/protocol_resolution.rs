@@ -48,20 +48,12 @@ pub fn infer_models_dev_model_protocol(
     npm_package: Option<&str>,
     shape: Option<&str>,
 ) -> Option<ProviderProtocol> {
-    if let Some(shape) = shape {
-        return match shape.trim() {
-            "responses" => Some(ProviderProtocol::OpenAIResponses),
-            "completions" => Some(ProviderProtocol::OpenAIChat),
-            _ => None,
-        };
-    }
-
-    match npm_package.map(str::trim) {
-        Some("@ai-sdk/anthropic") => Some(ProviderProtocol::AnthropicMessages),
-        Some("@ai-sdk/openai") => Some(ProviderProtocol::OpenAIResponses),
-        Some("@ai-sdk/openai-compatible") => Some(ProviderProtocol::OpenAIChat),
-        _ => None,
-    }
+    use crate::protocol_signal::{WireProtocolHint, infer_wire_protocol};
+    infer_wire_protocol(npm_package, shape).map(|hint| match hint {
+        WireProtocolHint::Chat => ProviderProtocol::OpenAIChat,
+        WireProtocolHint::Responses => ProviderProtocol::OpenAIResponses,
+        WireProtocolHint::Anthropic => ProviderProtocol::AnthropicMessages,
+    })
 }
 
 /// Resolves the effective protocol using ADR-093 / PROVIDER-008-A precedence.
@@ -129,7 +121,11 @@ pub(crate) fn resolve_model_provider_protocol(
     provider: &str,
     model: &str,
 ) -> ProtocolResolution<ProviderProtocol> {
-    let catalog_model = builtin_model_protocol(provider, model);
+    let endpoint = config
+        .providers
+        .get(provider)
+        .and_then(|entry| entry.base_url.as_deref());
+    let catalog_model = builtin_model_protocol(provider, model, endpoint);
     resolve_model_protocol_with_catalog_signal(config, provider, model, catalog_model)
 }
 

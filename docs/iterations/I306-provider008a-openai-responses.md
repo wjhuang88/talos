@@ -236,3 +236,59 @@ failed/passed as expected; all nine selected image-guard regressions passed; foc
 (`cargo clippy --locked -p talos-provider --test openai_responses_http -- -D warnings`) passed.
 Format and both governance validators are checked before the stable correction is published. CI3448's failed first attempt is preserved; a new head requires fresh
 unfiltered CI. All remaining I306 acceptance gates and Draft/Active/Claimed state are unchanged.
+
+### Rebase And Catalog Admission Stage — 2026-10-26
+
+The maintainer requested rebase and continued implementation. Old head `5acd2161c184daa1ce9791bc49a2b9223e61bbd4`
+is retained on `archive/provider-008a-pre-rebase-20261026`. The final implementation diff was consolidated
+and rebased onto `main@2789b97bfe807f486778f3b44c7053e2a0e6e13d` as local `817ec6f6` without conflicts.
+This preserves main's I308 scheduler/native-policy work and I309 activation, whose gix implementation
+remains a separate owner. The claim/actor/Work Slice are unchanged. CI3451's macOS preflight/Linux
+checks passed, but Windows was cancelled during workspace tests; prior validation is historical and
+fresh current-head CI is required after this rebase/data stage.
+
+A protocol-only catalog candidate has been prepared and tested with 4,016 optional protocol fields
+for the existing 6,474 models, including 119 Responses signals. It preserves all provider roots and
+model identity/limits/pricing/capabilities/variants. Per parent #724, generated data is a separate
+review PR based on #749; this code PR still carries the older packaged catalog and does not claim
+that its new protocol signals are active. The data carrier records the upstream snapshot hash,
+counts, withheld rows and Responses signal ledger. Distinct model-endpoint routing remains an
+explicit acceptance residual; protocol inference alone does not implement it.
+
+The runtime and generator now share one wire-signal map. The generator admits only implemented
+host/model transports using a compatible API root; the runtime suppresses built-in catalog inference
+on a replaced endpoint. The centralized factory completes a model-level Anthropic gateway root to
+`/messages` exactly once. This does not implement a new protocol family, authorization, SDK transport,
+endpoint probing, MODEL-014 capability inference, or a vendor-authentication wrapper.
+
+Verification for this rebased stage is in progress: catalog-build boundary tests, packaged-catalog
+and explicit-rollback matrix, affected packages, standard preflight and current-head CI. No Complete,
+Ready-for-Review, merge or release state is claimed. Recorded-stream fixture audit, distinct endpoint
+routing/residual disposition and independent provider/API review remain open acceptance rows.
+
+#### Rebased Code Validation Checkpoint
+
+Frozen code candidate: local `4187e823232b4cb69f8bb952c71a08727d9ee833`, parented on the rebased
+implementation above. The shared `CatalogProviderProtocol` mirror now also supports Responses and
+is non-exhaustive; the migration note applies to both public protocol enums in a minor release.
+
+- Pinned/locked core, config, provider, CLI and TUI tests: **1,787 passed in 50 result groups**, zero
+  failures, ignores or filters, against the older packaged catalog carried by the code PR.
+- The paired data candidate was also exercised during convergence; its isolated final run and four
+  snapshot-specific acceptance cases are recorded in its own PR.
+- Frozen standard preflight passed formatting, workspace check, strict Clippy and both governance
+  validators, then failed the inherited MCP `git_prepared` group at **26 passed / 21 failed** due
+  to the previously recorded Unix-socket and native Git maintenance binding conditions. No full
+  workspace/preflight success is claimed and no native/security guard was changed.
+- Independently resolved external SDK fixture passed default and coding modes with locked dependencies.
+- A preliminary preflight began before the catalog-enum edits finished and read inconsistent source
+  states, yielding E0599. It is not candidate evidence. Frozen compilation and affected tests above
+  supersede that local convergence attempt.
+- The first separate-worktree data run reused the code worktree's target directory, causing E0463 /
+  colliding StableCrateId metadata. It is not a product failure or acceptance evidence. Data now
+  uses its own target directory; code-local package artifacts were cleaned and the SDK rebuilt.
+
+Code and data publication verifies complete Git tree identity, and rewriting #749 uses the old
+`5acd2161` head as a force-with-lease precondition. Its old history remains in the archive branch.
+Neither code nor data is ready for merge until fresh unfiltered CI and the owner-defined API,
+fixture and endpoint residual gates are dispositioned. No sibling or I309 implementation is claimed.

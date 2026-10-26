@@ -52,7 +52,15 @@ pub fn build_configured_provider(
         ProviderProtocol::AnthropicMessages => {
             let mut provider = AnthropicProvider::new(api_key, &config.model);
             if let Some(base_url) = base_url {
-                provider = provider.with_base_url(base_url);
+                // Mixed-protocol catalogs advertise an API root; this adapter consumes a full
+                // Messages endpoint. Preserve existing full endpoints and append only once.
+                let base_url = base_url.trim().trim_end_matches('/');
+                let endpoint = if base_url.ends_with("/messages") {
+                    base_url.to_string()
+                } else {
+                    format!("{base_url}/messages")
+                };
+                provider = provider.with_base_url(endpoint);
             }
             provider = provider
                 .with_reasoning(reasoning, output_limit)
@@ -91,6 +99,37 @@ pub fn build_configured_provider(
 mod tests {
     use super::*;
     use talos_core::tool::{CapabilityProbe, ProtocolCapabilities};
+
+    #[test]
+    fn model_messages_override_constructs_a_full_endpoint_from_a_gateway_root() {
+        for base_url in [
+            "https://gateway.test/v1",
+            "https://gateway.test/v1/messages/",
+        ] {
+            let config = Config {
+                provider: "gateway".into(),
+                model: "test-model".into(),
+                providers: std::collections::HashMap::from([(
+                    "gateway".into(),
+                    talos_config::ProviderConfig {
+                        base_url: Some(base_url.into()),
+                        models: std::collections::HashMap::from([(
+                            "test-model".into(),
+                            talos_config::ModelConfig {
+                                protocol: Some(ProviderProtocol::AnthropicMessages),
+                                ..Default::default()
+                            },
+                        )]),
+                        ..Default::default()
+                    },
+                )]),
+                ..Default::default()
+            };
+            let provider = build_configured_provider(&config, "test-key").expect("adapter");
+            let preview = provider.request_preview(&[]).expect("request preview");
+            assert_eq!(preview["url"], "https://gateway.test/v1/messages");
+        }
+    }
 
     #[test]
     fn official_openai_default_constructs_responses_adapter() {

@@ -17,6 +17,7 @@ mod endpoint;
 mod env;
 mod error;
 mod protocol_resolution;
+mod protocol_signal;
 mod store;
 #[cfg(test)]
 mod store_finalization_tests;

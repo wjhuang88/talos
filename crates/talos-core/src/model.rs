@@ -103,6 +103,7 @@ pub enum ReasoningEffort {
 
 /// Provider API protocol advertised by catalog metadata.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum CatalogProviderProtocol {
     /// Anthropic Messages-compatible API.
     #[serde(rename = "anthropic-messages")]
@@ -110,6 +111,9 @@ pub enum CatalogProviderProtocol {
     /// OpenAI Chat Completions-compatible API.
     #[serde(rename = "openai-chat")]
     OpenAIChat,
+    /// OpenAI Responses-compatible API.
+    #[serde(rename = "openai-responses")]
+    OpenAIResponses,
 }
 
 /// Static metadata for a known model.

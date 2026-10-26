@@ -14,9 +14,52 @@ fn selecting_and_connecting_openai_do_not_persist_an_explicit_chat_override() {
         restored.provider_protocol(),
         ProviderProtocol::OpenAIResponses
     );
-    assert_eq!(
+    // Either the packaged snapshot or the confirmed provider default can supply evidence;
+    // selecting a model and inserting a credential must never create explicit user intent.
+    assert!(matches!(
         restored.resolve_provider_protocol().source,
-        ProtocolResolutionSource::Default
+        ProtocolResolutionSource::Default | ProtocolResolutionSource::CatalogInferred
+    ));
+}
+
+#[test]
+fn packaged_model_signal_cannot_confirm_a_replaced_builtin_endpoint() {
+    let mut config = Config {
+        provider: "openai".into(),
+        model: "o3".into(),
+        ..Default::default()
+    };
+    assert!(matches!(
+        config.resolve_provider_protocol().source,
+        ProtocolResolutionSource::Default | ProtocolResolutionSource::CatalogInferred
+    ));
+    config.providers.insert(
+        "openai".into(),
+        ProviderConfig {
+            base_url: Some("https://unconfirmed.test/v1".into()),
+            ..Default::default()
+        },
+    );
+    assert_eq!(config.provider_protocol(), ProviderProtocol::OpenAIChat);
+    config
+        .providers
+        .get_mut("openai")
+        .expect("provider")
+        .models
+        .insert(
+            "o3".into(),
+            talos_config::ModelConfig {
+                protocol: Some(ProviderProtocol::OpenAIResponses),
+                ..Default::default()
+            },
+        );
+    assert_eq!(
+        config.provider_protocol(),
+        ProviderProtocol::OpenAIResponses
+    );
+    assert_eq!(
+        config.resolve_provider_protocol().source,
+        ProtocolResolutionSource::Configured
     );
 }
 
