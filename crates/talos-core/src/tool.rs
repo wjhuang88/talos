@@ -32,7 +32,8 @@ pub use prepared_command::{
     PreparedCommandTargets,
 };
 pub use prepared_file_mutation::{
-    MAX_FILE_MUTATION_REVIEW_BYTES, PreparedFileMutationDescription, PreparedFileMutationEvidence,
+    FileMutationEvidenceError, MAX_FILE_MUTATION_REVIEW_BYTES, PreparedFileMutationDescription,
+    PreparedFileMutationEvidence,
 };
 pub use todo_presentation::{
     TodoDisplaySpan, TodoDisplayStatus, TodoPresentation, VisibleTodoPresentation,

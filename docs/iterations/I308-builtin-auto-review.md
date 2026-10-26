@@ -510,3 +510,19 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
   Next implement read-admitted content capture, identity-bound mutation review,
   fresh-state checks and mandatory bounded recovery through the normal pipeline,
   then end-to-end outcome tests and independent review before publication.
+
+### File mutation dispatch admission — 2026-10-26
+
+- Prepared normal-tool dispatch now routes file-change evidence through an
+  instance-ownership check and verifies its retained plan identity before
+  resolution. Simultaneous command and file-change evidence is rejected.
+- The additive resolver receives complete private images, normalized arguments,
+  permission facets and user intent separately from redacted presentation. Its
+  default preserves existing approval behavior and adds no Auto allowance.
+- Focused locked agent pipeline tests pass 20/20, including trusted allow/deny,
+  same-name external instance rejection and mismatched-plan rejection. Approved
+  evidence yields an exact one-use prepared proof without persistent grants.
+  `cargo fmt --all -- --check` passes.
+- This stage does not implement the file-tool producer or model assessor.
+  Actual edit/delete Auto execution, stale-state/recovery integration tests,
+  independent security review and final platform/CI gates remain outstanding.

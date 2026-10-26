@@ -5,6 +5,17 @@ use super::PreparedPlanIdentity;
 /// Maximum bytes in each captured before/after image admitted for assessment.
 pub const MAX_FILE_MUTATION_REVIEW_BYTES: usize = 2 * 1024 * 1024;
 
+/// Reasons complete file-change evidence cannot be retained for assessment.
+#[derive(Debug, thiserror::Error)]
+pub enum FileMutationEvidenceError {
+    /// A complete before or after image exceeds the review limit.
+    #[error("file mutation review image exceeds 2 MiB")]
+    ImageLimit,
+    /// A relative path cannot identify the retained target independently.
+    #[error("file mutation review requires an absolute target")]
+    RelativeTarget,
+}
+
 /// Exact text change captured after read admission by a file-tool implementation.
 ///
 /// This material may contain private file contents. It is assessment input, not
@@ -54,17 +65,17 @@ impl PreparedFileMutationEvidence {
     pub fn new(
         identity: PreparedPlanIdentity,
         description: PreparedFileMutationDescription,
-    ) -> Result<Self, String> {
+    ) -> Result<Self, FileMutationEvidenceError> {
         if description.before.len() > MAX_FILE_MUTATION_REVIEW_BYTES
             || description
                 .after
                 .as_ref()
                 .is_some_and(|text| text.len() > MAX_FILE_MUTATION_REVIEW_BYTES)
         {
-            return Err("file mutation review image exceeds 2 MiB".into());
+            return Err(FileMutationEvidenceError::ImageLimit);
         }
         if !description.path.is_absolute() {
-            return Err("file mutation review requires an absolute target".into());
+            return Err(FileMutationEvidenceError::RelativeTarget);
         }
         Ok(Self {
             identity,

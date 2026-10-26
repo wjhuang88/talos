@@ -124,6 +124,29 @@ impl BuiltinNetworkReviewEvidence<'_> {
 enum InvocationReviewSource<'a> {
     Network(&'a ToolNetworkManifest, bool),
     Builtin(&'a str),
+    FileMutation(&'a talos_core::tool::PreparedFileMutationEvidence),
+}
+
+/// Private file-change evidence supplied only for a registered built-in instance.
+pub struct BuiltinFileMutationReviewEvidence<'a> {
+    input: &'a serde_json::Value,
+    profile: &'a [ToolPermissionFacet],
+    mutation: &'a talos_core::tool::PreparedFileMutationEvidence,
+}
+
+impl BuiltinFileMutationReviewEvidence<'_> {
+    /// Exact normalized execution arguments, not a display projection.
+    pub fn input(&self) -> &serde_json::Value {
+        self.input
+    }
+    /// Complete permission profile to admit atomically.
+    pub fn profile(&self) -> &[ToolPermissionFacet] {
+        self.profile
+    }
+    /// Complete before/after content bound to the retained prepared operation.
+    pub fn mutation(&self) -> &talos_core::tool::PreparedFileMutationEvidence {
+        self.mutation
+    }
 }
 
 /// Evidence constructed only by dispatch for an explicitly registered built-in.
@@ -156,6 +179,26 @@ impl BuiltinInvocationReviewEvidence<'_> {
 /// Surface adapter that resolves an already-evaluated `Ask`.
 #[async_trait]
 pub trait ApprovalResolver: Send + Sync {
+    /// Reviews a trusted retained file mutation. Legacy surfaces preserve their
+    /// ordinary exact-input approval behavior; this default adds no Auto allowance.
+    async fn resolve_builtin_file_mutation(
+        &self,
+        request: PermissionApprovalRequest,
+        evidence: BuiltinFileMutationReviewEvidence<'_>,
+        remaining: Duration,
+        auto_assessment_allowed: bool,
+        user_intent: Option<&str>,
+    ) -> Result<ApprovalChoice, ApprovalResolverError> {
+        self.resolve_with_execution_context(
+            request,
+            evidence.input(),
+            None,
+            remaining,
+            auto_assessment_allowed,
+            user_intent,
+        )
+        .await
+    }
     /// Reviews an ordinary product-owned invocation. This evidence does not assert
     /// transport isolation or a retained execution plan. Legacy adapters preserve
     /// their existing resolution behavior.
@@ -516,6 +559,30 @@ impl PermissionPipeline {
         .into_prepared()
     }
 
+    pub(crate) async fn authorize_registered_file_mutation(
+        &self,
+        authorization: PermissionAuthorizationRequest<'_>,
+        user_intent: Option<&str>,
+        plan: &talos_core::tool::PreparedPlanIdentity,
+        evidence: &talos_core::tool::PreparedFileMutationEvidence,
+        builtin: bool,
+    ) -> Result<talos_permission::AdmittedInvocation, PermissionPipelineError> {
+        if !evidence.belongs_to(plan) {
+            return Err(PermissionPipelineError::State(
+                "file mutation evidence plan mismatch".into(),
+            ));
+        }
+        self.authorize_inner(
+            authorization,
+            user_intent,
+            None,
+            Some((plan, None)),
+            builtin.then_some(InvocationReviewSource::FileMutation(evidence)),
+        )
+        .await?
+        .into_prepared()
+    }
+
     /// Approves and admits a protected network invocation with its trusted manifest.
     pub async fn authorize_network(
         &self,
@@ -580,12 +647,13 @@ impl PermissionPipeline {
         )>,
         review_source: Option<InvocationReviewSource<'_>>,
     ) -> Result<PermissionAdmission, PermissionPipelineError> {
-        let (network_context, builtin_description) = match review_source {
+        let (network_context, builtin_description, file_mutation) = match review_source {
             Some(InvocationReviewSource::Network(manifest, builtin)) => {
-                (Some((manifest, builtin)), None)
+                (Some((manifest, builtin)), None, None)
             }
-            Some(InvocationReviewSource::Builtin(description)) => (None, Some(description)),
-            None => (None, None),
+            Some(InvocationReviewSource::Builtin(description)) => (None, Some(description), None),
+            Some(InvocationReviewSource::FileMutation(evidence)) => (None, None, Some(evidence)),
+            None => (None, None, None),
         };
         let network_manifest = network_context.map(|(manifest, _)| manifest);
         let PermissionAuthorizationRequest {
@@ -650,7 +718,20 @@ impl PermissionPipeline {
                     },
                 };
                 let remaining = deadline_at.saturating_duration_since(Instant::now());
-                let resolver_future = if let Some((_, Some(evidence))) = prepared {
+                let resolver_future = if let Some(mutation) = file_mutation {
+                    std::panic::AssertUnwindSafe(resolver.resolve_builtin_file_mutation(
+                        approval,
+                        BuiltinFileMutationReviewEvidence {
+                            input,
+                            profile,
+                            mutation,
+                        },
+                        remaining,
+                        auto_assessment_allowed,
+                        user_intent,
+                    ))
+                    .catch_unwind()
+                } else if let Some((_, Some(evidence))) = prepared {
                     std::panic::AssertUnwindSafe(resolver.resolve_prepared_command(
                         approval,
                         evidence,
@@ -835,6 +916,9 @@ pub fn headless_pipeline(engine: talos_permission::PermissionEngine) -> Permissi
 #[cfg(test)]
 #[path = "permission_pipeline/execution_input_tests.rs"]
 mod execution_input_tests;
+
+#[cfg(test)]
+mod file_mutation_tests;
 
 #[cfg(test)]
 #[path = "permission_pipeline/native_pull_command_tests.rs"]
