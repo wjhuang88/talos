@@ -1,9 +1,10 @@
-## T8 next-slice draft — 2026-10-26
+## T8 active implementation — 2026-10-26
 
-I308 proposes full PERM-007-H/G delivery after completed T7. Governance proposal #765 only:
-Claimed/Active are ineffective until merge; no new implementation yet. Full acceptance and current iteration
-dispositions are in `docs/iterations/I308-builtin-auto-review.md`. T2/T3 → T4 → T5 →
-T1 → T6 remain incomplete and unchanged. Prior checkpoints below remain historical.
+I308 activation #765 merged at `8f0ce2340`; the claim is effective.
+The [I308 owner](../iterations/I308-builtin-auto-review.md) records local built-in identity,
+retained-network review and ordinary invocation evidence stages. Full T8 is incomplete:
+default HTTP/WebSearch Auto admission, higher-risk backup/recovery and final platform/CI/review
+remain open. No T8 stage is claimed merged. T2/T3 → T4 → T5 → T1 → T6 remain incomplete.
 
 ## T7 merged and closed — 2026-10-26
 
@@ -3358,7 +3359,7 @@ Synchronize product owners before derived Backlog, Board and iteration indexes.
 |---|---|---|
 | C0 preserved TUI/process candidate | Complete; I299 owner closed | #701 merge `69092675`; full preflight, all native observations, exact-head CI/review and CAS recorded in I299 |
 | T7 structured Git resources/diff | [I300](../iterations/I300-structured-git-repair.md) Complete / Closed; #735 merged as `ee84889fd19c590fdcc125cb971143dffd3cfb94` | Real-wrapper reproduction, cause, approved/denied/escape tests, diff fidelity, protected-boundary review and delivered repair |
-| T8 all-built-in Auto approval (accepted 2026-10-11) | [PERM-007-H](../backlog/active/PERM-007-H-all-builtin-auto-review.md) Refinement / Unclaimed; immediately after T7 | Complete registered native-tool inventory, shared effect-aware model review, real admission/execution tests, policy reconciliation, visible decisions, independent security review and merged evidence |
+| T8 all-built-in Auto approval (accepted 2026-10-11) | [I308](../iterations/I308-builtin-auto-review.md) Active; effective activation #765 at `8f0ce2340`, full H/G incomplete | Complete registered native-tool inventory, shared effect-aware model review, real admission/execution tests, policy reconciliation, visible decisions, independent security review and merged evidence |
 | T2/T3 MODEL-014 | Unactivated; consolidated implementation/test slice | Accepted authority/schema decisions, inference/override/variant/adapter tests, walkthrough, docs and merged evidence |
 | T4 compaction policy/controls | Unactivated | Whole-request policy, safe summary replacement, failure/cancellation tests, observable status, runnable manual command and integrated evidence |
 | T5 Actor compaction/recovery | Unactivated | Safe-boundary model-callable operation, bounded authoritative history recovery, discovery/concurrency/privacy tests and merged evidence |

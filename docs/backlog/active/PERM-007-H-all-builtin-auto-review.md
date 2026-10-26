@@ -4,10 +4,17 @@
 |---|---|
 | Story ID | PERM-007-H |
 | Type | Permission / Security Story |
-| Status | In Progress (proposed by #765; effective only on merge) |
+| Status | In Progress (#765 merged; I308 active) |
 | Source | Maintainer request 2026-10-11: automatic approval must cover all built-in tools, not only script execution |
-| Selected Iteration | I308 / #765, proposed activation only |
+| Selected Iteration | I308 / #765, activated at `8f0ce2340` |
 | Depends On | I300 truthful Git effects; existing Agent-owned permission pipeline and shared evaluator |
+
+## Current Execution — 2026-10-26
+
+Activation #765 is merged at `8f0ce2340`. [I308](../../iterations/I308-builtin-auto-review.md)
+records local implementation and validation; full H/G acceptance remains incomplete.
+Default HTTP/WebSearch model admission and higher-risk backup/recovery are unimplemented.
+The selection-proposal paragraphs below preserve the published baseline and are historical.
 
 ## Outcome
 

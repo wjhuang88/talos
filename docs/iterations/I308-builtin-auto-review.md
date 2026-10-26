@@ -1,6 +1,6 @@
 # Iteration I308: Shared Auto Review For All Built-In Tools
 
-> Document status: Active (proposed; effective only when #765 merges)
+> Document status: Active (#765 merged; effective at `8f0ce2340d7728ac5b3ee8eba814050a2360e194`)
 > Published plan date: 2026-10-26
 > Planned objective: complete handoff T8 with model-assisted, invocation-local approval across registered native tools, including suitable Write, Network and Execute operations and higher-risk file changes.
 > Baseline rule: preserve this published target; implementation stages do not reduce acceptance.
@@ -238,3 +238,5 @@ No implementation completion evidence exists. Do not mark H, G or T8 Complete fr
   Both governance validators passed with zero warnings before the ordinary evidence
   extension. Default HTTP/WebSearch model execution and G backup/recovery remain
   unimplemented, so H/G/T8 remain Active and incomplete.
+
+- Latest local checks: locked agent Clippy passed with warnings denied after the context-enum cleanup; registration/input tests and independent incremental review are stage evidence only. Ordinary evidence plumbing is committed as `a44cba863`. Fetch reconfirmed unchanged main `8f0ce2340`; no rebase required.
