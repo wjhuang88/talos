@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use serde_json::Value;
@@ -112,6 +112,7 @@ const LEGACY_TOOL_REGISTRATION_SOURCE: &str = "legacy:unchecked";
 pub struct ToolRegistry {
     tools: HashMap<String, Arc<dyn AgentTool>>,
     contribution_sources: HashMap<String, ToolContributionSource>,
+    builtin_instances: HashSet<String>,
     cleanup_owners: Vec<Arc<dyn super::ToolCleanupOwner>>,
 }
 
@@ -148,6 +149,7 @@ impl ToolRegistry {
     pub fn register(&mut self, tool: Arc<dyn AgentTool>) {
         self.retain_cleanup_owner(tool.as_ref());
         let name = tool.name().to_owned();
+        self.builtin_instances.remove(&name);
         self.contribution_sources.remove(&name);
         self.tools.insert(name, tool);
     }
@@ -216,6 +218,34 @@ impl ToolRegistry {
             self.tools.insert(tool_name, tool);
         }
         Ok(())
+    }
+
+    /// Registers product-owned built-in implementations for model-assisted review.
+    ///
+    /// This is an explicit composition-root trust decision, not source/name inference.
+    /// Call only with implementations and wrappers owned by the product. Plugin, MCP
+    /// and embedder-supplied tools must use ordinary registration. This designation
+    /// grants no permission: policy and invocation-local admission remain mandatory.
+    /// A failed batch changes neither registrations nor built-in designations.
+    pub fn register_builtin_contributions(
+        &mut self,
+        contributions: impl IntoIterator<Item = ToolContribution>,
+    ) -> Result<(), ToolRegistrationError> {
+        let contributions = contributions.into_iter().collect::<Vec<_>>();
+        let names = contributions
+            .iter()
+            .map(|contribution| contribution.name().to_owned())
+            .collect::<Vec<_>>();
+        self.register_contributions(contributions)?;
+        self.builtin_instances.extend(names);
+        Ok(())
+    }
+
+    /// Reports explicit product ownership of the currently registered instance.
+    /// Ordinary replacement clears this designation, even for an identical name.
+    #[must_use]
+    pub fn is_builtin_instance(&self, name: &str) -> bool {
+        self.builtin_instances.contains(name)
     }
 
     fn registered_source(&self, tool_name: &str) -> Option<ToolContributionSource> {
@@ -351,3 +381,7 @@ mod cleanup_tests {
         assert!(second.0.load(Ordering::SeqCst));
     }
 }
+
+#[cfg(test)]
+#[path = "registry_builtin_tests.rs"]
+mod builtin_tests;

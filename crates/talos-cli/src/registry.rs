@@ -750,7 +750,7 @@ fn register_symbol_tool_contributions(
     for contribution in contributions {
         let contribution = contribution.map_tool(|tool| wrap(tool));
         registry
-            .register_contribution(contribution)
+            .register_builtin_contributions([contribution])
             .unwrap_or_else(|error| panic!("{error}"));
     }
 }
@@ -789,7 +789,7 @@ fn build_print_tool_registry_with_todo_contributions(
     contributions.extend(todo_contributions);
     for contribution in contributions {
         registry
-            .register_contribution(contribution)
+            .register_builtin_contributions([contribution])
             .unwrap_or_else(|error| panic!("{error}"));
     }
     for tool in scheduler_tools {
@@ -881,7 +881,7 @@ fn build_tui_tool_registry_with_todo_contributions(
     contributions.extend(todo_contributions);
     for contribution in contributions {
         registry
-            .register_contribution(contribution)
+            .register_builtin_contributions([contribution])
             .unwrap_or_else(|error| panic!("{error}"));
     }
     for tool in delay_tool {
@@ -895,34 +895,34 @@ pub(crate) fn build_mcp_tool_registry() -> ToolRegistry {
     let shared = contribution_groups(SharedToolProfile::Mcp, PathBuf::from("."));
     for contribution in shared.shell {
         registry
-            .register_contribution(contribution)
+            .register_builtin_contributions([contribution])
             .unwrap_or_else(|error| panic!("{error}"));
     }
     for contribution in shared.files {
         registry
-            .register_contribution(contribution)
+            .register_builtin_contributions([contribution])
             .unwrap_or_else(|error| panic!("{error}"));
     }
     for contribution in shared.workspace {
         registry
-            .register_contribution(contribution)
+            .register_builtin_contributions([contribution])
             .unwrap_or_else(|error| panic!("{error}"));
     }
     for contribution in shared.network {
         registry
-            .register_contribution(contribution)
+            .register_builtin_contributions([contribution])
             .unwrap_or_else(|error| panic!("{error}"));
     }
     registry.register(Arc::new(StatusTool));
     register_symbol_tool_contributions(&mut registry, shared.symbols, |tool| tool);
     for contribution in shared.git_read {
         registry
-            .register_contribution(contribution)
+            .register_builtin_contributions([contribution])
             .unwrap_or_else(|error| panic!("{error}"));
     }
     for contribution in shared.git_mutation {
         registry
-            .register_contribution(contribution)
+            .register_builtin_contributions([contribution])
             .unwrap_or_else(|error| panic!("{error}"));
     }
     registry
@@ -2096,3 +2096,7 @@ mod tests {
         0xae, 0x42, 0x60, 0x82, // IEND CRC
     ];
 }
+
+#[cfg(test)]
+#[path = "registry_builtin_tests.rs"]
+mod builtin_registration_tests;

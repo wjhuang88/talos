@@ -15,7 +15,7 @@ fn register_interactive_builtin_contributions(
     workspace_root: &Path,
 ) -> Result<Option<SharedAtomicCreateCapability>> {
     let bash = bash_tool_contribution(workspace_root.to_path_buf());
-    registry.register_contribution(bash)?;
+    registry.register_builtin_contributions([bash])?;
 
     let capability = CapStdAtomicCreateCapability::open(workspace_root)
         .ok()
@@ -24,18 +24,18 @@ fn register_interactive_builtin_contributions(
         workspace_root.to_path_buf(),
         capability.clone(),
     ) {
-        registry.register_contribution(contribution)?;
+        registry.register_builtin_contributions([contribution])?;
     }
 
     for contribution in workspace_non_document_tool_contributions(workspace_root.to_path_buf()) {
-        registry.register_contribution(contribution)?;
+        registry.register_builtin_contributions([contribution])?;
     }
 
     for contribution in git_read_tool_contributions(workspace_root.to_path_buf()) {
-        registry.register_contribution(contribution)?;
+        registry.register_builtin_contributions([contribution])?;
     }
     for contribution in git_mutation_tool_contributions(workspace_root.to_path_buf()) {
-        registry.register_contribution(contribution)?;
+        registry.register_builtin_contributions([contribution])?;
     }
 
     Ok(capability)
