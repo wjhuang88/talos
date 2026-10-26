@@ -776,3 +776,17 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
   no blockers, no independent test execution. Complete local serial locked preflight
   for this continuation is running; `/private/tmp/i308-dispositions-preflight.log`
   is not yet final success evidence.
+
+### Serial workspace validation result — 2026-10-26
+
+- The continuation's authorized full preflight completed successfully with
+  `RUST_TEST_THREADS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_DEV_DEBUG=0 ./scripts/release_preflight.sh`.
+  The script uses locked dependency checks; both external SDK fixture runs passed
+  and the terminal result is `release preflight: passed`. Evidence log:
+  `/private/tmp/i308-dispositions-preflight-authorized.log`.
+- The earlier sandbox run in `/private/tmp/i308-dispositions-preflight.log`
+  failed while observing the prepared local push subprocess with EPERM. The
+  authorized rerun passed; the earlier failure is retained rather than reported
+  as success. Production/test content is `29212de48809b0147fb9f03f46df6c0e8dd18762`;
+  subsequent changes record evidence only. Native Windows CI for the unpublished
+  Todo/search continuation is still outstanding. I308 and T8 remain Partial.
