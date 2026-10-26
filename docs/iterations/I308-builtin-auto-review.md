@@ -1022,3 +1022,21 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
 - Earlier CI does not cover the additional recovery tests or the new commit
   identities. Fresh aggregate review, exact-head CI and merge CAS remain due.
   T8 and the later handoff tasks remain incomplete.
+
+### Conditional Runtime skill policy evidence — 2026-10-26
+
+- Added real Runtime dispatch coverage for opt-in `skill_read`: body/reference
+  reads under default Read Allow and explicit Read Deny. All four cases reach
+  the next provider request; Deny returns refusal without either content marker.
+  Initial provider requests contain neither marker, and an allowed reference
+  read does not disclose the skill body. This proves these read-policy outcomes,
+  not Auto assessor/grant behavior or all conditional product tools.
+- Locked Runtime `tests::skill_disclosure` passed 5/5 again with the final
+  disclosure assertions. Locked Runtime lib/tests
+  Clippy passed with warnings denied. Independent read-only incremental review
+  approved the final test and checkpoint diff. This was a separate Agent sharing
+  the session/identity, not human review or an independent test execution.
+- This local test-only extension is outside published #772 head `05d0f4889` and
+  its running CI 40296390604. No production implementation changed. T8 remains
+  incomplete; ordinary effectful command/network Auto and other acceptance gaps
+  are not satisfied by this evidence.
