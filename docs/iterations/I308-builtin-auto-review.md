@@ -424,3 +424,22 @@ remaining H/G coverage remain unimplemented.
   review and execution, ordinary effectful Execute/Network coverage, remaining
   host evidence, final independent review, exact-head CI and merge are outstanding.
   T8 remains Active; no later handoff task is completed by this evidence.
+
+### Stable foundation stage submission — 2026-10-26
+
+- Stage delivery state: Review; the complete iteration remains Active and partial.
+  The candidate contains built-in ownership/registration, retained network review,
+  exact-input creation review, bounded edit/delete recovery and HTTP boundary fixes.
+  This is a stable implementation stage under the existing #765 claim, not a new
+  requirement or completion of H/G.
+- Refreshed main to `fef542c0186dc8a3413a66396d2e77d8d8eaa666` and rebased all
+  18 local commits without conflict. `git range-diff` reports every patch unchanged
+  from the previous `8f0ce2340..d56feeb3a` series. New base adds the dormant I293
+  SearchRouter core; the rebased stage requires fresh full validation and review.
+- Previous independent security/API review found no concrete blocking issue, but
+  it is not the new candidate's exact-head approval. Fresh stage CI/review and
+  merge-time CAS remain required; native Windows runtime remains outstanding.
+- Remaining implementation: higher-risk edit/delete model evidence and actual Auto
+  execution, ordinary effectful Execute/Network admission under resolved contracts,
+  complete tool/profile/host dispositions and full I308 acceptance. No later
+  handoff item is completed or waived by this submission.

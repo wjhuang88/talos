@@ -13,7 +13,9 @@
 
 Activation #765 is merged at `8f0ce2340`. [I308](../../iterations/I308-builtin-auto-review.md)
 records local implementation and validation; full H/G acceptance remains incomplete.
-Default HTTP/WebSearch model admission and higher-risk backup/recovery are unimplemented.
+Opt-in bounded edit/delete backup/recovery is implemented locally and passed full
+workspace preflight. Higher-risk diff/impact model review and Auto execution remain
+unimplemented; backup/recovery alone does not complete this Story.
 The selection-proposal paragraphs below preserve the published baseline and are historical.
 
 Issue #563 tracks future diff-aware writes, rollback/backup gates, and impact analysis for
