@@ -4,10 +4,12 @@
 //! suggest an invocation-local `ApproveOnce`; policy evaluation and grant admission
 //! remain owned by [`crate::permission_pipeline::PermissionPipeline`].
 
+mod invocation_review;
 mod network_review;
 mod prepared_command;
 mod script_evidence;
 
+pub use invocation_review::BuiltinInvocationAssessmentRequest;
 pub use network_review::{BuiltinNetworkAssessmentRequest, NetworkReviewEndpoint};
 pub use prepared_command::PreparedCommandAssessmentRequest;
 
@@ -839,6 +841,15 @@ pub enum AutoConfidence {
 /// Provider-independent model assessor. Implementations must not call tools recursively.
 #[async_trait]
 pub trait AutoPermissionAssessor: Send + Sync {
+    /// Reviews exact bounded arguments and intent of a trusted native invocation.
+    /// Existing assessors remain unsupported until explicitly implemented.
+    async fn assess_builtin_invocation(
+        &self,
+        _request: BuiltinInvocationAssessmentRequest,
+        _remaining: Duration,
+    ) -> Result<String, String> {
+        Err("builtin invocation assessment unsupported".into())
+    }
     /// Reviews complete network evidence. Legacy assessors fail closed by default.
     async fn assess_builtin_network(
         &self,
@@ -961,6 +972,13 @@ impl ProviderAutoPermissionAssessor {
 
 #[async_trait]
 impl AutoPermissionAssessor for ProviderAutoPermissionAssessor {
+    async fn assess_builtin_invocation(
+        &self,
+        request: BuiltinInvocationAssessmentRequest,
+        remaining: Duration,
+    ) -> Result<String, String> {
+        self.assess_invocation_payload(request, remaining).await
+    }
     async fn assess_builtin_network(
         &self,
         request: BuiltinNetworkAssessmentRequest,
@@ -2072,6 +2090,23 @@ impl AutoPermissionResolver {
 
 #[async_trait]
 impl ApprovalResolver for AutoPermissionResolver {
+    async fn resolve_builtin_invocation(
+        &self,
+        request: PermissionApprovalRequest,
+        evidence: crate::permission_pipeline::BuiltinInvocationReviewEvidence<'_>,
+        remaining: Duration,
+        auto_assessment_allowed: bool,
+        user_intent: Option<&str>,
+    ) -> Result<ApprovalChoice, ApprovalResolverError> {
+        self.resolve_invocation_review(
+            request,
+            evidence,
+            remaining,
+            auto_assessment_allowed,
+            user_intent,
+        )
+        .await
+    }
     async fn resolve_builtin_network(
         &self,
         request: PermissionApprovalRequest,

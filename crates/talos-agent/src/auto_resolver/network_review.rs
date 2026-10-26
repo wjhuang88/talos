@@ -8,7 +8,7 @@ const SCHEMA: &str = "builtin-network/v1";
 const MAX_REVIEW_BYTES: usize = 16 * 1024;
 
 /// Stop serialization before an oversized request can allocate an unbounded payload.
-fn bounded_json(value: &impl Serialize) -> Option<String> {
+pub(super) fn bounded_json(value: &impl Serialize) -> Option<String> {
     struct Writer(Vec<u8>);
     impl std::io::Write for Writer {
         fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
@@ -29,14 +29,14 @@ fn bounded_json(value: &impl Serialize) -> Option<String> {
     String::from_utf8(writer.0).ok()
 }
 
-fn sensitive_text(text: &str) -> bool {
+pub(super) fn sensitive_text(text: &str) -> bool {
     contains_secret_like_shell_input(text)
         || text
             .split(|c: char| !c.is_ascii_alphanumeric() && c != '-' && c != '_')
             .any(contains_secret_like_shell_input)
 }
 
-fn sensitive_json(value: &serde_json::Value, depth: usize) -> bool {
+pub(super) fn sensitive_json(value: &serde_json::Value, depth: usize) -> bool {
     if depth >= 64 {
         return true;
     }

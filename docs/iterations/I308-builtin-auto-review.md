@@ -328,3 +328,24 @@ of external scheduler collisions without relabeling. The CLI bin suite passed
 denied. Independent incremental ownership/security review found no new concrete
 blocker and confirmed registration failure starts no scheduler actor. This is static
 incremental review, not final exact-head approval or full T8 validation.
+
+### Exact-input creation checkpoint
+
+Trusted ordinary `write` now uses an additive, default-unsupported
+`assess_builtin_invocation` assessor method. The provider receives exact bounded
+contents, complete facets, current user intent, the existing capability-bound create
+projection and a fresh nonce/digest. High-confidence matching responses return Once;
+explicit human/Deny policy and admission checks remain authoritative. Existing
+third-party assessors do not automatically acquire this capability. The complete
+encoded input is checked before cloning and the complete model payload is capped at
+16 KiB; oversized or secret-like evidence falls back to human approval. This narrows
+the model-reviewed payload relative to the legacy 64 KiB content-shape classifier.
+
+Real Agent tests use `WriteTool` and `CapStdAtomicCreateCapability`, not a logging
+tool: allow creates the exact file, while uncertainty, provider error, Auto cancellation,
+session rebinding and oversized input create no file and no persistent grant. Final
+locked Agent library tests passed 492/492 and Agent Clippy including tests passed
+with warnings denied. Independent incremental static review identified the pre-clone limit correction
+and otherwise found no concrete new blocker. This stage does not enable existing-file
+edits/deletes, expand network authorization or complete T8. Ordinary Execute and the
+remaining H/G coverage remain unimplemented.
