@@ -1,6 +1,6 @@
 # Iteration I309: Upgrade gix To Latest Stable 0.90.0
 
-> Document status: Planned
+> Document status: Active (proposed in #774; ineffective until merge)
 > Published plan date: 2026-10-26
 > Planned objective: upgrade gix 0.87.1 to the latest observed stable, non-yanked 0.90.0 while preserving existing Git behavior and permission boundaries.
 > Baseline rule: preserve this target; append execution facts rather than rewriting acceptance.
@@ -10,13 +10,13 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 handoff closure session |
 | Work Slice | I309: gix 0.87.1 to 0.90.0 dependency graph, necessary consumer migrations, Git regression validation and dependency documentation; excludes Auto policy and search/provider implementation. |
 | Claimed At | 2026-10-26 |
 | Source Issue | None; explicit maintainer request in handoff session |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #774 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer explicitly requested latest gix upgrade; claim requires exact-head review, applicable CI, both validators and merge-time CAS. |
 | Implementation PR | Not started |
