@@ -24,6 +24,50 @@ async fn real_read_tools_preserve_policy_allow_and_deny_without_assessment() {
         std::fs::write(root.path().join("evidence.txt"), "read-fast-path-evidence")
             .expect("fixture");
         std::fs::write(root.path().join("changed.txt"), "changed-evidence").expect("fixture");
+        // Git is used only to build an isolated fixture; product reads use the actual tools.
+        for args in [
+            vec!["init", "--template=", "--initial-branch=auto-proof"],
+            vec!["add", "evidence.txt"],
+            vec![
+                "-c",
+                "user.name=Auto fixture",
+                "-c",
+                "user.email=auto@example.invalid",
+                "-c",
+                "commit.gpgSign=false",
+                "-c",
+                "maintenance.auto=false",
+                "commit",
+                "-m",
+                "auto-read-commit-evidence",
+            ],
+        ] {
+            let output = std::process::Command::new("git")
+                .env_clear()
+                .env("PATH", std::env::var_os("PATH").expect("PATH"))
+                .env("HOME", root.path())
+                .env("TEMP", root.path())
+                .env("TMP", root.path())
+                .env(
+                    "SystemRoot",
+                    std::env::var_os("SystemRoot").unwrap_or_default(),
+                )
+                .env("GIT_CONFIG_NOSYSTEM", "1")
+                .current_dir(root.path())
+                .args(args)
+                .output()
+                .expect("fixture Git");
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+        std::fs::write(
+            root.path().join("evidence.txt"),
+            "read-fast-path-evidence\nmodified",
+        )
+        .expect("modified tracked fixture");
         let tools: Vec<(Arc<dyn AgentTool>, Value)> = vec![
             (
                 Arc::new(talos_tools::file_tools::ReadTool::new(root.path().into())),
@@ -52,6 +96,26 @@ async fn real_read_tools_preserve_policy_allow_and_deny_without_assessment() {
             (
                 Arc::new(talos_tools::diff_stat::DiffTool::new(root.path().into())),
                 serde_json::json!({"old_path":"evidence.txt","new_path":"changed.txt"}),
+            ),
+            (
+                Arc::new(talos_tools::git::GitStatusTool::new(root.path().into())),
+                serde_json::json!({}),
+            ),
+            (
+                Arc::new(talos_tools::git::GitLogTool::new(root.path().into())),
+                serde_json::json!({}),
+            ),
+            (
+                Arc::new(talos_tools::git::GitBranchListTool::new(root.path().into())),
+                serde_json::json!({}),
+            ),
+            (
+                Arc::new(talos_tools::git::GitDiffTool::new(root.path().into())),
+                serde_json::json!({}),
+            ),
+            (
+                Arc::new(talos_tools::git::GitShowTool::new(root.path().into())),
+                serde_json::json!({"revision":"HEAD"}),
             ),
         ];
         for (tool, input) in tools {
@@ -129,10 +193,11 @@ async fn real_read_tools_preserve_policy_allow_and_deny_without_assessment() {
                     assert_eq!(result.is_error, denied, "{name}: {}", result.content);
                     if !denied {
                         assert!(
-                            result.content.contains(if name == "read" {
-                                "read-fast-path-evidence"
-                            } else {
-                                "evidence.txt"
+                            result.content.contains(match name.as_str() {
+                                "read" => "read-fast-path-evidence",
+                                "git_log" | "git_show" => "auto-read-commit-evidence",
+                                "git_branch_list" => "auto-proof",
+                                _ => "evidence.txt",
                             }),
                             "{name}: {}",
                             result.content

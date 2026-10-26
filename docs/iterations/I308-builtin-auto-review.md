@@ -324,7 +324,7 @@ Runtime shared composition has a separate Product/Runtime inventory-equivalence 
 | `read`, `ls`, `read_image`, `document_extract`, `grep`, `glob`, `diff`, `stat`, `tree`, `find_symbol`, `find_references`, `list_symbols`, `list_imports` | Real Agent dispatch tests cover default Read Allow and explicit Read Deny for read/ls/stat/tree/grep/glob/diff with actual results and zero model calls/grants. Remaining operations and complete profile/platform coverage remain outstanding. MCP omits `read_image`. |
 | `write`, `edit`, `delete` | Exact-content atomic creation is merged in #769; complete-image review and opt-in real recovery for string/anchored edit and text deletion are merged in #770. Binary/NUL and secret-like content retain human fallback. Expanded special-path/policy tests are published in #771; full G acceptance remains incomplete. |
 | `save_url`, `fetch_url`, `http_request`, `web_search` | Protected prepared network assessment exists; ordinary product transport Auto allowance remains unimplemented and its pending contract decision is not assumed accepted. |
-| `git_status`, `git_diff`, `git_log`, `git_show`, `git_branch_list` | Existing read policy retained; I308 complete disposition evidence outstanding. |
+| `git_status`, `git_diff`, `git_log`, `git_show`, `git_branch_list` | Real Agent dispatch verifies default Read Allow returns actual temporary-repository status/diff/history/commit/branch evidence and explicit Read Deny rejects all five, with zero assessor calls/grants. Complete profile/platform evidence remains outstanding. |
 | `git_add`, `git_commit`, `git_push`, `git_pull`, `git_checkout` | I300 prepared command route retained; no reopening of accepted whole-command Pull semantics. I308 full coverage evidence outstanding. |
 | `bash` (Unix) / `powershell` (Windows), `exec` | Existing shell/direct-command paths retained; I308 full profile/decision evidence outstanding. |
 | `todo_create`, `todo_create_batch`, `todo_update_batch`, `todo_update_status`, `todo_update`, `todo_delete`, `todo_add_dependency`, `todo_remove_dependency`, `todo_query` | Session-scoped Internal facets retain default deterministic Allow, not model approval. Local real-Agent tests cover all nine operations under default Allow and explicit Internal Deny, actual SQLite effects, unchanged other-session data, zero assessor calls and zero grants. MCP does not add Todo; complete profile/platform evidence remains outstanding. |
@@ -803,3 +803,16 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
 - Locked Agent library tests pass 498/498 after this extension; formatting passes.
   This establishes these concrete foreign-ID cases, not arbitrary cross-session
   attack coverage, new production behavior or complete I308 acceptance.
+
+### Git read admission verification — 2026-10-26
+
+- `tests/read_auto.rs` now dispatches all five actual Git read tools under
+  default Read Allow and explicit Read Deny, alongside the seven existing file
+  read/search/diff operations. Fixture initialization uses a cleared environment,
+  an empty template and a local unsigned commit; no user repository is modified.
+  Allowed calls must return fixture-specific path, commit message or branch
+  evidence. Every call produces one result, zero model assessments and zero
+  persistent grants. The focused locked production-dispatch test passes.
+- This does not implement new Git behavior or prove the full feature/host/profile
+  matrix. T8 remains incomplete; ordinary Execute/HTTP/WebSearch and remaining
+  native families retain their outstanding requirements.
