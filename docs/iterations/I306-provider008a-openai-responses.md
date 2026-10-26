@@ -157,3 +157,54 @@ protocol signals); obtain current-head CI and independent provider/API review; r
 resolve branch conflicts within this slice and repeat merge-time CAS. Recorded upstream stream
 fixtures and the full acceptance matrix must be audited explicitly rather than inferred from
 synthetic fixtures. Gemini/Azure/Bedrock, #705 and Search remain outside this work.
+
+### Local Validation Record — Published Source c6db8b88f31e449f1a6e138b672e335113800984
+
+Integrated main: `b21b6146c21894dc42e8fc5bf1d815af71fbc7c8`. Local merge/checkpoints were
+`5569e45b`, `28bac9f3` and `15b6529e`; these are local provenance, not remote completion commits.
+Published source `c6db8b88f31e449f1a6e138b672e335113800984` has the exact verified local source tree
+`119ad3b2aeead9ff7c792ddf34f458be3c2b466a`, with the previous #749 head and integrated main as
+parents. GitHub Git-object publication was used because ordinary Git push had no local write
+credential; the returned remote tree SHA was checked against the local tree before branch update.
+Main's Sandbox owner/iteration won the
+unrelated add/add conflicts; both sets of Evolution lessons were retained. No Sandbox, permission,
+native Git or MCP implementation change is authored by this slice.
+
+Pinned Rust 1.99.0; all Cargo verification uses locked dependencies. Local build/test debug info is
+zero, incremental compilation disabled, four build jobs; these settings do not change test filters.
+
+- Final affected-package run: `cargo test --locked -p talos-config -p talos-provider -p talos-cli
+  -p talos-tui` — **1,651 passed across 43 test/doc-test result groups; zero failed, ignored or
+  filtered**. Includes the real binary Responses configuration/rollback round, dotted model IDs,
+  the two-round Agent image/native-read scenario, Unicode/CRLF/EOF property tests, ciphertext-preview
+  regression and forward/reverse rendered wizard/cursor tests.
+- `cargo fmt --all -- --check`, workspace check and final
+  `cargo clippy --workspace --locked -- -D warnings` passed.
+- Both governance validators passed again with zero warnings after owner-evidence synchronization;
+  project-scale assessment completed. Subsequent publication mapping changes only evidence prose.
+- `python3 scripts/validate_runtime_sdk_fixture.py` passed in both default and coding modes,
+  with its independently resolved locked dependency graph and sole direct Talos dependency.
+
+Full-preflight history is retained rather than converted into a green claim:
+
+1. Before main integration, standard `release_preflight.sh` passed its static, governance, formatting,
+   workspace check and strict Clippy stages, then failed the unchanged runtime Unix-socket fixture
+   `runtime_evidence_rejects_directory_symlinks_and_socket_entries` with OS error 1 / Operation not
+   permitted (runtime group 72 passed / 1 failed). Current execution policy disallows Unix socket
+   creation. No source test was ignored or weakened.
+2. After main integration, standard preflight again passed its non-test gates, then stopped in the
+   inherited MCP `git_prepared` group: 26 passed / 21 failed. Two cases fail creating Unix sockets;
+   approved native Git cases report `Git maintenance executable differs from the bound Git binary`.
+   The local Git 2.51.1 layout has hard-linked executables at different canonical paths, triggering
+   the unchanged main guard. This record is not a closure of that separately owned native/security
+   behavior, and does not claim a green main baseline.
+3. A supplemental workspace run filtering only the single known runtime socket fixture also stopped
+   at the same MCP group. It did **not** prove that all remaining workspace tests pass; no broader
+   filtering was introduced to manufacture a green full-suite result.
+
+The first controlled Agent fixture inherited the repository process cwd and therefore read the
+wrong relative location. Running the child in its isolated workspace corrected the fixture; the
+strict read-result assertion and production permissions remain unchanged.
+
+Unfiltered current-head CI and independent provider/API review remain mandatory. Do not mark this
+stage Ready, merged, Complete or released from the local affected-package results alone.
