@@ -992,3 +992,15 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
   passed. Logs: `/private/tmp/i308-recovery-cancellation.log` and
   `/private/tmp/i308-recovery-cancel-clippy.log`. This local extension is not
   covered by the already-running CI for `6f56cb939`; fresh review/CI remains due.
+
+### Recovery replacement-directory evidence — 2026-10-26
+
+- Real Agent restoration dispatch for edit and delete now also covers a target
+  replaced by a nonempty directory. The permission-allowed invocation fails,
+  preserves the directory and sentinel contents, and retains the receipt. After
+  explicitly restoring the expected post-mutation state, same-instance recovery
+  succeeds. This covers a changed target type, not arbitrary same-content inode
+  replacement or rollback after a mutation starts.
+- Locked focused Agent tests passed 2/2, with twelve recovery dispatch scenarios.
+  No production behavior changed. This test extension is not covered by the
+  running remote candidate; independent review and fresh exact-head CI remain due.

@@ -19,7 +19,7 @@ impl ApprovalResolver for PendingRecoveryApproval {
 #[tokio::test]
 async fn recovery_dispatch_rechecks_policy_and_preserves_concurrent_changes() {
     for delete in [false, true] {
-        for scenario in ["allow", "deny", "ask", "changed", "cancel"] {
+        for scenario in ["allow", "deny", "ask", "changed", "cancel", "directory"] {
             let root = tempfile::tempdir().expect("workspace");
             let path = root.path().join("file.txt");
             std::fs::write(&path, "before").expect("fixture");
@@ -44,6 +44,13 @@ async fn recovery_dispatch_rechecks_policy_and_preserves_concurrent_changes() {
                 .to_owned();
             if scenario == "changed" {
                 std::fs::write(&path, "concurrent content").expect("concurrent writer");
+            }
+            if scenario == "directory" {
+                if !delete {
+                    std::fs::remove_file(&path).expect("replace edited file");
+                }
+                std::fs::create_dir(&path).expect("replacement directory");
+                std::fs::write(path.join("sentinel"), "keep").expect("directory contents");
             }
             let input = serde_json::json!({"path":"file.txt","recovery_id":id});
             let mut registry = ToolRegistry::new();
@@ -150,6 +157,26 @@ async fn recovery_dispatch_rechecks_policy_and_preserves_concurrent_changes() {
                         std::fs::read_to_string(&path).expect("current"),
                         "concurrent content"
                     );
+                }
+                "directory" => {
+                    assert!(
+                        path.is_dir(),
+                        "recovery must preserve the replacement directory"
+                    );
+                    assert_eq!(
+                        std::fs::read_to_string(path.join("sentinel")).expect("sentinel"),
+                        "keep"
+                    );
+                    // Restore the expected post-mutation state, then prove the failed
+                    // dispatch did not consume the instance-local receipt.
+                    std::fs::remove_file(path.join("sentinel")).expect("remove sentinel");
+                    std::fs::remove_dir(&path).expect("remove directory");
+                    if !delete {
+                        std::fs::write(&path, "after").expect("expected edited state");
+                    }
+                    let retry = tool.execute(input).await;
+                    assert!(!retry.is_error, "{}", retry.content);
+                    assert_eq!(std::fs::read_to_string(&path).expect("retry"), "before");
                 }
                 _ => {
                     if delete {
