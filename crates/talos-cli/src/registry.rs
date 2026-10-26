@@ -755,6 +755,17 @@ fn register_symbol_tool_contributions(
     }
 }
 
+/// Constructs and registers the product-owned scheduler instances.
+pub(crate) fn register_builtin_scheduler(
+    registry: &mut ToolRegistry,
+) -> Result<talos_agent::PendingSchedulerActor, talos_core::tool::ToolRegistrationError> {
+    let (tools, pending) = talos_agent::create_scheduler_tools();
+    registry.register_builtin_contributions(tools.into_iter().map(|tool| {
+        ToolContribution::new(ToolContributionSource::new("talos-agent:scheduler"), tool)
+    }))?;
+    Ok(pending)
+}
+
 /// Builds the tool registry for print/inline/RPC modes.
 ///
 /// These modes construct a registry before any durable [`talos_session::Session`]

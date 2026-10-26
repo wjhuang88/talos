@@ -176,7 +176,6 @@ impl TuiRuntimeBuilder {
             .context("failed to start MCP runtime")?;
         mcp_runtime.report_startup_failures();
 
-        let (scheduler_tools, pending_scheduler) = talos_agent::create_scheduler_tools();
         let atomic_create_capability = CapStdAtomicCreateCapability::open(&self.workspace_root)
             .ok()
             .map(|value| Arc::new(value) as talos_core::tool::SharedAtomicCreateCapability);
@@ -189,10 +188,11 @@ impl TuiRuntimeBuilder {
             self.approval_handler.clone(),
             self.workspace_root.clone(),
             session.id,
-            scheduler_tools,
+            Vec::new(),
             atomic_create_capability.clone(),
             language_provider_context,
         );
+        let pending_scheduler = crate::registry::register_builtin_scheduler(&mut registry)?;
         register_tui_permission_aware_tools(
             &mut registry,
             mcp_runtime.tools(),

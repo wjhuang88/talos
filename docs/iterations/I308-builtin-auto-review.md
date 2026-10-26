@@ -294,3 +294,37 @@ No implementation completion evidence exists. Do not mark H, G or T8 Complete fr
   string writes retain their existing non-atomic behavior and do not join this lock.
   Both governance validators passed before this checkpoint-only update. The stage
   remains local; complete H/G acceptance and final platform/preflight/CI gates remain.
+
+### Production inventory checkpoint
+
+`registry_builtin_tests::product_registries_have_no_uninventoried_native_operations`
+compares the complete Print/TUI/MCP registries against an explicit inventory and checks
+instance ownership for every entry. New registrations fail this test until inventoried.
+This is a coverage assertion, never a runtime tool-name allowlist or proof of Auto support.
+Runtime shared composition has a separate Product/Runtime inventory-equivalence test.
+
+| Registered operations | Current I308 disposition / remaining evidence |
+|---|---|
+| `read`, `ls`, `read_image`, `document_extract`, `grep`, `glob`, `diff`, `stat`, `tree`, `find_symbol`, `find_references`, `list_symbols`, `list_imports` | Existing policy/read paths retained; complete per-operation Auto fallback/production evidence still required. MCP omits `read_image`. |
+| `write`, `edit`, `delete` | Existing creation path retained; opt-in edit recovery implemented locally; higher-risk effect assessment and Auto execution still incomplete. |
+| `save_url`, `fetch_url`, `http_request`, `web_search` | Protected prepared network assessment exists; ordinary product transport Auto allowance remains unimplemented and its pending contract decision is not assumed accepted. |
+| `git_status`, `git_diff`, `git_log`, `git_show`, `git_branch_list` | Existing read policy retained; I308 complete disposition evidence outstanding. |
+| `git_add`, `git_commit`, `git_push`, `git_pull`, `git_checkout` | I300 prepared command route retained; no reopening of accepted whole-command Pull semantics. I308 full coverage evidence outstanding. |
+| `bash` (Unix) / `powershell` (Windows), `exec` | Existing shell/direct-command paths retained; I308 full profile/decision evidence outstanding. |
+| `todo_create`, `todo_create_batch`, `todo_update_batch`, `todo_update_status`, `todo_update`, `todo_delete`, `todo_add_dependency`, `todo_remove_dependency`, `todo_query` | Print/TUI session-scoped registrations inventoried; mutation Auto assessment and full disposition evidence outstanding. MCP does not add Todo. |
+| `status` | MCP-only read tool; concrete built-in ownership checked. |
+| `delay`, `schedule`, `list_scheduled_tasks`, `cancel_scheduled_task` | Product-owned scheduler factory now registers actual instances as built-ins in interactive/Print/Inline/RPC/TUI; caller-supplied scheduler instances remain external. Model-assisted scheduling allowance remains unimplemented. |
+
+Inventory work found and repaired a production gap: Print/Inline/RPC/TUI previously
+constructed scheduler tools locally but passed them through generic external registration.
+The new internal factory creates and registers the instances together; it accepts no
+caller-supplied tools. Generic registry constructors preserve external ownership semantics.
+Desktop-specific extensions, conditional skills, process capabilities and complete feature/host
+coverage still require separate verification; the table does not declare acceptance 1 complete.
+
+Validation: locked CLI `builtin_registration_tests` passed 5/5, including rejection
+of external scheduler collisions without relabeling. The CLI bin suite passed
+375/375 before the final collision test was added; CLI Clippy passed with warnings
+denied. Independent incremental ownership/security review found no new concrete
+blocker and confirmed registration failure starts no scheduler actor. This is static
+incremental review, not final exact-head approval or full T8 validation.
