@@ -1,3 +1,10 @@
+## T8 next-slice draft — 2026-10-26
+
+I308 proposes full PERM-007-H/G delivery after completed T7. Governance proposal #765 only:
+Claimed/Active are ineffective until merge; no new implementation yet. Full acceptance and current iteration
+dispositions are in `docs/iterations/I308-builtin-auto-review.md`. T2/T3 → T4 → T5 →
+T1 → T6 remain incomplete and unchanged. Prior checkpoints below remain historical.
+
 ## T7 merged and closed — 2026-10-26
 
 T7/I300 is Complete / Closed at #735, merge `ee84889fd19c590fdcc125cb971143dffd3cfb94`.

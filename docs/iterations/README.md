@@ -1,3 +1,9 @@
+## Proposed T8 selection — 2026-10-26
+
+[I308](I308-builtin-auto-review.md) proposes full PERM-007-H/G Auto coverage in #765.
+Claimed/Active values are ineffective until the reviewed, validated governance record merges.
+Implementation must start from that merge or later main. T7 is Complete; later handoff tasks remain incomplete.
+
 ## Current I300/T7 closure — 2026-10-26
 
 [I300](I300-structured-git-repair.md) is Complete / Closed at #735 (`ee84889fd`).

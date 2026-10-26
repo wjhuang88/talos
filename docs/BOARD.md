@@ -1,3 +1,9 @@
+## Proposed T8 selection — 2026-10-26
+
+[I308](iterations/I308-builtin-auto-review.md) proposes full PERM-007-H/G Auto coverage in #765.
+Claimed/Active values are ineffective until the reviewed, validated governance record merges.
+Implementation must start from that merge or later main. T7 is Complete; later handoff tasks remain incomplete.
+
 # Talos Board
 
 [I307](iterations/I307-bubblewrap-workspace-visibility.md) / #757 is Complete

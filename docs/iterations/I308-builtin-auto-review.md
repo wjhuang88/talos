@@ -1,0 +1,144 @@
+# Iteration I308: Shared Auto Review For All Built-In Tools
+
+> Document status: Active (proposed; effective only when #765 merges)
+> Published plan date: 2026-10-26
+> Planned objective: complete handoff T8 with model-assisted, invocation-local approval across registered native tools, including suitable Write, Network and Execute operations and higher-risk file changes.
+> Baseline rule: preserve this published target; implementation stages do not reduce acceptance.
+> MVP deliverable: a production native tool request needing approval can receive one model AllowOnce and actually execute through normal admission; every registered native operation has a tested disposition.
+
+## Collaboration Claim
+
+| Field | Value |
+|---|---|
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-6 handoff closure session |
+| Work Slice | I308 / PERM-007-H and PERM-007-G: native-tool Auto evidence, shared assessment and invocation-local admission, higher-risk file recovery, production registration coverage, tests and documentation; excludes search transport and provider protocol implementation. |
+| Claimed At | 2026-10-26 |
+| Source Issue | #563; handoff T8 |
+| Governance Claim PR | #765 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Maintainer authorized continued full handoff delivery; #765 requires independent permission/security/API review, exact-head CI, both validators and final merge-time CAS before merge. |
+| Implementation PR | Not started |
+| Last Updated | 2026-10-26 |
+| Handoff / Release Condition | Satisfy full H/G acceptance with existing implementation commits, independent permission/security/API review and platform evidence; no release authorized. |
+
+This governance candidate proposes claim and activation atomically in #765. Both are ineffective
+until the finalized exact-head record merges to main; implementation starts from that merge or later.
+No production implementation belongs in this governance candidate.
+
+## Published Baseline
+
+### Selected Stories
+
+| Story | Parent | Status At Selection | Depends On | Outcome |
+|---|---|---|---|---|
+| PERM-007-H | PERM-007 | Refinement / Unclaimed; acceptance explicit and ready for selection | I300 completed at `ee84889fd`; existing shared evaluator and permission pipeline | All registered native operations have tested, effect-aware dispositions and suitable requests can actually execute after model AllowOnce. |
+| PERM-007-G | PERM-007 / #563 | Refinement / Unclaimed; selected together with H | Shared typed evidence and atomic admission | Existing-file edits and destructive/high-impact native file operations have bounded diff/impact evidence, real backup/recovery and audit behavior before Auto allowance. |
+
+### Scope And Policy Reconciliation
+
+- Inventory actual production assembly in CLI interactive/TUI/MCP, Runtime and Desktop, including feature-gated registrations, Todo, scheduler, status, process and conditional skill tools. Distinguish dormant constructors and externally supplied overrides.
+- Reuse one shared model assessment path with implementation-owned typed, bounded evidence bound to exact normalized execution arguments, current user intent, resources and freshness. Presentation/redacted arguments are not authority.
+- Implement actual one-shot approval for suitable native Write, Network and Execute requests. Category-wide refusal, tool-name allowlists, advisory-only responses and unconditional human fallback do not satisfy H.
+- Preserve deterministic policy-allowed read-only fast paths with no additional model call. Multi-facet approval is atomic; partial approval cannot execute.
+- Preserve explicit Deny, explicit mandatory-human user policy, execution-unknown replay protection, admission identity checks, cancellation, evaluator isolation, bounded output and secret redaction.
+- H and G share this one iteration/claim. G's historical W2/W3 human gate remains until the relevant implementation is reviewed and validated; ADR-064's accepted 2026-10-22 amendment permits suitable effectful model approval. Do not silently remove G's diff, impact, backup/recovery or audit requirements.
+- Cover higher-risk operations exposed by existing native schemas: existing-source edits, delete and any existing rename/batch behavior, dependency/config/release/security files. Record inventory evidence where a proposed operation has no native tool; do not invent new tools to satisfy an inventory label.
+- Implement bounded backup/recovery for native file mutations, with failure/cancel and stale-target behavior. Describe actual recovery limits; never promise transactional rollback for arbitrary shell, Git, network or scheduled agent work. If a concrete effect cannot be safely assessed/enforced, expose its precise human decision and retain incomplete coverage honestly.
+- Unknown/unbound effects, insufficient intent/evidence, uncertainty, assessor failure and unsupported enforcement give actionable human/headless fallback. Model denial cannot execute; cancellation cannot leak an AllowOnce.
+- Trusted implementation ownership must survive production composition and wrappers without name spoofing: custom RuntimeBuilder tools and plugins do not become trusted native implementations through matching names, default provenance or diagnostic contribution source.
+- Retain I300's reviewed whole-command Pull semantics, one-shot credentials and process supervision; integrate through shared assessment without reopening per-path effect prediction.
+- Public API adaptations must preserve embedder compatibility or obtain the required ADR and migration decision before implementation; no silent exhaustive-enum or struct-literal break.
+
+### Non-Goals
+
+- Automatic authorization of external MCP/plugin/embedder tools merely because they resemble native tools.
+- New native tool families, search backend activation/transport, provider protocol work, universal rollback or permanent grants.
+- Dependency upgrades, new unsafe code, release/tag/publication or waiving any remaining handoff task.
+
+### Acceptance
+
+1. Given each production profile and applicable feature set, registration coverage identifies every native operation and a tested policy/model/human disposition; an undeclared new built-in fails the invariant. External same-name replacements cannot inherit native approval.
+2. Given a suitable native request needing permission, the shared assessor receives bound intent/effect evidence and model AllowOnce leads to actual production execution; representative non-shell Write, Network and Execute operations prove this end to end.
+3. Given multi-facet effects, all are admitted together or none execute. Existing deterministic read-only allows incur zero model calls.
+4. Given explicit Deny/human policy, uncertainty, error, cancellation, changed input/resource/evidence or replay, no unauthorized execution occurs and the user receives a truthful reason/fallback. Verify allow, deny, uncertain, error, cancel and stale outcomes through the production pipeline.
+5. Given higher-risk native file changes, bounded diff/impact evidence and actual backup/recovery behavior are tested before Auto execution, including special/config/security paths, destructive operations, partial failure and stale identity. No prose-only rollback claim satisfies G.
+6. Given CLI/Runtime/Desktop/MCP-hosted native composition and applicable hosts, intended behavior is reachable with visible model decision/rationale and safe secret handling; missing platform evidence stays outstanding.
+7. Auto user docs, API/migration notes and coverage inventory match implemented behavior. Independent permission/security/API review, full locked preflight, exact-head CI and merge CAS pass before completion.
+
+### Execution Stages
+
+1. Inventory and contract: complete operation/profile matrix, trusted evidence ownership and compatible API design; registry invariant and focused tests.
+2. Shared admission: unify assessment and atomic single-use admission; implement representative non-shell production allow/deny/error/cancel/stale paths.
+3. Full native coverage: finish all registered families and G diff/impact/backup/recovery behavior; preserve existing policy fast paths.
+4. Integration and closure: real host/feature coverage, user-visible diagnostics, documentation, independent review and final exact-head gates.
+
+Stages are logical commits/reviewable candidates, not substitutes for the complete acceptance above.
+Converge each stage locally before pushing; record remaining acceptance explicitly after any stage merge.
+Consult relevant existing implementations and upstream best practices when a design stalls; record the
+source and applicable limits instead of extending speculative local machinery.
+
+### Planned Validation
+
+- Repository-pinned Rust 1.99.0; all workspace checks/tests/builds use `--locked`.
+- Focused production registration/permission/assessment/execution tests, including external overrides and all decision outcomes.
+- Profile/feature coverage checks for native assemblies, deterministic read-only no-model tests and multi-facet denial tests.
+- Higher-risk write diff/impact/backup/recovery tests with failure, cancellation and stale targets.
+- `./scripts/release_preflight.sh` (full workspace checks, Clippy, tests and SDK consumers).
+- Windows compile through `cargo xwin` with locked dependencies; native Windows CI execution is a separate mandatory evidence row, not inferred from cross-compilation. Native Unix tests cover applicable behavior.
+- `scripts/validate_project_governance.sh .` and `bash scripts/validate_collaboration_claims.sh .`.
+- Independent exact-head permission/security/API review, CI and final merge-time CAS.
+
+### Documentation To Update
+
+- `README.md` Auto behavior/configuration sections and SDK examples affected by the final API.
+- Tool behavior/API migration notes, ADR-064/070/089 where affected, and a complete production operation coverage matrix in this owner or a linked reference.
+- H/G owners, #563, handoff ledger, backlog, iteration index and Board; completion requires already-existing implementation SHA evidence.
+
+### Risks And Rollback
+
+- Hard: write-capable effects remain permission-gated; explicit Deny/human policy and immutable safety constraints cannot be overridden.
+- Soft: accepted operation-level model review replaces historical category-level eligibility limits only after concrete implementation and independent review.
+- Assumption to validate: a compatible trusted evidence interface can serve all actual native assemblies without accepting embedder-provided claims as native authority.
+- Risks: stale evidence, native-name spoofing, partial multi-facet admission, sensitive diff leakage, unsafe recovery and implicit scheduled work. Each needs focused adversarial tests and independent review.
+- Rollback: revert a reviewed implementation stage to prior runnable behavior; do not auto-reset user data or imply external effects can be undone. Runtime backup recovery must be implemented and separately tested, not inferred from Git revert.
+
+## Selection Inventory And Disposition — 2026-10-26
+
+| Owner | Current state / disposition |
+|---|---|
+| I293 SEARCH-001-C | Active; retain its transport/endpoint-authority ownership. I308 assesses registered native requests without changing search routing/transport contracts. |
+| I294 SEARCH-001-D | Active; retain provider research/evidence, no overlapping implementation selected. |
+| I306 PROVIDER-008-A | Active, open implementation #749; retain provider protocol ownership, no protocol changes in I308. |
+| I302 TEST-003 / #717 | Review; retain unexplained Windows resource residual and #705 diagnostics; not absorbed or waived. |
+| I277 Desktop validation | Review, human/device rows deferred and nonblocking; retain original acceptance. |
+| I249 dependency pilot | Planned; explicitly defer unchanged behind the selected handoff queue. |
+| I164 | Paused; preserve supersession/layout disposition, do not reactivate. |
+| I146/I147/I150/I162/I262 | Current owner headers Complete; historical Review lines/stale index do not reopen them. |
+| I300 / I307 | Owners are Complete; T7 and its sandbox prerequisite have merged evidence, not activation blockers. |
+
+Existing parallel owners remain separately scoped; the maintainer's continued handoff execution
+selects I308 as this session's only new implementation stream. Open PR inspection found #749 and
+#705, neither claims H/G. Recheck target owner/PR overlap and dependencies immediately before merge.
+Handoff ordering after T8 remains T2/T3 → T4 → T5 → T1 → T6, all incomplete.
+
+## Actual Activation And Execution
+
+- 2026-10-26: governance draft only; source Issue #563 and its comments reviewed. No effective claim, implementation or activation yet.
+
+## Verification Evidence
+
+- Draft baseline: both local governance validators passed with zero warnings. Finalized candidate rerun, independent review, exact-head CI and merge CAS remain required.
+
+## Completion Evidence
+
+No implementation completion evidence exists. Do not mark H, G or T8 Complete from this plan.
+
+## Variance And Residuals
+
+- Full production operation matrix and compatible API design are stage 1 implementation deliverables, not claimed complete by discovery notes.
+- G remains human-gated until implemented/validated; no higher-risk policy implementation is claimed here.
+- Remaining handoff tasks and gix capability/advisory tracking retain separate owners.
+
+- 2026-10-26: #765 number backfilled; proposed Claimed/Active record and H/G owner synchronization are ineffective until main merge.
