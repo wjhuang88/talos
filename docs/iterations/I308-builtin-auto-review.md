@@ -860,3 +860,20 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
   the compiled conditional Checkout test passes 30/30 isolated repetitions.
   This narrows reproduction conditions but does not explain or repair the
   published macOS CI failure. No security revalidation was weakened.
+
+### Checkout CI diagnosis prerequisite — 2026-10-26
+
+- Retained-repository refusal now reports only fixed changed category names
+  (for example `entries` or `object_layout`), including when Tools is compiled
+  as a Runtime dependency. Previously that diagnostic existed only under Tools'
+  own test configuration and was absent from the failing Runtime CI output.
+  No paths, configuration values or captured contents are disclosed, and the
+  comparison and refusal behavior are unchanged. This is diagnostic capability,
+  not a root-cause fix or permission relaxation.
+- Locked Tools Git repository-state tests pass 14/14, Tools Git library/test
+  Clippy passes with warnings denied, and Runtime's focused Checkout test passes.
+  The initial Tools command omitted the Git feature and selected zero tests;
+  only the subsequent explicit `--features git` run counts as evidence.
+- Local Git is 2.54.0 while the failing CI recorded 2.55.0. Version difference
+  is an observation, not an established cause. Existing Windows jobs continue;
+  no failed CI rerun or production fixture change is used to claim resolution.
