@@ -190,3 +190,31 @@ success or root-cause closure is claimed. The assertion and production highlight
 unchanged. Treat this as an open validation blocker for the data candidate, not proof that the
 catalog caused or did not cause the behavior. Fresh unfiltered remote CI and full acceptance remain
 required; do not merge or activate the data from the passing four snapshot cases alone.
+
+## Terminal-Lifecycle Base Synchronization — 2026-10-26
+
+The code dependency is now #749 at `bb31d0125d63841165ce8cbab04cb729ace0e72f`, which ends
+Responses HTTP reading at the first semantic terminal instead of waiting for EOF/idle timeout.
+The combined candidate preserves every catalog byte and snapshot-test byte from the previous data
+head `bb705cc0e53ab07791581f5915a6fd3f3ce75ebf`; this synchronization changes no admitted/withheld
+counts, provider roots, pricing, limits or capabilities. Only this ledger adds new data-PR prose.
+
+Prior data CI3458 (run 40327420437) passed all six jobs. Its full macOS log explicitly records
+`highlight::tests::unavailable_grammar_keeps_existing_markdown_fallback ... ok`; the earlier repeated
+local failures remain observations with no inferred root-cause closure. The new code/base/head
+requires fresh unfiltered CI; that prior run is historical evidence for the earlier data head.
+
+Combined-source locked validation: all **4 catalog snapshot cases**, **3 Responses HTTP cases** and
+**25 transport/semantic/property cases** passed, zero failed/ignored/filtered. This includes both
+completed/failed outcomes with an intentionally unclosed HTTP body. The checkout switched branches
+after code validation finished and used that same checkout's own target; no independent worktrees
+shared build artifacts. An initial snapshot invocation lost its process/result handle after
+`running 4 tests`, so it supplies no verdict. A complete unfiltered rerun of those same four cases
+recorded exit 0; both later test invocations retain explicit exit status.
+
+The code candidate separately passed all 347 provider tests and the real binary Responses cases,
+plus workspace check/strict Clippy/governance gates; its standard local preflight still stops in
+inherited MCP git_prepared at 26 passed / 21 failed under the recorded socket/Git-binding conditions.
+This combined-source focused run is not a full local workspace pass. Recorded upstream SSE
+provenance, independent API review, distinct-endpoint residual disposition and #749-first merge /
+retarget sequencing remain open. Keep Draft; no completion, activation or release is claimed.

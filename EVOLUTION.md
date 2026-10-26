@@ -1528,3 +1528,14 @@ visible; distinguish passed assertions from independently emitted evidence.
   the code-side SDK consumer. Keep the original failed attempt distinct from passing source evidence.
 - Prevention: Share immutable registry/download caches, rather than build outputs across worktrees.
 - Promoted to rule/check: none; recorded in the I306 build/validation invocation contract.
+
+## 2026-10-26 - End HTTP readers at semantic stream terminals
+
+- Trigger: I306 Responses stream lifecycle audit after green cross-platform CI.
+- Symptom: A terminal response could retain the provider channel until HTTP EOF/idle timeout, or
+  be followed by another transport error from trailing malformed data.
+- Root cause: The semantic parser tracked terminal state but the framing/HTTP loop kept reading.
+- Fix: Stop decoding/reading after the first terminal batch and release the HTTP response body.
+- Prevention: Exercise a real chunked HTTP response that emits a terminal but never closes.
+- Promoted to rule/check: `semantic_terminal_closes_stream_without_waiting_for_http_eof` and
+  `semantic_terminal_discards_later_records_and_closes_decoder` provider regressions.

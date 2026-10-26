@@ -258,3 +258,64 @@ async fn mock_http_accepts_adr051_multimodal_continuation_without_path_leak() {
     )));
     mock.assert_async().await;
 }
+
+#[tokio::test]
+async fn semantic_terminal_closes_stream_without_waiting_for_http_eof() {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    for failed in [false, true] {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("fixture listener");
+        let address = listener.local_addr().expect("fixture address");
+        let terminal = if failed {
+            r#"{"type":"response.failed","response":{"error":{"message":"fixture failure"}}}"#
+        } else {
+            r#"{"type":"response.completed","response":{"usage":{"input_tokens":1,"output_tokens":2}}}"#
+        };
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.expect("fixture connection");
+            let mut request = [0; 8192];
+            let received = socket.read(&mut request).await.expect("fixture request");
+            assert!(received > 0, "fixture request must contain bytes");
+            let body = format!("data: {terminal}\n\n");
+            socket
+                .write_all(format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nTransfer-Encoding: chunked\r\n\r\n{:x}\r\n{body}\r\n",
+                    body.len(),
+                ).as_bytes())
+                .await
+                .expect("fixture terminal chunk");
+            // Deliberately omit the terminating HTTP chunk and keep the socket alive.
+            std::future::pending::<()>().await;
+        });
+        let provider = responses_provider(format!("http://{address}"));
+        let mut events = provider
+            .stream(&[Message::User {
+                content: "test".into(),
+            }])
+            .await
+            .expect("fixture stream");
+        let result = tokio::time::timeout(Duration::from_secs(2), async {
+            let mut received = Vec::new();
+            while let Some(event) = events.recv().await {
+                received.push(event);
+            }
+            received
+        })
+        .await;
+        server.abort();
+        let received =
+            result.expect("semantic terminal must close before idle timeout or HTTP EOF");
+        assert_eq!(received.len(), 1);
+        if failed {
+            assert!(
+                matches!(&received[0], AgentEvent::Error { message } if message.contains("fixture failure"))
+            );
+        } else {
+            assert!(
+                matches!(&received[0], AgentEvent::TurnEnd { stop_reason: StopReason::EndTurn, usage } if usage.input_tokens == 1 && usage.output_tokens == 2)
+            );
+        }
+    }
+}
