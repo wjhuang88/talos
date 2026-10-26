@@ -1,3 +1,9 @@
+## Proposed T8 selection — 2026-10-26
+
+[I308](../iterations/I308-builtin-auto-review.md) is a governance draft for full PERM-007-H/G Auto coverage.
+Unclaimed and not activated; actual PR number, review, checks and target-branch merge
+are required before implementation. T7 is Complete; later handoff tasks remain incomplete.
+
 # Product Backlog
 
 This file is the compact current-state backlog entrypoint. Story scope, acceptance criteria,

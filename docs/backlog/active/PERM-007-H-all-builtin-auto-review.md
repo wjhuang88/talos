@@ -110,3 +110,13 @@ It removes the T7-before-T8 dependency cycle without reducing this Story's full
 registry coverage, other built-in operations, or higher-risk policy requirements.
 PERM-007-H remains Refinement / Unclaimed; reuse and verify I300's shared path
 when this Story is activated. No generic all-built-in Auto success is claimed.
+
+## I308 Selection Proposal — 2026-10-26
+
+[I308](../../iterations/I308-builtin-auto-review.md) proposes joint ownership of H and G
+for handoff T8. This governance draft is Unclaimed and ineffective until finalized and merged.
+It preserves the complete existing acceptance, including actual invocation-local effectful
+approval and G's diff/impact/backup/recovery requirements. Historical higher-risk human gates
+remain until concrete implementation is independently reviewed and validated. No implementation
+or universal Auto coverage is claimed by selection. The iteration holds the single claim record;
+these Story owners delegate execution tracking to it once effective.

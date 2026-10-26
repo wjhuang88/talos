@@ -1,3 +1,9 @@
+## Proposed T8 selection — 2026-10-26
+
+[I308](iterations/I308-builtin-auto-review.md) is a governance draft for full PERM-007-H/G Auto coverage.
+Unclaimed and not activated; actual PR number, review, checks and target-branch merge
+are required before implementation. T7 is Complete; later handoff tasks remain incomplete.
+
 # Talos Board
 
 [I307](iterations/I307-bubblewrap-workspace-visibility.md) / #757 is Complete

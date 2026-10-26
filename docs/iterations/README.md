@@ -1,3 +1,9 @@
+## Proposed T8 selection — 2026-10-26
+
+[I308](I308-builtin-auto-review.md) is a governance draft for full PERM-007-H/G Auto coverage.
+Unclaimed and not activated; actual PR number, review, checks and target-branch merge
+are required before implementation. T7 is Complete; later handoff tasks remain incomplete.
+
 ## Current I300/T7 closure — 2026-10-26
 
 [I300](I300-structured-git-repair.md) is Complete / Closed at #735 (`ee84889fd`).
