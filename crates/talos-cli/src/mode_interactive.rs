@@ -85,7 +85,10 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
     let (sched_tools, sched_pending) = talos_agent::create_scheduler_tools();
     let mut registry = ToolRegistry::new();
     for tool in sched_tools {
-        registry.register(tool);
+        registry.register_builtin_contributions([talos_core::tool::ToolContribution::new(
+            talos_core::tool::ToolContributionSource::new("talos-agent:scheduler"),
+            tool,
+        )])?;
     }
     let atomic_create_capability = register_interactive_builtin_contributions(
         &mut registry,

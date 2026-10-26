@@ -913,7 +913,12 @@ pub(crate) fn build_mcp_tool_registry() -> ToolRegistry {
             .register_builtin_contributions([contribution])
             .unwrap_or_else(|error| panic!("{error}"));
     }
-    registry.register(Arc::new(StatusTool));
+    registry
+        .register_builtin_contributions([ToolContribution::new(
+            ToolContributionSource::new("talos-cli:status"),
+            Arc::new(StatusTool),
+        )])
+        .unwrap_or_else(|error| panic!("{error}"));
     register_symbol_tool_contributions(&mut registry, shared.symbols, |tool| tool);
     for contribution in shared.git_read {
         registry

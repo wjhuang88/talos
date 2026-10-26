@@ -11,6 +11,7 @@ fn shared_builtins_keep_explicit_ownership_in_product_registries() {
         Vec::new(),
     );
     let mcp = build_mcp_tool_registry();
+    assert!(mcp.is_builtin_instance("status"));
     for registry in [&print, &tui, &mcp] {
         for name in [
             "write",
@@ -27,5 +28,17 @@ fn shared_builtins_keep_explicit_ownership_in_product_registries() {
                 "lost ownership of {name}"
             );
         }
+    }
+}
+
+#[test]
+fn caller_supplied_scheduler_instances_do_not_gain_builtin_ownership() {
+    let (tools, _pending) = talos_agent::create_scheduler_tools();
+    let names: Vec<_> = tools.iter().map(|tool| tool.name().to_owned()).collect();
+    assert!(!names.is_empty());
+    let registry = build_print_tool_registry(tools);
+    for name in names {
+        assert!(registry.get(&name).is_some());
+        assert!(!registry.is_builtin_instance(&name));
     }
 }

@@ -214,3 +214,12 @@ No implementation completion evidence exists. Do not mark H, G or T8 Complete fr
   security/API follow-up found the credential fixes resolved its blockers. This
   is local stage evidence, not final exact-head CI/Windows evidence or T8 completion.
   Fetch confirmed origin/main remains `8f0ce2340`; no rebase was needed.
+- Production ownership follow-up: interactive mode now explicitly registers its locally
+  constructed scheduler instances as built-ins, and MCP registers its concrete `status`
+  instance as a built-in. Generic registry builders still treat caller-supplied scheduler
+  instances as external; a regression test verifies they cannot inherit built-in ownership.
+  Locked CLI `builtin_registration_tests` passed 2/2. The earlier filter
+  `registry_builtin_tests` selected zero tests and is not evidence. These changes are
+  local and unreviewed; they do not enable default HTTP/WebSearch Auto execution or
+  implement G recovery. Complete production inventory, common admission, final platform
+  validation and independent review remain open.
