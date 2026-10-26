@@ -39,11 +39,18 @@ impl AutoPermissionAssessor for Assessor {
             }
             _ => {}
         }
-        Ok(
-            serde_json::json!({"schema":request.schema,"request_digest":request.request_digest,
-            "decision":if self.scenario == "uncertain" {"human_required"} else {"allow_once"},"confidence":"high"})
-            .to_string(),
-        )
+        let mut response = serde_json::json!({"schema":request.schema,"request_digest":request.request_digest,
+            "decision":if self.scenario == "uncertain" {"human_required"} else {"allow_once"},"confidence":"high"});
+        match self.scenario {
+            "low_confidence" => response["confidence"] = "low".into(),
+            "wrong_digest" => response["request_digest"] = "sha256:another-invocation".into(),
+            "wrong_schema" => response["schema"] = "builtin-invocation/v2".into(),
+            "extra_field" => response["persistent_grant"] = true.into(),
+            "malformed" => return Ok("allow_once".into()),
+            "oversized_response" => return Ok("x".repeat(64 * 1024)),
+            _ => {}
+        }
+        Ok(response.to_string())
     }
 }
 
@@ -56,6 +63,12 @@ async fn trusted_creation_reviews_content_and_intent_before_real_execution() {
         "cancel",
         "stale",
         "oversized",
+        "low_confidence",
+        "wrong_digest",
+        "wrong_schema",
+        "extra_field",
+        "malformed",
+        "oversized_response",
     ] {
         let allow = scenario == "allow";
         let root = tempfile::tempdir().expect("workspace");
