@@ -407,3 +407,20 @@ remaining H/G coverage remain unimplemented.
   permission; the authorized rerun supplied compilation evidence.
 - Full H/G model review/execution coverage and final platform/review/CI/merge remain
   outstanding. No Auto edit/delete allowance or T8 completion is claimed here.
+
+### Recovery stage full validation — 2026-10-26
+
+- Implementation candidate `c924a3ee6` passed the complete standard preflight:
+  `CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_DEV_DEBUG=0 ./scripts/release_preflight.sh`.
+  Authorized run exited 0; log:
+  `/private/tmp/i308-recovery-stage-preflight-authorized.log`.
+  This includes both governance validators, formatting, locked workspace check,
+  Clippy with warnings denied, workspace tests and both external Runtime SDK fixtures.
+- The preceding sandbox run exited 101 with 959 tools tests passing and one
+  process-observation EPERM in `prepared_local_push_runs_all_eight_admitted_stages`.
+  The authorized complete rerun passed; the sandbox result is not a product pass
+  and was not bypassed by excluding the test.
+- This verifies the local recovery implementation stage only. Auto edit/delete
+  review and execution, ordinary effectful Execute/Network coverage, remaining
+  host evidence, final independent review, exact-head CI and merge are outstanding.
+  T8 remains Active; no later handoff task is completed by this evidence.
