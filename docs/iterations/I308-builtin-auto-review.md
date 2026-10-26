@@ -1,5 +1,21 @@
 # Iteration I308: Shared Auto Review For All Built-In Tools
 
+## Current delivery checkpoint — 2026-10-26
+
+Foundation #769 merged as `d45d08f0a82706c2abb26fcb32899f8b24fa64b1`.
+Exact head `ffa35973022c18f752cacad1922325e15c648379` passed all six jobs in
+CI 40274739232, including native Windows. Independent permission/security/API
+review and merge-time CAS are recorded in
+[#769 review receipt](https://github.com/wjhuang88/talos/pull/769#issuecomment-6409815251).
+The review was by a separate read-only Agent sharing the session/GitHub identity,
+not a separate natural person. It did not independently run tests.
+
+I308/H/G/T8 remain Active and incomplete. Mutation #770 is a separate unmerged
+stage; local policy/read coverage commits `82667ca54` and `07c005b87` are not yet
+published. Ordinary effectful Execute/HTTP/WebSearch Auto, remaining registered
+operation/profile dispositions and final delivery gates remain outstanding.
+Earlier checkpoints below preserve historical states and do not override this one.
+
 > Document status: Active (#765 merged; effective at `8f0ce2340d7728ac5b3ee8eba814050a2360e194`)
 > Published plan date: 2026-10-26
 > Planned objective: complete handoff T8 with model-assisted, invocation-local approval across registered native tools, including suitable Write, Network and Execute operations and higher-risk file changes.

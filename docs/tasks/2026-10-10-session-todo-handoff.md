@@ -1,11 +1,22 @@
 ## T8 active implementation — 2026-10-26
 
+Foundation #769 is now merged as `d45d08f0a82706c2abb26fcb32899f8b24fa64b1`,
+after all-success exact-head CI 40274739232 (including native Windows), independent
+Agent permission/security/API review and merge-time CAS. Mutation #770 remains
+unmerged with CI running at this checkpoint. Local follow-up commits `82667ca54`
+and `07c005b87` extend mutation-policy and real read-only dispatch evidence;
+Agent tests pass 497/497, Clippy and both governance validators pass.
+This is partial T8 delivery; ordinary Execute/HTTP/WebSearch Auto and the remaining
+operation/profile/platform coverage remain incomplete. T2/T3 → T4 → T5 → T1 → T6
+retain their full scope and remain incomplete.
+
 I308 activation #765 merged at `8f0ce2340`; the claim is effective.
 The [I308 owner](../iterations/I308-builtin-auto-review.md) records local built-in identity,
 retained-network review and ordinary invocation evidence stages. Full T8 is incomplete:
 ordinary effectful Execute, HTTP/WebSearch Auto admission, complete higher-risk mutation
 coverage and final platform/CI/review
-remain open. No T8 stage is claimed merged. T2/T3 → T4 → T5 → T1 → T6 remain incomplete.
+remain open. The foundation merge above supersedes earlier unmerged checkpoints.
+T2/T3 → T4 → T5 → T1 → T6 remain incomplete.
 
 Mutation checkpoint: `81df1fc45` implements complete-image Auto review for retained
 string edits. Local deletion continuation also captures original bytes after Read
