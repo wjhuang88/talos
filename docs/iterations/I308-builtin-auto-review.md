@@ -1,6 +1,6 @@
 # Iteration I308: Shared Auto Review For All Built-In Tools
 
-> Document status: Planned
+> Document status: Active (proposed; effective only when #765 merges)
 > Published plan date: 2026-10-26
 > Planned objective: complete handoff T8 with model-assisted, invocation-local approval across registered native tools, including suitable Write, Network and Execute operations and higher-risk file changes.
 > Baseline rule: preserve this published target; implementation stages do not reduce acceptance.
@@ -10,21 +10,21 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-6 handoff closure session |
 | Work Slice | I308 / PERM-007-H and PERM-007-G: native-tool Auto evidence, shared assessment and invocation-local admission, higher-risk file recovery, production registration coverage, tests and documentation; excludes search transport and provider protocol implementation. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-10-26 |
 | Source Issue | #563; handoff T8 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #765 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Maintainer authorized continued full handoff delivery; #765 requires independent permission/security/API review, exact-head CI, both validators and final merge-time CAS before merge. |
 | Implementation PR | Not started |
 | Last Updated | 2026-10-26 |
 | Handoff / Release Condition | Satisfy full H/G acceptance with existing implementation commits, independent permission/security/API review and platform evidence; no release authorized. |
 
-This draft establishes neither ownership nor activation. Finalize the actual governance PR number,
-proposed Claimed/Active state and authorization before review; both become effective only on main.
+This governance candidate proposes claim and activation atomically in #765. Both are ineffective
+until the finalized exact-head record merges to main; implementation starts from that merge or later.
 No production implementation belongs in this governance candidate.
 
 ## Published Baseline
@@ -92,7 +92,7 @@ source and applicable limits instead of extending speculative local machinery.
 
 ### Documentation To Update
 
-- Auto user guide and configuration/permission behavior documentation, located against current source during stage 1.
+- `README.md` Auto behavior/configuration sections and SDK examples affected by the final API.
 - Tool behavior/API migration notes, ADR-064/070/089 where affected, and a complete production operation coverage matrix in this owner or a linked reference.
 - H/G owners, #563, handoff ledger, backlog, iteration index and Board; completion requires already-existing implementation SHA evidence.
 
@@ -129,7 +129,7 @@ Handoff ordering after T8 remains T2/T3 → T4 → T5 → T1 → T6, all incompl
 
 ## Verification Evidence
 
-- Pending: local governance validators, independent review, exact-head CI and merge CAS.
+- Draft baseline: both local governance validators passed with zero warnings. Finalized candidate rerun, independent review, exact-head CI and merge CAS remain required.
 
 ## Completion Evidence
 
@@ -140,3 +140,5 @@ No implementation completion evidence exists. Do not mark H, G or T8 Complete fr
 - Full production operation matrix and compatible API design are stage 1 implementation deliverables, not claimed complete by discovery notes.
 - G remains human-gated until implemented/validated; no higher-risk policy implementation is claimed here.
 - Remaining handoff tasks and gix capability/advisory tracking retain separate owners.
+
+- 2026-10-26: #765 number backfilled; proposed Claimed/Active record and H/G owner synchronization are ineffective until main merge.

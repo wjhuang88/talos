@@ -1,8 +1,8 @@
 ## Proposed T8 selection — 2026-10-26
 
-[I308](../iterations/I308-builtin-auto-review.md) is a governance draft for full PERM-007-H/G Auto coverage.
-Unclaimed and not activated; actual PR number, review, checks and target-branch merge
-are required before implementation. T7 is Complete; later handoff tasks remain incomplete.
+[I308](../iterations/I308-builtin-auto-review.md) proposes full PERM-007-H/G Auto coverage in #765.
+Claimed/Active values are ineffective until the reviewed, validated governance record merges.
+Implementation must start from that merge or later main. T7 is Complete; later handoff tasks remain incomplete.
 
 # Product Backlog
 
