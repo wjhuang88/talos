@@ -1078,3 +1078,12 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
 - The first broad test invocation failed during linking with disk exhaustion,
   before test execution. Previously authorized `target/debug` example and
   incremental artifacts were cleared; subsequent library-only tests above pass.
+- The sandboxed standard preflight later failed at the eight-stage local Push
+  fixture's process-observation call (`EPERM`), with Tools 975/976 passing. It
+  therefore did not complete workspace/SDK validation. The same standard command
+  is now running with explicit outside-sandbox authorization; its result remains
+  pending (`/private/tmp/i308-runtime-registration-preflight-authorized.log`).
+- #772 subsequently merged as `881a27b890e5310055380e6e3f5b0da78f9fdd3c`.
+  Four local continuation commits were rebased onto it without conflicts; file
+  trees before and after rebase match. The repair is now `75d5811c0`, on
+  `feat/i308-runtime-registration`. No new candidate has been published yet.
