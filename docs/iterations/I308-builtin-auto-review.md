@@ -366,3 +366,24 @@ remaining H/G coverage remain unimplemented.
 - These commits remain local. Native Windows evidence, complete ordinary
   Write/Network/Execute coverage, full higher-risk recovery, final review, CI and
   merge are outstanding. This checkpoint does not complete T8 or any later task.
+
+### Recoverable deletion local checkpoint — 2026-10-26
+
+- Added optional regular-file `delete` backup/recovery without changing public
+  `DeleteInput` struct literals. Backup capture declares and checks Read in addition
+  to Write; restoration requires Write and never overwrites a recreated path.
+  Instance/path-bound, expiring receipts reuse the existing edit store limits.
+- Unix backup opening uses the existing Git integration pattern with libc
+  O_NOFOLLOW/O_NONBLOCK; Windows uses the existing windows-sys reparse-point flag
+  and rejects reparse metadata. The file-write feature now explicitly enables these
+  already-declared system dependencies; no dependency package or unsafe code added.
+- Locked file-write file-tool tests passed 86/86 and scoped tests Clippy passed with
+  warnings denied. An initial default-feature run selected zero tests and is not
+  evidence; a subsequent missing test import was fixed before the passing run.
+- Independent incremental review identified the original blocking/FIFO and symlink
+  backup-open race; the revised no-follow/nonblocking handle check closed that finding.
+  It did not grant whole-stage or merge approval. Ancestor/open-to-delete external
+  path races remain a limitation; no atomic rollback or concurrency isolation claimed.
+- README documents actual recovery limits. Auto deletion and full G coverage remain
+  unimplemented. Final full preflight, xwin/native Windows, exact-head review/CI and
+  merge remain outstanding. This local checkpoint does not complete T8.

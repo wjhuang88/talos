@@ -760,6 +760,16 @@ per file, 16 MiB and 64 records per instance. A full store refuses the edit befo
 This restores file contents only, not historical metadata, deleted files or directories;
 it is not durable recovery or protection against concurrent external writers.
 
+For a single regular-file deletion, `delete` also accepts `"retain_backup": true`.
+It requires Read permission for backup capture as well as Write permission for deletion.
+Use the returned ID with `{"path":"file.txt","recovery_id":"<returned-id>"}` on the
+same `delete` instance to restore under current Write permission. Restoration creates the
+file exclusively and refuses to overwrite any recreated file or link. The same memory,
+size and expiry limits apply; directories cannot be backed up. This restores bytes and
+basic permissions, not ownership, ACLs or timestamps. Failures can leave a partially
+restored file; inspect the reported effect before retrying. It does not provide isolation
+from concurrent external path replacement or make destructive operations Auto-eligible.
+
 File tools remain workspace-confined by default. When an interactive permission-aware mode requests
 an external path, Talos asks the operator; approval carries only the selected tool operation and
 normalized path. Denial, missing headless approval, path reuse, operation reuse, and changed

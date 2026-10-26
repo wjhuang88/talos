@@ -282,3 +282,28 @@ async fn anchored_edit_backup_restores_original_and_invalidates_old_snapshot() {
     );
     assert!(edit.execute(input).await.is_error);
 }
+
+#[cfg(unix)]
+#[test]
+fn backup_open_rejects_leaf_links_and_special_files() {
+    use std::os::unix::fs::symlink;
+    let dir = tempfile::tempdir().expect("tempdir");
+    let target = dir.path().join("target");
+    std::fs::write(&target, "private").expect("write");
+    let link = dir.path().join("link");
+    symlink(&target, &link).expect("symlink");
+    assert!(super::open_backup_file(&link).is_err());
+    let socket = dir.path().join("socket");
+    let _listener = std::os::unix::net::UnixListener::bind(&socket).expect("bind");
+    assert!(super::open_backup_file(&socket).is_err());
+    let fifo = dir.path().join("fifo");
+    assert!(
+        std::process::Command::new("mkfifo")
+            .arg(&fifo)
+            .status()
+            .expect("Unix mkfifo fixture")
+            .success()
+    );
+    // Without O_NONBLOCK this open would wait indefinitely for a writer.
+    assert!(super::open_backup_file(&fifo).is_err());
+}
