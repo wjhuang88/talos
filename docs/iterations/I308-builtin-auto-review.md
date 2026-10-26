@@ -321,7 +321,7 @@ Runtime shared composition has a separate Product/Runtime inventory-equivalence 
 
 | Registered operations | Current I308 disposition / remaining evidence |
 |---|---|
-| `read`, `ls`, `read_image`, `document_extract`, `grep`, `glob`, `diff`, `stat`, `tree`, `find_symbol`, `find_references`, `list_symbols`, `list_imports` | Existing policy/read paths retained; complete per-operation Auto fallback/production evidence still required. MCP omits `read_image`. |
+| `read`, `ls`, `read_image`, `document_extract`, `grep`, `glob`, `diff`, `stat`, `tree`, `find_symbol`, `find_references`, `list_symbols`, `list_imports` | Real Agent dispatch tests cover default Read Allow and explicit Read Deny for read/ls/stat/tree/grep/glob/diff with actual results and zero model calls/grants. Remaining operations and complete profile/platform coverage remain outstanding. MCP omits `read_image`. |
 | `write`, `edit`, `delete` | Exact-content atomic creation is merged in #769; complete-image review and opt-in real recovery for string/anchored edit and text deletion are in unmerged #770. Binary/NUL and secret-like content retain human fallback. Expanded special-path/policy tests are published in #771; full G acceptance remains incomplete. |
 | `save_url`, `fetch_url`, `http_request`, `web_search` | Protected prepared network assessment exists; ordinary product transport Auto allowance remains unimplemented and its pending contract decision is not assumed accepted. |
 | `git_status`, `git_diff`, `git_log`, `git_show`, `git_branch_list` | Existing read policy retained; I308 complete disposition evidence outstanding. |
@@ -739,3 +739,22 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
   incomplete without a closing-keyword phrase. #771's failed reconciliation must
   be rerun after its current CI run is terminal; no product failure is inferred
   from that metadata mismatch.
+
+### Search and diff read admission continuation — 2026-10-26
+
+- Existing `tests/read_auto.rs` now also dispatches real grep, glob and two-file
+  diff tools under default Read Allow and explicit Read Deny. Allowed results
+  contain the fixture path; denied calls return errors. All seven operations
+  retain zero assessor calls, zero grants and exactly one result per invocation.
+- Agent's dev-only talos-tools dependency enables its existing `search` feature
+  so these tests also compile in isolated package checks. No production feature
+  default, dependency version or permission behavior changes.
+- Locked Agent library tests pass 498/498; library/test Clippy passes with
+  `-D warnings`. Logs: `/private/tmp/i308-search-read-agent.log` and
+  `/private/tmp/i308-search-read-clippy.log`. Complete read-family/profile/platform
+  evidence remains outstanding; these fixtures do not prove arbitrary search or
+  diff content correctness.
+- Todo commit `3626be38682369d3f490d285db5c86ece6f3a4b4` received independent
+  read-only Agent APPROVE against base `e8e8dccdb5a7d8de281cf54206036778e45e5ac2`.
+  No blocking findings; reviewer did not independently execute tests and shares
+  this session's tooling/GitHub identity. Full T8 is not complete.

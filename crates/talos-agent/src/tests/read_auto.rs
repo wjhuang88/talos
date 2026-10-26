@@ -23,6 +23,7 @@ async fn real_read_tools_preserve_policy_allow_and_deny_without_assessment() {
         let root = tempfile::tempdir().expect("workspace");
         std::fs::write(root.path().join("evidence.txt"), "read-fast-path-evidence")
             .expect("fixture");
+        std::fs::write(root.path().join("changed.txt"), "changed-evidence").expect("fixture");
         let tools: Vec<(Arc<dyn AgentTool>, Value)> = vec![
             (
                 Arc::new(talos_tools::file_tools::ReadTool::new(root.path().into())),
@@ -39,6 +40,18 @@ async fn real_read_tools_preserve_policy_allow_and_deny_without_assessment() {
             (
                 Arc::new(talos_tools::tree::TreeTool::new(root.path().into())),
                 serde_json::json!({"path":"."}),
+            ),
+            (
+                Arc::new(talos_tools::search_tools::GrepTool::new(root.path().into())),
+                serde_json::json!({"path":".","pattern":"read-fast-path-evidence"}),
+            ),
+            (
+                Arc::new(talos_tools::search_tools::GlobTool::new(root.path().into())),
+                serde_json::json!({"pattern":"*.txt"}),
+            ),
+            (
+                Arc::new(talos_tools::diff_stat::DiffTool::new(root.path().into())),
+                serde_json::json!({"old_path":"evidence.txt","new_path":"changed.txt"}),
             ),
         ];
         for (tool, input) in tools {
