@@ -4,7 +4,7 @@ use talos_permission::{
     PermissionMode, PermissionSessionState,
 };
 
-fn admit(
+pub(super) fn admit(
     root: &Path,
     operation: &dyn PreparedNormalToolInvocation,
     input: &Value,

@@ -608,3 +608,35 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
   do not treat that earlier suite as exact-final evidence. Full serial locked
   preflight is running with log `/private/tmp/i308-mutation-preflight.log`; no final
   outcome, native Windows evidence or publication approval is claimed.
+
+### Retained anchored-edit review — 2026-10-26
+
+- Extended the existing prepared edit path to snapshot-anchored operations with
+  `retain_backup=true`. Both edit schemas share read-admitted capture, complete
+  before/after evidence, one-use approval and real recovery-backed execution.
+  Final anchored execution also rechecks the snapshot record and captured revision;
+  an invalidated snapshot does not execute even when file bytes are unchanged.
+- Extracted one shared anchored-edit calculation used by ordinary and prepared
+  execution. It preserves anchor/revision/overlap checks, checks the complete output
+  length before allocation for recoverable edits and builds the output in one pass.
+  This is implemented behavior, not a separate future refactor promise.
+- Explicit standalone file-write file-tool tests pass 95/95. A separate prepared
+  anchored test covers actual edit/restoration, changed content before/after capture,
+  snapshot invalidation, oversize, bad anchor and overlapping operations. Agent
+  production dispatch tests pass for string edit, delete and anchored edit; anchored
+  review uses the same allow/uncertain/error/cancel/stale/malformed/oversize/NUL matrix.
+- Full preflight started before this anchored continuation is still running at
+  `/private/tmp/i308-mutation-preflight.log`. Source changed during that run, so even
+  a passing result will not establish final exact-head validation for this stage.
+  Final workspace/platform validation, independent review and merge remain open.
+  Ordinary effectful Execute and ordinary HTTP/WebSearch Auto remain unimplemented;
+  T8 and the original later handoff queue are incomplete.
+- Follow-up validation: Agent library tests pass 496/496, Agent and standalone
+  file-write library Clippy pass with `-D warnings`, formatting and both governance
+  validators pass. Incremental independent static review found no concrete blocker;
+  this is not final exact-head publication approval.
+- The earlier full preflight terminated with Tools 974 passed / 1 failed:
+  `prepared_local_push_runs_all_eight_admitted_stages` could not launch `ps`
+  (`Operation not permitted`) to observe maintenance descendants under the sandbox.
+  A full serial preflight is now running outside that sandbox with stable source;
+  log: `/private/tmp/i308-mutation-preflight-final.log`. Its outcome is pending.

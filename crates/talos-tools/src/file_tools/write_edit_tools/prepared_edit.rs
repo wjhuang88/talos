@@ -1,4 +1,4 @@
-//! Read-admitted capture and one-use execution of recoverable string edits.
+//! Read-admitted capture and one-use execution of recoverable edits.
 
 use super::*;
 use talos_core::tool::{
@@ -13,12 +13,16 @@ pub(super) fn prepare(
     provenance: ToolProvenance,
 ) -> Result<Option<Box<dyn PreparedNormalToolInvocation>>, String> {
     if input.get("retain_backup").and_then(Value::as_bool) != Some(true)
-        || input.get("snapshot_id").is_some()
         || input.get("recovery_id").is_some()
     {
         return Ok(None);
     }
-    let edit: EditInput = serde_json::from_value(input.clone()).map_err(|e| e.to_string())?;
+    let edit = if input.get("snapshot_id").is_some() {
+        validate_anchored_field_types(input).map_err(|e| e.to_string())?;
+        RetainedEdit::Anchored(serde_json::from_value(input.clone()).map_err(|e| e.to_string())?)
+    } else {
+        RetainedEdit::String(serde_json::from_value(input.clone()).map_err(|e| e.to_string())?)
+    };
     Ok(Some(Box::new(PreparedEdit {
         root: tool.workspace_root.clone(),
         snapshots: tool.snapshots.clone(),
@@ -26,13 +30,14 @@ pub(super) fn prepare(
         input: input.clone(),
         profile: vec![ToolPermissionFacet::with_resource(
             ToolNature::Read,
-            &edit.path,
+            edit.path(),
             ToolResourceKind::Path,
         )],
         edit,
         provenance,
         identity: PreparedPlanIdentity::new(),
         mutation: None,
+        preview: String::new(),
     })))
 }
 
@@ -41,11 +46,26 @@ struct PreparedEdit {
     snapshots: Option<FileSnapshotRegistry>,
     recovery: std::sync::Arc<super::super::recovery::FileRecoveryStore>,
     input: Value,
-    edit: EditInput,
+    edit: RetainedEdit,
     provenance: ToolProvenance,
     identity: PreparedPlanIdentity,
     profile: Vec<ToolPermissionFacet>,
     mutation: Option<PreparedFileMutationEvidence>,
+    preview: String,
+}
+
+enum RetainedEdit {
+    String(EditInput),
+    Anchored(AnchoredEditInput),
+}
+
+impl RetainedEdit {
+    fn path(&self) -> &str {
+        match self {
+            Self::String(edit) => &edit.path,
+            Self::Anchored(edit) => &edit.path,
+        }
+    }
 }
 
 impl PreparedEdit {
@@ -63,7 +83,7 @@ impl PreparedEdit {
             .map_err(|_| "edit admission does not match prepared plan".to_owned())?;
         let path = resolve_authorized_path(
             &self.root,
-            &self.edit.path,
+            self.edit.path(),
             "edit",
             ToolNature::Read,
             &authorizations,
@@ -73,7 +93,7 @@ impl PreparedEdit {
             let description = mutation.description();
             let write_path = resolve_authorized_path(
                 &self.root,
-                &self.edit.path,
+                self.edit.path(),
                 "edit",
                 ToolNature::Write,
                 &authorizations,
@@ -81,6 +101,17 @@ impl PreparedEdit {
             .map_err(|e| e.to_string())?;
             if path != description.path || write_path != path {
                 return Err(FileToolError::PathIdentityChanged.to_string());
+            }
+            if let RetainedEdit::Anchored(edit) = &self.edit {
+                let snapshot = self
+                    .snapshots
+                    .as_ref()
+                    .ok_or(FileToolError::SnapshotNotFound.to_string())?
+                    .get(&edit.snapshot_id, &path)
+                    .map_err(|e| e.to_string())?;
+                if snapshot.file_revision != digest(description.before.as_bytes()) {
+                    return Err(FileToolError::FileRevisionMismatch.to_string());
+                }
             }
             let after = description.after.as_ref().ok_or("missing edit result")?;
             let lock = self
@@ -107,8 +138,8 @@ impl PreparedEdit {
             return Ok(PreparedNormalStage::Complete(ToolExecutionOutput::success(
                 format!(
                     "edited {}{receipt}\ndiff:\n{}",
-                    self.edit.path,
-                    super::bounded_replacement_diff(&self.edit.old_string, &self.edit.new_string),
+                    self.edit.path(),
+                    self.preview,
                 ),
             )));
         }
@@ -118,19 +149,43 @@ impl PreparedEdit {
                 .0,
         )
         .map_err(|_| "edit requires a text file")?;
-        let start = before
-            .find(&self.edit.old_string)
-            .ok_or("edit string not found")?;
-        let updated_len = before
-            .len()
-            .checked_sub(self.edit.old_string.len())
-            .and_then(|len| len.checked_add(self.edit.new_string.len()))
-            .filter(|len| *len <= talos_core::tool::MAX_FILE_MUTATION_REVIEW_BYTES)
-            .ok_or("edit result exceeds complete review image limit")?;
-        let mut after = String::with_capacity(updated_len);
-        after.push_str(&before[..start]);
-        after.push_str(&self.edit.new_string);
-        after.push_str(&before[start + self.edit.old_string.len()..]);
+        let after = match &self.edit {
+            RetainedEdit::Anchored(edit) => {
+                let registry = self
+                    .snapshots
+                    .as_ref()
+                    .ok_or(FileToolError::SnapshotNotFound.to_string())?;
+                let snapshot = registry
+                    .get(&edit.snapshot_id, &path)
+                    .map_err(|e| e.to_string())?;
+                let (updated, preview) = plan_anchored_edit(
+                    before.as_bytes(),
+                    edit,
+                    &snapshot,
+                    Some(talos_core::tool::MAX_FILE_MUTATION_REVIEW_BYTES),
+                )
+                .map_err(|e| e.to_string())?;
+                self.preview = preview;
+                String::from_utf8(updated).map_err(|_| "edit result requires text")?
+            }
+            RetainedEdit::String(edit) => {
+                let start = before
+                    .find(&edit.old_string)
+                    .ok_or("edit string not found")?;
+                let updated_len = before
+                    .len()
+                    .checked_sub(edit.old_string.len())
+                    .and_then(|len| len.checked_add(edit.new_string.len()))
+                    .filter(|len| *len <= talos_core::tool::MAX_FILE_MUTATION_REVIEW_BYTES)
+                    .ok_or("edit result exceeds complete review image limit")?;
+                let mut after = String::with_capacity(updated_len);
+                after.push_str(&before[..start]);
+                after.push_str(&edit.new_string);
+                after.push_str(&before[start + edit.old_string.len()..]);
+                self.preview = bounded_replacement_diff(&edit.old_string, &edit.new_string);
+                after
+            }
+        };
         self.identity = PreparedPlanIdentity::new();
         self.mutation = Some(
             PreparedFileMutationEvidence::new(
@@ -146,7 +201,7 @@ impl PreparedEdit {
         self.profile = [ToolNature::Read, ToolNature::Write]
             .into_iter()
             .map(|nature| {
-                ToolPermissionFacet::with_resource(nature, &self.edit.path, ToolResourceKind::Path)
+                ToolPermissionFacet::with_resource(nature, self.edit.path(), ToolResourceKind::Path)
             })
             .collect();
         Ok(PreparedNormalStage::Continue(self))
@@ -181,3 +236,7 @@ impl PreparedNormalToolInvocation for PreparedEdit {
 #[cfg(test)]
 #[path = "prepared_edit_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "prepared_anchored_tests.rs"]
+mod anchored_tests;

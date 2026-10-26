@@ -10,6 +10,7 @@ struct Assessor {
     state: Arc<talos_permission::PermissionSessionState>,
     control: AutoPermissionControl,
     delete: bool,
+    anchored: bool,
 }
 #[async_trait]
 impl AutoPermissionAssessor for Assessor {
@@ -26,7 +27,9 @@ impl AutoPermissionAssessor for Assessor {
         _: std::time::Duration,
     ) -> Result<String, String> {
         self.calls.fetch_add(1, Ordering::SeqCst);
-        if !self.delete {
+        if self.anchored {
+            assert_eq!(request.input["operations"][0]["content"], "hello");
+        } else if !self.delete {
             assert_eq!(request.input["new_string"], "hello");
         }
         assert_eq!(request.mutation.before, "hi");
@@ -70,15 +73,20 @@ impl AutoPermissionAssessor for Assessor {
 
 #[tokio::test]
 async fn trusted_edit_reviews_complete_images_before_real_execution() {
-    run_mutation_scenarios(false).await;
+    run_mutation_scenarios(false, false).await;
 }
 
 #[tokio::test]
 async fn trusted_delete_reviews_complete_image_before_real_execution() {
-    run_mutation_scenarios(true).await;
+    run_mutation_scenarios(true, false).await;
 }
 
-async fn run_mutation_scenarios(delete: bool) {
+#[tokio::test]
+async fn trusted_anchored_edit_reviews_complete_images_before_real_execution() {
+    run_mutation_scenarios(false, true).await;
+}
+
+async fn run_mutation_scenarios(delete: bool, anchored: bool) {
     for scenario in [
         "allow",
         "changed_file",
@@ -96,7 +104,7 @@ async fn run_mutation_scenarios(delete: bool) {
         "nul_original",
         "nul_replacement",
     ] {
-        if delete && scenario == "nul_replacement" {
+        if (delete && scenario == "nul_replacement") || (anchored && scenario == "nul_original") {
             continue;
         }
         let allow = scenario == "allow";
@@ -113,6 +121,36 @@ async fn run_mutation_scenarios(delete: bool) {
         )
         .expect("original");
         let mut registry = ToolRegistry::new();
+        let mut anchor = None;
+        let edit_tool: Arc<dyn AgentTool> = if anchored {
+            let (read, _, edit, _) =
+                talos_tools::file_tools::snapshot_aware_file_tools(root.path().to_owned());
+            let result = read
+                .execute(serde_json::json!({"path":"existing.txt"}))
+                .await;
+            assert!(!result.is_error, "{}", result.content);
+            let mut lines = result.content.lines();
+            let snapshot = lines
+                .next()
+                .expect("snapshot")
+                .strip_prefix("[snapshot:")
+                .and_then(|s| s.strip_suffix(']'))
+                .expect("id")
+                .to_owned();
+            let target = lines
+                .next()
+                .expect("line")
+                .split_once('|')
+                .expect("anchor")
+                .0
+                .to_owned();
+            anchor = Some((snapshot, target));
+            Arc::new(edit)
+        } else {
+            Arc::new(talos_tools::file_tools::EditTool::new(
+                root.path().to_owned(),
+            ))
+        };
         registry
             .register_builtin_contributions([ToolContribution::new(
                 ToolContributionSource::new("talos-tools:file"),
@@ -121,9 +159,7 @@ async fn run_mutation_scenarios(delete: bool) {
                         root.path().to_owned(),
                     )) as Arc<dyn AgentTool>
                 } else {
-                    Arc::new(talos_tools::file_tools::EditTool::new(
-                        root.path().to_owned(),
-                    )) as Arc<dyn AgentTool>
+                    edit_tool
                 },
             )])
             .expect("registration");
@@ -139,6 +175,7 @@ async fn run_mutation_scenarios(delete: bool) {
                 state: state.clone(),
                 control: control.clone(),
                 delete,
+                anchored,
             }),
             Arc::new(AutoDenyFallback),
             ManagedWorkspaceLease::for_permission_session(root.path(), state.clone())
@@ -161,6 +198,8 @@ async fn run_mutation_scenarios(delete: bool) {
                         name: if delete { "delete" } else { "edit" }.into(),
                         input: if delete {
                             serde_json::json!({"path":"existing.txt","retain_backup":true})
+                        } else if let Some((snapshot, target)) = &anchor {
+                            serde_json::json!({"path":"existing.txt","snapshot_id":snapshot,"retain_backup":true,"operations":[{"op":"replace","target":target,"content":content}]})
                         } else {
                             serde_json::json!({"path":"existing.txt","old_string":"hi","new_string":content,"retain_backup":true})
                         },

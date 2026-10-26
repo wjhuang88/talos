@@ -11,8 +11,11 @@ Mutation checkpoint: `81df1fc45` implements complete-image Auto review for retai
 string edits. Local deletion continuation also captures original bytes after Read
 admission, reviews text-file deletion, refuses changed content and returns a real
 owning-instance recovery receipt. Explicit standalone file-write file-tool tests
-pass 94/94; edit/delete Agent review scenarios pass locally. Anchored-edit Auto and
-final independent/platform/workspace evidence remain outstanding; see the I308 owner.
+pass 94/94; edit/delete Agent review scenarios pass locally. The local anchored-edit
+continuation now reuses capture/recovery and the existing anchor validation, with
+95/95 file-tool tests and real Agent review scenarios passing. Final independent,
+platform/workspace evidence and ordinary Execute/HTTP/WebSearch Auto remain
+outstanding; see the I308 owner.
 
 Creation-stage checkpoint: local `9852b65b3` enables exact-content model review
 followed by real atomic new-file creation; `75ffc8f9f` verifies refusal of invalid
