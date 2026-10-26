@@ -19,7 +19,7 @@
 | Governance Claim PR | #765 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer authorized continued full handoff delivery; #765 requires independent permission/security/API review, exact-head CI, both validators and final merge-time CAS before merge. |
-| Implementation PR | #769 |
+| Implementation PR | #769 (foundation); #770 (stacked file mutation stage) |
 | Last Updated | 2026-10-26 |
 | Handoff / Release Condition | Satisfy full H/G acceptance with existing implementation commits, independent permission/security/API review and platform evidence; no release authorized. |
 
@@ -306,7 +306,7 @@ Runtime shared composition has a separate Product/Runtime inventory-equivalence 
 | Registered operations | Current I308 disposition / remaining evidence |
 |---|---|
 | `read`, `ls`, `read_image`, `document_extract`, `grep`, `glob`, `diff`, `stat`, `tree`, `find_symbol`, `find_references`, `list_symbols`, `list_imports` | Existing policy/read paths retained; complete per-operation Auto fallback/production evidence still required. MCP omits `read_image`. |
-| `write`, `edit`, `delete` | Existing creation path retained; opt-in edit recovery implemented locally; higher-risk effect assessment and Auto execution still incomplete. |
+| `write`, `edit`, `delete` | Exact-content atomic creation is in #769; complete-image review and opt-in real recovery for string/anchored edit and text deletion are in #770. Binary/NUL and secret-like content retain human fallback. Expanded special-path/policy tests are local; neither PR is merged and full G acceptance remains incomplete. |
 | `save_url`, `fetch_url`, `http_request`, `web_search` | Protected prepared network assessment exists; ordinary product transport Auto allowance remains unimplemented and its pending contract decision is not assumed accepted. |
 | `git_status`, `git_diff`, `git_log`, `git_show`, `git_branch_list` | Existing read policy retained; I308 complete disposition evidence outstanding. |
 | `git_add`, `git_commit`, `git_push`, `git_pull`, `git_checkout` | I300 prepared command route retained; no reopening of accepted whole-command Pull semantics. I308 full coverage evidence outstanding. |
@@ -688,3 +688,17 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
   `/private/tmp/i308-mutation-policy-clippy.log`. This continuation has no new
   production code; publication review/platform gates remain outstanding. Full T8,
   ordinary Execute/HTTP/WebSearch Auto and all later handoff items remain open.
+
+### Read policy execution continuation — 2026-10-26
+
+- Separate `tests/read_auto.rs` exercises the real Read, Ls, Stat and Tree tools
+  through production Agent dispatch with Auto enabled. Workspace-policy Allow
+  returns actual file content/metadata/listings with zero assessor calls and zero
+  persistent grants. Explicit Read Deny returns an error, also with zero assessor
+  calls. Each invocation must produce exactly one tool result.
+- This verifies four read operations, not the complete production/profile inventory.
+  The file-mutation policy tests are committed independently as `82667ca54`.
+- Locked Agent library tests pass 497/497; library/test Clippy passes with
+  `-D warnings`. Logs: `/private/tmp/i308-read-policy-agent.log` and
+  `/private/tmp/i308-read-policy-clippy.log`. No new production behavior or full
+  workspace/native Windows validation is claimed by this test-only continuation.
