@@ -443,3 +443,30 @@ remaining H/G coverage remain unimplemented.
   execution, ordinary effectful Execute/Network admission under resolved contracts,
   complete tool/profile/host dispositions and full I308 acceptance. No later
   handoff item is completed or waived by this submission.
+
+### 2026-10-26 Current-head validation failures and fixture isolation
+
+At `99c828313`, two authorized parallel standard preflights each failed one
+unchanged search refusal socket fixture (Tools 970 passed / 1 failed). An isolated
+workspace-feature rerun passed. A temporary test-only error-chain diagnostic in
+a complete library run captured `ConnectionReset` / errno 54 with
+`is_connect=false`; it was removed. No production classifier change or root-cause
+fix is claimed. Issue #768 owns this independent validation residual; the earlier
+I300 BrokenPipe observation and this reset must not be relabelled as typed
+ConnectionRefused or used to broaden failover.
+
+The serial standard preflight then failed earlier at this stage's new CLI
+inventory assertion: Print lacked all Todo tools. `default_sessions_dir()` depends
+on process-global home environment, and existing init-wizard tests remove HOME.
+The inventory fixture now uses the existing explicit Todo-contribution builders
+with a temporary sessions directory, preserving the full expected inventory and
+instance-ownership assertions without depending on ambient home state. Focused
+registry tests pass; full post-fix preflight, renewed exact-head review and remote
+platform evidence remain outstanding. No T8 completion or merged stage is claimed.
+
+Local logs: `/private/tmp/i308-foundation-rebased-preflight.log`,
+`/private/tmp/i308-foundation-preflight-retry.log`,
+`/private/tmp/i308-search-classification-diagnostic.log`,
+`/private/tmp/i308-foundation-preflight-serial.log`, and
+`/private/tmp/i308-registry-isolation.log`. Serial scheduling is a diagnostic and
+validation alternative, not a fix for #768 or evidence of parallel reliability.

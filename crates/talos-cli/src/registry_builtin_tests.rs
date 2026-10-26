@@ -35,13 +35,21 @@ fn product_scheduler_factory_registers_exact_owned_instances() {
 // product tool must receive an explicit disposition in I308 before this changes.
 #[test]
 fn product_registries_have_no_uninventoried_native_operations() {
-    let print = build_print_tool_registry(Vec::new());
+    let temp = tempfile::tempdir().expect("sessions directory");
+    let sessions_dir = temp.path().join("sessions");
+    let session_id = Uuid::new_v4();
+    let print = build_print_tool_registry_with_todo_contributions(
+        Vec::new(),
+        todo_tool_contributions_for_sessions_dir(&sessions_dir, session_id),
+    );
     let (tx, _rx) = mpsc::unbounded_channel();
-    let tui = build_tui_tool_registry(
+    let tui = build_tui_tool_registry_with_todo_contributions(
         Arc::new(TuiApprovalHandler::new(tx, PathBuf::from("."))),
         PathBuf::from("."),
-        Uuid::new_v4(),
         Vec::new(),
+        todo_tool_contributions_for_sessions_dir(&sessions_dir, session_id),
+        None,
+        None,
     );
     let mcp = build_mcp_tool_registry();
     let shared = [
