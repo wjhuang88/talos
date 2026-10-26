@@ -1,3 +1,9 @@
+## Proposed gix dependency stage — 2026-10-26
+
+[I309](iterations/I309-gix-090-upgrade.md) proposes Active/Claimed in #774 for the explicit
+maintainer request to upgrade gix 0.87.1 to 0.90.0. Ownership and activation are ineffective
+until merge. No dependency change is implemented; I308/T8 remains independently incomplete.
+
 ## Active T8 implementation — 2026-10-26
 
 [I308](iterations/I308-builtin-auto-review.md) is Active after #765 merged at `8f0ce2340`.
