@@ -162,3 +162,128 @@ async fn shortened_presentation_cannot_hide_oversized_write_from_auto() {
     assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 0);
     assert!(!root.path().join("new.txt").exists());
 }
+
+#[tokio::test]
+async fn network_manifest_reaches_resolver_without_replacing_exact_input() {
+    use talos_core::tool::{ToolNetworkEndpoint, ToolNetworkScope};
+
+    struct NetworkResolver(ToolNetworkManifest);
+    #[async_trait]
+    impl ApprovalResolver for NetworkResolver {
+        async fn resolve(
+            &self,
+            _: PermissionApprovalRequest,
+            _: Duration,
+        ) -> Result<ApprovalChoice, ApprovalResolverError> {
+            panic!("network evidence must reach the dedicated resolver")
+        }
+
+        async fn resolve_network_invocation(
+            &self,
+            request: PermissionApprovalRequest,
+            input: &serde_json::Value,
+            manifest: &ToolNetworkManifest,
+            _: Duration,
+            auto_allowed: bool,
+            intent: Option<&str>,
+        ) -> Result<ApprovalChoice, ApprovalResolverError> {
+            assert_eq!(manifest, &self.0);
+            assert_eq!(input["query"], "private query");
+            assert_eq!(request.arguments["query"], "<redacted>");
+            assert!(auto_allowed);
+            assert_eq!(intent, Some("search documentation"));
+            Ok(ApprovalChoice::Deny)
+        }
+    }
+
+    let endpoint =
+        ToolNetworkEndpoint::new("https", "example.com", 443, "GET", "/search").expect("endpoint");
+    let manifest = ToolNetworkManifest::new(
+        ToolNetworkScope::new(uuid::Uuid::new_v4(), 0, vec![endpoint], None, vec![], 0)
+            .expect("scope"),
+    );
+    let root = tempfile::tempdir().expect("workspace");
+    let state = Arc::new(PermissionSessionState::new(
+        PermissionEngine::with_workspace_root(root.path().to_owned()),
+    ));
+    let pipeline = PermissionPipeline::new(
+        state.clone(),
+        PermissionContext::new(
+            PermissionMode::Interactive,
+            InteractionCapability::Available,
+        ),
+        Some(Arc::new(NetworkResolver(manifest.clone()))),
+    );
+    let input = serde_json::json!({"query": "private query"});
+    let facets = [ToolPermissionFacet::with_resource(
+        ToolNature::Network,
+        "example.com",
+        ToolResourceKind::Domain,
+    )];
+    let result = pipeline
+        .authorize_network(
+            PermissionAuthorizationRequest {
+                tool_name: "web_search",
+                provenance: ToolProvenance::Native,
+                profile: &facets,
+                input: &input,
+                presentation_input: serde_json::json!({"query": "<redacted>"}),
+                summary_fields: vec![],
+                deadline: Duration::from_secs(2),
+            },
+            &manifest,
+            Some("search documentation"),
+        )
+        .await;
+    assert!(
+        matches!(result, Err(PermissionPipelineError::Denied(_))),
+        "{}",
+        result.err().map(|e| e.to_string()).unwrap_or_default()
+    );
+    assert_eq!(state.grant_count().expect("grants"), 0);
+}
+
+#[tokio::test]
+async fn legacy_resolver_preserves_exact_input_network_fallback() {
+    use talos_core::tool::{ToolNetworkEndpoint, ToolNetworkScope};
+    let endpoint =
+        ToolNetworkEndpoint::new("https", "example.com", 443, "GET", "/").expect("endpoint");
+    let manifest = ToolNetworkManifest::new(
+        ToolNetworkScope::new(uuid::Uuid::new_v4(), 0, vec![endpoint], None, vec![], 0)
+            .expect("scope"),
+    );
+    let root = tempfile::tempdir().expect("workspace");
+    let state = Arc::new(PermissionSessionState::new(
+        PermissionEngine::with_workspace_root(root.path().to_owned()),
+    ));
+    let pipeline = PermissionPipeline::new(
+        state,
+        PermissionContext::new(
+            PermissionMode::Interactive,
+            InteractionCapability::Available,
+        ),
+        Some(Arc::new(InputResolver)),
+    );
+    let input = serde_json::json!({"remote": "origin"});
+    let facets = [ToolPermissionFacet::with_resource(
+        ToolNature::Network,
+        "example.com",
+        ToolResourceKind::Domain,
+    )];
+    pipeline
+        .authorize_network(
+            PermissionAuthorizationRequest {
+                tool_name: "legacy_network",
+                provenance: ToolProvenance::Native,
+                profile: &facets,
+                input: &input,
+                presentation_input: serde_json::json!({"remote": "<redacted>"}),
+                summary_fields: vec![],
+                deadline: Duration::from_secs(2),
+            },
+            &manifest,
+            Some("update this repository"),
+        )
+        .await
+        .expect("legacy adapter still approves through its original method");
+}

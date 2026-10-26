@@ -142,3 +142,36 @@ No implementation completion evidence exists. Do not mark H, G or T8 Complete fr
 - Remaining handoff tasks and gix capability/advisory tracking retain separate owners.
 
 - 2026-10-26: #765 number backfilled; proposed Claimed/Active record and H/G owner synchronization are ineffective until main merge.
+
+### Local execution checkpoint — 2026-10-26
+
+- Activation #765 is merged; implementation branch `feat/i308-builtin-auto-review`
+  starts from `8f0ce2340d7728ac5b3ee8eba814050a2360e194`.
+- Added a compatible default `ApprovalResolver::resolve_network_invocation` entry point.
+  The pipeline now passes the retained transport manifest separately from exact execution
+  input and human presentation. Existing adapters delegate to their previous exact-input
+  resolution method. The manifest does not establish native implementation ownership.
+- Focused validation: `cargo test --locked -p talos-agent --lib
+  permission_pipeline::execution_input_tests` passed all four tests, including network
+  evidence delivery, denial without grants and legacy adapter compatibility.
+- This is unmerged admission plumbing, not model-based network allowance. Shared typed
+  assessment, complete native ownership coverage, actual Auto execution and G
+  recovery remain unimplemented; full preflight and independent review remain outstanding.
+
+- Ownership foundation: added explicit built-in instance registration, with same-name
+  ordinary replacement revoking the marker and duplicate batches remaining atomic.
+  Product-owned CLI groups and Runtime coding-preset/skill contributions now use it;
+  caller overrides and plugin registration retain ordinary APIs. Direct scheduler,
+  process and other registrations still need coverage; no complete inventory claim.
+- Core ownership tests passed 3/3. Runtime `shared-composition` locked check passed
+  with `CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0`. An earlier default-debug
+  check exhausted disk space and is not a code-validation success. Previously authorized
+  `target/debug/deps` and incremental cleanup recovered space; no source/Git data removed.
+- CLI production registry ownership assertions are in a separate test module.
+  Ownership is not yet consumed for model approval; implementing
+  the common assessment/admission route remains the next step.
+
+- CLI production registry ownership test passed (1/1) across print/TUI/MCP assemblies.
+  Formatting and both governance validators passed. Ownership foundation is recorded
+  in local implementation commit `d2d31b9b6`; it has not been pushed or independently
+  reviewed. No stage merge, full preflight, native Windows run or T8 completion claimed.

@@ -102,6 +102,30 @@ pub struct PermissionAuthorizationRequest<'a> {
 /// Surface adapter that resolves an already-evaluated `Ask`.
 #[async_trait]
 pub trait ApprovalResolver: Send + Sync {
+    /// Reviews the retained network plan separately from caller-controlled arguments.
+    ///
+    /// The manifest describes transport-enforced destinations, not native implementation
+    /// ownership. Implementors must establish eligibility independently and redact/bound
+    /// private input before model review. Existing adapters preserve their resolution path.
+    async fn resolve_network_invocation(
+        &self,
+        request: PermissionApprovalRequest,
+        execution_input: &serde_json::Value,
+        _manifest: &ToolNetworkManifest,
+        remaining: Duration,
+        auto_assessment_allowed: bool,
+        user_intent: Option<&str>,
+    ) -> Result<ApprovalChoice, ApprovalResolverError> {
+        self.resolve_with_execution_input(
+            request,
+            execution_input,
+            remaining,
+            auto_assessment_allowed,
+            user_intent,
+        )
+        .await
+    }
+
     /// Reviews implementation-owned command evidence. Legacy adapters retain
     /// their human resolution path and do not acquire automatic command approval.
     async fn resolve_prepared_command(
@@ -492,6 +516,16 @@ impl PermissionPipeline {
                     std::panic::AssertUnwindSafe(resolver.resolve_prepared_command(
                         approval,
                         evidence,
+                        remaining,
+                        auto_assessment_allowed,
+                        user_intent,
+                    ))
+                    .catch_unwind()
+                } else if let Some(manifest) = network_manifest {
+                    std::panic::AssertUnwindSafe(resolver.resolve_network_invocation(
+                        approval,
+                        input,
+                        manifest,
                         remaining,
                         auto_assessment_allowed,
                         user_intent,
