@@ -321,7 +321,7 @@ Runtime shared composition has a separate Product/Runtime inventory-equivalence 
 
 | Registered operations | Current I308 disposition / remaining evidence |
 |---|---|
-| `read`, `ls`, `read_image`, `document_extract`, `grep`, `glob`, `diff`, `stat`, `tree`, `find_symbol`, `find_references`, `list_symbols`, `list_imports` | Real Agent dispatch tests cover default Read Allow and explicit Read Deny for all listed operations except read_image, with actual results and zero model calls/grants. Image attachment and complete profile/platform coverage remain outstanding. MCP omits `read_image`. |
+| `read`, `ls`, `read_image`, `document_extract`, `grep`, `glob`, `diff`, `stat`, `tree`, `find_symbol`, `find_references`, `list_symbols`, `list_imports` | Real Agent dispatch tests cover default Read Allow and explicit Read Deny for all listed operations, with actual results and zero model assessments/grants. Image attachment reaches only the next provider request after an allowed read. Complete profile/platform coverage remains outstanding. MCP omits `read_image`. |
 | `write`, `edit`, `delete` | Exact-content atomic creation is merged in #769; complete-image review and opt-in real recovery for string/anchored edit and text deletion are merged in #770. Binary/NUL and secret-like content retain human fallback. Expanded special-path/policy tests are published in #771; full G acceptance remains incomplete. |
 | `save_url`, `fetch_url`, `http_request`, `web_search` | Protected prepared network assessment exists; ordinary product transport Auto allowance remains unimplemented and its pending contract decision is not assumed accepted. |
 | `git_status`, `git_diff`, `git_log`, `git_show`, `git_branch_list` | Real Agent dispatch verifies default Read Allow returns actual temporary-repository status/diff/history/commit/branch evidence and explicit Read Deny rejects all five, with zero assessor calls/grants. Complete profile/platform evidence remains outstanding. |
@@ -833,3 +833,20 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
   `29212de48809b0147fb9f03f46df6c0e8dd18762` through published #772 head
   `9514b0152e48f4db73fbabdbdd61f0bc9ca0c7fc`, with no blockers and no independent
   test rerun. This review does not cover the later document/symbol additions.
+
+### Image read continuation verification — 2026-10-26
+
+- Added the actual `read_image` tool to the existing real-Agent policy matrix,
+  bringing it to 18 operations. An allowed PNG read reaches only the second
+  provider request with the expected basename, MIME and byte count; explicit
+  Read Deny produces no image attachment in either request. Both paths retain
+  zero model assessments and zero persistent grants.
+- Enabled the existing image feature only in Agent's development dependency.
+  Locked Agent library tests pass 498/498, Agent library/test Clippy passes with
+  warnings denied, and workspace format checking passes. These results do not
+  establish native Windows or final workspace acceptance.
+- Published #772 CI 40285467815 failed its Runtime conditional Checkout test:
+  retained repository metadata changed after preparation. The focused local
+  reproduction passes; the cause remains unestablished and is not repaired by
+  this image test change. Existing Windows jobs remain running. T8 remains
+  Partial, with effectful invocation families and final acceptance outstanding.
