@@ -553,3 +553,24 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
   `--features file-write --lib -- -D warnings` passes. The producer refuses an
   oversized after image before allocating it; the additional test also proves
   the file remains unchanged, and capture/commit identities differ.
+
+### Model-reviewed recoverable string edits — 2026-10-26
+
+- Added a separate complete-image assessor payload and provider adapter. Auto
+  dispatch reviews registered native `edit` with `retain_backup=true`; the
+  payload includes exact arguments, original/result, facets, user intent and a
+  fresh nonce/digest. Strict matching high-confidence `allow_once` is required.
+  Permission revision/reset checks remain live, and all outcomes are one-use.
+- The shared 16 KiB encoded review budget is enforced without truncation. Larger
+  files may use bounded recovery but require human approval; suspected secrets,
+  unsupported assessors, invalid responses and uncertain outcomes also fall back.
+  Delete and anchored-edit Auto remain unimplemented, not implicitly supported.
+- Agent end-to-end tests cover 13 scenarios: real replacement on allow; human
+  required, assessor error, disabled/stale context, oversized request, low
+  confidence, wrong digest/schema, extra response fields, malformed/oversized
+  response, and a concurrent writer during review. That writer's data survives
+  even when the assessor returns allow. No persistent grant is created.
+- Locked agent library tests pass 494/494; locked agent library Clippy with
+  `-D warnings` passes. These are local checks, not full workspace, native Windows
+  or independent review evidence. Foundation PR #769 remains pending remotely
+  (run 40274739232 has no jobs); the continuation is not pushed or merged.

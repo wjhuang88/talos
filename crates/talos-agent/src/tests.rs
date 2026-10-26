@@ -6739,3 +6739,5 @@ fn dispatch_recovery_requires_explicit_protocol_evidence() {
         "invalid tool call arguments"
     ));
 }
+
+mod edit_auto;
