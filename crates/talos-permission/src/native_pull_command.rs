@@ -28,6 +28,12 @@ impl PermissionEngine {
         {
             return None;
         }
+        self.transitive_effect_restriction()
+    }
+
+    pub(crate) fn transitive_effect_restriction(
+        &self,
+    ) -> Option<(PermissionDecision, PermissionDecisionSource)> {
         let mut human_checkpoint = None;
         for (rule, metadata) in self.rules.iter().zip(&self.rule_metadata) {
             // Helpers are arbitrary programs. Without OS confinement, do not
@@ -44,7 +50,7 @@ impl PermissionEngine {
                 PermissionDecision::Deny(_) => {
                     return Some((
                         PermissionDecision::Deny(
-                            "Native Pull command authority cannot enforce an active restriction on transitive effects".into(),
+                            "Invocation authority cannot enforce an active restriction on transitive effects".into(),
                         ),
                         source,
                     ));

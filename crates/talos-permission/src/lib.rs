@@ -352,10 +352,15 @@ impl PermissionEngine {
         let mut first_deny = None;
         let mut saw_ask = false;
         let mut reports = Vec::with_capacity(facets.len());
+        let transitive_restriction = request
+            .transitive_effects()
+            .then(|| self.transitive_effect_restriction())
+            .flatten();
 
         for (facet_index, facet) in facets.iter().enumerate() {
-            let (decision, source) =
-                self.evaluate_facet_structured(request.tool_name(), facet, request.input());
+            let (decision, source) = transitive_restriction.clone().unwrap_or_else(|| {
+                self.evaluate_facet_structured(request.tool_name(), facet, request.input())
+            });
             match &decision {
                 PermissionDecision::Allow => {}
                 PermissionDecision::Ask => saw_ask = true,
@@ -826,3 +831,6 @@ impl Default for PermissionEngine {
 #[cfg(test)]
 #[path = "permission_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+mod transitive_effect_tests;
