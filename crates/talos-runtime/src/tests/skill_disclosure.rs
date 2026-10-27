@@ -224,6 +224,67 @@ async fn skill_read_tool_is_opt_in_and_reads_bound_skills() {
 
 struct CallerSkillRead;
 
+#[tokio::test]
+async fn skill_read_respects_read_policy_for_body_and_reference() {
+    for denied in [false, true] {
+        for reference in [false, true] {
+            let skills = tempfile::tempdir().expect("skills");
+            let skill = write_skill(skills.path(), "policy", "POLICY-BODY-MARKER");
+            std::fs::write(
+                skills.path().join("policy/reference.md"),
+                "POLICY-REFERENCE-MARKER",
+            )
+            .expect("reference");
+            let mut input = serde_json::json!({"skill": "policy"});
+            if reference {
+                input["reference"] = serde_json::json!("reference.md");
+            }
+            let (model, requests) = recording(
+                MockProvider::new()
+                    .with_tool_call("skill_read", input)
+                    .with_response("done"),
+            );
+            let mut builder = RuntimeBuilder::new()
+                .provider(model)
+                .workspace_root(skills.path())
+                .skill_read_tool(vec![skill]);
+            if denied {
+                builder = builder.permission_rule(PermissionRule::new_nature(
+                    ToolNature::Read,
+                    None,
+                    None,
+                    PermissionDecision::Deny("skill reading disabled by user".into()),
+                ));
+            }
+            let mut runtime = builder.build().expect("runtime");
+            tokio::time::timeout(Duration::from_secs(5), run_turn(&mut runtime, "read skill"))
+                .await
+                .expect("bounded turn");
+            let captured = requests.lock().expect("requests").clone();
+            assert_eq!(captured.len(), 2, "tool result must reach next request");
+            assert!(!captured[0].0.contains("POLICY-BODY-MARKER"));
+            assert!(!captured[0].0.contains("POLICY-REFERENCE-MARKER"));
+            let result = &captured[1].0;
+            if denied {
+                assert!(!result.contains("POLICY-BODY-MARKER"), "{result}");
+                assert!(!result.contains("POLICY-REFERENCE-MARKER"), "{result}");
+                assert!(result.to_lowercase().contains("denied"), "{result}");
+            } else {
+                let expected = if reference {
+                    "POLICY-REFERENCE-MARKER"
+                } else {
+                    "POLICY-BODY-MARKER"
+                };
+                assert!(result.contains(expected), "{result}");
+                if reference {
+                    assert!(!result.contains("POLICY-BODY-MARKER"), "{result}");
+                }
+            }
+            runtime.shutdown().await.expect("shutdown");
+        }
+    }
+}
+
 #[async_trait]
 impl AgentTool for CallerSkillRead {
     fn name(&self) -> &str {
