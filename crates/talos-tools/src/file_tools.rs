@@ -14,6 +14,8 @@ mod ls_tool;
 mod read_tool;
 #[cfg(feature = "file-write")]
 mod recovery;
+#[cfg(all(feature = "file-write", feature = "network"))]
+pub(crate) use recovery::{FileRecoveryStore, read_bounded_regular_file};
 #[cfg(feature = "file-read")]
 mod snapshot;
 #[cfg(feature = "file-write")]

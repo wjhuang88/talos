@@ -762,6 +762,20 @@ Talos ships with built-in tools for common coding-agent work:
 `http_request` stops reading the response once its body limit is exceeded (64 KiB
 by default). Truncated responses report a lower bound on the received size;
 the remaining body is not downloaded to calculate a total.
+
+`save_url` stops retaining the download when its 10 MiB body limit is exceeded,
+before writing the destination. For an existing regular file, `retain_backup: true`
+enables a recoverable atomic overwrite (2 MiB maximum before and after).
+It requires destination Read permission in addition to Network and Write.
+Use the returned `recovery_id` with the same `destination` to restore; supply a
+`url` string for schema compatibility, but restoration ignores it and requires
+only Read and Write. Recovery is available in the same tool instance for 15 minutes,
+subject to a 64-record/16 MiB backup budget. It refuses changed destination content,
+another path or instance, and already-consumed receipts. Backups are not durable
+across restarts. This option does not create automatic download approval or promise
+rollback of arbitrary network effects; default saves retain their overwrite behavior.
+The shared replacement primitive checks content before an atomic rename; another
+process can still race between that check and rename.
 - Document extraction: `document_extract` (read-only bounded text extraction from local text/HTML/JSON/CSV/Markdown/XML files)
 - Image reading: `read_image` (model-invoked image read for vision-capable models; validates PNG/JPEG/GIF/WebP through shared ingestion; exact-path authorization; returns a safe summary and a one-shot provider continuation artifact per ADR-051; only presented when the active model's catalog metadata confirms `image_input = true`)
 - Process execution: `exec` (argv-only single process, no shell parsing), plus the
