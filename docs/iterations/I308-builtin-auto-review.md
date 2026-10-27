@@ -1114,6 +1114,8 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
 
 ### Desktop Todo registration continuation — 2026-10-27
 
+- Parent Runtime registration stage #773 merged as `d2ab62dc9b206777913bcd4f721e71e11d357aa7`, after exact-head CI 40440474869 passed all eight checks at `1ccb979421d4c7aaac81ddfc95a1174387c12bbb`. Independent final permission/security/API review and unchanged-base CAS are recorded in [the merge receipt](https://github.com/wjhuang88/talos/pull/773#issuecomment-6433284386). Both local governance validators passed with zero warnings. This closes only the parent registration stage; Desktop Todo and ordinary invocation implementation remain outstanding.
+
 - Follow-up branch `feat/i308-desktop-todo-registration` starts at reviewed PR #773 candidate `1ccb97942`; the submitted parent head remains unchanged while CI 40440474869 runs.
 - Added a factory-only RuntimeBuilder session Todo registration method and switched Desktop composition to it. Caller `.tool()` remains untrusted, including caller-supplied instances from the same public Todo factory. Registration-order tests check both override directions. This does not enable ordinary command/HTTP Auto or complete the profile matrix.
 - Focused locked shared-composition registration tests are running; full validation, native platform execution and independent review remain outstanding. README documents the new additive builder method.
