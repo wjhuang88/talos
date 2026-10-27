@@ -15,6 +15,7 @@ pub(in crate::search_backend) mod plan;
 pub(in crate::search_backend) mod searxng;
 
 use crate::search_backend::{SearchBackendId, bing_parser, ddg_parser, instant_answer};
+use talos_core::tool::ToolNetworkScope;
 use thiserror::Error;
 
 use admission::{AdmissionError, AdmittedCompatibilityResults};
@@ -24,6 +25,23 @@ use super::{
     ToolNetworkManifest, TransportError, TransportResponse, Url, encode_form_with_limit,
     request_endpoint,
 };
+
+/// A shared manifest may add candidate endpoints, but it must not widen global transport policy.
+/// Private-address exceptions, proxy selection and redirect allowance apply to the whole manifest,
+/// not to one endpoint, so mixing different values would grant one candidate another's authority.
+pub(super) fn manifest_extends_scope_without_policy_widening(
+    manifest: &ToolNetworkManifest,
+    required: &ToolNetworkScope,
+) -> bool {
+    let supplied = manifest.scope();
+    required
+        .endpoints()
+        .iter()
+        .all(|endpoint| supplied.endpoints().contains(endpoint))
+        && supplied.proxy() == required.proxy()
+        && supplied.private_addresses() == required.private_addresses()
+        && supplied.redirect_limit() == required.redirect_limit()
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
 pub(in crate::search_backend) enum CompatibilityError {
