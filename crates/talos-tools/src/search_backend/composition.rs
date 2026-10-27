@@ -71,7 +71,7 @@ impl SearchCompositionConfiguration {
             if prepared.permission_profile() != facets.as_slice() {
                 return Err(TransportError::InvalidRequest.into());
             }
-            candidates.push(PreparedSearchCandidate::SearXng(prepared));
+            candidates.push(PreparedSearchCandidate::SearXng(Box::new(prepared)));
         }
 
         Ok(PreparedSearchComposition {
@@ -194,7 +194,7 @@ impl RunningSearchComposition {
 
 enum PreparedSearchCandidate {
     Direct(Box<PreparedCompatibilityPlan>),
-    SearXng(PreparedSearXng),
+    SearXng(Box<PreparedSearXng>),
 }
 
 impl PreparedSearchCandidate {
@@ -234,7 +234,7 @@ impl RunningSearchCandidate {
                 .await
                 .map(|rows| rows.into_results())
                 .map_err(SearchCandidateExecutionError::Compatibility),
-            PreparedSearchCandidate::SearXng(plan) => plan
+            PreparedSearchCandidate::SearXng(plan) => (*plan)
                 .execute(self.authority, self.budget)
                 .await
                 .map(|rows| rows.into_results())
