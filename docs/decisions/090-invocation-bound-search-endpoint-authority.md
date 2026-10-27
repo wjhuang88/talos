@@ -182,6 +182,30 @@ is declared before approval and remains a knowledge fallback, not a native gener
 
 ## Migration And Acceptance
 
+### Ordinary Invocation Coexistence — 2026-10-27
+
+The maintainer, also the responsible actor recorded for I293 and I308, explicitly confirmed
+this boundary in the handoff closure session. This supplies the owner concurrence requested by
+[I308's accepted proposal](../proposals/i308-native-invocation-authorization.md); the amendment
+becomes effective on target-branch merge after independent security/API review and exact-head CI.
+
+- Ordinary implementation-owned HTTP may use I308's whole-invocation review, including retained
+  proxy/redirect configuration and transitive effects. It does not promise per-endpoint isolation
+  or inherit this ADR's protected endpoint authority. Positive trusted registration and an explicit
+  ordinary disposition are required; absence of prepared evidence is insufficient.
+- WebSearch, search compatibility/default transport and every tool requiring prepared-network
+  admission remain under I293 and this ADR. Naming a compatibility adapter ordinary does not
+  change ownership. Missing, failed, stale or unsupported preparation/authority must reject;
+  neither ordinary HTTP nor Shell/Exec review is an internal fallback for that protected call.
+- A separately requested ordinary Shell/Exec/HTTP operation retains its accepted invocation
+  semantics, including possible network effects; this amendment does not claim to confine arbitrary
+  commands or prevent users from independently requesting network access. Explicit Deny and
+  mandatory-human policies, including incompatible finer restrictions, remain authoritative.
+- This decision does not activate ordinary Auto, alter search routing, waive transport/parity/D
+  gates, or deliver any runtime behavior. I308 must prove trusted eligibility, actual dispatch,
+  protected non-downgrade and the rest of its acceptance before delivery. I293 retains its existing
+  scope and acceptance; no search implementation is transferred to I308.
+
 - Preserve web_search name, model schema/formatter contract, Network family/contribution and
   private SearchBackend vocabulary. No model-selected provider, GeoIP or startup probe.
 - Add only defaulted trait methods/new types/additive permission entry points. Do not add fields
