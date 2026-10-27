@@ -1291,3 +1291,27 @@ Native Windows and final exact-head gates remain pending. T8 remains Partial.
   Independent bounded static security/API review approved the locale source and
   fixture delta. Native Windows and fresh exact-head remote evidence remain pending;
   this is not T8 completion.
+
+
+### 2026-10-27 Windows retained-directory fixture repair
+
+- Native Windows run 40475830775 failed three Agent tests at attempted directory
+  rename with sharing violation (OS error 32). cap-std 4.0.3 deliberately opens
+  directories without FILE_SHARE_DELETE; its `Dir::from_std_file` contract
+  explicitly requires this to prevent races. Upstream source:
+  https://github.com/bytecodealliance/cap-std/blob/v4.0.3/cap-std/src/fs/dir.rs
+  and `cap-primitives/src/windows/fs/dir_utils.rs` at the same tag.
+- Retain production handle semantics. Unix tests still replace/unlink the original
+  and require rejection. Windows tests assert rename is blocked, original path
+  remains and no destination appears; execution stays in the unchanged directory.
+  The identity unit test also checks stable identity and successful rename after
+  releasing the handle. Hook/fallback completion flags are asserted outside panic
+  containment, so an assertion panic cannot masquerade as successful protection.
+- Locked Agent library tests pass 509/509 and cargo-xwin Windows test-target
+  compilation passes. Logs: root
+  `target/recovery/windows-directory-fixture-{agent,xwin}.log`. The first xwin
+  attempt was blocked updating its external cache; the authorized retry passed.
+  Independent bounded static security review approved; no product authorization
+  predicate, dependency, unsafe code or public API changes in this repair.
+- Final full preflight and exact-head remote/native Windows gates remain pending.
+  T8 and the whole handoff remain Partial.

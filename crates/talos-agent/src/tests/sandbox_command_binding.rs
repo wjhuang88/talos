@@ -65,8 +65,13 @@ async fn real_exec_preserves_sequentially_created_working_directory() {
     );
 }
 
+fn context_is_unchanged(scenario: &str) -> bool {
+    scenario == "unchanged" || (cfg!(windows) && scenario == "directory")
+}
+
 struct SandboxMutation {
     scenario: &'static str,
+    mutation_completed: Arc<std::sync::atomic::AtomicBool>,
     root: PathBuf,
     state: Arc<talos_permission::PermissionSessionState>,
     configuration: Option<Arc<std::sync::atomic::AtomicUsize>>,
@@ -94,8 +99,22 @@ impl HookHandler for SandboxMutation {
                 });
             }
             "directory" => {
-                std::fs::rename(&self.root, self.root.with_extension("old")).expect("move");
-                std::fs::create_dir(&self.root).expect("replace");
+                let destination = self.root.with_extension("old");
+                #[cfg(windows)]
+                {
+                    // The admitted cap-std handle prevents replacement itself.
+                    // Prove this branch ran without panicking inside the hook.
+                    let error = std::fs::rename(&self.root, &destination)
+                        .expect_err("admitted Windows directory is retained");
+                    assert_eq!(error.raw_os_error(), Some(32));
+                    assert!(self.root.is_dir());
+                    assert!(!destination.exists());
+                }
+                #[cfg(not(windows))]
+                {
+                    std::fs::rename(&self.root, destination).expect("move");
+                    std::fs::create_dir(&self.root).expect("replace");
+                }
             }
             "policy" => self
                 .state
@@ -109,6 +128,8 @@ impl HookHandler for SandboxMutation {
             "session" => self.state.rebind_session().expect("session"),
             _ => {}
         }
+        self.mutation_completed
+            .store(true, std::sync::atomic::Ordering::SeqCst);
         HookResult::Continue
     }
 }
@@ -124,6 +145,7 @@ async fn sandbox_hook_cannot_change_admitted_execution_context() {
         "restriction",
         "session",
     ] {
+        let mutation_completed = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let parent = tempfile::tempdir().expect("parent");
         let root = parent.path().join("workspace");
         std::fs::create_dir(&root).expect("workspace");
@@ -142,6 +164,7 @@ async fn sandbox_hook_cannot_change_admitted_execution_context() {
         let mut hooks = HookRegistry::new();
         hooks.register(Arc::new(SandboxMutation {
             scenario,
+            mutation_completed: mutation_completed.clone(),
             root: root.clone(),
             state: state.clone(),
             configuration: None,
@@ -169,15 +192,19 @@ async fn sandbox_hook_cannot_change_admitted_execution_context() {
                 &serde_json::json!({"command":"echo admitted"}),
             )
             .await;
+        assert!(
+            scenario == "command" || mutation_completed.load(std::sync::atomic::Ordering::SeqCst),
+            "{scenario}: mutation must complete outside panic containment"
+        );
         assert_eq!(
             result.is_error,
-            scenario != "unchanged",
+            !context_is_unchanged(scenario),
             "{scenario}: {}",
             result.content
         );
         assert_eq!(
             executions.lock().await.len(),
-            usize::from(scenario == "unchanged"),
+            usize::from(context_is_unchanged(scenario)),
             "{scenario}"
         );
     }
@@ -252,6 +279,7 @@ async fn sandbox_fallback_approval_cannot_change_execution_context() {
         "session",
         "configuration",
     ] {
+        let mutation_completed = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let parent = tempfile::tempdir().expect("parent");
         let root = parent.path().join("workspace");
         std::fs::create_dir(&root).expect("root");
@@ -277,6 +305,7 @@ async fn sandbox_fallback_approval_cannot_change_execution_context() {
             SandboxFallbackPolicy::Ask,
             Some(Arc::new(MutatingFallback(SandboxMutation {
                 scenario,
+                mutation_completed: mutation_completed.clone(),
                 root: root.clone(),
                 state: state.clone(),
                 configuration: Some(configuration),
@@ -306,15 +335,19 @@ async fn sandbox_fallback_approval_cannot_change_execution_context() {
             )
             .await
             .expect("execution");
+        assert!(
+            mutation_completed.load(std::sync::atomic::Ordering::SeqCst),
+            "{scenario}: mutation must complete outside panic containment"
+        );
         assert_eq!(
             results[0].is_error,
-            scenario != "unchanged",
+            !context_is_unchanged(scenario),
             "{scenario}: {}",
             results[0].content
         );
         assert_eq!(
             root.join("executed").exists(),
-            scenario == "unchanged",
+            context_is_unchanged(scenario),
             "{scenario}"
         );
     }
@@ -364,6 +397,7 @@ async fn final_permission_hook_cannot_retarget_or_invalidate_process_approval() 
         "session",
         "configuration",
     ] {
+        let mutation_completed = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let parent = tempfile::tempdir().expect("parent");
         let root = parent.path().join("workspace");
         std::fs::create_dir(&root).expect("workspace");
@@ -383,6 +417,7 @@ async fn final_permission_hook_cannot_retarget_or_invalidate_process_approval() 
         let mut hooks = HookRegistry::new();
         hooks.register(Arc::new(FinalContextMutation(SandboxMutation {
             scenario,
+            mutation_completed: mutation_completed.clone(),
             root: root.clone(),
             state: state.clone(),
             configuration: Some(configuration),
@@ -419,15 +454,20 @@ async fn final_permission_hook_cannot_retarget_or_invalidate_process_approval() 
             )
             .await
             .expect("execution");
+        assert!(
+            scenario == "unresolved"
+                || mutation_completed.load(std::sync::atomic::Ordering::SeqCst),
+            "{scenario}: mutation must complete outside panic containment"
+        );
         assert_eq!(
             results[0].is_error,
-            !matches!(scenario, "unchanged" | "unresolved"),
+            !(context_is_unchanged(scenario) || scenario == "unresolved"),
             "{scenario}: {}",
             results[0].content
         );
         assert_eq!(
             root.join("executed").exists(),
-            matches!(scenario, "unchanged" | "unresolved"),
+            context_is_unchanged(scenario) || scenario == "unresolved",
             "{scenario}"
         );
     }

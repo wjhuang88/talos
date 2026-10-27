@@ -1530,3 +1530,16 @@ visible; distinguish passed assertions from independently emitted evidence.
   real REPL/TUI acceptance. Audit all consumers of a replaced protocol before
   publishing the next stable stage; fixture changes alone cannot close a lost
   product behavior. Local acceptance passes; fresh remote gates remain required.
+
+
+## 2026-10-27 - Validate retained-handle platform semantics
+
+- Trigger: native Windows CI rejected rename in three directory freshness tests.
+- Cause: Unix replacement assumptions were copied to Windows without checking
+  cap-std's intentional no-FILE_SHARE_DELETE handle contract. Compile-only xwin
+  checks cannot detect native filesystem behavior.
+- Repair/check: preserve the upstream invariant; assert blocked replacement and
+  unchanged execution on Windows, replacement detection/refusal on Unix, and
+  successful rename after releasing the Windows identity handle. Assert hook
+  completion outside panic containment. Keep native Windows CI as required
+  runtime evidence, separate from cross-compilation.

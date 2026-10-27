@@ -31,7 +31,8 @@ impl PartialEq for ExecutionDirectoryIdentity {
 /// Reopening the path detects replacement while the original handle prevents
 /// its identifier from being recycled. This is freshness evidence, not atomic
 /// execution confinement. Windows' upstream 64-bit index does not cover ReFS's
-/// full 128-bit identity.
+/// full 128-bit identity. On Windows cap-std also prevents rename/deletion of
+/// the retained directory by opening without FILE_SHARE_DELETE.
 pub(crate) fn execution_directory_identity(path: &Path) -> Option<ExecutionDirectoryIdentity> {
     std::panic::catch_unwind(|| {
         use cap_fs_ext::MetadataExt;
@@ -80,19 +81,39 @@ mod tests {
             serde_json::to_value(&original).expect("serialized token"),
             serde_json::Value::String(original.token().to_owned())
         );
-        std::fs::rename(&path, root.path().join("retained")).expect("retain original");
-        // The retained handle outlives even deletion of the original pathname.
-        std::fs::remove_dir(root.path().join("retained")).expect("unlink original");
-        assert!(
-            original
-                ._directory
-                .dir_metadata()
-                .expect("open original")
-                .is_dir()
-        );
-        std::fs::create_dir(&path).expect("replacement directory");
-        let replacement = execution_directory_identity(&path).expect("replacement identity");
-        assert_ne!(original, replacement);
+        #[cfg(windows)]
+        {
+            // cap-std intentionally excludes FILE_SHARE_DELETE. Do not replace
+            // its handle with a share-delete handle: Dir requires that invariant.
+            let error = std::fs::rename(&path, root.path().join("retained"))
+                .expect_err("retained Windows directory cannot be replaced");
+            assert_eq!(error.raw_os_error(), Some(32));
+            assert_eq!(
+                execution_directory_identity(&path).as_ref(),
+                Some(&original)
+            );
+            drop(original);
+            std::fs::rename(&path, root.path().join("retained"))
+                .expect("rename after releasing identity");
+            std::fs::create_dir(&path).expect("replacement after release");
+            assert!(execution_directory_identity(&path).is_some());
+        }
+        #[cfg(not(windows))]
+        {
+            std::fs::rename(&path, root.path().join("retained")).expect("retain original");
+            // The retained handle outlives even deletion of the original pathname.
+            std::fs::remove_dir(root.path().join("retained")).expect("unlink original");
+            assert!(
+                original
+                    ._directory
+                    .dir_metadata()
+                    .expect("open original")
+                    .is_dir()
+            );
+            std::fs::create_dir(&path).expect("replacement directory");
+            let replacement = execution_directory_identity(&path).expect("replacement identity");
+            assert_ne!(original, replacement);
+        }
         assert!(execution_directory_identity(&root.path().join("missing")).is_none());
         let file = root.path().join("file");
         std::fs::write(&file, b"").expect("regular file");
