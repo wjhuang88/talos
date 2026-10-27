@@ -3,7 +3,8 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 #[tokio::test]
 async fn ephemeral_deadline_cancels_stalled_error_body_and_retry_backoff() {
-    for anthropic in [false, true] {
+    for family in 0..3 {
+        let anthropic = family == 1;
         for stalled_body in [false, true] {
             let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
                 .await
@@ -32,6 +33,12 @@ async fn ephemeral_deadline_cancels_stalled_error_body_and_retry_backoff() {
             let provider: Box<dyn LanguageModel> = if anthropic {
                 Box::new(
                     AnthropicProvider::new("fixture", "fixture")
+                        .with_base_url(endpoint)
+                        .with_timeout_config(timeout),
+                )
+            } else if family == 2 {
+                Box::new(
+                    OpenAIResponsesProvider::new("fixture", "fixture")
                         .with_base_url(endpoint)
                         .with_timeout_config(timeout),
                 )
@@ -69,6 +76,13 @@ async fn ephemeral_deadline_cancels_stalled_error_body_and_retry_backoff() {
                     Ok(Err(error)) => panic!("fixture was not reached: {error}"),
                     _ => panic!("fixture was not reached"),
                 }
+            }
+            if family == 2 && !stalled_body {
+                assert!(
+                    matches!(result, Ok(Err(ProviderError::ServerError(_)))),
+                    "Responses image request must not retry its first 503"
+                );
+                continue;
             }
             assert!(
                 matches!(result, Ok(Err(ProviderError::InvalidResponse(message)))

@@ -7,8 +7,9 @@ changed; I308 remains independently Active/Partial. See I309 for inventory and v
 ## Active T8 implementation — 2026-10-26
 
 [I308](I308-builtin-auto-review.md) is Active after #765 merged at `8f0ce2340`.
-Local ownership and evidence stages are implemented; full H/G Auto behavior remains incomplete.
-Default network admission, higher-risk recovery and final delivery gates remain open.
+Stages #769–#772 are merged; full H/G Auto behavior remains incomplete.
+Ordinary command/network Auto admission, remaining recovery/profile acceptance
+and final delivery gates remain open. See I308 for exact merged evidence.
 T7 is Complete; later handoff tasks remain incomplete.
 
 ## Current I300/T7 closure — 2026-10-26

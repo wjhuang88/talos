@@ -142,7 +142,7 @@ mod tests {
             provider.protocol_capabilities(),
             CapabilityProbe::Known(ProtocolCapabilities {
                 native_tools: true,
-                compatibility: false,
+                compatibility: true,
             })
         );
     }
@@ -159,12 +159,8 @@ mod tests {
             .or_default()
             .protocol = ProviderProtocol::OpenAIChat;
         let provider = build_configured_provider(&config, "sk-test").expect("provider builds");
-        assert_ne!(
-            provider.protocol_capabilities(),
-            CapabilityProbe::Known(ProtocolCapabilities {
-                native_tools: true,
-                compatibility: false,
-            })
-        );
+        let preview = provider.request_preview(&[]).expect("request preview");
+        assert!(preview["body"].get("messages").is_some());
+        assert!(preview["body"].get("input").is_none());
     }
 }

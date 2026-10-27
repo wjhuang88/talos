@@ -44,6 +44,38 @@ pub(crate) fn append_ephemeral_images(
     images: Vec<talos_core::provider::EphemeralImage>,
     anthropic: bool,
 ) -> talos_core::provider::ProviderResult<Option<std::time::Instant>> {
+    append_images(
+        body,
+        images,
+        if anthropic {
+            ImageWire::Anthropic
+        } else {
+            ImageWire::Chat
+        },
+    )
+}
+
+/// Consumes request-local images using Responses input items and the shared limits/deadline.
+pub(crate) fn append_responses_ephemeral_images(
+    body: &mut serde_json::Value,
+    images: Vec<talos_core::provider::EphemeralImage>,
+) -> talos_core::provider::ProviderResult<Option<std::time::Instant>> {
+    append_images(body, images, ImageWire::Responses)
+}
+
+#[derive(Clone, Copy)]
+enum ImageWire {
+    Chat,
+    Anthropic,
+    Responses,
+}
+
+fn append_images(
+    body: &mut serde_json::Value,
+    images: Vec<talos_core::provider::EphemeralImage>,
+    wire: ImageWire,
+) -> talos_core::provider::ProviderResult<Option<std::time::Instant>> {
+    let anthropic = matches!(wire, ImageWire::Anthropic);
     use base64::Engine;
     use talos_core::provider::ProviderError;
     if images.is_empty() {
@@ -72,12 +104,18 @@ pub(crate) fn append_ephemeral_images(
         let encoded = base64::engine::general_purpose::STANDARD.encode(bytes);
         blocks.push(if anthropic {
             serde_json::json!({"type":"image","source":{"type":"base64","media_type":"image/png","data":encoded}})
+        } else if matches!(wire, ImageWire::Responses) {
+            serde_json::json!({"type":"input_image","image_url":format!("data:image/png;base64,{encoded}")})
         } else {
             serde_json::json!({"type":"image_url","image_url":{"url":format!("data:image/png;base64,{encoded}")}})
         });
     }
     let messages = body
-        .get_mut("messages")
+        .get_mut(if matches!(wire, ImageWire::Responses) {
+            "input"
+        } else {
+            "messages"
+        })
         .and_then(serde_json::Value::as_array_mut)
         .ok_or_else(|| {
             ProviderError::InvalidResponse("ephemeral image request unavailable".into())
@@ -107,7 +145,11 @@ pub(crate) fn append_ephemeral_images(
             }
         }
     } else {
-        messages.push(serde_json::json!({"role":"user","content":blocks}));
+        let mut message = serde_json::json!({"role":"user","content":blocks});
+        if matches!(wire, ImageWire::Responses) {
+            message["type"] = serde_json::json!("message");
+        }
+        messages.push(message);
     }
     Ok(deadline)
 }

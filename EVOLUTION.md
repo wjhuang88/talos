@@ -5,6 +5,15 @@
 Record reusable lessons from failures, corrections, and unexpected successes. Check here before
 repeating known mistakes.
 
+## 2026-10-27 - Use logical time for offline cancellation fixtures
+
+- Trigger: CI3463 Windows failed before the I293 stand-in tool started; approval exceeded its 10ms budget.
+- Symptom: A Session interruption test never reached its cancellation/cleanup assertions.
+- Root cause: The offline fixture used a real Tokio clock for an approval deadline unrelated to its cancellation observation; a temporary 30ms resolver delay reproduced the rejection.
+- Fix: Start that Session test with paused Tokio time, retaining its budget and every cleanup/result assertion. Remove temporary delay instrumentation before submission.
+- Prevention: Use logical time for offline timer premises; keep real transport/process timing evidence separate. This does not locate the exact delay in the original CI worker.
+- Promoted to rule/check: `session_interrupt_releases_owned_tool_before_cancelled_terminal_event` uses the same paused-clock setup as its adjacent approval/execution characterization.
+
 ## 2026-10-23 - Research stalled designs and report implementation honestly
 
 - Trigger: Maintainer correction during prolonged I300 convergence.
@@ -1539,3 +1548,12 @@ visible; distinguish passed assertions from independently emitted evidence.
 - Prevention: Exercise a real chunked HTTP response that emits a terminal but never closes.
 - Promoted to rule/check: `semantic_terminal_closes_stream_without_waiting_for_http_eof` and
   `semantic_terminal_discards_later_records_and_closes_decoder` provider regressions.
+
+## 2026-10-27 - Exercise the configured runtime boundary in provider tests
+
+- Trigger: Independent I306 review found tool-generated images and explicit textual protocols unusable despite green CI.
+- Symptom: Direct Multimodal/stream tests and a user --attach binary case bypassed EphemeralImage dispatch; direct protocol calls bypassed the dropped configuration field.
+- Root cause: Fixtures proved nearby input paths rather than the runtime boundary named by acceptance.
+- Fix: Implement the actual image trait entry and retain tool_protocol when merging configuration; verify real CLI read_image and configured Compat/Strict tool rounds.
+- Prevention: Separate durable attachments from request-local tool images, and dispatch configuration through the real binary. A TTL guard alone does not satisfy no automatic image repost.
+- Promoted to rule/check: responses_tool_image_is_sent_once_through_real_agent, responses_compat_tool_round_through_real_agent, responses_strict_tool_round_through_real_agent and tool_image_is_never_automatically_reposted_after_503.

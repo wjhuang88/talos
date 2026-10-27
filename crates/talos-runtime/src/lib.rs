@@ -1106,7 +1106,7 @@ impl SandboxFallbackHandler for RuntimeSandboxFallbackHandler {
 /// of being executed.
 pub struct RuntimeBuilder {
     provider: Option<Arc<dyn LanguageModel>>,
-    tools: Vec<Arc<dyn AgentTool>>,
+    tools: Vec<RuntimeToolRegistration>,
     workspace_root: PathBuf,
     permission_rules: Vec<PermissionRule>,
     sandbox: Option<Box<dyn SandboxProvider>>,
@@ -1127,6 +1127,49 @@ pub struct RuntimeBuilder {
     shutdown_finalizers: Vec<Arc<dyn RuntimeFinalizer>>,
     #[cfg(feature = "shared-composition")]
     atomic_create_capability: Option<talos_core::tool::SharedAtomicCreateCapability>,
+}
+
+enum RuntimeToolRegistration {
+    Caller(Arc<dyn AgentTool>),
+    Builtin(talos_core::tool::ToolContribution),
+}
+
+impl RuntimeToolRegistration {
+    fn tool(&self) -> &Arc<dyn AgentTool> {
+        match self {
+            Self::Caller(tool) => tool,
+            Self::Builtin(contribution) => contribution.tool(),
+        }
+    }
+}
+
+fn register_runtime_tools(
+    tools: Vec<RuntimeToolRegistration>,
+) -> RuntimeResult<(
+    ToolRegistry,
+    Vec<Arc<dyn talos_core::tool::ToolCleanupOwner>>,
+)> {
+    // The ownership ledger includes replaced instances, while trust belongs only
+    // to the winning registration. Reuse registry receipt retention/deduplication.
+    let mut ledger = ToolRegistry::new();
+    for entry in &tools {
+        ledger.register(entry.tool().clone());
+    }
+    let owners = ledger.cleanup_receipts();
+    let mut seen = std::collections::HashSet::new();
+    let mut registry = ToolRegistry::new();
+    for entry in tools.into_iter().rev() {
+        if !seen.insert(entry.tool().name().to_owned()) {
+            continue;
+        }
+        match entry {
+            RuntimeToolRegistration::Caller(tool) => registry.register(tool),
+            RuntimeToolRegistration::Builtin(contribution) => registry
+                .register_builtin_contributions([contribution])
+                .map_err(|error| RuntimeError::Agent(AgentError::ToolError(error.to_string())))?,
+        }
+    }
+    Ok((registry, owners))
 }
 
 impl RuntimeBuilder {
@@ -1183,7 +1226,7 @@ impl RuntimeBuilder {
     /// by default or added by a preset.
     #[must_use]
     pub fn tool(mut self, tool: Arc<dyn AgentTool>) -> Self {
-        self.tools.push(tool);
+        self.tools.push(RuntimeToolRegistration::Caller(tool));
         self
     }
 
@@ -1192,6 +1235,9 @@ impl RuntimeBuilder {
     /// This method is available only with the `shared-composition` feature. It
     /// does not change `RuntimeBuilder::new()` and does not grant permission:
     /// every added tool still passes through the runtime permission adapter.
+    /// Built-in identity is retained only for these internally constructed tools.
+    /// Calls to this method and [`Self::tool`] replace earlier same-name tools;
+    /// caller replacements do not inherit built-in identity.
     #[cfg(feature = "shared-composition")]
     #[must_use]
     pub fn shared_tools(mut self) -> Self {
@@ -1202,7 +1248,7 @@ impl RuntimeBuilder {
                 self.atomic_create_capability.clone(),
             )
             .into_iter()
-            .map(|contribution| contribution.tool().clone()),
+            .map(RuntimeToolRegistration::Builtin),
         );
         self
     }
@@ -1427,7 +1473,7 @@ impl RuntimeBuilder {
     /// host must observe terminal cleanup.
     pub fn build(mut self) -> RuntimeResult<RuntimeHandle> {
         let provider = self.provider.ok_or(RuntimeError::MissingProvider)?;
-        let tools = self.tools;
+        let mut tools = self.tools;
         let mut builtin_contributions = Vec::new();
         if matches!(self.preset, Some(RuntimePreset::Coding)) {
             #[cfg(feature = "shared-composition")]
@@ -1436,7 +1482,7 @@ impl RuntimeBuilder {
                 // replace an embedder's hardened implementation by name.
                 let caller_tool_names = tools
                     .iter()
-                    .map(|tool| tool.name().to_owned())
+                    .map(|entry| entry.tool().name().to_owned())
                     .collect::<HashSet<_>>();
                 builtin_contributions.extend(
                     composition::runtime_tool_contributions(self.workspace_root.clone())
@@ -1450,7 +1496,7 @@ impl RuntimeBuilder {
         if !self.skill_read_skills.is_empty()
             && !tools
                 .iter()
-                .any(|tool| tool.name() == skill_read::SKILL_READ_TOOL_NAME)
+                .any(|entry| entry.tool().name() == skill_read::SKILL_READ_TOOL_NAME)
         {
             builtin_contributions.push(talos_core::tool::ToolContribution::new(
                 talos_core::tool::ToolContributionSource::new("talos-runtime:skill"),
@@ -1464,15 +1510,13 @@ impl RuntimeBuilder {
             self.workspace_root.clone(),
             &self.permission_rules,
         ));
-        let mut registry = ToolRegistry::new();
         let approval_handler = self.approval_handler.clone();
-        for tool in tools {
-            registry.register(tool);
-        }
-        registry
-            .register_builtin_contributions(builtin_contributions)
-            .map_err(|error| RuntimeError::Agent(AgentError::ToolError(error.to_string())))?;
-        let owners = registry.cleanup_receipts();
+        tools.extend(
+            builtin_contributions
+                .into_iter()
+                .map(RuntimeToolRegistration::Builtin),
+        );
+        let (registry, owners) = register_runtime_tools(tools)?;
         if !owners.is_empty() {
             self.shutdown_finalizers
                 .push(Arc::new(ToolCleanupRuntimeFinalizer {
@@ -1983,6 +2027,7 @@ pub async fn collect_until_turn_completed(
 
 #[cfg(test)]
 mod tests {
+    mod builtin_registration;
     mod network_invocation;
     mod skill_disclosure;
     use std::sync::Mutex as StdMutex;
@@ -3686,7 +3731,7 @@ mod tests {
         let mut names = builder
             .tools
             .iter()
-            .map(|tool| tool.name().to_string())
+            .map(|entry| entry.tool().name().to_string())
             .collect::<Vec<_>>();
         names.sort();
         names.dedup();

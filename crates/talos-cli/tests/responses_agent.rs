@@ -123,7 +123,12 @@ fn responses_image_and_native_read_complete_through_real_agent() {
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
-    assert!(String::from_utf8_lossy(&output.stdout).contains("RESPONSES-AGENT-COMPLETE"));
+    assert!(
+        String::from_utf8_lossy(&output.stdout).contains("RESPONSES-AGENT-COMPLETE"),
+        "stdout={} stderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
     let requests = server.join().expect("controlled endpoint finished");
     for request in &requests {
         assert_eq!(request["store"], false);
@@ -152,4 +157,253 @@ fn responses_image_and_native_read_complete_through_real_agent() {
                     .as_str()
                     .is_some_and(|text| text.contains("RESPONSES-READ-RESULT")))
     );
+}
+
+#[test]
+fn responses_tool_image_is_sent_once_through_real_agent() {
+    let temp = tempfile::tempdir().expect("isolated home and workspace");
+    let config_dir = temp.path().join(".talos");
+    std::fs::create_dir(&config_dir).expect("config directory");
+    std::fs::write(temp.path().join("note.txt"), "RESPONSES-READ-RESULT").expect("read fixture");
+    let image_path = temp.path().join("sample.png");
+    image::RgbaImage::from_pixel(1, 1, image::Rgba([1, 2, 3, 255]))
+        .save(&image_path)
+        .expect("image fixture");
+    let listener = TcpListener::bind("127.0.0.1:0").expect("controlled endpoint");
+    listener.set_nonblocking(true).expect("bounded accept");
+    let address = listener.local_addr().expect("endpoint address");
+    std::fs::write(config_dir.join("config.toml"), format!(
+        "provider = \"fixture\"\nmodel = \"test-model\"\n[providers.fixture]\nprotocol = \"openai-chat\"\nbase_url = \"http://{address}\"\napi_key = \"test-key\"\n[providers.fixture.models.test-model]\nprotocol = \"openai-responses\"\nimage_input = true\n"
+    )).expect("config");
+    let server = std::thread::spawn(move || {
+        let deadline = Instant::now() + Duration::from_secs(25);
+        let mut requests = Vec::new();
+        while requests.len() < 3 {
+            let mut socket = loop {
+                match listener.accept() {
+                    Ok((socket, _)) => break socket,
+                    Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                        assert!(
+                            Instant::now() < deadline,
+                            "Agent did not finish its two requests"
+                        );
+                        std::thread::sleep(Duration::from_millis(5));
+                    }
+                    Err(error) => panic!("accept: {error}"),
+                }
+            };
+            requests.push(read_request(&mut socket));
+            let mut events = vec![serde_json::json!({"type": "response.created"})];
+            if requests.len() <= 2 {
+                let (name, path, id) = if requests.len() == 1 {
+                    ("read_image", "sample.png", "call_image")
+                } else {
+                    ("read", "note.txt", "call_read")
+                };
+                let item = serde_json::json!({
+                    "id": format!("fc_{id}"), "type": "function_call", "call_id": id,
+                    "name": name, "arguments": serde_json::json!({"path":path}).to_string(),
+                });
+                events
+                    .push(serde_json::json!({"type": "response.output_item.added", "item": item}));
+                events.push(serde_json::json!({"type": "response.output_item.done", "item": item}));
+            } else {
+                events.push(serde_json::json!({"type": "response.output_text.delta", "delta": "RESPONSES-AGENT-COMPLETE"}));
+            }
+            events.push(serde_json::json!({"type": "response.completed", "response": {"usage": {"input_tokens": 10, "output_tokens": 2}}}));
+            let body: String = events
+                .iter()
+                .map(|event| format!("data: {event}\n\n"))
+                .collect();
+            socket.write_all(format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()
+            ).as_bytes()).expect("response");
+        }
+        requests
+    });
+    let mut child = Command::new(env!("CARGO_BIN_EXE_talos"))
+        .args(["--print", "--no-context", "--workspace"])
+        .arg(temp.path())
+        .arg("Read note.txt and describe the image")
+        .current_dir(temp.path())
+        .env("HOME", temp.path())
+        .env("USERPROFILE", temp.path())
+        .env("NO_PROXY", "127.0.0.1,localhost")
+        .env("no_proxy", "127.0.0.1,localhost")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("real talos binary");
+    let deadline = Instant::now() + Duration::from_secs(30);
+    while child.try_wait().expect("poll binary").is_none() {
+        if Instant::now() >= deadline {
+            child.kill().expect("terminate timed-out fixture");
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let output = child.wait_with_output().expect("binary output");
+    assert!(
+        output.status.success(),
+        "stdout={} stderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&output.stdout).contains("RESPONSES-AGENT-COMPLETE"),
+        "stdout={} stderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let requests = server.join().expect("controlled endpoint finished");
+    for request in &requests {
+        assert_eq!(request["store"], false);
+        assert_eq!(request["stream"], true);
+        assert!(request.get("previous_response_id").is_none());
+    }
+    assert!(
+        requests[0]["tools"]
+            .as_array()
+            .expect("native tools")
+            .iter()
+            .any(|tool| tool["type"] == "function" && tool["name"] == "read")
+    );
+    for (index, request) in requests.iter().enumerate() {
+        assert_eq!(
+            request["input"]
+                .to_string()
+                .matches("\"type\":\"input_image\"")
+                .count(),
+            usize::from(index == 1),
+            "tool image must appear exactly once in the next request"
+        );
+        assert!(!request.to_string().contains("data:image") || index == 1);
+    }
+    assert!(
+        requests[1]["input"]
+            .as_array()
+            .expect("Responses input items")
+            .iter()
+            .any(|item| item["type"] == "function_call_output" && item["call_id"] == "call_image")
+    );
+    assert!(
+        requests[2]["input"]
+            .as_array()
+            .expect("Responses input items")
+            .iter()
+            .any(|item| {
+                item["type"] == "function_call_output"
+                    && item["call_id"] == "call_read"
+                    && item["output"]
+                        .as_str()
+                        .is_some_and(|text| text.contains("RESPONSES-READ-RESULT"))
+            })
+    );
+}
+
+#[test]
+fn responses_compat_tool_round_through_real_agent() {
+    textual_tool_round_through_real_agent("compat");
+}
+#[test]
+fn responses_strict_tool_round_through_real_agent() {
+    textual_tool_round_through_real_agent("talos-strict");
+}
+
+fn textual_tool_round_through_real_agent(mode: &str) {
+    let temp = tempfile::tempdir().expect("isolated home and workspace");
+    let config_dir = temp.path().join(".talos");
+    std::fs::create_dir(&config_dir).expect("config directory");
+    std::fs::write(temp.path().join("note.txt"), "RESPONSES-READ-RESULT").expect("read fixture");
+    let image_path = temp.path().join("sample.png");
+    image::RgbaImage::from_pixel(1, 1, image::Rgba([1, 2, 3, 255]))
+        .save(&image_path)
+        .expect("image fixture");
+    let listener = TcpListener::bind("127.0.0.1:0").expect("controlled endpoint");
+    listener.set_nonblocking(true).expect("bounded accept");
+    let address = listener.local_addr().expect("endpoint address");
+    std::fs::write(config_dir.join("config.toml"), format!(
+        "provider = \"fixture\"\nmodel = \"test-model\"\n[providers.fixture]\nprotocol = \"openai-chat\"\ntool_protocol = \"{mode}\"\nbase_url = \"http://{address}\"\napi_key = \"test-key\"\n[providers.fixture.models.test-model]\nprotocol = \"openai-responses\"\nimage_input = true\n"
+    )).expect("config");
+    let server = std::thread::spawn(move || {
+        let deadline = Instant::now() + Duration::from_secs(25);
+        let mut requests = Vec::new();
+        while requests.len() < 2 {
+            let mut socket = loop {
+                match listener.accept() {
+                    Ok((socket, _)) => break socket,
+                    Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                        assert!(
+                            Instant::now() < deadline,
+                            "Agent did not finish its two requests"
+                        );
+                        std::thread::sleep(Duration::from_millis(5));
+                    }
+                    Err(error) => panic!("accept: {error}"),
+                }
+            };
+            requests.push(read_request(&mut socket));
+            let mut events = vec![serde_json::json!({"type": "response.created"})];
+            if requests.len() == 1 {
+                let text = r#"<tool_call>{"id":"call_read","name":"read","args":{"path":"note.txt"}}</tool_call>"#;
+                events.push(serde_json::json!({"type":"response.output_text.delta","delta":text}));
+            } else {
+                events.push(serde_json::json!({"type": "response.output_text.delta", "delta": "RESPONSES-AGENT-COMPLETE"}));
+            }
+            events.push(serde_json::json!({"type": "response.completed", "response": {"usage": {"input_tokens": 10, "output_tokens": 2}}}));
+            let body: String = events
+                .iter()
+                .map(|event| format!("data: {event}\n\n"))
+                .collect();
+            socket.write_all(format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()
+            ).as_bytes()).expect("response");
+        }
+        requests
+    });
+    let mut child = Command::new(env!("CARGO_BIN_EXE_talos"))
+        .args(["--print", "--no-context", "--workspace"])
+        .arg(temp.path())
+        .arg("Read note.txt and describe the image")
+        .current_dir(temp.path())
+        .env("HOME", temp.path())
+        .env("USERPROFILE", temp.path())
+        .env("NO_PROXY", "127.0.0.1,localhost")
+        .env("no_proxy", "127.0.0.1,localhost")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("real talos binary");
+    let deadline = Instant::now() + Duration::from_secs(30);
+    while child.try_wait().expect("poll binary").is_none() {
+        if Instant::now() >= deadline {
+            child.kill().expect("terminate timed-out fixture");
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let output = child.wait_with_output().expect("binary output");
+    assert!(
+        output.status.success(),
+        "stdout={} stderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&output.stdout).contains("RESPONSES-AGENT-COMPLETE"),
+        "stdout={} stderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let requests = server.join().expect("controlled endpoint finished");
+    for request in &requests {
+        assert_eq!(request["store"], false);
+        assert_eq!(request["stream"], true);
+        assert!(request.get("previous_response_id").is_none());
+    }
+    assert!(requests[0]["tools"].as_array().is_none_or(Vec::is_empty));
+    let replay = requests[1]["input"].to_string();
+    assert!(replay.contains("<tool_result id=call_read"));
+    assert!(replay.contains("RESPONSES-READ-RESULT"));
+    assert!(!replay.contains("function_call_output"));
 }

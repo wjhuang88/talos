@@ -14,7 +14,9 @@ I308/H/G/T8 remain Active and incomplete. Mutation #770 merged as
 `687b84a93b4a9f40ede1eb600151c0a22a8f2d59`; policy/read coverage #771 merged as
 `b21b6146c21894dc42e8fc5bf1d815af71fbc7c8` after all-six-success exact-head
 CI 40280848025, independent final-target review and merge CAS. Scheduler/read/
-Todo/recovery stage #772 remains unmerged. Ordinary effectful Execute/HTTP/WebSearch Auto, remaining registered
+Todo/recovery stage #772 merged as `881a27b890e5310055380e6e3f5b0da78f9fdd3c`
+after all-six-success exact-head CI 40296390604, independent review and merge CAS.
+Ordinary effectful Execute/HTTP/WebSearch Auto, remaining registered
 operation/profile dispositions and final delivery gates remain outstanding.
 Earlier checkpoints below preserve historical states and do not override this one.
 
@@ -37,7 +39,7 @@ Earlier checkpoints below preserve historical states and do not override this on
 | Governance Claim PR | #765 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer authorized continued full handoff delivery; #765 requires independent permission/security/API review, exact-head CI, both validators and final merge-time CAS before merge. |
-| Implementation PR | #769 (foundation, merged); #770 (file mutation, merged); #771 (policy/read tests, merged); #772 (scheduler and native operation evidence) |
+| Implementation PR | #769 (foundation, merged); #770 (file mutation, merged); #771 (policy/read tests, merged); #772 (scheduler and native operation evidence, merged) |
 | Last Updated | 2026-10-26 |
 | Handoff / Release Condition | Satisfy full H/G acceptance with existing implementation commits, independent permission/security/API review and platform evidence; no release authorized. |
 
@@ -1022,3 +1024,90 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
 - Earlier CI does not cover the additional recovery tests or the new commit
   identities. Fresh aggregate review, exact-head CI and merge CAS remain due.
   T8 and the later handoff tasks remain incomplete.
+
+### Conditional Runtime skill policy evidence — 2026-10-26
+
+- Added real Runtime dispatch coverage for opt-in `skill_read`: body/reference
+  reads under default Read Allow and explicit Read Deny. All four cases reach
+  the next provider request; Deny returns refusal without either content marker.
+  Initial provider requests contain neither marker, and an allowed reference
+  read does not disclose the skill body. This proves these read-policy outcomes,
+  not Auto assessor/grant behavior or all conditional product tools.
+- Locked Runtime `tests::skill_disclosure` passed 5/5 again with the final
+  disclosure assertions. Locked Runtime lib/tests
+  Clippy passed with warnings denied. Independent read-only incremental review
+  approved the final test and checkpoint diff. This was a separate Agent sharing
+  the session/identity, not human review or an independent test execution.
+- This local test-only extension is outside published #772 head `05d0f4889` and
+  its running CI 40296390604. No production implementation changed. T8 remains
+  incomplete; ordinary effectful command/network Auto and other acceptance gaps
+  are not satisfied by this evidence.
+
+### Ordinary invocation decision draft — 2026-10-26
+
+- The previously pending ordinary command/network authorization question now has
+  a concrete [decision proposal](../proposals/i308-native-invocation-authorization.md).
+  It requests invocation-level review of transitive effects, not per-target
+  confinement, and remains unaccepted/unimplemented. A maintainer question is
+  pending; no answer is inferred from the earlier Pull-only acceptance.
+- Independent read-only design review requested explicit pre-Allow policy
+  compatibility and positive network eligibility/I293 ownership boundaries;
+  the proposal now includes both, and distinguishes human review from isolation.
+  This is design feedback, not implementation approval or T8 delivery evidence.
+
+### Runtime shared-instance registration repair — 2026-10-26
+
+- `RuntimeBuilder::shared_tools()` previously discarded factory contribution
+  identity and registered its tools as caller instances. The local repair retains
+  internal contributions, preserves last-registration-wins ordering with `tool()`,
+  and never transfers built-in identity to a caller replacement. Presets still
+  fill only absent names. All registered cleanup owners, including replaced
+  instances, remain retained and pointer-deduplicated for shutdown.
+- Three separate registration regressions pass; the full locked Runtime library
+  suite with `shared-composition` passes 82/82, including actual shared Read,
+  preset override, skill policy and shutdown tests. Locked Runtime library/tests
+  Clippy passes with warnings denied. These tests do not establish full Runtime
+  Auto-dispatch acceptance or ordinary command/network Auto implementation.
+- The default-feature locked Runtime library suite also passes 73/73; both
+  governance validators pass with zero warnings. The standard workspace
+  preflight is running and is not yet claimed successful.
+- Independent same-session read-only Agent security/API review approved the
+  production/test diff, with no independent test execution. This local repair
+  is outside published #772 head `05d0f4889`; it still needs the next stable
+  candidate's full validation, exact-head CI/review and merge. T8 remains Partial.
+- The first broad test invocation failed during linking with disk exhaustion,
+  before test execution. Previously authorized `target/debug` example and
+  incremental artifacts were cleared; subsequent library-only tests above pass.
+- The sandboxed standard preflight later failed at the eight-stage local Push
+  fixture's process-observation call (`EPERM`), with Tools 975/976 passing. It
+  therefore did not complete workspace/SDK validation. The same standard command
+  is now running with explicit outside-sandbox authorization; its result remains
+  pending (`/private/tmp/i308-runtime-registration-preflight-authorized.log`).
+- #772 subsequently merged as `881a27b890e5310055380e6e3f5b0da78f9fdd3c`.
+  Four local continuation commits were rebased onto it without conflicts; file
+  trees before and after rebase match. The repair is now `75d5811c0`, on
+  `feat/i308-runtime-registration`. No new candidate has been published yet.
+
+- Authorized standard preflight completed with exit 0 on 2026-10-26 for
+  production tree `57ee6103c3831e9ebaad18339fa0057fc170a653`:
+  `RUST_TEST_THREADS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_DEV_DEBUG=0 ./scripts/release_preflight.sh`.
+  Workspace checks, Clippy, tests/doctests, governance and external Runtime SDK
+  fixture passed; log: `/private/tmp/i308-runtime-registration-preflight-authorized.log`.
+  This supersedes the pending result above, preserves the sandbox failure, and
+  does not establish remote CI, merge, or full T8 completion.
+
+### Rebased registration candidate — 2026-10-27
+
+- Registration candidate rebased onto main `326e05751ad5d5bead11c7bc7789a82bae265526`; implementation head before this evidence update is `f5d724896`. PR #773 still points to the previous head until local convergence.
+- Post-rebase standard locked preflight failed with exit 101 at CLI test linking: `ld: write() failed, errno=28 (No space left on device)`. This is not a passing post-rebase gate and does not establish a product regression. Log: `/private/tmp/i308-rebased-ci-preflight.log`.
+- With no Cargo/compiler process active, removed only rebuildable executable files from the previously authorized root `target/debug/examples` directory (33 files, 3,394,336,464 logical bytes); dependency libraries were retained. Available disk rose from 219 MiB to 2.6 GiB.
+- Standard locked preflight is being retried with unchanged source, incremental compilation disabled, dev/test debug information disabled and serial tests. Log: `/private/tmp/i308-rebased-ci-preflight-retry.log`. Result remains outstanding until the process exits.
+- Full T8 and the original handoff remain incomplete. Ordinary invocation authorization remains a maintainer decision; Desktop Todo factory registration and the remaining operation/profile/platform matrix are not implemented by this checkpoint.
+
+- During retry, reclaimed 96 executable files older than six hours under authorized root `target/debug/deps` (2,485,667,936 logical bytes), excluding shared libraries and current compilation outputs. Available space recovered to 3.0 GiB; workspace tests are now executing. No source or Git data was removed.
+
+- Correction: the retry exited 101 because the age-based executable cleanup removed a still-required cached `talos_config` test binary after Cargo had scheduled it. The earlier assertion that old outputs were safe during an active build was incorrect. This was an agent cleanup error, not a product test failure. Do not remove artifacts during any Cargo run; the next full retry must rebuild missing outputs. Code review APPROVE covers base `326e05751` to `f5d724896`, with no independent builds; final documentation, CI and CAS remain pending.
+
+- 2026-10-27: maintainer explicitly accepted the ordinary Shell/Exec/HTTP whole-invocation authorization proposal. ADR-064 records this scope decision; earlier pending-decision checkpoints are historical. Implementation and its full acceptance remain outstanding; search is excluded under I293/ADR-090.
+
+- Third post-rebase standard locked preflight passed (exit 0) with `release preflight: passed`, including workspace checks, Clippy, tests/doctests and both external Runtime SDK consumers. Log: `/private/tmp/i308-rebased-ci-preflight-retry2.log`. This supersedes the pending retry result, preserves both earlier failures and establishes local validation only; exact-head remote CI and merge CAS remain outstanding.

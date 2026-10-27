@@ -319,3 +319,109 @@ async fn semantic_terminal_closes_stream_without_waiting_for_http_eof() {
         }
     }
 }
+
+#[tokio::test]
+async fn tool_image_is_never_automatically_reposted_after_503() {
+    use talos_core::provider::EphemeralImage;
+    use talos_core::tool::ToolProtocol;
+    let mut server = mockito::Server::new_async().await;
+    let mock = server
+        .mock("POST", "/responses")
+        .with_status(503)
+        .with_body("unavailable")
+        .expect(1)
+        .create_async()
+        .await;
+    let provider = OpenAIResponsesProvider::new("fixture", "fixture")
+        .with_base_url(server.url())
+        .with_timeout_config(talos_config::ProviderTimeoutConfig {
+            max_attempts: 3,
+            backoff_base_ms: 1,
+            backoff_max_ms: 1,
+            ..Default::default()
+        });
+    let image = EphemeralImage::png(
+        b"\x89PNG\r\n\x1a\nfixture".to_vec(),
+        std::time::Instant::now() + Duration::from_secs(120),
+    )
+    .expect("image");
+    let (progress, _) = tokio::sync::mpsc::unbounded_channel();
+    let result = provider
+        .stream_with_ephemeral_images(
+            &[Message::User {
+                content: "fixture".into(),
+            }],
+            &[],
+            ToolProtocol::Native,
+            progress,
+            &[],
+            vec![image],
+        )
+        .await;
+    assert!(matches!(
+        result,
+        Err(talos_core::provider::ProviderError::ServerError(_))
+    ));
+    mock.assert_async().await;
+}
+
+#[tokio::test]
+async fn explicit_text_protocols_dispatch_and_parse_tools_on_responses() {
+    use talos_core::tool::ToolProtocol;
+    for (protocol, truncated) in [
+        (ToolProtocol::Compat, false),
+        (ToolProtocol::TalosStrict, false),
+        (ToolProtocol::Compat, true),
+        (ToolProtocol::TalosStrict, true),
+    ] {
+        let mut server = mockito::Server::new_async().await;
+        let text = "<tool_call>{\"name\":\"probe\",\"args\":{\"value\":1}}</tool_call>";
+        let terminal = if truncated {
+            json!({"type":"response.incomplete","response":{"incomplete_details":{"reason":"max_output_tokens"},"usage":{"input_tokens":4,"output_tokens":2}}})
+        } else {
+            json!({"type":"response.completed","response":{"usage":{"input_tokens":4,"output_tokens":2}}})
+        };
+        let body = format!(
+            "data: {}\n\ndata: {}\n\n",
+            json!({"type":"response.output_text.delta","delta":text}),
+            terminal
+        );
+        let mock = server
+            .mock("POST", "/responses")
+            .match_request(|r| {
+                let body: Value =
+                    serde_json::from_slice(r.body().expect("request body")).expect("request JSON");
+                body["tools"].as_array().is_none_or(Vec::is_empty) && body["store"] == false
+            })
+            .with_status(200)
+            .with_header("content-type", "text/event-stream")
+            .with_body(body)
+            .expect(1)
+            .create_async()
+            .await;
+        let provider = responses_provider(server.url());
+        let (progress, _) = tokio::sync::mpsc::unbounded_channel();
+        let events = collect_events(
+            provider
+                .stream_with_protocol(
+                    &[Message::User {
+                        content: "fixture".into(),
+                    }],
+                    &[],
+                    protocol,
+                    progress,
+                )
+                .await
+                .expect("text protocol dispatch"),
+        )
+        .await;
+        assert!(events.iter().any(|event| matches!(event, AgentEvent::ToolCall { call, .. } if call.name == "probe" && call.input == json!({"value":1}))));
+        let expected = if truncated {
+            StopReason::MaxTokens
+        } else {
+            StopReason::ToolUse
+        };
+        assert!(events.iter().any(|event| matches!(event, AgentEvent::TurnEnd { stop_reason, .. } if *stop_reason == expected)));
+        mock.assert_async().await;
+    }
+}

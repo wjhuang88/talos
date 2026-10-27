@@ -82,10 +82,11 @@ impl OpenAIResponsesProvider {
             ToolProtocol::Auto => Err(ProviderError::InvalidResponse(
                 "automatic tool protocol must be resolved before OpenAI Responses dispatch".into(),
             )),
-            ToolProtocol::Compat | ToolProtocol::TalosStrict => Err(ProviderError::InvalidResponse(
-                "OpenAI Responses adapter requires native function tools; textual compatibility tool protocols are not enabled for this wire family"
-                    .into(),
-            )),
+            ToolProtocol::Compat | ToolProtocol::TalosStrict => {
+                self.client
+                    .stream(&crate::compatibility_messages(messages), &[], progress_tx)
+                    .await
+            }
         }
     }
 
@@ -99,16 +100,18 @@ impl OpenAIResponsesProvider {
         let source = self
             .semantic_stream(messages, tools, protocol, progress_tx)
             .await?;
-        Self::bridge_legacy(source)
+        Self::bridge_legacy(source, protocol)
     }
 
     fn bridge_legacy(
         source: mpsc::Receiver<crate::openai_responses_sse::ResponsesStreamOutput>,
+        protocol: ToolProtocol,
     ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
         let (tx, rx) = mpsc::channel(32);
-        tokio::spawn(forward_response_stream(
+        tokio::spawn(forward_protocol_stream(
             source,
             InvocationSender::Legacy(tx),
+            protocol,
         ));
         Ok(rx)
     }
@@ -127,7 +130,7 @@ impl OpenAIResponsesProvider {
             .with_reasoning(None, Some(limits.max_output_tokens))
             .with_timeout_config(timeout);
         let source = isolated.stream(messages, &[], None).await?;
-        Self::bridge_legacy(source)
+        Self::bridge_legacy(source, ToolProtocol::Native)
     }
 }
 
@@ -135,11 +138,11 @@ impl OpenAIResponsesProvider {
 impl LanguageModel for OpenAIResponsesProvider {
     fn protocol_capabilities(&self) -> CapabilityProbe {
         // Selecting the Responses wire family is itself explicit/confirmed evidence that native
-        // function items are available. Textual Talos compatibility framing is intentionally not
-        // mixed into this adapter.
+        // function items are available. Explicit textual tool modes use the shared compatibility
+        // projection and parser on the same Responses wire family.
         CapabilityProbe::Known(ProtocolCapabilities {
             native_tools: true,
-            compatibility: false,
+            compatibility: true,
         })
     }
 
@@ -182,6 +185,58 @@ impl LanguageModel for OpenAIResponsesProvider {
             .await
     }
 
+    async fn stream_with_ephemeral_images(
+        &self,
+        messages: &[Message],
+        tools: &[ToolDefinition],
+        protocol: ToolProtocol,
+        progress_tx: mpsc::UnboundedSender<ProviderProgress>,
+        browser_tools: &[String],
+        images: Vec<talos_core::provider::EphemeralImage>,
+    ) -> ProviderResult<ProviderInvocationStream> {
+        if images.is_empty() {
+            return self
+                .stream_with_invocation_integrity(
+                    messages,
+                    tools,
+                    protocol,
+                    progress_tx,
+                    browser_tools,
+                )
+                .await;
+        }
+        if protocol == ToolProtocol::Auto {
+            return Err(ProviderError::InvalidResponse(
+                "automatic tool protocol must be resolved before Responses dispatch".into(),
+            ));
+        }
+        let native = protocol == ToolProtocol::Native;
+        let projected = if native {
+            messages.to_vec()
+        } else {
+            crate::compatibility_messages(messages)
+        };
+        let source = self
+            .client
+            .stream_with_images(
+                &projected,
+                if native { tools } else { &[] },
+                Some(&progress_tx),
+                images,
+            )
+            .await?;
+        let (tx, rx) = mpsc::channel(32);
+        tokio::spawn(forward_protocol_stream(
+            source,
+            InvocationSender::Original {
+                tx,
+                browser_tools: browser_tools.to_vec(),
+            },
+            protocol,
+        ));
+        Ok(ProviderInvocationStream::original(rx))
+    }
+
     async fn stream_with_invocation_integrity(
         &self,
         messages: &[Message],
@@ -194,12 +249,13 @@ impl LanguageModel for OpenAIResponsesProvider {
             .semantic_stream(messages, tools, protocol, Some(&progress_tx))
             .await?;
         let (tx, rx) = mpsc::channel::<ProviderInvocationEvent>(32);
-        tokio::spawn(forward_response_stream(
+        tokio::spawn(forward_protocol_stream(
             source,
             InvocationSender::Original {
                 tx,
                 browser_tools: browser_tools.to_vec(),
             },
+            protocol,
         ));
         Ok(ProviderInvocationStream::original(rx))
     }
@@ -223,6 +279,76 @@ impl LanguageModel for OpenAIResponsesProvider {
     }
 }
 
+async fn forward_protocol_stream(
+    mut source: mpsc::Receiver<crate::openai_responses_sse::ResponsesStreamOutput>,
+    sink: InvocationSender,
+    protocol: ToolProtocol,
+) {
+    use crate::openai_responses_sse::ResponsesStreamOutput;
+    if protocol == ToolProtocol::Native {
+        forward_response_stream(source, sink).await;
+        return;
+    }
+    let mut text = String::new();
+    while let Some(output) = source.recv().await {
+        match output {
+            ResponsesStreamOutput::Agent(AgentEvent::TextDelta { delta }) => {
+                text.push_str(&delta);
+                if !sink.buffers_compat_text(protocol)
+                    && sink.send(AgentEvent::TextDelta { delta }).await.is_err()
+                {
+                    return;
+                }
+            }
+            ResponsesStreamOutput::Agent(AgentEvent::TurnEnd {
+                mut stop_reason,
+                usage,
+            }) => {
+                let calls = match crate::anthropic_stream::parse_invocation_text_calls(
+                    &text, protocol, &sink,
+                ) {
+                    Ok(calls) => calls,
+                    Err(message) => {
+                        let _ = sink
+                            .send(AgentEvent::Error {
+                                message: message.into(),
+                            })
+                            .await;
+                        return;
+                    }
+                };
+                if !calls.is_empty() && stop_reason == talos_core::message::StopReason::EndTurn {
+                    stop_reason = talos_core::message::StopReason::ToolUse;
+                }
+                if sink.release_compat_text(&text, protocol).await.is_err() {
+                    return;
+                }
+                for call in calls {
+                    if sink.send_invocation(call).await.is_err() {
+                        return;
+                    }
+                }
+                let _ = sink.send(AgentEvent::TurnEnd { stop_reason, usage }).await;
+                return;
+            }
+            ResponsesStreamOutput::FunctionCall { .. } => {
+                let _ = sink
+                    .send(AgentEvent::Error {
+                        message: "unexpected native tool call in Responses textual tool mode"
+                            .into(),
+                    })
+                    .await;
+                return;
+            }
+            ResponsesStreamOutput::Agent(event) => {
+                if sink.send(event).await.is_err() {
+                    return;
+                }
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -234,7 +360,7 @@ mod tests {
             provider.protocol_capabilities(),
             CapabilityProbe::Known(ProtocolCapabilities {
                 native_tools: true,
-                compatibility: false,
+                compatibility: true,
             })
         );
         assert_eq!(
@@ -244,13 +370,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn auto_and_textual_tool_protocols_fail_before_network_dispatch() {
+    async fn unresolved_auto_fails_before_network_dispatch() {
         let provider = OpenAIResponsesProvider::new("sk-test", "gpt-test");
-        for protocol in [
-            ToolProtocol::Auto,
-            ToolProtocol::Compat,
-            ToolProtocol::TalosStrict,
-        ] {
+        {
+            let protocol = ToolProtocol::Auto;
             let (progress, _rx) = mpsc::unbounded_channel();
             let error = provider
                 .stream_with_protocol(&[], &[], protocol, progress)

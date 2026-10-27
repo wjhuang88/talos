@@ -12,15 +12,18 @@
 ## Current Execution — 2026-10-26
 
 Activation #765 is merged at `8f0ce2340`. [I308](../../iterations/I308-builtin-auto-review.md)
-records local implementation and validation; full H/G acceptance remains incomplete.
-Opt-in bounded edit/delete backup/recovery is implemented locally and passed full
-workspace preflight. Higher-risk diff/impact model review and Auto execution remain
-unimplemented; backup/recovery alone does not complete this Story.
+records implementation and validation; full H/G acceptance remains incomplete.
+#770 (`687b84a93b4a9f40ede1eb600151c0a22a8f2d59`) merged complete-image
+model review and invocation-local Auto execution for supported text edits/deletion,
+with opt-in bounded backup/recovery. #771 adds policy/path evidence; #772
+(`881a27b890e5310055380e6e3f5b0da78f9fdd3c`) adds recovery permission,
+changed-target and pre-admission cancellation evidence. Started-write rollback,
+universal identity protection and full G acceptance are not established.
 The selection-proposal paragraphs below preserve the published baseline and are historical.
 
-Issue #563 tracks future diff-aware writes, rollback/backup gates, and impact analysis for
-higher-risk automatic permission decisions. This owner is intake-only; W0/W1 behavior remains
-unchanged and all higher-risk operations remain human-required until separately governed.
+Issue #563 remains open for the complete higher-risk write acceptance. Earlier
+intake-only/human-required descriptions below are historical, superseded only
+for the concrete supported operations above.
 
 ## I308 Selection Proposal — 2026-10-26
 

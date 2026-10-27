@@ -32,6 +32,13 @@ support boundaries. See [I280 migration](I280-RUNTIME-FACADE-MIGRATION.md).
 | `RuntimeBuilder::skill_read_tool` | Opt-in read-only `skill_read` tool over bound skills with confinement, 2 MiB file cap and 48 KiB chunks; caller tool of the same name wins (ADR-092) | I303 pre-1.0 additive API; not registered by default |
 | `RuntimeBuilder::shared_tools` | Explicitly opt into the shared Talos built-in tool contribution inventory when the `shared-composition` feature is enabled | I160 pre-1.0 additive API; not selected by `RuntimeBuilder::new()` |
 
+`shared_tools()` preserves built-in identity for its internally constructed instances,
+without granting execution permission. Registration follows builder call order: the
+last `shared_tools()` or `tool()` registration of a name wins. Caller tools never
+inherit built-in identity from a replaced tool. Cleanup owners from replaced
+instances remain retained for runtime shutdown. The coding preset only fills
+missing tool names and preserves explicit registrations.
+
 ### Re-exported Protocol Types (actual `pub use` in `talos-runtime`)
 
 These are selected types `talos-runtime` re-exports. For the complete named export set,

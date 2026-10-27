@@ -13,7 +13,7 @@ fn public_provider_declares_native_tool_evidence() {
         provider.protocol_capabilities(),
         CapabilityProbe::Known(ProtocolCapabilities {
             native_tools: true,
-            compatibility: false,
+            compatibility: true,
         })
     );
     assert_eq!(
@@ -23,13 +23,10 @@ fn public_provider_declares_native_tool_evidence() {
 }
 
 #[tokio::test]
-async fn public_provider_rejects_non_native_protocols_before_network_dispatch() {
+async fn public_provider_rejects_unresolved_auto_before_network_dispatch() {
     let provider = OpenAIResponsesProvider::new("sk-test", "gpt-test");
-    for protocol in [
-        ToolProtocol::Auto,
-        ToolProtocol::Compat,
-        ToolProtocol::TalosStrict,
-    ] {
+    {
+        let protocol = ToolProtocol::Auto;
         let (progress, _rx) = mpsc::unbounded_channel();
         let error = provider
             .stream_with_protocol(&[], &[], protocol, progress)
@@ -63,7 +60,7 @@ fn public_factory_builds_responses_for_confirmed_official_openai_default() {
         provider.protocol_capabilities(),
         CapabilityProbe::Known(ProtocolCapabilities {
             native_tools: true,
-            compatibility: false,
+            compatibility: true,
         })
     );
 }
