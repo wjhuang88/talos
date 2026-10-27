@@ -191,7 +191,10 @@ mod shared_manifest_tests {
             direct_plan.manifest().invocation_id(),
             searxng_plan.manifest().invocation_id()
         );
-        assert_eq!(direct_plan.permission_profile(), searxng_plan.permission_profile());
+        assert_eq!(
+            direct_plan.permission_profile(),
+            searxng_plan.permission_profile()
+        );
         assert_eq!(manifest.scope().endpoints().len(), 5);
         assert_eq!(direct_plan.permission_profile().len(), 5);
         assert!(!format!("{manifest:?}").contains("private query"));
@@ -201,8 +204,8 @@ mod shared_manifest_tests {
     fn shared_manifest_cannot_widen_global_network_policy() {
         let direct = DirectCompatibilityConfiguration::new().expect("direct");
         let searxng = SearXngConfiguration::new("https://search.example/").expect("searxng");
-        let proxy = ToolNetworkEndpoint::new("http", "proxy.example", 8080, "CONNECT", "/")
-            .expect("proxy");
+        let proxy =
+            ToolNetworkEndpoint::new("http", "proxy.example", 8080, "CONNECT", "/").expect("proxy");
         let private: IpAddr = "127.0.0.1".parse().expect("private ip");
         for (proxy, private_addresses, redirect_limit) in [
             (Some(proxy), vec![], 0),
@@ -220,7 +223,9 @@ mod shared_manifest_tests {
             );
             assert!(matches!(
                 direct.prepare_with_manifest(&manifest, "q", 1),
-                Err(CompatibilityError::Transport(TransportError::InvalidRequest))
+                Err(CompatibilityError::Transport(
+                    TransportError::InvalidRequest
+                ))
             ));
             assert!(matches!(
                 searxng.prepare_with_manifest(&manifest, "q", 1),
