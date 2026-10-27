@@ -1,3 +1,25 @@
+## Active resume checkpoint — 2026-10-27 cache/worktree cleanup
+
+Active branch: `feat/i308-save-auto`; worktree:
+`/private/tmp/talos-i308-save-active` (moved out of `target` before `cargo clean`).
+Rebased candidate `bafc87af7` is based on merged Fetch `d6f1e6a56`;
+Save Auto implementation is now `085903952`. Executable source, lockfile and
+scripts match the pre-rebase candidate. Three clean merged worktrees were removed
+and six missing-path registrations pruned; branches/commits were preserved.
+Root and Save `cargo clean` removed about 33.8 GiB; free space was 33 GiB.
+
+Previous unsandboxed run passed all workspace tests, including Tools997/997,
+then failed SDK-consumer compilation with ENOSPC. Concurrent xwin also failed
+ENOSPC. Neither constitutes complete preflight/Windows success. Fresh full
+standard preflight passed with `CARGO_PROFILE_DEV_DEBUG=0`,
+`CARGO_PROFILE_TEST_DEBUG=0`, `CARGO_INCREMENTAL=0`; log:
+`/private/tmp/i308-save-rebased-preflight.log`. This includes the full workspace
+tests and the external Runtime SDK fixture. Serial Windows xwin passed;
+log: `/private/tmp/i308-save-rebased-xwin.log`.
+Full candidate independent Agent security/API review approved `bafc87af7`
+against `d6f1e6a56`; the reviewer did not independently run tests. Save is not pushed
+or merged, T8 is Partial, and the entire later handoff queue remains outstanding.
+
 <!-- Latest stage checkpoint: 2026-10-27 -->
 Fetch #784 merged as `d6f1e6a56c3d337168b587feb92add36223007c4` after
 all-eight-success exact-head CI 40504783551, independent security/API review,

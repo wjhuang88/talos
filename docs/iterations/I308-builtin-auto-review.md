@@ -10,16 +10,16 @@ both governance validators and merge-time CAS. The review receipt is
 https://github.com/wjhuang88/talos/pull/784#issuecomment-6443350514.
 
 Recoverable Save Auto is implemented locally at
-`0013e63fe36646feba5175eebf32e96d1a83205b`: the retained-download capture and
+`085903952` (rebased from `0013e63fe36646feba5175eebf32e96d1a83205b`): the retained-download capture and
 subsequent complete-text mutation receive separate invocation-local assessments.
 Unregistered/replacement instances retain manual authorization without builtin
 model evidence. Binary, sensitive, incomplete and default non-recoverable writes
 retain fallback. Tests passed: Save 21/21, Agent 510/510, Core 122/122;
 Agent test Clippy and independent static permission/security/API review passed.
-The reviewer did not independently execute tests. Full standard preflight passed
-check and Clippy, then failed during workspace test compilation with
-`No space left on device`; full workspace success is not established. Cache
-cleanup freed space and a fresh full run is executing. Native Windows execution, Save stage
+The reviewer did not independently execute tests. After earlier ENOSPC failures,
+authorized cache cleanup and worktree relocation, full standard preflight passed
+for candidate `bafc87af7`, including workspace tests and the external SDK fixture.
+Windows test cross-compilation via cargo xwin passed. Native Windows execution, Save stage
 publication/CI/merge, complete operation/profile reconciliation and final H/G
 acceptance remain outstanding. Guarded search cannot downgrade. The original
 acceptance and remaining handoff queue are unchanged.
@@ -363,14 +363,14 @@ Runtime shared composition has a separate Product/Runtime inventory-equivalence 
 | `write`, `edit`, `delete` | Exact-content atomic creation is merged in #769; complete-image review and opt-in real recovery for string/anchored edit and text deletion are merged in #770. Binary/NUL and secret-like content retain human fallback. Expanded special-path/policy tests are published in #771; full G acceptance remains incomplete. |
 | `http_request` | Ordinary whole-invocation Auto merged in #783, with actual proxy/redirect AllowOnce and refusal/stale/external/replacement effects tested and exact-head platform CI. Full profile acceptance remains open. |
 | `fetch_url` | Ordinary whole-invocation Auto merged in #784 after full local preflight, review and exact-head platform CI. Reuses HTTP configuration/final-context binding and eight real proxy/redirect scenarios; full profile acceptance remains open. Configuration distinguishes constructor redirects from timeout-override defaults and output truncation from full response buffering. |
-| `save_url` | Local recoverable capture and complete-text mutation Auto implemented at `0013e63fe`; 16 production Agent scenarios cover model outcomes, policy, registration ownership, input changes and binary/default fallback. Full workspace/platform/remote gates remain pending. |
-| `web_search` | Ordinary Auto acceptance remains open. I293 guarded compatibility/SearXNG instances are separately protected and cannot downgrade. Ordinary HTTP evidence does not cover this row. |
+| `save_url` | Local recoverable capture and complete-text mutation Auto implemented at `085903952`; 16 production Agent scenarios cover model outcomes, policy, registration ownership, input changes and binary/default fallback. Full standard preflight and cargo-xwin passed; native CI/publication/merge remain pending. |
+| `web_search` | ADR-090 excludes ordinary whole-invocation Auto for WebSearch, including compatibility/default search. Existing legacy instances retain deterministic policy/human paths; guarded instances require their dedicated prepared-network route and cannot downgrade. Concrete production fallback/profile evidence remains outstanding; the synthetic network carrier fixture alone does not prove WebSearch acceptance. |
 | `git_status`, `git_diff`, `git_log`, `git_show`, `git_branch_list` | Real Agent dispatch verifies default Read Allow returns actual temporary-repository status/diff/history/commit/branch evidence and explicit Read Deny rejects all five, with zero assessor calls/grants. Complete profile/platform evidence remains outstanding. |
 | `git_add`, `git_commit`, `git_push`, `git_pull`, `git_checkout` | I300 prepared command route retained; no reopening of accepted whole-command Pull semantics. I308 full coverage evidence outstanding. |
-| `bash` (Unix) / `powershell` (Windows), `exec` | Local whole-invocation Auto implementation and actual Unix allow/refusal/cancel/stale/registration/replay tests pass. Windows fixtures compile via cargo xwin; native Windows and full profile/final gates remain outstanding. |
+| `bash` (Unix) / `powershell` (Windows), `exec` | Whole-invocation Auto merged in #783 with actual Unix allow/refusal/cancel/stale/registration/replay tests and exact-head Windows workspace CI. Per-entry-point reachability/final acceptance still requires reconciliation; cross-compilation alone is never native evidence. |
 | `todo_create`, `todo_create_batch`, `todo_update_batch`, `todo_update_status`, `todo_update`, `todo_delete`, `todo_add_dependency`, `todo_remove_dependency`, `todo_query` | Session-scoped Internal facets retain default deterministic Allow, not model approval. Local real-Agent tests cover all nine operations under default Allow and explicit Internal Deny, actual SQLite effects, unchanged other-session data, zero assessor calls and zero grants. MCP does not add Todo; complete profile/platform evidence remains outstanding. |
 | `status` | MCP-only read tool; concrete built-in ownership checked. |
-| `delay`, `schedule`, `list_scheduled_tasks`, `cancel_scheduled_task` | Product-owned scheduler factory registers actual instances as built-ins; caller-supplied instances remain external. A local action-review implementation now admits exact scheduling/cancellation invocations, pending validation and independent review below. `list_scheduled_tasks` retains Read policy. This stage is not merged acceptance. |
+| `delay`, `schedule`, `list_scheduled_tasks`, `cancel_scheduled_task` | Scheduler registration and action review merged in #772. Product-owned instances are built-ins; caller-supplied instances remain external. Exact scheduling/cancellation review does not approve future tool effects. `list_scheduled_tasks` retains Read policy. Complete profile/final acceptance remains open. |
 
 Inventory work found and repaired a production gap: Print/Inline/RPC/TUI previously
 constructed scheduler tools locally but passed them through generic external registration.
@@ -1454,3 +1454,40 @@ still pending. This local stage does not complete T8 or waive save/search accept
   restore, default/nonrecoverable saves and binary mutations gain no Auto approval
   from this route. T8 full G/search/profile acceptance and all later original
   handoff tasks remain incomplete.
+
+### Rebased full Save candidate review — 2026-10-27
+
+Candidate `bafc87af73cbd7ce9ce34d53fea0987d9148d6a8` is based on Fetch
+merge `d6f1e6a56c3d337168b587feb92add36223007c4`. Independent read-only
+Agent security/API review approved the complete aggregate delta: bounded download,
+instance-bound bounded recovery, exact admitted path capture, separate fresh
+write plan, complete UTF-8 mutation evidence, positive builtin ownership and
+unregistered manual compatibility. No new dependency/unsafe or required trait
+method/public input fields. Reviewer did not run tests. It is a separate Agent,
+not a separate natural person. Existing endpoint non-isolation, underlying chunk
+allocation and content-check/rename race limits remain explicitly disclosed.
+
+The prior unsandboxed run passed workspace tests (Tools997/997), then SDK
+compilation and a concurrent xwin check failed ENOSPC; neither complete gate passed.
+After authorized `cargo clean`, the active worktree moved outside target to
+`/private/tmp/talos-i308-save-active`. Fresh full standard preflight runs with
+debug symbols and incremental caching disabled to limit artifact size and passed,
+including all workspace tests and the external Runtime SDK fixture (log:
+`/private/tmp/i308-save-rebased-preflight.log`). Serial xwin passed (log:
+`/private/tmp/i308-save-rebased-xwin.log`). Save publication/CI/merge and full T8 acceptance
+remain outstanding. Historical pre-rebase SHAs above remain valid provenance,
+not current-head validation claims.
+
+### Remaining acceptance reconciliation after Save — working checklist
+
+This is an execution checklist against the unchanged numbered acceptance, not a
+reduced completion definition. Existing passing suites must be matched to actual
+production composition before closing each row.
+
+| Acceptance | Evidence to inspect / remaining concrete work |
+|---|---|
+| 1, operation/profile inventory | CLI `registry_builtin_tests`, Runtime `composition` equivalence, Desktop contributions/optional feature assemblies and MCP-only status. Record each conditional registration and concrete disposition; registration identity alone does not prove Auto dispatch. |
+| 2–4, actual admission | Existing Agent write/edit/read/Todo/scheduler/ordinary HTTP/command fixtures; add missing real registered Git operation and protected/legacy WebSearch disposition evidence. Preserve no-model reads, atomic facets, refusal/cancel/stale/replay checks. |
+| 5, higher-risk recovery | Reconcile `edit_auto`, mutation pipeline/recovery tests and Save recovery: special/config/security paths, destructive operation, partial failure, cancellation and stale target. Record unsupported native rename/batch inventory rather than inventing tools or rollback guarantees. |
+| 6, host reachability | Inspect CLI/Runtime/Desktop/MCP actual resolver installation and visible decisions, beyond registry equality; match applicable feature/native Windows evidence to these paths. |
+| 7, delivery gates | Save preflight/SDK/xwin, stable stage publication, exact-head native CI/review/CAS; then full H/G owner and user-doc reconciliation with implementation SHAs before Complete. |
