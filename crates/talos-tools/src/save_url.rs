@@ -212,20 +212,12 @@ impl AgentTool for SaveUrlTool {
             return ToolResult::error(format!("server returned status {status}"));
         }
 
-        let body_bytes = match response.bytes().await {
+        let body_bytes = match read_bounded_body(response, self.max_body_bytes).await {
             Ok(b) => b,
             Err(e) => {
                 return ToolResult::error(format!("failed to read response body: {e}"));
             }
         };
-
-        if body_bytes.len() > self.max_body_bytes {
-            return ToolResult::error(format!(
-                "response too large ({} bytes, max {})",
-                body_bytes.len(),
-                self.max_body_bytes
-            ));
-        }
 
         // Write to file.
         let dest_path = PathBuf::from(&parsed.destination);
@@ -247,71 +239,23 @@ impl AgentTool for SaveUrlTool {
     }
 }
 
+async fn read_bounded_body(
+    mut response: reqwest::Response,
+    limit: usize,
+) -> Result<Vec<u8>, String> {
+    let mut body = Vec::new();
+    while let Some(chunk) = response.chunk().await.map_err(|error| error.to_string())? {
+        if chunk.len() > limit.saturating_sub(body.len()) {
+            return Err(format!("response too large (max {limit} bytes)"));
+        }
+        body.extend_from_slice(&chunk);
+    }
+    Ok(body)
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_tool_name() {
-        let tool = SaveUrlTool::new();
-        assert_eq!(tool.name(), "save_url");
-    }
-
-    #[test]
-    fn test_tool_not_read_only() {
-        let tool = SaveUrlTool::new();
-        assert!(!tool.is_read_only());
-    }
-
-    #[test]
-    fn test_tool_nature_is_write() {
-        let tool = SaveUrlTool::new();
-        assert!(matches!(tool.nature(), ToolNature::Write));
-    }
-
-    #[test]
-    fn test_permission_profile_includes_network_and_write_facets() {
-        let tool = SaveUrlTool::new();
-        let profile = tool.permission_profile(&serde_json::json!({
-            "url": "https://Example.com/archive.zip",
-            "destination": "downloads/archive.zip"
-        }));
-
-        assert_eq!(profile.len(), 2);
-        assert_eq!(profile[0].nature, ToolNature::Network);
-        assert_eq!(profile[0].resource.as_deref(), Some("example.com"));
-        assert_eq!(profile[0].resource_kind, Some(ToolResourceKind::Domain));
-        assert_eq!(profile[1].nature, ToolNature::Write);
-        assert_eq!(
-            profile[1].resource.as_deref(),
-            Some("downloads/archive.zip")
-        );
-        assert_eq!(profile[1].resource_kind, Some(ToolResourceKind::Path));
-    }
-
-    #[test]
-    fn test_tool_summary_fields() {
-        let tool = SaveUrlTool::new();
-        assert_eq!(tool.summary_fields(), &["url", "destination"]);
-    }
-
-    #[test]
-    fn test_tool_emits_parameters_schema() {
-        let tool = SaveUrlTool::new();
-        let schema = tool.parameters();
-        assert!(schema.is_object());
-        assert!(schema.get("properties").is_some());
-    }
-
-    #[test]
-    fn test_deserialize_input() {
-        let json = r#"{"url": "https://example.com/file.zip", "destination": "/tmp/file.zip"}"#;
-        let input: SaveUrlInput = serde_json::from_str(json).expect("operation should succeed");
-        assert_eq!(input.url, "https://example.com/file.zip");
-        assert_eq!(input.destination, "/tmp/file.zip");
-    }
-}
+mod tests;
