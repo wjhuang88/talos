@@ -11,7 +11,7 @@ mod network_review;
 mod prepared_command;
 mod script_evidence;
 
-pub use action_review::BuiltinActionAssessmentRequest;
+pub use action_review::{BuiltinActionAssessmentRequest, OrdinaryInvocationAssessmentRequest};
 pub use file_mutation_review::FileMutationAssessmentRequest;
 pub use invocation_review::BuiltinInvocationAssessmentRequest;
 pub use network_review::{BuiltinNetworkAssessmentRequest, NetworkReviewEndpoint};
@@ -845,6 +845,15 @@ pub enum AutoConfidence {
 /// Provider-independent model assessor. Implementations must not call tools recursively.
 #[async_trait]
 pub trait AutoPermissionAssessor: Send + Sync {
+    /// Reviews an ordinary frozen invocation including transitive effects.
+    async fn assess_ordinary_invocation(
+        &self,
+        _request: OrdinaryInvocationAssessmentRequest,
+        _remaining: Duration,
+    ) -> Result<String, String> {
+        Err("ordinary invocation assessment unsupported".into())
+    }
+
     /// Reviews one session-local action. Existing assessors remain unsupported.
     async fn assess_builtin_action(
         &self,
@@ -992,6 +1001,14 @@ impl ProviderAutoPermissionAssessor {
 
 #[async_trait]
 impl AutoPermissionAssessor for ProviderAutoPermissionAssessor {
+    async fn assess_ordinary_invocation(
+        &self,
+        request: OrdinaryInvocationAssessmentRequest,
+        remaining: Duration,
+    ) -> Result<String, String> {
+        self.assess_ordinary_payload(request, remaining).await
+    }
+
     async fn assess_builtin_action(
         &self,
         request: BuiltinActionAssessmentRequest,
