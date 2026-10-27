@@ -1315,3 +1315,5 @@ Native Windows and final exact-head gates remain pending. T8 remains Partial.
   predicate, dependency, unsafe code or public API changes in this repair.
 - Final full preflight and exact-head remote/native Windows gates remain pending.
   T8 and the whole handoff remain Partial.
+
+- Final unchanged-source standard locked preflight at `cb6e20878` passed end to end (exit 0), including Tools 983/983 and both external Runtime SDK consumer modes. Command: `CARGO_TARGET_DIR=/Users/GHuang/WorkSpace/RustProjects/talos/target CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_DEV_DEBUG=0 RUST_TEST_THREADS=1 ./scripts/release_preflight.sh`; log: root `target/recovery/ordinary-final-platform-preflight-serial.log`. Two earlier full-suite attempts failed search connection-refusal classification; focused network/workspace reproductions passed. Serial success does not establish their root cause or a fix; retain the logs and track the unresolved intermittent failure under I293. No search implementation changed. Fresh exact-head remote CI/native Windows and final review/CAS remain outstanding; T8 remains Partial.
