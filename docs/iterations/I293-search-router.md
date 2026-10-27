@@ -31,6 +31,15 @@
 
 ## Scope
 
+### I308 Coexistence Coordination — 2026-10-27
+
+The maintainer, the recorded responsible actor for this owner and I308, confirmed ordinary HTTP
+whole-invocation review may coexist with this task. WebSearch, search compatibility/default
+transport and all required prepared-network tools retain ADR-090 admission and cannot downgrade
+to ordinary review on failure. The ADR-090 amendment must pass independent security/API review,
+exact-head CI and merge before I308 activation. This coordination does not change this task's
+scope, activation gates, delivery status or transport/parity evidence.
+
 - Add Talos-owned first-valid-success routing with bounded hedging and cancellation/deadline propagation.
 - Preserve backend identity and typed failures, while keeping health state bounded and query-free.
 - Keep paid providers explicit opt-in, Wikipedia as compatibility knowledge fallback, and rust-websearch as rollback adapter.

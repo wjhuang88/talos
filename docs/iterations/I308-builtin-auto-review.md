@@ -49,6 +49,16 @@ No production implementation belongs in this governance candidate.
 
 ## Published Baseline
 
+### Coexistence Decision Checkpoint — 2026-10-27
+
+The maintainer confirmed the I293/I308 boundary as the responsible actor of both owners:
+ordinary HTTP may receive whole-invocation review; WebSearch, search compatibility/default
+transport and required prepared-network tools retain ADR-090 authority and cannot downgrade.
+The proposal and ADR-090 record that decision. This documentation stage preserves the published
+baseline and runtime acceptance. Required evidence: independent exact-head security/API review,
+both governance validators, exact-head CI and target-branch merge. Remaining implementation and
+platform/dispatch evidence stay owned here; no ordinary Auto activation or completion is claimed.
+
 ### Selected Stories
 
 | Story | Parent | Status At Selection | Depends On | Outcome |
