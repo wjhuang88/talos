@@ -767,6 +767,12 @@ the remaining body is not downloaded to calculate a total.
 before writing the destination. For an existing regular file, `retain_backup: true`
 enables a recoverable atomic overwrite (2 MiB maximum before and after).
 It requires destination Read permission in addition to Network and Write.
+Registered recoverable saves first admit Network and Read to capture the original
+and download without writing. A fresh Read/Write approval then covers the retained
+replacement; it does not download again. Complete UTF-8 before/after images are
+available to the file review pipeline; binary images retain human approval.
+This stage does not yet enable Save URL model Auto approval. Relative destinations
+use the permission workspace, and changed targets or contents are refused.
 Use the returned `recovery_id` with the same `destination` to restore; supply a
 `url` string for schema compatibility, but restoration ignores it and requires
 only Read and Write. Recovery is available in the same tool instance for 15 minutes,

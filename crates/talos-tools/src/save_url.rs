@@ -55,7 +55,7 @@ pub struct SaveUrlInput {
 pub struct SaveUrlTool {
     client: reqwest::Client,
     max_body_bytes: usize,
-    recovery: crate::file_tools::FileRecoveryStore,
+    recovery: std::sync::Arc<crate::file_tools::FileRecoveryStore>,
 }
 
 impl SaveUrlTool {
@@ -71,6 +71,46 @@ impl SaveUrlTool {
             max_body_bytes: DEFAULT_MAX_BODY_BYTES,
             recovery: Default::default(),
         }
+    }
+}
+
+impl SaveUrlTool {
+    async fn download(&self, url: &str, limit: usize) -> Result<Vec<u8>, String> {
+        // Validate URL.
+        let parsed_url = match reqwest::Url::parse(url) {
+            Ok(url) => url,
+            Err(e) => return Err(format!("invalid URL: {e}")),
+        };
+
+        let scheme = parsed_url.scheme();
+        if scheme != "http" && scheme != "https" {
+            return Err(format!("unsupported URL scheme '{scheme}'"));
+        }
+
+        // SSRF guard.
+        let host = match parsed_url.host_str() {
+            Some(h) => h.to_string(),
+            None => return Err("URL has no host".to_string()),
+        };
+
+        if let Err(e) = check_ssrf(&host).await {
+            return Err(format!("SSRF guard blocked: {e}"));
+        }
+
+        // Download.
+        let response = match self.client.get(url).send().await {
+            Ok(resp) => resp,
+            Err(e) => {
+                return Err(SaveUrlError::DownloadFailed(e.to_string()).to_string());
+            }
+        };
+
+        let status = response.status();
+        if !status.is_success() {
+            return Err(format!("server returned status {status}"));
+        }
+
+        read_bounded_body(response, limit).await
     }
 }
 
@@ -108,6 +148,14 @@ async fn check_ssrf(host: &str) -> Result<(), String> {
 
 #[async_trait]
 impl AgentTool for SaveUrlTool {
+    fn prepare_normalized_with_provenance(
+        &self,
+        input: &Value,
+        provenance: talos_core::tool::ToolProvenance,
+    ) -> Result<Option<Box<dyn talos_core::tool::PreparedNormalToolInvocation>>, String> {
+        prepared::prepare(self, input, provenance)
+    }
+
     fn name(&self) -> &str {
         "save_url"
     }
@@ -251,51 +299,15 @@ impl AgentTool for SaveUrlTool {
             None
         };
 
-        // Validate URL.
-        let parsed_url = match reqwest::Url::parse(&parsed.url) {
-            Ok(url) => url,
-            Err(e) => return ToolResult::error(format!("invalid URL: {e}")),
-        };
-
-        let scheme = parsed_url.scheme();
-        if scheme != "http" && scheme != "https" {
-            return ToolResult::error(format!("unsupported URL scheme '{scheme}'"));
-        }
-
-        // SSRF guard.
-        let host = match parsed_url.host_str() {
-            Some(h) => h.to_string(),
-            None => return ToolResult::error("URL has no host".to_string()),
-        };
-
-        if let Err(e) = check_ssrf(&host).await {
-            return ToolResult::error(format!("SSRF guard blocked: {e}"));
-        }
-
-        // Download.
-        let response = match self.client.get(parsed.url.as_str()).send().await {
-            Ok(resp) => resp,
-            Err(e) => {
-                return ToolResult::error(SaveUrlError::DownloadFailed(e.to_string()).to_string());
-            }
-        };
-
-        let status = response.status();
-        if !status.is_success() {
-            return ToolResult::error(format!("server returned status {status}"));
-        }
-
         let limit = if retain_backup {
             self.max_body_bytes
                 .min(talos_core::tool::MAX_FILE_MUTATION_REVIEW_BYTES)
         } else {
             self.max_body_bytes
         };
-        let body_bytes = match read_bounded_body(response, limit).await {
-            Ok(b) => b,
-            Err(e) => {
-                return ToolResult::error(format!("failed to read response body: {e}"));
-            }
+        let body_bytes = match self.download(&parsed.url, limit).await {
+            Ok(bytes) => bytes,
+            Err(error) => return ToolResult::error(error),
         };
 
         if let Some((path, before)) = captured {
@@ -355,3 +367,5 @@ mod tests;
 
 #[cfg(test)]
 mod recovery_tests;
+
+mod prepared;

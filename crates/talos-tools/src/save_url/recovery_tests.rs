@@ -1,7 +1,9 @@
 use super::*;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-async fn tool_with_download(body: &'static [u8]) -> (SaveUrlTool, tokio::task::JoinHandle<()>) {
+pub(super) async fn tool_with_download(
+    body: &'static [u8],
+) -> (SaveUrlTool, tokio::task::JoinHandle<()>) {
     tool_with_download_action(body, || {}).await
 }
 
