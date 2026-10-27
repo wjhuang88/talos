@@ -841,7 +841,7 @@ impl Agent {
                     && prepared_network.is_none()
                     && matches!(
                         call.name.as_str(),
-                        "bash" | "powershell" | "exec" | "http_request"
+                        "bash" | "powershell" | "exec" | "http_request" | "fetch_url"
                     )
                     && tool.invocation_review_configuration().is_some()
                 {

@@ -326,3 +326,29 @@ eight-file provenance/data boundary. No different model endpoint or unsupported 
 Final validation and exact published-head review are recorded in the PR; code-first merge, retarget
 onto main and merge-time CAS sequencing remain required. Status stays Active/Claimed, with no
 completion or release claim.
+
+
+### Code Merged; Data Retargeted To Main — 2026-10-27
+
+Code PR #749 merged as `60e27eb6653b3a8fef638a2b9a7294a036b78db0` after exact-head CI3498's eight
+successful jobs, independent Agent provider/API review, current-main #784 non-overlap review and
+Single-maintainer authorization/CAS. Its merge commit preserves `1388874d` ancestry. Model-specific
+endpoint routing remains unimplemented/withheld under parent #724; neither code carrier merge nor
+this data stage marks #748/I306 Complete or publishes a release.
+
+Data #775 is now retargeted from the code branch to main. The new stable candidate integrates that
+already-merged main commit, including #784 Fetch URL Auto, without conflicts. Relative to main the
+same eight data/provenance files remain. Every catalog, test, archive, license, README, audit-script
+and preflight-entry byte from `0c1abf79` is unchanged; only this ledger appends new integration facts.
+The offline audit was repeated on the combined tree: all 6,474 models match the frozen source,
+4,010 hints (3,853 Chat / 38 Messages / 119 Responses), unchanged withheld categories and identical
+non-protocol semantic digest. No fresh upstream download or new protocol inference is performed.
+
+CI3499 was successful on the prior stacked head, but is historical for the new main integration.
+At reconciliation start, environment maintenance had removed the Rust toolchain/build cache. The
+first governance invocation could not read SQLite dependency metadata because cargo was missing;
+the pinned Rust 1.99.0 toolchain was then restored for that check. No new local Cargo test verdict
+is claimed for this reconciliation. Earlier exact 1,803-pass execution
+remains attributed to `0c1abf79`. The new published head requires its own full CI against the actual
+combined checkout, and independent final head/base/tree binding, before data merge. Retarget alone
+and rerunning the old workflow are not substituted for the new integration evidence.

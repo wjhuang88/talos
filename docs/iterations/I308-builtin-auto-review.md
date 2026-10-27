@@ -66,7 +66,7 @@ Earlier checkpoints below preserve historical states and do not override this on
 | Governance Claim PR | #765 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer authorized continued full handoff delivery; #765 requires independent permission/security/API review, exact-head CI, both validators and final merge-time CAS before merge. |
-| Implementation PR | #769 (foundation, merged); #770 (file mutation, merged); #771 (policy/read tests, merged); #772 (scheduler and native operation evidence, merged); #773 (parent Runtime registration, merged); #779 (Desktop Todo registration); #783 (ordinary Shell/Exec/HTTP, Review) |
+| Implementation PR | #769 (foundation, merged); #770 (file mutation, merged); #771 (policy/read tests, merged); #772 (scheduler and native operation evidence, merged); #773 (parent Runtime registration, merged); #779 (Desktop Todo registration, merged); #783 (ordinary Shell/Exec/HTTP, merged); #784 (Fetch URL, Review) |
 | Last Updated | 2026-10-27 |
 | Handoff / Release Condition | Satisfy full H/G acceptance with existing implementation commits, independent permission/security/API review and platform evidence; no release authorized. |
 
@@ -365,7 +365,8 @@ Runtime shared composition has a separate Product/Runtime inventory-equivalence 
 | `read`, `ls`, `read_image`, `document_extract`, `grep`, `glob`, `diff`, `stat`, `tree`, `find_symbol`, `find_references`, `list_symbols`, `list_imports` | Real Agent dispatch tests cover default Read Allow and explicit Read Deny for all listed operations, with actual results and zero model assessments/grants. Image attachment reaches only the next provider request after an allowed read. Complete profile/platform coverage remains outstanding. MCP omits `read_image`. |
 | `write`, `edit`, `delete` | Exact-content atomic creation is merged in #769; complete-image review and opt-in real recovery for string/anchored edit and text deletion are merged in #770. Binary/NUL and secret-like content retain human fallback. Expanded special-path/policy tests are published in #771; full G acceptance remains incomplete. |
 | `http_request` | Ordinary whole-invocation Auto implemented locally; actual proxy/redirect AllowOnce and refusal/stale/external/replacement effects tested. Final native Windows, review/CI/merge remain outstanding. |
-| `save_url`, `fetch_url`, `web_search` | Default production instances are not prepared-network tools and do not receive ordinary model AllowOnce. Existing deterministic policy/human paths remain; actual production fallback tests and remaining Auto acceptance are outstanding. I293 guarded compatibility/SearXNG instances are separately protected and cannot downgrade. Ordinary HTTP evidence does not cover this row. |
+| `fetch_url` | Local ordinary whole-invocation Auto implementation reuses the HTTP route, configuration/final-context binding and all eight real proxy/redirect scenarios; final local/platform/remote gates remain pending. Configuration distinguishes constructor redirects from timeout-override defaults and output truncation from full response buffering. |
+| `save_url`, `web_search` | Default production instances are not prepared-network tools and do not receive ordinary model AllowOnce. Existing deterministic policy/human paths remain; actual production fallback tests and remaining Auto acceptance are outstanding. I293 guarded compatibility/SearXNG instances are separately protected and cannot downgrade. Ordinary HTTP evidence does not cover this row. |
 | `git_status`, `git_diff`, `git_log`, `git_show`, `git_branch_list` | Real Agent dispatch verifies default Read Allow returns actual temporary-repository status/diff/history/commit/branch evidence and explicit Read Deny rejects all five, with zero assessor calls/grants. Complete profile/platform evidence remains outstanding. |
 | `git_add`, `git_commit`, `git_push`, `git_pull`, `git_checkout` | I300 prepared command route retained; no reopening of accepted whole-command Pull semantics. I308 full coverage evidence outstanding. |
 | `bash` (Unix) / `powershell` (Windows), `exec` | Local whole-invocation Auto implementation and actual Unix allow/refusal/cancel/stale/registration/replay tests pass. Windows fixtures compile via cargo xwin; native Windows and full profile/final gates remain outstanding. |
@@ -1317,3 +1318,38 @@ Native Windows and final exact-head gates remain pending. T8 remains Partial.
   T8 and the whole handoff remain Partial.
 
 - Final unchanged-source standard locked preflight at `cb6e20878` passed end to end (exit 0), including Tools 983/983 and both external Runtime SDK consumer modes. Command: `CARGO_TARGET_DIR=/Users/GHuang/WorkSpace/RustProjects/talos/target CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_DEV_DEBUG=0 RUST_TEST_THREADS=1 ./scripts/release_preflight.sh`; log: root `target/recovery/ordinary-final-platform-preflight-serial.log`. Two earlier full-suite attempts failed search connection-refusal classification; focused network/workspace reproductions passed. Serial success does not establish their root cause or a fix; retain the logs and track the unresolved intermittent failure under I293. No search implementation changed. Fresh exact-head remote CI/native Windows and final review/CAS remain outstanding; T8 remains Partial.
+
+### Fetch URL ordinary Auto follow-up — 2026-10-27
+
+The next local stage extends the accepted ordinary network route to positively
+registered fetch_url instances. It reuses shared assessment, transitive-policy
+compatibility, one-use admission and final retained-context checks. Search and
+save_url are unchanged. The existing subprocess proxy fixture now exercises both
+production HTTP and fetch instances, with tool-specific input/intent, real redirect
+and response effects, all eight allow/refusal/stale/registration scenarios, and
+zero accepted or queued proxy connections on refusal. Initial fixture attempts
+found a missing Network presentation family and a missing execution-context capture
+entry; both were corrected and the wrapped configuration assertions now pass.
+Independent static review required accurate disclosure of existing transport:
+timeout_secs rebuilds a client with the default redirect limit; maximum_body_bytes
+only truncates displayed content after complete buffering. Both facts are explicit
+in bound configuration without changing transport or claiming a memory cap.
+Focused real proxy tests pass; full locked Agent library tests pass 509/509.
+Tools tests, Clippy, final exact-head review, native Windows and remote gates are
+still pending. This local stage does not complete T8 or waive save/search acceptance.
+
+### 2026-10-27 additional local validation and remote gate finding
+
+- Fetch stage: `cargo test --locked -p talos-tools --features network` passed (406 library tests plus integration/doc targets); Agent/Tools library-and-test Clippy passed with network enabled and warnings denied. The earlier default-feature Tools invocation ran no fetch tests and is not evidence for network coverage.
+- Three HTTP response fixtures now read complete request headers with a 16 KiB bound and five-second timeout, handling partial reads rather than discarding the returned byte count.
+- PR #783 exact-head run `40475830775` passed both explicit Desktop feature jobs, but the workspace job failed the real REPL locale acceptance. `scripts/accept_auto_locale.py` still recognizes only the old assessor protocol. Inspection additionally confirmed a product gap: ordinary invocation human fallback uses fixed English and does not propagate the existing session locale/presentation behavior. This finding was unresolved at the stash checkpoint; the ordinary locale repair above now implements the correction and passes local real REPL/TUI acceptance. Changing fixture expectations alone was insufficient. PR #783 must not merge until the behavior and real REPL acceptance are repaired and fresh required gates pass.
+- Fetch completed successfully against origin; current implementation HEAD is 20 commits ahead and zero behind origin/main. No rebase was needed at this checkpoint.
+
+### Ordinary invocation stage merged — 2026-10-27
+
+- PR #783 merged as `da280c8a77b25798e59df37f3bdc2bf2fafce1c9`, exact candidate `ae01ebb3920d4e50d8cd2942e81528d1eb66b731`. CI 40482737690 passed all eight checks, including native Windows workspace/Desktop and Linux Desktop. Both local governance validators passed with zero warnings. Independent same-session read-only Agent final permission/security/API review approved exact head/base `85ac39b48`; no independent builds or natural-person approval claimed. Merge receipt: https://github.com/wjhuang88/talos/pull/783#issuecomment-6441484942 .
+- This closes the Shell/Exec/ordinary HTTP stage only. Fetch follow-up remains local; Save URL/search and complete operation/profile acceptance remain incomplete. T8 and the full handoff remain Partial.
+
+- Fetch full standard locked preflight passed (exit 0), Tools 983/983 and both external Runtime SDK consumers; root log `target/recovery/ordinary-fetch-preflight.log`, same low-debug/incremental-disabled serial command and shared target as the preceding ordinary stage. Independent static permission/security/API review approved original implementation `0eb2a70c5` against `cb6e20878`, without builds. Rebased onto merged parent `da280c8a7`; `git diff 1dcdf885d HEAD` showed only one owner-document separator change, with all executable sources, lockfile and scripts identical. The conflict retained both parent evidence and Fetch notes. Remote exact-head/native Windows and final review remain pending; T8 remains Partial.
+
+- Fetch stable candidate published as PR #784 at `6e01c5690`; exact-head CI and native Windows evidence are pending. No T8 completion is claimed.

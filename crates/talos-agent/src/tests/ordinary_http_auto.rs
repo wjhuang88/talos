@@ -7,8 +7,17 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 const CHILD_SCENARIO: &str = "TALOS_I308_HTTP_AUTO_CHILD";
 const URL: &str = "http://93.184.216.34/start";
 
+fn user_intent(tool: &str) -> &'static str {
+    if tool == "http_request" {
+        "send fixture-payload to the supplied HTTP endpoint, following its redirect"
+    } else {
+        "read the supplied URL as raw text, following its redirect"
+    }
+}
+
 struct Assessor {
     scenario: String,
+    tool: String,
     calls: Arc<AtomicUsize>,
     reached: Arc<AtomicUsize>,
     state: Arc<talos_permission::PermissionSessionState>,
@@ -28,9 +37,32 @@ impl AutoPermissionAssessor for Assessor {
         _: std::time::Duration,
     ) -> Result<String, String> {
         self.calls.fetch_add(1, Ordering::SeqCst);
-        assert_eq!(request.action.tool, "http_request");
+        assert_eq!(request.action.tool, self.tool);
         assert_eq!(request.action.input["url"], URL);
-        assert_eq!(request.action.input["body"], "fixture-payload");
+        assert_eq!(request.action.user_intent, user_intent(&self.tool));
+        if self.tool == "http_request" {
+            assert_eq!(request.action.input["body"], "fixture-payload");
+        } else {
+            assert_eq!(request.action.input["mode"], "raw");
+            assert_eq!(
+                request.configuration["tool_configuration"]["timeout_override_redirect_limit"],
+                5
+            );
+            assert!(
+                request.configuration["tool_configuration"]["response_buffering"]
+                    .as_str()
+                    .expect("buffering disclosure")
+                    .contains("no transfer or allocation cap")
+            );
+            assert_eq!(
+                request.configuration["tool_configuration"]["constructor_redirect_limit"],
+                5
+            );
+            assert_eq!(
+                request.configuration["tool_configuration"]["maximum_display_body_bytes"],
+                65536
+            );
+        }
         assert_eq!(
             request.configuration["tool_configuration"]["backend"],
             "reqwest"
@@ -73,7 +105,7 @@ impl LanguageModel for HttpModel {
     }
 }
 
-async fn child(scenario: String) {
+async fn child(scenario: String, tool: String) {
     let allow = scenario == "allow";
     let results = Arc::new(AtomicUsize::new(0));
     let root = tempfile::tempdir().expect("workspace");
@@ -87,7 +119,7 @@ async fn child(scenario: String) {
         let contributions = talos_tools::network_tool_contributions();
         let tool = contributions
             .iter()
-            .find(|entry| entry.name() == "http_request")
+            .find(|entry| entry.name() == tool)
             .expect("production HTTP")
             .tool()
             .clone();
@@ -96,7 +128,7 @@ async fn child(scenario: String) {
     let mut engine = PermissionEngine::with_workspace_root(root.path().to_owned());
     if matches!(scenario.as_str(), "deny" | "human") {
         engine.add_rule(talos_permission::PermissionRule::new(
-            "http_request",
+            &tool,
             None,
             if scenario == "deny" {
                 PermissionDecision::Deny("explicit test policy".into())
@@ -115,6 +147,7 @@ async fn child(scenario: String) {
     let resolver = AutoPermissionResolver::new(
         Arc::new(Assessor {
             scenario,
+            tool: tool.clone(),
             calls: calls.clone(),
             reached: reached.clone(),
             state: state.clone(),
@@ -129,8 +162,12 @@ async fn child(scenario: String) {
             AgentEvent::ToolCall {
                 call: ToolCall {
                     id: "http".into(),
-                    name: "http_request".into(),
-                    input: serde_json::json!({"method":"POST","url":URL,"body":"fixture-payload","timeout_secs":3}),
+                    name: tool.clone(),
+                    input: if tool == "http_request" {
+                        serde_json::json!({"method":"POST","url":URL,"body":"fixture-payload","timeout_secs":3})
+                    } else {
+                        serde_json::json!({"url":URL,"mode":"raw","timeout_secs":3})
+                    },
                 },
                 provenance: Default::default(),
                 summary_fields: vec![],
@@ -163,11 +200,9 @@ async fn child(scenario: String) {
     );
     agent.set_tool_presentation_policy(ToolPresentationPolicy::with_families([
         ToolFamily::AdvancedNetwork,
+        ToolFamily::Network,
     ]));
-    agent
-        .run("send fixture-payload to the supplied HTTP endpoint, following its redirect".into())
-        .await
-        .expect("run");
+    agent.run(user_intent(&tool).into()).await.expect("run");
     assert_eq!(calls.load(Ordering::SeqCst), expected_calls);
     assert_eq!(reached.load(Ordering::SeqCst), expected_calls);
     assert_eq!(results.load(Ordering::SeqCst), 1);
@@ -202,93 +237,109 @@ async fn read_request(stream: &mut tokio::net::TcpStream) -> String {
 #[tokio::test]
 async fn real_http_auto_controls_proxy_and_redirect_effects() {
     if let Ok(scenario) = std::env::var(CHILD_SCENARIO) {
-        child(scenario).await;
+        child(
+            scenario,
+            std::env::var("TALOS_I308_HTTP_AUTO_TOOL").expect("tool"),
+        )
+        .await;
         return;
     }
-    for scenario in [
-        "allow",
-        "uncertain",
-        "error",
-        "stale",
-        "deny",
-        "human",
-        "external",
-        "replacement",
-    ] {
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
-            .await
-            .expect("proxy");
-        let address = listener.local_addr().expect("address");
-        let listener = Arc::new(listener);
-        let server_listener = listener.clone();
-        let connections = Arc::new(AtomicUsize::new(0));
-        let observed = connections.clone();
-        let server = tokio::spawn(async move {
-            for index in 0..2 {
-                let (mut stream, _) = server_listener.accept().await.expect("accept");
-                observed.fetch_add(1, Ordering::SeqCst);
-                let request = read_request(&mut stream).await;
-                if index == 0 {
-                    assert!(
-                        request.starts_with("POST http://93.184.216.34/start HTTP/1.1\r\n"),
-                        "{request}"
-                    );
-                    assert!(request.ends_with("fixture-payload"));
-                    stream.write_all(b"HTTP/1.1 302 Found\r\nLocation: http://93.184.216.34/finish\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").await.expect("redirect");
-                } else {
-                    assert!(
-                        request.starts_with("GET http://93.184.216.34/finish HTTP/1.1\r\n"),
-                        "{request}"
-                    );
-                    stream.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 7\r\nConnection: close\r\n\r\nfixture").await.expect("response");
-                }
-            }
-        });
-        let mut command =
-            tokio::process::Command::new(std::env::current_exe().expect("test executable"));
-        command
-            .args([
-                "--exact",
-                "tests::ordinary_http_auto::real_http_auto_controls_proxy_and_redirect_effects",
-                "--nocapture",
-            ])
-            .env(CHILD_SCENARIO, scenario)
-            .env("HTTP_PROXY", format!("http://{address}"))
-            .env("http_proxy", format!("http://{address}"))
-            .env("NO_PROXY", "")
-            .env("no_proxy", "")
-            .env_remove("ALL_PROXY")
-            .env_remove("all_proxy")
-            .env_remove("HTTPS_PROXY")
-            .env_remove("https_proxy")
-            .env_remove("REQUEST_METHOD")
-            .kill_on_drop(true);
-        let output = tokio::time::timeout(std::time::Duration::from_secs(20), command.output())
-            .await
-            .expect("bounded child")
-            .expect("child");
-        assert!(
-            output.status.success(),
-            "{scenario}: {} {}",
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
-        );
-        if scenario == "allow" {
-            tokio::time::timeout(std::time::Duration::from_secs(5), server)
+    for tool in ["http_request", "fetch_url"] {
+        for scenario in [
+            "allow",
+            "uncertain",
+            "error",
+            "stale",
+            "deny",
+            "human",
+            "external",
+            "replacement",
+        ] {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
                 .await
-                .expect("proxy completed")
-                .expect("proxy task");
-            assert_eq!(connections.load(Ordering::SeqCst), 2);
-        } else {
-            server.abort();
-            let _ = server.await;
-            assert_eq!(connections.load(Ordering::SeqCst), 0, "{scenario}");
+                .expect("proxy");
+            let address = listener.local_addr().expect("address");
+            let listener = Arc::new(listener);
+            let server_listener = listener.clone();
+            let connections = Arc::new(AtomicUsize::new(0));
+            let observed = connections.clone();
+            let server = tokio::spawn(async move {
+                for index in 0..2 {
+                    let (mut stream, _) = server_listener.accept().await.expect("accept");
+                    observed.fetch_add(1, Ordering::SeqCst);
+                    let request = read_request(&mut stream).await;
+                    if index == 0 {
+                        assert!(
+                            request.starts_with(&format!(
+                                "{} http://93.184.216.34/start HTTP/1.1\r\n",
+                                if tool == "http_request" {
+                                    "POST"
+                                } else {
+                                    "GET"
+                                }
+                            )),
+                            "{request}"
+                        );
+                        if tool == "http_request" {
+                            assert!(request.ends_with("fixture-payload"));
+                        }
+                        stream.write_all(b"HTTP/1.1 302 Found\r\nLocation: http://93.184.216.34/finish\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").await.expect("redirect");
+                    } else {
+                        assert!(
+                            request.starts_with("GET http://93.184.216.34/finish HTTP/1.1\r\n"),
+                            "{request}"
+                        );
+                        stream.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 7\r\nConnection: close\r\n\r\nfixture").await.expect("response");
+                    }
+                }
+            });
+            let mut command =
+                tokio::process::Command::new(std::env::current_exe().expect("test executable"));
+            command
+                .args([
+                    "--exact",
+                    "tests::ordinary_http_auto::real_http_auto_controls_proxy_and_redirect_effects",
+                    "--nocapture",
+                ])
+                .env(CHILD_SCENARIO, scenario)
+                .env("TALOS_I308_HTTP_AUTO_TOOL", tool)
+                .env("HTTP_PROXY", format!("http://{address}"))
+                .env("http_proxy", format!("http://{address}"))
+                .env("NO_PROXY", "")
+                .env("no_proxy", "")
+                .env_remove("ALL_PROXY")
+                .env_remove("all_proxy")
+                .env_remove("HTTPS_PROXY")
+                .env_remove("https_proxy")
+                .env_remove("REQUEST_METHOD")
+                .kill_on_drop(true);
+            let output = tokio::time::timeout(std::time::Duration::from_secs(20), command.output())
+                .await
+                .expect("bounded child")
+                .expect("child");
             assert!(
-                tokio::time::timeout(std::time::Duration::from_millis(50), listener.accept())
-                    .await
-                    .is_err(),
-                "{scenario}: unexpected queued proxy connection"
+                output.status.success(),
+                "{scenario}: {} {}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
             );
+            if scenario == "allow" {
+                tokio::time::timeout(std::time::Duration::from_secs(5), server)
+                    .await
+                    .expect("proxy completed")
+                    .expect("proxy task");
+                assert_eq!(connections.load(Ordering::SeqCst), 2);
+            } else {
+                server.abort();
+                let _ = server.await;
+                assert_eq!(connections.load(Ordering::SeqCst), 0, "{scenario}");
+                assert!(
+                    tokio::time::timeout(std::time::Duration::from_millis(50), listener.accept())
+                        .await
+                        .is_err(),
+                    "{scenario}: unexpected queued proxy connection"
+                );
+            }
         }
     }
 }

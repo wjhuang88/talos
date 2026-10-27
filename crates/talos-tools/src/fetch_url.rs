@@ -59,6 +59,7 @@ fn default_mode() -> String {
 pub struct FetchUrlTool {
     client: reqwest::Client,
     max_body_bytes: usize,
+    redirect_limit: usize,
     #[cfg(test)]
     skip_ssrf: bool,
 }
@@ -80,6 +81,7 @@ impl FetchUrlTool {
         Self {
             client,
             max_body_bytes,
+            redirect_limit,
             #[cfg(test)]
             skip_ssrf: false,
         }
@@ -98,6 +100,7 @@ impl FetchUrlTool {
         Self {
             client,
             max_body_bytes,
+            redirect_limit,
             skip_ssrf: true,
         }
     }
@@ -115,6 +118,7 @@ impl FetchUrlTool {
         Self {
             client,
             max_body_bytes,
+            redirect_limit: 0,
             skip_ssrf: true,
         }
     }
@@ -128,6 +132,19 @@ impl Default for FetchUrlTool {
 
 #[async_trait]
 impl AgentTool for FetchUrlTool {
+    fn invocation_review_configuration(&self) -> Option<Value> {
+        Some(serde_json::json!({
+            "backend": "reqwest",
+            "constructor_redirect_limit": self.redirect_limit,
+            "timeout_override_redirect_limit": DEFAULT_REDIRECT_LIMIT,
+            "maximum_display_body_bytes": self.max_body_bytes,
+            "response_buffering": "complete response buffered before display truncation; no transfer or allocation cap",
+            "default_timeout_secs": DEFAULT_TIMEOUT_SECS,
+            "proxy": "reqwest inherited system proxy configuration",
+            "destination_isolation": false,
+        }))
+    }
+
     fn name(&self) -> &str {
         "fetch_url"
     }
