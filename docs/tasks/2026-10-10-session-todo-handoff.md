@@ -1,3 +1,12 @@
+> Local checkpoint 2026-10-27: `0013e63fe36646feba5175eebf32e96d1a83205b`
+> implements staged Save URL Auto review for registered recoverable text saves.
+> Sixteen production Agent/proxy scenarios pass, including manual external-tool
+> compatibility; Agent510/Core122/Save21 and Agent warnings-denied Clippy pass.
+> Both governance validators pass. Standard workspace preflight is running;
+> native Windows/exact-head CI, final review and merge remain outstanding.
+> Default saves, restoration and binary writes gain no Auto approval from this
+> route. T8 full acceptance and T2/T3 → T4 → T5 → T1 → T6 remain incomplete.
+
 > Local checkpoint 2026-10-27: `a3ae723a1` adds retained Save URL download
 > capture and separately admitted recoverable replacement, using approval-bound
 > paths and complete text mutation evidence. Save21 / feature-selected Tools483
