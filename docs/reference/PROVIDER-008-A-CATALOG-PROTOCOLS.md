@@ -1,6 +1,8 @@
 # PROVIDER-008-A: Protocol-Only Catalog Projection
 
-Carrier: a generated-data Draft PR stacked on code PR #749; not independently activatable.
+Carrier: data PR #775 merged to main as `6af8654c6ee6e422d4d3f4e5dad171c78604cafd`,
+after code #749 merged as `60e27eb6653b3a8fef638a2b9a7294a036b78db0`. Earlier stacked/Draft
+checkpoints below are historical. Child A remains Review / Claimed pending acceptance disposition.
 
 Current source: archived [2026-10-27 snapshot](../../scripts/fixtures/provider008a-models-20261027/README.md)
 from https://models.dev/api.json. Earlier dated checkpoints below describe superseded inputs. This is catalog evidence, not a live endpoint
@@ -352,3 +354,19 @@ is claimed for this reconciliation. Earlier exact 1,803-pass execution
 remains attributed to `0c1abf79`. The new published head requires its own full CI against the actual
 combined checkout, and independent final head/base/tree binding, before data merge. Retarget alone
 and rerunning the old workflow are not substituted for the new integration evidence.
+
+
+### Final Data Merge — 2026-10-28
+
+Exact data head `76647990c0d8dfa3fad4895024bc6376f62ac6a2` passed CI3509/run40537545803,
+all eight jobs including full release preflight, native Windows workspace, Linux/Windows Desktop
+and both governance validators. Independent final-object review APPROVE and merge-time CAS passed.
+Data #775 merged as `6af8654c6ee6e422d4d3f4e5dad171c78604cafd` with target parent `f0d484b2`
+and data parent `76647990`; code-first sequencing is satisfied by #749 / `60e27eb6`.
+The seven non-ledger data/test/archive/preflight files remain byte-identical to the reviewed stage.
+No upstream re-download, new protocol inference or new local Cargo test verdict is claimed.
+
+The Story/I306 owner now records Review / Claimed, Completion Commit: Pending. Distinct model-endpoint
+routing remains unimplemented; 56 records remain withheld. Parent tracking is not implementation or
+an acceptance waiver. Owner acceptance requires implementation or an explicit accepted scope decision
+before completion; #724/#748 remain open. No sibling implementation, tag or release is claimed.

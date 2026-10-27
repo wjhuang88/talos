@@ -386,3 +386,12 @@ only shared prepared-command assessment and Pull integration before T7 activatio
 It is ineffective until target-branch merge. I300 remains Active; PERM-007-H's
 remaining full built-in coverage stays unclaimed and subsequent. See the I300
 owner for scope, acceptance and complete active/review/planned inventory.
+
+
+## Current I306 Review — 2026-10-28
+
+[I306](I306-provider008a-openai-responses.md) / [PROVIDER-008-A](../backlog/active/PROVIDER-008-A-openai-responses-protocol.md)
+is Review / Claimed after code #749 (`60e27eb6`) and catalog #775 (`6af8654c`) merged.
+CI3498/CI3509 each passed all eight jobs with exact-head technical review and CAS.
+Distinct model-endpoint routing remains unimplemented / withheld; owner acceptance and #748 closure
+remain pending. Parent #724 and unclaimed B/C/D are not Complete.

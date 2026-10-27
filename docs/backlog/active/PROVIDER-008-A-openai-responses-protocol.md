@@ -1,6 +1,6 @@
 # PROVIDER-008-A: Protocol Architecture And OpenAI Responses
 
-**Status**: Active / Claimed; selected for I306
+**Status**: Review / Claimed; implementation merged, acceptance residual remains
 **Type**: Provider / Config / Model-Catalog Story
 **Parent Epic**: [PROVIDER-008](PROVIDER-008-openai-responses-api-support.md) / [Issue #724](https://github.com/wjhuang88/talos/issues/724)
 **Source Issue**: [#748](https://github.com/wjhuang88/talos/issues/748)
@@ -19,8 +19,8 @@
 | Governance Claim PR | #747 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer requested implementation of parent #724 in the 2026-10-22 talos开发 session; child requirement #748 records this bounded slice. Governance-only #747 must pass exact-head applicable CI, both governance validators, provider/API technical review and merge-time CAS before this claim is effective. |
-| Implementation PR | #749 |
-| Last Updated | 2026-10-27 |
+| Implementation PR | #749 (code), #775 (catalog data) |
+| Last Updated | 2026-10-28 |
 | Handoff / Release Condition | Claim activates only when #747 reaches main with accepted ADR-093. Sibling families remain unclaimed; Complete requires existing implementation commit evidence. |
 
 ## Goal
@@ -187,3 +187,44 @@ they do not substitute attachment history for a one-shot tool image. Upstream fi
 license and acquisition limits are explicit in the fixture README. Independent WIP re-review
 approves those corrections; stable-head CI/review/publication remain pending. Details and retained
 initial failures are in I306. Status stays Active / Claimed, with no completion or release claim.
+
+
+## Merged Implementation / Acceptance Review — 2026-10-28
+
+Code #749 merged as `60e27eb6653b3a8fef638a2b9a7294a036b78db0`; the separately reviewed
+catalog #775 merged as `6af8654c6ee6e422d4d3f4e5dad171c78604cafd`. Claim #747 remains effective,
+with the same Responsible Actor and Work Slice. This owner is now Review / Claimed.
+Completion Commit: Pending. Merged implementation evidence does not by itself close acceptance.
+Earlier Draft/Active checkpoints above are historical; the published scope and acceptance remain.
+
+Code head `1388874d` passed CI3498 / run40510753909 (8/8), and final data head `76647990`
+passed CI3509 / run40537545803 (8/8), including full release preflight, native Windows workspace,
+Linux/Windows Desktop and both governance validators. Exact-head independent read-only Agent
+technical review APPROVE covered provider/API corrections, source provenance, all 6,474 catalog
+rows, final trees and relevant-base integration. This shared-account review is not a distinct
+natural-person approval. Single-maintainer merge authorization and final CAS are recorded in each PR.
+
+Acceptance evidence on the merged implementation:
+
+| Acceptance area | Evidence / coverage |
+|---|---|
+| Protocol precedence, explicit Chat rollback, unconfirmed gateway, ambiguity and provenance | Config/resolver/request tests and packaged-catalog snapshot tests; explicit protocol remains authoritative. |
+| Stateless text, ordered images, native tools and reasoning | Dedicated Responses mapping/stream tests plus the actual CLI binary scenarios in I306. |
+| Request-local tool image continuation | Real read_image -> read -> final round sends the image once, without --attach; expiry and bounds are tested. |
+| Native, Compat and TalosStrict tools | Four real CLI Agent scenarios cover native attachments, one-shot tool image, Compat and Strict; merged config retains tool_protocol. |
+| Parallel tools, usage, terminal/error, unknown events and EOF | Synthetic interleaved streams, property tests and sourced byte-identical SDK recordings; fixture README preserves provenance and limitations. No live Talos endpoint capture is claimed. |
+| Catalog source and non-protocol preservation | Frozen 2026-10-27 source plus exhaustive offline audit: 4,010 hints on 6,474 preserved models; no non-protocol mismatch. |
+
+Still open: distinct model-endpoint routing is unimplemented. The catalog withholds all 56 such
+records, alongside absent models, unsupported transports and provider-root drift, rather than
+claiming their runtime support. This remains an acceptance/coverage residual under parent #724;
+this checkpoint neither waives the requirement nor declares the multi-protocol-host goal complete.
+Before Complete, resolve that residual through implementation or an explicit accepted scope decision,
+then synchronize owner, indexes, Board and #748 with existing implementation evidence.
+Gemini/Azure/Bedrock remain unclaimed siblings; MODEL-014 and active probing remain separate.
+The next release must use the documented pre-1.0 minor migration for the public enum/default change;
+no tag or release is authorized by this checkpoint.
+
+Earlier local full-preflight MCP 26 passed / 21 failed and lost/interrupted validation records remain
+historical failures; green native CI does not turn them into local successes. The original 2026-10-26
+catalog input remains unavailable; the distinct archived 2026-10-27 source is the reviewed data evidence.

@@ -1,6 +1,6 @@
 # Iteration I306: Protocol Architecture And OpenAI Responses
 
-> Document status: Active
+> Document status: Review
 > Published plan date: 2026-10-22
 > Planned objective: establish model-level wire-protocol resolution and deliver a complete OpenAI Responses adapter under ADR-093.
 > Baseline rule: preserve this bounded child-A scope; Gemini, Azure or Bedrock use separate owners/iterations.
@@ -17,10 +17,10 @@
 | Claimed At | 2026-10-22 |
 | Source Issue | #748 |
 | Governance Claim PR | #747 |
-| Implementation PR | #749 |
+| Implementation PR | #749 (code), #775 (catalog data) |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer requested implementation of parent #724 in the 2026-10-22 talos开发 session; child #748 records the bounded implementation requirement. Governance-only #747 must pass exact-head applicable CI, both governance validators, provider/API technical review and merge-time CAS before this claim is effective. |
-| Last Updated | 2026-10-27 |
+| Last Updated | 2026-10-28 |
 | Handoff / Release Condition | Activates only when #747 merges with accepted ADR-093. Complete only with existing implementation commit evidence; siblings B-D remain separate. |
 
 ## Published Baseline
@@ -425,3 +425,37 @@ CI3479. Preserve main's permission/security implementation without authoring cha
 The only textual merge conflict was appended EVOLUTION lessons; both sides are retained. Actor,
 claim and Work Slice are unchanged. Fresh exact-head CI and independent relevant-base review apply.
 No completion, sibling implementation, release or success of interrupted local validation is claimed.
+
+
+## Merged Implementation Review — 2026-10-28
+
+The [Story owner](../backlog/active/PROVIDER-008-A-openai-responses-protocol.md#merged-implementation--acceptance-review--2026-10-28)
+now records Review / Claimed, existing implementation merges and the acceptance residual.
+Code #749 merged at `60e27eb6653b3a8fef638a2b9a7294a036b78db0`; catalog #775 merged at
+`6af8654c6ee6e422d4d3f4e5dad171c78604cafd`. Completion Commit: Pending.
+Earlier Draft/Active and unmerged-data checkpoints are retained as history.
+
+Exact code `1388874d` CI3498/run40510753909 and data `76647990` CI3509/run40537545803 each
+passed all eight jobs, including native full workspace/preflight and both governance validators.
+Independent read-only Agent technical review APPROVE binds the exact code/data heads, final trees,
+source audit and relevant main integration; both carrier PRs record Single-maintainer authorization
+and final CAS. This does not claim a distinct natural-person approval or a new local full-test run.
+The prior local 1,799/50 and 1,803/51 successes stay attributed to their recorded heads;
+inherited MCP 26/21 failure and interrupted/lost attempts are not relabeled.
+
+Real binary runtime evidence is `crates/talos-cli/tests/responses_agent.rs`:
+`responses_image_and_native_read_complete_through_real_agent`,
+`responses_tool_image_is_sent_once_through_real_agent`,
+`responses_compat_tool_round_through_real_agent` and
+`responses_strict_tool_round_through_real_agent`. CI runs these unfiltered with the workspace.
+They cover attachment/native tools, one-shot read_image continuation and both text tool modes.
+The recorded fixture corpus is sourced SDK recording evidence plus synthetic parallel-stream tests,
+not a live Talos endpoint capture. The data audit checks all 6,474 records and the frozen source hash;
+4,010 optional protocol hints preserve every non-protocol field.
+
+Resume gate: resolve the unimplemented distinct model-endpoint routing / multi-protocol-host coverage
+residual (56 withheld catalog records) through implementation or an explicit accepted scope decision.
+Keeping it under parent #724 is tracking, not acceptance or a scope waiver. Recheck owner/claim,
+non-overlap and applicable validation before implementation; do not start Gemini/Azure/Bedrock or
+MODEL-014 under this claim. Final owner-first completion and #748 closure remain pending.
+No release or parent #724 completion is claimed.
