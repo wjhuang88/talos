@@ -98,3 +98,29 @@ restore 0.87.1 without altering T7/T8 policy. Do not conceal a failed validation
 - crates.io sparse index `https://index.crates.io/3/g/gix`, fetched 2026-10-26: latest stable non-yanked 0.90.0, declared Rust 1.88. This is registry evidence, not a validated graph/MSRV result.
 - Upstream release: https://github.com/GitoxideLabs/gitoxide/releases/tag/gix-v0.90.0 (2026-10-22).
 - Dependency graph migration, runtime validation and completion remain unimplemented.
+
+
+### Initial implementation checkpoint — 2026-10-26
+
+- Claim #774 merged at `2789b97bf`; implementation branch starts from that main commit.
+- Both direct consumers (`talos-tools` optional Git and `talos-tui`) now request 0.90.0; root and external SDK fixture locks resolve that version. Existing feature selections remain unchanged.
+- Initial check found one upstream API rename: `gix::path::try_from_bstr` to `from_bstr`. Inspected gix-path 0.14.1 source: Unix byte preservation and non-Unix invalid-UTF-8 error remain, with no lossy conversion. After migration, locked tools Git + TUI check passes.
+- Resolved non-gix changes: faster-hex 0.10.0→0.10.1, prodash 31.0.0→31.0.1, defmt 0.3.101 added, sha1/sha1-checked replaced by sha1dc 0.1.5. Downloaded changed manifests declare MSRV at most 1.88 (workspace 1.95); this metadata comparison is not an executed MSRV build. Changed package licenses are MIT, Apache-2.0 or dual MIT/Apache-2.0. sha1dc has no build dependency or native binding in its manifest. Full feature/native closure and advisory validation remain pending.
+- Formatting passes. Git regression suite is running; no full upgrade completion, platform acceptance or accepted-baseline advancement is claimed.
+
+### Broader validation checkpoint — 2026-10-27
+
+- Standard locked release preflight passed (release preflight: passed): /private/tmp/i309-preflight-final.log. All-target/all-feature workspace check passed: /private/tmp/i309-all-feature-check.log. These do not prove all-feature test acceptance.
+- All-feature workspace tests exited 101: installed_language_tool_obeys_production_agent_deny requires real packaged language Bundles and TALOS_LANGUAGE_BUNDLE_ROOT; the direct invocation did not provide them. Full all-feature test acceptance remains outstanding. Log: /private/tmp/i309-all-feature-test.log. Use the existing scripts/validate_language_plugins.sh packaging flow to provide actual bundles before rerunning; do not suppress this test.
+- All-target/all-feature Clippy exited 101 at large_enum_variant in talos-cli event_loop and unused_io_amount in talos-tools HTTP fixture tests. These files are unchanged by this candidate, but baseline reproduction and resolution remain outstanding; no waiver or completion is claimed. Log: /private/tmp/i309-all-feature-clippy.log.
+- The upgrade remains Partial: executed MSRV, Windows cross-build/native evidence, graph security review, final exact-head review/CI and merge are outstanding.
+
+- Executed MSRV evidence: cargo +1.95.0 check -p talos-tools --no-default-features --features git -p talos-tui --locked passed exit 0 (1m00s), isolated target /private/tmp/talos-i309-msrv; log /private/tmp/i309-msrv.log. This establishes affected-consumer compilation on workspace MSRV, not native Windows execution.
+- Parsed before/after audit records confirm both tools and TUI resolve gix 0.87.1 before and 0.90.0 after. Both offline reports explicitly retain security/deprecation unknown; equal file sizes did not mean equal contents.
+
+### Validation repair and advisory lookup — 2026-10-27
+
+- All-feature Clippy repairs are implemented locally but not yet validated: HTTP loopback fixtures now consume complete bounded request headers (16 KiB / five seconds), handling partial reads and premature EOF; the CLI event queue boxes its large approval-request variant without changing the request or responder. These are upgrade-validation prerequisites, not gix feature changes. Root I308 preflight is still running, so no concurrent compilation was started here.
+- Queried upstream RustSec advisory-db at `3279c99911354c400e1d41e47c7d60e39258b147`, comparing all 56 new name/version lock entries against package advisory records. The 14 matching records all have a declared patched lower bound satisfied by the resolved version: faster-hex 0.10.1 (RUSTSEC-2026-0306); gix-attributes 0.37.1 (2024-0359); gix-date 0.18.1 (2025-0140); gix-fs 0.24.1 (2024-0350); gix-index 0.58.0 (2024-0348/0352); gix-path 0.14.1 (2024-0355/0367/0371); gix-ref 0.69.1 (2024-0351); gix-transport 0.62.0 (2023-0064, 2024-0335); gix-worktree 0.59.0 (2024-0349/0353). In particular, the upgrade's faster-hex 0.10.0→0.10.1 removes an x86/x86_64 AVX2 out-of-bounds read covered by the first advisory. Source: https://rustsec.org/advisories/RUSTSEC-2026-0306.html .
+- Evidence: `/private/tmp/i309-changed-package-advisories.json` contains versions, full advisory headers and upstream database commit. This is a bounded manual changed-package comparison, not cargo-audit or an assertion about the full unchanged workspace graph; cargo-audit is not installed. No known matching unpatched advisory was identified for the changed entries in that database snapshot. Unknown vulnerabilities and full-graph audit coverage remain unknown.
+- Independent same-session read-only dependency/security/API inspection found no demonstrated migration blocker, but did not approve delivery or execute builds. `sha1dc 0.1.5` is pure Rust (`build = false`, no production dependencies/native bindings), with dependency-owned unsafe SIMD loads/stores and CPU target dispatch. Pure Rust does not mean unsafe-free. No Talos-authored unsafe was added; ADR-007 is not evidence approving this dependency's internals. Source inspection is not a proof of SIMD soundness; final feature/native closure and platform testing remain required.
