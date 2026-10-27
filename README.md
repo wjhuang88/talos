@@ -1019,6 +1019,10 @@ linking Talos CLI or TUI crates. The initial pre-1.0 facade exposes `RuntimeBuil
 explicit request previews. Embedders can also provide approval handlers and customize or append the
 runtime system prompt through `RuntimeBuilder`.
 
+`RuntimeBuilder::session_todo_tools(sessions_dir, session_id)` constructs the native Todo group
+for an explicit session while retaining its built-in identity. It grants no permissions;
+registering a replacement through `.tool()` never transfers built-in identity to that replacement.
+
 Runtime shutdown is bounded and shareable. `RuntimeHandle::shutdown_controller()` returns a
 cloneable shutdown-only controller; `ShutdownOptions` selects `FinishCurrent` or `Interrupt` under
 one total monotonic deadline, and every caller receives the same redacted `ShutdownReport`. Once the
