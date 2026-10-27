@@ -3,9 +3,33 @@ use super::*;
 use crate::auto_resolver::OrdinaryInvocationAssessmentRequest;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+#[cfg(unix)]
+const SHELL_NAME: &str = "bash";
+#[cfg(windows)]
+const SHELL_NAME: &str = "powershell";
+#[cfg(unix)]
+const SHELL_COMMAND: &str = "mkdir nested && touch nested/effect";
+#[cfg(windows)]
+const SHELL_COMMAND: &str =
+    "New-Item -ItemType Directory nested; New-Item -ItemType File nested/effect";
+
+fn exec_input() -> serde_json::Value {
+    #[cfg(unix)]
+    return serde_json::json!({"steps":[
+        {"command":"mkdir", "args":["nested"]},
+        {"command":"touch", "args":["effect"], "cwd":"nested"}
+    ]});
+    #[cfg(windows)]
+    return serde_json::json!({"steps":[
+        {"command":"cmd.exe", "args":["/D", "/C", "mkdir nested"]},
+        {"command":"cmd.exe", "args":["/D", "/C", "type nul > effect"], "cwd":"nested"}
+    ]});
+}
+
 struct Assessor {
     scenario: &'static str,
     calls: Arc<AtomicUsize>,
+    reached: Arc<AtomicUsize>,
     state: Arc<talos_permission::PermissionSessionState>,
 }
 
@@ -34,20 +58,20 @@ impl AutoPermissionAssessor for Assessor {
             );
             assert_eq!(request.action.input["steps"][1]["cwd"], "nested");
         } else {
-            assert_eq!(request.action.tool, "bash");
-            assert_eq!(
-                request.action.input["command"],
-                "mkdir nested && touch nested/effect"
-            );
+            assert_eq!(request.action.tool, SHELL_NAME);
+            assert_eq!(request.action.input["command"], SHELL_COMMAND);
         }
+        self.reached.fetch_add(1, Ordering::SeqCst);
         match self.scenario {
             "error" => return Err("unavailable".into()),
             "stale" => self.state.rebind_session().expect("rebind"),
+            "panic" => panic!("fixture assessor panic"),
+            "timeout" => tokio::time::sleep(std::time::Duration::from_secs(3)).await,
             _ => {}
         }
         Ok(serde_json::json!({
             "schema":request.action.schema,
-            "request_digest":request.action.request_digest,
+            "request_digest":if self.scenario == "digest" { "mismatched".into() } else { request.action.request_digest },
             "decision":if self.scenario == "uncertain" { "human_required" } else { "allow_once" },
             "confidence":"high"
         })
@@ -55,11 +79,20 @@ impl AutoPermissionAssessor for Assessor {
     }
 }
 
-#[cfg(unix)]
 #[tokio::test]
 async fn real_shell_and_exec_auto_control_effects() {
-    for tool_name in ["exec", "bash"] {
-        for scenario in ["allow", "uncertain", "error", "stale"] {
+    for tool_name in ["exec", SHELL_NAME] {
+        for scenario in [
+            "allow",
+            "uncertain",
+            "error",
+            "stale",
+            "deny",
+            "human",
+            "panic",
+            "timeout",
+            "digest",
+        ] {
             let root = tempfile::tempdir().expect("workspace");
             let mut registry = ToolRegistry::new();
             registry
@@ -67,14 +100,26 @@ async fn real_shell_and_exec_auto_control_effects() {
                     root.path().to_owned(),
                 ))
                 .expect("trusted registration");
-            let state = Arc::new(talos_permission::PermissionSessionState::new(
-                PermissionEngine::with_workspace_root(root.path().to_owned()),
-            ));
+            let mut engine = PermissionEngine::with_workspace_root(root.path().to_owned());
+            if matches!(scenario, "deny" | "human") {
+                engine.add_rule(talos_permission::PermissionRule::new(
+                    tool_name,
+                    None,
+                    if scenario == "deny" {
+                        PermissionDecision::Deny("explicit test policy".into())
+                    } else {
+                        PermissionDecision::Ask
+                    },
+                ));
+            }
+            let state = Arc::new(talos_permission::PermissionSessionState::new(engine));
             let calls = Arc::new(AtomicUsize::new(0));
+            let reached = Arc::new(AtomicUsize::new(0));
             let resolver = AutoPermissionResolver::new(
                 Arc::new(Assessor {
                     scenario,
                     calls: calls.clone(),
+                    reached: reached.clone(),
                     state: state.clone(),
                 }),
                 Arc::new(AutoDenyFallback),
@@ -83,13 +128,10 @@ async fn real_shell_and_exec_auto_control_effects() {
                 std::time::Duration::from_secs(2),
                 AutoPermissionControl::new(true),
             );
-            let input = if tool_name == "bash" {
-                serde_json::json!({"command":"mkdir nested && touch nested/effect"})
+            let input = if tool_name == SHELL_NAME {
+                serde_json::json!({"command":SHELL_COMMAND})
             } else {
-                serde_json::json!({"steps":[
-                    {"command":"mkdir", "args":["nested"]},
-                    {"command":"touch", "args":["effect"], "cwd":"nested"}
-                ]})
+                exec_input()
             };
             let model = MockModel::new(vec![
                 vec![
@@ -128,7 +170,16 @@ async fn real_shell_and_exec_auto_control_effects() {
                 .run("create nested and then create an empty effect file inside it".into())
                 .await
                 .expect("run");
-            assert_eq!(calls.load(Ordering::SeqCst), 1, "{scenario}");
+            assert_eq!(
+                calls.load(Ordering::SeqCst),
+                usize::from(!matches!(scenario, "deny" | "human")),
+                "{tool_name}/{scenario}"
+            );
+            assert_eq!(
+                reached.load(Ordering::SeqCst),
+                usize::from(!matches!(scenario, "deny" | "human")),
+                "scenario not reached: {tool_name}/{scenario}"
+            );
             assert_eq!(
                 root.path().join("nested/effect").exists(),
                 scenario == "allow",
