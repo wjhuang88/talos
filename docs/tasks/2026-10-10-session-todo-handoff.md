@@ -1,3 +1,23 @@
+## Active resume checkpoint — 2026-10-27 real Pull Auto ownership
+
+Active worktree `/private/tmp/talos-i308-save-active` now uses branch
+`feat/i308-git-auto-evidence`, stacked on Save PR #785 final head `4e869fd9a`.
+Save full preflight/SDK/xwin and static review passed; exact-head CI
+40525328345 was last confirmed pending. No merge is claimed.
+
+Real registered Pull Auto testing found external/replacement GitPullTool instances
+could receive model command evidence without positive built-in ownership. The
+dispatch fix `115b302ad` forwards that evidence only for registered built-in instances,
+retaining exact prepared/manual admission for other tools. Ten real local Git
+scenarios cover model allow/human/error/stale, Deny/mandatory-human, external and
+replacement refusal plus their explicit manual compatibility. The focused test
+and full Agent library suite (511/511) pass. Assessor assertion-reached counters
+prevent caught panics from masquerading as refusal evidence. Independent static
+review approved the working executable delta; Agent library/test Clippy passed. Full standard preflight is running at
+`/private/tmp/i308-git-auto-preflight.log`; platform and publication gates remain
+outstanding. The implementation is committed; owner checkpoint changes remain local. T8 and all later tasks remain
+incomplete. The original queue and acceptance are unchanged.
+
 ## Active resume checkpoint — 2026-10-27 cache/worktree cleanup
 
 Active branch: `feat/i308-save-auto`; worktree:

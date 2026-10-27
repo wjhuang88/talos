@@ -1491,3 +1491,23 @@ production composition before closing each row.
 | 5, higher-risk recovery | Reconcile `edit_auto`, mutation pipeline/recovery tests and Save recovery: special/config/security paths, destructive operation, partial failure, cancellation and stale target. Record unsupported native rename/batch inventory rather than inventing tools or rollback guarantees. |
 | 6, host reachability | Inspect CLI/Runtime/Desktop/MCP actual resolver installation and visible decisions, beyond registry equality; match applicable feature/native Windows evidence to these paths. |
 | 7, delivery gates | Save preflight/SDK/xwin, stable stage publication, exact-head native CI/review/CAS; then full H/G owner and user-doc reconciliation with implementation SHAs before Complete. |
+
+### Real Pull Auto ownership follow-up — 2026-10-27
+
+Production dispatch testing exposed a gap not covered by synthetic prepared-command
+pipeline fixtures: a real external/replacement GitPullTool could reach model command
+review because evidence forwarding omitted positive built-in ownership. Commit `115b302ad`
+filters evidence at Agent registry dispatch; external instances retain exact
+prepared manual admission, including successful explicit human approval. The
+public pipeline API remains a trusted embedder surface, now documented accordingly.
+
+The new separate `git_auto.rs` test exercises ten real local Pull scenarios with
+actual HEAD/worktree effects, zero retained grants, assessor assertion-reached
+checks and explicit discovery-only human fallback. Model allow executes; model
+human/error/stale, explicit Deny/mandatory-human and unregistered/replacement
+instances cannot silently execute. Explicit manual external/replacement approval
+still succeeds. Focused tests and full Agent library 511/511 pass; independent
+static security/API review approved the working delta without running tests.
+Agent library/test Clippy passed. Full standard preflight is running; final
+commit review, Windows checks and publication remain pending. This narrows a real registration trust gap; it does not add model
+Auto support to Add/Commit/Push/Checkout or complete profile/search/G acceptance.
