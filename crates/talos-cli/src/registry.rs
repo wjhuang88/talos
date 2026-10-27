@@ -252,6 +252,10 @@ impl AgentTool for TuiPermissionAwareTool {
         self.inner.execution_working_directory()
     }
 
+    fn invocation_review_configuration(&self) -> Option<serde_json::Value> {
+        self.inner.invocation_review_configuration()
+    }
+
     fn name(&self) -> &str {
         self.inner.name()
     }
@@ -462,6 +466,10 @@ impl PermissionAwareTool {
 impl AgentTool for PermissionAwareTool {
     fn execution_working_directory(&self) -> Option<std::path::PathBuf> {
         self.inner.execution_working_directory()
+    }
+
+    fn invocation_review_configuration(&self) -> Option<serde_json::Value> {
+        self.inner.invocation_review_configuration()
     }
 
     fn name(&self) -> &str {

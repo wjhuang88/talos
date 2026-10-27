@@ -1951,6 +1951,10 @@ impl AgentTool for RuntimePermissionAwareTool {
         self.inner.execution_working_directory()
     }
 
+    fn invocation_review_configuration(&self) -> Option<serde_json::Value> {
+        self.inner.invocation_review_configuration()
+    }
+
     fn name(&self) -> &str {
         self.inner.name()
     }

@@ -576,6 +576,21 @@ impl ExecTool {
 
 #[async_trait]
 impl AgentTool for ExecTool {
+    fn execution_working_directory(&self) -> Option<PathBuf> {
+        Some(self.workspace_root.clone())
+    }
+
+    fn invocation_review_configuration(&self) -> Option<Value> {
+        Some(serde_json::json!({
+            "backend": "direct-argv",
+            "workspace_root": self.workspace_root.to_str()?,
+            "default_timeout_ms": self.timeout.as_millis(),
+            "maximum_timeout_secs": MAX_TIMEOUT_SECS,
+            "maximum_stream_bytes": MAX_STREAM_BYTES,
+            "environment": "inherited with validated per-step overrides",
+        }))
+    }
+
     fn name(&self) -> &str {
         "exec"
     }

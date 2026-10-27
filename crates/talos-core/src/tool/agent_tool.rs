@@ -269,6 +269,15 @@ pub trait AgentTool: Send + Sync {
         None
     }
 
+    /// Returns implementation-owned configuration for exact invocation review.
+    ///
+    /// This metadata grants no trust or permission. Admission must separately verify
+    /// built-in registration and bind this complete value with the execution input.
+    /// Wrappers must forward it unchanged; `None` leaves this review unavailable.
+    fn invocation_review_configuration(&self) -> Option<Value> {
+        None
+    }
+
     fn summary_fields(&self) -> &'static [&'static str] {
         &[]
     }
