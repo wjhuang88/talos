@@ -236,7 +236,9 @@ async fn network_ask_without_resolver_denies_before_starting_owned_work() {
     assert_eq!(observed.drops.load(Ordering::SeqCst), 0);
 }
 
-#[tokio::test]
+// This offline cancellation fixture must reach execution before it tests interruption.
+// Keep its short approval budget in logical time so host scheduling cannot consume it.
+#[tokio::test(start_paused = true)]
 async fn session_interrupt_releases_owned_tool_before_cancelled_terminal_event() {
     let root = tempfile::tempdir().expect("owned workspace");
     let observed = Arc::new(Observations::default());
