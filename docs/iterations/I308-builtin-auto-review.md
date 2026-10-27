@@ -2,30 +2,27 @@
 
 ## Current delivery checkpoint — 2026-10-27
 
-I308/T8 remain Active / Partial. Ordinary Shell/Exec/HTTP stage #783 is published
-at `58661ec72558f26fe92ca0451db09ac95a298809`, based on main `85ac39b48`.
-The full standard locked preflight and independent static permission/security/API
-review passed at that head. Remote run 40475830775 passed both explicit Desktop
-feature jobs, but its workspace job exposed an additional real REPL locale
-regression. The ordinary review branch did not carry the established session
-locale or render model-reported decision points; the fixture also recognized only
-the legacy assessor protocol. The local repair restores presentation-only locale
-hints through a backward-compatible assessor default method, reuses the existing
-safe explanation renderer, and accepts model explanation only after current
-context/schema/digest verification. Locale remains outside authorization identity.
-Real REPL and TUI acceptance pass for zh/en/ja, resume/rotation and manual Deny;
-Agent library tests pass 509/509. Fresh full workspace, Desktop, independent
-review and exact-head remote gates are required before merge. The default
-workspace preflight omits optional desktop-ui and does not replace those checks.
+I308/T8 remain Active / Partial. Ordinary Shell/Exec/HTTP #783 merged as
+`da280c8a77b25798e59df37f3bdc2bf2fafce1c9`. Fetch #784 merged as
+`d6f1e6a56c3d337168b587feb92add36223007c4` after all eight jobs passed in
+exact-head CI 40504783551, independent static permission/security/API approval,
+both governance validators and merge-time CAS. The review receipt is
+https://github.com/wjhuang88/talos/pull/784#issuecomment-6443350514.
 
-Real Unix tests cover command file creation and HTTP proxy/redirect effects,
-policy refusal, failure/stale outcomes, Auto-control disablement,
-external/replacement registration and command replay. Full Agent tests pass
-509/509; cargo-xwin test-target checking is compile evidence only. Native Windows
-execution, complete operation/profile reconciliation and final CI/merge remain
-outstanding. Default save_url/fetch_url/WebSearch ordinary Auto acceptance remains
-open; guarded search cannot downgrade. The original acceptance and remaining
-handoff queue are unchanged.
+Recoverable Save Auto is implemented locally at
+`0013e63fe36646feba5175eebf32e96d1a83205b`: the retained-download capture and
+subsequent complete-text mutation receive separate invocation-local assessments.
+Unregistered/replacement instances retain manual authorization without builtin
+model evidence. Binary, sensitive, incomplete and default non-recoverable writes
+retain fallback. Tests passed: Save 21/21, Agent 510/510, Core 122/122;
+Agent test Clippy and independent static permission/security/API review passed.
+The reviewer did not independently execute tests. Full standard preflight passed
+check and Clippy, then failed during workspace test compilation with
+`No space left on device`; full workspace success is not established. Cache
+cleanup freed space and a fresh full run is executing. Native Windows execution, Save stage
+publication/CI/merge, complete operation/profile reconciliation and final H/G
+acceptance remain outstanding. Guarded search cannot downgrade. The original
+acceptance and remaining handoff queue are unchanged.
 
 ### Earlier merged-stage checkpoint — 2026-10-26
 
@@ -66,7 +63,7 @@ Earlier checkpoints below preserve historical states and do not override this on
 | Governance Claim PR | #765 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer authorized continued full handoff delivery; #765 requires independent permission/security/API review, exact-head CI, both validators and final merge-time CAS before merge. |
-| Implementation PR | #769 (foundation, merged); #770 (file mutation, merged); #771 (policy/read tests, merged); #772 (scheduler and native operation evidence, merged); #773 (parent Runtime registration, merged); #779 (Desktop Todo registration, merged); #783 (ordinary Shell/Exec/HTTP, merged); #784 (Fetch URL, Review) |
+| Implementation PR | #769 (foundation, merged); #770 (file mutation, merged); #771 (policy/read tests, merged); #772 (scheduler and native operation evidence, merged); #773 (parent Runtime registration, merged); #779 (Desktop Todo registration, merged); #783 (ordinary Shell/Exec/HTTP, merged); #784 (Fetch URL, merged) |
 | Last Updated | 2026-10-27 |
 | Handoff / Release Condition | Satisfy full H/G acceptance with existing implementation commits, independent permission/security/API review and platform evidence; no release authorized. |
 
@@ -364,9 +361,10 @@ Runtime shared composition has a separate Product/Runtime inventory-equivalence 
 |---|---|
 | `read`, `ls`, `read_image`, `document_extract`, `grep`, `glob`, `diff`, `stat`, `tree`, `find_symbol`, `find_references`, `list_symbols`, `list_imports` | Real Agent dispatch tests cover default Read Allow and explicit Read Deny for all listed operations, with actual results and zero model assessments/grants. Image attachment reaches only the next provider request after an allowed read. Complete profile/platform coverage remains outstanding. MCP omits `read_image`. |
 | `write`, `edit`, `delete` | Exact-content atomic creation is merged in #769; complete-image review and opt-in real recovery for string/anchored edit and text deletion are merged in #770. Binary/NUL and secret-like content retain human fallback. Expanded special-path/policy tests are published in #771; full G acceptance remains incomplete. |
-| `http_request` | Ordinary whole-invocation Auto implemented locally; actual proxy/redirect AllowOnce and refusal/stale/external/replacement effects tested. Final native Windows, review/CI/merge remain outstanding. |
-| `fetch_url` | Local ordinary whole-invocation Auto implementation reuses the HTTP route, configuration/final-context binding and all eight real proxy/redirect scenarios; final local/platform/remote gates remain pending. Configuration distinguishes constructor redirects from timeout-override defaults and output truncation from full response buffering. |
-| `save_url`, `web_search` | Default production instances are not prepared-network tools and do not receive ordinary model AllowOnce. Existing deterministic policy/human paths remain; actual production fallback tests and remaining Auto acceptance are outstanding. I293 guarded compatibility/SearXNG instances are separately protected and cannot downgrade. Ordinary HTTP evidence does not cover this row. |
+| `http_request` | Ordinary whole-invocation Auto merged in #783, with actual proxy/redirect AllowOnce and refusal/stale/external/replacement effects tested and exact-head platform CI. Full profile acceptance remains open. |
+| `fetch_url` | Ordinary whole-invocation Auto merged in #784 after full local preflight, review and exact-head platform CI. Reuses HTTP configuration/final-context binding and eight real proxy/redirect scenarios; full profile acceptance remains open. Configuration distinguishes constructor redirects from timeout-override defaults and output truncation from full response buffering. |
+| `save_url` | Local recoverable capture and complete-text mutation Auto implemented at `0013e63fe`; 16 production Agent scenarios cover model outcomes, policy, registration ownership, input changes and binary/default fallback. Full workspace/platform/remote gates remain pending. |
+| `web_search` | Ordinary Auto acceptance remains open. I293 guarded compatibility/SearXNG instances are separately protected and cannot downgrade. Ordinary HTTP evidence does not cover this row. |
 | `git_status`, `git_diff`, `git_log`, `git_show`, `git_branch_list` | Real Agent dispatch verifies default Read Allow returns actual temporary-repository status/diff/history/commit/branch evidence and explicit Read Deny rejects all five, with zero assessor calls/grants. Complete profile/platform evidence remains outstanding. |
 | `git_add`, `git_commit`, `git_push`, `git_pull`, `git_checkout` | I300 prepared command route retained; no reopening of accepted whole-command Pull semantics. I308 full coverage evidence outstanding. |
 | `bash` (Unix) / `powershell` (Windows), `exec` | Local whole-invocation Auto implementation and actual Unix allow/refusal/cancel/stale/registration/replay tests pass. Windows fixtures compile via cargo xwin; native Windows and full profile/final gates remain outstanding. |

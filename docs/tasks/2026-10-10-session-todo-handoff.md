@@ -1,3 +1,11 @@
+<!-- Latest stage checkpoint: 2026-10-27 -->
+Fetch #784 merged as `d6f1e6a56c3d337168b587feb92add36223007c4` after
+all-eight-success exact-head CI 40504783551, independent security/API review,
+both governance validators and merge CAS. Save implementation `0013e63fe`
+remains local: full preflight retry is running after disk-full compilation failure
+and authorized rebuildable-cache cleanup. T8 and all later original tasks remain
+incomplete; see I308 owner for current evidence and preserved acceptance.
+
 > Local checkpoint 2026-10-27: `0013e63fe36646feba5175eebf32e96d1a83205b`
 > implements staged Save URL Auto review for registered recoverable text saves.
 > Sixteen production Agent/proxy scenarios pass, including manual external-tool
