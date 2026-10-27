@@ -1,5 +1,5 @@
 use super::*;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::AsyncWriteExt;
 
 async fn response(
     body: &'static [u8],
@@ -11,8 +11,7 @@ async fn response(
     let address = listener.local_addr().expect("address");
     let server = tokio::spawn(async move {
         let (mut stream, _) = listener.accept().await.expect("accept");
-        let mut buffer = [0; 4096];
-        stream.read(&mut buffer).await.expect("request");
+        super::test_support::read_request_headers(&mut stream).await;
         stream
             .write_all(
                 format!(
@@ -69,8 +68,7 @@ async fn oversized_chunked_body_does_not_wait_for_end_of_stream() {
     let (finish, finished) = tokio::sync::oneshot::channel::<()>();
     let server = tokio::spawn(async move {
         let (mut stream, _) = listener.accept().await.expect("accept");
-        let mut buffer = [0; 4096];
-        stream.read(&mut buffer).await.expect("request");
+        super::test_support::read_request_headers(&mut stream).await;
         stream
             .write_all(
                 b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n3\r\nabc\r\n3\r\ndef\r\n",
