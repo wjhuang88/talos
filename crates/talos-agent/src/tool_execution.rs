@@ -830,6 +830,7 @@ impl Agent {
                             user_intent,
                             working_directory.as_deref(),
                             tool.description(),
+                            tool.invocation_review_configuration().as_ref(),
                         )
                         .await
                 } else {

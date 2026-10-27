@@ -45,6 +45,10 @@ impl ApprovalResolver for InputResolver {
         assert_eq!(evidence.profile().len(), 1);
         assert_eq!(evidence.profile()[0].nature, ToolNature::Execute);
         assert!(evidence.working_directory().is_some());
+        assert_eq!(
+            evidence.configuration(),
+            Some(&serde_json::json!({"backend": "test-retained"}))
+        );
         self.resolve_with_execution_input(
             request,
             evidence.input(),
@@ -135,6 +139,7 @@ async fn native_and_prepared_requests_separate_execution_input_from_presentation
                     Some("update this repository"),
                     Some(root.path()),
                     "Update the current repository",
+                    Some(&serde_json::json!({"backend": "test-retained"})),
                 )
                 .await
                 .expect("builtin approval");
@@ -348,4 +353,72 @@ async fn legacy_resolver_preserves_exact_input_network_fallback() {
         )
         .await
         .expect("legacy adapter still approves through its original method");
+}
+
+#[tokio::test]
+async fn ordinary_invocation_restrictions_precede_deterministic_allow() {
+    use talos_permission::{PermissionDecision, PermissionRule};
+    for tool in ["exec", "http_request", "bash", "powershell"] {
+        for restriction in [
+            PermissionDecision::Ask,
+            PermissionDecision::Deny("private".into()),
+        ] {
+            let root = tempfile::tempdir().expect("workspace");
+            let mut engine = PermissionEngine::with_workspace_root(root.path().into());
+            engine.add_rule(PermissionRule::new_nature(
+                ToolNature::Execute,
+                None,
+                None,
+                PermissionDecision::Allow,
+            ));
+            let human_only = matches!(restriction, PermissionDecision::Ask);
+            engine.add_rule(PermissionRule::new_nature(
+                ToolNature::Write,
+                Some("undisclosed-output/**".into()),
+                None,
+                restriction,
+            ));
+            let state = Arc::new(PermissionSessionState::new(engine));
+            let pipeline = PermissionPipeline::new(
+                state.clone(),
+                PermissionContext::new(
+                    PermissionMode::Interactive,
+                    InteractionCapability::Available,
+                ),
+                None,
+            );
+            let facets = [ToolPermissionFacet::with_resource(
+                ToolNature::Execute,
+                "test",
+                ToolResourceKind::Command,
+            )];
+            let input = serde_json::json!({"command": "test"});
+            let result = pipeline
+                .authorize_registered_invocation(
+                    PermissionAuthorizationRequest {
+                        tool_name: tool,
+                        provenance: ToolProvenance::Native,
+                        profile: &facets,
+                        input: &input,
+                        presentation_input: input.clone(),
+                        summary_fields: vec![],
+                        deadline: Duration::from_secs(2),
+                    },
+                    Some("run the requested operation"),
+                    Some(root.path()),
+                    "test builtin",
+                    None,
+                )
+                .await;
+            assert!(
+                if human_only {
+                    matches!(result, Err(PermissionPipelineError::ResolverUnavailable))
+                } else {
+                    matches!(result, Err(PermissionPipelineError::Denied(_)))
+                },
+                "{tool}: {result:?}"
+            );
+            assert_eq!(state.grant_count().expect("grants"), 0);
+        }
+    }
 }
